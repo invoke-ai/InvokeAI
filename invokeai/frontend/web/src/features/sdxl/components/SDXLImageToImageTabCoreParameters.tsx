@@ -41,7 +41,6 @@ const SDXLImageToImageTabCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
-            <ParamIterations />
             <ParamSteps />
             <ParamCFGScale />
             <ParamModelandVAEandScheduler />
@@ -53,7 +52,6 @@ const SDXLImageToImageTabCoreParameters = () => {
         ) : (
           <>
             <Flex gap={3}>
-              <ParamIterations />
               <ParamSteps />
               <ParamCFGScale />
             </Flex>

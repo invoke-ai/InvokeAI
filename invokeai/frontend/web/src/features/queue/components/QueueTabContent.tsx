@@ -1,10 +1,10 @@
 import { Box, Flex } from '@chakra-ui/react';
-import QueueControls from 'features/queue/components/QueueControls';
+import VerticalQueueControls from 'features/queue/components/VerticalQueueControls';
 import { memo } from 'react';
 import CurrentQueueItemCard from './CurrentQueueItemCard';
 import NextQueueItemCard from './NextQueueItemCard';
+import QueueList from './QueueList/QueueList';
 import QueueStatusCard from './QueueStatusCard';
-import QueueTable from './QueueTable';
 
 const QueueTabContent = () => {
   return (
@@ -19,14 +19,14 @@ const QueueTabContent = () => {
     >
       <Flex gap={2} w="full">
         <Flex layerStyle="second" borderRadius="base" p={2}>
-          <QueueControls orientation="vertical" />
+          <VerticalQueueControls orientation="vertical" />
         </Flex>
         <QueueStatusCard />
         <CurrentQueueItemCard />
         <NextQueueItemCard />
       </Flex>
       <Box layerStyle="second" p={2} borderRadius="base" w="full" h="full">
-        <QueueTable />
+        <QueueList />
       </Box>
     </Flex>
   );

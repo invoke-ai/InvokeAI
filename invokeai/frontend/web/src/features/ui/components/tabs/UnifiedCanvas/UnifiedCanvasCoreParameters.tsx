@@ -39,7 +39,6 @@ const UnifiedCanvasCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
-            <ParamIterations />
             <ParamSteps />
             <ParamCFGScale />
             <ParamModelandVAEandScheduler />
@@ -51,7 +50,6 @@ const UnifiedCanvasCoreParameters = () => {
         ) : (
           <>
             <Flex gap={3}>
-              <ParamIterations />
               <ParamSteps />
               <ParamCFGScale />
             </Flex>

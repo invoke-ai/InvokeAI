@@ -1,24 +1,24 @@
 import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import { parseify } from 'common/util/serialize';
+import { prepareLinearUIBatch } from 'features/nodes/util/graphBuilders/buildLinearBatchConfig';
+import { buildLinearImageToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearImageToImageGraph';
+import { buildLinearSDXLImageToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearSDXLImageToImageGraph';
 import { buildLinearSDXLTextToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearSDXLTextToImageGraph';
 import { buildLinearTextToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearTextToImageGraph';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import { startAppListening } from '..';
-import { prepareLinearUIBatch } from 'features/nodes/util/graphBuilders/buildLinearBatchConfig';
-import { buildLinearSDXLImageToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearSDXLImageToImageGraph';
-import { buildLinearImageToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearImageToImageGraph';
 
-export const addUserEnqueuedT2iOrI2iListener = () => {
+export const addEnqueueRequestedLinear = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) &&
       (action.payload.tabName === 'txt2img' ||
         action.payload.tabName === 'img2img'),
     effect: async (action, { getState, dispatch }) => {
-      const log = logger('session');
+      const log = logger('queue');
       const state = getState();
       const model = state.generation.model;
       const { prepend } = action.payload;
@@ -47,9 +47,9 @@ export const addUserEnqueuedT2iOrI2iListener = () => {
             fixedCacheKey: 'enqueueBatch',
           })
         );
-
         const enqueueResult = await req.unwrap();
         req.reset();
+
         dispatch(
           queueApi.endpoints.startQueueExecution.initiate(undefined, {
             fixedCacheKey: 'startQueue',
@@ -63,9 +63,6 @@ export const addUserEnqueuedT2iOrI2iListener = () => {
             description: t('queue.batchQueuedDesc', {
               item_count: enqueueResult.enqueued,
               direction: prepend ? t('queue.front') : t('queue.back'),
-              directionAction: prepend
-                ? t('queue.prepended')
-                : t('queue.appended'),
             }),
             status: 'success',
           })
@@ -73,7 +70,7 @@ export const addUserEnqueuedT2iOrI2iListener = () => {
       } catch {
         log.error(
           { batchConfig: parseify(batchConfig) },
-          'Failed to enqueue batch'
+          t('queue.batchFailedToQueue')
         );
         dispatch(
           addToast({

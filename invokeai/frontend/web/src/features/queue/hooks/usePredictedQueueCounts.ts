@@ -1,12 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useMemo } from 'react';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 const selector = createSelector(
-  stateSelector,
-  ({ dynamicPrompts, generation }) => {
+  [stateSelector, activeTabNameSelector],
+  ({ dynamicPrompts, generation }, activeTabName) => {
+    if (activeTabName === 'nodes') {
+      return generation.iterations;
+    }
     return dynamicPrompts.prompts.length * generation.iterations;
   }
 );

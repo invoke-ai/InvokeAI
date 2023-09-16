@@ -1,5 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
+import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -26,7 +26,7 @@ const NodeEditorPanelGroup = () => {
 
   return (
     <Flex sx={{ flexDir: 'column', gap: 2, height: '100%', width: '100%' }}>
-      <ProcessButtons />
+      <QueueControls />
       <PanelGroup
         ref={panelGroupRef}
         id="workflow-panel-group"

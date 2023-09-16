@@ -25,6 +25,9 @@ export type UpdateBoardArg =
 export type BatchConfig =
   paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
 
+export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
+export type EnqueueGraphResult = components['schemas']['EnqueueGraphResult'];
+
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
  */
@@ -104,6 +107,7 @@ export type Edge = s['Edge'];
 export type GraphExecutionState = s['GraphExecutionState'];
 export type Batch = s['Batch'];
 export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
+export type SessionQueueItem = s['SessionQueueItem'];
 
 // General nodes
 export type CollectInvocation = s['CollectInvocation'];

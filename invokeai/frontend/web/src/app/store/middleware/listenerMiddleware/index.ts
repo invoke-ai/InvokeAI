@@ -80,9 +80,9 @@ import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } f
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
-import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
-import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
-import { addUserEnqueuedT2iOrI2iListener } from './listeners/addUserEnqueuedT2iOrI2iListener';
+import { addEnqueueRequestedCanvasListener } from './listeners/enqueueRequestedCanvas';
+import { addEnqueueRequestedNodes } from './listeners/enqueueRequestedNodes';
+import { addEnqueueRequestedLinear } from './listeners/enqueueRequestedLinear';
 import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
 import { addDynamicPromptsListener } from './listeners/promptChanged';
 import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
@@ -133,9 +133,9 @@ addImagesStarredListener();
 addImagesUnstarredListener();
 
 // User Invoked
-addUserInvokedCanvasListener();
-addUserInvokedNodesListener();
-addUserEnqueuedT2iOrI2iListener();
+addEnqueueRequestedCanvasListener();
+addEnqueueRequestedNodes();
+addEnqueueRequestedLinear();
 addSessionReadyToInvokeListener();
 
 // Canvas actions

@@ -32,13 +32,13 @@ import { startAppListening } from '..';
  * 8. Initialize the staging area if not yet initialized
  * 9. Dispatch the sessionReadyToInvoke action to invoke the session
  */
-export const addUserInvokedCanvasListener = () => {
+export const addEnqueueRequestedCanvasListener = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) &&
       action.payload.tabName === 'unifiedCanvas',
     effect: async (action, { getState, dispatch }) => {
-      const log = logger('session');
+      const log = logger('queue');
       const { prepend } = action.payload;
       const state = getState();
 
@@ -170,9 +170,6 @@ export const addUserInvokedCanvasListener = () => {
             description: t('queue.batchQueuedDesc', {
               item_count: enqueueResult.enqueued,
               direction: prepend ? t('queue.front') : t('queue.back'),
-              directionAction: prepend
-                ? t('queue.prepended')
-                : t('queue.appended'),
             }),
             status: 'success',
           })
@@ -180,7 +177,7 @@ export const addUserInvokedCanvasListener = () => {
       } catch {
         log.error(
           { batchConfig: parseify(batchConfig) },
-          'Failed to enqueue batch'
+          t('queue.batchFailedToQueue')
         );
         dispatch(
           addToast({

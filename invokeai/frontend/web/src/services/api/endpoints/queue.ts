@@ -112,21 +112,26 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/start`,
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionQueueStatus'],
+      invalidatesTags: ['SessionQueueStatus', 'CurrentSessionQueueItem'],
     }),
     stopQueueExecution: build.mutation<void, void>({
       query: () => ({
         url: `queue/${$queueId.get()}/stop`,
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionQueueStatus'],
+      invalidatesTags: ['SessionQueueStatus', 'CurrentSessionQueueItem'],
     }),
     cancelQueueExecution: build.mutation<void, void>({
       query: () => ({
         url: `queue/${$queueId.get()}/cancel`,
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionQueueStatus'],
+      invalidatesTags: [
+        'SessionQueueStatus',
+        'SessionQueueItem',
+        'SessionQueueItemDTO',
+        'CurrentSessionQueueItem',
+      ],
     }),
     pruneQueue: build.mutation<
       paths['/api/v1/queue/{queue_id}/prune']['put']['responses']['200']['content']['application/json'],
@@ -136,7 +141,11 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/prune`,
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionQueueStatus'],
+      invalidatesTags: [
+        'SessionQueueStatus',
+        'SessionQueueItem',
+        'SessionQueueItemDTO',
+      ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
@@ -159,6 +168,8 @@ export const queueApi = api.injectEndpoints({
         'SessionQueueStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
+        'SessionQueueItem',
+        'SessionQueueItemDTO',
       ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
@@ -233,8 +244,36 @@ export const queueApi = api.injectEndpoints({
     >({
       query: (item_id) => ({
         url: `queue/${$queueId.get()}/i/${item_id}/cancel`,
-        method: 'GET',
+        method: 'PUT',
       }),
+      onQueryStarted: async (item_id, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            queueApi.util.updateQueryData(
+              'listQueueItems',
+              undefined,
+              (draft) => {
+                queueItemsAdapter.updateOne(draft, {
+                  id: item_id,
+                  changes: { status: data.status },
+                });
+              }
+            )
+          );
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: (result) => {
+        if (!result) {
+          return [];
+        }
+        return [
+          { type: 'SessionQueueItem', id: result.item_id },
+          { type: 'SessionQueueItemDTO', id: result.item_id },
+        ];
+      },
     }),
     cancelByBatchIds: build.mutation<
       paths['/api/v1/queue/{queue_id}/cancel_by_batch_ids']['put']['responses']['200']['content']['application/json'],
@@ -254,6 +293,7 @@ export const queueApi = api.injectEndpoints({
           // no-op
         }
       },
+      invalidatesTags: ['SessionQueueItem', 'SessionQueueItemDTO'],
     }),
     listQueueItems: build.query<
       EntityState<components['schemas']['SessionQueueItemDTO']> & {
@@ -278,7 +318,6 @@ export const queueApi = api.injectEndpoints({
           response.items
         ),
       merge: (cache, response) => {
-        console.log(cache);
         queueItemsAdapter.addMany(
           cache,
           queueItemsAdapter.getSelectors().selectAll(response)
@@ -305,6 +344,7 @@ export const {
   useGetQueueItemQuery,
   usePeekNextQueueItemQuery,
   useListQueueItemsQuery,
+  useCancelQueueItemMutation,
 } = queueApi;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
