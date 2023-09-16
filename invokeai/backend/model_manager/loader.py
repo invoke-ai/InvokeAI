@@ -42,7 +42,7 @@ class ModelInfo:
         self.context.__exit__(*args, **kwargs)
 
 
-class ModelLoaderBase(ABC):
+class ModelLoadBase(ABC):
     """Abstract base class for a model loader which works with the ModelConfigStore backend."""
 
     @abstractmethod
@@ -113,8 +113,8 @@ class ModelLoaderBase(ABC):
         pass
 
 
-class ModelLoader(ModelLoaderBase):
-    """Implementation of ModelLoaderBase."""
+class ModelLoad(ModelLoadBase):
+    """Implementation of ModelLoadBase."""
 
     _app_config: InvokeAIAppConfig
     _store: ModelConfigStore
@@ -130,7 +130,7 @@ class ModelLoader(ModelLoaderBase):
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ):
         """
-        Initialize ModelLoader object.
+        Initialize ModelLoad object.
 
         :param config: The app's InvokeAIAppConfig object.
         """

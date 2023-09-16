@@ -14,18 +14,17 @@ from invokeai.app.models.exceptions import CanceledException
 from invokeai.backend.model_manager import (
     BaseModelType,
     DuplicateModelException,
-    MergeInterpolationMethod,
     ModelConfigBase,
     ModelInfo,
     ModelInstallJob,
-    ModelLoader,
-    ModelMerger,
+    ModelLoad,
     ModelSearch,
     ModelType,
     SubModelType,
     UnknownModelException,
 )
 from invokeai.backend.model_manager.cache import CacheStats
+from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
 
 from .config import InvokeAIAppConfig
 
@@ -291,7 +290,7 @@ class ModelManagerServiceBase(ABC):
 class ModelManagerService(ModelManagerServiceBase):
     """Responsible for managing models on disk and in memory."""
 
-    _loader: ModelLoader = Field(description="InvokeAIAppConfig object for the current process")
+    _loader: ModelLoad = Field(description="InvokeAIAppConfig object for the current process")
     _event_bus: "EventServiceBase" = Field(description="an event bus to send install events to", default=None)
 
     def __init__(self, config: InvokeAIAppConfig, event_bus: Optional["EventServiceBase"] = None):
@@ -304,7 +303,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         self._event_bus = event_bus
         handlers = [self._event_bus.emit_model_event] if self._event_bus else None
-        self._loader = ModelLoader(config, event_handlers=handlers)
+        self._loader = ModelLoad(config, event_handlers=handlers)
 
     def get_model(
         self,
@@ -500,7 +499,7 @@ class ModelManagerService(ModelManagerServiceBase):
         model_keys: List[str] = Field(
             default=None, min_items=2, max_items=3, description="List of model keys to merge"
         ),
-        merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
+        merged_model_name: Optional[str] = Field(default=None, description="Name of destination model after merging"),
         alpha: Optional[float] = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
         force: Optional[bool] = False,
@@ -514,8 +513,12 @@ class ModelManagerService(ModelManagerServiceBase):
         :param interp: Interpolation method. None (default)
         :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
         """
-        merger = ModelMerger(self._loader)
+        merger = ModelMerger(self._loader.store)
         try:
+            if not merged_model_name:
+                merged_model_name = "+".join([self._loader.store.get_model(x).name for x in model_keys])
+                raise Exception("not implemented")
+
             self.logger.error("ModelMerger needs to be rewritten.")
             result = merger.merge_diffusion_models_and_save(
                 model_keys=model_keys,

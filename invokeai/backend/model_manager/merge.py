@@ -9,14 +9,16 @@ Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
 
 import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import InvokeAIAppConfig
 
-from . import BaseModelType, ModelConfigBase, ModelLoader, ModelType, ModelVariantType
+from . import ModelConfigBase, ModelConfigStore, ModelInstall, ModelType
+from .probe import ModelProbe, ModelProbeInfo
 
 
 class MergeInterpolationMethod(str, Enum):
@@ -27,8 +29,18 @@ class MergeInterpolationMethod(str, Enum):
 
 
 class ModelMerger(object):
-    def __init__(self, manager: ModelLoader):
-        self.manager = manager
+    _store: ModelConfigStore
+    _config: InvokeAIAppConfig
+
+    def __init__(self, store: ModelConfigStore, config: Optional[InvokeAIAppConfig] = None):
+        """
+        Initialize a ModelMerger object.
+
+        :param store: Underlying storage manager for the running process.
+        :param config: InvokeAIAppConfig object (if not provided, default will be selected).
+        """
+        self._store = store
+        self._config = config or InvokeAIAppConfig.get_config()
 
     def merge_diffusion_models(
         self,
@@ -70,8 +82,7 @@ class ModelMerger(object):
 
     def merge_diffusion_models_and_save(
         self,
-        model_names: List[str],
-        base_model: Union[BaseModelType, str],
+        model_keys: List[str],
         merged_model_name: str,
         alpha: float = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
@@ -93,24 +104,36 @@ class ModelMerger(object):
              cache_dir, resume_download, force_download, proxies, local_files_only, use_auth_token, revision, torch_dtype, device_map
         """
         model_paths = list()
-        config = self.manager.app_config
-        base_model = BaseModelType(base_model)
+        model_names = list()
+        config = self._config
+        store = self._store
+        base_models = set()
         vae = None
 
-        for mod in model_names:
-            info = self.manager.list_model(mod, base_model=base_model, model_type=ModelType.Main)
-            assert info, f"model {mod}, base_model {base_model}, is unknown"
+        assert (
+            len(model_keys) <= 2 or interp == MergeInterpolationMethod.AddDifference
+        ), "When merging three models, only the 'add_difference' merge method is supported"
+
+        for key in model_keys:
+            info = store.get_model(key)
+            model_names.append(info.name)
             assert (
-                info["model_format"] == "diffusers"
-            ), f"{mod} is not a diffusers model. It must be optimized before merging"
-            assert info["variant"] == "normal", f"{mod} is a {info['variant']} model, which cannot currently be merged"
+                info.model_format == "diffusers"
+            ), f"{info.name} ({info.key}) is not a diffusers model. It must be optimized before merging"
             assert (
-                len(model_names) <= 2 or interp == MergeInterpolationMethod.AddDifference
-            ), "When merging three models, only the 'add_difference' merge method is supported"
+                info.variant == "normal"
+            ), f"{info.name} ({info.key}) is a {info.variant} model, which cannot currently be merged"
+
             # pick up the first model's vae
-            if mod == model_names[0]:
-                vae = info.get("vae")
-            model_paths.extend([(config.root_path / info["path"]).as_posix()])
+            if key == model_keys[0]:
+                vae = info.vae
+
+            # tally base models used
+            base_models.add(info.base_model)
+            model_paths.extend([(config.models_path / info.path).as_posix()])
+
+        assert len(base_models) == 1, f"All models to merge must have same base model, but found bases {base_models}"
+        base_model = base_models.pop()
 
         merge_method = None if interp == "weighted_sum" else MergeInterpolationMethod(interp)
         logger.debug(f"interp = {interp}, merge_method={merge_method}")
@@ -126,18 +149,11 @@ class ModelMerger(object):
         merged_pipe.save_pretrained(dump_path, safe_serialization=True)
 
         # register model and get its unique key
-        info = ModelProbeInfo(
-            model_type=ModelType.Main,
-            base_type=base_model,
-            format="diffusers",
-        )
-        key = self.manager.installer.register_path(
-            model_path=dump_path,
-            info=info,
-        )
+        installer = ModelInstall(store=self._store, config=self._config)
+        key = installer.register_path(dump_path)
 
         # update model's config
-        model_config = self.manager.store.get_model(key)
+        model_config = self._store.get_model(key)
         model_config.update(
             dict(
                 name=merged_model_name,
@@ -145,5 +161,5 @@ class ModelMerger(object):
                 vae=vae,
             )
         )
-        self.manager.store.update_model(key, model_config)
+        self._store.update_model(key, model_config)
         return model_config

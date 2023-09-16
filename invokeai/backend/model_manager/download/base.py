@@ -128,6 +128,12 @@ class DownloadQueueBase(ABC):
         :param variant: Variant to download, such as "fp16" (repo_ids only).
         :param event_handlers: Optional callables that will be called whenever job status changes.
         :returns the job: job.id will be a non-negative value after execution
+
+        Known variants currently are:
+        1. onnx
+        2. openvino
+        3. fp16
+        4. None (usually returns fp32 model)
         """
         pass
 

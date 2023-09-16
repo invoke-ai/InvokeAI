@@ -146,13 +146,19 @@ class ModelInstallBase(ABC):
         """Return the download queue used by the installer."""
         pass
 
+    @property
     @abstractmethod
-    def register_path(self, model_path: Union[Path, str], info: Optional[ModelProbeInfo] = None) -> str:
+    def store(self) -> ModelConfigStore:
+        """Return the storage backend used by the installer."""
+        pass
+
+    @abstractmethod
+    def register_path(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]]) -> str:
         """
         Probe and register the model at model_path.
 
         :param model_path: Filesystem Path to the model.
-        :param info: Optional ModelProbeInfo object. If not provided, model will be probed.
+        :param overrides: Dict of attributes that will override probed values.
         :returns id: The string ID of the registered model.
         """
         pass
@@ -201,6 +207,12 @@ class ModelInstallBase(ABC):
 
         The `inplace` flag does not affect the behavior of downloaded
         models, which are always moved into the `models` directory.
+
+        Variants recognized by HuggingFace currently are:
+        1. onnx
+        2. openvino
+        3. fp16
+        4. None (usually returns fp32 model)
         """
         pass
 
@@ -349,6 +361,11 @@ class ModelInstall(ModelInstallBase):
         """Return the queue."""
         return self._download_queue
 
+    @property
+    def store(self) -> ModelConfigStore:
+        """Return the storage backend used by the installer."""
+        return self._store
+
     def register_path(
         self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None
     ) -> str:  # noqa D102
@@ -360,7 +377,7 @@ class ModelInstall(ModelInstallBase):
         key: str = FastModelHash.hash(model_path)
         registration_data = dict(
             path=model_path.as_posix(),
-            name=model_path.stem,
+            name=model_path.name if model_path.is_dir() else model_path.stem,
             base_model=info.base_type,
             model_type=info.model_type,
             model_format=info.format,
@@ -581,7 +598,7 @@ class ModelInstall(ModelInstallBase):
         This will raise a ValueError unless the model is a checkpoint.
         This will raise an UnknownModelException if key is unknown.
         """
-        from .loader import ModelInfo, ModelLoader  # to avoid circular imports
+        from .loader import ModelInfo, ModelLoad  # to avoid circular imports
 
         new_diffusers_path = None
 
@@ -594,7 +611,7 @@ class ModelInstall(ModelInstallBase):
             # We are taking advantage of a side effect of get_model() that converts check points
             # into cached diffusers directories stored at `path`. It doesn't matter
             # what submodel type we request here, so we get the smallest.
-            loader = ModelLoader(self._config)
+            loader = ModelLoad(self._config)
             submodel = {"submodel_type": SubModelType.Scheduler} if info.model_type == ModelType.Main else {}
             converted_model: ModelInfo = loader.get_model(key, **submodel)
 

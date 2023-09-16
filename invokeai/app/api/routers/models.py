@@ -2,7 +2,6 @@
 
 
 import pathlib
-import traceback
 from typing import List, Literal, Optional, Union
 
 from fastapi import Body, Path, Query, Response
@@ -13,12 +12,13 @@ from starlette.exceptions import HTTPException
 from invokeai.backend import BaseModelType, ModelType
 from invokeai.backend.model_manager import (
     OPENAPI_MODEL_CONFIGS,
+    DuplicateModelException,
     InvalidModelException,
-    MergeInterpolationMethod,
     ModelConfigBase,
     SchedulerPredictionType,
     UnknownModelException,
 )
+from invokeai.backend.model_manager.merge import MergeInterpolationMethod
 
 from ..dependencies import ApiDependencies
 
@@ -225,15 +225,13 @@ async def convert_model(
     ),
 ) -> ConvertModelResponse:
     """Convert a checkpoint model into a diffusers model, optionally saving to the indicated destination directory, or `models` if none."""
-    logger = ApiDependencies.invoker.services.logger
-    info = ApiDependencies.invoker.services.model_manager.model_info(key)
     try:
         dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
         ApiDependencies.invoker.services.model_manager.convert_model(key, convert_dest_directory=dest)
         model_raw = ApiDependencies.invoker.services.model_manager.model_info(key).dict()
         response = parse_obj_as(ConvertModelResponse, model_raw)
     except UnknownModelException as e:
-        raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found: {str(e)}")
+        raise HTTPException(status_code=404, detail=f"Model '{key}' not found: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response
@@ -252,6 +250,7 @@ async def convert_model(
 async def search_for_models(
     search_path: pathlib.Path = Query(description="Directory path to search for models"),
 ) -> List[pathlib.Path]:
+    """Search for all models in a server-local path."""
     if not search_path.is_dir():
         raise HTTPException(
             status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory"
@@ -283,27 +282,31 @@ async def list_ckpt_configs() -> List[pathlib.Path]:
     response_model=bool,
 )
 async def sync_to_config() -> bool:
-    """Call after making changes to models.yaml, autoimport directories or models directory to synchronize
-    in-memory data structures with disk data structures."""
+    """
+    Synchronize model in-memory data structures with disk.
+
+    Call after making changes to models.yaml, autoimport directories
+    or models directory.
+    """
     ApiDependencies.invoker.services.model_manager.sync_to_config()
     return True
 
 
 @models_router.put(
-    "/merge/{base_model}",
+    "/merge",
     operation_id="merge_models",
     responses={
         200: {"description": "Model converted successfully"},
         400: {"description": "Incompatible models"},
         404: {"description": "One or more models not found"},
+        409: {"description": "An identical merged model is already installed"},
     },
     status_code=200,
     response_model=MergeModelResponse,
 )
 async def merge_models(
-    base_model: BaseModelType = Path(description="Base model"),
-    model_names: List[str] = Body(description="model name", min_items=2, max_items=3),
-    merged_model_name: Optional[str] = Body(description="Name of destination model"),
+    keys: List[str] = Body(description="model name", min_items=2, max_items=3),
+    merged_model_name: Optional[str] = Body(description="Name of destination model", default=None),
     alpha: Optional[float] = Body(description="Alpha weighting strength to apply to 2d and 3d models", default=0.5),
     interp: Optional[MergeInterpolationMethod] = Body(description="Interpolation method"),
     force: Optional[bool] = Body(
@@ -314,28 +317,24 @@ async def merge_models(
         default=None,
     ),
 ) -> MergeModelResponse:
-    """Convert a checkpoint model into a diffusers model"""
+    """Merge the indicated diffusers model."""
     logger = ApiDependencies.invoker.services.logger
     try:
-        logger.info(f"Merging models: {model_names} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
+        logger.info(f"Merging models: {keys} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
         dest = pathlib.Path(merge_dest_directory) if merge_dest_directory else None
-        result = ApiDependencies.invoker.services.model_manager.merge_models(
-            model_names,
-            base_model,
-            merged_model_name=merged_model_name or "+".join(model_names),
+        result: ModelConfigBase = ApiDependencies.invoker.services.model_manager.merge_models(
+            model_keys=keys,
+            merged_model_name=merged_model_name,
             alpha=alpha,
             interp=interp,
             force=force,
             merge_dest_directory=dest,
         )
-        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-            result.name,
-            base_model=base_model,
-            model_type=ModelType.Main,
-        )
-        response = parse_obj_as(ConvertModelResponse, model_raw)
+        response = parse_obj_as(ConvertModelResponse, result.dict())
+    except DuplicateModelException as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except UnknownModelException:
-        raise HTTPException(status_code=404, detail=f"One or more of the models '{model_names}' not found")
+        raise HTTPException(status_code=404, detail=f"One or more of the models '{keys}' not found")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response

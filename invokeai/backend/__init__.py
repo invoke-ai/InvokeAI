@@ -7,7 +7,7 @@ from .model_manager import (  # noqa F401
     InvalidModelException,
     ModelConfigStore,
     ModelInstall,
-    ModelLoader,
+    ModelLoad,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,

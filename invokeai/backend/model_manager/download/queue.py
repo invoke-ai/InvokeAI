@@ -118,7 +118,9 @@ class DownloadQueue(DownloadQueueBase):
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> DownloadJobBase:
-        """Create a download job and return its ID."""
+        """
+        Create a download job and return its ID.
+        """
         kwargs = dict()
 
         if Path(source).exists():
@@ -503,8 +505,8 @@ class DownloadQueue(DownloadQueueBase):
             repo_id = job.source
             variant = job.variant
             urls_to_download, metadata = self._get_repo_info(repo_id, variant)
-            if job.destination.stem != Path(repo_id).stem:
-                job.destination = job.destination / Path(repo_id).stem
+            if job.destination.name != Path(repo_id).name:
+                job.destination = job.destination / Path(repo_id).name
             job.metadata = metadata
             bytes_downloaded = dict()
             job.total_bytes = 0
@@ -535,7 +537,15 @@ class DownloadQueue(DownloadQueueBase):
         repo_id: str,
         variant: Optional[str] = None,
     ) -> Tuple[List[Tuple[AnyHttpUrl, Path, Path]], ModelSourceMetadata]:
-        """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
+        """
+        Given a repo_id and an optional variant, return list of URLs to download to get the model.
+
+        Known variants currently are:
+        1. onnx
+        2. openvino
+        3. fp16
+        4. None (usually returns fp32 model)
+        """
         model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True)
         sibs = model_info.siblings
         paths = [x.rfilename for x in sibs]
@@ -564,7 +574,19 @@ class DownloadQueue(DownloadQueueBase):
         basenames = dict()
         for p in paths:
             path = Path(p)
-            if path.suffix in [".bin", ".safetensors", ".pt"]:
+
+            if path.suffix == ".onnx":
+                if variant == "onnx":
+                    result.add(path)
+
+            elif path.name.startswith("openvino_model"):
+                if variant == "openvino":
+                    result.add(path)
+
+            elif path.suffix in [".json", ".txt"]:
+                result.add(path)
+
+            elif path.suffix in [".bin", ".safetensors", ".pt"] and variant in ["fp16", None]:
                 parent = path.parent
                 suffixes = path.suffixes
                 if len(suffixes) == 2:
@@ -584,10 +606,13 @@ class DownloadQueue(DownloadQueueBase):
                         basenames[basename] = path
                 else:
                     basenames[basename] = path
+
             else:
-                result.add(path)
+                continue
+
         for v in basenames.values():
             result.add(v)
+
         return result
 
     def _download_path(self, job: DownloadJobBase):

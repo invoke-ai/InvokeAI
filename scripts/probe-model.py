@@ -3,6 +3,7 @@
 """Little command-line utility for probing a model on disk."""
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -25,6 +26,6 @@ args = parser.parse_args()
 for path in args.model_path:
     try:
         info = ModelProbe().probe(path, helper)
-        print(f"{path}: {info}")
+        print(f"{path}:{json.dumps(info.dict(), sort_keys=True, indent=4)}")
     except InvalidModelException as exc:
         print(exc)

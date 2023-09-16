@@ -4,7 +4,7 @@ import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend import BaseModelType, ModelConfigStore, ModelType, SubModelType
-from invokeai.backend.model_manager import ModelLoader
+from invokeai.backend.model_manager import ModelLoad
 
 BASIC_MODEL_NAME = "sdxl-base-1-0"
 VAE_OVERRIDE_MODEL_NAME = "sdxl-base-with-custom-vae-1-0"
@@ -12,18 +12,18 @@ VAE_NULL_OVERRIDE_MODEL_NAME = "sdxl-base-with-empty-vae-1-0"
 
 
 @pytest.fixture
-def model_manager(datadir) -> ModelLoader:
+def model_manager(datadir) -> ModelLoad:
     config = InvokeAIAppConfig(root=datadir, conf_path="configs/relative_sub.models.yaml")
-    return ModelLoader(config=config)
+    return ModelLoad(config=config)
 
 
-def test_get_model_names(model_manager: ModelLoader):
+def test_get_model_names(model_manager: ModelLoad):
     store = model_manager.store
     names = [x.name for x in store.all_models()]
     assert names[:2] == [BASIC_MODEL_NAME, VAE_OVERRIDE_MODEL_NAME]
 
 
-def test_get_model_path_for_diffusers(model_manager: ModelLoader, datadir: Path):
+def test_get_model_path_for_diffusers(model_manager: ModelLoad, datadir: Path):
     models = model_manager.store.search_by_name(model_name=BASIC_MODEL_NAME)
     assert len(models) == 1
     model_config = models[0]
@@ -33,7 +33,7 @@ def test_get_model_path_for_diffusers(model_manager: ModelLoader, datadir: Path)
     assert not is_override
 
 
-def test_get_model_path_for_overridden_vae(model_manager: ModelLoader, datadir: Path):
+def test_get_model_path_for_overridden_vae(model_manager: ModelLoad, datadir: Path):
     models = model_manager.store.search_by_name(model_name=VAE_OVERRIDE_MODEL_NAME)
     assert len(models) == 1
     model_config = models[0]
@@ -43,7 +43,7 @@ def test_get_model_path_for_overridden_vae(model_manager: ModelLoader, datadir: 
     assert is_override
 
 
-def test_get_model_path_for_null_overridden_vae(model_manager: ModelLoader, datadir: Path):
+def test_get_model_path_for_null_overridden_vae(model_manager: ModelLoad, datadir: Path):
     model_config = model_manager.store.search_by_name(model_name=VAE_NULL_OVERRIDE_MODEL_NAME)[0]
     vae_model_path, is_override = model_manager._get_model_path(model_config, SubModelType.Vae)
     assert not is_override

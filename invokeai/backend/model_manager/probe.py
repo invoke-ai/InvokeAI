@@ -15,26 +15,28 @@ from typing import Callable, Optional
 import safetensors.torch
 import torch
 from picklescan.scanner import scan_file_path
+from pydantic import BaseModel
 
 from .config import BaseModelType, ModelFormat, ModelType, ModelVariantType, SchedulerPredictionType
-from .util import SilenceWarnings, lora_token_vector_length, read_checkpoint_meta
+from .hash import FastModelHash
+from .util import lora_token_vector_length, read_checkpoint_meta
 
 
 class InvalidModelException(Exception):
     """Raised when an invalid model is encountered."""
 
 
-@dataclass
-class ModelProbeInfo(object):
+class ModelProbeInfo(BaseModel):
     """Fields describing a probed model."""
 
     model_type: ModelType
     base_type: BaseModelType
     format: ModelFormat
-    variant_type: ModelVariantType = "normal"
-    prediction_type: SchedulerPredictionType = "v_prediction"
-    upcast_attention: bool = False
-    image_size: int = None
+    hash: str
+    variant_type: Optional[ModelVariantType] = "normal"
+    prediction_type: Optional[SchedulerPredictionType] = "v_prediction"
+    upcast_attention: Optional[bool] = False
+    image_size: Optional[int] = None
 
 
 class ModelProbeBase(ABC):
@@ -131,6 +133,7 @@ class ModelProbe(ModelProbeBase):
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
             format = probe.get_format()
+            hash = FastModelHash.hash(model)
 
             model_info = ModelProbeInfo(
                 model_type=model_type,
@@ -142,6 +145,7 @@ class ModelProbe(ModelProbeBase):
                     and prediction_type == SchedulerPredictionType.VPrediction
                 ),
                 format=format,
+                hash=hash,
                 image_size=1024
                 if (base_type in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner})
                 else 768
