@@ -1,5 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { memo } from 'react';
+import ParamIPAdapterBeginEnd from './ParamIPAdapterBeginEnd';
 import ParamIPAdapterFeatureToggle from './ParamIPAdapterFeatureToggle';
 import ParamIPAdapterImage from './ParamIPAdapterImage';
 import ParamIPAdapterModelSelect from './ParamIPAdapterModelSelect';
@@ -26,6 +27,7 @@ const IPAdapterPanel = () => {
       <ParamIPAdapterImage />
       <ParamIPAdapterModelSelect />
       <ParamIPAdapterWeight />
+      <ParamIPAdapterBeginEnd />
     </Flex>
   );
 };

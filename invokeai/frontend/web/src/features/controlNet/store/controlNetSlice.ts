@@ -64,6 +64,8 @@ export type IPAdapterConfig = {
   adapterImage: ImageDTO | null;
   model: IPAdapterModelParam | null;
   weight: number;
+  beginStepPct: number;
+  endStepPct: number;
 };
 
 export type ControlNetState = {
@@ -78,6 +80,8 @@ export const initialIPAdapterState: IPAdapterConfig = {
   adapterImage: null,
   model: null,
   weight: 1,
+  beginStepPct: 0,
+  endStepPct: 1,
 };
 
 export const initialControlNetState: ControlNetState = {
@@ -388,6 +392,12 @@ export const controlNetSlice = createSlice({
     ) => {
       state.ipAdapterInfo.model = action.payload;
     },
+    ipAdapterBeginStepPctChanged: (state, action: PayloadAction<number>) => {
+      state.ipAdapterInfo.beginStepPct = action.payload;
+    },
+    ipAdapterEndStepPctChanged: (state, action: PayloadAction<number>) => {
+      state.ipAdapterInfo.endStepPct = action.payload;
+    },
     ipAdapterStateReset: (state) => {
       state.isIPAdapterEnabled = false;
       state.ipAdapterInfo = { ...initialIPAdapterState };
@@ -455,6 +465,8 @@ export const {
   ipAdapterImageChanged,
   ipAdapterWeightChanged,
   ipAdapterModelChanged,
+  ipAdapterBeginStepPctChanged,
+  ipAdapterEndStepPctChanged,
   ipAdapterStateReset,
 } = controlNetSlice.actions;
 

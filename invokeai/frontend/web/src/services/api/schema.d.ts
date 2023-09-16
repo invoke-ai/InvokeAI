@@ -2564,10 +2564,22 @@ export type components = {
       image_encoder_model: components["schemas"]["CLIPVisionModelField"];
       /**
        * Weight
-       * @description The weight of the IP-Adapter.
+       * @description The weight given to the ControlNet
        * @default 1
        */
-      weight?: number;
+      weight?: number | number[];
+      /**
+       * Begin Step Percent
+       * @description When the IP-Adapter is first applied (% of total steps)
+       * @default 0
+       */
+      begin_step_percent?: number;
+      /**
+       * End Step Percent
+       * @description When the IP-Adapter is last applied (% of total steps)
+       * @default 1
+       */
+      end_step_percent?: number;
     };
     /**
      * IP-Adapter
@@ -2602,10 +2614,22 @@ export type components = {
       ip_adapter_model: components["schemas"]["IPAdapterModelField"];
       /**
        * Weight
-       * @description The weight of the IP-Adapter.
+       * @description The weight given to the IP-Adapter
        * @default 1
        */
-      weight?: number;
+      weight?: number | number[];
+      /**
+       * Begin Step Percent
+       * @description When the IP-Adapter is first applied (% of total steps)
+       * @default 0
+       */
+      begin_step_percent?: number;
+      /**
+       * End Step Percent
+       * @description When the IP-Adapter is last applied (% of total steps)
+       * @default 1
+       */
+      end_step_percent?: number;
       /**
        * Type
        * @default ip_adapter
@@ -7707,35 +7731,23 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
-    /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
-     * ControlNetModelFormat
+     * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
-     * IPAdapterModelFormat
+     * CLIPVisionModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    IPAdapterModelFormat: "invokeai";
+    CLIPVisionModelFormat: "diffusers";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
@@ -7743,11 +7755,23 @@ export type components = {
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusionOnnxModelFormat
+     * IPAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    IPAdapterModelFormat: "invokeai";
+    /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

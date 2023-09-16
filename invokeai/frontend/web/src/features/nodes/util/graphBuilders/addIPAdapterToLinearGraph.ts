@@ -14,16 +14,18 @@ export const addIPAdapterToLinearGraph = (
   //   | MetadataAccumulatorInvocation
   //   | undefined;
 
-  if (isIPAdapterEnabled) {
+  if (isIPAdapterEnabled && ipAdapterInfo.model) {
     const ipAdapterNode: IPAdapterInvocation = {
       id: IP_ADAPTER,
       type: 'ip_adapter',
       is_intermediate: true,
       weight: ipAdapterInfo.weight,
       ip_adapter_model: {
-        base_model: 'sd-1',
-        model_name: 'ip_adapter_plus_sd15',
+        base_model: ipAdapterInfo.model?.base_model,
+        model_name: ipAdapterInfo.model?.model_name,
       },
+      begin_step_percent: ipAdapterInfo.beginStepPct,
+      end_step_percent: ipAdapterInfo.endStepPct,
     };
 
     if (ipAdapterInfo.adapterImage) {
