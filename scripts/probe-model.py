@@ -5,11 +5,8 @@
 import argparse
 import sys
 from pathlib import Path
-from invokeai.backend.model_manager import (
-    ModelProbe,
-    SchedulerPredictionType,
-    InvalidModelException,
-)
+
+from invokeai.backend.model_manager import InvalidModelException, ModelProbe, SchedulerPredictionType
 
 
 def helper(model_path: Path):

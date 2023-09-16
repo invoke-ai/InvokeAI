@@ -3,14 +3,14 @@ Test the refactored model config classes.
 """
 
 from invokeai.backend.model_manager.config import (
-    ModelConfigFactory,
     InvalidModelConfigException,
+    LoRAConfig,
     MainCheckpointConfig,
     MainDiffusersConfig,
-    LoRAConfig,
-    TextualInversionConfig,
+    ModelConfigFactory,
     ONNXSD1Config,
     ONNXSD2Config,
+    TextualInversionConfig,
     ValidationError,
 )
 

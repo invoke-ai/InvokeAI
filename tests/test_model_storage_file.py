@@ -2,21 +2,13 @@
 Test the refactored model config classes.
 """
 
+from hashlib import sha256
+
 import pytest
 
-from hashlib import sha256
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager.storage import (
-    ModelConfigStoreYAML,
-    ModelConfigStore,
-    UnknownModelException,
-)
-from invokeai.backend.model_manager.config import (
-    ModelType,
-    TextualInversionConfig,
-    DiffusersConfig,
-    VaeDiffusersConfig,
-)
+from invokeai.backend.model_manager.config import DiffusersConfig, ModelType, TextualInversionConfig, VaeDiffusersConfig
+from invokeai.backend.model_manager.storage import ModelConfigStore, ModelConfigStoreYAML, UnknownModelException
 
 
 @pytest.fixture

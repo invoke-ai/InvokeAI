@@ -2,18 +2,19 @@
 
 import tempfile
 import time
-import requests
-from requests_testadapter import TestAdapter
-from requests import HTTPError
 from pathlib import Path
 
+import requests
+from requests import HTTPError
+from requests_testadapter import TestAdapter
+
+import invokeai.backend.model_manager.download.queue as download_queue
 from invokeai.backend.model_manager.download import (
+    DownloadJobBase,
     DownloadJobStatus,
     DownloadQueue,
-    DownloadJobBase,
     UnknownJobIDException,
 )
-import invokeai.backend.model_manager.download.queue as download_queue
 
 # Allow for at least one chunk to be fetched during the pause/unpause test.
 # Otherwise pause test doesn't work because whole file contents are read
