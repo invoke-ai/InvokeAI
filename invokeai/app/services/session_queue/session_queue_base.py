@@ -8,7 +8,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     CancelByBatchIDsResult,
     ClearResult,
-    EnqueueResult,
+    EnqueueBatchResult,
+    EnqueueGraphResult,
     IsEmptyResult,
     IsFullResult,
     PruneResult,
@@ -27,12 +28,12 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def enqueue(self, queue_id: str, graph: Graph, prepend: bool) -> EnqueueResult:
+    def enqueue_graph(self, queue_id: str, graph: Graph, prepend: bool) -> EnqueueGraphResult:
         """Enqueues a single graph for execution."""
         pass
 
     @abstractmethod
-    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueResult:
+    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
         """Enqueues all permutations of a batch for execution."""
         pass
 

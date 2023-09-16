@@ -245,11 +245,19 @@ class SetManyQueueItemStatusResult(BaseModel):
     status: QUEUE_ITEM_STATUS = Field(..., description="The new status of the queue items")
 
 
-class EnqueueResult(BaseModel):
+class EnqueueBatchResult(BaseModel):
     enqueued: int = Field(description="The total number of queue items enqueued")
     requested: int = Field(description="The total number of queue items requested to be enqueued")
     batch: Batch = Field(description="The batch that was enqueued")
     priority: int = Field(description="The priority of the enqueued batch")
+
+
+class EnqueueGraphResult(BaseModel):
+    enqueued: int = Field(description="The total number of queue items enqueued")
+    requested: int = Field(description="The total number of queue items requested to be enqueued")
+    batch: Batch = Field(description="The batch that was enqueued")
+    priority: int = Field(description="The priority of the enqueued batch")
+    queue_item: SessionQueueItemDTO = Field(description="The queue item that was enqueued")
 
 
 class ClearResult(BaseModel):

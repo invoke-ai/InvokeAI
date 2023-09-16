@@ -9,7 +9,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     CancelByBatchIDsResult,
     ClearResult,
-    EnqueueResult,
+    EnqueueBatchResult,
+    EnqueueGraphResult,
     PruneResult,
     SessionQueueItem,
     SessionQueueItemDTO,
@@ -28,34 +29,34 @@ class SessionQueueAndExecutionStatusResult(SessionQueueStatusResult, SessionExec
 
 
 @session_queue_router.post(
-    "/{queue_id}/enqueue",
-    operation_id="enqueue",
+    "/{queue_id}/enqueue_graph",
+    operation_id="enqueue_graph",
     responses={
-        201: {"model": EnqueueResult},
+        201: {"model": EnqueueGraphResult},
     },
 )
-async def enqueue(
+async def enqueue_graph(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     graph: Graph = Body(description="The graph to enqueue"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
-) -> EnqueueResult:
+) -> EnqueueGraphResult:
     """Enqueues a graph for single execution."""
 
-    return ApiDependencies.invoker.services.session_queue.enqueue(queue_id=queue_id, graph=graph, prepend=prepend)
+    return ApiDependencies.invoker.services.session_queue.enqueue_graph(queue_id=queue_id, graph=graph, prepend=prepend)
 
 
 @session_queue_router.post(
     "/{queue_id}/enqueue_batch",
     operation_id="enqueue_batch",
     responses={
-        201: {"model": EnqueueResult},
+        201: {"model": EnqueueBatchResult},
     },
 )
 async def enqueue_batch(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
-) -> EnqueueResult:
+) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution."""
 
     return ApiDependencies.invoker.services.session_queue.enqueue_batch(queue_id=queue_id, batch=batch, prepend=prepend)

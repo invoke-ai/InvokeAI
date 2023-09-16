@@ -11,7 +11,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     CancelByBatchIDsResult,
     ClearResult,
-    EnqueueResult,
+    EnqueueBatchResult,
+    EnqueueGraphResult,
     IsEmptyResult,
     IsFullResult,
     PruneResult,
@@ -152,15 +153,6 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self._lock.release()
 
-    def start_service(self, invoker: Invoker) -> None:
-        self._invoker = invoker
-        self._set_in_progress_to_canceled()
-        prune_result = self.prune(DEFAULT_QUEUE_ID)
-        self._invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
-
-    def enqueue(self, queue_id: str, graph: Graph, prepend: bool) -> EnqueueResult:
-        return self.enqueue_batch(queue_id=queue_id, batch=Batch(graph=graph), prepend=prepend)
-
     def _get_current_queue_size(self, queue_id: str) -> int:
         self._cursor.execute(
             """--sql
@@ -187,7 +179,39 @@ class SqliteSessionQueue(SessionQueueBase):
         )
         return cast(Union[int, None], self._cursor.fetchone()[0]) or 0
 
-    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueResult:
+    def start_service(self, invoker: Invoker) -> None:
+        self._invoker = invoker
+        self._set_in_progress_to_canceled()
+        prune_result = self.prune(DEFAULT_QUEUE_ID)
+        self._invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
+
+    def enqueue_graph(self, queue_id: str, graph: Graph, prepend: bool) -> EnqueueGraphResult:
+        enqueue_result = self.enqueue_batch(queue_id=queue_id, batch=Batch(graph=graph), prepend=prepend)
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT *
+                FROM session_queue
+                WHERE queue_id = ?
+                AND batch_id = ?
+                """,
+                (queue_id, enqueue_result.batch.batch_id),
+            )
+            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+        if result is None:
+            raise SessionQueueItemNotFoundError(f"No queue item with batch id {enqueue_result.batch.batch_id}")
+        return EnqueueGraphResult(
+            **enqueue_result.dict(),
+            queue_item=SessionQueueItemDTO.from_dict(dict(result)),
+        )
+
+    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
         try:
             self._lock.acquire()
 
@@ -234,7 +258,7 @@ class SqliteSessionQueue(SessionQueueBase):
             raise
         finally:
             self._lock.release()
-        return EnqueueResult(
+        return EnqueueBatchResult(
             requested=requested_count,
             enqueued=enqueued_count,
             batch=batch,
