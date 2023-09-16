@@ -253,6 +253,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
         self.control_model = control_model
+        self.use_ip_adapter = False
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
         """
@@ -416,12 +417,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 extra_conditioning_info=conditioning_data.extra,
                 step_count=len(self.scheduler.timesteps),
             )
+            self.use_ip_adapter = False
         elif ip_adapter_data is not None:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
             attn_ctx = ip_adapter_data.ip_adapter_model.apply_ip_adapter_attention(
                 unet=self.invokeai_diffuser.model, scale=ip_adapter_data.weight
             )
+            self.use_ip_adapter = True
         else:
             attn_ctx = nullcontext()
 
@@ -506,7 +509,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
         # handle IP-Adapter
-        if ip_adapter_data is not None:
+        if self.use_ip_adapter and ip_adapter_data is not None: # somewhat redundant but logic is clearer
             first_adapter_step = math.floor(ip_adapter_data.begin_step_percent * total_step_count)
             last_adapter_step = math.ceil(ip_adapter_data.end_step_percent * total_step_count)
             if step_index >= first_adapter_step and step_index <= last_adapter_step:
