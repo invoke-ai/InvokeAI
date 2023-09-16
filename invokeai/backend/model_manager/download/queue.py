@@ -22,6 +22,7 @@ from huggingface_hub import HfApi, hf_hub_url
 
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.app.services.config import InvokeAIAppConfig
+from . import REPO_ID_RE, HTTP_RE
 from .base import (
     DownloadQueueBase,
     DownloadJobStatus,
@@ -59,7 +60,7 @@ class DownloadJobRepoID(DownloadJobBase):
     @validator("source")
     @classmethod
     def _validate_source(cls, v: str) -> str:
-        if not re.match(r"^[\w-]+/[\w-]+$", v):
+        if not re.match(REPO_ID_RE, v):
             raise ValidationError(f"{v} invalid repo_id")
         return v
 
@@ -123,10 +124,10 @@ class DownloadQueue(DownloadQueueBase):
 
         if Path(source).exists():
             cls = DownloadJobPath
-        elif re.match(r"^[\w-]+/[\w-]+$", str(source)):
+        elif re.match(REPO_ID_RE, str(source)):
             cls = DownloadJobRepoID
             kwargs = dict(variant=variant)
-        elif re.match(r"^https?://", str(source)):
+        elif re.match(HTTP_RE, str(source)):
             cls = DownloadJobURL
         else:
             raise NotImplementedError(f"Don't know what to do with this type of source: {source}")

@@ -2,11 +2,11 @@ import bisect
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Literal
 
 import torch
 from safetensors.torch import load_file
-
+from ..config import LoRAConfig
 from .base import (
     BaseModelType,
     InvalidModelException,
@@ -27,8 +27,8 @@ class LoRAModelFormat(str, Enum):
 class LoRAModel(ModelBase):
     # model_size: int
 
-    class Config(ModelConfigBase):
-        model_format: LoRAModelFormat  # TODO:
+    class Config(LoRAConfig):
+        model_format: Literal[LoRAModelFormat.LyCORIS]  # TODO:
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.Lora

@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Literal
 
 from diffusers import OnnxRuntimeModel
-
+from ..config import ONNXSD1Config, ONNXSD2Config
 from .base import (
     BaseModelType,
     DiffusersModel,
@@ -21,9 +21,8 @@ class StableDiffusionOnnxModelFormat(str, Enum):
 
 
 class ONNXStableDiffusion1Model(DiffusersModel):
-    class Config(ModelConfigBase):
+    class Config(ONNXSD1Config):
         model_format: Literal[StableDiffusionOnnxModelFormat.Onnx]
-        variant: ModelVariantType
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1
@@ -80,11 +79,8 @@ class ONNXStableDiffusion1Model(DiffusersModel):
 
 class ONNXStableDiffusion2Model(DiffusersModel):
     # TODO: check that configs overwriten properly
-    class Config(ModelConfigBase):
+    class Config(ONNXSD2Config):
         model_format: Literal[StableDiffusionOnnxModelFormat.Onnx]
-        variant: ModelVariantType
-        prediction_type: SchedulerPredictionType
-        upcast_attention: bool
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion2

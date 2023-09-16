@@ -10,7 +10,7 @@ Typical usage:
              base_model='sd-1',
              model_type='main',
              config='configs/stable-diffusion/v1-inference.yaml',
-             model_variant='normal',
+             variant='normal',
              model_format='checkpoint'
             )
   config = ModelConfigFactory.make_config(raw)
@@ -173,10 +173,16 @@ class VaeDiffusersConfig(ModelConfigBase):
     model_format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-class ControlNetDiffusersConfig(ModelConfigBase):
+class ControlNetDiffusersConfig(DiffusersConfig):
     """Model config for ControlNet models (diffusers version)."""
 
     model_format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+
+class ControlNetCheckpointConfig(CheckpointConfig):
+    """Model config for ControlNet models (diffusers version)."""
+
+    model_format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
 
 class TextualInversionConfig(ModelConfigBase):
@@ -189,11 +195,13 @@ class MainConfig(ModelConfigBase):
     """Model config for main models."""
 
     vae: Optional[str] = Field(None)
-    model_variant: ModelVariantType = ModelVariantType.Normal
+    variant: ModelVariantType = ModelVariantType.Normal
 
 
 class MainCheckpointConfig(CheckpointConfig, MainConfig):
     """Model config for main checkpoint models."""
+
+    config: str
 
 
 class MainDiffusersConfig(DiffusersConfig, MainConfig):

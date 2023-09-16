@@ -1,14 +1,14 @@
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 
 import safetensors
 import torch
 from omegaconf import OmegaConf
 
 from invokeai.app.services.config import InvokeAIAppConfig
-
+from ..config import VaeDiffusersConfig, VaeCheckpointConfig
 from .base import (
     BaseModelType,
     EmptyConfigLoader,
@@ -34,8 +34,11 @@ class VaeModel(ModelBase):
     # vae_class: Type
     # model_size: int
 
-    class Config(ModelConfigBase):
-        model_format: VaeModelFormat
+    class DiffusersConfig(VaeDiffusersConfig):
+        model_format: Literal[VaeModelFormat.Diffusers] = VaeModelFormat.Diffusers
+
+    class CheckpointConfig(VaeCheckpointConfig):
+        model_format: Literal[VaeModelFormat.Checkpoint] = VaeModelFormat.Checkpoint
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.Vae

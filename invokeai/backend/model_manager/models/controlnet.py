@@ -7,7 +7,7 @@ import torch
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-
+from ..config import ControlNetDiffusersConfig, ControlNetCheckpointConfig
 from .base import (
     BaseModelType,
     EmptyConfigLoader,
@@ -32,12 +32,11 @@ class ControlNetModel(ModelBase):
     # model_class: Type
     # model_size: int
 
-    class DiffusersConfig(ModelConfigBase):
-        model_format: Literal[ControlNetModelFormat.Diffusers]
+    class DiffusersConfig(ControlNetDiffusersConfig):
+        model_format: Literal[ControlNetModelFormat.Diffusers] = ControlNetModelFormat.Diffusers
 
-    class CheckpointConfig(ModelConfigBase):
-        model_format: Literal[ControlNetModelFormat.Checkpoint]
-        config: str
+    class CheckpointConfig(ControlNetCheckpointConfig):
+        model_format: Literal[ControlNetModelFormat.Checkpoint] = ControlNetModelFormat.Checkpoint
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.ControlNet

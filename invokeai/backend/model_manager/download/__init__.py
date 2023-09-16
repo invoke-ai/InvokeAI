@@ -7,6 +7,8 @@ from .base import (  # noqa F401
     UnknownJobIDException,
     DownloadJobBase,
     ModelSourceMetadata,
+    REPO_ID_RE,
+    HTTP_RE,
 )
 
 from .queue import DownloadQueue  # noqa F401

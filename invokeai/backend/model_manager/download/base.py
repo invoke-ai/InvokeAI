@@ -11,6 +11,10 @@ from typing import List, Optional, Callable, Union
 from pydantic import BaseModel, Field
 from pydantic.networks import AnyHttpUrl
 
+# Used to distinguish between repo_id sources and URL sources
+REPO_ID_RE = r"^[\w-]+/[.\w-]+$"
+HTTP_RE = r"^https?://"
+
 
 class DownloadJobStatus(str, Enum):
     """State of a download job."""
@@ -49,7 +53,9 @@ class DownloadJobBase(BaseModel):
     id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a placeholder
     source: str = Field(description="URL or repo_id to download")
     destination: Path = Field(description="Destination of URL on local disk")
-    metadata: Optional[ModelSourceMetadata] = Field(description="Model metadata (source-specific)", default=None)
+    metadata: ModelSourceMetadata = Field(
+        description="Model metadata (source-specific)", default_factory=ModelSourceMetadata
+    )
     access_token: Optional[str] = Field(description="access token needed to access this resource")
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
     bytes: int = Field(default=0, description="Bytes downloaded so far")

@@ -12,6 +12,7 @@ from ..config import SilenceWarnings
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
+from ..config import MainCheckpointConfig, MainDiffusersConfig
 from .base import (
     BaseModelType,
     DiffusersModel,
@@ -32,16 +33,11 @@ class StableDiffusion1ModelFormat(str, Enum):
 
 
 class StableDiffusion1Model(DiffusersModel):
-    class DiffusersConfig(ModelConfigBase):
+    class DiffusersConfig(MainDiffusersConfig):
         model_format: Literal[StableDiffusion1ModelFormat.Diffusers]
-        vae: Optional[str] = Field(None)
-        variant: ModelVariantType
 
-    class CheckpointConfig(ModelConfigBase):
+    class CheckpointConfig(MainCheckpointConfig):
         model_format: Literal[StableDiffusion1ModelFormat.Checkpoint]
-        vae: Optional[str] = Field(None)
-        config: str
-        variant: ModelVariantType
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1

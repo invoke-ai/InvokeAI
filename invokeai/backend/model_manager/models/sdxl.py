@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 from omegaconf import OmegaConf
 from pydantic import Field
-
+from ..config import MainDiffusersConfig, MainCheckpointConfig
 from .base import (
     BaseModelType,
     DiffusersModel,
@@ -25,16 +25,11 @@ class StableDiffusionXLModelFormat(str, Enum):
 
 class StableDiffusionXLModel(DiffusersModel):
     # TODO: check that configs overwriten properly
-    class DiffusersConfig(ModelConfigBase):
+    class DiffusersConfig(MainDiffusersConfig):
         model_format: Literal[StableDiffusionXLModelFormat.Diffusers]
-        vae: Optional[str] = Field(None)
-        variant: ModelVariantType
 
     class CheckpointConfig(ModelConfigBase):
         model_format: Literal[StableDiffusionXLModelFormat.Checkpoint]
-        vae: Optional[str] = Field(None)
-        config: str
-        variant: ModelVariantType
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner}

@@ -1,10 +1,11 @@
 import os
-from typing import Optional
+from typing import Optional, Literal
 
 import torch
 
 # TODO: naming
 from ..lora import TextualInversionModel as TextualInversionModelRaw
+from ..config import ModelFormat, TextualInversionConfig
 from .base import (
     BaseModelType,
     InvalidModelException,
@@ -20,8 +21,15 @@ from .base import (
 class TextualInversionModel(ModelBase):
     # model_size: int
 
-    class Config(ModelConfigBase):
-        model_format: None
+    class FolderConfig(TextualInversionConfig):
+        """Config for embeddings that are represented as a folder containing learned_embeds.bin."""
+
+        model_format: Literal[ModelFormat.EmbeddingFolder]
+
+    class FileConfig(TextualInversionConfig):
+        """Config for embeddings that are contained in safetensors/checkpoint files."""
+
+        model_format: Literal[ModelFormat.EmbeddingFile]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.TextualInversion

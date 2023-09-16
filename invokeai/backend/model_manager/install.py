@@ -66,6 +66,8 @@ from .download import (
     DownloadJobBase,
     ModelSourceMetadata,
     DownloadEventHandler,
+    REPO_ID_RE,
+    HTTP_RE,
 )
 from .download.queue import DownloadJobURL, DownloadJobRepoID, DownloadJobPath
 from .hash import FastModelHash
@@ -481,10 +483,10 @@ class ModelInstall(ModelInstallBase):
         models_dir = self._config.models_path
         self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
 
-        if re.match(r"^[\w-]+/[\w-]+$", str(source)):
+        if re.match(REPO_ID_RE, str(source)):
             cls = ModelInstallRepoIDJob
             kwargs = dict(variant=variant)
-        elif re.match(r"^https?://", str(source)):
+        elif re.match(HTTP_RE, str(source)):
             cls = ModelInstallURLJob
             kwargs = {}
         else:

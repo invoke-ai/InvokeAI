@@ -29,12 +29,9 @@ ConvertModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 MergeModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ImportModelAttributes = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
-# class ModelsList(BaseModel):
-#    models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
-
 
 class ModelsList(BaseModel):
-    models: List[ModelConfigBase]
+    models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
 
 
 @models_router.get(
@@ -51,9 +48,9 @@ async def list_models(
     if base_models and len(base_models) > 0:
         models_raw = list()
         for base_model in base_models:
-            models_raw.extend(manager.list_models(base_model=base_model, model_type=model_type))
+            models_raw.extend([x.dict() for x in manager.list_models(base_model=base_model, model_type=model_type)])
     else:
-        models_raw = manager.list_models(model_type=model_type)
+        models_raw = [x.dict() for x in manager.list_models(model_type=model_type)]
     models = parse_obj_as(ModelsList, {"models": models_raw})
     return models
 
