@@ -88,9 +88,7 @@ class TextualInversionModel(ModelBase):
     @classmethod
     def convert_if_required(
         cls,
-        model_path: str,
+        model_config: ModelConfigBase,
         output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
     ) -> str:
-        return model_path
+        return model_config.path

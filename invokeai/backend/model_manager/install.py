@@ -52,7 +52,7 @@ import re
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from shutil import rmtree, move
+from shutil import move, rmtree
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 from pydantic import Field
@@ -62,8 +62,8 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .config import (
-    ModelConfigBase,
     BaseModelType,
+    ModelConfigBase,
     ModelFormat,
     ModelType,
     ModelVariantType,
@@ -412,7 +412,6 @@ class ModelInstall(ModelInstallBase):
             counter += 1
         return old_path.replace(new_path)
 
-
     def _probe_model(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> ModelProbeInfo:
         info: ModelProbeInfo = ModelProbe.probe(model_path)
         if overrides:  # used to override probe fields
@@ -566,11 +565,10 @@ class ModelInstall(ModelInstallBase):
     def hash(self, model_path: Union[Path, str]) -> str:  # noqa D102
         return FastModelHash.hash(model_path)
 
-
     def convert_model(
-            self,
-            key: str,
-            dest_directory: Optional[Path] = None,
+        self,
+        key: str,
+        dest_directory: Optional[Path] = None,
     ) -> ModelConfigBase:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -583,11 +581,12 @@ class ModelInstall(ModelInstallBase):
         This will raise a ValueError unless the model is a checkpoint.
         This will raise an UnknownModelException if key is unknown.
         """
-        from .loader import ModelInfo, ModelLoader   # to avoid circular imports
+        from .loader import ModelInfo, ModelLoader  # to avoid circular imports
+
+        new_diffusers_path = None
+
         try:
             info: ModelConfigBase = self._store.get_model(key)
-
-            print(f'DEBUG: requested_model={info}')
 
             if info.model_format != "checkpoint":
                 raise ValueError(f"not a checkpoint format model: {info.name}")
@@ -601,23 +600,27 @@ class ModelInstall(ModelInstallBase):
 
             checkpoint_path = loader.resolve_model_path(info.path)
             old_diffusers_path = loader.resolve_model_path(converted_model.location)
-            new_diffusers_path = None
+
+            # new values to write in
+            update = info.dict()
+            update.pop("config")
+            update["model_format"] = "diffusers"
+            update["path"] = converted_model.location.as_posix()
+
             if dest_directory:
                 new_diffusers_path = Path(dest_directory) / info.name
                 if new_diffusers_path.exists():
                     raise ValueError(f"A diffusers model already exists at {new_diffusers_path}")
                 move(old_diffusers_path, new_diffusers_path)
-                info.path = new_diffusers_path.as_posix()
+                update["path"] = new_diffusers_path.as_posix()
 
-            info.pop("config")
-            info.model_format = "diffusers"
-            self._store.update_model(key, info)
+            self._store.update_model(key, update)
             result = self.sync_model_path(key)
-        except Exception:
+        except Exception as excp:
             # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
             if new_diffusers_path:
                 rmtree(new_diffusers_path)
-            raise
+            raise excp
 
         if checkpoint_path.exists() and checkpoint_path.is_relative_to(self._config.models_path):
             checkpoint_path.unlink()

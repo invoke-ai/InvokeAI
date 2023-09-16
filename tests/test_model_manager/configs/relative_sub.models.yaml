@@ -6,7 +6,7 @@ ed799245c762f6d0a9ddfd4e31fdb010:
   base_model: sdxl
   model_type: main
   model_format: diffusers
-  model_variant: normal
+  variant: normal
   description: SDXL base v1.0
 
 fa78e05dbf51c540ff9256eb65446fd6:
@@ -14,7 +14,7 @@ fa78e05dbf51c540ff9256eb65446fd6:
   path: sdxl/main/SDXL base 1_0
   base_model: sdxl
   model_type: main
-  model_variant: normal
+  variant: normal
   model_format: diffusers
   description: SDXL with customized VAE
   vae: sdxl/vae/sdxl-vae-fp16-fix/
@@ -24,7 +24,7 @@ fa78e05dbf51c540ff9256eb65446fd6:
   path: sdxl/main/SDXL base 1_0
   base_model: sdxl
   model_type: main
-  model_variant: normal
+  variant: normal
   model_format: diffusers
   description: SDXL with customized VAE
   vae: ''

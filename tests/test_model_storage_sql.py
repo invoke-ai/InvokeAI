@@ -14,7 +14,6 @@ from invokeai.backend.model_manager.storage import ModelConfigStore, ModelConfig
 
 @pytest.fixture
 def store(datadir) -> ModelConfigStore:
-    print(f"DEBUG: datadir={datadir}")
     InvokeAIAppConfig.get_config(root=datadir)
     return ModelConfigStoreSQL(datadir / "databases" / "models.db")
 
@@ -37,7 +36,7 @@ def test_add(store: ModelConfigStore):
         base_model="sd-1",
         model_type="main",
         config="/tmp/foo.yaml",
-        model_variant="normal",
+        variant="normal",
         model_format="checkpoint",
     )
     store.add_model("key1", raw)

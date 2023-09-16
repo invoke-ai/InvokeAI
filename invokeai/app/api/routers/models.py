@@ -73,8 +73,8 @@ async def list_models(
     response_model=UpdateModelResponse,
 )
 async def update_model(
-        key: str = Path(description="Unique key of model"),
-        info: Union[tuple(OPENAPI_MODEL_CONFIGS)] = Body(description="Model configuration"),
+    key: str = Path(description="Unique key of model"),
+    info: Union[tuple(OPENAPI_MODEL_CONFIGS)] = Body(description="Model configuration"),
 ) -> UpdateModelResponse:
     """Update model contents with a new config. If the model name or base fields are changed, then the model is renamed."""
     logger = ApiDependencies.invoker.services.logger
@@ -192,11 +192,8 @@ async def add_model(
     response_model=None,
 )
 async def delete_model(
-        key: str = Path(description="Unique key of model to remove from model registry."),
-        delete_files: Optional[bool] = Query(
-            description="Delete underlying files and directories as well.",
-            default=False
-        )
+    key: str = Path(description="Unique key of model to remove from model registry."),
+    delete_files: Optional[bool] = Query(description="Delete underlying files and directories as well.", default=False),
 ) -> Response:
     """Delete Model"""
     logger = ApiDependencies.invoker.services.logger
@@ -231,7 +228,6 @@ async def convert_model(
     logger = ApiDependencies.invoker.services.logger
     info = ApiDependencies.invoker.services.model_manager.model_info(key)
     try:
-        logger.info(f"Converting model: {info.name}")
         dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
         ApiDependencies.invoker.services.model_manager.convert_model(key, convert_dest_directory=dest)
         model_raw = ApiDependencies.invoker.services.model_manager.model_info(key).dict()

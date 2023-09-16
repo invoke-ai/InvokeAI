@@ -1,12 +1,13 @@
 import json
 import os
 from enum import Enum
-from typing import Literal, Optional
+from pathlib import Path
+from typing import Literal, Optional, Union
 
 from omegaconf import OmegaConf
 from pydantic import Field
 
-from ..config import MainCheckpointConfig, MainDiffusersConfig
+from ..config import CheckpointConfig, MainCheckpointConfig, MainDiffusersConfig
 from .base import (
     BaseModelType,
     DiffusersModel,
@@ -17,6 +18,7 @@ from .base import (
     classproperty,
     read_checkpoint_meta,
 )
+from .stable_diffusion import StableDiffusionModelBase
 
 
 class StableDiffusionXLModelFormat(str, Enum):
@@ -24,7 +26,7 @@ class StableDiffusionXLModelFormat(str, Enum):
     Diffusers = "diffusers"
 
 
-class StableDiffusionXLModel(DiffusersModel):
+class StableDiffusionXLModel(StableDiffusionModelBase):
     # TODO: check that configs overwriten properly
     class DiffusersConfig(MainDiffusersConfig):
         model_format: Literal[StableDiffusionXLModelFormat.Diffusers]
@@ -100,26 +102,3 @@ class StableDiffusionXLModel(DiffusersModel):
             return StableDiffusionXLModelFormat.Diffusers
         else:
             return StableDiffusionXLModelFormat.Checkpoint
-
-    @classmethod
-    def convert_if_required(
-        cls,
-        model_path: str,
-        output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
-    ) -> str:
-        # The convert script adapted from the diffusers package uses
-        # strings for the base model type. To avoid making too many
-        # source code changes, we simply translate here
-        if isinstance(config, cls.CheckpointConfig):
-            from invokeai.backend.model_management.models.stable_diffusion import _convert_ckpt_and_cache
-
-            return _convert_ckpt_and_cache(
-                version=base_model,
-                model_config=config,
-                output_path=output_path,
-                use_safetensors=False,  # corrupts sdxl models for some reason
-            )
-        else:
-            return model_path

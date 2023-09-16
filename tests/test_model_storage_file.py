@@ -35,7 +35,7 @@ def test_add(store: ModelConfigStore):
         base_model="sd-1",
         model_type="main",
         config="/tmp/foo.yaml",
-        model_variant="normal",
+        variant="normal",
         model_format="checkpoint",
     )
     store.add_model("key1", raw)

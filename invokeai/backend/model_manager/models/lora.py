@@ -81,16 +81,14 @@ class LoRAModel(ModelBase):
     @classmethod
     def convert_if_required(
         cls,
-        model_path: str,
+        model_config: ModelConfigBase,
         output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
     ) -> str:
-        if cls.detect_format(model_path) == LoRAModelFormat.Diffusers:
+        if cls.detect_format(model_config.path) == LoRAModelFormat.Diffusers:
             # TODO: add diffusers lora when it stabilizes a bit
             raise NotImplementedError("Diffusers lora not supported")
         else:
-            return model_path
+            return model_config.path
 
 
 class LoRALayerBase:

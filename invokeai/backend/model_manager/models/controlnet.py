@@ -112,27 +112,21 @@ class ControlNetModel(ModelBase):
     @classmethod
     def convert_if_required(
         cls,
-        model_path: str,
+        model_config: ModelConfigBase,
         output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
     ) -> str:
-        if cls.detect_format(model_path) == ControlNetModelFormat.Checkpoint:
+        if isinstance(model_config, ControlNetCheckpointConfig):
             return _convert_controlnet_ckpt_and_cache(
-                model_path=model_path,
-                model_config=config.config,
+                model_config=model_config,
                 output_path=output_path,
-                base_model=base_model,
             )
         else:
-            return model_path
+            return model_config.path
 
 
 def _convert_controlnet_ckpt_and_cache(
-    model_path: str,
+    model_config: ControlNetCheckpointConfig,
     output_path: str,
-    base_model: BaseModelType,
-    model_config: ControlNetModel.CheckpointConfig,
 ) -> str:
     """
     Convert the controlnet from checkpoint format to diffusers format,
@@ -140,7 +134,7 @@ def _convert_controlnet_ckpt_and_cache(
     file. If already on disk then just returns Path.
     """
     app_config = InvokeAIAppConfig.get_config()
-    weights = app_config.root_path / model_path
+    weights = app_config.root_path / model_config.path
     output_path = Path(output_path)
 
     logger.info(f"Converting {weights} to diffusers format")

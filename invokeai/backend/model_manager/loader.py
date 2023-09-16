@@ -218,9 +218,11 @@ class ModelLoader(ModelLoaderBase):
                the model to retrieve (e.g. ModelType.Vae)
         """
         model_config = self.store.get_model(key)  # May raise a UnknownModelException
-        if model_config.model_type == 'main' and not submodel_type:
-            raise InvalidModelException('submodel_type is required when loading a main model')
-        
+        if model_config.model_type == "main" and not submodel_type:
+            raise InvalidModelException("submodel_type is required when loading a main model")
+
+        submodel_type = SubModelType(submodel_type) if submodel_type else None
+
         model_path, is_submodel_override = self._get_model_path(model_config, submodel_type)
 
         if is_submodel_override:
@@ -233,10 +235,8 @@ class ModelLoader(ModelLoaderBase):
 
         dst_convert_path = self._get_model_cache_path(model_path)
         model_path = model_class.convert_if_required(
-            base_model=model_config.base_model,
-            model_path=model_path.as_posix(),
+            model_config=model_config,
             output_path=dst_convert_path,
-            config=model_config,
         )
 
         model_context = self._cache.get_model(
@@ -244,7 +244,7 @@ class ModelLoader(ModelLoaderBase):
             model_class=model_class,
             base_model=model_config.base_model,
             model_type=model_config.model_type,
-            submodel=SubModelType(submodel_type),
+            submodel=submodel_type,
         )
 
         if key not in self._cache_keys:
@@ -255,7 +255,7 @@ class ModelLoader(ModelLoaderBase):
             context=model_context,
             name=model_config.name,
             base_model=model_config.base_model,
-            type=submodel_type or model_type,
+            type=submodel_type or model_config.model_type,
             key=model_config.key,
             location=model_path,
             precision=self._cache.precision,

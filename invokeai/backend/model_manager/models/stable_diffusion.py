@@ -23,7 +23,6 @@ from .base import (
     classproperty,
     read_checkpoint_meta,
 )
-from .sdxl import StableDiffusionXLModel
 
 
 class StableDiffusion1ModelFormat(str, Enum):
@@ -31,7 +30,28 @@ class StableDiffusion1ModelFormat(str, Enum):
     Diffusers = "diffusers"
 
 
-class StableDiffusion1Model(DiffusersModel):
+class StableDiffusionModelBase(DiffusersModel):
+    """Base class that defines common class methodsd."""
+
+    @classmethod
+    def convert_if_required(
+        cls,
+        model_config: ModelConfigBase,
+        output_path: str,
+    ) -> str:
+        if isinstance(model_config, MainCheckpointConfig):
+            from invokeai.backend.model_manager.models.stable_diffusion import _convert_ckpt_and_cache
+
+            return _convert_ckpt_and_cache(
+                model_config=model_config,
+                output_path=output_path,
+                use_safetensors=False,  # corrupts sdxl models for some reason
+            )
+        else:
+            return model_config.path
+
+
+class StableDiffusion1Model(StableDiffusionModelBase):
     class DiffusersConfig(MainDiffusersConfig):
         model_format: Literal[StableDiffusion1ModelFormat.Diffusers]
 
@@ -110,31 +130,13 @@ class StableDiffusion1Model(DiffusersModel):
 
         raise InvalidModelException(f"Not a valid model: {model_path}")
 
-    @classmethod
-    def convert_if_required(
-        cls,
-        model_path: str,
-        output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
-    ) -> str:
-        if isinstance(config, cls.CheckpointConfig):
-            return _convert_ckpt_and_cache(
-                version=BaseModelType.StableDiffusion1,
-                model_config=config,
-                load_safety_checker=False,
-                output_path=output_path,
-            )
-        else:
-            return model_path
-
 
 class StableDiffusion2ModelFormat(str, Enum):
     Checkpoint = "checkpoint"
     Diffusers = "diffusers"
 
 
-class StableDiffusion2Model(DiffusersModel):
+class StableDiffusion2Model(StableDiffusionModelBase):
     # TODO: check that configs overwriten properly
     class DiffusersConfig(ModelConfigBase):
         model_format: Literal[StableDiffusion2ModelFormat.Diffusers]
@@ -221,33 +223,11 @@ class StableDiffusion2Model(DiffusersModel):
 
         raise InvalidModelException(f"Not a valid model: {model_path}")
 
-    @classmethod
-    def convert_if_required(
-        cls,
-        model_path: str,
-        output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
-    ) -> str:
-        if isinstance(config, cls.CheckpointConfig):
-            return _convert_ckpt_and_cache(
-                version=BaseModelType.StableDiffusion2,
-                model_config=config,
-                output_path=output_path,
-            )
-        else:
-            return model_path
-
 
 # TODO: rework
 # pass precision - currently defaulting to fp16
 def _convert_ckpt_and_cache(
-    version: BaseModelType,
-    model_config: Union[
-        StableDiffusion1Model.CheckpointConfig,
-        StableDiffusion2Model.CheckpointConfig,
-        StableDiffusionXLModel.CheckpointConfig,
-    ],
+    model_config: ModelConfigBase,
     output_path: str,
     use_save_model: bool = False,
     **kwargs,
@@ -258,7 +238,7 @@ def _convert_ckpt_and_cache(
     file. If already on disk then just returns Path.
     """
     app_config = InvokeAIAppConfig.get_config()
-
+    version = model_config.base_model.value
     weights = app_config.models_path / model_config.path
     config_file = app_config.root_path / model_config.config
     output_path = Path(output_path)

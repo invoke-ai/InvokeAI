@@ -22,7 +22,7 @@ def test_checkpoints():
         base_model="sd-1",
         model_type="main",
         config="/tmp/foo.yaml",
-        model_variant="normal",
+        variant="normal",
         model_format="checkpoint",
     )
     config = ModelConfigFactory.make_config(raw)
@@ -38,7 +38,7 @@ def test_diffusers():
         name="foo",
         base_model="sd-2",
         model_type="main",
-        model_variant="inpaint",
+        variant="inpaint",
         model_format="diffusers",
         vae="/tmp/foobar/vae.pt",
     )
@@ -46,7 +46,7 @@ def test_diffusers():
     assert isinstance(config, MainDiffusersConfig)
     assert config.model_format == "diffusers"
     assert config.base_model == "sd-2"
-    assert config.model_variant == "inpaint"
+    assert config.variant == "inpaint"
     assert config.vae == "/tmp/foobar/vae.pt"
 
 
@@ -56,7 +56,7 @@ def test_invalid_diffusers():
         name="foo",
         base_model="sd-2",
         model_type="main",
-        model_variant="inpaint",
+        variant="inpaint",
         config="/tmp/foo.ckpt",
         model_format="diffusers",
     )
@@ -105,7 +105,7 @@ def test_onnx():
         name="foo",
         base_model="sd-1",
         model_type="onnx",
-        model_variant="normal",
+        variant="normal",
         model_format="onnx",
     )
     config = ModelConfigFactory.make_config(raw)
@@ -133,7 +133,7 @@ def test_assignment():
         name="foo",
         base_model="sd-2",
         model_type="onnx",
-        model_variant="normal",
+        variant="normal",
         model_format="onnx",
         upcast_attention=True,
         prediction_type="epsilon",
@@ -154,7 +154,7 @@ def test_invalid_combination():
         name="foo",
         base_model="sd-2",
         model_type="main",
-        model_variant="normal",
+        variant="normal",
         model_format="onnx",
         upcast_attention=True,
         prediction_type="epsilon",

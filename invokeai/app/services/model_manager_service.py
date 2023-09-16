@@ -28,7 +28,6 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.cache import CacheStats
 
 from .config import InvokeAIAppConfig
-from .events import EventServiceBase
 
 if TYPE_CHECKING:
     from ..invocations.baseinvocation import InvocationContext
@@ -38,7 +37,7 @@ class ModelManagerServiceBase(ABC):
     """Responsible for managing models on disk and in memory."""
 
     @abstractmethod
-    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional[EventServiceBase] = None):
+    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional["EventServiceBase"] = None):
         """
         Initialize a ModelManagerService.
 
@@ -293,9 +292,9 @@ class ModelManagerService(ModelManagerServiceBase):
     """Responsible for managing models on disk and in memory."""
 
     _loader: ModelLoader = Field(description="InvokeAIAppConfig object for the current process")
-    _event_bus: EventServiceBase = Field(description="an event bus to send install events to", default=None)
+    _event_bus: "EventServiceBase" = Field(description="an event bus to send install events to", default=None)
 
-    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional[EventServiceBase] = None):
+    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional["EventServiceBase"] = None):
         """
         Initialize a ModelManagerService.
 
@@ -363,7 +362,6 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Return a ModelConfigBase object for each model in the database.
         """
-        self.logger.warning(f"list_model(model_type={model_type})")
         return self._loader.store.search_by_name(model_name=model_name, base_model=base_model, model_type=model_type)
 
     def add_model(
@@ -390,7 +388,7 @@ class ModelManagerService(ModelManagerServiceBase):
         Add a model using a path, repo_id or URL.
 
         :param model_attributes: Dictionary of ModelConfigBase fields to
-        attach to the model. When installing a URL or repo_id, some metadata 
+        attach to the model. When installing a URL or repo_id, some metadata
         values, such as `tags` will be automagically added.
         """
         self.logger.debug(f"add/update model {source}")
@@ -460,9 +458,8 @@ class ModelManagerService(ModelManagerServiceBase):
         directory already in place.
         """
         model_info = self.model_info(key)
-        self.logger.debug(f"convert model {model_info.name}")
-        self.logger.warning("This is not implemented yet")
-        return self._loader.convert_model(key, convert_dest_directory)
+        self.logger.info(f"Converting model {model_info.name} into a diffusers")
+        return self._loader.installer.convert_model(key, convert_dest_directory)
 
     def collect_cache_stats(self, cache_stats: CacheStats):
         """

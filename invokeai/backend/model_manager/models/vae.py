@@ -101,28 +101,21 @@ class VaeModel(ModelBase):
     @classmethod
     def convert_if_required(
         cls,
-        model_path: str,
+        model_config: ModelConfigBase,
         output_path: str,
-        config: ModelConfigBase,  # empty config or config of parent model
-        base_model: BaseModelType,
     ) -> str:
-        if cls.detect_format(model_path) == VaeModelFormat.Checkpoint:
+        if isinstance(model_config, VaeCheckpointConfig):
             return _convert_vae_ckpt_and_cache(
-                weights_path=model_path,
+                model_config=model_config,
                 output_path=output_path,
-                base_model=base_model,
-                model_config=config,
             )
         else:
-            return model_path
+            return model_config.path
 
 
-# TODO: rework
 def _convert_vae_ckpt_and_cache(
-    weights_path: str,
-    output_path: str,
-    base_model: BaseModelType,
     model_config: ModelConfigBase,
+    output_path: str,
 ) -> str:
     """
     Convert the VAE indicated in mconfig into a diffusers AutoencoderKL
@@ -130,7 +123,7 @@ def _convert_vae_ckpt_and_cache(
     file. If already on disk then just returns Path.
     """
     app_config = InvokeAIAppConfig.get_config()
-    weights_path = app_config.root_dir / weights_path
+    weights_path = app_config.root_dir / model_config.path
     output_path = Path(output_path)
 
     """
@@ -152,6 +145,7 @@ def _convert_vae_ckpt_and_cache(
     if output_path.exists():
         return output_path
 
+    base_model = model_config.base_model
     if base_model in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
         from .stable_diffusion import _select_ckpt_config
 
