@@ -38,7 +38,7 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def dequeue(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def dequeue(self) -> Optional[SessionQueueItem]:
         """Dequeues the next session queue item, returning it if one is available."""
         pass
 

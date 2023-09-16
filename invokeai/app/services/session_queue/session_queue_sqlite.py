@@ -265,22 +265,19 @@ class SqliteSessionQueue(SessionQueueBase):
             priority=priority,
         )
 
-    def dequeue(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def dequeue(self) -> Optional[SessionQueueItem]:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT item_id
+                SELECT *
                 FROM session_queue
-                WHERE
-                  queue_id = ?
-                  AND status = 'pending'
+                WHERE status = 'pending'
                 ORDER BY
                   priority DESC,
-                  order_id ASC -- created_at doesn't have high enough precision to be used for ordering
+                  order_id ASC
                 LIMIT 1
-                """,
-                (queue_id,),
+                """
             )
             result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
         except Exception:
@@ -290,7 +287,10 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         if result is None:
             return None
-        return self.set_queue_item_status(queue_id=queue_id, item_id=result[0], status="in_progress")
+        queue_item = SessionQueueItem.from_dict(dict(result))
+        return self.set_queue_item_status(
+            queue_id=queue_item.queue_id, item_id=queue_item.item_id, status="in_progress"
+        )
 
     def peek(self, queue_id: str) -> Optional[SessionQueueItem]:
         try:
@@ -319,7 +319,7 @@ class SqliteSessionQueue(SessionQueueBase):
             return None
         return SessionQueueItem.from_dict(dict(result))
 
-    def set_queue_item_status(self, queue_id: str, item_id: int, status: QUEUE_ITEM_STATUS) -> SessionQueueItem:
+    def set_queue_item_status(self, queue_id: str, item_id: str, status: QUEUE_ITEM_STATUS) -> SessionQueueItem:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -420,7 +420,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return IsFullResult(is_full=is_full)
 
-    def delete_queue_item(self, queue_id: str, item_id: int) -> SessionQueueItem:
+    def delete_queue_item(self, queue_id: str, item_id: str) -> SessionQueueItem:
         queue_item = self.get_queue_item(queue_id=queue_id, item_id=item_id)
         try:
             self._lock.acquire()
@@ -543,7 +543,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return CancelByBatchIDsResult(canceled=count)
 
-    def get_queue_item(self, queue_id: str, item_id: int) -> SessionQueueItem:
+    def get_queue_item(self, queue_id: str, item_id: str) -> SessionQueueItem:
         try:
             self._lock.acquire()
             self._cursor.execute(

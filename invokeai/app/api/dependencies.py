@@ -13,6 +13,7 @@ from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.session_execution.session_execution_default import DefaultSessionExecutionService
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
@@ -69,8 +70,8 @@ class ApiDependencies:
         # TODO: build a file/path manager?
         db_path = config.db_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        db_location = str(db_path)
-        # db_location = ":memory:"
+        # db_location = str(db_path)
+        db_location = ":memory:"
 
         logger.info(f"Using database at {db_location}")
         db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
@@ -138,6 +139,7 @@ class ApiDependencies:
             performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
             session_queue=SqliteSessionQueue(conn=db_conn, lock=lock),
+            session_processor=DefaultSessionProcessor(),
             session_execution=DefaultSessionExecutionService(),
         )
 
@@ -155,5 +157,7 @@ class ApiDependencies:
 
     @staticmethod
     def shutdown():
+        print("SHUTTING DOWN")
         if ApiDependencies.invoker:
+            print("SHUTTING DOWN INVOKER")
             ApiDependencies.invoker.stop_service()

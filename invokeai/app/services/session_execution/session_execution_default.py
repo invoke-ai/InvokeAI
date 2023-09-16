@@ -62,7 +62,7 @@ class DefaultSessionExecutionService(SessionExecutionServiceBase):
         if self._current:
             return
 
-        queue_item = self._invoker.services.session_queue.dequeue(queue_id=queue_id)
+        queue_item = self._invoker.services.session_queue.dequeue()
 
         if queue_item is None:
             # queue empty
@@ -75,7 +75,7 @@ class DefaultSessionExecutionService(SessionExecutionServiceBase):
         # execute the session
         self._invoker.services.graph_execution_manager.set(queue_item.session)
         self._emit_queue_item_status()
-        self._invoker.invoke(self._current.session, invoke_all=True)
+        # self._invoker.invoke(self._current.session, invoke_all=True)
 
     def start(
         self,

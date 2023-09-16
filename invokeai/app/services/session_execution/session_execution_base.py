@@ -13,11 +13,6 @@ class SessionExecutionServiceBase(ABC):
         pass
 
     @abstractmethod
-    def invoke_next(self, queue_id: str) -> None:
-        """Invokes the next queue item"""
-        pass
-
-    @abstractmethod
     def start(
         self,
         queue_id: str,

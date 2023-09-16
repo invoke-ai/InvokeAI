@@ -257,6 +257,27 @@ async def cancel_queue_item(
     item_id: str = Path(description="The queue item to cancel"),
 ) -> SessionQueueItem:
     """Deletes a queue item"""
-    return ApiDependencies.invoker.services.session_queue.set_queue_item_status(
-        queue_id=queue_id, item_id=item_id, status="canceled"
-    )
+    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(queue_id=queue_id, item_id=item_id)
+    if queue_item.status not in ["completed", "failed", "canceled"]:
+        return ApiDependencies.invoker.services.session_queue.set_queue_item_status(
+            queue_id=queue_id, item_id=item_id, status="canceled"
+        )
+    return queue_item
+
+
+@session_queue_router.put(
+    "/{queue_id}/start_processor",
+    operation_id="start_processor",
+)
+async def start_processor() -> None:
+    """Deletes a queue item"""
+    ApiDependencies.invoker.services.session_processor.start()
+
+
+@session_queue_router.put(
+    "/{queue_id}/stop_processor",
+    operation_id="stop_processor",
+)
+async def stop_processor() -> None:
+    """Deletes a queue item"""
+    ApiDependencies.invoker.services.session_processor.stop()
