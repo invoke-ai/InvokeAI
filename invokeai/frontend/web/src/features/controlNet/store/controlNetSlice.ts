@@ -74,16 +74,18 @@ export type ControlNetState = {
   ipAdapterInfo: IPAdapterConfig;
 };
 
+export const initialIPAdapterState: IPAdapterConfig = {
+  adapterImage: null,
+  model: null,
+  weight: 1,
+};
+
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
   pendingControlImages: [],
   isIPAdapterEnabled: false,
-  ipAdapterInfo: {
-    adapterImage: null,
-    model: null,
-    weight: 1,
-  },
+  ipAdapterInfo: { ...initialIPAdapterState },
 };
 
 export const controlNetSlice = createSlice({
@@ -388,11 +390,7 @@ export const controlNetSlice = createSlice({
     },
     ipAdapterStateReset: (state) => {
       state.isIPAdapterEnabled = false;
-      state.ipAdapterInfo = {
-        adapterImage: null,
-        model: null,
-        weight: 1,
-      };
+      state.ipAdapterInfo = { ...initialIPAdapterState };
     },
   },
   extraReducers: (builder) => {
