@@ -61,7 +61,10 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const QueueTab = () => {
+const computeItemKey = (index: number, item: SessionQueueItemDTO): string =>
+  item.item_id;
+
+const QueueTable = () => {
   const { listCursor, listPriority } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -99,11 +102,13 @@ const QueueTab = () => {
     if (!listQueueItemsData?.has_more) {
       return;
     }
-    dispatch(listCursorChanged(queueItems[queueItems.length - 1]?.order_id));
-    dispatch(listPriorityChanged(queueItems[queueItems.length - 1]?.priority));
+    const lastItem = queueItems[queueItems.length - 1];
+    if (!lastItem) {
+      return;
+    }
+    dispatch(listCursorChanged(lastItem.order_id));
+    dispatch(listPriorityChanged(lastItem.priority));
   }, [dispatch, listQueueItemsData?.has_more, queueItems]);
-
-  console.log(listCursor, listPriority);
 
   return (
     <Box ref={rootRef} w="full" h="full">
@@ -115,27 +120,30 @@ const QueueTab = () => {
           components={TableComponents}
           fixedHeaderContent={FixedHeaderContent}
           itemContent={ItemContent}
+          computeItemKey={computeItemKey}
         />
       )}
     </Box>
   );
 };
 
-export default memo(QueueTab);
+export default memo(QueueTable);
+
+const _hover = { bg: 'base.150', _dark: { bg: 'base.750' } };
 
 const TableComponents: TableComponents<SessionQueueItemDTO> = {
-  Table: forwardRef((props, ref) => (
-    <Table {...props} ref={ref} size="sm" layout="fixed" />
-  )),
-  TableHead: forwardRef((props, ref) => <Thead {...props} ref={ref} h={8} />),
-  TableRow: forwardRef((props, ref) => (
-    <Tr
-      {...props}
-      ref={ref}
-      _hover={{ bg: 'base.150', _dark: { bg: 'base.750' } }}
-    />
-  )),
-  TableBody: forwardRef((props, ref) => <Tbody {...props} ref={ref} />),
+  Table: memo(
+    forwardRef((props, ref) => (
+      <Table {...props} ref={ref} size="sm" layout="fixed" />
+    ))
+  ),
+  TableHead: memo(
+    forwardRef((props, ref) => <Thead {...props} ref={ref} h={8} />)
+  ),
+  TableRow: memo(
+    forwardRef((props, ref) => <Tr {...props} ref={ref} _hover={_hover} />)
+  ),
+  TableBody: memo(forwardRef((props, ref) => <Tbody {...props} ref={ref} />)),
 };
 
 const FixedHeaderContent: FixedHeaderContent = () => (
@@ -155,27 +163,25 @@ const FixedHeaderContent: FixedHeaderContent = () => (
   </Tr>
 );
 
+const _dark = { borderColor: 'base.750' };
+
 const ItemContent: ItemContent<SessionQueueItemDTO, unknown> = (
   index,
   { item_id, status, batch_id, field_values }
 ) => (
   <>
-    <Td
-      borderColor="base.150"
-      _dark={{ borderColor: 'base.750' }}
-      textAlign="right"
-    >
+    <Td borderColor="base.150" _dark={_dark} textAlign="right">
       <Text>{index + 1}</Text>
     </Td>
-    <Td borderColor="base.150" _dark={{ borderColor: 'base.750' }}>
+    <Td borderColor="base.150" _dark={_dark}>
       <QueueStatusBadge status={status} />
     </Td>
-    <Td borderColor="base.150" _dark={{ borderColor: 'base.750' }}>
+    <Td borderColor="base.150" _dark={_dark}>
       <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
         {batch_id}
       </Text>
     </Td>
-    <Td borderColor="base.150" _dark={{ borderColor: 'base.750' }}>
+    <Td borderColor="base.150" _dark={_dark}>
       {field_values && (
         <Flex gap={2}>
           {field_values
