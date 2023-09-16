@@ -10,4 +10,5 @@ export type ImageUsage = {
   isCanvasImage: boolean;
   isNodesImage: boolean;
   isControlNetImage: boolean;
+  isIPAdapterImage: boolean;
 };

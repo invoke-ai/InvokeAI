@@ -386,6 +386,14 @@ export const controlNetSlice = createSlice({
     ) => {
       state.ipAdapterInfo.model = action.payload;
     },
+    ipAdapterStateReset: (state) => {
+      state.isIPAdapterEnabled = false;
+      state.ipAdapterInfo = {
+        adapterImage: null,
+        model: null,
+        weight: 1,
+      };
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
@@ -449,6 +457,7 @@ export const {
   ipAdapterImageChanged,
   ipAdapterWeightChanged,
   ipAdapterModelChanged,
+  ipAdapterStateReset,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;
