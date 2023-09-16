@@ -167,8 +167,8 @@ class ControlNetData:
 class IPAdapterData:
     ip_adapter_model: IPAdapter = Field(default=None)
     # TODO: change to polymorphic so can do different weights per step (once implemented...)
-    # weight: Union[float, List[float]] = Field(default=1.0)
-    weight: float = Field(default=1.0)
+    weight: Union[float, List[float]] = Field(default=1.0)
+    # weight: float = Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
 
@@ -421,8 +421,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         elif ip_adapter_data is not None:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
+            weight = ip_adapter_data.weight[0] if isinstance(ip_adapter_data.weight, List) else ip_adapter_data.weight
             attn_ctx = ip_adapter_data.ip_adapter_model.apply_ip_adapter_attention(
-                unet=self.invokeai_diffuser.model, scale=ip_adapter_data.weight
+                unet=self.invokeai_diffuser.model, scale=weight,
             )
             self.use_ip_adapter = True
         else:
@@ -512,9 +513,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if self.use_ip_adapter and ip_adapter_data is not None: # somewhat redundant but logic is clearer
             first_adapter_step = math.floor(ip_adapter_data.begin_step_percent * total_step_count)
             last_adapter_step = math.ceil(ip_adapter_data.end_step_percent * total_step_count)
+            weight = ip_adapter_data.weight[step_index] if isinstance(ip_adapter_data.weight, List) else ip_adapter_data.weight
             if step_index >= first_adapter_step and step_index <= last_adapter_step:
                 # only apply IP-Adapter if current step is within the IP-Adapter's begin/end step range
-                ip_adapter_data.ip_adapter_model.set_scale(ip_adapter_data.weight)
+                # ip_adapter_data.ip_adapter_model.set_scale(ip_adapter_data.weight)
+                ip_adapter_data.ip_adapter_model.set_scale(weight)
             else:
                 # otherwise, set IP-Adapter scale to 0, so it has no effect
                 ip_adapter_data.ip_adapter_model.set_scale(0.0)

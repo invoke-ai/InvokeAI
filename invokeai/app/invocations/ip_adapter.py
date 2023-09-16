@@ -1,6 +1,8 @@
 import os
 
+from builtins import bool, float
 from pydantic import BaseModel, Field
+from typing import Dict, List, Literal, Optional, Union
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -33,9 +35,14 @@ class IPAdapterField(BaseModel):
     image: ImageField = Field(description="The IP-Adapter image prompt.")
     ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
     image_encoder_model: CLIPVisionModelField = Field(description="The name of the CLIP image encoder model.")
-    weight: float = Field(default=1.0, ge=0, description="The weight of the IP-Adapter.")
-    begin_step_percent: float = Field(default=0.0, ge=0, le=1.0)
-    end_step_percent: float = Field(default=1.0, ge=0, le=1.0)
+    weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
+    # weight: float = Field(default=1.0, ge=0, description="The weight of the IP-Adapter.")
+    begin_step_percent: float = Field(
+        default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
+    )
+    end_step_percent: float = Field(
+        default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
+    )
 
 
 @invocation_output("ip_adapter_output")
@@ -55,7 +62,11 @@ class IPAdapterInvocation(BaseInvocation):
         title="IP-Adapter Model",
         input=Input.Direct,
     )
-    weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
+
+    # weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
+    weight: Union[float, List[float]] = InputField(default=1, ge=0, description="The weight given to the IP-Adapter",
+                                                   ui_type=UIType.Float, title="Weight")
+
     begin_step_percent: float = InputField(
         default=0, ge=-1, le=2, description="When the IP-Adapter is first applied (% of total steps)"
     )
@@ -81,7 +92,6 @@ class IPAdapterInvocation(BaseInvocation):
             model_name=image_encoder_model_name,
             base_model=BaseModelType.Any,
         )
-
         return IPAdapterOutput(
             ip_adapter=IPAdapterField(
                 image=self.image,
