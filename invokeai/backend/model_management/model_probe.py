@@ -1,24 +1,23 @@
 import json
-import torch
-import safetensors.torch
-
 from dataclasses import dataclass
-
-from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
-from typing import Callable, Literal, Union, Dict, Optional
+from typing import Callable, Dict, Literal, Optional, Union
+
+import safetensors.torch
+import torch
+from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
 
 from .models import (
     BaseModelType,
+    InvalidModelException,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
     SilenceWarnings,
-    InvalidModelException,
 )
-from .util import lora_token_vector_length
 from .models.base import read_checkpoint_meta
+from .util import lora_token_vector_length
 
 
 @dataclass
@@ -51,6 +50,7 @@ class ModelProbe(object):
         "StableDiffusionUpscalePipeline": ModelType.Main,
         "StableDiffusionXLPipeline": ModelType.Main,
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
+        "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
     }
@@ -218,9 +218,9 @@ class ModelProbe(object):
             raise "The model {model_name} is potentially infected by malware. Aborting import."
 
 
-###################################################3
+# ##################################################3
 # Checkpoint probing
-###################################################3
+# ##################################################3
 class ProbeBase(object):
     def get_base_type(self) -> BaseModelType:
         pass
@@ -432,7 +432,7 @@ class PipelineFolderProbe(FolderProbeBase):
                 return ModelVariantType.Depth
             elif in_channels == 4:
                 return ModelVariantType.Normal
-        except:
+        except Exception:
             pass
         return ModelVariantType.Normal
 

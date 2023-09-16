@@ -5,7 +5,7 @@ import IAITextarea from 'common/components/IAITextarea';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { setNegativePrompt } from 'features/parameters/store/generationSlice';
-import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
+import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
@@ -109,4 +109,4 @@ const ParamNegativeConditioning = () => {
   );
 };
 
-export default ParamNegativeConditioning;
+export default memo(ParamNegativeConditioning);

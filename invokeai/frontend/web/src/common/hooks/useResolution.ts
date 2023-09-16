@@ -11,8 +11,14 @@ export default function useResolution():
   const tabletResolutions = ['md', 'lg'];
   const desktopResolutions = ['xl', '2xl'];
 
-  if (mobileResolutions.includes(breakpointValue)) return 'mobile';
-  if (tabletResolutions.includes(breakpointValue)) return 'tablet';
-  if (desktopResolutions.includes(breakpointValue)) return 'desktop';
+  if (mobileResolutions.includes(breakpointValue)) {
+    return 'mobile';
+  }
+  if (tabletResolutions.includes(breakpointValue)) {
+    return 'tablet';
+  }
+  if (desktopResolutions.includes(breakpointValue)) {
+    return 'desktop';
+  }
   return 'unknown';
 }

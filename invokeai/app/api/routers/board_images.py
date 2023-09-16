@@ -34,7 +34,7 @@ async def add_image_to_board(
             board_id=board_id, image_name=image_name
         )
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to add image to board")
 
 
@@ -53,7 +53,7 @@ async def remove_image_from_board(
     try:
         result = ApiDependencies.invoker.services.board_images.remove_image_from_board(image_name=image_name)
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to remove image from board")
 
 
@@ -79,10 +79,10 @@ async def add_images_to_board(
                     board_id=board_id, image_name=image_name
                 )
                 added_image_names.append(image_name)
-            except:
+            except Exception:
                 pass
         return AddImagesToBoardResult(board_id=board_id, added_image_names=added_image_names)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to add images to board")
 
 
@@ -105,8 +105,8 @@ async def remove_images_from_board(
             try:
                 ApiDependencies.invoker.services.board_images.remove_image_from_board(image_name=image_name)
                 removed_image_names.append(image_name)
-            except:
+            except Exception:
                 pass
         return RemoveImagesFromBoardResult(removed_image_names=removed_image_names)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to remove images from board")

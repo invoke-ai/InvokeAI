@@ -1,11 +1,12 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
+import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useTranslation } from 'react-i18next';
 
 import { userInvoked } from 'app/store/actions';
 import IAITextarea from 'common/components/IAITextarea';
@@ -45,6 +46,7 @@ const ParamSDXLPositiveStyleConditioning = () => {
   const isReady = useIsReadyToInvoke();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
+  const { t } = useTranslation();
 
   const { prompt, activeTabName, shouldConcatSDXLStylePrompt } =
     useAppSelector(promptInputSelector);
@@ -143,7 +145,7 @@ const ParamSDXLPositiveStyleConditioning = () => {
             name="prompt"
             ref={promptRef}
             value={prompt}
-            placeholder="Positive Style Prompt"
+            placeholder={t('sdxl.posStylePrompt')}
             onChange={handleChangePrompt}
             onKeyDown={handleKeyDown}
             resize="vertical"
@@ -166,4 +168,4 @@ const ParamSDXLPositiveStyleConditioning = () => {
   );
 };
 
-export default ParamSDXLPositiveStyleConditioning;
+export default memo(ParamSDXLPositiveStyleConditioning);

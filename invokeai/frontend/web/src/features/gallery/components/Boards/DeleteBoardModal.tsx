@@ -132,8 +132,8 @@ const DeleteBoardModal = (props: Props) => {
               ) : (
                 <ImageUsageMessage
                   imageUsage={imageUsageSummary}
-                  topMessage="This board contains images used in the following features:"
-                  bottomMessage="Deleting this board and its images will reset any features currently using them."
+                  topMessage={t('boards.topMessage')}
+                  bottomMessage={t('boards.bottomMessage')}
                 />
               )}
               <Text>Deleted boards cannot be restored.</Text>

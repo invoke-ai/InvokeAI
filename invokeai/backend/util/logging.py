@@ -178,17 +178,16 @@ InvokeAI:
 import logging.handlers
 import socket
 import urllib.parse
-
 from abc import abstractmethod
 from pathlib import Path
 
-from invokeai.app.services.config import InvokeAIAppConfig, get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 try:
     import syslog
 
     SYSLOG_AVAILABLE = True
-except:
+except ImportError:
     SYSLOG_AVAILABLE = False
 
 
@@ -417,7 +416,7 @@ class InvokeAILogger(object):
                     syslog_args["socktype"] = _SOCK_MAP[arg_value[0]]
                 else:
                     syslog_args["address"] = arg_name
-        except:
+        except Exception:
             raise ValueError(f"{args} is not a value argument list for syslog logging")
         return logging.handlers.SysLogHandler(**syslog_args)
 

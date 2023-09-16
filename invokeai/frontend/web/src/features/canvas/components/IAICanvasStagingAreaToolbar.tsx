@@ -13,7 +13,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { isEqual } from 'lodash-es';
 
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -129,7 +129,9 @@ const IAICanvasStagingAreaToolbar = () => {
     currentStagingAreaImage?.imageName ?? skipToken
   );
 
-  if (!currentStagingAreaImage) return null;
+  if (!currentStagingAreaImage) {
+    return null;
+  }
 
   return (
     <Flex
@@ -138,11 +140,10 @@ const IAICanvasStagingAreaToolbar = () => {
       w="100%"
       align="center"
       justify="center"
-      filter="drop-shadow(0 0.5rem 1rem rgba(0,0,0))"
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}
     >
-      <ButtonGroup isAttached>
+      <ButtonGroup isAttached borderRadius="base" shadow="dark-lg">
         <IAIIconButton
           tooltip={`${t('unifiedCanvas.previous')} (Left)`}
           aria-label={`${t('unifiedCanvas.previous')} (Left)`}
@@ -207,4 +208,4 @@ const IAICanvasStagingAreaToolbar = () => {
   );
 };
 
-export default IAICanvasStagingAreaToolbar;
+export default memo(IAICanvasStagingAreaToolbar);

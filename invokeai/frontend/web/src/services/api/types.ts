@@ -111,6 +111,8 @@ export type ImageBlurInvocation = s['ImageBlurInvocation'];
 export type ImageScaleInvocation = s['ImageScaleInvocation'];
 export type InfillPatchMatchInvocation = s['InfillPatchMatchInvocation'];
 export type InfillTileInvocation = s['InfillTileInvocation'];
+export type CreateDenoiseMaskInvocation = s['CreateDenoiseMaskInvocation'];
+export type MaskEdgeInvocation = s['MaskEdgeInvocation'];
 export type RandomIntInvocation = s['RandomIntInvocation'];
 export type CompelInvocation = s['CompelInvocation'];
 export type DynamicPromptInvocation = s['DynamicPromptInvocation'];
@@ -129,6 +131,7 @@ export type ESRGANInvocation = s['ESRGANInvocation'];
 export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
+export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];
@@ -155,6 +158,9 @@ export type ZoeDepthImageProcessorInvocation =
 
 // Node Outputs
 export type ImageOutput = s['ImageOutput'];
+export type StringOutput = s['StringOutput'];
+export type FloatOutput = s['FloatOutput'];
+export type IntegerOutput = s['IntegerOutput'];
 export type IterateInvocationOutput = s['IterateInvocationOutput'];
 export type CollectInvocationOutput = s['CollectInvocationOutput'];
 export type LatentsOutput = s['LatentsOutput'];

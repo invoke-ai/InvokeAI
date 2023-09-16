@@ -37,7 +37,7 @@ async def create_board(
     try:
         result = ApiDependencies.invoker.services.boards.create(board_name=board_name)
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to create board")
 
 
@@ -50,7 +50,7 @@ async def get_board(
     try:
         result = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404, detail="Board not found")
 
 
@@ -73,7 +73,7 @@ async def update_board(
     try:
         result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to update board")
 
 
@@ -105,7 +105,7 @@ async def delete_board(
                 deleted_board_images=deleted_board_images,
                 deleted_images=[],
             )
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete board")
 
 

@@ -1,20 +1,17 @@
 import io
 from typing import Optional
 
-from PIL import Image
 from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
+from PIL import Image
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.image_record import (
-    ImageDTO,
-    ImageRecordChanges,
-    ImageUrlsDTO,
-)
+from invokeai.app.services.models.image_record import ImageDTO, ImageRecordChanges, ImageUrlsDTO
+
 from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
@@ -55,7 +52,7 @@ async def upload_image(
         if crop_visible:
             bbox = pil_image.getbbox()
             pil_image = pil_image.crop(bbox)
-    except:
+    except Exception:
         # Error opening the image
         raise HTTPException(status_code=415, detail="Failed to read image")
 
@@ -73,7 +70,7 @@ async def upload_image(
         response.headers["Location"] = image_dto.image_url
 
         return image_dto
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to create image")
 
 
@@ -85,7 +82,7 @@ async def delete_image(
 
     try:
         ApiDependencies.invoker.services.images.delete(image_name)
-    except Exception as e:
+    except Exception:
         # TODO: Does this need any exception handling at all?
         pass
 
@@ -97,7 +94,7 @@ async def clear_intermediates() -> int:
     try:
         count_deleted = ApiDependencies.invoker.services.images.delete_intermediates()
         return count_deleted
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to clear intermediates")
         pass
 
@@ -115,7 +112,7 @@ async def update_image(
 
     try:
         return ApiDependencies.invoker.services.images.update(image_name, image_changes)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Failed to update image")
 
 
@@ -131,7 +128,7 @@ async def get_image_dto(
 
     try:
         return ApiDependencies.invoker.services.images.get_dto(image_name)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
@@ -147,7 +144,7 @@ async def get_image_metadata(
 
     try:
         return ApiDependencies.invoker.services.images.get_metadata(image_name)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
@@ -183,7 +180,7 @@ async def get_image_full(
         )
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
@@ -212,7 +209,7 @@ async def get_image_thumbnail(
         response = FileResponse(path, media_type="image/webp", content_disposition_type="inline")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
@@ -234,7 +231,7 @@ async def get_image_urls(
             image_url=image_url,
             thumbnail_url=thumbnail_url,
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
@@ -282,10 +279,10 @@ async def delete_images_from_list(
             try:
                 ApiDependencies.invoker.services.images.delete(image_name)
                 deleted_images.append(image_name)
-            except:
+            except Exception:
                 pass
         return DeleteImagesFromListResult(deleted_images=deleted_images)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete images")
 
 
@@ -303,10 +300,10 @@ async def star_images_in_list(
             try:
                 ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=True))
                 updated_image_names.append(image_name)
-            except:
+            except Exception:
                 pass
         return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to star images")
 
 
@@ -320,8 +317,8 @@ async def unstar_images_in_list(
             try:
                 ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=False))
                 updated_image_names.append(image_name)
-            except:
+            except Exception:
                 pass
         return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to unstar images")

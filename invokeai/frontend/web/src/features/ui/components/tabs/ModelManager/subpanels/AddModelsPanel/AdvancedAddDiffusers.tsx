@@ -1,16 +1,17 @@
 import { Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import { DiffusersModelConfig } from 'services/api/types';
 import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import BaseModelSelect from '../shared/BaseModelSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
+import { getModelName } from './util';
 
 type AdvancedAddDiffusersProps = {
   model_path?: string;
@@ -25,7 +26,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
 
   const advancedAddDiffusersForm = useForm<DiffusersModelConfig>({
     initialValues: {
-      model_name: model_path?.split('\\').splice(-1)[0] ?? '',
+      model_name: model_path ? getModelName(model_path, false) : '',
       base_model: 'sd-1',
       model_type: 'main',
       path: model_path ? model_path : '',
@@ -46,7 +47,9 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
         dispatch(
           addToast(
             makeToast({
-              title: `Model Added: ${values.model_name}`,
+              title: t('modelManager.modelAdded', {
+                modelName: values.model_name,
+              }),
               status: 'success',
             })
           )
@@ -62,7 +65,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
           dispatch(
             addToast(
               makeToast({
-                title: 'Model Add Failed',
+                title: t('toast.modelAddFailed'),
                 status: 'error',
               })
             )
@@ -81,27 +84,40 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
       <Flex flexDirection="column" gap={2}>
         <IAIMantineTextInput
           required
-          label="Model Name"
+          label={t('modelManager.model')}
           {...advancedAddDiffusersForm.getInputProps('model_name')}
         />
         <BaseModelSelect
+          label={t('modelManager.baseModel')}
           {...advancedAddDiffusersForm.getInputProps('base_model')}
         />
         <IAIMantineTextInput
           required
-          label="Model Location"
-          placeholder="Provide the path to a local folder where your Diffusers Model is stored"
+          label={t('modelManager.modelLocation')}
+          placeholder={t('modelManager.modelLocationValidationMsg')}
           {...advancedAddDiffusersForm.getInputProps('path')}
+          onBlur={(e) => {
+            if (advancedAddDiffusersForm.values['model_name'] === '') {
+              const modelName = getModelName(e.currentTarget.value, false);
+              if (modelName) {
+                advancedAddDiffusersForm.setFieldValue(
+                  'model_name',
+                  modelName as string
+                );
+              }
+            }
+          }}
         />
         <IAIMantineTextInput
-          label="Description"
+          label={t('modelManager.description')}
           {...advancedAddDiffusersForm.getInputProps('description')}
         />
         <IAIMantineTextInput
-          label="VAE Location"
+          label={t('modelManager.vaeLocation')}
           {...advancedAddDiffusersForm.getInputProps('vae')}
         />
         <ModelVariantSelect
+          label={t('modelManager.variant')}
           {...advancedAddDiffusersForm.getInputProps('variant')}
         />
         <IAIButton mt={2} type="submit">

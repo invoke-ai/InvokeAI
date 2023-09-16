@@ -18,6 +18,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { clamp, isEqual } from 'lodash-es';
+import { memo } from 'react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -117,7 +118,11 @@ const IAICanvasToolChooserOptions = () => {
   useHotkeys(
     ['BracketLeft'],
     () => {
-      dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
+      if (brushSize - 5 <= 5) {
+        dispatch(setBrushSize(Math.max(brushSize - 1, 1)));
+      } else {
+        dispatch(setBrushSize(Math.max(brushSize - 5, 1)));
+      }
     },
     {
       enabled: () => !isStaging,
@@ -252,4 +257,4 @@ const IAICanvasToolChooserOptions = () => {
   );
 };
 
-export default IAICanvasToolChooserOptions;
+export default memo(IAICanvasToolChooserOptions);

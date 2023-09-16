@@ -1,31 +1,37 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { getIsGraphAcyclic } from 'features/nodes/hooks/useIsValidConnection';
-import { COLLECTION_TYPES } from 'features/nodes/types/constants';
+import {
+  COLLECTION_MAP,
+  COLLECTION_TYPES,
+  POLYMORPHIC_TO_SINGLE_MAP,
+  POLYMORPHIC_TYPES,
+} from 'features/nodes/types/constants';
 import { FieldType } from 'features/nodes/types/types';
 import { HandleType } from 'reactflow';
+import i18n from 'i18next';
+
+/**
+ * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/hooks/useIsValidConnection.ts`
+ * TODO: Figure out how to do this without duplicating all the logic
+ */
 
 export const makeConnectionErrorSelector = (
   nodeId: string,
   fieldName: string,
   handleType: HandleType,
   fieldType?: FieldType
-) =>
-  createSelector(stateSelector, (state) => {
+) => {
+  return createSelector(stateSelector, (state) => {
     if (!fieldType) {
-      return 'No field type';
+      return i18n.t('nodes.noFieldType');
     }
 
     const { currentConnectionFieldType, connectionStartParams, nodes, edges } =
       state.nodes;
 
-    if (!state.nodes.shouldValidateGraph) {
-      // manual override!
-      return null;
-    }
-
     if (!connectionStartParams || !currentConnectionFieldType) {
-      return 'No connection in progress';
+      return i18n.t('nodes.noConnectionInProgress');
     }
 
     const {
@@ -35,50 +41,93 @@ export const makeConnectionErrorSelector = (
     } = connectionStartParams;
 
     if (!connectionHandleType || !connectionNodeId || !connectionFieldName) {
-      return 'No connection data';
+      return i18n.t('nodes.noConnectionData');
     }
 
-    const targetFieldType =
+    const targetType =
       handleType === 'target' ? fieldType : currentConnectionFieldType;
-    const sourceFieldType =
+    const sourceType =
       handleType === 'source' ? fieldType : currentConnectionFieldType;
 
     if (nodeId === connectionNodeId) {
-      return 'Cannot connect to self';
+      return i18n.t('nodes.cannotConnectToSelf');
     }
 
     if (handleType === connectionHandleType) {
       if (handleType === 'source') {
-        return 'Cannot connect output to output';
+        return i18n.t('nodes.cannotConnectOutputToOutput');
       }
-      return 'Cannot connect input to input';
+      return i18n.t('nodes.cannotConnectInputToInput');
     }
 
     if (
-      fieldType !== currentConnectionFieldType &&
-      fieldType !== 'CollectionItem' &&
-      currentConnectionFieldType !== 'CollectionItem'
-    ) {
-      if (
-        !(
-          COLLECTION_TYPES.includes(targetFieldType) &&
-          COLLECTION_TYPES.includes(sourceFieldType)
-        )
-      ) {
-        // except for collection items, field types must match
-        return 'Field types must match';
-      }
-    }
-
-    if (
-      handleType === 'target' &&
       edges.find((edge) => {
         return edge.target === nodeId && edge.targetHandle === fieldName;
       }) &&
       // except CollectionItem inputs can have multiples
-      targetFieldType !== 'CollectionItem'
+      targetType !== 'CollectionItem'
     ) {
-      return 'Inputs may only have one connection';
+      return i18n.t('nodes.inputMayOnlyHaveOneConnection');
+    }
+
+    /**
+     * Connection types must be the same for a connection, with exceptions:
+     * - CollectionItem can connect to any non-Collection
+     * - Non-Collections can connect to CollectionItem
+     * - Anything (non-Collections, Collections, Polymorphics) can connect to Polymorphics of the same base type
+     * - Generic Collection can connect to any other Collection or Polymorphic
+     * - Any Collection can connect to a Generic Collection
+     */
+
+    if (sourceType !== targetType) {
+      const isCollectionItemToNonCollection =
+        sourceType === 'CollectionItem' &&
+        !COLLECTION_TYPES.includes(targetType);
+
+      const isNonCollectionToCollectionItem =
+        targetType === 'CollectionItem' &&
+        !COLLECTION_TYPES.includes(sourceType) &&
+        !POLYMORPHIC_TYPES.includes(sourceType);
+
+      const isAnythingToPolymorphicOfSameBaseType =
+        POLYMORPHIC_TYPES.includes(targetType) &&
+        (() => {
+          if (!POLYMORPHIC_TYPES.includes(targetType)) {
+            return false;
+          }
+          const baseType =
+            POLYMORPHIC_TO_SINGLE_MAP[
+              targetType as keyof typeof POLYMORPHIC_TO_SINGLE_MAP
+            ];
+
+          const collectionType =
+            COLLECTION_MAP[baseType as keyof typeof COLLECTION_MAP];
+
+          return sourceType === baseType || sourceType === collectionType;
+        })();
+
+      const isGenericCollectionToAnyCollectionOrPolymorphic =
+        sourceType === 'Collection' &&
+        (COLLECTION_TYPES.includes(targetType) ||
+          POLYMORPHIC_TYPES.includes(targetType));
+
+      const isCollectionToGenericCollection =
+        targetType === 'Collection' && COLLECTION_TYPES.includes(sourceType);
+
+      const isIntToFloat = sourceType === 'integer' && targetType === 'float';
+
+      if (
+        !(
+          isCollectionItemToNonCollection ||
+          isNonCollectionToCollectionItem ||
+          isAnythingToPolymorphicOfSameBaseType ||
+          isGenericCollectionToAnyCollectionOrPolymorphic ||
+          isCollectionToGenericCollection ||
+          isIntToFloat
+        )
+      ) {
+        return i18n.t('nodes.fieldTypesMustMatch');
+      }
     }
 
     const isGraphAcyclic = getIsGraphAcyclic(
@@ -89,8 +138,9 @@ export const makeConnectionErrorSelector = (
     );
 
     if (!isGraphAcyclic) {
-      return 'Connection would create a cycle';
+      return i18n.t('nodes.connectionWouldCreateCycle');
     }
 
     return null;
   });
+};

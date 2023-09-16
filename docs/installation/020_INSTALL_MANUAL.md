@@ -8,9 +8,9 @@ title: Installing Manually
 
 </figure>
 
-!!! warning "This is for advanced Users"
+!!! warning "This is for Advanced Users"
 
-    **python experience is mandatory**
+    **Python experience is mandatory**
 
 ## Introduction
 
@@ -287,7 +287,7 @@ manager, please follow these steps:
     Leave off the `--gui` option to run the script using command-line arguments. Pass the `--help` argument
     to get usage instructions.
 
-### Developer Install
+## Developer Install
 
 If you have an interest in how InvokeAI works, or you would like to
 add features or bugfixes, you are encouraged to install the source
@@ -296,13 +296,14 @@ code for InvokeAI. For this to work, you will need to install the
 on your system, please see the [Git Installation
 Guide](https://github.com/git-guides/install-git)
 
+1. Create a fork of the InvokeAI repository through the GitHub UI or [this link](https://github.com/invoke-ai/InvokeAI/fork) 
 1. From the command line, run this command:
    ```bash
-   git clone https://github.com/invoke-ai/InvokeAI.git
+   git clone https://github.com/<your_github_username>/InvokeAI.git
    ```
 
     This will create a directory named `InvokeAI` and populate it with the
-    full source code from the InvokeAI repository.
+    full source code from your fork of the InvokeAI repository.
 
 2. Activate the InvokeAI virtual environment as per step (4) of the manual
 installation protocol (important!)

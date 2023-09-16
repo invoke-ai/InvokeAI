@@ -5,23 +5,23 @@ from typing import Optional
 
 import safetensors
 import torch
-from diffusers.utils import is_safetensors_available
 from omegaconf import OmegaConf
 
 from invokeai.app.services.config import InvokeAIAppConfig
+
 from .base import (
+    BaseModelType,
+    EmptyConfigLoader,
+    InvalidModelException,
     ModelBase,
     ModelConfigBase,
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelVariantType,
-    EmptyConfigLoader,
-    calc_model_size_by_fs,
-    calc_model_size_by_data,
-    classproperty,
-    InvalidModelException,
     ModelNotFoundException,
+    ModelType,
+    ModelVariantType,
+    SubModelType,
+    calc_model_size_by_data,
+    calc_model_size_by_fs,
+    classproperty,
 )
 
 
@@ -44,14 +44,14 @@ class VaeModel(ModelBase):
         try:
             config = EmptyConfigLoader.load_config(self.model_path, config_name="config.json")
             # config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
+        except Exception:
             raise Exception("Invalid vae model! (config.json not found or invalid)")
 
         try:
             vae_class_name = config.get("_class_name", "AutoencoderKL")
             self.vae_class = self._hf_definition_to_type(["diffusers", vae_class_name])
             self.model_size = calc_model_size_by_fs(self.model_path)
-        except:
+        except Exception:
             raise Exception("Invalid vae model! (Unkown vae type)")
 
     def get_size(self, child_type: Optional[SubModelType] = None):
@@ -175,5 +175,5 @@ def _convert_vae_ckpt_and_cache(
         vae_config=config,
         image_size=image_size,
     )
-    vae_model.save_pretrained(output_path, safe_serialization=is_safetensors_available())
+    vae_model.save_pretrained(output_path, safe_serialization=True)
     return output_path

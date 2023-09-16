@@ -1,16 +1,13 @@
-from abc import ABC, abstractmethod
-from typing import Optional, cast
 import sqlite3
 import threading
-from typing import Optional, Union
 import uuid
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.board_record import (
-    BoardRecord,
-    deserialize_board_record,
-)
+from abc import ABC, abstractmethod
+from typing import Optional, Union, cast
 
-from pydantic import BaseModel, Field, Extra
+from pydantic import BaseModel, Extra, Field
+
+from invokeai.app.services.image_record_storage import OffsetPaginatedResults
+from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
 
 
 class BoardChanges(BaseModel, extra=Extra.forbid):
@@ -230,7 +227,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             # Change the name of a board
             if changes.board_name is not None:
                 self._cursor.execute(
-                    f"""--sql
+                    """--sql
                     UPDATE boards
                     SET board_name = ?
                     WHERE board_id = ?;
@@ -241,7 +238,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             # Change the cover image of a board
             if changes.cover_image_name is not None:
                 self._cursor.execute(
-                    f"""--sql
+                    """--sql
                     UPDATE boards
                     SET cover_image_name = ?
                     WHERE board_id = ?;

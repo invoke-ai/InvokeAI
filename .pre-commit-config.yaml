@@ -8,3 +8,17 @@ repos:
     language: system
     entry: black
     types: [python]
+
+  - id: flake8
+    name: flake8
+    stages: [commit]
+    language: system
+    entry: flake8
+    types: [python]
+
+  - id: isort
+    name: isort
+    stages: [commit]
+    language: system
+    entry: isort
+    types: [python]

@@ -16,11 +16,15 @@ const useColorPicker = () => {
 
   return {
     updateColorUnderCursor: () => {
-      if (!stage || !canvasBaseLayer) return;
+      if (!stage || !canvasBaseLayer) {
+        return;
+      }
 
       const position = stage.getPointerPosition();
 
-      if (!position) return;
+      if (!position) {
+        return;
+      }
 
       const pixelRatio = Konva.pixelRatio;
 

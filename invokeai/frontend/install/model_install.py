@@ -11,6 +11,7 @@ The work is actually done in backend code in model_install_backend.py.
 
 import argparse
 import curses
+import logging
 import sys
 import textwrap
 import traceback
@@ -20,34 +21,28 @@ from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
 from shutil import get_terminal_size
 
-import logging
 import npyscreen
 import torch
 from npyscreen import widget
 
-from invokeai.backend.util.logging import InvokeAILogger
-
-from invokeai.backend.install.model_install_backend import (
-    InstallSelections,
-    ModelInstall,
-    SchedulerPredictionType,
-)
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.install.model_install_backend import InstallSelections, ModelInstall, SchedulerPredictionType
 from invokeai.backend.model_management import ModelManager, ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.widgets import (
+    MIN_COLS,
+    MIN_LINES,
+    BufferBox,
     CenteredTitleText,
+    CyclingForm,
     MultiSelectColumns,
     SingleSelectColumns,
     TextBox,
-    BufferBox,
-    set_min_terminal_size,
-    select_stable_diffusion_config_file,
-    CyclingForm,
-    MIN_COLS,
-    MIN_LINES,
     WindowTooSmallException,
+    select_stable_diffusion_config_file,
+    set_min_terminal_size,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
 
 config = InvokeAIAppConfig.get_config()
 logger = InvokeAILogger.getLogger()
@@ -251,7 +246,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     ) -> dict[str, npyscreen.widget]:
         """Generic code to create model selection widgets"""
         widgets = dict()
-        model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and not x in exclude]
+        model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and x not in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
 
         show_recommended = len(self.installed_models) == 0
@@ -357,14 +352,14 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 try:
                     v.hidden = True
                     v.editable = False
-                except:
+                except Exception:
                     pass
         for k, v in widgets[selected_tab].items():
             try:
                 v.hidden = False
                 if not isinstance(v, (npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
                     v.editable = True
-            except:
+            except Exception:
                 pass
         self.__class__.current_tab = selected_tab  # for persistence
         self.display()
@@ -541,7 +536,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.ti_models,
         ]
         for section in ui_sections:
-            if not "models_selected" in section:
+            if "models_selected" not in section:
                 continue
             selected = set([section["models"][x] for x in section["models_selected"].value])
             models_to_install = [x for x in selected if not self.all_models[x].installed]
@@ -637,7 +632,7 @@ def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection) -> SchedulerPre
             return None
         else:
             return response
-    except:
+    except Exception:
         return None
 
 
@@ -673,8 +668,7 @@ def process_and_execute(
 def select_and_download_models(opt: Namespace):
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     config.precision = precision
-    helper = lambda x: ask_user_for_prediction_type(x)
-    installer = ModelInstall(config, prediction_type_helper=helper)
+    installer = ModelInstall(config, prediction_type_helper=ask_user_for_prediction_type)
     if opt.list_models:
         installer.list_models(opt.list_models)
     elif opt.add or opt.delete:

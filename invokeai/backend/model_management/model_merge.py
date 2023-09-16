@@ -9,13 +9,14 @@ Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
 import warnings
 from enum import Enum
 from pathlib import Path
+from typing import List, Optional, Union
+
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
-from typing import List, Union, Optional
 
 import invokeai.backend.util.logging as logger
 
-from ...backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType, AddModelResult
+from ...backend.model_management import AddModelResult, BaseModelType, ModelManager, ModelType, ModelVariantType
 
 
 class MergeInterpolationMethod(str, Enum):

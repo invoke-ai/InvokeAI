@@ -17,9 +17,8 @@ export const CLIP_SKIP = 'clip_skip';
 export const IMAGE_TO_LATENTS = 'image_to_latents';
 export const LATENTS_TO_LATENTS = 'latents_to_latents';
 export const RESIZE = 'resize_image';
+export const IMG2IMG_RESIZE = 'img2img_resize';
 export const CANVAS_OUTPUT = 'canvas_output';
-export const INPAINT = 'inpaint';
-export const INPAINT_SEAM_FIX = 'inpaint_seam_fix';
 export const INPAINT_IMAGE = 'inpaint_image';
 export const SCALED_INPAINT_IMAGE = 'scaled_inpaint_image';
 export const INPAINT_IMAGE_RESIZE_UP = 'inpaint_image_resize_up';
@@ -27,6 +26,16 @@ export const INPAINT_IMAGE_RESIZE_DOWN = 'inpaint_image_resize_down';
 export const INPAINT_INFILL = 'inpaint_infill';
 export const INPAINT_INFILL_RESIZE_DOWN = 'inpaint_infill_resize_down';
 export const INPAINT_FINAL_IMAGE = 'inpaint_final_image';
+export const INPAINT_CREATE_MASK = 'inpaint_create_mask';
+export const INPAINT_MASK = 'inpaint_mask';
+export const CANVAS_COHERENCE_DENOISE_LATENTS =
+  'canvas_coherence_denoise_latents';
+export const CANVAS_COHERENCE_NOISE = 'canvas_coherence_noise';
+export const CANVAS_COHERENCE_NOISE_INCREMENT =
+  'canvas_coherence_noise_increment';
+export const CANVAS_COHERENCE_MASK_EDGE = 'canvas_coherence_mask_edge';
+export const CANVAS_COHERENCE_INPAINT_CREATE_MASK =
+  'canvas_coherence_inpaint_create_mask';
 export const MASK_FROM_ALPHA = 'tomask';
 export const MASK_EDGE = 'mask_edge';
 export const MASK_BLUR = 'mask_blur';
@@ -51,6 +60,9 @@ export const SDXL_REFINER_POSITIVE_CONDITIONING =
 export const SDXL_REFINER_NEGATIVE_CONDITIONING =
   'sdxl_refiner_negative_conditioning';
 export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
+export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
+export const SEAMLESS = 'seamless';
+export const SDXL_REFINER_SEAMLESS = 'refiner_seamless';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

@@ -1,8 +1,8 @@
 #!/bin/env python
 
 import argparse
-import sys
 from pathlib import Path
+
 from invokeai.backend.model_management.model_probe import ModelProbe
 
 parser = argparse.ArgumentParser(description="Probe model type")

@@ -1,12 +1,13 @@
 import torch
 from PIL import Image
+
 from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.models.image import ProgressImage
-from ..invocations.baseinvocation import InvocationContext
-from ...backend.util.util import image_to_dataURL
-from ...backend.stable_diffusion import PipelineIntermediateState
-from invokeai.app.services.config import InvokeAIAppConfig
+
 from ...backend.model_management.models import BaseModelType
+from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.util.util import image_to_dataURL
+from ..invocations.baseinvocation import InvocationContext
 
 
 def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=None):

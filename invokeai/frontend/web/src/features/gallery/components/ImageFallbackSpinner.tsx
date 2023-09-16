@@ -1,4 +1,5 @@
 import { Flex, Spinner, SpinnerProps } from '@chakra-ui/react';
+import { memo } from 'react';
 
 type ImageFallbackSpinnerProps = SpinnerProps;
 
@@ -23,4 +24,4 @@ const ImageFallbackSpinner = (props: ImageFallbackSpinnerProps) => {
   );
 };
 
-export default ImageFallbackSpinner;
+export default memo(ImageFallbackSpinner);

@@ -13,6 +13,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
+import { memo } from 'react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -161,4 +162,4 @@ const UnifiedCanvasToolSelect = () => {
   );
 };
 
-export default UnifiedCanvasToolSelect;
+export default memo(UnifiedCanvasToolSelect);

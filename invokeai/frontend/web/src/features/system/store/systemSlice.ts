@@ -2,9 +2,8 @@ import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
-import { startCase } from 'lodash-es';
+import { get, startCase, truncate, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
 import {
   isAnySessionRejected,
@@ -26,6 +25,7 @@ import {
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../util/makeToast';
 import { LANGUAGES } from './constants';
+import { zPydanticValidationError } from './zodSchemas';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -68,10 +68,6 @@ export interface SystemState {
    */
   wereModelsReceived: boolean;
   /**
-   * Whether or not the OpenAPI schema was received and parsed
-   */
-  wasSchemaParsed: boolean;
-  /**
    * The console output logging level
    */
   consoleLogLevel: InvokeLogLevel;
@@ -111,7 +107,6 @@ export const initialSystemState: SystemState = {
   isCancelScheduled: false,
   subscribedNodeIds: [],
   wereModelsReceived: false,
-  wasSchemaParsed: false,
   consoleLogLevel: 'debug',
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
@@ -338,13 +333,6 @@ export const systemSlice = createSlice({
       );
     });
 
-    /**
-     * OpenAPI schema was parsed
-     */
-    builder.addCase(nodeTemplatesBuilt, (state) => {
-      state.wasSchemaParsed = true;
-    });
-
     // *** Matchers - must be after all cases ***
 
     /**
@@ -361,18 +349,40 @@ export const systemSlice = createSlice({
       state.progressImage = null;
 
       let errorDescription = undefined;
+      const duration = 5000;
 
       if (action.payload?.status === 422) {
-        errorDescription = 'Validation Error';
+        const result = zPydanticValidationError.safeParse(action.payload);
+        if (result.success) {
+          result.data.error.detail.map((e) => {
+            state.toastQueue.push(
+              makeToast({
+                title: truncate(upperFirst(e.msg), { length: 128 }),
+                status: 'error',
+                description: truncate(
+                  `Path:
+                ${e.loc.join('.')}`,
+                  { length: 128 }
+                ),
+                duration,
+              })
+            );
+          });
+          return;
+        }
       } else if (action.payload?.error) {
-        errorDescription = action.payload?.error as string;
+        errorDescription = action.payload?.error;
       }
 
       state.toastQueue.push(
         makeToast({
           title: t('toast.serverError'),
           status: 'error',
-          description: errorDescription,
+          description: truncate(
+            get(errorDescription, 'detail', 'Unknown Error'),
+            { length: 128 }
+          ),
+          duration,
         })
       );
     });

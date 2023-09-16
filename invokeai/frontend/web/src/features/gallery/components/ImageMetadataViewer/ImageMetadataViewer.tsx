@@ -9,14 +9,15 @@ import {
   Tabs,
   Text,
 } from '@chakra-ui/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
-import { useDebounce } from 'use-debounce';
+import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
-import ImageMetadataJSON from './ImageMetadataJSON';
+import { useAppSelector } from '../../../../app/store/storeHooks';
+import { configSelector } from '../../../system/store/configSelectors';
+import { useTranslation } from 'react-i18next';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -28,19 +29,19 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // useHotkeys('esc', () => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
+  const { t } = useTranslation();
 
-  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
-    image.image_name,
-    500
-  );
+  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
 
-  const { currentData } = useGetImageMetadataQuery(
-    debounceState.isPending()
-      ? skipToken
-      : debouncedMetadataQueryArg ?? skipToken
+  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
+    { image, shouldFetchMetadataFromApi },
+    {
+      selectFromResult: (res) => ({
+        metadata: res?.currentData?.metadata,
+        workflow: res?.currentData?.workflow,
+      }),
+    }
   );
-  const metadata = currentData?.metadata;
-  const graph = currentData?.graph;
 
   return (
     <Flex
@@ -71,31 +72,31 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
       >
         <TabList>
-          <Tab>Core Metadata</Tab>
-          <Tab>Image Details</Tab>
-          <Tab>Graph</Tab>
+          <Tab>{t('metadata.metadata')}</Tab>
+          <Tab>{t('metadata.imageDetails')}</Tab>
+          <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
           <TabPanel>
             {metadata ? (
-              <ImageMetadataJSON jsonObject={metadata} label="Core Metadata" />
+              <DataViewer data={metadata} label={t('metadata.metadata')} />
             ) : (
-              <IAINoContentFallback label="No core metadata found" />
+              <IAINoContentFallback label={t('metadata.noMetaData')} />
             )}
           </TabPanel>
           <TabPanel>
             {image ? (
-              <ImageMetadataJSON jsonObject={image} label="Image Details" />
+              <DataViewer data={image} label={t('metadata.imageDetails')} />
             ) : (
-              <IAINoContentFallback label="No image details found" />
+              <IAINoContentFallback label={t('metadata.noImageDetails')} />
             )}
           </TabPanel>
           <TabPanel>
-            {graph ? (
-              <ImageMetadataJSON jsonObject={graph} label="Graph" />
+            {workflow ? (
+              <DataViewer data={workflow} label={t('metadata.workflow')} />
             ) : (
-              <IAINoContentFallback label="No graph found" />
+              <IAINoContentFallback label={t('metadata.noWorkFlow')} />
             )}
           </TabPanel>
         </TabPanels>

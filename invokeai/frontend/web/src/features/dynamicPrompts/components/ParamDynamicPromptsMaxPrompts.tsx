@@ -3,11 +3,12 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import {
   maxPromptsChanged,
   maxPromptsReset,
 } from '../store/dynamicPromptsSlice';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -31,6 +32,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
   const { maxPrompts, min, sliderMax, inputMax, isDisabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleChange = useCallback(
     (v: number) => {
@@ -45,7 +47,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
 
   return (
     <IAISlider
-      label="Max Prompts"
+      label={t('prompt.maxPrompts')}
       isDisabled={isDisabled}
       min={min}
       max={sliderMax}
@@ -60,4 +62,4 @@ const ParamDynamicPromptsMaxPrompts = () => {
   );
 };
 
-export default ParamDynamicPromptsMaxPrompts;
+export default memo(ParamDynamicPromptsMaxPrompts);

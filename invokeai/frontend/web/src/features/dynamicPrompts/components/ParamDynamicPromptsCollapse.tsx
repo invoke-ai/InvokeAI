@@ -4,10 +4,12 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
+import { memo } from 'react';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
 import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -21,6 +23,7 @@ const selector = createSelector(
 
 const ParamDynamicPromptsCollapse = () => {
   const { activeLabel } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const isDynamicPromptingEnabled =
     useFeatureStatus('dynamicPrompting').isFeatureEnabled;
@@ -30,7 +33,7 @@ const ParamDynamicPromptsCollapse = () => {
   }
 
   return (
-    <IAICollapse label="Dynamic Prompts" activeLabel={activeLabel}>
+    <IAICollapse label={t('prompt.dynamicPrompts')} activeLabel={activeLabel}>
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
         <ParamDynamicPromptsToggle />
         <ParamDynamicPromptsCombinatorial />
@@ -40,4 +43,4 @@ const ParamDynamicPromptsCollapse = () => {
   );
 };
 
-export default ParamDynamicPromptsCollapse;
+export default memo(ParamDynamicPromptsCollapse);

@@ -9,7 +9,7 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selector = createSelector(
@@ -64,4 +64,4 @@ const InitialImage = () => {
   );
 };
 
-export default InitialImage;
+export default memo(InitialImage);

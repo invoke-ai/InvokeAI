@@ -2,23 +2,17 @@ from __future__ import annotations
 
 import copy
 from contextlib import contextmanager
-from typing import Optional, Dict, Tuple, Any, Union, List
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-import torch
-from safetensors.torch import load_file
-from torch.utils.hooks import RemovableHandle
-
-from diffusers.models import UNet2DConditionModel
-from transformers import CLIPTextModel
-from onnx import numpy_helper
-from onnxruntime import OrtValue
 import numpy as np
-
+import torch
 from compel.embeddings_provider import BaseTextualInversionManager
 from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
+
+from .models.lora import LoRAModel
 
 """
 loras = [
@@ -52,7 +46,7 @@ class ModelPatcher:
                 module = module.get_submodule(submodule_name)
                 module_key += "." + submodule_name
                 submodule_name = key_parts.pop(0)
-            except:
+            except Exception:
                 submodule_name += "_" + key_parts.pop(0)
 
         module = module.get_submodule(submodule_name)
@@ -312,7 +306,9 @@ class TextualInversionManager(BaseTextualInversionManager):
 
 
 class ONNXModelPatcher:
-    from .models.base import IAIOnnxRuntimeModel, OnnxRuntimeModel
+    from diffusers import OnnxRuntimeModel
+
+    from .models.base import IAIOnnxRuntimeModel
 
     @classmethod
     @contextmanager
@@ -341,7 +337,7 @@ class ONNXModelPatcher:
     def apply_lora(
         cls,
         model: IAIOnnxRuntimeModel,
-        loras: List[Tuple[LoraModel, float]],
+        loras: List[Tuple[LoRAModel, float]],
         prefix: str,
     ):
         from .models.base import IAIOnnxRuntimeModel

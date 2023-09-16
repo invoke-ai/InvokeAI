@@ -1,5 +1,6 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { Flex, IconButton, Link, Text, Tooltip } from '@chakra-ui/react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
@@ -74,4 +75,4 @@ const ImageMetadataItem = ({
   );
 };
 
-export default ImageMetadataItem;
+export default memo(ImageMetadataItem);

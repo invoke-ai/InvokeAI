@@ -1,9 +1,12 @@
 import { logger } from 'app/logging/logger';
+import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   modelChanged,
+  setHeight,
+  setWidth,
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
 import { zMainOrOnnxModel } from 'features/parameters/types/parameterSchemas';
@@ -11,6 +14,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addModelSelectedListener = () => {
   startAppListening({
@@ -64,13 +68,31 @@ export const addModelSelectedListener = () => {
           dispatch(
             addToast(
               makeToast({
-                title: `Base model changed, cleared ${modelsCleared} incompatible submodel${
+                title: `${t(
+                  'toast.baseModelChangedCleared'
+                )} ${modelsCleared} ${t('toast.incompatibleSubmodel')}${
                   modelsCleared === 1 ? '' : 's'
                 }`,
                 status: 'warning',
               })
             )
           );
+        }
+      }
+
+      // Update Width / Height / Bounding Box Dimensions on Model Change
+      if (
+        state.generation.model?.base_model !== newModel.base_model &&
+        state.ui.shouldAutoChangeDimensions
+      ) {
+        if (['sdxl', 'sdxl-refiner'].includes(newModel.base_model)) {
+          dispatch(setWidth(1024));
+          dispatch(setHeight(1024));
+          dispatch(setBoundingBoxDimensions({ width: 1024, height: 1024 }));
+        } else {
+          dispatch(setWidth(512));
+          dispatch(setHeight(512));
+          dispatch(setBoundingBoxDimensions({ width: 512, height: 512 }));
         }
       }
 

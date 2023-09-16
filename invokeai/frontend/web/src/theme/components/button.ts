@@ -8,7 +8,16 @@ const invokeAI = defineStyle((props) => {
   if (c === 'base') {
     const _disabled = {
       bg: mode('base.150', 'base.700')(props),
-      color: mode('base.500', 'base.500')(props),
+      color: mode('base.300', 'base.500')(props),
+      svg: {
+        fill: mode('base.500', 'base.500')(props),
+      },
+      opacity: 1,
+    };
+
+    const data_progress = {
+      bg: 'none',
+      color: mode('base.300', 'base.500')(props),
       svg: {
         fill: mode('base.500', 'base.500')(props),
       },
@@ -31,6 +40,7 @@ const invokeAI = defineStyle((props) => {
         _disabled,
       },
       _disabled,
+      '&[data-progress="true"]': { ...data_progress, _hover: data_progress },
     };
   }
 
@@ -42,6 +52,17 @@ const invokeAI = defineStyle((props) => {
       filter: 'unset',
     },
     opacity: 1,
+    filter: mode(undefined, 'saturate(65%)')(props),
+  };
+
+  const data_progress = {
+    // bg: 'none',
+    color: mode(`${c}.50`, `${c}.500`)(props),
+    svg: {
+      fill: mode(`${c}.50`, `${c}.500`)(props),
+      filter: 'unset',
+    },
+    opacity: 0.7,
     filter: mode(undefined, 'saturate(65%)')(props),
   };
 
@@ -61,6 +82,7 @@ const invokeAI = defineStyle((props) => {
       },
       _disabled,
     },
+    '&[data-progress="true"]': { ...data_progress, _hover: data_progress },
   };
 });
 

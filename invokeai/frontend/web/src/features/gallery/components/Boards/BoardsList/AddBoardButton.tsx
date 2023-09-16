@@ -1,27 +1,27 @@
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
-
-const DEFAULT_BOARD_NAME = 'My Board';
+import { useTranslation } from 'react-i18next';
 
 const AddBoardButton = () => {
+  const { t } = useTranslation();
   const [createBoard, { isLoading }] = useCreateBoardMutation();
-
+  const DEFAULT_BOARD_NAME = t('boards.myBoard');
   const handleCreateBoard = useCallback(() => {
     createBoard(DEFAULT_BOARD_NAME);
-  }, [createBoard]);
+  }, [createBoard, DEFAULT_BOARD_NAME]);
 
   return (
     <IAIIconButton
       icon={<FaPlus />}
       isLoading={isLoading}
-      tooltip="Add Board"
-      aria-label="Add Board"
+      tooltip={t('boards.addBoard')}
+      aria-label={t('boards.addBoard')}
       onClick={handleCreateBoard}
       size="sm"
     />
   );
 };
 
-export default AddBoardButton;
+export default memo(AddBoardButton);

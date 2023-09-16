@@ -111,7 +111,7 @@ export default function ModelConvert(props: ModelConvertProps) {
       acceptButtonText={`${t('modelManager.convert')}`}
       triggerComponent={
         <IAIButton
-          size={'sm'}
+          size="sm"
           aria-label={t('modelManager.convertToDiffusers')}
           className=" modal-close-btn"
           isLoading={isLoading}

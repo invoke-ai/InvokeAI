@@ -21,8 +21,8 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
-
 from invokeai.app.services.config import InvokeAIAppConfig
+
 from ...backend.training import do_textual_inversion_training, parse_args
 
 TRAINING_DATA = "text-inversion-training-data"
@@ -59,7 +59,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
         try:
             default = self.model_names.index(saved_args["model"])
-        except:
+        except Exception:
             pass
 
         self.add_widget_intelligent(
@@ -377,7 +377,7 @@ def previous_args() -> dict:
     try:
         conf = OmegaConf.load(conf_file)
         conf["placeholder_token"] = conf["placeholder_token"].strip("<>")
-    except:
+    except Exception:
         conf = None
 
     return conf

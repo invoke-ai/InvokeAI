@@ -15,6 +15,8 @@ import { socketMiddleware } from 'services/events/middleware';
 import Loading from '../../common/components/Loading/Loading';
 import '../../i18n';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
+import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
+import { $headerComponent } from 'app/store/nanostores/headerComponent';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -26,6 +28,11 @@ interface Props extends PropsWithChildren {
   headerComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
+  selectedImage?: {
+    imageName: string;
+    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
+  };
+  customStarUi?: CustomStarUi;
 }
 
 const InvokeAIUI = ({
@@ -35,6 +42,8 @@ const InvokeAIUI = ({
   headerComponent,
   middleware,
   projectId,
+  selectedImage,
+  customStarUi,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -75,13 +84,33 @@ const InvokeAIUI = ({
     };
   }, [apiUrl, token, middleware, projectId]);
 
+  useEffect(() => {
+    if (customStarUi) {
+      $customStarUI.set(customStarUi);
+    }
+
+    return () => {
+      $customStarUI.set(undefined);
+    };
+  }, [customStarUi]);
+
+  useEffect(() => {
+    if (headerComponent) {
+      $headerComponent.set(headerComponent);
+    }
+
+    return () => {
+      $headerComponent.set(undefined);
+    };
+  }, [headerComponent]);
+
   return (
     <React.StrictMode>
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App config={config} headerComponent={headerComponent} />
+              <App config={config} selectedImage={selectedImage} />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>

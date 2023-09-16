@@ -3,13 +3,14 @@
 import copy
 import itertools
 import uuid
-from typing import Annotated, Any, Literal, Optional, Union, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Optional, Union, get_args, get_origin, get_type_hints
 
 import networkx as nx
 from pydantic import BaseModel, root_validator, validator
 from pydantic.fields import Field
 
-from ..invocations import *
+# Importing * is bad karma but needed here for node detection
+from ..invocations import *  # noqa: F401 F403
 from ..invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -18,6 +19,8 @@ from ..invocations.baseinvocation import (
     InvocationContext,
     OutputField,
     UIType,
+    invocation,
+    invocation_output,
 )
 
 # in 3.10 this would be "from types import NoneType"
@@ -109,6 +112,10 @@ def are_connection_types_compatible(from_type: Any, to_type: Any) -> bool:
         if to_type in get_args(from_type):
             return True
 
+        # allow int -> float, pydantic will cast for us
+        if from_type is int and to_type is float:
+            return True
+
         # if not issubclass(from_type, to_type):
         if not is_union_subtype(from_type, to_type):
             return False
@@ -147,23 +154,15 @@ class NodeAlreadyExecutedError(Exception):
 
 
 # TODO: Create and use an Empty output?
+@invocation_output("graph_output")
 class GraphInvocationOutput(BaseInvocationOutput):
-    type: Literal["graph_output"] = "graph_output"
-
-    class Config:
-        schema_extra = {
-            "required": [
-                "type",
-                "image",
-            ]
-        }
+    pass
 
 
 # TODO: Fill this out and move to invocations
+@invocation("graph")
 class GraphInvocation(BaseInvocation):
     """Execute a graph"""
-
-    type: Literal["graph"] = "graph"
 
     # TODO: figure out how to create a default here
     graph: "Graph" = Field(description="The graph to run", default=None)
@@ -173,10 +172,9 @@ class GraphInvocation(BaseInvocation):
         return GraphInvocationOutput()
 
 
+@invocation_output("iterate_output")
 class IterateInvocationOutput(BaseInvocationOutput):
     """Used to connect iteration outputs. Will be expanded to a specific output."""
-
-    type: Literal["iterate_output"] = "iterate_output"
 
     item: Any = OutputField(
         description="The item being iterated over", title="Collection Item", ui_type=UIType.CollectionItem
@@ -184,10 +182,9 @@ class IterateInvocationOutput(BaseInvocationOutput):
 
 
 # TODO: Fill this out and move to invocations
+@invocation("iterate", version="1.0.0")
 class IterateInvocation(BaseInvocation):
     """Iterates over a list of items"""
-
-    type: Literal["iterate"] = "iterate"
 
     collection: list[Any] = InputField(
         description="The list of items to iterate over", default_factory=list, ui_type=UIType.Collection
@@ -199,18 +196,16 @@ class IterateInvocation(BaseInvocation):
         return IterateInvocationOutput(item=self.collection[self.index])
 
 
+@invocation_output("collect_output")
 class CollectInvocationOutput(BaseInvocationOutput):
-    type: Literal["collect_output"] = "collect_output"
-
     collection: list[Any] = OutputField(
         description="The collection of input items", title="Collection", ui_type=UIType.Collection
     )
 
 
+@invocation("collect", version="1.0.0")
 class CollectInvocation(BaseInvocation):
     """Collects values into a collection"""
-
-    type: Literal["collect"] = "collect"
 
     item: Any = InputField(
         description="The item to collect (all inputs must be of the same type)",
@@ -445,7 +440,7 @@ class Graph(BaseModel):
         node = graph.nodes[node_id]
 
         # Ensure the node type matches the new node
-        if type(node) != type(new_node):
+        if type(node) is not type(new_node):
             raise TypeError(f"Node {node_path} is type {type(node)} but new node is type {type(new_node)}")
 
         # Ensure the new id is either the same or is not in the graph
@@ -632,7 +627,7 @@ class Graph(BaseModel):
             [
                 t
                 for input_field in input_fields
-                for t in ([input_field] if get_origin(input_field) == None else get_args(input_field))
+                for t in ([input_field] if get_origin(input_field) is None else get_args(input_field))
                 if t != NoneType
             ]
         )  # Get unique types
@@ -923,7 +918,7 @@ class GraphExecutionState(BaseModel):
             None,
         )
 
-        if next_node_id == None:
+        if next_node_id is None:
             return None
 
         # Get all parents of the next node

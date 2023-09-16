@@ -1,11 +1,12 @@
-import torch
-import numpy as np
-import cv2
-from PIL import Image
-from diffusers.utils import PIL_INTERPOLATION
+from typing import Union
 
+import cv2
+import numpy as np
+import torch
+from controlnet_aux.util import HWC3
+from diffusers.utils import PIL_INTERPOLATION
 from einops import rearrange
-from controlnet_aux.util import HWC3, resize_image
+from PIL import Image
 
 ###################################################################
 # Copy of scripts/lvminthin.py from Mikubill/sd-webui-controlnet
@@ -232,7 +233,8 @@ def np_img_resize(np_img: np.ndarray, resize_mode: str, h: int, w: int, device: 
     k0 = float(h) / old_h
     k1 = float(w) / old_w
 
-    safeint = lambda x: int(np.round(x))
+    def safeint(x: Union[int, float]) -> int:
+        return int(np.round(x))
 
     # if resize_mode == external_code.ResizeMode.OUTER_FIT:
     if resize_mode == "fill_resize":  # OUTER_FIT

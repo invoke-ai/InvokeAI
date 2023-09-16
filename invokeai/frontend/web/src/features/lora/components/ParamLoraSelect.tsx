@@ -9,7 +9,7 @@ import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectI
 import { loraAdded } from 'features/lora/store/loraSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
 const selector = createSelector(
@@ -102,4 +102,4 @@ const ParamLoRASelect = () => {
   );
 };
 
-export default ParamLoRASelect;
+export default memo(ParamLoRASelect);

@@ -20,11 +20,31 @@
 import re
 from contextlib import nullcontext
 from io import BytesIO
-from typing import Optional, Union
 from pathlib import Path
+from typing import Optional, Union
 
 import requests
 import torch
+from diffusers.models import AutoencoderKL, ControlNetModel, PriorTransformer, UNet2DConditionModel
+from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
+from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder
+from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from diffusers.pipelines.stable_diffusion.stable_unclip_image_normalizer import StableUnCLIPImageNormalizer
+from diffusers.schedulers import (
+    DDIMScheduler,
+    DDPMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    HeunDiscreteScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+    UnCLIPScheduler,
+)
+from diffusers.utils import is_accelerate_available, is_omegaconf_available
+from diffusers.utils.import_utils import BACKENDS_MAPPING
+from picklescan.scanner import scan_file_path
 from transformers import (
     AutoFeatureExtractor,
     BertTokenizerFast,
@@ -37,35 +57,9 @@ from transformers import (
     CLIPVisionModelWithProjection,
 )
 
-from diffusers.models import (
-    AutoencoderKL,
-    ControlNetModel,
-    PriorTransformer,
-    UNet2DConditionModel,
-)
-from diffusers.schedulers import (
-    DDIMScheduler,
-    DDPMScheduler,
-    DPMSolverMultistepScheduler,
-    EulerAncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
-    HeunDiscreteScheduler,
-    LMSDiscreteScheduler,
-    PNDMScheduler,
-    UnCLIPScheduler,
-)
-from diffusers.utils import is_accelerate_available, is_omegaconf_available, is_safetensors_available
-from diffusers.utils.import_utils import BACKENDS_MAPPING
-from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
-from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder
-from diffusers.pipelines.pipeline_utils import DiffusionPipeline
-from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-from diffusers.pipelines.stable_diffusion.stable_unclip_image_normalizer import StableUnCLIPImageNormalizer
-
-from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.util.logging import InvokeAILogger
 
-from picklescan.scanner import scan_file_path
 from .models import BaseModelType, ModelVariantType
 
 try:
@@ -1205,8 +1199,8 @@ def download_from_original_stable_diffusion_ckpt(
         StableDiffusionControlNetPipeline,
         StableDiffusionInpaintPipeline,
         StableDiffusionPipeline,
-        StableDiffusionXLPipeline,
         StableDiffusionXLImg2ImgPipeline,
+        StableDiffusionXLPipeline,
         StableUnCLIPImg2ImgPipeline,
         StableUnCLIPPipeline,
     )
@@ -1221,9 +1215,6 @@ def download_from_original_stable_diffusion_ckpt(
         raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
 
     if from_safetensors:
-        if not is_safetensors_available():
-            raise ValueError(BACKENDS_MAPPING["safetensors"][1])
-
         from safetensors.torch import load_file as safe_load
 
         checkpoint = safe_load(checkpoint_path, device="cpu")
@@ -1662,9 +1653,6 @@ def download_controlnet_from_original_ckpt(
     from omegaconf import OmegaConf
 
     if from_safetensors:
-        if not is_safetensors_available():
-            raise ValueError(BACKENDS_MAPPING["safetensors"][1])
-
         from safetensors import safe_open
 
         checkpoint = {}
@@ -1741,7 +1729,7 @@ def convert_ckpt_to_diffusers(
 
     pipe.save_pretrained(
         dump_path,
-        safe_serialization=use_safetensors and is_safetensors_available(),
+        safe_serialization=use_safetensors,
     )
 
 
@@ -1757,7 +1745,4 @@ def convert_controlnet_to_diffusers(
     """
     pipe = download_controlnet_from_original_ckpt(checkpoint_path, **kwargs)
 
-    pipe.save_pretrained(
-        dump_path,
-        safe_serialization=is_safetensors_available(),
-    )
+    pipe.save_pretrained(dump_path, safe_serialization=True)

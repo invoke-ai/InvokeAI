@@ -3,6 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
+import SubParametersWrapper from 'features/parameters/components/Parameters/SubParametersWrapper';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { setSDXLImg2ImgDenoisingStrength } from '../store/sdxlSlice';
@@ -34,19 +35,21 @@ const ParamSDXLImg2ImgDenoisingStrength = () => {
   }, [dispatch]);
 
   return (
-    <IAISlider
-      label={`${t('parameters.denoisingStrength')}`}
-      step={0.01}
-      min={0}
-      max={1}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={sdxlImg2ImgDenoisingStrength}
-      isInteger={false}
-      withInput
-      withSliderMarks
-      withReset
-    />
+    <SubParametersWrapper>
+      <IAISlider
+        label={t('sdxl.denoisingStrength')}
+        step={0.01}
+        min={0}
+        max={1}
+        onChange={handleChange}
+        handleReset={handleReset}
+        value={sdxlImg2ImgDenoisingStrength}
+        isInteger={false}
+        withInput
+        withSliderMarks
+        withReset
+      />
+    </SubParametersWrapper>
   );
 };
 

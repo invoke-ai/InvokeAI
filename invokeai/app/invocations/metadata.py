@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import Field
 
@@ -8,8 +8,8 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
@@ -32,6 +32,7 @@ class CoreMetadata(BaseModelExcludeNull):
     generation_mode: str = Field(
         description="The generation mode that output this image",
     )
+    created_by: Optional[str] = Field(description="The name of the creator of the image")
     positive_prompt: str = Field(description="The positive prompt parameter")
     negative_prompt: str = Field(description="The negative prompt parameter")
     width: int = Field(description="The width parameter")
@@ -71,10 +72,10 @@ class CoreMetadata(BaseModelExcludeNull):
     )
     refiner_steps: Optional[int] = Field(default=None, description="The number of steps used for the refiner")
     refiner_scheduler: Optional[str] = Field(default=None, description="The scheduler used for the refiner")
-    refiner_positive_aesthetic_store: Optional[float] = Field(
+    refiner_positive_aesthetic_score: Optional[float] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
-    refiner_negative_aesthetic_store: Optional[float] = Field(
+    refiner_negative_aesthetic_score: Optional[float] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
     refiner_start: Optional[float] = Field(default=None, description="The start value used for refiner denoising")
@@ -90,20 +91,18 @@ class ImageMetadata(BaseModelExcludeNull):
     graph: Optional[dict] = Field(default=None, description="The graph that created the image")
 
 
+@invocation_output("metadata_accumulator_output")
 class MetadataAccumulatorOutput(BaseInvocationOutput):
     """The output of the MetadataAccumulator node"""
-
-    type: Literal["metadata_accumulator_output"] = "metadata_accumulator_output"
 
     metadata: CoreMetadata = OutputField(description="The core metadata for the image")
 
 
-@title("Metadata Accumulator")
-@tags("metadata")
+@invocation(
+    "metadata_accumulator", title="Metadata Accumulator", tags=["metadata"], category="metadata", version="1.0.0"
+)
 class MetadataAccumulatorInvocation(BaseInvocation):
     """Outputs a Core Metadata Object"""
-
-    type: Literal["metadata_accumulator"] = "metadata_accumulator"
 
     generation_mode: str = InputField(
         description="The generation mode that output this image",
@@ -163,11 +162,11 @@ class MetadataAccumulatorInvocation(BaseInvocation):
         default=None,
         description="The scheduler used for the refiner",
     )
-    refiner_positive_aesthetic_store: Optional[float] = InputField(
+    refiner_positive_aesthetic_score: Optional[float] = InputField(
         default=None,
         description="The aesthetic score used for the refiner",
     )
-    refiner_negative_aesthetic_store: Optional[float] = InputField(
+    refiner_negative_aesthetic_score: Optional[float] = InputField(
         default=None,
         description="The aesthetic score used for the refiner",
     )

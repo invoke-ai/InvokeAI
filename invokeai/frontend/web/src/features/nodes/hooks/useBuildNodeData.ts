@@ -14,7 +14,7 @@ import {
   OutputFieldValue,
 } from '../types/types';
 import { buildInputFieldValue } from '../util/fieldValueBuilders';
-import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
+import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from '../types/constants';
 
 const templatesSelector = createSelector(
   [(state: RootState) => state.nodes],
@@ -34,10 +34,24 @@ export const useBuildNodeData = () => {
     (type: AnyInvocationType | 'current_image' | 'notes') => {
       const nodeId = uuidv4();
 
+      let _x = window.innerWidth / 2;
+      let _y = window.innerHeight / 2;
+
+      // attempt to center the node in the middle of the flow
+      const rect = document
+        .querySelector('#workflow-editor')
+        ?.getBoundingClientRect();
+
+      if (rect) {
+        _x = rect.width / 2 - NODE_WIDTH / 2;
+        _y = rect.height / 2 - NODE_WIDTH / 2;
+      }
+
       const { x, y } = flow.project({
-        x: window.innerWidth / 2.5,
-        y: window.innerHeight / 8,
+        x: _x,
+        y: _y,
       });
+
       if (type === 'current_image') {
         const node: Node<CurrentImageNodeData> = {
           ...SHARED_NODE_PROPERTIES,
@@ -124,11 +138,14 @@ export const useBuildNodeData = () => {
         data: {
           id: nodeId,
           type,
-          inputs,
-          outputs,
-          isOpen: true,
+          version: template.version,
           label: '',
           notes: '',
+          isOpen: true,
+          embedWorkflow: false,
+          isIntermediate: true,
+          inputs,
+          outputs,
         },
       };
 

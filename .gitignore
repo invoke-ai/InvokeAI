@@ -1,22 +1,7 @@
-# ignore default image save location and model symbolic link
 .idea/
-embeddings/
-outputs/
-models/ldm/stable-diffusion-v1/model.ckpt
-**/restoration/codeformer/weights
-
-# ignore user models config
-configs/models.user.yaml
-config/models.user.yml
-invokeai.init
-.version
-.last_model
 
 # ignore the Anaconda/Miniconda installer used while building Docker image
 anaconda.sh
-
-# ignore a directory which serves as a place for initial images
-inputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -189,20 +174,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-src
 **/__pycache__/
-outputs
 
-# Logs and associated folders
-# created from generated embeddings.
-logs
-testtube
-checkpoints
 # If it's a Mac
 .DS_Store
-
-invokeai/frontend/yarn.lock
-invokeai/frontend/node_modules
 
 # Let the frontend manage its own gitignore
 !invokeai/frontend/web/*
@@ -210,18 +185,6 @@ invokeai/frontend/node_modules
 # Scratch folder
 .scratch/
 .vscode/
-gfpgan/
-models/ldm/stable-diffusion-v1/*.sha256
-
-
-# GFPGAN model files
-gfpgan/
-
-# config file (will be created by installer)
-configs/models.yaml
-
-# ignore initfile
-.invokeai
 
 # ignore environment.yml and requirements.txt
 # these are links to the real files in environments-and-requirements

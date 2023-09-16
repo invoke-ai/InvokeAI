@@ -5,8 +5,8 @@ Abstract base class for recursive directory search for models.
 
 import os
 from abc import ABC, abstractmethod
-from typing import List, Set, types
 from pathlib import Path
+from typing import List, Set, types
 
 import invokeai.backend.util.logging as logger
 
@@ -56,7 +56,7 @@ class ModelSearch(ABC):
         self.on_search_completed()
 
     def walk_directory(self, path: Path):
-        for root, dirs, files in os.walk(path):
+        for root, dirs, files in os.walk(path, followlinks=True):
             if str(Path(root).name).startswith("."):
                 self._pruned_paths.add(root)
             if any([Path(root).is_relative_to(x) for x in self._pruned_paths]):

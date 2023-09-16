@@ -4,6 +4,7 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { useState } from 'react';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
+import { useTranslation } from 'react-i18next';
 
 export const advancedAddModeData: SelectItem[] = [
   { label: 'Diffusers', value: 'diffusers' },
@@ -16,14 +17,18 @@ export default function AdvancedAddModels() {
   const [advancedAddMode, setAdvancedAddMode] =
     useState<ManualAddMode>('diffusers');
 
+  const { t } = useTranslation();
+
   return (
     <Flex flexDirection="column" gap={4} width="100%">
       <IAIMantineSelect
-        label="Model Type"
+        label={t('modelManager.modelType')}
         value={advancedAddMode}
         data={advancedAddModeData}
         onChange={(v) => {
-          if (!v) return;
+          if (!v) {
+            return;
+          }
           setAdvancedAddMode(v as ManualAddMode);
         }}
       />

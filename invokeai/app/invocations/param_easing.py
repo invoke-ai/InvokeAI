@@ -3,7 +3,6 @@ from typing import Literal, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 import PIL.Image
 from easing_functions import (
     BackEaseIn,
@@ -38,24 +37,17 @@ from easing_functions import (
     SineEaseInOut,
     SineEaseOut,
 )
-from matplotlib.figure import Figure
 from matplotlib.ticker import MaxNLocator
-from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.primitives import FloatCollectionOutput
 
-from ...backend.util.logging import InvokeAILogger
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
-@title("Float Range")
-@tags("math", "range")
+@invocation("float_range", title="Float Range", tags=["math", "range"], category="math", version="1.0.0")
 class FloatLinearRangeInvocation(BaseInvocation):
     """Creates a range"""
 
-    type: Literal["float_range"] = "float_range"
-
-    # Inputs
     start: float = InputField(default=5, description="The first value of the range")
     stop: float = InputField(default=10, description="The last value of the range")
     steps: int = InputField(default=30, description="number of values to interpolate over (including start and stop)")
@@ -103,14 +95,10 @@ EASING_FUNCTION_KEYS = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
 
 
 # actually I think for now could just use CollectionOutput (which is list[Any]
-@title("Step Param Easing")
-@tags("step", "easing")
+@invocation("step_param_easing", title="Step Param Easing", tags=["step", "easing"], category="step", version="1.0.0")
 class StepParamEasingInvocation(BaseInvocation):
     """Experimental per-step parameter easing for denoising steps"""
 
-    type: Literal["step_param_easing"] = "step_param_easing"
-
-    # Inputs
     easing: EASING_FUNCTION_KEYS = InputField(default="Linear", description="The easing function to use")
     num_steps: int = InputField(default=20, description="number of denoising steps")
     start_value: float = InputField(default=0.0, description="easing starting value")

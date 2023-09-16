@@ -6,11 +6,16 @@ import {
   SDXLLoraLoaderInvocation,
 } from 'services/api/types';
 import {
+  CANVAS_COHERENCE_DENOISE_LATENTS,
   LORA_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
+  SDXL_CANVAS_INPAINT_GRAPH,
+  SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_INPAINT_CREATE_MASK,
+  SEAMLESS,
 } from './constants';
 
 export const addSDXLLoRAsToGraph = (
@@ -33,20 +38,27 @@ export const addSDXLLoRAsToGraph = (
     | MetadataAccumulatorInvocation
     | undefined;
 
+  // Handle Seamless Plugs
+  const unetLoaderId = modelLoaderNodeId;
+  let clipLoaderId = modelLoaderNodeId;
+  if (
+    [SEAMLESS, SDXL_REFINER_INPAINT_CREATE_MASK].includes(modelLoaderNodeId)
+  ) {
+    clipLoaderId = SDXL_MODEL_LOADER;
+  }
+
   if (loraCount > 0) {
     // Remove modelLoaderNodeId unet/clip/clip2 connections to feed it to LoRAs
     graph.edges = graph.edges.filter(
       (e) =>
         !(
-          e.source.node_id === modelLoaderNodeId &&
-          ['unet'].includes(e.source.field)
+          e.source.node_id === unetLoaderId && ['unet'].includes(e.source.field)
         ) &&
         !(
-          e.source.node_id === modelLoaderNodeId &&
-          ['clip'].includes(e.source.field)
+          e.source.node_id === clipLoaderId && ['clip'].includes(e.source.field)
         ) &&
         !(
-          e.source.node_id === modelLoaderNodeId &&
+          e.source.node_id === clipLoaderId &&
           ['clip2'].includes(e.source.field)
         )
     );
@@ -85,7 +97,7 @@ export const addSDXLLoRAsToGraph = (
       // first lora = start the lora chain, attach directly to model loader
       graph.edges.push({
         source: {
-          node_id: modelLoaderNodeId,
+          node_id: unetLoaderId,
           field: 'unet',
         },
         destination: {
@@ -96,7 +108,7 @@ export const addSDXLLoRAsToGraph = (
 
       graph.edges.push({
         source: {
-          node_id: modelLoaderNodeId,
+          node_id: clipLoaderId,
           field: 'clip',
         },
         destination: {
@@ -107,7 +119,7 @@ export const addSDXLLoRAsToGraph = (
 
       graph.edges.push({
         source: {
-          node_id: modelLoaderNodeId,
+          node_id: clipLoaderId,
           field: 'clip2',
         },
         destination: {
@@ -162,6 +174,24 @@ export const addSDXLLoRAsToGraph = (
           field: 'unet',
         },
       });
+
+      if (
+        graph.id &&
+        [SDXL_CANVAS_INPAINT_GRAPH, SDXL_CANVAS_OUTPAINT_GRAPH].includes(
+          graph.id
+        )
+      ) {
+        graph.edges.push({
+          source: {
+            node_id: currentLoraNodeId,
+            field: 'unet',
+          },
+          destination: {
+            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+            field: 'unet',
+          },
+        });
+      }
 
       graph.edges.push({
         source: {

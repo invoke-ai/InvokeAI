@@ -5,26 +5,28 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path
-from pydantic import Field
-from typing import Literal, Optional, Union, Callable, List, Tuple, TYPE_CHECKING
 from types import ModuleType
-
-from invokeai.backend.model_management import (
-    ModelManager,
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelInfo,
-    AddModelResult,
-    SchedulerPredictionType,
-    ModelMerger,
-    MergeInterpolationMethod,
-    ModelNotFoundException,
-)
-from invokeai.backend.model_management.model_search import FindModels
+from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Tuple, Union
 
 import torch
+from pydantic import Field
+
 from invokeai.app.models.exceptions import CanceledException
+from invokeai.backend.model_management import (
+    AddModelResult,
+    BaseModelType,
+    MergeInterpolationMethod,
+    ModelInfo,
+    ModelManager,
+    ModelMerger,
+    ModelNotFoundException,
+    ModelType,
+    SchedulerPredictionType,
+    SubModelType,
+)
+from invokeai.backend.model_management.model_cache import CacheStats
+from invokeai.backend.model_management.model_search import FindModels
+
 from ...backend.util import choose_precision, choose_torch_device
 from .config import InvokeAIAppConfig
 
@@ -277,6 +279,13 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def collect_cache_stats(self, cache_stats: CacheStats):
+        """
+        Reset model cache statistics for graph with graph_id.
+        """
+        pass
+
+    @abstractmethod
     def commit(self, conf_file: Optional[Path] = None) -> None:
         """
         Write current configuration out to the indicated file.
@@ -322,8 +331,8 @@ class ModelManagerService(ModelManagerServiceBase):
         # configuration value. If present, then the
         # cache size is set to 2.5 GB times
         # the number of max_loaded_models. Otherwise
-        # use new `max_cache_size` config setting
-        max_cache_size = config.max_cache_size if hasattr(config, "max_cache_size") else config.max_loaded_models * 2.5
+        # use new `ram_cache_size` config setting
+        max_cache_size = config.ram_cache_size
 
         logger.debug(f"Maximum RAM cache size: {max_cache_size} GiB")
 
@@ -499,6 +508,12 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         self.logger.debug(f"convert model {model_name}")
         return self.mgr.convert_model(model_name, base_model, model_type, convert_dest_directory)
+
+    def collect_cache_stats(self, cache_stats: CacheStats):
+        """
+        Reset model cache statistics for graph with graph_id.
+        """
+        self.mgr.cache.stats = cache_stats
 
     def commit(self, conf_file: Optional[Path] = None):
         """

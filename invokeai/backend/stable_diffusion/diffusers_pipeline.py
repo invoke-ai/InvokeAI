@@ -2,25 +2,19 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
-import math
-import secrets
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generic, List, Optional, Type, Union
+from typing import Any, Callable, List, Optional, Union
 
-import PIL.Image
 import einops
+import PIL.Image
 import psutil
 import torch
 import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
-    StableDiffusionPipeline,
-)
-from diffusers.pipelines.stable_diffusion.safety_checker import (
-    StableDiffusionSafetyChecker,
-)
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
 from diffusers.utils.import_utils import is_xformers_available
@@ -29,13 +23,9 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from .diffusion import (
-    AttentionMapSaver,
-    InvokeAIDiffuserComponent,
-    PostprocessingSettings,
-    BasicConditioningInfo,
-)
-from ..util import normalize_device
+
+from ..util import auto_detect_slice_size, normalize_device
+from .diffusion import AttentionMapSaver, BasicConditioningInfo, InvokeAIDiffuserComponent, PostprocessingSettings
 
 
 @dataclass
@@ -146,7 +136,7 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = Tr
     w, h = trim_to_multiple_of(*image.size, multiple_of=multiple_of)
     transformation = T.Compose(
         [
-            T.Resize((h, w), T.InterpolationMode.LANCZOS),
+            T.Resize((h, w), T.InterpolationMode.LANCZOS, antialias=True),
             T.ToTensor(),
         ]
     )
@@ -293,6 +283,24 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if xformers is available, use it, otherwise use sliced attention.
         """
         config = InvokeAIAppConfig.get_config()
+        if config.attention_type == "xformers":
+            self.enable_xformers_memory_efficient_attention()
+            return
+        elif config.attention_type == "sliced":
+            slice_size = config.attention_slice_size
+            if slice_size == "auto":
+                slice_size = auto_detect_slice_size(latents)
+            elif slice_size == "balanced":
+                slice_size = "auto"
+            self.enable_attention_slicing(slice_size=slice_size)
+            return
+        elif config.attention_type == "normal":
+            self.disable_attention_slicing()
+            return
+        elif config.attention_type == "torch-sdp":
+            raise Exception("torch-sdp attention slicing not yet implemented")
+
+        # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
             if is_xformers_available() and not config.disable_xformers:
                 self.enable_xformers_memory_efficient_attention()
@@ -342,6 +350,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
         mask: Optional[torch.Tensor] = None,
+        masked_latents: Optional[torch.Tensor] = None,
         seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if init_timestep.shape[0] == 0:
@@ -360,28 +369,28 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
         if mask is not None:
+            # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
+            if noise is None:
+                noise = torch.randn(
+                    orig_latents.shape,
+                    dtype=torch.float32,
+                    device="cpu",
+                    generator=torch.Generator(device="cpu").manual_seed(seed or 0),
+                ).to(device=orig_latents.device, dtype=orig_latents.dtype)
+
+                latents = self.scheduler.add_noise(latents, noise, batched_t)
+                latents = torch.lerp(
+                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
+                )
+
             if is_inpainting_model(self.unet):
-                # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
-                # (that's why there's a mask!) but it seems to really want that blanked out.
-                # masked_latents = latents * torch.where(mask < 0.5, 1, 0) TODO: inpaint/outpaint/infill
+                if masked_latents is None:
+                    raise Exception("Source image required for inpaint mask when inpaint model used!")
 
-                # TODO: we should probably pass this in so we don't have to try/finally around setting it.
-                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(self._unet_forward, mask, orig_latents)
+                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
+                    self._unet_forward, mask, masked_latents
+                )
             else:
-                # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
-                if noise is None:
-                    noise = torch.randn(
-                        orig_latents.shape,
-                        dtype=torch.float32,
-                        device="cpu",
-                        generator=torch.Generator(device="cpu").manual_seed(seed or 0),
-                    ).to(device=orig_latents.device, dtype=orig_latents.dtype)
-
-                    latents = self.scheduler.add_noise(latents, noise, batched_t)
-                    latents = torch.lerp(
-                        orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
-                    )
-
                 additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise))
 
         try:
@@ -541,11 +550,21 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
 
+        # TODO: issue to diffusers?
+        # undo internal counter increment done by scheduler.step, so timestep can be resolved as before call
+        # this needed to be able call scheduler.add_noise with current timestep
+        if self.scheduler.order == 2:
+            self.scheduler._index_counter[timestep.item()] -= 1
+
         # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
         #    But the way things are now, scheduler runs _after_ that, so there was
         #    no way to use it to apply an operation that happens after the last scheduler.step.
         for guidance in additional_guidance:
             step_output = guidance(step_output, timestep, conditioning_data)
+
+        # restore internal counter
+        if self.scheduler.order == 2:
+            self.scheduler._index_counter[timestep.item()] += 1
 
         return step_output
 

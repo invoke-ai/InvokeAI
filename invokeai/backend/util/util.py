@@ -1,11 +1,10 @@
+import base64
 import importlib
+import io
 import math
 import multiprocessing as mp
 import os
 import re
-import io
-import base64
-
 from collections import abc
 from inspect import isfunction
 from pathlib import Path
@@ -19,6 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 
 import invokeai.backend.util.logging as logger
+
 from .devices import torch_dtype
 
 
@@ -84,7 +84,7 @@ def count_params(model, verbose=False):
 
 
 def instantiate_from_config(config, **kwargs):
-    if not "target" in config:
+    if "target" not in config:
         if config == "__is_first_stage__":
             return None
         elif config == "__is_unconditional__":
@@ -234,16 +234,17 @@ def rand_perlin_2d(shape, res, device, fade=lambda t: 6 * t**5 - 15 * t**4 + 10 
         .repeat_interleave(d[1], 1)
     )
 
-    dot = lambda grad, shift: (
-        torch.stack(
-            (
-                grid[: shape[0], : shape[1], 0] + shift[0],
-                grid[: shape[0], : shape[1], 1] + shift[1],
-            ),
-            dim=-1,
-        )
-        * grad[: shape[0], : shape[1]]
-    ).sum(dim=-1)
+    def dot(grad, shift):
+        return (
+            torch.stack(
+                (
+                    grid[: shape[0], : shape[1], 0] + shift[0],
+                    grid[: shape[0], : shape[1], 1] + shift[1],
+                ),
+                dim=-1,
+            )
+            * grad[: shape[0], : shape[1]]
+        ).sum(dim=-1)
 
     n00 = dot(tile_grads([0, -1], [0, -1]), [0, 0]).to(device)
     n10 = dot(tile_grads([1, None], [0, -1]), [-1, 0]).to(device)
@@ -287,7 +288,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     if dest.is_dir():
         try:
             file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition")).group(1)
-        except:
+        except AttributeError:
             file_name = os.path.basename(url)
         dest = dest / file_name
     else:
@@ -342,7 +343,7 @@ def url_attachment_name(url: str) -> dict:
         resp = requests.get(url, stream=True)
         match = re.search('filename="(.+)"', resp.headers.get("Content-Disposition"))
         return match.group(1)
-    except:
+    except Exception:
         return None
 
 

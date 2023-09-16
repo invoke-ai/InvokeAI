@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
@@ -11,6 +13,7 @@ from typing import (
     Any,
     Callable,
     ClassVar,
+    Literal,
     Mapping,
     Optional,
     Type,
@@ -20,12 +23,19 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field
-from pydantic.fields import Undefined
+import semver
+from pydantic import BaseModel, Field, validator
+from pydantic.fields import ModelField, Undefined
 from pydantic.typing import NoArgAnyCallable
+
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
+
+
+class InvalidVersionError(ValueError):
+    pass
 
 
 class FieldDescriptions:
@@ -71,6 +81,9 @@ class FieldDescriptions:
     safe_mode = "Whether or not to use safe mode"
     scribble_mode = "Whether or not to use scribble mode"
     scale_factor = "The factor by which to scale"
+    blend_alpha = (
+        "Blending factor. 0.0 = use input A only, 1.0 = use input B only, 0.5 = 50% mix of input A and input B."
+    )
     num_1 = "The first number"
     num_2 = "The second number"
     mask = "The mask to use for the operation"
@@ -99,24 +112,39 @@ class UIType(str, Enum):
     """
 
     # region Primitives
-    Integer = "integer"
-    Float = "float"
     Boolean = "boolean"
-    String = "string"
-    Array = "array"
-    Image = "ImageField"
-    Latents = "LatentsField"
+    Color = "ColorField"
     Conditioning = "ConditioningField"
     Control = "ControlField"
-    Color = "ColorField"
-    ImageCollection = "ImageCollection"
-    ConditioningCollection = "ConditioningCollection"
-    ColorCollection = "ColorCollection"
-    LatentsCollection = "LatentsCollection"
-    IntegerCollection = "IntegerCollection"
-    FloatCollection = "FloatCollection"
-    StringCollection = "StringCollection"
+    Float = "float"
+    Image = "ImageField"
+    Integer = "integer"
+    Latents = "LatentsField"
+    String = "string"
+    # endregion
+
+    # region Collection Primitives
     BooleanCollection = "BooleanCollection"
+    ColorCollection = "ColorCollection"
+    ConditioningCollection = "ConditioningCollection"
+    ControlCollection = "ControlCollection"
+    FloatCollection = "FloatCollection"
+    ImageCollection = "ImageCollection"
+    IntegerCollection = "IntegerCollection"
+    LatentsCollection = "LatentsCollection"
+    StringCollection = "StringCollection"
+    # endregion
+
+    # region Polymorphic Primitives
+    BooleanPolymorphic = "BooleanPolymorphic"
+    ColorPolymorphic = "ColorPolymorphic"
+    ConditioningPolymorphic = "ConditioningPolymorphic"
+    ControlPolymorphic = "ControlPolymorphic"
+    FloatPolymorphic = "FloatPolymorphic"
+    ImagePolymorphic = "ImagePolymorphic"
+    IntegerPolymorphic = "IntegerPolymorphic"
+    LatentsPolymorphic = "LatentsPolymorphic"
+    StringPolymorphic = "StringPolymorphic"
     # endregion
 
     # region Models
@@ -138,8 +166,11 @@ class UIType(str, Enum):
     # endregion
 
     # region Misc
-    FilePath = "FilePath"
     Enum = "enum"
+    Scheduler = "Scheduler"
+    WorkflowField = "WorkflowField"
+    IsIntermediate = "IsIntermediate"
+    MetadataField = "MetadataField"
     # endregion
 
 
@@ -166,6 +197,9 @@ class _InputField(BaseModel):
     ui_hidden: bool
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
+    ui_order: Optional[int]
+    ui_choice_labels: Optional[dict[str, str]]
+    item_default: Optional[Any]
 
 
 class _OutputField(BaseModel):
@@ -178,6 +212,7 @@ class _OutputField(BaseModel):
 
     ui_hidden: bool
     ui_type: Optional[UIType]
+    ui_order: Optional[int]
 
 
 def InputField(
@@ -211,6 +246,9 @@ def InputField(
     ui_type: Optional[UIType] = None,
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
+    ui_order: Optional[int] = None,
+    ui_choice_labels: Optional[dict[str, str]] = None,
+    item_default: Optional[Any] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -230,13 +268,18 @@ def InputField(
       Internally, there is no difference between SD-1, SD-2 and SDXL model fields, they all use \
       `MainModelField`. So to ensure the base-model-specific UI is rendered, you can use \
       `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
-      
+
     :param UIComponent ui_component: [None] Optionally specifies a specific component to use in the UI. \
       The UI will always render a suitable component, but sometimes you want something different than the default. \
       For example, a `string` field will default to a single-line input, but you may want a multi-line textarea instead. \
       For this case, you could provide `UIComponent.Textarea`.
 
     : param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI.
+
+    : param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
+
+    : param bool item_default: [None] Specifies the default item value, if this is a collection input. \
+      Ignored for non-collection fields..
     """
     return Field(
         *args,
@@ -269,6 +312,9 @@ def InputField(
         ui_type=ui_type,
         ui_component=ui_component,
         ui_hidden=ui_hidden,
+        ui_order=ui_order,
+        item_default=item_default,
+        ui_choice_labels=ui_choice_labels,
         **kwargs,
     )
 
@@ -302,6 +348,7 @@ def OutputField(
     repr: bool = True,
     ui_type: Optional[UIType] = None,
     ui_hidden: bool = False,
+    ui_order: Optional[int] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -318,6 +365,8 @@ def OutputField(
       `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
 
     : param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI. \
+
+    : param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
     """
     return Field(
         *args,
@@ -348,6 +397,7 @@ def OutputField(
         repr=repr,
         ui_type=ui_type,
         ui_hidden=ui_hidden,
+        ui_order=ui_order,
         **kwargs,
     )
 
@@ -355,12 +405,15 @@ def OutputField(
 class UIConfigBase(BaseModel):
     """
     Provides additional node configuration to the UI.
-    This is used internally by the @tags and @title decorator logic. You probably want to use those
-    decorators, though you may add this class to a node definition to specify the title and tags.
+    This is used internally by the @invocation decorator logic. Do not use this directly.
     """
 
-    tags: Optional[list[str]] = Field(default_factory=None, description="The tags to display in the UI")
-    title: Optional[str] = Field(default=None, description="The display name of the node")
+    tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
+    title: Optional[str] = Field(default=None, description="The node's display name")
+    category: Optional[str] = Field(default=None, description="The node's category")
+    version: Optional[str] = Field(
+        default=None, description='The node\'s version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".'
+    )
 
 
 class InvocationContext:
@@ -373,10 +426,11 @@ class InvocationContext:
 
 
 class BaseInvocationOutput(BaseModel):
-    """Base class for all invocation outputs"""
+    """
+    Base class for all invocation outputs.
 
-    # All outputs must include a type name like this:
-    # type: Literal['your_output_name']
+    All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
+    """
 
     @classmethod
     def get_all_subclasses_tuple(cls):
@@ -388,6 +442,13 @@ class BaseInvocationOutput(BaseModel):
             subclasses.extend(next_subclasses)
             toprocess.extend(next_subclasses)
         return tuple(subclasses)
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+            if "required" not in schema or not isinstance(schema["required"], list):
+                schema["required"] = list()
+            schema["required"].extend(["type"])
 
 
 class RequiredConnectionException(Exception):
@@ -405,15 +466,16 @@ class MissingInputException(Exception):
 
 
 class BaseInvocation(ABC, BaseModel):
-    """A node to process inputs and produce outputs.
-    May use dependency injection in __init__ to receive providers.
     """
+    A node to process inputs and produce outputs.
+    May use dependency injection in __init__ to receive providers.
 
-    # All invocations must include a type name like this:
-    # type: Literal['your_output_name']
+    All invocations must use the `@invocation` decorator to provide their unique type.
+    """
 
     @classmethod
     def get_all_subclasses(cls):
+        app_config = InvokeAIAppConfig.get_config()
         subclasses = []
         toprocess = [cls]
         while len(toprocess) > 0:
@@ -421,7 +483,23 @@ class BaseInvocation(ABC, BaseModel):
             next_subclasses = next.__subclasses__()
             subclasses.extend(next_subclasses)
             toprocess.extend(next_subclasses)
-        return subclasses
+        allowed_invocations = []
+        for sc in subclasses:
+            is_in_allowlist = (
+                sc.__fields__.get("type").default in app_config.allow_nodes
+                if isinstance(app_config.allow_nodes, list)
+                else True
+            )
+
+            is_in_denylist = (
+                sc.__fields__.get("type").default in app_config.deny_nodes
+                if isinstance(app_config.deny_nodes, list)
+                else False
+            )
+
+            if is_in_allowlist and not is_in_denylist:
+                allowed_invocations.append(sc)
+        return allowed_invocations
 
     @classmethod
     def get_invocations(cls):
@@ -449,6 +527,13 @@ class BaseInvocation(ABC, BaseModel):
                 schema["title"] = uiconfig.title
             if uiconfig and hasattr(uiconfig, "tags"):
                 schema["tags"] = uiconfig.tags
+            if uiconfig and hasattr(uiconfig, "category"):
+                schema["category"] = uiconfig.category
+            if uiconfig and hasattr(uiconfig, "version"):
+                schema["version"] = uiconfig.version
+            if "required" not in schema or not isinstance(schema["required"], list):
+                schema["required"] = list()
+            schema["required"].extend(["type", "id"])
 
     @abstractmethod
     def invoke(self, context: InvocationContext) -> BaseInvocationOutput:
@@ -485,37 +570,124 @@ class BaseInvocation(ABC, BaseModel):
                     raise MissingInputException(self.__fields__["type"].default, field_name)
         return self.invoke(context)
 
-    id: str = InputField(description="The id of this node. Must be unique among all nodes.")
-    is_intermediate: bool = InputField(
-        default=False, description="Whether or not this node is an intermediate node.", input=Input.Direct
+    id: str = Field(
+        description="The id of this instance of an invocation. Must be unique among all instances of invocations."
     )
+    is_intermediate: bool = InputField(
+        default=False, description="Whether or not this is an intermediate invocation.", ui_type=UIType.IsIntermediate
+    )
+    workflow: Optional[str] = InputField(
+        default=None,
+        description="The workflow to save with the image",
+        ui_type=UIType.WorkflowField,
+    )
+
+    @validator("workflow", pre=True)
+    def validate_workflow_is_json(cls, v):
+        if v is None:
+            return None
+        try:
+            json.loads(v)
+        except json.decoder.JSONDecodeError:
+            raise ValueError("Workflow must be valid JSON")
+        return v
+
     UIConfig: ClassVar[Type[UIConfigBase]]
 
 
-T = TypeVar("T", bound=BaseInvocation)
+GenericBaseInvocation = TypeVar("GenericBaseInvocation", bound=BaseInvocation)
 
 
-def title(title: str) -> Callable[[Type[T]], Type[T]]:
-    """Adds a title to the invocation. Use this to override the default title generation, which is based on the class name."""
+def invocation(
+    invocation_type: str,
+    title: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+    category: Optional[str] = None,
+    version: Optional[str] = None,
+) -> Callable[[Type[GenericBaseInvocation]], Type[GenericBaseInvocation]]:
+    """
+    Adds metadata to an invocation.
 
-    def wrapper(cls: Type[T]) -> Type[T]:
+    :param str invocation_type: The type of the invocation. Must be unique among all invocations.
+    :param Optional[str] title: Adds a title to the invocation. Use if the auto-generated title isn't quite right. Defaults to None.
+    :param Optional[list[str]] tags: Adds tags to the invocation. Invocations may be searched for by their tags. Defaults to None.
+    :param Optional[str] category: Adds a category to the invocation. Used to group the invocations in the UI. Defaults to None.
+    """
+
+    def wrapper(cls: Type[GenericBaseInvocation]) -> Type[GenericBaseInvocation]:
+        # Validate invocation types on creation of invocation classes
+        # TODO: ensure unique?
+        if re.compile(r"^\S+$").match(invocation_type) is None:
+            raise ValueError(f'"invocation_type" must consist of non-whitespace characters, got "{invocation_type}"')
+
+        # Add OpenAPI schema extras
         uiconf_name = cls.__qualname__ + ".UIConfig"
         if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
             cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
-        cls.UIConfig.title = title
+        if title is not None:
+            cls.UIConfig.title = title
+        if tags is not None:
+            cls.UIConfig.tags = tags
+        if category is not None:
+            cls.UIConfig.category = category
+        if version is not None:
+            try:
+                semver.Version.parse(version)
+            except ValueError as e:
+                raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
+            cls.UIConfig.version = version
+
+        # Add the invocation type to the pydantic model of the invocation
+        invocation_type_annotation = Literal[invocation_type]  # type: ignore
+        invocation_type_field = ModelField.infer(
+            name="type",
+            value=invocation_type,
+            annotation=invocation_type_annotation,
+            class_validators=None,
+            config=cls.__config__,
+        )
+        cls.__fields__.update({"type": invocation_type_field})
+        # to support 3.9, 3.10 and 3.11, as described in https://docs.python.org/3/howto/annotations.html
+        if annotations := cls.__dict__.get("__annotations__", None):
+            annotations.update({"type": invocation_type_annotation})
         return cls
 
     return wrapper
 
 
-def tags(*tags: str) -> Callable[[Type[T]], Type[T]]:
-    """Adds tags to the invocation. Use this to improve the streamline finding the invocation in the UI."""
+GenericBaseInvocationOutput = TypeVar("GenericBaseInvocationOutput", bound=BaseInvocationOutput)
 
-    def wrapper(cls: Type[T]) -> Type[T]:
-        uiconf_name = cls.__qualname__ + ".UIConfig"
-        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
-            cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
-        cls.UIConfig.tags = list(tags)
+
+def invocation_output(
+    output_type: str,
+) -> Callable[[Type[GenericBaseInvocationOutput]], Type[GenericBaseInvocationOutput]]:
+    """
+    Adds metadata to an invocation output.
+
+    :param str output_type: The type of the invocation output. Must be unique among all invocation outputs.
+    """
+
+    def wrapper(cls: Type[GenericBaseInvocationOutput]) -> Type[GenericBaseInvocationOutput]:
+        # Validate output types on creation of invocation output classes
+        # TODO: ensure unique?
+        if re.compile(r"^\S+$").match(output_type) is None:
+            raise ValueError(f'"output_type" must consist of non-whitespace characters, got "{output_type}"')
+
+        # Add the output type to the pydantic model of the invocation output
+        output_type_annotation = Literal[output_type]  # type: ignore
+        output_type_field = ModelField.infer(
+            name="type",
+            value=output_type,
+            annotation=output_type_annotation,
+            class_validators=None,
+            config=cls.__config__,
+        )
+        cls.__fields__.update({"type": output_type_field})
+
+        # to support 3.9, 3.10 and 3.11, as described in https://docs.python.org/3/howto/annotations.html
+        if annotations := cls.__dict__.get("__annotations__", None):
+            annotations.update({"type": output_type_annotation})
+
         return cls
 
     return wrapper

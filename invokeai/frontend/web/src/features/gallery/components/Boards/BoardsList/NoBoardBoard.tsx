@@ -156,4 +156,4 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
 
 NoBoardBoard.displayName = 'HoverableBoard';
 
-export default NoBoardBoard;
+export default memo(NoBoardBoard);

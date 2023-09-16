@@ -1,4 +1,5 @@
 import { Badge, Flex } from '@chakra-ui/react';
+import { memo } from 'react';
 import { ImageDTO } from 'services/api/types';
 
 type ImageMetadataOverlayProps = {
@@ -26,4 +27,4 @@ const ImageMetadataOverlay = ({ imageDTO }: ImageMetadataOverlayProps) => {
   );
 };
 
-export default ImageMetadataOverlay;
+export default memo(ImageMetadataOverlay);

@@ -12,6 +12,7 @@ import {
   isCanvasFillRect,
 } from '../store/canvasTypes';
 import IAICanvasImage from './IAICanvasImage';
+import { memo } from 'react';
 
 const selector = createSelector(
   [canvasSelector],
@@ -33,7 +34,9 @@ const selector = createSelector(
 const IAICanvasObjectRenderer = () => {
   const { objects } = useAppSelector(selector);
 
-  if (!objects) return null;
+  if (!objects) {
+    return null;
+  }
 
   return (
     <Group name="outpainting-objects" listening={false}>
@@ -101,4 +104,4 @@ const IAICanvasObjectRenderer = () => {
   );
 };
 
-export default IAICanvasObjectRenderer;
+export default memo(IAICanvasObjectRenderer);

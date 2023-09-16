@@ -1,51 +1,48 @@
 # Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
-import asyncio
-import sys
-from inspect import signature
-
-import logging
-import uvicorn
-import socket
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.openapi.utils import get_openapi
-from fastapi.staticfiles import StaticFiles
-from fastapi_events.handlers.local import local_handler
-from fastapi_events.middleware import EventHandlerASGIMiddleware
-from pathlib import Path
-from pydantic.schema import schema
-
-# This should come early so that modules can log their initialization properly
 from .services.config import InvokeAIAppConfig
-from ..backend.util.logging import InvokeAILogger
 
+# parse_args() must be called before any other imports. if it is not called first, consumers of the config
+# which are imported/used before parse_args() is called will get the default config values instead of the
+# values from the command line or config file.
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
+
+if True:  # hack to make flake8 happy with imports coming after setting up the config
+    import asyncio
+    import logging
+    import mimetypes
+    import socket
+    from inspect import signature
+    from pathlib import Path
+
+    import torch
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+    from fastapi.openapi.utils import get_openapi
+    from fastapi.staticfiles import StaticFiles
+    from fastapi_events.handlers.local import local_handler
+    from fastapi_events.middleware import EventHandlerASGIMiddleware
+    from pydantic.schema import schema
+
+    # noinspection PyUnresolvedReferences
+    import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+    import invokeai.frontend.web as web_dir
+    from invokeai.version.invokeai_version import __version__
+
+    from ..backend.util.logging import InvokeAILogger
+    from .api.dependencies import ApiDependencies
+    from .api.routers import app_info, board_images, boards, images, models, sessions
+    from .api.sockets import SocketIO
+    from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
+
+    if torch.backends.mps.is_available():
+        # noinspection PyUnresolvedReferences
+        import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+
+
 logger = InvokeAILogger.getLogger(config=app_config)
-from invokeai.version.invokeai_version import __version__
-
-# we call this early so that the message appears before
-# other invokeai initialization messages
-if app_config.version:
-    print(f"InvokeAI version {__version__}")
-    sys.exit(0)
-
-import invokeai.frontend.web as web_dir
-import mimetypes
-
-from .api.dependencies import ApiDependencies
-from .api.routers import sessions, models, images, boards, board_images, app_info
-from .api.sockets import SocketIO
-from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, UIConfigBase
-
-
-import torch
-import invokeai.backend.util.hotfixes
-
-if torch.backends.mps.is_available():
-    import invokeai.backend.util.mps_fixes
 
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
@@ -128,6 +125,7 @@ def custom_openapi():
 
     output_schemas = schema(output_types, ref_prefix="#/components/schemas/")
     for schema_key, output_schema in output_schemas["definitions"].items():
+        output_schema["class"] = "output"
         openapi_schema["components"]["schemas"][schema_key] = output_schema
 
         # TODO: note that we assume the schema_key here is the TYPE.__name__
@@ -136,8 +134,8 @@ def custom_openapi():
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = schema([UIConfigBase, _InputField, _OutputField], ref_prefix="#/components/schemas/")
-    for schema_key, output_schema in ui_config_schemas["definitions"].items():
-        openapi_schema["components"]["schemas"][schema_key] = output_schema
+    for schema_key, ui_config_schema in ui_config_schemas["definitions"].items():
+        openapi_schema["components"]["schemas"][schema_key] = ui_config_schema
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
@@ -146,8 +144,8 @@ def custom_openapi():
         output_type_title = output_type_titles[output_type.__name__]
         invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
-
         invoker_schema["output"] = outputs_ref
+        invoker_schema["class"] = "invocation"
 
     from invokeai.backend.model_management.models import get_model_config_enums
 
@@ -213,6 +211,17 @@ def invoke_api():
 
     check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
 
+    if app_config.dev_reload:
+        try:
+            import jurigged
+        except ImportError as e:
+            logger.error(
+                'Can\'t start `--dev_reload` because jurigged is not found; `pip install -e ".[dev]"` to include development dependencies.',
+                exc_info=e,
+            )
+        else:
+            jurigged.watch(logger=InvokeAILogger.getLogger(name="jurigged").info)
+
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
@@ -230,13 +239,16 @@ def invoke_api():
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
     for logname in ["uvicorn.access", "uvicorn"]:
-        l = logging.getLogger(logname)
-        l.handlers.clear()
+        log = logging.getLogger(logname)
+        log.handlers.clear()
         for ch in logger.handlers:
-            l.addHandler(ch)
+            log.addHandler(ch)
 
     loop.run_until_complete(server.serve())
 
 
 if __name__ == "__main__":
-    invoke_api()
+    if app_config.version:
+        print(f"InvokeAI version {__version__}")
+    else:
+        invoke_api()

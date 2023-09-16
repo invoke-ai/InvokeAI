@@ -6,4 +6,5 @@ import { UIState } from './uiTypes';
 export const uiPersistDenylist: (keyof UIState)[] = [
   'shouldShowImageDetails',
   'globalContextMenuCloseTrigger',
+  'panels',
 ];

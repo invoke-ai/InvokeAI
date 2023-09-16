@@ -234,8 +234,8 @@ import textwrap
 import types
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import rmtree, move
-from typing import Optional, List, Literal, Tuple, Union, Dict, Set, Callable
+from shutil import move, rmtree
+from typing import Callable, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import torch
 import yaml
@@ -246,20 +246,21 @@ from pydantic import BaseModel, Field
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, Chdir
+
 from .model_cache import ModelCache, ModelLocker
 from .model_search import ModelSearch
 from .models import (
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelError,
-    SchedulerPredictionType,
     MODEL_CLASSES,
-    ModelConfigBase,
-    ModelNotFoundException,
-    InvalidModelException,
+    BaseModelType,
     DuplicateModelException,
+    InvalidModelException,
     ModelBase,
+    ModelConfigBase,
+    ModelError,
+    ModelNotFoundException,
+    ModelType,
+    SchedulerPredictionType,
+    SubModelType,
 )
 
 # We are only starting to number the config file with release 3.
@@ -341,7 +342,8 @@ class ModelManager(object):
         self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
-            max_vram_cache_size=self.app_config.max_vram_cache_size,
+            max_vram_cache_size=self.app_config.vram_cache_size,
+            lazy_offloading=self.app_config.lazy_offload,
             execution_device=device_type,
             precision=precision,
             sequential_offload=sequential_offload,
@@ -419,12 +421,12 @@ class ModelManager(object):
         base_model_str, model_type_str, model_name = model_key.split("/", 2)
         try:
             model_type = ModelType(model_type_str)
-        except:
+        except Exception:
             raise Exception(f"Unknown model type: {model_type_str}")
 
         try:
             base_model = BaseModelType(base_model_str)
-        except:
+        except Exception:
             raise Exception(f"Unknown base model: {base_model_str}")
 
         return (model_name, base_model, model_type)
@@ -855,7 +857,7 @@ class ModelManager(object):
             info.pop("config")
 
             result = self.add_model(model_name, base_model, model_type, model_attributes=info, clobber=True)
-        except:
+        except Exception:
             # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
             rmtree(new_diffusers_path)
             raise
@@ -1042,7 +1044,7 @@ class ModelManager(object):
         # Patch in the SD VAE from core so that it is available for use by the UI
         try:
             self.heuristic_import({str(self.resolve_model_path("core/convert/sd-vae-ft-mse"))})
-        except:
+        except Exception:
             pass
 
         installer = ModelInstall(

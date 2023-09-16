@@ -1,24 +1,24 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
+import math
 from typing import Literal, Optional, get_args
 
 import numpy as np
-import math
 from PIL import Image, ImageOps
-from invokeai.app.invocations.primitives import ImageField, ImageOutput, ColorField
 
+from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
+from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
 from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, title, tags
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
+from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 
 def infill_methods() -> list[str]:
-    methods = [
-        "tile",
-        "solid",
-    ]
+    methods = ["tile", "solid", "lama", "cv2"]
     if PatchMatch.patchmatch_available():
         methods.insert(0, "patchmatch")
     return methods
@@ -26,6 +26,11 @@ def infill_methods() -> list[str]:
 
 INFILL_METHODS = Literal[tuple(infill_methods())]
 DEFAULT_INFILL_METHOD = "patchmatch" if "patchmatch" in get_args(INFILL_METHODS) else "tile"
+
+
+def infill_lama(im: Image.Image) -> Image.Image:
+    lama = LaMA()
+    return lama(im)
 
 
 def infill_patchmatch(im: Image.Image) -> Image.Image:
@@ -40,6 +45,10 @@ def infill_patchmatch(im: Image.Image) -> Image.Image:
     im_patched_np = PatchMatch.inpaint(im.convert("RGB"), ImageOps.invert(im.split()[-1]), patch_size=3)
     im_patched = Image.fromarray(im_patched_np, mode="RGB")
     return im_patched
+
+
+def infill_cv2(im: Image.Image) -> Image.Image:
+    return cv2_inpaint(im)
 
 
 def get_tile_images(image: np.ndarray, width=8, height=8):
@@ -90,7 +99,7 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
         return im
 
     # Find all invalid tiles and replace with a random valid tile
-    replace_count = (tiles_mask == False).sum()
+    replace_count = (tiles_mask == False).sum()  # noqa: E712
     rng = np.random.default_rng(seed=seed)
     tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[rng.choice(filtered_tiles.shape[0], replace_count), :, :, :]
 
@@ -109,14 +118,10 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
     return si
 
 
-@title("Solid Color Infill")
-@tags("image", "inpaint")
+@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
 class InfillColorInvocation(BaseInvocation):
     """Infills transparent areas of an image with a solid color"""
 
-    type: Literal["infill_rgba"] = "infill_rgba"
-
-    # Inputs
     image: ImageField = InputField(description="The image to infill")
     color: ColorField = InputField(
         default=ColorField(r=127, g=127, b=127, a=255),
@@ -138,6 +143,7 @@ class InfillColorInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -147,14 +153,10 @@ class InfillColorInvocation(BaseInvocation):
         )
 
 
-@title("Tile Infill")
-@tags("image", "inpaint")
+@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
 class InfillTileInvocation(BaseInvocation):
     """Infills transparent areas of an image with tiles of the image"""
 
-    type: Literal["infill_tile"] = "infill_tile"
-
-    # Input
     image: ImageField = InputField(description="The image to infill")
     tile_size: int = InputField(default=32, ge=1, description="The tile size (px)")
     seed: int = InputField(
@@ -177,6 +179,7 @@ class InfillTileInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -186,23 +189,96 @@ class InfillTileInvocation(BaseInvocation):
         )
 
 
-@title("PatchMatch Infill")
-@tags("image", "inpaint")
+@invocation(
+    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0"
+)
 class InfillPatchMatchInvocation(BaseInvocation):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
-    type: Literal["infill_patchmatch"] = "infill_patchmatch"
+    image: ImageField = InputField(description="The image to infill")
+    downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
+    resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
-    # Inputs
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
+
+        resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
+
+        infill_image = image.copy()
+        width = int(image.width / self.downscale)
+        height = int(image.height / self.downscale)
+        infill_image = infill_image.resize(
+            (width, height),
+            resample=resample_mode,
+        )
+
+        if PatchMatch.patchmatch_available():
+            infilled = infill_patchmatch(infill_image)
+        else:
+            raise ValueError("PatchMatch is not available on this system")
+
+        infilled = infilled.resize(
+            (image.width, image.height),
+            resample=resample_mode,
+        )
+
+        infilled.paste(image, (0, 0), mask=image.split()[-1])
+        # image.paste(infilled, (0, 0), mask=image.split()[-1])
+
+        image_dto = context.services.images.create(
+            image=infilled,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
+class LaMaInfillInvocation(BaseInvocation):
+    """Infills transparent areas of an image using the LaMa model"""
+
     image: ImageField = InputField(description="The image to infill")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        if PatchMatch.patchmatch_available():
-            infilled = infill_patchmatch(image.copy())
-        else:
-            raise ValueError("PatchMatch is not available on this system")
+        infilled = infill_lama(image.copy())
+
+        image_dto = context.services.images.create(
+            image=infilled,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint")
+class CV2InfillInvocation(BaseInvocation):
+    """Infills transparent areas of an image using OpenCV Inpainting"""
+
+    image: ImageField = InputField(description="The image to infill")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get_pil_image(self.image.image_name)
+
+        infilled = infill_cv2(image.copy())
 
         image_dto = context.services.images.create(
             image=infilled,

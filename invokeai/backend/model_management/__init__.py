@@ -1,16 +1,19 @@
 """
 Initialization file for invokeai.backend.model_management
 """
-from .model_manager import ModelManager, ModelInfo, AddModelResult, SchedulerPredictionType
-from .model_cache import ModelCache
-from .lora import ModelPatcher, ONNXModelPatcher
-from .models import (
+# This import must be first
+from .model_manager import ModelManager, ModelInfo, AddModelResult, SchedulerPredictionType  # noqa: F401 isort: split
+
+from .lora import ModelPatcher, ONNXModelPatcher  # noqa: F401
+from .model_cache import ModelCache  # noqa: F401
+from .models import (  # noqa: F401
     BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelVariantType,
-    ModelNotFoundException,
     DuplicateModelException,
+    ModelNotFoundException,
+    ModelType,
+    ModelVariantType,
+    SubModelType,
 )
-from .model_merge import ModelMerger, MergeInterpolationMethod
-from .lora import ModelPatcher
+
+# This import must be last
+from .model_merge import ModelMerger, MergeInterpolationMethod  # noqa: F401 isort: split

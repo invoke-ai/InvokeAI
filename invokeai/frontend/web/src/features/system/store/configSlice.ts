@@ -5,16 +5,18 @@ import { merge } from 'lodash-es';
 
 export const initialConfigState: AppConfig = {
   shouldUpdateImagesOnConnect: false,
+  shouldFetchMetadataFromApi: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
   disabledSDFeatures: [
     'variation',
-    'seamless',
     'symmetry',
     'hires',
     'perlinNoise',
     'noiseThreshold',
   ],
+  nodesAllowlist: undefined,
+  nodesDenylist: undefined,
   canRestoreDeletedImagesFromBin: true,
   sd: {
     disabledControlNetModels: [],

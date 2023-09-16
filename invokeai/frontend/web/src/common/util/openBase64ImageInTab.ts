@@ -5,7 +5,9 @@ type Base64AndCaption = {
 
 const openBase64ImageInTab = (images: Base64AndCaption[]) => {
   const w = window.open('');
-  if (!w) return;
+  if (!w) {
+    return;
+  }
 
   images.forEach((i) => {
     const image = new Image();

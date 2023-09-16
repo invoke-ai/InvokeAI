@@ -15,7 +15,9 @@ import { addDeleteBoardAndImagesFulfilledListener } from './listeners/boardAndIm
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
 import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
 import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
+import { addCanvasImageToControlNetListener } from './listeners/canvasImageToControlNet';
 import { addCanvasMaskSavedToGalleryListener } from './listeners/canvasMaskSavedToGallery';
+import { addCanvasMaskToControlNetListener } from './listeners/canvasMaskToControlNet';
 import { addCanvasMergedListener } from './listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGallery';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
@@ -41,6 +43,8 @@ import {
   addImageUploadedFulfilledListener,
   addImageUploadedRejectedListener,
 } from './listeners/imageUploaded';
+import { addImagesStarredListener } from './listeners/imagesStarred';
+import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
@@ -80,8 +84,7 @@ import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
-import { addImagesStarredListener } from './listeners/imagesStarred';
-import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
+import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -137,6 +140,8 @@ addSessionReadyToInvokeListener();
 // Canvas actions
 addCanvasSavedToGalleryListener();
 addCanvasMaskSavedToGalleryListener();
+addCanvasImageToControlNetListener();
+addCanvasMaskToControlNetListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
@@ -197,6 +202,9 @@ addBoardIdSelectedListener();
 
 // Node schemas
 addReceivedOpenAPISchemaListener();
+
+// Workflows
+addWorkflowLoadedListener();
 
 // DND
 addImageDroppedListener();

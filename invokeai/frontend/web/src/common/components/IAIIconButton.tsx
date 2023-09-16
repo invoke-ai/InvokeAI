@@ -9,8 +9,8 @@ import { memo } from 'react';
 
 export type IAIIconButtonProps = IconButtonProps & {
   role?: string;
-  tooltip?: string;
-  tooltipProps?: Omit<TooltipProps, 'children'>;
+  tooltip?: TooltipProps['label'];
+  tooltipProps?: Omit<TooltipProps, 'children' | 'label'>;
   isChecked?: boolean;
 };
 

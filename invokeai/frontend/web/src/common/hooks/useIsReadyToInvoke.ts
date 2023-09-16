@@ -2,71 +2,122 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-// import { validateSeedWeights } from 'common/util/seedWeightPairs';
+import { isInvocationNode } from 'features/nodes/types/types';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { forEach } from 'lodash-es';
-import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
-import { modelsApi } from '../../services/api/endpoints/models';
+import { forEach, map } from 'lodash-es';
+import { getConnectedEdges } from 'reactflow';
+import i18n from 'i18next';
 
-const readinessSelector = createSelector(
+const selector = createSelector(
   [stateSelector, activeTabNameSelector],
   (state, activeTabName) => {
-    const { generation, system } = state;
-    const { initialImage } = generation;
+    const { generation, system, nodes } = state;
+    const { initialImage, model } = generation;
 
     const { isProcessing, isConnected } = system;
 
-    let isReady = true;
-    const reasonsWhyNotReady: string[] = [];
+    const reasons: string[] = [];
 
-    if (activeTabName === 'img2img' && !initialImage) {
-      isReady = false;
-      reasonsWhyNotReady.push('No initial image selected');
-    }
-
-    const { isSuccess: mainModelsSuccessfullyLoaded } =
-      modelsApi.endpoints.getMainModels.select(NON_REFINER_BASE_MODELS)(state);
-    if (!mainModelsSuccessfullyLoaded) {
-      isReady = false;
-      reasonsWhyNotReady.push('Models are not loaded');
-    }
-
-    // TODO: job queue
     // Cannot generate if already processing an image
     if (isProcessing) {
-      isReady = false;
-      reasonsWhyNotReady.push('System Busy');
+      reasons.push(i18n.t('parameters.invoke.systemBusy'));
     }
 
     // Cannot generate if not connected
     if (!isConnected) {
-      isReady = false;
-      reasonsWhyNotReady.push('System Disconnected');
+      reasons.push(i18n.t('parameters.invoke.systemDisconnected'));
     }
 
-    // // Cannot generate variations without valid seed weights
-    // if (
-    //   shouldGenerateVariations &&
-    //   (!(validateSeedWeights(seedWeights) || seedWeights === '') || seed === -1)
-    // ) {
-    //   isReady = false;
-    //   reasonsWhyNotReady.push('Seed-Weights badly formatted.');
-    // }
+    if (activeTabName === 'img2img' && !initialImage) {
+      reasons.push(i18n.t('parameters.invoke.noInitialImageSelected'));
+    }
 
-    forEach(state.controlNet.controlNets, (controlNet, id) => {
-      if (!controlNet.model) {
-        isReady = false;
-        reasonsWhyNotReady.push(`ControlNet ${id} has no model selected.`);
+    if (activeTabName === 'nodes') {
+      if (nodes.shouldValidateGraph) {
+        if (!nodes.nodes.length) {
+          reasons.push(i18n.t('parameters.invoke.noNodesInGraph'));
+        }
+
+        nodes.nodes.forEach((node) => {
+          if (!isInvocationNode(node)) {
+            return;
+          }
+
+          const nodeTemplate = nodes.nodeTemplates[node.data.type];
+
+          if (!nodeTemplate) {
+            // Node type not found
+            reasons.push(i18n.t('parameters.invoke.missingNodeTemplate'));
+            return;
+          }
+
+          const connectedEdges = getConnectedEdges([node], nodes.edges);
+
+          forEach(node.data.inputs, (field) => {
+            const fieldTemplate = nodeTemplate.inputs[field.name];
+            const hasConnection = connectedEdges.some(
+              (edge) =>
+                edge.target === node.id && edge.targetHandle === field.name
+            );
+
+            if (!fieldTemplate) {
+              reasons.push(i18n.t('parameters.invoke.missingFieldTemplate'));
+              return;
+            }
+
+            if (
+              fieldTemplate.required &&
+              field.value === undefined &&
+              !hasConnection
+            ) {
+              reasons.push(
+                i18n.t('parameters.invoke.missingInputForField', {
+                  nodeLabel: node.data.label || nodeTemplate.title,
+                  fieldLabel: field.label || fieldTemplate.title,
+                })
+              );
+              return;
+            }
+          });
+        });
       }
-    });
+    } else {
+      if (!model) {
+        reasons.push(i18n.t('parameters.invoke.noModelSelected'));
+      }
 
-    // All good
-    return { isReady, reasonsWhyNotReady };
+      if (state.controlNet.isEnabled) {
+        map(state.controlNet.controlNets).forEach((controlNet, i) => {
+          if (!controlNet.isEnabled) {
+            return;
+          }
+          if (!controlNet.model) {
+            reasons.push(
+              i18n.t('parameters.invoke.noModelForControlNet', { index: i + 1 })
+            );
+          }
+
+          if (
+            !controlNet.controlImage ||
+            (!controlNet.processedControlImage &&
+              controlNet.processorType !== 'none')
+          ) {
+            reasons.push(
+              i18n.t('parameters.invoke.noControlImageForControlNet', {
+                index: i + 1,
+              })
+            );
+          }
+        });
+      }
+    }
+
+    return { isReady: !reasons.length, isProcessing, reasons };
   },
   defaultSelectorOptions
 );
 
 export const useIsReadyToInvoke = () => {
-  const { isReady } = useAppSelector(readinessSelector);
-  return isReady;
+  const { isReady, isProcessing, reasons } = useAppSelector(selector);
+  return { isReady, isProcessing, reasons };
 };

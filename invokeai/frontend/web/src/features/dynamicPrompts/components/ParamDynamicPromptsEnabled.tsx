@@ -3,8 +3,9 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { isEnabledToggled } from '../store/dynamicPromptsSlice';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -19,6 +20,7 @@ const selector = createSelector(
 const ParamDynamicPromptsToggle = () => {
   const dispatch = useAppDispatch();
   const { isEnabled } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const handleToggleIsEnabled = useCallback(() => {
     dispatch(isEnabledToggled());
@@ -26,11 +28,11 @@ const ParamDynamicPromptsToggle = () => {
 
   return (
     <IAISwitch
-      label="Enable Dynamic Prompts"
+      label={t('prompt.enableDynamicPrompts')}
       isChecked={isEnabled}
       onChange={handleToggleIsEnabled}
     />
   );
 };
 
-export default ParamDynamicPromptsToggle;
+export default memo(ParamDynamicPromptsToggle);

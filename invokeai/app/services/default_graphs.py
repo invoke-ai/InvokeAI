@@ -1,11 +1,10 @@
-from ..invocations.latent import LatentsToImageInvocation, DenoiseLatentsInvocation
-from ..invocations.image import ImageNSFWBlurInvocation
-from ..invocations.noise import NoiseInvocation
 from ..invocations.compel import CompelInvocation
+from ..invocations.image import ImageNSFWBlurInvocation
+from ..invocations.latent import DenoiseLatentsInvocation, LatentsToImageInvocation
+from ..invocations.noise import NoiseInvocation
 from ..invocations.primitives import IntegerInvocation
 from .graph import Edge, EdgeConnection, ExposedNodeInput, ExposedNodeOutput, Graph, LibraryGraph
 from .item_storage import ItemStorageABC
-
 
 default_text_to_image_graph_id = "539b2af5-2b4d-4d8c-8071-e54a3255fc74"
 
@@ -17,9 +16,9 @@ def create_text_to_image() -> LibraryGraph:
         description="Converts text to an image",
         graph=Graph(
             nodes={
-                "width": IntegerInvocation(id="width", a=512),
-                "height": IntegerInvocation(id="height", a=512),
-                "seed": IntegerInvocation(id="seed", a=-1),
+                "width": IntegerInvocation(id="width", value=512),
+                "height": IntegerInvocation(id="height", value=512),
+                "seed": IntegerInvocation(id="seed", value=-1),
                 "3": NoiseInvocation(id="3"),
                 "4": CompelInvocation(id="4"),
                 "5": CompelInvocation(id="5"),
@@ -29,15 +28,15 @@ def create_text_to_image() -> LibraryGraph:
             },
             edges=[
                 Edge(
-                    source=EdgeConnection(node_id="width", field="a"),
+                    source=EdgeConnection(node_id="width", field="value"),
                     destination=EdgeConnection(node_id="3", field="width"),
                 ),
                 Edge(
-                    source=EdgeConnection(node_id="height", field="a"),
+                    source=EdgeConnection(node_id="height", field="value"),
                     destination=EdgeConnection(node_id="3", field="height"),
                 ),
                 Edge(
-                    source=EdgeConnection(node_id="seed", field="a"),
+                    source=EdgeConnection(node_id="seed", field="value"),
                     destination=EdgeConnection(node_id="3", field="seed"),
                 ),
                 Edge(
@@ -65,9 +64,9 @@ def create_text_to_image() -> LibraryGraph:
         exposed_inputs=[
             ExposedNodeInput(node_path="4", field="prompt", alias="positive_prompt"),
             ExposedNodeInput(node_path="5", field="prompt", alias="negative_prompt"),
-            ExposedNodeInput(node_path="width", field="a", alias="width"),
-            ExposedNodeInput(node_path="height", field="a", alias="height"),
-            ExposedNodeInput(node_path="seed", field="a", alias="seed"),
+            ExposedNodeInput(node_path="width", field="value", alias="width"),
+            ExposedNodeInput(node_path="height", field="value", alias="height"),
+            ExposedNodeInput(node_path="seed", field="value", alias="seed"),
         ],
         exposed_outputs=[ExposedNodeOutput(node_path="8", field="image", alias="image")],
     )

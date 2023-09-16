@@ -1,107 +1,97 @@
 import { Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
-import { memo, useState } from 'react';
-import { MdDeviceHub } from 'react-icons/md';
-import { Panel, PanelGroup } from 'react-resizable-panels';
-import 'reactflow/dist/style.css';
-import NodeEditorPanelGroup from './panel/NodeEditorPanelGroup';
-import { Flow } from './Flow';
 import { AnimatePresence, motion } from 'framer-motion';
+import { memo } from 'react';
+import { MdDeviceHub } from 'react-icons/md';
+import 'reactflow/dist/style.css';
+import AddNodePopover from './flow/AddNodePopover/AddNodePopover';
+import { Flow } from './flow/Flow';
+import TopLeftPanel from './flow/panels/TopLeftPanel/TopLeftPanel';
+import TopCenterPanel from './flow/panels/TopCenterPanel/TopCenterPanel';
+import TopRightPanel from './flow/panels/TopRightPanel/TopRightPanel';
+import BottomLeftPanel from './flow/panels/BottomLeftPanel/BottomLeftPanel';
+import MinimapPanel from './flow/panels/MinimapPanel/MinimapPanel';
+import { useTranslation } from 'react-i18next';
 
 const NodeEditor = () => {
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const isReady = useAppSelector((state) => state.nodes.isReady);
+  const { t } = useTranslation();
   return (
-    <PanelGroup
-      id="node-editor"
-      autoSaveId="node-editor"
-      direction="horizontal"
-      style={{ height: '100%', width: '100%' }}
+    <Flex
+      layerStyle="first"
+      sx={{
+        position: 'relative',
+        width: 'full',
+        height: 'full',
+        borderRadius: 'base',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
-      <Panel
-        id="node-editor-panel-group"
-        collapsible
-        onCollapse={setIsPanelCollapsed}
-        minSize={25}
-      >
-        <NodeEditorPanelGroup />
-      </Panel>
-      <ResizeHandle
-        collapsedDirection={isPanelCollapsed ? 'left' : undefined}
-      />
-      <Panel id="node-editor-content">
-        <Flex
-          layerStyle={'first'}
-          sx={{
-            position: 'relative',
-            width: 'full',
-            height: 'full',
-            borderRadius: 'base',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <AnimatePresence>
-            {isReady && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                }}
-                animate={{
-                  opacity: 1,
-                  transition: { duration: 0.2 },
-                }}
-                exit={{
-                  opacity: 0,
-                  transition: { duration: 0.2 },
-                }}
-                style={{ width: '100%', height: '100%' }}
-              >
-                <Flow />
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <AnimatePresence>
-            {!isReady && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                }}
-                animate={{
-                  opacity: 1,
-                  transition: { duration: 0.2 },
-                }}
-                exit={{
-                  opacity: 0,
-                  transition: { duration: 0.2 },
-                }}
-                style={{ position: 'absolute', width: '100%', height: '100%' }}
-              >
-                <Flex
-                  layerStyle={'first'}
-                  sx={{
-                    position: 'relative',
-                    width: 'full',
-                    height: 'full',
-                    borderRadius: 'base',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <IAINoContentFallback
-                    label="Loading Nodes..."
-                    icon={MdDeviceHub}
-                  />
-                </Flex>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Flex>
-      </Panel>
-    </PanelGroup>
+      <AnimatePresence>
+        {isReady && (
+          <motion.div
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 0.2 },
+            }}
+            exit={{
+              opacity: 0,
+              transition: { duration: 0.2 },
+            }}
+            style={{ position: 'relative', width: '100%', height: '100%' }}
+          >
+            <Flow />
+            <AddNodePopover />
+            <TopLeftPanel />
+            <TopCenterPanel />
+            <TopRightPanel />
+            <BottomLeftPanel />
+            <MinimapPanel />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {!isReady && (
+          <motion.div
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 0.2 },
+            }}
+            exit={{
+              opacity: 0,
+              transition: { duration: 0.2 },
+            }}
+            style={{ position: 'absolute', width: '100%', height: '100%' }}
+          >
+            <Flex
+              layerStyle="first"
+              sx={{
+                position: 'relative',
+                width: 'full',
+                height: 'full',
+                borderRadius: 'base',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+              }}
+            >
+              <IAINoContentFallback
+                label={t('nodes.loadingNodes')}
+                icon={MdDeviceHub}
+              />
+            </Flex>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Flex>
   );
 };
 

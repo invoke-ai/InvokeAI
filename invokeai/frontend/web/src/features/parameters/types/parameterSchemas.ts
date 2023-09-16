@@ -210,7 +210,7 @@ export type HeightParam = z.infer<typeof zHeight>;
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
-const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+export const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
 
 export type BaseModelParam = z.infer<typeof zBaseModel>;
 
@@ -417,6 +417,22 @@ export type MaskBlurMethodParam = z.infer<typeof zMaskBlurMethod>;
 export const isValidMaskBlurMethod = (
   val: unknown
 ): val is MaskBlurMethodParam => zMaskBlurMethod.safeParse(val).success;
+
+/**
+ * Zod schema for a Canvas Coherence Mode method parameter
+ */
+export const zCanvasCoherenceMode = z.enum(['unmasked', 'mask', 'edge']);
+/**
+ * Type alias for Canvas Coherence Mode parameter, inferred from its zod schema
+ */
+export type CanvasCoherenceModeParam = z.infer<typeof zCanvasCoherenceMode>;
+/**
+ * Validates/type-guards a value as a mask blur method parameter
+ */
+export const isValidCoherenceModeParam = (
+  val: unknown
+): val is CanvasCoherenceModeParam =>
+  zCanvasCoherenceMode.safeParse(val).success;
 
 // /**
 //  * Zod schema for BaseModelType

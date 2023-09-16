@@ -1,10 +1,12 @@
 import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   KeyboardEvent,
   ReactNode,
@@ -18,8 +20,6 @@ import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import ImageUploadOverlay from './ImageUploadOverlay';
-import { AnimatePresence, motion } from 'framer-motion';
-import { stateSelector } from 'app/store/store';
 
 const selector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -150,7 +150,9 @@ const ImageUploader = (props: ImageUploaderProps) => {
       {...getRootProps({ style: {} })}
       onKeyDown={(e: KeyboardEvent) => {
         // Bail out if user hits spacebar - do not open the uploader
-        if (e.key === ' ') return;
+        if (e.key === ' ') {
+          return;
+        }
       }}
     >
       <input {...getInputProps()} />

@@ -60,7 +60,7 @@ class ImageFileStorageBase(ABC):
         image: PILImageType,
         image_name: str,
         metadata: Optional[dict] = None,
-        graph: Optional[dict] = None,
+        workflow: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
@@ -110,7 +110,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         image: PILImageType,
         image_name: str,
         metadata: Optional[dict] = None,
-        graph: Optional[dict] = None,
+        workflow: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
@@ -119,12 +119,23 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             pnginfo = PngImagePlugin.PngInfo()
 
-            if metadata is not None:
-                pnginfo.add_text("invokeai_metadata", json.dumps(metadata))
-            if graph is not None:
-                pnginfo.add_text("invokeai_graph", json.dumps(graph))
+            if metadata is not None or workflow is not None:
+                if metadata is not None:
+                    pnginfo.add_text("invokeai_metadata", json.dumps(metadata))
+                if workflow is not None:
+                    pnginfo.add_text("invokeai_workflow", workflow)
+            else:
+                # For uploaded images, we want to retain metadata. PIL strips it on save; manually add it back
+                # TODO: retain non-invokeai metadata on save...
+                original_metadata = image.info.get("invokeai_metadata", None)
+                if original_metadata is not None:
+                    pnginfo.add_text("invokeai_metadata", original_metadata)
+                original_workflow = image.info.get("invokeai_workflow", None)
+                if original_workflow is not None:
+                    pnginfo.add_text("invokeai_workflow", original_workflow)
 
             image.save(image_path, "PNG", pnginfo=pnginfo)
+
             thumbnail_name = get_thumbnail_name(image_name)
             thumbnail_path = self.get_path(thumbnail_name, thumbnail=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
@@ -179,7 +190,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         return None if image_name not in self.__cache else self.__cache[image_name]
 
     def __set_cache(self, image_name: Path, image: PILImageType):
-        if not image_name in self.__cache:
+        if image_name not in self.__cache:
             self.__cache[image_name] = image
             self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
             if len(self.__cache) > self.__max_cache_size:

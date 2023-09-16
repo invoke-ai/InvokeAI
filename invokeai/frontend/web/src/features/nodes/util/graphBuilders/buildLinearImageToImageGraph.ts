@@ -10,6 +10,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -24,6 +25,7 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SEAMLESS,
 } from './constants';
 
 /**
@@ -49,6 +51,8 @@ export const buildLinearImageToImageGraph = (
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
     vaePrecision,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   // TODO: add batch functionality
@@ -80,6 +84,10 @@ export const buildLinearImageToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  const fp32 = vaePrecision === 'fp32';
+
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
+
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
@@ -88,9 +96,9 @@ export const buildLinearImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+        id: modelLoaderNodeId,
         model,
       },
       [CLIP_SKIP]: {
@@ -116,7 +124,7 @@ export const buildLinearImageToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -134,14 +142,14 @@ export const buildLinearImageToImageGraph = (
         // image: {
         //   image_name: initialImage.image_name,
         // },
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
     },
     edges: [
       // Connect Model Loader to UNet and CLIP Skip
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -151,7 +159,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -338,11 +346,17 @@ export const buildLinearImageToImageGraph = (
     },
   });
 
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
+
   // optionally add custom VAE
-  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS);
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

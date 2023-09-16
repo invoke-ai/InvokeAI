@@ -1,6 +1,4 @@
 name: style checks
-# just formatting for now
-# TODO: add isort and flake8 later
 
 on:
   pull_request:
@@ -20,8 +18,8 @@ jobs:
 
       - name: Install dependencies with pip
         run: |
-          pip install black
+          pip install black flake8 Flake8-pyproject isort
 
-      # - run: isort --check-only .
+      - run: isort --check-only .
       - run: black --check .
-      # - run: flake8
+      - run: flake8

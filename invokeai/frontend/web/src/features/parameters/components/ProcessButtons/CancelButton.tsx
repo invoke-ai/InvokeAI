@@ -27,6 +27,7 @@ import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
 
 import { ChevronDownIcon } from '@chakra-ui/icons';
 import { sessionCanceled } from 'services/api/thunks/session';
+import IAIButton from 'common/components/IAIButton';
 
 const cancelButtonSelector = createSelector(
   systemSelector,
@@ -49,15 +50,14 @@ const cancelButtonSelector = createSelector(
   }
 );
 
-interface CancelButtonProps {
+type Props = Omit<ButtonProps, 'aria-label'> & {
   btnGroupWidth?: string | number;
-}
+  asIconButton?: boolean;
+};
 
-const CancelButton = (
-  props: CancelButtonProps & Omit<ButtonProps, 'aria-label'>
-) => {
+const CancelButton = (props: Props) => {
   const dispatch = useAppDispatch();
-  const { btnGroupWidth = 'auto', ...rest } = props;
+  const { btnGroupWidth = 'auto', asIconButton = false, ...rest } = props;
   const {
     isProcessing,
     isConnected,
@@ -124,16 +124,31 @@ const CancelButton = (
 
   return (
     <ButtonGroup isAttached width={btnGroupWidth}>
-      <IAIIconButton
-        icon={cancelIcon}
-        tooltip={cancelLabel}
-        aria-label={cancelLabel}
-        isDisabled={!isConnected || !isProcessing || !isCancelable}
-        onClick={handleClickCancel}
-        colorScheme="error"
-        id="cancel-button"
-        {...rest}
-      />
+      {asIconButton ? (
+        <IAIIconButton
+          icon={cancelIcon}
+          tooltip={cancelLabel}
+          aria-label={cancelLabel}
+          isDisabled={!isConnected || !isProcessing || !isCancelable}
+          onClick={handleClickCancel}
+          colorScheme="error"
+          id="cancel-button"
+          {...rest}
+        />
+      ) : (
+        <IAIButton
+          leftIcon={cancelIcon}
+          tooltip={cancelLabel}
+          aria-label={cancelLabel}
+          isDisabled={!isConnected || !isProcessing || !isCancelable}
+          onClick={handleClickCancel}
+          colorScheme="error"
+          id="cancel-button"
+          {...rest}
+        >
+          {t('parameters.cancel.cancel')}
+        </IAIButton>
+      )}
       <Menu closeOnSelect={false}>
         <MenuButton
           as={IAIIconButton}

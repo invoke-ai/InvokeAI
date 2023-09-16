@@ -178,7 +178,7 @@ export const modelsApi = api.injectEndpoints({
         const query = queryString.stringify(params, { arrayFormat: 'none' });
         return `models/?${query}`;
       },
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'OnnxModel', id: LIST_TAG },
         ];
@@ -194,11 +194,7 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
-      transformResponse: (
-        response: { models: OnnxModelConfig[] },
-        meta,
-        arg
-      ) => {
+      transformResponse: (response: { models: OnnxModelConfig[] }) => {
         const entities = createModelEntities<OnnxModelConfigEntity>(
           response.models
         );
@@ -221,7 +217,7 @@ export const modelsApi = api.injectEndpoints({
         const query = queryString.stringify(params, { arrayFormat: 'none' });
         return `models/?${query}`;
       },
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'MainModel', id: LIST_TAG },
         ];
@@ -237,11 +233,7 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
-      transformResponse: (
-        response: { models: MainModelConfig[] },
-        meta,
-        arg
-      ) => {
+      transformResponse: (response: { models: MainModelConfig[] }) => {
         const entities = createModelEntities<MainModelConfigEntity>(
           response.models
         );
@@ -361,7 +353,7 @@ export const modelsApi = api.injectEndpoints({
     }),
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'LoRAModel', id: LIST_TAG },
         ];
@@ -377,11 +369,7 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
-      transformResponse: (
-        response: { models: LoRAModelConfig[] },
-        meta,
-        arg
-      ) => {
+      transformResponse: (response: { models: LoRAModelConfig[] }) => {
         const entities = createModelEntities<LoRAModelConfigEntity>(
           response.models
         );
@@ -421,7 +409,7 @@ export const modelsApi = api.injectEndpoints({
       void
     >({
       query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'ControlNetModel', id: LIST_TAG },
         ];
@@ -437,11 +425,7 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
-      transformResponse: (
-        response: { models: ControlNetModelConfig[] },
-        meta,
-        arg
-      ) => {
+      transformResponse: (response: { models: ControlNetModelConfig[] }) => {
         const entities = createModelEntities<ControlNetModelConfigEntity>(
           response.models
         );
@@ -453,7 +437,7 @@ export const modelsApi = api.injectEndpoints({
     }),
     getVaeModels: build.query<EntityState<VaeModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'VaeModel', id: LIST_TAG },
         ];
@@ -469,11 +453,7 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
-      transformResponse: (
-        response: { models: VaeModelConfig[] },
-        meta,
-        arg
-      ) => {
+      transformResponse: (response: { models: VaeModelConfig[] }) => {
         const entities = createModelEntities<VaeModelConfigEntity>(
           response.models
         );
@@ -488,7 +468,7 @@ export const modelsApi = api.injectEndpoints({
       void
     >({
       query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'TextualInversionModel', id: LIST_TAG },
         ];
@@ -504,11 +484,9 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
-      transformResponse: (
-        response: { models: TextualInversionModelConfig[] },
-        meta,
-        arg
-      ) => {
+      transformResponse: (response: {
+        models: TextualInversionModelConfig[];
+      }) => {
         const entities = createModelEntities<TextualInversionModelConfigEntity>(
           response.models
         );
@@ -525,7 +503,7 @@ export const modelsApi = api.injectEndpoints({
           url: `/models/search?${folderQueryStr}`,
         };
       },
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'ScannedModels', id: LIST_TAG },
         ];
