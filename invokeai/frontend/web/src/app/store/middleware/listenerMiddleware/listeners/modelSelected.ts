@@ -14,6 +14,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addModelSelectedListener = () => {
   startAppListening({
@@ -67,7 +68,9 @@ export const addModelSelectedListener = () => {
           dispatch(
             addToast(
               makeToast({
-                title: `Base model changed, cleared ${modelsCleared} incompatible submodel${
+                title: `${t(
+                  'toast.baseModelChangedCleared'
+                )} ${modelsCleared} ${t('toast.incompatibleSubmodel')}${
                   modelsCleared === 1 ? '' : 's'
                 }`,
                 status: 'warning',
