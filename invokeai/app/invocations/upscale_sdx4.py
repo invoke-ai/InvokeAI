@@ -75,17 +75,9 @@ class UpscaleLatentsInvocation(BaseInvocation):
 
             conditioning_data = self.get_conditioning_data(context, scheduler, unet, self.seed)
 
-            # TODO: https://github.com/huggingface/diffusers/issues/4349
-            class FakeEncoder:
-                class FakeEncoderConfig:
-                    pass
-
-                config = FakeEncoderConfig()
-                dtype = unet.dtype
-
             pipeline = StableDiffusionUpscalePipeline(
                 vae=vae,
-                text_encoder=FakeEncoder(),
+                text_encoder=None,
                 tokenizer=None,
                 unet=unet,
                 low_res_scheduler=low_res_scheduler,
