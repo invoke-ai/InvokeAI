@@ -26,14 +26,23 @@ import { v4 as uuidv4 } from 'uuid';
 const selector = createSelector(
   [stateSelector],
   ({ controlNet }) => {
-    const { controlNets, isEnabled } = controlNet;
+    const { controlNets, isEnabled, isIPAdapterEnabled } = controlNet;
 
     const validControlNets = getValidControlNets(controlNets);
 
-    const activeLabel =
-      isEnabled && validControlNets.length > 0
-        ? `${validControlNets.length} Active`
-        : undefined;
+    let activeLabel = undefined;
+
+    if (isEnabled && validControlNets.length > 0) {
+      activeLabel = `${validControlNets.length} ControlNet`;
+    }
+
+    if (isIPAdapterEnabled) {
+      if (activeLabel) {
+        activeLabel = `${activeLabel}, IP Adapter`;
+      } else {
+        activeLabel = 'IP Adapter';
+      }
+    }
 
     return { controlNetsArray: map(controlNets), activeLabel };
   },
