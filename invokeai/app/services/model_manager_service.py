@@ -370,7 +370,9 @@ class ModelManagerService(ModelManagerServiceBase):
         self, model_path: Path, model_attributes: Optional[dict] = None, wait: bool = False
     ) -> ModelInstallJob:
         """
-        Add a model using its path, with a dictionary of attributes. Will fail with an
+        Add a model using its path, with a dictionary of attributes.
+
+        Will fail with an
         assertion error if the name already exists.
         """
         self.logger.debug(f"add/update model {model_path}")
@@ -385,8 +387,11 @@ class ModelManagerService(ModelManagerServiceBase):
         model_attributes: Optional[Dict[str, Any]] = None,
     ) -> ModelInstallJob:
         """
-        Add a model using its path, with a dictionary of attributes. Will fail with an
-        assertion error if the name already exists.
+        Add a model using a path, repo_id or URL.
+
+        :param model_attributes: Dictionary of ModelConfigBase fields to
+        attach to the model. When installing a URL or repo_id, some metadata 
+        values, such as `tags` will be automagically added.
         """
         self.logger.debug(f"add/update model {source}")
         variant = "fp16" if self._loader.precision == "float16" else None
@@ -402,17 +407,18 @@ class ModelManagerService(ModelManagerServiceBase):
         new_config: Union[dict, ModelConfigBase],
     ) -> ModelConfigBase:
         """
-        Update the named model with a dictionary of attributes. Will fail with a
+        Update the named model with a dictionary of attributes.
+
+        Will fail with a
         UnknownModelException if the name does not already exist.
 
         On a successful update, the config will be changed in memory. Will fail
         with an assertion error if provided attributes are incorrect or
         the model key is unknown.
         """
-        model_info = self.model_info(key)
-        self.logger.debug(f"update model {model_info.name}")
-        self.logger.warning("TO DO: write code to move models around if base or type change")
-        return self._loader.store.update_model(key, new_config)
+        self.logger.debug(f"update model {key}")
+        new_info = self._loader.store.update_model(key, new_config)
+        return self._loader.installer.sync_model_path(new_info.key)
 
     def del_model(
         self,
@@ -420,7 +426,9 @@ class ModelManagerService(ModelManagerServiceBase):
         delete_files: bool = False,
     ):
         """
-        Delete the named model from configuration. If delete_files is true,
+        Delete the named model from configuration.
+
+        If delete_files is true,
         then the underlying weight file or diffusers directory will be deleted
         as well.
         """
@@ -428,7 +436,7 @@ class ModelManagerService(ModelManagerServiceBase):
         self.logger.debug(f"delete model {model_info.name}")
         self._loader.store.del_model(key)
         if delete_files and Path(model_info.path).exists():
-            path = Path(model_info)
+            path = Path(model_info.path)
             if path.is_dir():
                 shutil.rmtree(path)
             else:

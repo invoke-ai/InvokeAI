@@ -2,6 +2,7 @@
 
 
 import pathlib
+import traceback
 from typing import List, Literal, Optional, Union
 
 from fastapi import Body, Path, Query, Response
@@ -23,6 +24,10 @@ from ..dependencies import ApiDependencies
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
+# NOTE: The generic configuration classes defined in invokeai.backend.model_manager.config
+# such as "MainCheckpointConfig" are repackaged by code original written by Stalker
+# into base-specific classes such as `abc.StableDiffusion1ModelCheckpointConfig`
+# This is the reason for the calls to dict() followed by pydantic.parse_obj_as()
 UpdateModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ImportModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ConvertModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
@@ -56,7 +61,7 @@ async def list_models(
 
 
 @models_router.patch(
-    "/{base_model}/{model_type}/{model_name}",
+    "/{key}",
     operation_id="update_model",
     responses={
         200: {"description": "The model was updated successfully"},
@@ -68,58 +73,17 @@ async def list_models(
     response_model=UpdateModelResponse,
 )
 async def update_model(
-    base_model: BaseModelType = Path(description="Base model"),
-    model_type: ModelType = Path(description="The type of model"),
-    model_name: str = Path(description="model name"),
-    info: Union[tuple(OPENAPI_MODEL_CONFIGS)] = Body(description="Model configuration"),
+        key: str = Path(description="Unique key of model"),
+        info: Union[tuple(OPENAPI_MODEL_CONFIGS)] = Body(description="Model configuration"),
 ) -> UpdateModelResponse:
     """Update model contents with a new config. If the model name or base fields are changed, then the model is renamed."""
     logger = ApiDependencies.invoker.services.logger
 
     try:
-        previous_info = ApiDependencies.invoker.services.model_manager.list_model(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-        )
-
-        # rename operation requested
-        if info.model_name != model_name or info.base_model != base_model:
-            ApiDependencies.invoker.services.model_manager.rename_model(
-                base_model=base_model,
-                model_type=model_type,
-                model_name=model_name,
-                new_name=info.model_name,
-                new_base=info.base_model,
-            )
-            logger.info(f"Successfully renamed {base_model.value}/{model_name}=>{info.base_model}/{info.model_name}")
-            # update information to support an update of attributes
-            model_name = info.model_name
-            base_model = info.base_model
-            new_info = ApiDependencies.invoker.services.model_manager.list_model(
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
-            )
-            if new_info.get("path") != previous_info.get(
-                "path"
-            ):  # model manager moved model path during rename - don't overwrite it
-                info.path = new_info.get("path")
-
-        # replace empty string values with None/null to avoid phenomenon of vae: ''
         info_dict = info.dict()
         info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
-
-        ApiDependencies.invoker.services.model_manager.update_model(
-            model_name=model_name, base_model=base_model, model_type=model_type, model_attributes=info_dict
-        )
-
-        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-        )
-        model_response = parse_obj_as(UpdateModelResponse, model_raw)
+        new_config = ApiDependencies.invoker.services.model_manager.update_model(key, new_config=info_dict)
+        model_response = parse_obj_as(UpdateModelResponse, new_config.dict())
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -221,25 +185,25 @@ async def add_model(
 
 
 @models_router.delete(
-    "/{base_model}/{model_type}/{model_name}",
+    "/{key}",
     operation_id="del_model",
     responses={204: {"description": "Model deleted successfully"}, 404: {"description": "Model not found"}},
     status_code=204,
     response_model=None,
 )
 async def delete_model(
-    base_model: BaseModelType = Path(description="Base model"),
-    model_type: ModelType = Path(description="The type of model"),
-    model_name: str = Path(description="model name"),
+        key: str = Path(description="Unique key of model to remove from model registry."),
+        delete_files: Optional[bool] = Query(
+            description="Delete underlying files and directories as well.",
+            default=False
+        )
 ) -> Response:
     """Delete Model"""
     logger = ApiDependencies.invoker.services.logger
 
     try:
-        ApiDependencies.invoker.services.model_manager.del_model(
-            model_name, base_model=base_model, model_type=model_type
-        )
-        logger.info(f"Deleted model: {model_name}")
+        ApiDependencies.invoker.services.model_manager.del_model(key, delete_files=delete_files)
+        logger.info(f"Deleted model: {key}")
         return Response(status_code=204)
     except UnknownModelException as e:
         logger.error(str(e))
@@ -247,7 +211,7 @@ async def delete_model(
 
 
 @models_router.put(
-    "/convert/{base_model}/{model_type}/{model_name}",
+    "/convert/{key}",
     operation_id="convert_model",
     responses={
         200: {"description": "Model converted successfully"},
@@ -258,27 +222,19 @@ async def delete_model(
     response_model=ConvertModelResponse,
 )
 async def convert_model(
-    base_model: BaseModelType = Path(description="Base model"),
-    model_type: ModelType = Path(description="The type of model"),
-    model_name: str = Path(description="model name"),
+    key: str = Path(description="Unique key of model to remove from model registry."),
     convert_dest_directory: Optional[str] = Query(
         default=None, description="Save the converted model to the designated directory"
     ),
 ) -> ConvertModelResponse:
     """Convert a checkpoint model into a diffusers model, optionally saving to the indicated destination directory, or `models` if none."""
     logger = ApiDependencies.invoker.services.logger
+    info = ApiDependencies.invoker.services.model_manager.model_info(key)
     try:
-        logger.info(f"Converting model: {model_name}")
+        logger.info(f"Converting model: {info.name}")
         dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
-        ApiDependencies.invoker.services.model_manager.convert_model(
-            model_name,
-            base_model=base_model,
-            model_type=model_type,
-            convert_dest_directory=dest,
-        )
-        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-            model_name, base_model=base_model, model_type=model_type
-        )
+        ApiDependencies.invoker.services.model_manager.convert_model(key, convert_dest_directory=dest)
+        model_raw = ApiDependencies.invoker.services.model_manager.model_info(key).dict()
         response = parse_obj_as(ConvertModelResponse, model_raw)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found: {str(e)}")

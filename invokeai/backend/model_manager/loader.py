@@ -91,8 +91,12 @@ class ModelLoaderBase(ABC):
     @abstractmethod
     def collect_cache_stats(self, cache_stats: CacheStats):
         """Replace cache statistics."""
+        pass
 
-    pass
+    @abstractmethod
+    def resolve_model_path(self, path: Union[Path, str]) -> Path:
+        """Turn a potentially relative path into an absolute one in the models_dir."""
+        pass
 
     @property
     @abstractmethod
@@ -214,6 +218,9 @@ class ModelLoader(ModelLoaderBase):
                the model to retrieve (e.g. ModelType.Vae)
         """
         model_config = self.store.get_model(key)  # May raise a UnknownModelException
+        if model_config.model_type == 'main' and not submodel_type:
+            raise InvalidModelException('submodel_type is required when loading a main model')
+        
         model_path, is_submodel_override = self._get_model_path(model_config, submodel_type)
 
         if is_submodel_override:
@@ -258,17 +265,17 @@ class ModelLoader(ModelLoaderBase):
     def collect_cache_stats(self, cache_stats: CacheStats):
         self._cache.stats = cache_stats
 
+    def resolve_model_path(self, path: Union[Path, str]) -> Path:
+        """Turn a potentially relative path into an absolute one in the models_dir."""
+        return self._app_config.models_path / path
+
     def _get_implementation(self, base_model: BaseModelType, model_type: ModelType) -> type[ModelBase]:
         """Get the concrete implementation class for a specific model type."""
         model_class = MODEL_CLASSES[base_model][model_type]
         return model_class
 
     def _get_model_cache_path(self, model_path):
-        return self._resolve_model_path(Path(".cache") / hashlib.md5(str(model_path).encode()).hexdigest())
-
-    def _resolve_model_path(self, path: Union[Path, str]) -> Path:
-        """Return relative paths based on configured models_path."""
-        return self._app_config.models_path / path
+        return self.resolve_model_path(Path(".cache") / hashlib.md5(str(model_path).encode()).hexdigest())
 
     def _get_model_path(
         self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None
@@ -287,7 +294,7 @@ class ModelLoader(ModelLoaderBase):
                 model_path = getattr(model_config, submodel_type)
                 is_submodel_override = True
 
-        model_path = self._resolve_model_path(model_path)
+        model_path = self.resolve_model_path(model_path)
         return model_path, is_submodel_override
 
     def sync_to_config(self):
@@ -301,7 +308,7 @@ class ModelLoader(ModelLoaderBase):
         with Chdir(self._app_config.models_path):
             self._logger.info("Checking for models that have been moved or deleted from disk.")
             for model_config in self._store.all_models():
-                path = self._resolve_model_path(model_config.path)
+                path = self.resolve_model_path(model_config.path)
                 if not path.exists():
                     self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering.")
                     defunct_models.add(model_config.key)
@@ -311,6 +318,6 @@ class ModelLoader(ModelLoaderBase):
             self._logger.info(f"Scanning {self._app_config.models_path} for new models")
             for cur_base_model in BaseModelType:
                 for cur_model_type in ModelType:
-                    models_dir = self._resolve_model_path(Path(cur_base_model.value, cur_model_type.value))
+                    models_dir = self.resolve_model_path(Path(cur_base_model.value, cur_model_type.value))
                     installed.update(self._installer.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")

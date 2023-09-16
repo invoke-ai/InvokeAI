@@ -163,6 +163,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
             self._commit()
         finally:
             self._lock.release()
+        return self.get_model(key)
 
     def get_model(self, key: str) -> ModelConfigBase:
         """

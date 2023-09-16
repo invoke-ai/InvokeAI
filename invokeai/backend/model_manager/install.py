@@ -52,7 +52,7 @@ import re
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from shutil import rmtree
+from shutil import rmtree, move
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 from pydantic import Field
@@ -61,7 +61,15 @@ from pydantic.networks import AnyHttpUrl
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
 
-from .config import BaseModelType, ModelFormat, ModelType, ModelVariantType, SchedulerPredictionType
+from .config import (
+    ModelConfigBase,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+    SubModelType,
+)
 from .download import (
     HTTP_RE,
     REPO_ID_RE,
@@ -111,8 +119,8 @@ class ModelInstallBase(ABC):
     @abstractmethod
     def __init__(
         self,
-        store: Optional[ModelConfigStore] = None,
         config: Optional[InvokeAIAppConfig] = None,
+        store: Optional[ModelConfigStore] = None,
         logger: Optional[InvokeAILogger] = None,
         download: Optional[DownloadQueueBase] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
@@ -271,6 +279,20 @@ class ModelInstallBase(ABC):
         """
         pass
 
+    @abstractmethod
+    def sync_model_path(self, key) -> Path:
+        """
+        Move model into the location indicated by its basetype, type and name.
+
+        Call this after updating a model's attributes in order to move
+        the model's path into the location indicated by its basetype, type and
+        name. Applies only to models whose paths are within the root `models_dir`
+        directory.
+
+        May raise an UnknownModelException.
+        """
+        pass
+
 
 class ModelInstall(ModelInstallBase):
     """Model installer class handles installation from a local path."""
@@ -372,18 +394,24 @@ class ModelInstall(ModelInstallBase):
         info: ModelProbeInfo = self._probe_model(model_path, overrides)
 
         dest_path = self._config.models_path / info.base_type.value / info.model_type.value / model_path.name
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        return self._register(
+            self._move_model(model_path, dest_path),
+            info,
+        )
+
+    def _move_model(self, old_path: Path, new_path: Path) -> Path:
+        if old_path == new_path:
+            return old_path
+
+        new_path.parent.mkdir(parents=True, exist_ok=True)
 
         # if path already exists then we jigger the name to make it unique
         counter: int = 1
-        while dest_path.exists():
-            dest_path = dest_path.with_stem(dest_path.stem + f"_{counter:02d}")
+        while new_path.exists():
+            new_path = new_path.with_stem(new_path.stem + f"_{counter:02d}")
             counter += 1
+        return old_path.replace(new_path)
 
-        return self._register(
-            model_path.replace(dest_path),
-            info,
-        )
 
     def _probe_model(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> ModelProbeInfo:
         info: ModelProbeInfo = ModelProbe.probe(model_path)
@@ -436,7 +464,7 @@ class ModelInstall(ModelInstallBase):
             info.license = metadata.license
             info.thumbnail_url = metadata.thumbnail_url
             self._store.update_model(model_id, info)
-            self._async_installs[job.source] = model_id
+            self._async_installs[info.source] = model_id
             job.model_key = model_id
         elif job.status == "error":
             self._logger.warning(f"{job.source}: Model installation error: {job.error}")
@@ -455,12 +483,35 @@ class ModelInstall(ModelInstallBase):
             info.source = str(job.source)
             info.description = f"Imported model {info.name}"
             self._store.update_model(model_id, info)
-            self._async_installs[job.source] = model_id
+            self._async_installs[info.source] = model_id
             job.model_key = model_id
         elif job.status == "error":
             self._logger.warning(f"{job.source}: Model installation error: {job.error}")
         elif job.status == "cancelled":
             self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
+
+    def sync_model_path(self, key) -> ModelConfigBase:
+        """
+        Move model into the location indicated by its basetype, type and name.
+
+        Call this after updating a model's attributes in order to move
+        the model's path into the location indicated by its basetype, type and
+        name. Applies only to models whose paths are within the root `models_dir`
+        directory.
+
+        May raise an UnknownModelException.
+        """
+        model = self._store.get_model(key)
+        old_path = Path(model.path)
+        models_dir = self._config.models_path
+
+        if not old_path.is_relative_to(models_dir):
+            return old_path
+
+        new_path = models_dir / model.base_model.value / model.model_type.value / model.name
+        model.path = self._move_model(old_path, new_path).as_posix()
+        self._store.update_model(key, model)
+        return model
 
     def _make_download_job(
         self,
@@ -487,7 +538,7 @@ class ModelInstall(ModelInstallBase):
             cls = ModelInstallURLJob
             kwargs = {}
         else:
-            raise NotImplementedError(f"Don't know what to do with this type of source: {source}")
+            raise ValueError(f"'{source}' is not recognized as a local file, directory, repo_id or URL")
         return cls(source=source, destination=Path(self._tmpdir.name), access_token=access_token, **kwargs)
 
     def wait_for_installs(self) -> Dict[str, str]:  # noqa D102
@@ -514,6 +565,64 @@ class ModelInstall(ModelInstallBase):
 
     def hash(self, model_path: Union[Path, str]) -> str:  # noqa D102
         return FastModelHash.hash(model_path)
+
+
+    def convert_model(
+            self,
+            key: str,
+            dest_directory: Optional[Path] = None,
+    ) -> ModelConfigBase:
+        """
+        Convert a checkpoint file into a diffusers folder, deleting the cached
+        version and deleting the original checkpoint file if it is in the models
+        directory.
+        :param key: Unique key of model.
+        :dest_directory: Optional place to put converted file. If not specified,
+        will be stored in the `models_dir`.
+
+        This will raise a ValueError unless the model is a checkpoint.
+        This will raise an UnknownModelException if key is unknown.
+        """
+        from .loader import ModelInfo, ModelLoader   # to avoid circular imports
+        try:
+            info: ModelConfigBase = self._store.get_model(key)
+
+            print(f'DEBUG: requested_model={info}')
+
+            if info.model_format != "checkpoint":
+                raise ValueError(f"not a checkpoint format model: {info.name}")
+
+            # We are taking advantage of a side effect of get_model() that converts check points
+            # into cached diffusers directories stored at `path`. It doesn't matter
+            # what submodel type we request here, so we get the smallest.
+            loader = ModelLoader(self._config)
+            submodel = {"submodel_type": SubModelType.Scheduler} if info.model_type == ModelType.Main else {}
+            converted_model: ModelInfo = loader.get_model(key, **submodel)
+
+            checkpoint_path = loader.resolve_model_path(info.path)
+            old_diffusers_path = loader.resolve_model_path(converted_model.location)
+            new_diffusers_path = None
+            if dest_directory:
+                new_diffusers_path = Path(dest_directory) / info.name
+                if new_diffusers_path.exists():
+                    raise ValueError(f"A diffusers model already exists at {new_diffusers_path}")
+                move(old_diffusers_path, new_diffusers_path)
+                info.path = new_diffusers_path.as_posix()
+
+            info.pop("config")
+            info.model_format = "diffusers"
+            self._store.update_model(key, info)
+            result = self.sync_model_path(key)
+        except Exception:
+            # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
+            if new_diffusers_path:
+                rmtree(new_diffusers_path)
+            raise
+
+        if checkpoint_path.exists() and checkpoint_path.is_relative_to(self._config.models_path):
+            checkpoint_path.unlink()
+
+        return result
 
     # the following two methods are callbacks to the ModelSearch object
     def _scan_register(self, model: Path) -> bool:
