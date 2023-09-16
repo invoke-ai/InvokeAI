@@ -62,7 +62,8 @@ const ParamIPAdapterImage = () => {
         imageDTO={imageDTO}
         droppableData={droppableData}
         draggableData={draggableData}
-        isUploadDisabled={!isIPAdapterEnabled}
+        isUploadDisabled={true}
+        isDropDisabled={!isIPAdapterEnabled}
         dropLabel={t('toast.setIPAdapterImage')}
         noContentFallback={
           <IAINoContentFallback
