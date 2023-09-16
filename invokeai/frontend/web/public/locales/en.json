@@ -193,7 +193,9 @@
         "w": "W",
         "weight": "Weight",
         "enableIPAdapter": "Enable IP Adapter",
-        "ipAdapterModel": "Adapter Model"
+        "ipAdapterModel": "Adapter Model",
+        "resetIPAdapterImage": "Reset IP Adapter Image",
+        "ipAdapterImageFallback": "No IP Adapter Image Selected"
     },
     "embedding": {
         "addEmbedding": "Add Embedding",

@@ -13,7 +13,7 @@ const IPAdapterPanel = () => {
         gap: 3,
         paddingInline: 3,
         paddingBlock: 2,
-        paddingBottom: 6,
+        paddingBottom: 5,
         borderRadius: 'base',
         position: 'relative',
         bg: 'base.250',
