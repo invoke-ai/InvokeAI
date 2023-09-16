@@ -78,6 +78,7 @@ const ParamIPAdapterImage = () => {
           icon={<FaUndo />}
           onClick={() => dispatch(ipAdapterImageChanged(null))}
           isDisabled={!imageDTO}
+          size="sm"
           sx={{
             position: 'absolute',
             top: 3,
