@@ -34,6 +34,8 @@ class IPAdapterField(BaseModel):
     ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
     image_encoder_model: CLIPVisionModelField = Field(description="The name of the CLIP image encoder model.")
     weight: float = Field(default=1.0, ge=0, description="The weight of the IP-Adapter.")
+    begin_step_percent: float = Field(default=0.0, ge=0, le=1.0)
+    end_step_percent: float = Field(default=1.0, ge=0, le=1.0)
 
 
 @invocation_output("ip_adapter_output")
@@ -54,6 +56,12 @@ class IPAdapterInvocation(BaseInvocation):
         input=Input.Direct,
     )
     weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
+    begin_step_percent: float = InputField(
+        default=0, ge=-1, le=2, description="When the IP-Adapter is first applied (% of total steps)"
+    )
+    end_step_percent: float = InputField(
+        default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
+    )
 
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
@@ -80,5 +88,7 @@ class IPAdapterInvocation(BaseInvocation):
                 ip_adapter_model=self.ip_adapter_model,
                 image_encoder_model=image_encoder_model,
                 weight=self.weight,
+                begin_step_percent=self.begin_step_percent,
+                end_step_percent=self.end_step_percent,
             ),
         )

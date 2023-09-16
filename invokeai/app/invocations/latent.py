@@ -446,6 +446,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return IPAdapterData(
             ip_adapter_model=ip_adapter_model,
             weight=ip_adapter.weight,
+            begin_step_percent=ip_adapter.begin_step_percent,
+            end_step_percent=ip_adapter.end_step_percent,
         )
 
     # original idea by https://github.com/AmericanPresidentJimmyCarter

@@ -131,8 +131,18 @@ class IPAdapter:
         self._attn_processors = attn_procs
         self._state_dict = None
 
+    # @genomancer: pushed scaling back out into its own method (like original Tencent implementation)
+    #      which makes implementing begin_step_percent and end_step_percent easier
+    #  but based on self._attn_processors (ala @Ryan) instead of original Tencent unet.attn_processors,
+    #      which should make it easier to implement multiple IPAdapters
+    def set_scale(self, scale):
+        if self._attn_processors is not None:
+            for attn_processor in self._attn_processors.values():
+                if isinstance(attn_processor, IPAttnProcessor):
+                    attn_processor.scale = scale
+
     @contextmanager
-    def apply_ip_adapter_attention(self, unet: UNet2DConditionModel, scale: int):
+    def apply_ip_adapter_attention(self, unet: UNet2DConditionModel, scale: float):
         """A context manager that patches `unet` with this IP-Adapter's attention processors while it is active.
 
         Yields:
@@ -143,10 +153,11 @@ class IPAdapter:
             # used on any UNet model (with the same dimensions).
             self._prepare_attention_processors(unet)
 
-        # Set scale.
-        for attn_processor in self._attn_processors.values():
-            if isinstance(attn_processor, IPAttnProcessor):
-                attn_processor.scale = scale
+        # Set scale
+        self.set_scale(scale)
+        # for attn_processor in self._attn_processors.values():
+        #     if isinstance(attn_processor, IPAttnProcessor):
+        #         attn_processor.scale = scale
 
         orig_attn_processors = unet.attn_processors
 

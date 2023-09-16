@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import dataclass
+import math
 from typing import Any, Callable, List, Optional, Union
 
 import einops
@@ -168,6 +169,8 @@ class IPAdapterData:
     # TODO: change to polymorphic so can do different weights per step (once implemented...)
     # weight: Union[float, List[float]] = Field(default=1.0)
     weight: float = Field(default=1.0)
+    begin_step_percent: float = Field(default=0.0)
+    end_step_percent: float = Field(default=1.0)
 
 
 @dataclass
@@ -445,6 +448,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     total_step_count=len(timesteps),
                     additional_guidance=additional_guidance,
                     control_data=control_data,
+                    ip_adapter_data=ip_adapter_data,
                 )
                 latents = step_output.prev_sample
 
@@ -490,6 +494,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         total_step_count: int,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
+        ip_adapter_data: Optional[IPAdapterData] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
@@ -500,6 +505,18 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
+        # handle IP-Adapter
+        if ip_adapter_data is not None:
+            first_adapter_step = math.floor(ip_adapter_data.begin_step_percent * total_step_count)
+            last_adapter_step = math.ceil(ip_adapter_data.end_step_percent * total_step_count)
+            if step_index >= first_adapter_step and step_index <= last_adapter_step:
+                # only apply IP-Adapter if current step is within the IP-Adapter's begin/end step range
+                ip_adapter_data.ip_adapter_model.set_scale(ip_adapter_data.weight)
+            else:
+                # otherwise, set IP-Adapter scale to 0, so it has no effect
+                ip_adapter_data.ip_adapter_model.set_scale(0.0)
+
+        # handle ControlNet(s)
         # default is no controlnet, so set controlnet processing output to None
         controlnet_down_block_samples, controlnet_mid_block_sample = None, None
         if control_data is not None:
