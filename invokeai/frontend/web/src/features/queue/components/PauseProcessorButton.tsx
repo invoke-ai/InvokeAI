@@ -2,7 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaStop } from 'react-icons/fa';
+import { FaPause } from 'react-icons/fa';
 import {
   useGetProcessorStatusQuery,
   usePauseProcessorMutation,
@@ -49,7 +49,7 @@ const PauseProcessorButton = ({ asIconButton }: Props) => {
       tooltip={t('queue.pauseTooltip')}
       isDisabled={!processorStatus?.is_started || isQueueMutationInProgress}
       isLoading={processorStatus?.is_stop_pending}
-      icon={<FaStop />}
+      icon={<FaPause />}
       onClick={handleClick}
       colorScheme="gold"
     />

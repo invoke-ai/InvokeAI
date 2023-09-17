@@ -32,8 +32,8 @@ const QueueControls = () => {
         <ButtonGroup isAttached>
           <ResumeProcessorButton asIconButton />
           <PauseProcessorButton asIconButton />
-          <ClearQueueButton asIconButton />
         </ButtonGroup>
+        <ClearQueueButton asIconButton />
       </Flex>
       <Flex h={3} w="full">
         <ProgressBar />
