@@ -1,8 +1,8 @@
 import os
+from builtins import float
+from typing import List, Union
 
-from builtins import bool, float
 from pydantic import BaseModel, Field
-from typing import Dict, List, Literal, Optional, Union
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
