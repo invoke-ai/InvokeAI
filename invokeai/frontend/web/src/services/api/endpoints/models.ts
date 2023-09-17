@@ -221,7 +221,6 @@ export const modelsApi = api.injectEndpoints({
         const tags: ApiFullTagDescription[] = [
           { type: 'MainModel', id: LIST_TAG },
         ];
-
         if (result) {
           tags.push(
             ...result.ids.map((id) => ({
