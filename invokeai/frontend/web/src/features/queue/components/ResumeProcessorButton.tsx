@@ -28,14 +28,14 @@ const ResumeProcessorButton = ({ asIconButton }: Props) => {
       await resumeProcessor().unwrap();
       dispatch(
         addToast({
-          title: t('queue.startSucceeded'),
+          title: t('queue.resumeSucceeded'),
           status: 'success',
         })
       );
     } catch {
       dispatch(
         addToast({
-          title: t('queue.startFailed'),
+          title: t('queue.resumeFailed'),
           status: 'error',
         })
       );
@@ -45,8 +45,8 @@ const ResumeProcessorButton = ({ asIconButton }: Props) => {
   return (
     <QueueButton
       asIconButton={asIconButton}
-      label={t('queue.start')}
-      tooltip={t('queue.startTooltip')}
+      label={t('queue.resume')}
+      tooltip={t('queue.resumeTooltip')}
       isDisabled={
         processorStatus?.is_started ||
         processorStatus?.is_processing ||

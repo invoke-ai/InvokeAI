@@ -3,11 +3,11 @@ from typing import Optional
 from fastapi import Body, Path, Query
 from fastapi.routing import APIRouter
 
-from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatusResult
-from invokeai.app.services.session_queue.session_queue_common import (  # CancelByBatchIDsResult,
+from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
+from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
-    BatchStatusResult,
+    BatchStatus,
     CancelByBatchIDsResult,
     ClearResult,
     EnqueueBatchResult,
@@ -15,7 +15,7 @@ from invokeai.app.services.session_queue.session_queue_common import (  # Cancel
     PruneResult,
     SessionQueueItem,
     SessionQueueItemDTO,
-    SessionQueueStatusResult,
+    SessionQueueStatus,
 )
 from invokeai.app.services.shared.models import CursorPaginatedResults
 
@@ -25,7 +25,7 @@ from ..dependencies import ApiDependencies
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
 
-class SessionQueueAndProcessorStatusResult(SessionQueueStatusResult, SessionProcessorStatusResult):
+class SessionQueueAndProcessorStatusResult(SessionQueueStatus, SessionProcessorStatus):
     """The overall status of session queue and processor"""
 
     pass
@@ -185,12 +185,12 @@ async def get_next_queue_item(
     "/{queue_id}/status",
     operation_id="get_queue_status",
     responses={
-        200: {"model": SessionQueueStatusResult},
+        200: {"model": SessionQueueStatus},
     },
 )
 async def get_queue_status(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> SessionQueueStatusResult:
+) -> SessionQueueStatus:
     """Gets the status of the session queue"""
     return ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id)
 
@@ -199,12 +199,12 @@ async def get_queue_status(
     "/{queue_id}/processor/status",
     operation_id="get_processor_status",
     responses={
-        200: {"model": SessionProcessorStatusResult},
+        200: {"model": SessionProcessorStatus},
     },
 )
 async def get_processor_status(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> SessionProcessorStatusResult:
+) -> SessionProcessorStatus:
     """Gets the status of the session queue"""
     return ApiDependencies.invoker.services.session_processor.get_status()
 
@@ -213,13 +213,13 @@ async def get_processor_status(
     "/{queue_id}/b/{batch_id}/status",
     operation_id="get_batch_status",
     responses={
-        200: {"model": BatchStatusResult},
+        200: {"model": BatchStatus},
     },
 )
 async def get_batch_status(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_id: str = Path(description="The batch to get the status of"),
-) -> BatchStatusResult:
+) -> BatchStatus:
     """Gets the status of the session queue"""
     return ApiDependencies.invoker.services.session_queue.get_batch_status(queue_id=queue_id, batch_id=batch_id)
 

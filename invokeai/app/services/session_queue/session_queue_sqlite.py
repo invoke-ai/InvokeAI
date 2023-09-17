@@ -13,7 +13,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
     Batch,
-    BatchStatusResult,
+    BatchStatus,
     CancelByBatchIDsResult,
     CancelByQueueIDResult,
     ClearResult,
@@ -25,7 +25,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueItemNotFoundError,
-    SessionQueueStatusResult,
+    SessionQueueStatus,
     calc_session_count,
     prepare_values_to_insert,
 )
@@ -775,7 +775,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return CursorPaginatedResults(items=items, limit=limit, has_more=has_more)
 
-    def get_queue_status(self, queue_id: str) -> SessionQueueStatusResult:
+    def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
         try:
             self.__lock.acquire()
             self.__cursor.execute(
@@ -796,7 +796,7 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self.__lock.release()
 
-        return SessionQueueStatusResult(
+        return SessionQueueStatus(
             queue_id=queue_id,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
@@ -806,7 +806,7 @@ class SqliteSessionQueue(SessionQueueBase):
             total=total,
         )
 
-    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatusResult:
+    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:
         try:
             self.__lock.acquire()
             self.__cursor.execute(
@@ -829,7 +829,7 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self.__lock.release()
 
-        return BatchStatusResult(
+        return BatchStatus(
             batch_id=batch_id,
             queue_id=queue_id,
             pending=counts.get("pending", 0),

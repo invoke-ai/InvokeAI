@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo, ModelType, SubModelType
+from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import EnqueueBatchResult, SessionQueueItem
 from invokeai.app.util.misc import get_timestamp
 
@@ -11,6 +12,7 @@ from invokeai.app.util.misc import get_timestamp
 class EventServiceBase:
     session_event: str = "session_event"
     queue_event: str = "queue_event"
+    processor_event: str = "processor_event"
 
     """Basic event bus, to have an empty stand-in when not needed"""
 
@@ -26,10 +28,18 @@ class EventServiceBase:
         )
 
     def __emit_queue_event(self, event_name: str, payload: dict) -> None:
-        """Queue events are emitted to a room with "queue" as the room name"""
+        """Queue events are emitted to a room with queue_id as the room name"""
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.queue_event,
+            payload=dict(event=event_name, data=payload),
+        )
+
+    def __emit_processor_event(self, event_name: str, payload: dict) -> None:
+        """Processor events are emitted to a room with "processor" as the room name"""
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.processor_event,
             payload=dict(event=event_name, data=payload),
         )
 
@@ -233,3 +243,7 @@ class EventServiceBase:
             event_name="queue_cleared",
             payload=dict(queue_id=queue_id),
         )
+
+    def emit_processor_status_changed(self, processor_status: SessionProcessorStatus) -> None:
+        """Emitted when the queue is cleared"""
+        self.__emit_processor_event(event_name="processor_status_changed", payload=processor_status.dict())

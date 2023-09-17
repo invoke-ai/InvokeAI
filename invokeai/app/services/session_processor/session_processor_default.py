@@ -11,7 +11,7 @@ from invokeai.app.services.session_queue.session_queue_common import SessionQueu
 
 from ..invoker import Invoker
 from .session_processor_base import SessionProcessorBase
-from .session_processor_common import SessionProcessorStatusResult
+from .session_processor_common import SessionProcessorStatus
 
 POLLING_INTERVAL = 1
 THREAD_LIMIT = 1
@@ -33,6 +33,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
     def stop(self, *args, **kwargs) -> None:
         self.__stop_event.set()
+        self._emit_status_changed()
 
     def _poll_now(self) -> None:
         self.__poll_now_event.set()
@@ -48,6 +49,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
             ),
         )
         self.__thread.start()
+        self._emit_status_changed()
 
     async def _on_session_event(self, event: FastAPIEvent) -> None:
         event_name = event[1]["event"]
@@ -81,8 +83,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def _is_stop_pending(self) -> bool:
         return self.__stop_event.is_set()
 
-    def get_status(self) -> SessionProcessorStatusResult:
-        return SessionProcessorStatusResult(
+    def _emit_status_changed(self) -> None:
+        self.__invoker.services.events.emit_processor_status_changed(self.get_status())
+
+    def get_status(self) -> SessionProcessorStatus:
+        return SessionProcessorStatus(
             is_started=self._is_started(),
             is_processing=self._is_processing(),
             is_stop_pending=self._is_stop_pending(),
@@ -92,10 +97,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
         if self._is_started():
             return
         self.__stop_event.clear()
+        self._emit_status_changed()
         self._start_thread()
 
     def pause(self) -> None:
         self.__stop_event.set()
+        self._emit_status_changed()
 
     def __process(
         self,
@@ -117,7 +124,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         # TODO: Why isn't the log level specified in dependencies.py working?
                         # Within the thread, it is always INFO and `logger.debug()` doesn't display.
                         # self.__invoker.services.logger.debug(f"Executing queue item {queue_item.item_id}")
-                        print(f"Executing queue item {queue_item.item_id}")
                         self.__queue_item = queue_item
                         self.__invoker.services.graph_execution_manager.set(queue_item.session)
                         self.__invoker.invoke(queue_item.session, invoke_all=True)
@@ -125,7 +131,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                 if queue_item is None:
                     # self.__invoker.services.logger.debug("Waiting for next polling interval or event")
-                    print("Waiting for next polling interval or event")
                     poll_now_event.wait(POLLING_INTERVAL)
                     continue
         except Exception:
@@ -135,3 +140,4 @@ class DefaultSessionProcessor(SessionProcessorBase):
             poll_now_event.clear()
             self.__queue_item = None
             self.__threadLimit.release()
+            self._emit_status_changed()

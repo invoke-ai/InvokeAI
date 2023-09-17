@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatusResult
+from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 
 
 class SessionProcessorBase(ABC):
@@ -23,6 +23,6 @@ class SessionProcessorBase(ABC):
         pass
 
     @abstractmethod
-    def get_status(self) -> SessionProcessorStatusResult:
+    def get_status(self) -> SessionProcessorStatus:
         """Gets the status of the session processor"""
         pass

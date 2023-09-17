@@ -52,7 +52,7 @@ export const addEnqueueRequestedLinear = () => {
 
         dispatch(
           queueApi.endpoints.resumeProcessor.initiate(undefined, {
-            fixedCacheKey: 'startQueue',
+            fixedCacheKey: 'resumeProcessor',
           })
         );
 

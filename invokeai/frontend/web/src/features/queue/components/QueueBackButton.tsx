@@ -9,6 +9,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
+import { useIsQueueEmpty } from '../hooks/useIsQueueEmpty';
 
 const QueueBackButton = () => {
   const tabName = useAppSelector(activeTabNameSelector);
@@ -16,6 +17,7 @@ const QueueBackButton = () => {
   const { isReady } = useIsReadyToEnqueue();
   const dispatch = useAppDispatch();
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
+  const isEmpty = useIsQueueEmpty();
 
   const handleEnqueue = useCallback(() => {
     dispatch(clampSymmetrySteps());
@@ -41,7 +43,7 @@ const QueueBackButton = () => {
       flexGrow={3}
       minW={44}
     >
-      {t('queue.queueBack')}
+      {isEmpty ? t('parameters.invoke.invoke') : t('queue.queueBack')}
     </IAIButton>
   );
 };

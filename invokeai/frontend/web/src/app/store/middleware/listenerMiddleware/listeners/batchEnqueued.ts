@@ -25,7 +25,7 @@ export const addBatchEnqueuedListener = () => {
 
         dispatch(
           queueApi.endpoints.resumeProcessor.initiate(undefined, {
-            fixedCacheKey: 'startQueue',
+            fixedCacheKey: 'resumeProcessor',
           })
         );
 

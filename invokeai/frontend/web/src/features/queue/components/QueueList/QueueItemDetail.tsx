@@ -19,15 +19,7 @@ type Props = {
 };
 
 const QueueItemComponent = ({ queueItemDTO }: Props) => {
-  const {
-    batch_id,
-    completed_at,
-    error,
-    item_id,
-    session_id,
-    started_at,
-    status,
-  } = queueItemDTO;
+  const { session_id, batch_id, item_id } = queueItemDTO;
   const { t } = useTranslation();
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const [cancelQueueItem, { isLoading: isLoadingCancelQueueItem }] =
@@ -64,13 +56,17 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
   );
   const { data: queueItem } = useGetQueueItemQuery(item_id);
   const executionTime = useMemo(() => {
-    if (!completed_at || !started_at) {
+    if (!queueItem?.completed_at || !queueItem?.started_at) {
       return 'n/a';
     }
     return String(
-      ((Date.parse(completed_at) - Date.parse(started_at)) / 1000).toFixed(2)
+      (
+        (Date.parse(queueItem.completed_at) -
+          Date.parse(queueItem.started_at)) /
+        1000
+      ).toFixed(2)
     );
-  }, [completed_at, started_at]);
+  }, [queueItem?.completed_at, queueItem?.started_at]);
 
   return (
     <Flex
@@ -97,7 +93,11 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           <IAIButton
             onClick={handleCancelQueueItem}
             isLoading={isLoadingCancelQueueItem}
-            isDisabled={['canceled', 'completed', 'failed'].includes(status)}
+            isDisabled={
+              queueItem
+                ? ['canceled', 'completed', 'failed'].includes(queueItem.status)
+                : true
+            }
             aria-label={t('queue.cancelItem')}
             icon={<FaTimes />}
             colorScheme="error"
@@ -116,7 +116,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           </IAIButton>
         </ButtonGroup>
       </Flex>
-      {error && (
+      {queueItem?.error && (
         <Flex
           layerStyle="second"
           p={3}
@@ -129,7 +129,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           <Heading size="sm" color="error.500" _dark={{ color: 'error.400' }}>
             Error
           </Heading>
-          <pre>{error}</pre>
+          <pre>{queueItem.error}</pre>
         </Flex>
       )}
       <Flex

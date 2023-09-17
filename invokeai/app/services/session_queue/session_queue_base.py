@@ -5,7 +5,7 @@ from invokeai.app.services.graph import Graph
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
-    BatchStatusResult,
+    BatchStatus,
     CancelByBatchIDsResult,
     CancelByQueueIDResult,
     ClearResult,
@@ -16,7 +16,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     PruneResult,
     SessionQueueItem,
     SessionQueueItemDTO,
-    SessionQueueStatusResult,
+    SessionQueueStatus,
 )
 from invokeai.app.services.shared.models import CursorPaginatedResults
 
@@ -70,12 +70,12 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_queue_status(self, queue_id: str) -> SessionQueueStatusResult:
+    def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
         """Gets the status of the queue"""
         pass
 
     @abstractmethod
-    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatusResult:
+    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:
         """Gets the status of a batch"""
         pass
 

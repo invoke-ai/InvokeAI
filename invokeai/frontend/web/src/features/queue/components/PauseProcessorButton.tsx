@@ -28,14 +28,14 @@ const PauseProcessorButton = ({ asIconButton }: Props) => {
       await pauseProcessor().unwrap();
       dispatch(
         addToast({
-          title: t('queue.stopRequested'),
+          title: t('queue.pauseRequested'),
           status: 'info',
         })
       );
     } catch {
       dispatch(
         addToast({
-          title: t('queue.stopFailed'),
+          title: t('queue.pauseFailed'),
           status: 'error',
         })
       );
@@ -45,8 +45,8 @@ const PauseProcessorButton = ({ asIconButton }: Props) => {
   return (
     <QueueButton
       asIconButton={asIconButton}
-      label={t('queue.stop')}
-      tooltip={t('queue.stopTooltip')}
+      label={t('queue.pause')}
+      tooltip={t('queue.pauseTooltip')}
       isDisabled={!processorStatus?.is_started || isQueueMutationInProgress}
       isLoading={processorStatus?.is_stop_pending}
       icon={<FaStop />}

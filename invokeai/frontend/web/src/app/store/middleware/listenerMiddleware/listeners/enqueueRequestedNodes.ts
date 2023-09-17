@@ -36,7 +36,7 @@ export const addEnqueueRequestedNodes = () => {
 
         dispatch(
           queueApi.endpoints.resumeProcessor.initiate(undefined, {
-            fixedCacheKey: 'startQueue',
+            fixedCacheKey: 'resumeProcessor',
           })
         );
 

@@ -556,8 +556,8 @@ export type components = {
        */
       items?: (string | number)[];
     };
-    /** BatchStatusResult */
-    BatchStatusResult: {
+    /** BatchStatus */
+    BatchStatus: {
       /**
        * Queue Id
        * @description The ID of the queue
@@ -1178,6 +1178,11 @@ export type components = {
        */
       workflow?: string;
       /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
+      /**
        * Skipped Layers
        * @description Number of layers to skip in text encoder
        * @default 0
@@ -1189,11 +1194,6 @@ export type components = {
        * @enum {string}
        */
       type: "clip_skip";
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
     };
     /**
      * ClipSkipInvocationOutput
@@ -6948,8 +6948,8 @@ export type components = {
        */
       type: "segment_anything_processor";
     };
-    /** SessionProcessorStatusResult */
-    SessionProcessorStatusResult: {
+    /** SessionProcessorStatus */
+    SessionProcessorStatus: {
       /**
        * Is Started
        * @description Whether the session processor is started
@@ -7119,8 +7119,8 @@ export type components = {
        */
       completed_at?: string;
     };
-    /** SessionQueueStatusResult */
-    SessionQueueStatusResult: {
+    /** SessionQueueStatus */
+    SessionQueueStatus: {
       /**
        * Queue Id
        * @description The ID of the queue
@@ -8150,17 +8150,17 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * ControlNetModelFormat
      * @description An enumeration.
@@ -9894,7 +9894,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueStatusResult"];
+          "application/json": components["schemas"]["SessionQueueStatus"];
         };
       };
       /** @description Validation Error */
@@ -9920,7 +9920,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionProcessorStatusResult"];
+          "application/json": components["schemas"]["SessionProcessorStatus"];
         };
       };
       /** @description Validation Error */
@@ -9948,7 +9948,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["BatchStatusResult"];
+          "application/json": components["schemas"]["BatchStatus"];
         };
       };
       /** @description Validation Error */

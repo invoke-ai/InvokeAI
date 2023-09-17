@@ -4,12 +4,14 @@ export interface QueueState {
   listCursor: number | undefined;
   listPriority: number | undefined;
   selectedQueueItem: string | undefined;
+  resumeProcessorOnEnqueue: boolean;
 }
 
 export const initialQueueState: QueueState = {
   listCursor: undefined,
   listPriority: undefined,
   selectedQueueItem: undefined,
+  resumeProcessorOnEnqueue: true,
 };
 
 const initialState: QueueState = initialQueueState;
@@ -38,6 +40,12 @@ export const queueSlice = createSlice({
         state.selectedQueueItem = action.payload;
       }
     },
+    resumeProcessorOnEnqueueChanged: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.resumeProcessorOnEnqueue = action.payload;
+    },
   },
 });
 
@@ -46,6 +54,7 @@ export const {
   listPriorityChanged,
   listParamsReset,
   queueItemSelectionToggled,
+  resumeProcessorOnEnqueueChanged,
 } = queueSlice.actions;
 
 export default queueSlice.reducer;

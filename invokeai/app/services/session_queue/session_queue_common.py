@@ -230,7 +230,7 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
 # region Query Results
 
 
-class SessionQueueStatusResult(BaseModel):
+class SessionQueueStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
@@ -240,7 +240,7 @@ class SessionQueueStatusResult(BaseModel):
     total: int = Field(..., description="Total number of queue items")
 
 
-class BatchStatusResult(BaseModel):
+class BatchStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
     batch_id: str = Field(..., description="The ID of the batch")
     pending: int = Field(..., description="Number of queue items with status 'pending'")

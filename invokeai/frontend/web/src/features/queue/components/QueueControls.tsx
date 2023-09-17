@@ -1,10 +1,10 @@
 import { ButtonGroup, Flex, Spacer, Text } from '@chakra-ui/react';
 import CancelCurrentQueueItemButton from 'features/queue/components/CancelCurrentQueueItemButton';
 import ClearQueueButton from 'features/queue/components/ClearQueueButton';
+import PauseProcessorButton from 'features/queue/components/PauseProcessorButton';
 import QueueBackButton from 'features/queue/components/QueueBackButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
-import ResumeProcessorButton from 'features/queue/components/StartQueueButton';
-import PauseProcessorButton from 'features/queue/components/StopQueueButton';
+import ResumeProcessorButton from 'features/queue/components/ResumeProcessorButton';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -141,7 +141,7 @@ export const addEnqueueRequestedCanvasListener = () => {
         req.reset();
         dispatch(
           queueApi.endpoints.resumeProcessor.initiate(undefined, {
-            fixedCacheKey: 'startQueue',
+            fixedCacheKey: 'resumeProcessor',
           })
         );
 

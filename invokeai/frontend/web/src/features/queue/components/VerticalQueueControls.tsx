@@ -3,8 +3,8 @@ import { memo } from 'react';
 import CancelCurrentQueueItemButton from './CancelCurrentQueueItemButton';
 import ClearQueueButton from './ClearQueueButton';
 import PruneQueueButton from './PruneQueueButton';
-import ResumeProcessorButton from './StartQueueButton';
-import PauseProcessorButton from './StopQueueButton';
+import ResumeProcessorButton from './ResumeProcessorButton';
+import PauseProcessorButton from './PauseProcessorButton';
 
 type Props = ButtonGroupProps & {
   asIconButtons?: boolean;

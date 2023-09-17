@@ -39,7 +39,7 @@ export const addUpscaleRequestedListener = () => {
         req.reset();
         dispatch(
           queueApi.endpoints.resumeProcessor.initiate(undefined, {
-            fixedCacheKey: 'startQueue',
+            fixedCacheKey: 'resumeProcessor',
           })
         );
         log.debug(
