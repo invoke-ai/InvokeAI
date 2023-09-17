@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, parse_obj_as
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.models.exceptions import CanceledException
@@ -24,6 +24,7 @@ from invokeai.backend.model_manager import (
     UnknownModelException,
 )
 from invokeai.backend.model_manager.cache import CacheStats
+from invokeai.backend.model_manager.download import DownloadJobBase
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
 
 from .config import InvokeAIAppConfig
@@ -32,11 +33,16 @@ if TYPE_CHECKING:
     from ..invocations.baseinvocation import InvocationContext
 
 
+# "forward declaration" because of circular import issues
+class EventServiceBase:
+    pass
+
+
 class ModelManagerServiceBase(ABC):
     """Responsible for managing models on disk and in memory."""
 
     @abstractmethod
-    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional["EventServiceBase"] = None):
+    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional[EventServiceBase] = None):
         """
         Initialize a ModelManagerService.
 
@@ -212,6 +218,60 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def list_install_jobs(self) -> List[ModelInstallJob]:
+        """Return a series of active or enqueued ModelInstallJobs."""
+        pass
+
+    @abstractmethod
+    def id_to_job(self, id: int) -> ModelInstallJob:
+        """Return the ModelInstallJob instance corresponding to the given job ID."""
+        pass
+
+    @abstractmethod
+    def wait_for_installs(self) -> Dict[str, str]:
+        """
+        Wait for all pending installs to complete.
+
+        This will block until all pending downloads have
+        completed, been cancelled, or errored out. It will
+        block indefinitely if one or more jobs are in the
+        paused state.
+
+        It will return a dict that maps the source model
+        path, URL or repo_id to the ID of the installed model.
+        """
+        pass
+
+    @abstractmethod
+    def start_job(self, job_id: int):
+        """Start the given install job if it is paused or idle."""
+        pass
+
+    @abstractmethod
+    def pause_job(self, job_id: int):
+        """Pause the given install job if it is paused or idle."""
+        pass
+
+    @abstractmethod
+    def cancel_job(self, job_id: int):
+        """Cancel the given install job."""
+        pass
+
+    @abstractmethod
+    def change_job_priority(self, job_id: int, delta: int):
+        """
+        Change an install job's priority.
+
+        :param job_id: Job to change
+        :param delta: Value to increment or decrement priority.
+
+        Lower values are higher priority.  The default starting value is 10.
+        Thus to make this a really high priority job:
+           manager.change_job_priority(-10).
+        """
+        pass
+
+    @abstractmethod
     def merge_models(
         self,
         model_keys: List[str] = Field(
@@ -254,35 +314,6 @@ class ModelManagerServiceBase(ABC):
     @abstractmethod
     def collect_cache_stats(self, cache_stats: CacheStats):
         """Reset model cache statistics for graph with graph_id."""
-        pass
-
-    @abstractmethod
-    def cancel_job(self, job: ModelInstallJob):
-        """Cancel this job."""
-        pass
-
-    @abstractmethod
-    def pause_job(self, job: ModelInstallJob):
-        """Pause this job."""
-        pass
-
-    @abstractmethod
-    def start_job(self, job: ModelInstallJob):
-        """(re)start this job."""
-        pass
-
-    @abstractmethod
-    def change_priority(self, job: ModelInstallJob, delta: int):
-        """
-        Raise or lower the priority of the job.
-
-        :param job: Job to  apply change to
-        :param delta: Value to increment or decrement priority.
-
-        Lower values are higher priority.  The default starting value is 10.
-        Thus to make my_job a really high priority job:
-           manager.change_priority(my_job, -10).
-        """
         pass
 
 
@@ -390,13 +421,66 @@ class ModelManagerService(ModelManagerServiceBase):
         attach to the model. When installing a URL or repo_id, some metadata
         values, such as `tags` will be automagically added.
         """
-        self.logger.debug(f"add/update model {source}")
+        self.logger.debug(f"add model {source}")
         variant = "fp16" if self._loader.precision == "float16" else None
         return self._loader.installer.install(
             source,
             probe_override=model_attributes,
             variant=variant,
         )
+
+    def list_install_jobs(self) -> List[ModelInstallJob]:
+        """Return a series of active or enqueued ModelInstallJobs."""
+        queue = self._loader.queue
+        jobs: List[DownloadJobBase] = queue.list_jobs()
+        return [parse_obj_as(ModelInstallJob, x) for x in jobs]  # downcast to proper type
+
+    def id_to_job(self, id: int) -> ModelInstallJob:
+        """Return the ModelInstallJob instance corresponding to the given job ID."""
+        return self._loader.queue.id_to_job(id)
+
+    def wait_for_installs(self) -> Dict[str, str]:
+        """
+        Wait for all pending installs to complete.
+
+        This will block until all pending downloads have
+        completed, been cancelled, or errored out. It will
+        block indefinitely if one or more jobs are in the
+        paused state.
+
+        It will return a dict that maps the source model
+        path, URL or repo_id to the ID of the installed model.
+        """
+        return self._loader.installer.wait_for_installs()
+
+    def start_job(self, job_id: int):
+        """Start the given install job if it is paused or idle."""
+        queue = self._loader.queue
+        queue.start_job(queue.id_to_job(job_id))
+
+    def pause_job(self, job_id: int):
+        """Pause the given install job if it is paused or idle."""
+        queue = self._loader.queue
+        queue.pause_job(queue.id_to_job(job_id))
+
+    def cancel_job(self, job_id: int):
+        """Cancel the given install job."""
+        queue = self._loader.queue
+        queue.cancel_job(queue.id_to_job(job_id))
+
+    def change_job_priority(self, job_id: int, delta: int):
+        """
+        Change an install job's priority.
+
+        :param job_id: Job to change
+        :param delta: Value to increment or decrement priority.
+
+        Lower values are higher priority.  The default starting value is 10.
+        Thus to make this a really high priority job:
+           manager.change_job_priority(-10).
+        """
+        queue = self._loader.queue
+        queue.change_priority(queue.id_to_job(job_id), delta)
 
     def update_model(
         self,
@@ -415,7 +499,8 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         self.logger.debug(f"update model {key}")
         new_info = self._loader.store.update_model(key, new_config)
-        return self._loader.installer.sync_model_path(new_info.key)
+        self._loader.installer.sync_model_path(new_info.key)
+        return new_info
 
     def del_model(
         self,
@@ -570,28 +655,3 @@ class ModelManagerService(ModelManagerServiceBase):
         :param new_name: New name for the model
         """
         return self.update_model(key, {"name": new_name})
-
-    def cancel_job(self, job: ModelInstallJob):
-        """Cancel this job."""
-        self._loader.queue.cancel_job(job)
-
-    def pause_job(self, job: ModelInstallJob):
-        """Pause this job."""
-        self._loader.queue.pause_job(job)
-
-    def start_job(self, job: ModelInstallJob):
-        """(re)start this job."""
-        self._loader.queue.start_job(job)
-
-    def change_priority(self, job: ModelInstallJob, delta: int):
-        """
-        Raise or lower the priority of the job.
-
-        :param job: Job to  apply change to
-        :param delta: Value to increment or decrement priority.
-
-        Lower values are higher priority.  The default starting value is 10.
-        Thus to make my_job a really high priority job:
-           manager.change_priority(my_job, -10).
-        """
-        self._loader.queue.change_priority(job, delta)

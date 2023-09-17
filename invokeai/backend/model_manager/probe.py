@@ -456,12 +456,8 @@ class PipelineFolderProbe(FolderProbeBase):
         """Return the SchedulerPredictionType of a diffusers-style sd-2 model."""
         with open(self.model / "scheduler" / "scheduler_config.json", "r") as file:
             scheduler_conf = json.load(file)
-        if scheduler_conf["prediction_type"] == "v_prediction":
-            return SchedulerPredictionType.VPrediction
-        elif scheduler_conf["prediction_type"] == "epsilon":
-            return SchedulerPredictionType.Epsilon
-        else:
-            return None
+        prediction_type = scheduler_conf.get("prediction_type", "epsilon")
+        return SchedulerPredictionType(prediction_type)
 
     def get_variant_type(self) -> ModelVariantType:
         """Return the ModelVariantType for diffusers-style main models."""

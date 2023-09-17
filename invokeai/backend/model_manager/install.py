@@ -383,22 +383,26 @@ class ModelInstall(ModelInstallBase):
             model_format=info.format,
         )
         # add 'main' specific fields
-        if info.model_type == ModelType.Main and info.format == ModelFormat.Checkpoint:
-            try:
-                config_file = self._legacy_configs[info.base_type][info.variant_type]
-                if isinstance(config_file, dict):  # need another tier for sd-2.x models
-                    if prediction_type := info.prediction_type:
-                        config_file = config_file[prediction_type]
-                    else:
-                        self._logger.warning(
-                            f"Could not infer prediction type for {model_path.stem}. Guessing 'v_prediction' for a SD-2 768 pixel model"
-                        )
-                        config_file = config_file[SchedulerPredictionType.VPrediction]
-                registration_data.update(
-                    config=Path(self._config.legacy_conf_dir, config_file).as_posix(),
-                )
-            except KeyError as exc:
-                raise InvalidModelException("Configuration file for this checkpoint could not be determined") from exc
+        if info.model_type == ModelType.Main:
+            registration_data.update(variant=info.variant_type)
+            if info.format == ModelFormat.Checkpoint:
+                try:
+                    config_file = self._legacy_configs[info.base_type][info.variant_type]
+                    if isinstance(config_file, dict):  # need another tier for sd-2.x models
+                        if prediction_type := info.prediction_type:
+                            config_file = config_file[prediction_type]
+                        else:
+                            self._logger.warning(
+                                f"Could not infer prediction type for {model_path.stem}. Guessing 'v_prediction' for a SD-2 768 pixel model"
+                            )
+                            config_file = config_file[SchedulerPredictionType.VPrediction]
+                    registration_data.update(
+                        config=Path(self._config.legacy_conf_dir, config_file).as_posix(),
+                    )
+                except KeyError as exc:
+                    raise InvalidModelException(
+                        "Configuration file for this checkpoint could not be determined"
+                    ) from exc
         self._store.add_model(key, registration_data)
         return key
 

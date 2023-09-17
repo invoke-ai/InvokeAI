@@ -2,6 +2,7 @@
 
 
 import pathlib
+from enum import Enum
 from typing import List, Literal, Optional, Union
 
 from fastapi import Body, Path, Query, Response
@@ -15,11 +16,10 @@ from invokeai.backend.model_manager import (
     DuplicateModelException,
     InvalidModelException,
     ModelConfigBase,
-    ModelInstallJob,
     SchedulerPredictionType,
     UnknownModelException,
 )
-from invokeai.backend.model_manager.download import DownloadJobStatus
+from invokeai.backend.model_manager.download import DownloadJobStatus, UnknownJobIDException
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod
 
 from ..dependencies import ApiDependencies
@@ -47,7 +47,16 @@ class ModelImportStatus(BaseModel):
     job_id: int
     source: str
     priority: int
+    bytes: int
+    total_bytes: int
     status: DownloadJobStatus
+
+
+class JobControlOperation(str, Enum):
+    START = "Start"
+    PAUSE = "Pause"
+    CANCEL = "Cancel"
+    CHANGE_PRIORITY = "Change Priority"
 
 
 @models_router.get(
@@ -129,20 +138,27 @@ async def import_model(
     """
     Add a model using its local path, repo_id, or remote URL.
 
-    Model characteristics will be probed and configured automatically.
-    The return object is a ModelInstallJob job ID. The work will be
-    performed in the background. Listen on the event bus for a series of
-    `model_event` events with an `id` matching the returned job id to get
-    the progress, completion status, errors, and information on the
-    model that was installed.
-    """
+    Models will be downloaded, probed, configured and installed in a
+    series of background threads. The return object has a `job_id` property
+    that can be used to control the download job.
 
+    Listen on the event bus for a series of `model_event` events with an `id`
+    matching the returned job id to get the progress, completion status, errors,
+    and information on the model that was installed.
+    """
     logger = ApiDependencies.invoker.services.logger
     try:
         result = ApiDependencies.invoker.services.model_manager.install_model(
             location, model_attributes={"prediction_type": SchedulerPredictionType(prediction_type)}
         )
-        return ModelImportStatus(job_id=result.id, source=result.source, priority=result.priority, status=result.status)
+        return ModelImportStatus(
+            job_id=result.id,
+            source=result.source,
+            priority=result.priority,
+            bytes=result.bytes,
+            total_bytes=result.total_bytes,
+            status=result.status,
+        )
     except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
@@ -169,19 +185,24 @@ async def import_model(
 async def add_model(
     info: Union[tuple(OPENAPI_MODEL_CONFIGS)] = Body(description="Model configuration"),
 ) -> ImportModelResponse:
-    """Add a model using the configuration information appropriate for its type. Only local models can be added by path"""
+    """
+    Add a model using the configuration information appropriate for its type. Only local models can be added by path.
+    This call will block until the model is installed.
+    """
 
     logger = ApiDependencies.invoker.services.logger
-
     try:
-        ApiDependencies.invoker.services.model_manager.add_model(
-            info.model_name, info.base_model, info.model_type, model_attributes=info.dict()
-        )
-        logger.info(f"Successfully added {info.model_name}")
-        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-            model_name=info.model_name, base_model=info.base_model, model_type=info.model_type
-        )
-        return parse_obj_as(ImportModelResponse, model_raw)
+        path = info.path
+        job = ApiDependencies.invoker.services.model_manager.add_model(path)
+        ApiDependencies.invoker.services.model_manager.wait_for_installs()
+        key = job.model_key
+        logger.info(f"Created model {key} for {path}")
+
+        # update with the provided info
+        info_dict = info.dict()
+        info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
+        new_config = ApiDependencies.invoker.services.model_manager.update_model(key, new_config=info_dict)
+        return parse_obj_as(ImportModelResponse, new_config.dict())
     except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
@@ -344,3 +365,92 @@ async def merge_models(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response
+
+
+@models_router.get(
+    "/jobs",
+    operation_id="list_install_jobs",
+    responses={
+        200: {"description": "The control job was updated successfully"},
+        400: {"description": "Bad request"},
+    },
+    status_code=200,
+    response_model=List[ModelImportStatus],
+)
+async def list_install_jobs() -> List[ModelImportStatus]:
+    """List active and pending model installation jobs."""
+    logger = ApiDependencies.invoker.services.logger
+    mgr = ApiDependencies.invoker.services.model_manager
+    try:
+        jobs = mgr.list_install_jobs()
+        return [
+            ModelImportStatus(
+                job_id=x.id,
+                source=x.source,
+                priority=x.priority,
+                bytes=x.bytes,
+                total_bytes=x.total_bytes,
+                status=x.status,
+            )
+            for x in jobs
+        ]
+    except Exception as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@models_router.patch(
+    "/jobs/{job_id}",
+    operation_id="control_install_jobs",
+    responses={
+        200: {"description": "The control job was updated successfully"},
+        400: {"description": "Bad request"},
+        404: {"description": "The job could not be found"},
+    },
+    status_code=200,
+    response_model=ModelImportStatus,
+)
+async def control_install_jobs(
+    job_id: int = Path(description="Install job_id for start, pause and cancel operations"),
+    operation: JobControlOperation = Body(description="The operation to perform on the job."),
+    priority_delta: Optional[int] = Body(
+        description="Change in job priority for priority operations only. Negative numbers increase priority.",
+        default=None,
+    ),
+) -> ModelImportStatus:
+    """Start, pause, cancel, or change the run priority of a running model install job."""
+    logger = ApiDependencies.invoker.services.logger
+    mgr = ApiDependencies.invoker.services.model_manager
+    try:
+        job = mgr.id_to_job(job_id)
+
+        if operation == JobControlOperation.START:
+            mgr.start_job(job_id)
+
+        elif operation == JobControlOperation.PAUSE:
+            mgr.pause_job(job_id)
+
+        elif operation == JobControlOperation.CANCEL:
+            mgr.cancel_job(job_id)
+
+        elif operation == JobControlOperation.CHANGE_PRIORITY:
+            mgr.change_job_priority(job_id, priority_delta)
+        else:
+            raise ValueError(f"Unknown operation {JobControlOperation.value}")
+
+        return ModelImportStatus(
+            job_id=job_id,
+            source=job.source,
+            priority=job.priority,
+            status=job.status,
+            bytes=job.bytes,
+            total_bytes=job.total_bytes,
+        )
+    except UnknownJobIDException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=400, detail=str(e))
