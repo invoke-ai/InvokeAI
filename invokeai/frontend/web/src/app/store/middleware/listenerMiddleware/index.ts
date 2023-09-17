@@ -86,7 +86,6 @@ import { addEnqueueRequestedLinear } from './listeners/enqueueRequestedLinear';
 import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
 import { addDynamicPromptsListener } from './listeners/promptChanged';
 import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
-import { addSocketQueueStatusChangedEventListener } from './listeners/socketio/socketQueueStatusChanged';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -175,7 +174,6 @@ addModelLoadEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
 addSocketQueueItemStatusChangedEventListener();
-addSocketQueueStatusChangedEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();

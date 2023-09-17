@@ -42,6 +42,7 @@ const TextToImageTabCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
+            <ParamIterations />
             <ParamSteps />
             <ParamCFGScale />
             <ParamModelandVAEandScheduler />
@@ -53,6 +54,7 @@ const TextToImageTabCoreParameters = () => {
         ) : (
           <>
             <Flex gap={3}>
+              <ParamIterations />
               <ParamSteps />
               <ParamCFGScale />
             </Flex>

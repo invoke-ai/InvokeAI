@@ -441,6 +441,5 @@ const isAnyServerError = isAnyOf(
 
 const isAnyCancelQueueItem = isAnyOf(
   queueApi.endpoints.cancelQueueItem.matchFulfilled,
-  queueApi.endpoints.cancelQueueExecution.matchFulfilled,
   queueApi.endpoints.clearQueue.matchFulfilled
 );

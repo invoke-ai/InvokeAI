@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from invokeai.app.services.item_storage import ItemStorageABC
     from invokeai.app.services.latent_storage import LatentsStorageBase
     from invokeai.app.services.model_manager_service import ModelManagerServiceBase
-    from invokeai.app.services.session_execution.session_execution_base import SessionExecutionServiceBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 
@@ -42,7 +41,6 @@ class InvocationServices:
     queue: "InvocationQueueABC"
     session_queue: "SessionQueueBase"
     session_processor: "SessionProcessorBase"
-    session_execution: "SessionExecutionServiceBase"
 
     def __init__(
         self,
@@ -61,7 +59,6 @@ class InvocationServices:
         queue: "InvocationQueueABC",
         session_queue: "SessionQueueBase",
         session_processor: "SessionProcessorBase",
-        session_execution: "SessionExecutionServiceBase",
     ):
         self.board_images = board_images
         self.boards = boards
@@ -78,4 +75,3 @@ class InvocationServices:
         self.queue = queue
         self.session_queue = session_queue
         self.session_processor = session_processor
-        self.session_execution = session_execution

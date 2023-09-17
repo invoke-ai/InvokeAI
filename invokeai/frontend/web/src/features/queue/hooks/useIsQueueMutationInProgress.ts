@@ -1,12 +1,12 @@
 import {
-  useCancelByBatchIdsMutation,
-  useCancelQueueExecutionMutation,
+  useCancelQueueItemMutation,
+  // useCancelByBatchIdsMutation,
   useClearQueueMutation,
   useEnqueueBatchMutation,
   useEnqueueGraphMutation,
   usePruneQueueMutation,
-  useStartQueueExecutionMutation,
-  useStopQueueExecutionMutation,
+  useResumeProcessorMutation,
+  usePauseProcessorMutation,
 } from 'services/api/endpoints/queue';
 
 export const useIsQueueMutationInProgress = () => {
@@ -18,17 +18,17 @@ export const useIsQueueMutationInProgress = () => {
     useEnqueueGraphMutation({
       fixedCacheKey: 'enqueueGraph',
     });
-  const [_triggerStartQueue, { isLoading: isLoadingStartQueue }] =
-    useStartQueueExecutionMutation({
-      fixedCacheKey: 'startQueue',
+  const [_triggerResumeProcessor, { isLoading: isLoadingResumeProcessor }] =
+    useResumeProcessorMutation({
+      fixedCacheKey: 'resumeProcessor',
     });
-  const [_triggerStopQueue, { isLoading: isLoadingStopQueue }] =
-    useStopQueueExecutionMutation({
-      fixedCacheKey: 'stopQueue',
+  const [_triggerPauseProcessor, { isLoading: isLoadingPauseProcessor }] =
+    usePauseProcessorMutation({
+      fixedCacheKey: 'pauseProcessor',
     });
   const [_triggerCancelQueue, { isLoading: isLoadingCancelQueue }] =
-    useCancelQueueExecutionMutation({
-      fixedCacheKey: 'cancelQueue',
+    useCancelQueueItemMutation({
+      fixedCacheKey: 'cancelQueueItem',
     });
   const [_triggerClearQueue, { isLoading: isLoadingClearQueue }] =
     useClearQueueMutation({
@@ -38,18 +38,18 @@ export const useIsQueueMutationInProgress = () => {
     usePruneQueueMutation({
       fixedCacheKey: 'pruneQueue',
     });
-  const [_triggerCancelByBatchIds, { isLoading: isLoadingCancelByBatchIds }] =
-    useCancelByBatchIdsMutation({
-      fixedCacheKey: 'cancelByBatchIds',
-    });
+  // const [_triggerCancelByBatchIds, { isLoading: isLoadingCancelByBatchIds }] =
+  //   useCancelByBatchIdsMutation({
+  //     fixedCacheKey: 'cancelByBatchIds',
+  //   });
   return (
     isLoadingEnqueueBatch ||
     isLoadingEnqueueGraph ||
-    isLoadingStartQueue ||
-    isLoadingStopQueue ||
+    isLoadingResumeProcessor ||
+    isLoadingPauseProcessor ||
     isLoadingCancelQueue ||
     isLoadingClearQueue ||
-    isLoadingPruneQueue ||
-    isLoadingCancelByBatchIds
+    isLoadingPruneQueue
+    // isLoadingCancelByBatchIds
   );
 };

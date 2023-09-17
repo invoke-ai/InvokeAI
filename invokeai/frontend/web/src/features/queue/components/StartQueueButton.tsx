@@ -4,8 +4,8 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
 import {
-  useGetQueueStatusQuery,
-  useStartQueueExecutionMutation,
+  useGetProcessorStatusQuery,
+  useResumeProcessorMutation,
 } from 'services/api/endpoints/queue';
 import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import QueueButton from './common/QueueButton';
@@ -14,18 +14,18 @@ type Props = {
   asIconButton?: boolean;
 };
 
-const StartQueueButton = ({ asIconButton }: Props) => {
-  const { data: queueStatusData } = useGetQueueStatusQuery();
+const ResumeProcessorButton = ({ asIconButton }: Props) => {
+  const { data: processorStatus } = useGetProcessorStatusQuery();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [startQueue] = useStartQueueExecutionMutation({
-    fixedCacheKey: 'startQueue',
+  const [resumeProcessor] = useResumeProcessorMutation({
+    fixedCacheKey: 'resumeProcessor',
   });
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
 
   const handleClick = useCallback(async () => {
     try {
-      await startQueue().unwrap();
+      await resumeProcessor().unwrap();
       dispatch(
         addToast({
           title: t('queue.startSucceeded'),
@@ -40,7 +40,7 @@ const StartQueueButton = ({ asIconButton }: Props) => {
         })
       );
     }
-  }, [dispatch, startQueue, t]);
+  }, [dispatch, resumeProcessor, t]);
 
   return (
     <QueueButton
@@ -48,9 +48,8 @@ const StartQueueButton = ({ asIconButton }: Props) => {
       label={t('queue.start')}
       tooltip={t('queue.startTooltip')}
       isDisabled={
-        queueStatusData?.started ||
-        queueStatusData?.stop_after_current ||
-        queueStatusData?.pending === 0 ||
+        processorStatus?.is_started ||
+        processorStatus?.is_processing ||
         isQueueMutationInProgress
       }
       icon={<FaPlay />}
@@ -60,4 +59,4 @@ const StartQueueButton = ({ asIconButton }: Props) => {
   );
 };
 
-export default memo(StartQueueButton);
+export default memo(ResumeProcessorButton);

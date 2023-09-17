@@ -23,7 +23,7 @@ export const enqueueBatch = async (
     req.reset();
 
     dispatch(
-      queueApi.endpoints.startQueueExecution.initiate(undefined, {
+      queueApi.endpoints.resumeProcessor.initiate(undefined, {
         fixedCacheKey: 'startQueue',
       })
     );

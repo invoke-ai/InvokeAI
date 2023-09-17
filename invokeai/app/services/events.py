@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo, ModelType, SubModelType
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.session_queue.session_queue_common import EnqueueBatchResult, SessionQueueItem
 from invokeai.app.util.misc import get_timestamp
 
 
@@ -195,8 +195,20 @@ class EventServiceBase:
             ),
         )
 
+    def emit_session_canceled(
+        self,
+        graph_execution_state_id: str,
+    ) -> None:
+        """Emitted when a session is canceled"""
+        self.__emit_session_event(
+            event_name="session_canceled",
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+            ),
+        )
+
     def emit_queue_item_status_changed(self, session_queue_item: SessionQueueItem) -> None:
-        """Emitted when a queue item is status_changed"""
+        """Emitted when a queue item's status changes"""
         self.__emit_queue_event(
             event_name="queue_item_status_changed",
             payload=dict(
@@ -206,4 +218,18 @@ class EventServiceBase:
                 batch_id=session_queue_item.batch_id,
                 status=session_queue_item.status,
             ),
+        )
+
+    def emit_batch_enqueued(self, enqueue_result: EnqueueBatchResult) -> None:
+        """Emitted when a batch is enqueued"""
+        self.__emit_queue_event(
+            event_name="batch_enqueued",
+            payload=enqueue_result.dict(),
+        )
+
+    def emit_queue_cleared(self, queue_id: str) -> None:
+        """Emitted when the queue is cleared"""
+        self.__emit_queue_event(
+            event_name="queue_cleared",
+            payload=dict(queue_id=queue_id),
         )

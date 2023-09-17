@@ -1,21 +1,28 @@
-from abc import ABC
-from typing import Optional
+from abc import ABC, abstractmethod
 
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatusResult
 
 
-class SessionProcessorABC(ABC):
-    def start(self) -> None:
+class SessionProcessorBase(ABC):
+    """
+    Base class for session processor.
+
+    The session processor is responsible for executing sessions. It runs a simple polling loop,
+    checking the session queue for new sessions to execute. It must coordinate with the
+    invocation queue to ensure only one session is executing at a time.
+    """
+
+    @abstractmethod
+    def resume(self) -> None:
+        """Starts or resumes the session processor"""
         pass
 
-    def stop(self) -> None:
+    @abstractmethod
+    def pause(self) -> None:
+        """Pauses the session processor"""
         pass
 
-    def poll_now(self) -> None:
-        pass
-
-    def get_current(self) -> Optional[SessionQueueItem]:
-        pass
-
-    def clear_current(self) -> None:
+    @abstractmethod
+    def get_status(self) -> SessionProcessorStatusResult:
+        """Gets the status of the session processor"""
         pass

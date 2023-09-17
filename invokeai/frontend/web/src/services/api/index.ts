@@ -22,6 +22,8 @@ export const tagTypes = [
   'SessionQueueItemDTO',
   'SessionQueueItemDTOList',
   'SessionQueueStatus',
+  'SessionProcessorStatus',
+  'BatchStatus',
 ];
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';

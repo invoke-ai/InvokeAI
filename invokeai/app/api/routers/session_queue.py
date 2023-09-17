@@ -3,10 +3,11 @@ from typing import Optional
 from fastapi import Body, Path, Query
 from fastapi.routing import APIRouter
 
-from invokeai.app.services.session_execution.session_execution_common import SessionExecutionStatusResult
-from invokeai.app.services.session_queue.session_queue_common import (
+from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatusResult
+from invokeai.app.services.session_queue.session_queue_common import (  # CancelByBatchIDsResult,
     QUEUE_ITEM_STATUS,
     Batch,
+    BatchStatusResult,
     CancelByBatchIDsResult,
     ClearResult,
     EnqueueBatchResult,
@@ -24,7 +25,9 @@ from ..dependencies import ApiDependencies
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
 
-class SessionQueueAndExecutionStatusResult(SessionQueueStatusResult, SessionExecutionStatusResult):
+class SessionQueueAndProcessorStatusResult(SessionQueueStatusResult, SessionProcessorStatusResult):
+    """The overall status of session queue and processor"""
+
     pass
 
 
@@ -84,42 +87,25 @@ async def list_queue_items(
 
 
 @session_queue_router.put(
-    "/{queue_id}/start",
-    operation_id="start",
+    "/{queue_id}/resume",
+    operation_id="resume",
 )
-async def start(
+async def resume(
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> None:
-    """Starts session queue execution"""
-    return ApiDependencies.invoker.services.session_execution.start(
-        queue_id=queue_id,
-    )
+    """Resumes session processor"""
+    return ApiDependencies.invoker.services.session_processor.resume()
 
 
 @session_queue_router.put(
-    "/{queue_id}/stop",
-    operation_id="stop",
+    "/{queue_id}/pause",
+    operation_id="pause",
 )
-async def stop(
+async def Pause(
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> None:
-    """Stops session queue execution, waiting for the currently executing session to finish"""
-    return ApiDependencies.invoker.services.session_execution.stop(
-        queue_id=queue_id,
-    )
-
-
-@session_queue_router.put(
-    "/{queue_id}/cancel",
-    operation_id="cancel",
-)
-async def cancel(
-    queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> None:
-    """Stops session queue execution, immediately canceling the currently-executing session"""
-    return ApiDependencies.invoker.services.session_execution.cancel(
-        queue_id=queue_id,
-    )
+    """Pauses session processor"""
+    return ApiDependencies.invoker.services.session_processor.pause()
 
 
 @session_queue_router.put(
@@ -132,13 +118,6 @@ async def cancel_by_batch_ids(
     batch_ids: list[str] = Body(description="The list of batch_ids to cancel all queue items for", embed=True),
 ) -> CancelByBatchIDsResult:
     """Immediately cancels all queue items from the given batch ids"""
-    current = ApiDependencies.invoker.services.session_execution.get_current(
-        queue_id=queue_id,
-    )
-    if current is not None and current.batch_id in batch_ids:
-        ApiDependencies.invoker.services.session_execution.cancel(
-            queue_id=queue_id,
-        )
     return ApiDependencies.invoker.services.session_queue.cancel_by_batch_ids(queue_id=queue_id, batch_ids=batch_ids)
 
 
@@ -153,12 +132,11 @@ async def clear(
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> ClearResult:
     """Clears the queue entirely, immediately canceling the currently-executing session"""
-    ApiDependencies.invoker.services.session_execution.cancel(
-        queue_id=queue_id,
-    )
-    return ApiDependencies.invoker.services.session_queue.clear(
-        queue_id=queue_id,
-    )
+    queue_item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
+    if queue_item is not None:
+        ApiDependencies.invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
+    clear_result = ApiDependencies.invoker.services.session_queue.clear(queue_id)
+    return clear_result
 
 
 @session_queue_router.put(
@@ -172,62 +150,78 @@ async def prune(
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> PruneResult:
     """Prunes all completed or errored queue items"""
-    return ApiDependencies.invoker.services.session_queue.prune(
-        queue_id=queue_id,
-    )
+    return ApiDependencies.invoker.services.session_queue.prune(queue_id)
 
 
 @session_queue_router.get(
     "/{queue_id}/current",
-    operation_id="current",
+    operation_id="get_current_queue_item",
     responses={
         200: {"model": Optional[SessionQueueItem]},
     },
 )
-async def current(
+async def get_current_queue_item(
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> Optional[SessionQueueItem]:
     """Gets the currently execution queue item"""
-    return ApiDependencies.invoker.services.session_execution.get_current(
-        queue_id=queue_id,
-    )
+    return ApiDependencies.invoker.services.session_queue.get_current(queue_id)
 
 
 @session_queue_router.get(
-    "/{queue_id}/peek",
-    operation_id="peek",
+    "/{queue_id}/next",
+    operation_id="get_next_queue_item",
     responses={
         200: {"model": Optional[SessionQueueItem]},
     },
 )
-async def peek(
+async def get_next_queue_item(
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> Optional[SessionQueueItem]:
     """Gets the next queue item, without executing it"""
-    return ApiDependencies.invoker.services.session_queue.peek(
-        queue_id=queue_id,
-    )
+    return ApiDependencies.invoker.services.session_queue.get_next(queue_id)
 
 
 @session_queue_router.get(
     "/{queue_id}/status",
-    operation_id="get_status",
+    operation_id="get_queue_status",
     responses={
-        200: {"model": SessionQueueAndExecutionStatusResult},
+        200: {"model": SessionQueueStatusResult},
     },
 )
-async def get_status(
+async def get_queue_status(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> SessionQueueAndExecutionStatusResult:
+) -> SessionQueueStatusResult:
     """Gets the status of the session queue"""
-    queue_status = ApiDependencies.invoker.services.session_queue.get_status(
-        queue_id=queue_id,
-    )
-    execution_status = ApiDependencies.invoker.services.session_execution.get_status(
-        queue_id=queue_id,
-    )
+    return ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id)
 
-    return SessionQueueAndExecutionStatusResult(**queue_status.dict(), **execution_status.dict())
+
+@session_queue_router.get(
+    "/{queue_id}/processor/status",
+    operation_id="get_processor_status",
+    responses={
+        200: {"model": SessionProcessorStatusResult},
+    },
+)
+async def get_processor_status(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+) -> SessionProcessorStatusResult:
+    """Gets the status of the session queue"""
+    return ApiDependencies.invoker.services.session_processor.get_status()
+
+
+@session_queue_router.get(
+    "/{queue_id}/b/{batch_id}/status",
+    operation_id="get_batch_status",
+    responses={
+        200: {"model": BatchStatusResult},
+    },
+)
+async def get_batch_status(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    batch_id: str = Path(description="The batch to get the status of"),
+) -> BatchStatusResult:
+    """Gets the status of the session queue"""
+    return ApiDependencies.invoker.services.session_queue.get_batch_status(queue_id=queue_id, batch_id=batch_id)
 
 
 @session_queue_router.get(
@@ -242,7 +236,7 @@ async def get_queue_item(
     item_id: str = Path(description="The queue item to get"),
 ) -> SessionQueueItem:
     """Gets a queue item"""
-    return ApiDependencies.invoker.services.session_queue.get_queue_item(queue_id=queue_id, item_id=item_id)
+    return ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
 
 
 @session_queue_router.put(
@@ -257,27 +251,5 @@ async def cancel_queue_item(
     item_id: str = Path(description="The queue item to cancel"),
 ) -> SessionQueueItem:
     """Deletes a queue item"""
-    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(queue_id=queue_id, item_id=item_id)
-    if queue_item.status not in ["completed", "failed", "canceled"]:
-        return ApiDependencies.invoker.services.session_queue.set_queue_item_status(
-            queue_id=queue_id, item_id=item_id, status="canceled"
-        )
-    return queue_item
 
-
-@session_queue_router.put(
-    "/{queue_id}/start_processor",
-    operation_id="start_processor",
-)
-async def start_processor() -> None:
-    """Deletes a queue item"""
-    ApiDependencies.invoker.services.session_processor.start()
-
-
-@session_queue_router.put(
-    "/{queue_id}/stop_processor",
-    operation_id="stop_processor",
-)
-async def stop_processor() -> None:
-    """Deletes a queue item"""
-    ApiDependencies.invoker.services.session_processor.stop()
+    return ApiDependencies.invoker.services.session_queue.cancel_queue_item(item_id)

@@ -39,6 +39,7 @@ const SDXLUnifiedCanvasTabCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
+            <ParamIterations />
             <ParamSteps />
             <ParamCFGScale />
             <ParamModelandVAEandScheduler />
@@ -50,6 +51,7 @@ const SDXLUnifiedCanvasTabCoreParameters = () => {
         ) : (
           <>
             <Flex gap={3}>
+              <ParamIterations />
               <ParamSteps />
               <ParamCFGScale />
             </Flex>

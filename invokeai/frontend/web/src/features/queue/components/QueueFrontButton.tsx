@@ -36,10 +36,9 @@ const QueueFrontButton = () => {
     <IAIIconButton
       colorScheme="base"
       aria-label={t('queue.queueFront')}
-      isDisabled={!isReady}
+      isDisabled={!isReady || isQueueMutationInProgress}
       onClick={handleEnqueue}
       tooltip={<EnqueueButtonTooltip prepend />}
-      isLoading={isQueueMutationInProgress}
       icon={<FaBoltLightning />}
     />
   );

@@ -8,7 +8,6 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import { usePredictedQueueCounts } from '../hooks/usePredictedQueueCounts';
 
 const tooltipSelector = createSelector(
   [stateSelector],
@@ -33,7 +32,6 @@ const QueueButtonTooltipContent = ({ prepend = false }: Props) => {
   const [_, { isLoading }] = useEnqueueBatchMutation({
     fixedCacheKey: 'enqueueBatch',
   });
-  const counts = usePredictedQueueCounts();
 
   const label = useMemo(() => {
     if (isLoading) {
@@ -41,12 +39,12 @@ const QueueButtonTooltipContent = ({ prepend = false }: Props) => {
     }
     if (isReady) {
       if (prepend) {
-        return t('queue.queueFront', { predicted: counts?.predicted ?? '?' });
+        return t('queue.queueFront');
       }
-      return t('queue.queueBack', { predicted: counts?.predicted ?? '?' });
+      return t('queue.queueBack');
     }
     return t('queue.notReady');
-  }, [counts?.predicted, isLoading, isReady, prepend, t]);
+  }, [isLoading, isReady, prepend, t]);
 
   return (
     <Flex flexDir="column" gap={1}>

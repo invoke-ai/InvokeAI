@@ -23,7 +23,7 @@ class FastAPIEventService(EventServiceBase):
 
         super().__init__()
 
-    def stop_service(self, *args, **kwargs):
+    def stop(self, *args, **kwargs):
         self.__stop_event.set()
         self.__queue.put(None)
 

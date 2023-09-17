@@ -328,26 +328,19 @@ export type paths = {
      */
     get: operations["list_queue_items"];
   };
-  "/api/v1/queue/{queue_id}/start": {
+  "/api/v1/queue/{queue_id}/resume": {
     /**
-     * Start
-     * @description Starts session queue execution
+     * Resume
+     * @description Resumes session processor
      */
-    put: operations["start"];
+    put: operations["resume"];
   };
-  "/api/v1/queue/{queue_id}/stop": {
+  "/api/v1/queue/{queue_id}/pause": {
     /**
-     * Stop
-     * @description Stops session queue execution, waiting for the currently executing session to finish
+     * Pause
+     * @description Pauses session processor
      */
-    put: operations["stop"];
-  };
-  "/api/v1/queue/{queue_id}/cancel": {
-    /**
-     * Cancel
-     * @description Stops session queue execution, immediately canceling the currently-executing session
-     */
-    put: operations["cancel"];
+    put: operations["pause"];
   };
   "/api/v1/queue/{queue_id}/cancel_by_batch_ids": {
     /**
@@ -372,24 +365,38 @@ export type paths = {
   };
   "/api/v1/queue/{queue_id}/current": {
     /**
-     * Current
+     * Get Current Queue Item
      * @description Gets the currently execution queue item
      */
-    get: operations["current"];
+    get: operations["get_current_queue_item"];
   };
-  "/api/v1/queue/{queue_id}/peek": {
+  "/api/v1/queue/{queue_id}/next": {
     /**
-     * Peek
+     * Get Next Queue Item
      * @description Gets the next queue item, without executing it
      */
-    get: operations["peek"];
+    get: operations["get_next_queue_item"];
   };
   "/api/v1/queue/{queue_id}/status": {
     /**
-     * Get Status
+     * Get Queue Status
      * @description Gets the status of the session queue
      */
-    get: operations["get_status"];
+    get: operations["get_queue_status"];
+  };
+  "/api/v1/queue/{queue_id}/processor/status": {
+    /**
+     * Get Processor Status
+     * @description Gets the status of the session queue
+     */
+    get: operations["get_processor_status"];
+  };
+  "/api/v1/queue/{queue_id}/b/{batch_id}/status": {
+    /**
+     * Get Batch Status
+     * @description Gets the status of the session queue
+     */
+    get: operations["get_batch_status"];
   };
   "/api/v1/queue/{queue_id}/i/{item_id}": {
     /**
@@ -548,6 +555,49 @@ export type components = {
        * @description The list of items to substitute into the node/field.
        */
       items?: (string | number)[];
+    };
+    /** BatchStatusResult */
+    BatchStatusResult: {
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Batch Id
+       * @description The ID of the batch
+       */
+      batch_id: string;
+      /**
+       * Pending
+       * @description Number of queue items with status 'pending'
+       */
+      pending: number;
+      /**
+       * In Progress
+       * @description Number of queue items with status 'in_progress'
+       */
+      in_progress: number;
+      /**
+       * Completed
+       * @description Number of queue items with status 'complete'
+       */
+      completed: number;
+      /**
+       * Failed
+       * @description Number of queue items with status 'error'
+       */
+      failed: number;
+      /**
+       * Canceled
+       * @description Number of queue items with status 'canceled'
+       */
+      canceled: number;
+      /**
+       * Total
+       * @description Total number of queue items
+       */
+      total: number;
     };
     /**
      * Blank Image
@@ -1016,7 +1066,10 @@ export type components = {
        */
       type: "infill_cv2";
     };
-    /** CancelByBatchIDsResult */
+    /**
+     * CancelByBatchIDsResult
+     * @description Result of canceling by list of batch ids
+     */
     CancelByBatchIDsResult: {
       /**
        * Canceled
@@ -1125,11 +1178,6 @@ export type components = {
        */
       workflow?: string;
       /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
-      /**
        * Skipped Layers
        * @description Number of layers to skip in text encoder
        * @default 0
@@ -1141,6 +1189,11 @@ export type components = {
        * @enum {string}
        */
       type: "clip_skip";
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
     };
     /**
      * ClipSkipInvocationOutput
@@ -2338,6 +2391,11 @@ export type components = {
     };
     /** EnqueueBatchResult */
     EnqueueBatchResult: {
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
       /**
        * Enqueued
        * @description The total number of queue items enqueued
@@ -6890,58 +6948,23 @@ export type components = {
        */
       type: "segment_anything_processor";
     };
-    /** SessionQueueAndExecutionStatusResult */
-    SessionQueueAndExecutionStatusResult: {
+    /** SessionProcessorStatusResult */
+    SessionProcessorStatusResult: {
       /**
-       * Started
-       * @description Whether the session queue is running
+       * Is Started
+       * @description Whether the session processor is started
        */
-      started: boolean;
+      is_started: boolean;
       /**
-       * Stop After Current
-       * @description Whether the session queue is pending a stop
+       * Is Processing
+       * @description Whether a session is being processed
        */
-      stop_after_current: boolean;
+      is_processing: boolean;
       /**
-       * Queue Id
-       * @description The ID of the queue
+       * Is Stop Pending
+       * @description Whether processor is pending stopping
        */
-      queue_id: string;
-      /**
-       * Pending
-       * @description Number of queue items with status 'pending'
-       */
-      pending: number;
-      /**
-       * In Progress
-       * @description Number of queue items with status 'in_progress'
-       */
-      in_progress: number;
-      /**
-       * Completed
-       * @description Number of queue items with status 'complete'
-       */
-      completed: number;
-      /**
-       * Failed
-       * @description Number of queue items with status 'error'
-       */
-      failed: number;
-      /**
-       * Canceled
-       * @description Number of queue items with status 'canceled'
-       */
-      canceled: number;
-      /**
-       * Total
-       * @description Total number of queue items
-       */
-      total: number;
-      /**
-       * Max Queue Size
-       * @description Maximum number of queue items allowed
-       */
-      max_queue_size: number;
+      is_stop_pending: boolean;
     };
     /**
      * SessionQueueItem
@@ -7006,6 +7029,11 @@ export type components = {
        * @description When this queue item was updated
        */
       updated_at: string;
+      /**
+       * Started At
+       * @description When this queue item was started
+       */
+      started_at?: string;
       /**
        * Completed At
        * @description When this queue item was completed
@@ -7081,10 +7109,53 @@ export type components = {
        */
       updated_at: string;
       /**
+       * Started At
+       * @description When this queue item was started
+       */
+      started_at?: string;
+      /**
        * Completed At
        * @description When this queue item was completed
        */
       completed_at?: string;
+    };
+    /** SessionQueueStatusResult */
+    SessionQueueStatusResult: {
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Pending
+       * @description Number of queue items with status 'pending'
+       */
+      pending: number;
+      /**
+       * In Progress
+       * @description Number of queue items with status 'in_progress'
+       */
+      in_progress: number;
+      /**
+       * Completed
+       * @description Number of queue items with status 'complete'
+       */
+      completed: number;
+      /**
+       * Failed
+       * @description Number of queue items with status 'error'
+       */
+      failed: number;
+      /**
+       * Canceled
+       * @description Number of queue items with status 'canceled'
+       */
+      canceled: number;
+      /**
+       * Total
+       * @description Total number of queue items
+       */
+      total: number;
     };
     /**
      * Show Image
@@ -8079,6 +8150,12 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -8102,12 +8179,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -9622,10 +9693,10 @@ export type operations = {
     };
   };
   /**
-   * Start
-   * @description Starts session queue execution
+   * Resume
+   * @description Resumes session processor
    */
-  start: {
+  resume: {
     parameters: {
       path: {
         /** @description The queue id to perform this operation on */
@@ -9648,36 +9719,10 @@ export type operations = {
     };
   };
   /**
-   * Stop
-   * @description Stops session queue execution, waiting for the currently executing session to finish
+   * Pause
+   * @description Pauses session processor
    */
-  stop: {
-    parameters: {
-      path: {
-        /** @description The queue id to perform this operation on */
-        queue_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Cancel
-   * @description Stops session queue execution, immediately canceling the currently-executing session
-   */
-  cancel: {
+  pause: {
     parameters: {
       path: {
         /** @description The queue id to perform this operation on */
@@ -9783,10 +9828,10 @@ export type operations = {
     };
   };
   /**
-   * Current
+   * Get Current Queue Item
    * @description Gets the currently execution queue item
    */
-  current: {
+  get_current_queue_item: {
     parameters: {
       path: {
         /** @description The queue id to perform this operation on */
@@ -9809,10 +9854,10 @@ export type operations = {
     };
   };
   /**
-   * Peek
+   * Get Next Queue Item
    * @description Gets the next queue item, without executing it
    */
-  peek: {
+  get_next_queue_item: {
     parameters: {
       path: {
         /** @description The queue id to perform this operation on */
@@ -9835,10 +9880,10 @@ export type operations = {
     };
   };
   /**
-   * Get Status
+   * Get Queue Status
    * @description Gets the status of the session queue
    */
-  get_status: {
+  get_queue_status: {
     parameters: {
       path: {
         /** @description The queue id to perform this operation on */
@@ -9849,7 +9894,61 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueAndExecutionStatusResult"];
+          "application/json": components["schemas"]["SessionQueueStatusResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Processor Status
+   * @description Gets the status of the session queue
+   */
+  get_processor_status: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionProcessorStatusResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Batch Status
+   * @description Gets the status of the session queue
+   */
+  get_batch_status: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+        /** @description The batch to get the status of */
+        batch_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BatchStatusResult"];
         };
       };
       /** @description Validation Error */

@@ -1,11 +1,11 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePeekNextQueueItemQuery } from 'services/api/endpoints/queue';
+import { useGetNextQueueItemQuery } from 'services/api/endpoints/queue';
 import QueueItemCard from './common/QueueItemCard';
 
 const NextQueueItemCard = () => {
   const { t } = useTranslation();
-  const { data: nextQueueItemData } = usePeekNextQueueItemQuery();
+  const { data: nextQueueItemData } = useGetNextQueueItemQuery();
 
   return (
     <QueueItemCard

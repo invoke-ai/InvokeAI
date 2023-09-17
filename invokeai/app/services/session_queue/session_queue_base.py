@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from invokeai.app.services.graph import Graph
-from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
+    BatchStatusResult,
     CancelByBatchIDsResult,
+    CancelByQueueIDResult,
     ClearResult,
     EnqueueBatchResult,
     EnqueueGraphResult,
@@ -16,15 +17,16 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueStatusResult,
-    SetManyQueueItemStatusResult,
 )
 from invokeai.app.services.shared.models import CursorPaginatedResults
 
 
 class SessionQueueBase(ABC):
+    """Base class for session queue"""
+
     @abstractmethod
-    def start_service(self, invoker: Invoker) -> None:
-        """Startup callback for the SessionQueue service"""
+    def dequeue(self) -> Optional[SessionQueueItem]:
+        """Dequeues the next session queue item."""
         pass
 
     @abstractmethod
@@ -38,13 +40,13 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def dequeue(self) -> Optional[SessionQueueItem]:
-        """Dequeues the next session queue item, returning it if one is available."""
+    def get_current(self, queue_id: str) -> Optional[SessionQueueItem]:
+        """Gets the currently-executing session queue item"""
         pass
 
     @abstractmethod
-    def peek(self, queue_id: str) -> Optional[SessionQueueItem]:
-        """Peeks at the next session queue item, returning it if one is available."""
+    def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
+        """Gets the next session queue item (does not dequeue it)"""
         pass
 
     @abstractmethod
@@ -68,13 +70,28 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def get_queue_status(self, queue_id: str) -> SessionQueueStatusResult:
+        """Gets the status of the queue"""
+        pass
+
+    @abstractmethod
+    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatusResult:
+        """Gets the status of a batch"""
+        pass
+
+    @abstractmethod
+    def cancel_queue_item(self, item_id: str) -> SessionQueueItem:
+        """Cancels a session queue item"""
+        pass
+
+    @abstractmethod
     def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
         """Cancels all queue items with matching batch IDs"""
         pass
 
     @abstractmethod
-    def get_status(self, queue_id: str) -> SessionQueueStatusResult:
-        """Gets the number of queue items with each status"""
+    def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
+        """Cancels all queue items with matching queue ID"""
         pass
 
     @abstractmethod
@@ -90,28 +107,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_queue_item(self, queue_id: str, item_id: str) -> SessionQueueItem:
+    def get_queue_item(self, item_id: str) -> SessionQueueItem:
         """Gets a session queue item by ID"""
         pass
 
     @abstractmethod
     def get_queue_item_by_session_id(self, session_id: str) -> SessionQueueItem:
         """Gets a queue item by session ID"""
-        pass
-
-    @abstractmethod
-    def set_queue_item_status(self, queue_id: str, item_id: str, status: QUEUE_ITEM_STATUS) -> SessionQueueItem:
-        """Sets the status of a session queue item"""
-        pass
-
-    @abstractmethod
-    def set_many_queue_item_status(
-        self, queue_id: str, item_ids: list[str], status: QUEUE_ITEM_STATUS
-    ) -> SetManyQueueItemStatusResult:
-        """Sets the status of a session queue item"""
-        pass
-
-    @abstractmethod
-    def delete_queue_item(self, queue_id: str, item_id: str) -> SessionQueueItem:
-        """Deletes a session queue item by ID"""
         pass

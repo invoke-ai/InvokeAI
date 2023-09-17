@@ -1,12 +1,10 @@
-import { ButtonGroup, Flex, Text } from '@chakra-ui/react';
-import ParamRuns from 'features/parameters/components/Parameters/Core/ParamRuns';
-import CancelQueueButton from 'features/queue/components/CancelQueueButton';
+import { ButtonGroup, Flex, Spacer, Text } from '@chakra-ui/react';
+import CancelCurrentQueueItemButton from 'features/queue/components/CancelCurrentQueueItemButton';
 import ClearQueueButton from 'features/queue/components/ClearQueueButton';
 import QueueBackButton from 'features/queue/components/QueueBackButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
-import StartQueueButton from 'features/queue/components/StartQueueButton';
-import StopQueueButton from 'features/queue/components/StopQueueButton';
-import { usePredictedQueueCounts } from 'features/queue/hooks/usePredictedQueueCounts';
+import ResumeProcessorButton from 'features/queue/components/StartQueueButton';
+import PauseProcessorButton from 'features/queue/components/StopQueueButton';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,11 +27,11 @@ const QueueControls = () => {
         <ButtonGroup isAttached flexGrow={2}>
           <QueueBackButton />
           <QueueFrontButton />
+          <CancelCurrentQueueItemButton asIconButton />
         </ButtonGroup>
         <ButtonGroup isAttached>
-          <StartQueueButton asIconButton />
-          <StopQueueButton asIconButton />
-          <CancelQueueButton asIconButton />
+          <ResumeProcessorButton asIconButton />
+          <PauseProcessorButton asIconButton />
           <ClearQueueButton asIconButton />
         </ButtonGroup>
       </Flex>
@@ -48,49 +46,35 @@ const QueueControls = () => {
 export default memo(QueueControls);
 
 const QueueCounts = memo(() => {
-  const counts = usePredictedQueueCounts();
-  const { data: queueStatus } = useGetQueueStatusQuery();
+  const { hasItems, pending } = useGetQueueStatusQuery(undefined, {
+    selectFromResult: ({ data }) => {
+      if (!data) {
+        return {
+          hasItems: false,
+          pending: 0,
+        };
+      }
+
+      const { pending, in_progress } = data;
+
+      return {
+        hasItems: pending + in_progress > 0,
+        pending,
+      };
+    },
+  });
   const { t } = useTranslation();
-
-  if (!counts || !queueStatus) {
-    return null;
-  }
-
-  const { requested, predicted, max_queue_size } = counts;
-  const { pending, in_progress } = queueStatus;
   return (
     <Flex justifyContent="space-between" alignItems="center">
-      <ParamRuns />
-      {/* <Tooltip
-        label={
-          requested > predicted &&
-          t('queue.queueMaxExceeded', {
-            requested,
-            skip: requested - predicted,
-            max_queue_size,
-          })
-        }
-      >
-        <Text
-          variant="subtext"
-          fontSize="sm"
-          fontWeight={400}
-          fontStyle="oblique 10deg"
-          opacity={0.7}
-          color={requested > predicted ? 'warning.500' : undefined}
-        >
-          {t('queue.queueCountPrediction', { predicted })}
-        </Text>
-      </Tooltip> */}
+      <Spacer />
       <Text
         variant="subtext"
         fontSize="sm"
         fontWeight={400}
         fontStyle="oblique 10deg"
-        opacity={0.7}
         pe={1}
       >
-        {pending + in_progress > 0
+        {hasItems
           ? t('queue.queuedCount', {
               pending,
             })

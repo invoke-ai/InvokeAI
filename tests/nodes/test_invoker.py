@@ -78,7 +78,7 @@ def mock_invoker(mock_services: InvocationServices) -> Invoker:
 
 def test_can_create_graph_state(mock_invoker: Invoker):
     g = mock_invoker.create_execution_state()
-    mock_invoker.stop_service()
+    mock_invoker.stop()
 
     assert g is not None
     assert isinstance(g, GraphExecutionState)
@@ -86,7 +86,7 @@ def test_can_create_graph_state(mock_invoker: Invoker):
 
 def test_can_create_graph_state_from_graph(mock_invoker: Invoker, simple_graph):
     g = mock_invoker.create_execution_state(graph=simple_graph)
-    mock_invoker.stop_service()
+    mock_invoker.stop()
 
     assert g is not None
     assert isinstance(g, GraphExecutionState)
@@ -104,7 +104,7 @@ def test_can_invoke(mock_invoker: Invoker, simple_graph):
         return len(g.executed) > 0
 
     wait_until(lambda: has_executed_any(g), timeout=5, interval=1)
-    mock_invoker.stop_service()
+    mock_invoker.stop()
 
     g = mock_invoker.services.graph_execution_manager.get(g.id)
     assert len(g.executed) > 0
@@ -121,7 +121,7 @@ def test_can_invoke_all(mock_invoker: Invoker, simple_graph):
         return g.is_complete()
 
     wait_until(lambda: has_executed_all(g), timeout=5, interval=1)
-    mock_invoker.stop_service()
+    mock_invoker.stop()
 
     g = mock_invoker.services.graph_execution_manager.get(g.id)
     assert g.is_complete()
@@ -139,7 +139,7 @@ def test_handles_errors(mock_invoker: Invoker):
         return g.is_complete()
 
     wait_until(lambda: has_executed_all(g), timeout=5, interval=1)
-    mock_invoker.stop_service()
+    mock_invoker.stop()
 
     g = mock_invoker.services.graph_execution_manager.get(g.id)
     assert g.has_error()

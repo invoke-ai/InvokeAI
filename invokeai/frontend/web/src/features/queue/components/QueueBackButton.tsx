@@ -34,11 +34,10 @@ const QueueBackButton = () => {
   );
   return (
     <IAIButton
-      isDisabled={!isReady}
+      isDisabled={!isReady || isQueueMutationInProgress}
       colorScheme="accent"
       onClick={handleEnqueue}
       tooltip={<EnqueueButtonTooltip />}
-      isLoading={isQueueMutationInProgress}
       flexGrow={3}
       minW={44}
     >

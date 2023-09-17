@@ -51,7 +51,7 @@ export const addEnqueueRequestedLinear = () => {
         req.reset();
 
         dispatch(
-          queueApi.endpoints.startQueueExecution.initiate(undefined, {
+          queueApi.endpoints.resumeProcessor.initiate(undefined, {
             fixedCacheKey: 'startQueue',
           })
         );

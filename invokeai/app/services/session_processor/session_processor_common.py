@@ -1,8 +1,7 @@
-POLLING_INTERVAL = 1
-THREAD_LIMIT = 1
-FINISHED_SESSION_EVENTS = [
-    "graph_execution_state_complete",
-    "invocation_error",
-    "session_retrieval_error",
-    "invocation_retrieval_error",
-]
+from pydantic import BaseModel, Field
+
+
+class SessionProcessorStatusResult(BaseModel):
+    is_started: bool = Field(description="Whether the session processor is started")
+    is_processing: bool = Field(description="Whether a session is being processed")
+    is_stop_pending: bool = Field(description="Whether processor is pending stopping")

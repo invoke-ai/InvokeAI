@@ -17,7 +17,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker: Invoker
     __threadLimit: BoundedSemaphore
 
-    def start_service(self, invoker) -> None:
+    def start(self, invoker) -> None:
         # if we do want multithreading at some point, we could make this configurable
         self.__threadLimit = BoundedSemaphore(1)
         self.__invoker = invoker
@@ -30,7 +30,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
         self.__invoker_thread.daemon = True  # TODO: make async and do not use threads
         self.__invoker_thread.start()
 
-    def stop_service(self, *args, **kwargs) -> None:
+    def stop(self, *args, **kwargs) -> None:
         self.__stop_event.set()
 
     def __process(self, stop_event: Event):

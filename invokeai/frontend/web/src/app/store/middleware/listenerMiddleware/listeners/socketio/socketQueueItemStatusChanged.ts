@@ -12,7 +12,12 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
     actionCreator: socketQueueItemStatusChanged,
     effect: (action, { dispatch, getState }) => {
       const log = logger('socketio');
-      const { item_id, status: newStatus } = action.payload.data;
+      const {
+        item_id,
+        batch_id,
+        graph_execution_state_id,
+        status: newStatus,
+      } = action.payload.data;
       log.debug(
         action.payload,
         `Queue item ${item_id} status updated: ${newStatus}`
@@ -29,7 +34,6 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
       );
 
       const state = getState();
-      const { batch_id, graph_execution_state_id } = action.payload.data;
       if (state.canvas.batchIds.includes(batch_id)) {
         dispatch(canvasSessionIdAdded(graph_execution_state_id));
       }
@@ -39,6 +43,10 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
           'SessionQueueStatus',
+          'SessionProcessorStatus',
+          { type: 'SessionQueueItem', id: item_id },
+          { type: 'SessionQueueItemDTO', id: item_id },
+          { type: 'BatchStatus', id: batch_id },
         ])
       );
     },

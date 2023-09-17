@@ -4,8 +4,8 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaStop } from 'react-icons/fa';
 import {
-  useGetQueueStatusQuery,
-  useStopQueueExecutionMutation,
+  useGetProcessorStatusQuery,
+  usePauseProcessorMutation,
 } from 'services/api/endpoints/queue';
 import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import QueueButton from './common/QueueButton';
@@ -14,18 +14,18 @@ type Props = {
   asIconButton?: boolean;
 };
 
-const StopQueueButton = ({ asIconButton }: Props) => {
-  const { data: queueStatusData } = useGetQueueStatusQuery();
+const PauseProcessorButton = ({ asIconButton }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [stopQueue] = useStopQueueExecutionMutation({
-    fixedCacheKey: 'stopQueue',
+  const { data: processorStatus } = useGetProcessorStatusQuery();
+  const [pauseProcessor] = usePauseProcessorMutation({
+    fixedCacheKey: 'pauseProcessor',
   });
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
 
   const handleClick = useCallback(async () => {
     try {
-      await stopQueue().unwrap();
+      await pauseProcessor().unwrap();
       dispatch(
         addToast({
           title: t('queue.stopRequested'),
@@ -40,14 +40,15 @@ const StopQueueButton = ({ asIconButton }: Props) => {
         })
       );
     }
-  }, [dispatch, stopQueue, t]);
+  }, [dispatch, pauseProcessor, t]);
 
   return (
     <QueueButton
       asIconButton={asIconButton}
       label={t('queue.stop')}
       tooltip={t('queue.stopTooltip')}
-      isDisabled={!queueStatusData?.started || isQueueMutationInProgress}
+      isDisabled={!processorStatus?.is_started || isQueueMutationInProgress}
+      isLoading={processorStatus?.is_stop_pending}
       icon={<FaStop />}
       onClick={handleClick}
       colorScheme="gold"
@@ -55,4 +56,4 @@ const StopQueueButton = ({ asIconButton }: Props) => {
   );
 };
 
-export default memo(StopQueueButton);
+export default memo(PauseProcessorButton);

@@ -167,6 +167,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
     error: Optional[str] = Field(default=None, description="The error message if this queue item errored")
     created_at: Union[datetime.datetime, str] = Field(description="When this queue item was created")
     updated_at: Union[datetime.datetime, str] = Field(description="When this queue item was updated")
+    started_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was started")
     completed_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was completed")
 
     @classmethod
@@ -237,15 +238,21 @@ class SessionQueueStatusResult(BaseModel):
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")
     total: int = Field(..., description="Total number of queue items")
-    max_queue_size: int = Field(..., description="Maximum number of queue items allowed")
 
 
-class SetManyQueueItemStatusResult(BaseModel):
-    item_ids: list[str] = Field(..., description="The queue item IDs that were updated")
-    status: QUEUE_ITEM_STATUS = Field(..., description="The new status of the queue items")
+class BatchStatusResult(BaseModel):
+    queue_id: str = Field(..., description="The ID of the queue")
+    batch_id: str = Field(..., description="The ID of the batch")
+    pending: int = Field(..., description="Number of queue items with status 'pending'")
+    in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
+    completed: int = Field(..., description="Number of queue items with status 'complete'")
+    failed: int = Field(..., description="Number of queue items with status 'error'")
+    canceled: int = Field(..., description="Number of queue items with status 'canceled'")
+    total: int = Field(..., description="Total number of queue items")
 
 
 class EnqueueBatchResult(BaseModel):
+    queue_id: str = Field(description="The ID of the queue")
     enqueued: int = Field(description="The total number of queue items enqueued")
     requested: int = Field(description="The total number of queue items requested to be enqueued")
     batch: Batch = Field(description="The batch that was enqueued")
@@ -273,7 +280,15 @@ class PruneResult(ClearResult):
 
 
 class CancelByBatchIDsResult(BaseModel):
+    """Result of canceling by list of batch ids"""
+
     canceled: int = Field(..., description="Number of queue items canceled")
+
+
+class CancelByQueueIDResult(CancelByBatchIDsResult):
+    """Result of canceling by queue id"""
+
+    pass
 
 
 class IsEmptyResult(BaseModel):

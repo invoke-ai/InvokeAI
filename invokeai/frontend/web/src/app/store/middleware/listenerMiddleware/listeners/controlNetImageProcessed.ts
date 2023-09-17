@@ -47,7 +47,7 @@ export const addControlNetImageProcessedListener = () => {
         const enqueueResult = await req.unwrap();
         req.reset();
         dispatch(
-          queueApi.endpoints.startQueueExecution.initiate(undefined, {
+          queueApi.endpoints.resumeProcessor.initiate(undefined, {
             fixedCacheKey: 'startQueue',
           })
         );
