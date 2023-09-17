@@ -64,8 +64,9 @@ class IPAdapterInvocation(BaseInvocation):
     )
 
     # weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
-    weight: Union[float, List[float]] = InputField(default=1, ge=0, description="The weight given to the IP-Adapter",
-                                                   ui_type=UIType.Float, title="Weight")
+    weight: Union[float, List[float]] = InputField(
+        default=1, ge=0, description="The weight given to the IP-Adapter", ui_type=UIType.Float, title="Weight"
+    )
 
     begin_step_percent: float = InputField(
         default=0, ge=-1, le=2, description="When the IP-Adapter is first applied (% of total steps)"
