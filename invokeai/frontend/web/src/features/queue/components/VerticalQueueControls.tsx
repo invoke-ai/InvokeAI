@@ -1,10 +1,9 @@
 import { ButtonGroup, ButtonGroupProps, Flex } from '@chakra-ui/react';
 import { memo } from 'react';
-import CancelCurrentQueueItemButton from './CancelCurrentQueueItemButton';
 import ClearQueueButton from './ClearQueueButton';
+import PauseProcessorButton from './PauseProcessorButton';
 import PruneQueueButton from './PruneQueueButton';
 import ResumeProcessorButton from './ResumeProcessorButton';
-import PauseProcessorButton from './PauseProcessorButton';
 
 type Props = ButtonGroupProps & {
   asIconButtons?: boolean;
@@ -16,7 +15,6 @@ const VerticalQueueControls = ({ asIconButtons, ...rest }: Props) => {
       <ButtonGroup w="full" isAttached {...rest}>
         <ResumeProcessorButton asIconButton={asIconButtons} />
         <PauseProcessorButton asIconButton={asIconButtons} />
-        <CancelCurrentQueueItemButton asIconButton={asIconButtons} />
       </ButtonGroup>
       <ButtonGroup w="full" isAttached {...rest}>
         <PruneQueueButton asIconButton={asIconButtons} />

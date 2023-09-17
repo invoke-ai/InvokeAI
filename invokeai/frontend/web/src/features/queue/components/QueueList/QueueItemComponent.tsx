@@ -6,10 +6,10 @@ import {
   Text,
 } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
-import { useCancelQueueItemMutation } from 'services/api/endpoints/queue';
 import { SessionQueueItemDTO } from 'services/api/types';
 import QueueStatusBadge from '../common/QueueStatusBadge';
 import QueueItemDetail from './QueueItemDetail';
@@ -34,14 +34,13 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
   const handleToggle = useCallback(() => {
     context.toggleQueueItem(item.item_id);
   }, [context, item.item_id]);
-  const [cancelQueueItem, { isLoading: isLoadingCancelQueueItem }] =
-    useCancelQueueItemMutation();
+  const { cancelQueueItem, isLoading } = useCancelQueueItem(item.item_id);
   const handleCancelQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      cancelQueueItem(item.item_id);
+      cancelQueueItem();
     },
-    [cancelQueueItem, item.item_id]
+    [cancelQueueItem]
   );
   const isOpen = useMemo(
     () => context.openQueueItems.includes(item.item_id),
@@ -68,13 +67,14 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           w={COLUMN_WIDTHS.number}
           justifyContent="flex-end"
           alignItems="center"
+          flexShrink={0}
         >
           <Text variant="subtext">{index + 1}</Text>
         </Flex>
-        <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center">
+        <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
         </Flex>
-        <Flex w={COLUMN_WIDTHS.batchId}>
+        <Flex w={COLUMN_WIDTHS.batchId} flexShrink={0}>
           <Text
             overflow="hidden"
             textOverflow="ellipsis"
@@ -84,9 +84,14 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
             {item.batch_id}
           </Text>
         </Flex>
-        <Flex alignItems="center" flexGrow={1}>
+        <Flex
+          alignItems="center"
+          w={COLUMN_WIDTHS.fieldValues}
+          flexGrow={1}
+          overflow="hidden"
+        >
           {item.field_values && (
-            <Flex gap={2}>
+            <Flex gap={2} overflow="hidden">
               {item.field_values
                 .filter((v) => v.node_path !== 'metadata_accumulator')
                 .map(({ node_path, field_name, value }) => (
@@ -108,9 +113,8 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
             <IAIIconButton
-              tooltip={t('queue.cancelItem')}
               onClick={handleCancelQueueItem}
-              isLoading={isLoadingCancelQueueItem}
+              isLoading={isLoading}
               isDisabled={['canceled', 'completed', 'failed'].includes(
                 item.status
               )}

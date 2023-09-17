@@ -2,16 +2,12 @@ import { ButtonGroup, Flex, Heading, Spinner, Text } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
-import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
+import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
-import {
-  useCancelByBatchIdsMutation,
-  useCancelQueueItemMutation,
-  useGetBatchStatusQuery,
-  useGetQueueItemQuery,
-} from 'services/api/endpoints/queue';
+import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
 import { SessionQueueItemDTO } from 'services/api/types';
 
 type Props = {
@@ -21,52 +17,30 @@ type Props = {
 const QueueItemComponent = ({ queueItemDTO }: Props) => {
   const { session_id, batch_id, item_id } = queueItemDTO;
   const { t } = useTranslation();
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
-  const [cancelQueueItem, { isLoading: isLoadingCancelQueueItem }] =
-    useCancelQueueItemMutation();
-  const [cancelByBatchIds, { isLoading: isLoadingCancelByBatchIds }] =
-    useCancelByBatchIdsMutation();
-  const { isCanceled } = useGetBatchStatusQuery(
-    { batch_id: queueItemDTO.batch_id },
-    {
-      selectFromResult: ({ data }) => {
-        if (!data) {
-          return { isCanceled: true };
-        }
+  const {
+    cancelBatch,
+    isLoading: isLoadingCancelBatch,
+    isCanceled,
+  } = useCancelBatch(batch_id);
 
-        return {
-          isCanceled: data?.in_progress === 0 && data?.pending === 0,
-        };
-      },
-    }
-  );
-  const handleCancelQueueItem = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      cancelQueueItem(item_id);
-    },
-    [cancelQueueItem, item_id]
-  );
-  const handleCancelBatch = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      cancelByBatchIds({ batch_ids: [batch_id] });
-    },
-    [cancelByBatchIds, batch_id]
-  );
+  const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } =
+    useCancelQueueItem(item_id);
+
   const { data: queueItem } = useGetQueueItemQuery(item_id);
+
   const executionTime = useMemo(() => {
     if (!queueItem?.completed_at || !queueItem?.started_at) {
-      return 'n/a';
+      if (queueItem?.status === 'in_progress') {
+        return t('queue.inProgress');
+      }
+      return t('queue.pending');
     }
-    return String(
-      (
-        (Date.parse(queueItem.completed_at) -
-          Date.parse(queueItem.started_at)) /
-        1000
-      ).toFixed(2)
-    );
-  }, [queueItem?.completed_at, queueItem?.started_at]);
+    const seconds = (
+      (Date.parse(queueItem.completed_at) - Date.parse(queueItem.started_at)) /
+      1000
+    ).toFixed(2);
+    return `${seconds}s`;
+  }, [queueItem, t]);
 
   return (
     <Flex
@@ -91,7 +65,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         <QueueItemData label="Execution Time" data={executionTime} />
         <ButtonGroup size="xs" orientation="vertical">
           <IAIButton
-            onClick={handleCancelQueueItem}
+            onClick={cancelQueueItem}
             isLoading={isLoadingCancelQueueItem}
             isDisabled={
               queueItem
@@ -105,8 +79,8 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
             {t('queue.cancelItem')}
           </IAIButton>
           <IAIButton
-            onClick={handleCancelBatch}
-            isLoading={isLoadingCancelByBatchIds || isQueueMutationInProgress}
+            onClick={cancelBatch}
+            isLoading={isLoadingCancelBatch}
             isDisabled={isCanceled}
             aria-label={t('queue.cancelBatch')}
             icon={<FaTimes />}
@@ -159,7 +133,9 @@ type QueueItemDataProps = { label: string; data: string };
 const QueueItemData = ({ label, data }: QueueItemDataProps) => {
   return (
     <Flex flexDir="column" p={1} gap={1}>
-      <Heading size="sm">{label}</Heading>
+      <Heading size="sm" color="base.400">
+        {label}
+      </Heading>
       <Text>{data}</Text>
     </Flex>
   );

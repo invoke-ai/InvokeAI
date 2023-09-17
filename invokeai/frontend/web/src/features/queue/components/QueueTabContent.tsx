@@ -1,10 +1,11 @@
-import { Box, Flex } from '@chakra-ui/react';
-import VerticalQueueControls from 'features/queue/components/VerticalQueueControls';
+import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { memo } from 'react';
-import CurrentQueueItemCard from './CurrentQueueItemCard';
-import NextQueueItemCard from './NextQueueItemCard';
+import ClearQueueButton from './ClearQueueButton';
+import PauseProcessorButton from './PauseProcessorButton';
+import PruneQueueButton from './PruneQueueButton';
 import QueueList from './QueueList/QueueList';
-import QueueStatusCard from './QueueStatusCard';
+import QueueStatus from './QueueStatus';
+import ResumeProcessorButton from './ResumeProcessorButton';
 
 const QueueTabContent = () => {
   return (
@@ -18,12 +19,29 @@ const QueueTabContent = () => {
       gap={2}
     >
       <Flex gap={2} w="full">
-        <Flex layerStyle="second" borderRadius="base" p={2}>
-          <VerticalQueueControls orientation="vertical" />
+        <Flex layerStyle="second" borderRadius="base" p={2} gap={2}>
+          <ButtonGroup w={28} orientation="vertical" isAttached size="sm">
+            <ResumeProcessorButton />
+            <PauseProcessorButton />
+          </ButtonGroup>
+          <ButtonGroup w={28} orientation="vertical" isAttached size="sm">
+            <PruneQueueButton />
+            <ClearQueueButton />
+          </ButtonGroup>
         </Flex>
-        <QueueStatusCard />
+        <Flex
+          layerStyle="second"
+          borderRadius="base"
+          flexDir="column"
+          py={2}
+          px={3}
+          gap={2}
+        >
+          <QueueStatus />
+        </Flex>
+        {/* <QueueStatusCard />
         <CurrentQueueItemCard />
-        <NextQueueItemCard />
+        <NextQueueItemCard /> */}
       </Flex>
       <Box layerStyle="second" p={2} borderRadius="base" w="full" h="full">
         <QueueList />

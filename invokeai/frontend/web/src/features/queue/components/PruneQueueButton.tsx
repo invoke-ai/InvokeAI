@@ -1,13 +1,7 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsStars } from 'react-icons/bs';
-import {
-  useGetQueueStatusQuery,
-  usePruneQueueMutation,
-} from 'services/api/endpoints/queue';
-import { listCursorChanged, listPriorityChanged } from '../store/queueSlice';
+import { usePruneQueue } from '../hooks/usePruneQueue';
 import QueueButton from './common/QueueButton';
 
 type Props = {
@@ -15,53 +9,18 @@ type Props = {
 };
 
 const PruneQueueButton = ({ asIconButton }: Props) => {
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [pruneQueue, { isLoading }] = usePruneQueueMutation({
-    fixedCacheKey: 'pruneQueue',
-  });
-  const { count } = useGetQueueStatusQuery(undefined, {
-    selectFromResult: ({ data }) => {
-      if (!data) {
-        return { count: 0 };
-      }
-
-      return {
-        count: data.queue.completed + data.queue.canceled + data.queue.failed,
-      };
-    },
-  });
-
-  const handleClick = useCallback(async () => {
-    try {
-      const data = await pruneQueue().unwrap();
-      dispatch(
-        addToast({
-          title: t('queue.pruneSucceeded', { item_count: data.deleted }),
-          status: 'success',
-        })
-      );
-      dispatch(listCursorChanged(undefined));
-      dispatch(listPriorityChanged(undefined));
-    } catch {
-      dispatch(
-        addToast({
-          title: t('queue.pruneFailed'),
-          status: 'error',
-        })
-      );
-    }
-  }, [dispatch, pruneQueue, t]);
+  const { pruneQueue, isLoading, finishedCount } = usePruneQueue();
 
   return (
     <QueueButton
-      isDisabled={!count}
+      isDisabled={!finishedCount}
       isLoading={isLoading}
       asIconButton={asIconButton}
       label={t('queue.prune')}
-      tooltip={t('queue.pruneTooltip', { item_count: count })}
+      tooltip={t('queue.pruneTooltip', { item_count: finishedCount })}
       icon={<BsStars />}
-      onClick={handleClick}
+      onClick={pruneQueue}
       colorScheme="blue"
     />
   );
