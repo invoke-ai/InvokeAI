@@ -78,7 +78,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
         finally:
             self._lock.release()
         assert (
-            self.version == CONFIG_FILE_VERSION
+            str(self.version) == CONFIG_FILE_VERSION
         ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
 
     def _create_tables(self) -> None:

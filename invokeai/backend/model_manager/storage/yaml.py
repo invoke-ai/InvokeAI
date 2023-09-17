@@ -69,7 +69,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
             self._initialize_yaml()
         self._config = OmegaConf.load(self._filename)
         assert (
-            self.version == CONFIG_FILE_VERSION
+            str(self.version) == CONFIG_FILE_VERSION
         ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
 
     def _initialize_yaml(self):
