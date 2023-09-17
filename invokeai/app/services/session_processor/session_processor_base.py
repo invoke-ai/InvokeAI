@@ -13,12 +13,12 @@ class SessionProcessorBase(ABC):
     """
 
     @abstractmethod
-    def resume(self) -> None:
+    def resume(self) -> SessionProcessorStatus:
         """Starts or resumes the session processor"""
         pass
 
     @abstractmethod
-    def pause(self) -> None:
+    def pause(self) -> SessionProcessorStatus:
         """Pauses the session processor"""
         pass
 

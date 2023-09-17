@@ -139,11 +139,6 @@ export const addEnqueueRequestedCanvasListener = () => {
 
         const enqueueResult = await req.unwrap();
         req.reset();
-        dispatch(
-          queueApi.endpoints.resumeProcessor.initiate(undefined, {
-            fixedCacheKey: 'resumeProcessor',
-          })
-        );
 
         log.debug({ enqueueResult: parseify(enqueueResult) }, 'Batch enqueued');
 

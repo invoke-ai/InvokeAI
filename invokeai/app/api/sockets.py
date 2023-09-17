@@ -22,10 +22,6 @@ class SocketIO:
         self.__sio.on("unsubscribe_queue", handler=self._handle_unsub_queue)
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._handle_queue_event)
 
-        self.__sio.on("subscribe_processor", handler=self._handle_sub_processor)
-        self.__sio.on("unsubscribe_processor", handler=self._handle_unsub_processor)
-        local_handler.register(event_name=EventServiceBase.processor_event, _func=self._handle_processor_event)
-
     async def _handle_session_event(self, event: Event):
         await self.__sio.emit(
             event=event[1]["event"],
@@ -55,16 +51,3 @@ class SocketIO:
     async def _handle_unsub_queue(self, sid, data, *args, **kwargs):
         if "queue_id" in data:
             self.__sio.enter_room(sid, data["queue_id"])
-
-    async def _handle_processor_event(self, event: Event):
-        await self.__sio.emit(
-            event=event[1]["event"],
-            data=event[1]["data"],
-            room="processor",
-        )
-
-    async def _handle_sub_processor(self, sid, *args, **kwargs):
-        self.__sio.enter_room(sid, "processor")
-
-    async def _handle_unsub_processor(self, sid, *args, **kwargs):
-        self.__sio.enter_room(sid, "processor")

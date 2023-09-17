@@ -4,10 +4,9 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPause } from 'react-icons/fa';
 import {
-  useGetProcessorStatusQuery,
+  useGetQueueStatusQuery,
   usePauseProcessorMutation,
 } from 'services/api/endpoints/queue';
-import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import QueueButton from './common/QueueButton';
 
 type Props = {
@@ -17,11 +16,10 @@ type Props = {
 const PauseProcessorButton = ({ asIconButton }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { data: processorStatus } = useGetProcessorStatusQuery();
-  const [pauseProcessor] = usePauseProcessorMutation({
+  const { data: queueStatus } = useGetQueueStatusQuery();
+  const [pauseProcessor, { isLoading }] = usePauseProcessorMutation({
     fixedCacheKey: 'pauseProcessor',
   });
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
 
   const handleClick = useCallback(async () => {
     try {
@@ -47,8 +45,8 @@ const PauseProcessorButton = ({ asIconButton }: Props) => {
       asIconButton={asIconButton}
       label={t('queue.pause')}
       tooltip={t('queue.pauseTooltip')}
-      isDisabled={!processorStatus?.is_started || isQueueMutationInProgress}
-      isLoading={processorStatus?.is_stop_pending}
+      isDisabled={!queueStatus?.processor.is_started}
+      isLoading={isLoading}
       icon={<FaPause />}
       onClick={handleClick}
       colorScheme="gold"

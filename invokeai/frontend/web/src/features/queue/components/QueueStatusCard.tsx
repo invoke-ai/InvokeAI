@@ -5,7 +5,7 @@ import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 const QueueStatusCard = () => {
   const { t } = useTranslation();
-  const { data: queueStatusData } = useGetQueueStatusQuery();
+  const { data: queueStatus } = useGetQueueStatusQuery();
 
   return (
     <Flex
@@ -21,31 +21,31 @@ const QueueStatusCard = () => {
         <Text as="span" fontWeight={600}>
           {t('queue.pending')}:{' '}
         </Text>
-        {queueStatusData?.pending}
+        {queueStatus?.queue.pending}
       </Text>
       <Text>
         <Text as="span" fontWeight={600}>
           {t('queue.inProgress')}:{' '}
         </Text>
-        {queueStatusData?.in_progress}
+        {queueStatus?.queue.in_progress}
       </Text>
       <Text>
         <Text as="span" fontWeight={600}>
           {t('queue.completed')}:{' '}
         </Text>
-        {queueStatusData?.completed}
+        {queueStatus?.queue.completed}
       </Text>
       <Text>
         <Text as="span" fontWeight={600}>
           {t('queue.failed')}:{' '}
         </Text>
-        {queueStatusData?.failed}
+        {queueStatus?.queue.failed}
       </Text>
       <Text>
         <Text as="span" fontWeight={600}>
           {t('queue.canceled')}:{' '}
         </Text>
-        {queueStatusData?.canceled}
+        {queueStatus?.queue.canceled}
       </Text>
     </Flex>
   );

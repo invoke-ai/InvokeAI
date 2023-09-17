@@ -55,7 +55,7 @@ const QueueCounts = memo(() => {
         };
       }
 
-      const { pending, in_progress } = data;
+      const { pending, in_progress } = data.queue;
 
       return {
         hasItems: pending + in_progress > 0,

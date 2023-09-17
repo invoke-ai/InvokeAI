@@ -328,14 +328,14 @@ export type paths = {
      */
     get: operations["list_queue_items"];
   };
-  "/api/v1/queue/{queue_id}/resume": {
+  "/api/v1/queue/{queue_id}/processor/resume": {
     /**
      * Resume
      * @description Resumes session processor
      */
     put: operations["resume"];
   };
-  "/api/v1/queue/{queue_id}/pause": {
+  "/api/v1/queue/{queue_id}/processor/pause": {
     /**
      * Pause
      * @description Pauses session processor
@@ -383,13 +383,6 @@ export type paths = {
      * @description Gets the status of the session queue
      */
     get: operations["get_queue_status"];
-  };
-  "/api/v1/queue/{queue_id}/processor/status": {
-    /**
-     * Get Processor Status
-     * @description Gets the status of the session queue
-     */
-    get: operations["get_processor_status"];
   };
   "/api/v1/queue/{queue_id}/b/{batch_id}/status": {
     /**
@@ -1178,11 +1171,6 @@ export type components = {
        */
       workflow?: string;
       /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
-      /**
        * Skipped Layers
        * @description Number of layers to skip in text encoder
        * @default 0
@@ -1194,6 +1182,11 @@ export type components = {
        * @enum {string}
        */
       type: "clip_skip";
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
     };
     /**
      * ClipSkipInvocationOutput
@@ -6960,11 +6953,14 @@ export type components = {
        * @description Whether a session is being processed
        */
       is_processing: boolean;
-      /**
-       * Is Stop Pending
-       * @description Whether processor is pending stopping
-       */
-      is_stop_pending: boolean;
+    };
+    /**
+     * SessionQueueAndProcessorStatus
+     * @description The overall status of session queue and processor
+     */
+    SessionQueueAndProcessorStatus: {
+      queue: components["schemas"]["SessionQueueStatus"];
+      processor: components["schemas"]["SessionProcessorStatus"];
     };
     /**
      * SessionQueueItem
@@ -7126,6 +7122,21 @@ export type components = {
        * @description The ID of the queue
        */
       queue_id: string;
+      /**
+       * Item Id
+       * @description The current queue item id
+       */
+      item_id?: string;
+      /**
+       * Batch Id
+       * @description The current queue item's batch id
+       */
+      batch_id?: string;
+      /**
+       * Session Id
+       * @description The current queue item's session id
+       */
+      session_id?: string;
       /**
        * Pending
        * @description Number of queue items with status 'pending'
@@ -8150,23 +8161,17 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusionOnnxModelFormat
+     * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
@@ -8179,6 +8184,12 @@ export type components = {
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;
@@ -9707,7 +9718,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["SessionProcessorStatus"];
         };
       };
       /** @description Validation Error */
@@ -9733,7 +9744,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["SessionProcessorStatus"];
         };
       };
       /** @description Validation Error */
@@ -9894,33 +9905,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueStatus"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Get Processor Status
-   * @description Gets the status of the session queue
-   */
-  get_processor_status: {
-    parameters: {
-      path: {
-        /** @description The queue id to perform this operation on */
-        queue_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["SessionProcessorStatus"];
+          "application/json": components["schemas"]["SessionQueueAndProcessorStatus"];
         };
       };
       /** @description Validation Error */

@@ -232,6 +232,9 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
 
 class SessionQueueStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
+    item_id: Optional[str] = Field(description="The current queue item id")
+    batch_id: Optional[str] = Field(description="The current queue item's batch id")
+    session_id: Optional[str] = Field(description="The current queue item's session id")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")

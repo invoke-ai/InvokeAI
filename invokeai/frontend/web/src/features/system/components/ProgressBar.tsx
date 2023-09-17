@@ -5,7 +5,7 @@ import { SystemState } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetProcessorStatusQuery } from 'services/api/endpoints/queue';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { systemSelector } from '../store/systemSelectors';
 
 const progressBarSelector = createSelector(
@@ -24,22 +24,24 @@ const progressBarSelector = createSelector(
 
 const ProgressBar = () => {
   const { t } = useTranslation();
-  const { data: processorStatus } = useGetProcessorStatusQuery();
+  const { data: queueStatus } = useGetQueueStatusQuery();
   const { currentStep, totalSteps, currentStatusHasSteps } =
     useAppSelector(progressBarSelector);
 
   const value = useMemo(() => {
-    if (currentStep && processorStatus?.is_processing) {
+    if (currentStep && Boolean(queueStatus?.queue.in_progress)) {
       return Math.round((currentStep * 100) / totalSteps);
     }
     return 0;
-  }, [currentStep, processorStatus?.is_processing, totalSteps]);
+  }, [currentStep, queueStatus?.queue.in_progress, totalSteps]);
 
   return (
     <Progress
       value={value}
       aria-label={t('accessibility.invokeProgressBar')}
-      isIndeterminate={processorStatus?.is_processing && !currentStatusHasSteps}
+      isIndeterminate={
+        Boolean(queueStatus?.queue.in_progress) && !currentStatusHasSteps
+      }
       h="full"
       w="full"
       borderRadius={2}

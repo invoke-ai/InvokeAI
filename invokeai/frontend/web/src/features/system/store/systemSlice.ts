@@ -19,7 +19,6 @@ import {
   appSocketInvocationError,
   appSocketInvocationRetrievalError,
   appSocketInvocationStarted,
-  appSocketProcessorStatusChanged,
   appSocketSessionRetrievalError,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
@@ -196,12 +195,6 @@ export const systemSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(appSocketProcessorStatusChanged, (state, action) => {
-      const { is_started, is_stop_pending } = action.payload.data;
-      if (!is_started && !is_stop_pending) {
-        state.progressImage = null;
-      }
-    });
     /**
      * Socket Connected
      */

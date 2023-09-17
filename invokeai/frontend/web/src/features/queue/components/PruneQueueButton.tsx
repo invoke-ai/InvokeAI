@@ -7,7 +7,6 @@ import {
   useGetQueueStatusQuery,
   usePruneQueueMutation,
 } from 'services/api/endpoints/queue';
-import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import { listCursorChanged, listPriorityChanged } from '../store/queueSlice';
 import QueueButton from './common/QueueButton';
 
@@ -18,15 +17,18 @@ type Props = {
 const PruneQueueButton = ({ asIconButton }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [pruneQueue] = usePruneQueueMutation({ fixedCacheKey: 'pruneQueue' });
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+  const [pruneQueue, { isLoading }] = usePruneQueueMutation({
+    fixedCacheKey: 'pruneQueue',
+  });
   const { count } = useGetQueueStatusQuery(undefined, {
     selectFromResult: ({ data }) => {
       if (!data) {
         return { count: 0 };
       }
 
-      return { count: data.completed + data.canceled + data.failed };
+      return {
+        count: data.queue.completed + data.queue.canceled + data.queue.failed,
+      };
     },
   });
 
@@ -53,7 +55,8 @@ const PruneQueueButton = ({ asIconButton }: Props) => {
 
   return (
     <QueueButton
-      isDisabled={!count || isQueueMutationInProgress}
+      isDisabled={!count}
+      isLoading={isLoading}
       asIconButton={asIconButton}
       label={t('queue.prune')}
       tooltip={t('queue.pruneTooltip', { item_count: count })}

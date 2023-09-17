@@ -148,17 +148,6 @@ export type QueueItemStatusChangedEvent = {
   status: components['schemas']['SessionQueueItemDTO']['status'];
 };
 
-/**
- * A `queue_status_changed` socket.io event.
- *
- * @example socket.on('queue_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
- */
-export type ProcessorStatusChangedEvent = {
-  is_started: boolean;
-  is_processing: boolean;
-  is_stop_pending: boolean;
-};
-
 export type ClientEmitSubscribeSession = {
   session: string;
 };
@@ -188,7 +177,6 @@ export type ServerToClientEvents = {
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
-  processor_status_changed: (payload: ProcessorStatusChangedEvent) => void;
 };
 
 export type ClientToServerEvents = {
@@ -198,6 +186,4 @@ export type ClientToServerEvents = {
   unsubscribe_session: (payload: ClientEmitUnsubscribeSession) => void;
   subscribe_queue: (payload: ClientEmitSubscribeQueue) => void;
   unsubscribe_queue: (payload: ClientEmitUnsubscribeQueue) => void;
-  subscribe_processor: () => void;
-  unsubscribe_processor: () => void;
 };

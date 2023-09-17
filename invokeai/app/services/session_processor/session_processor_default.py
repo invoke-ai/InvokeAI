@@ -22,6 +22,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self.__invoker: Invoker = invoker
         self.__queue_item: Optional[SessionQueueItem] = None
 
+        self.__resume_event = ThreadEvent()
         self.__stop_event = ThreadEvent()
         self.__poll_now_event = ThreadEvent()
 
@@ -33,7 +34,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
     def stop(self, *args, **kwargs) -> None:
         self.__stop_event.set()
-        self._emit_status_changed()
 
     def _poll_now(self) -> None:
         self.__poll_now_event.set()
@@ -44,12 +44,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
             name="session_processor",
             target=self.__process,
             kwargs=dict(
-                stop_event=self.__stop_event,
-                poll_now_event=self.__poll_now_event,
+                stop_event=self.__stop_event, poll_now_event=self.__poll_now_event, resume_event=self.__resume_event
             ),
         )
         self.__thread.start()
-        self._emit_status_changed()
 
     async def _on_session_event(self, event: FastAPIEvent) -> None:
         event_name = event[1]["event"]
@@ -75,41 +73,36 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._poll_now()
 
     def _is_started(self) -> bool:
-        return self.__thread.is_alive()
+        return self.__resume_event.is_set()
 
     def _is_processing(self) -> bool:
         return self.__queue_item is not None
-
-    def _is_stop_pending(self) -> bool:
-        return self.__stop_event.is_set()
-
-    def _emit_status_changed(self) -> None:
-        self.__invoker.services.events.emit_processor_status_changed(self.get_status())
 
     def get_status(self) -> SessionProcessorStatus:
         return SessionProcessorStatus(
             is_started=self._is_started(),
             is_processing=self._is_processing(),
-            is_stop_pending=self._is_stop_pending(),
         )
 
-    def resume(self) -> None:
-        if self._is_started():
-            return
-        self.__stop_event.clear()
-        self._emit_status_changed()
-        self._start_thread()
+    def resume(self) -> SessionProcessorStatus:
+        if not self.__resume_event.is_set():
+            self.__resume_event.set()
+        return self.get_status()
 
-    def pause(self) -> None:
-        self.__stop_event.set()
-        self._emit_status_changed()
+    def pause(self) -> SessionProcessorStatus:
+        if self.__resume_event.is_set():
+            self.__resume_event.clear()
+        return self.get_status()
 
     def __process(
         self,
         stop_event: ThreadEvent,
         poll_now_event: ThreadEvent,
+        resume_event: ThreadEvent,
     ):
         try:
+            stop_event.clear()
+            resume_event.set()
             self.__threadLimit.acquire()
             queue_item: Optional[SessionQueueItem] = None
             self.__invoker.services.logger
@@ -117,7 +110,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 poll_now_event.clear()
 
                 # do not dequeue if there is already a session running
-                if self.__queue_item is None:
+                if self.__queue_item is None and resume_event.is_set():
                     queue_item = self.__invoker.services.session_queue.dequeue()
 
                     if queue_item is not None:
@@ -140,4 +133,3 @@ class DefaultSessionProcessor(SessionProcessorBase):
             poll_now_event.clear()
             self.__queue_item = None
             self.__threadLimit.release()
-            self._emit_status_changed()

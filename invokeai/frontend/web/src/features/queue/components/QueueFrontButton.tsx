@@ -8,8 +8,8 @@ import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaBoltLightning } from 'react-icons/fa6';
+import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useIsQueueEmpty } from '../hooks/useIsQueueEmpty';
-import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
 
 const QueueFrontButton = () => {
@@ -17,7 +17,9 @@ const QueueFrontButton = () => {
   const dispatch = useAppDispatch();
   const { isReady } = useIsReadyToEnqueue();
   const { t } = useTranslation();
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+  const [_, { isLoading }] = useEnqueueBatchMutation({
+    fixedCacheKey: 'enqueueBatch',
+  });
   const isEmpty = useIsQueueEmpty();
   const handleEnqueue = useCallback(() => {
     dispatch(clampSymmetrySteps());
@@ -28,17 +30,18 @@ const QueueFrontButton = () => {
     ['ctrl+shift+enter', 'meta+shift+enter'],
     handleEnqueue,
     {
-      enabled: () => !isQueueMutationInProgress,
+      enabled: () => !isLoading,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
-    [isQueueMutationInProgress, tabName]
+    [isLoading, tabName]
   );
   return (
     <IAIIconButton
       colorScheme="base"
       aria-label={t('queue.queueFront')}
-      isDisabled={!isReady || isQueueMutationInProgress || isEmpty}
+      isDisabled={!isReady || isEmpty}
+      isLoading={isLoading}
       onClick={handleEnqueue}
       tooltip={<EnqueueButtonTooltip prepend />}
       icon={<FaBoltLightning />}

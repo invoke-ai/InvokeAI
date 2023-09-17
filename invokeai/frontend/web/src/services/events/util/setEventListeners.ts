@@ -16,7 +16,6 @@ import {
   socketInvocationStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
-  socketProcessorStatusChanged,
   socketQueueItemStatusChanged,
   socketSessionRetrievalError,
 } from '../actions';
@@ -41,8 +40,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(socketConnected());
     const queue_id = $queueId.get();
     socket.emit('subscribe_queue', { queue_id });
-
-    socket.emit('subscribe_processor');
   });
 
   socket.on('connect_error', (error) => {
@@ -171,9 +168,5 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       });
     }
     dispatch(socketQueueItemStatusChanged({ data }));
-  });
-
-  socket.on('processor_status_changed', (data) => {
-    dispatch(socketProcessorStatusChanged({ data }));
   });
 };

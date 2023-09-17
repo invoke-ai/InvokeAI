@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import Body, Path, Query
 from fastapi.routing import APIRouter
+from pydantic import BaseModel
 
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -25,10 +26,11 @@ from ..dependencies import ApiDependencies
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
 
-class SessionQueueAndProcessorStatusResult(SessionQueueStatus, SessionProcessorStatus):
+class SessionQueueAndProcessorStatus(BaseModel):
     """The overall status of session queue and processor"""
 
-    pass
+    queue: SessionQueueStatus
+    processor: SessionProcessorStatus
 
 
 @session_queue_router.post(
@@ -87,23 +89,25 @@ async def list_queue_items(
 
 
 @session_queue_router.put(
-    "/{queue_id}/resume",
+    "/{queue_id}/processor/resume",
     operation_id="resume",
+    responses={200: {"model": SessionProcessorStatus}},
 )
 async def resume(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> None:
+) -> SessionProcessorStatus:
     """Resumes session processor"""
     return ApiDependencies.invoker.services.session_processor.resume()
 
 
 @session_queue_router.put(
-    "/{queue_id}/pause",
+    "/{queue_id}/processor/pause",
     operation_id="pause",
+    responses={200: {"model": SessionProcessorStatus}},
 )
 async def Pause(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> None:
+) -> SessionProcessorStatus:
     """Pauses session processor"""
     return ApiDependencies.invoker.services.session_processor.pause()
 
@@ -185,28 +189,16 @@ async def get_next_queue_item(
     "/{queue_id}/status",
     operation_id="get_queue_status",
     responses={
-        200: {"model": SessionQueueStatus},
+        200: {"model": SessionQueueAndProcessorStatus},
     },
 )
 async def get_queue_status(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> SessionQueueStatus:
+) -> SessionQueueAndProcessorStatus:
     """Gets the status of the session queue"""
-    return ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id)
-
-
-@session_queue_router.get(
-    "/{queue_id}/processor/status",
-    operation_id="get_processor_status",
-    responses={
-        200: {"model": SessionProcessorStatus},
-    },
-)
-async def get_processor_status(
-    queue_id: str = Path(description="The queue id to perform this operation on"),
-) -> SessionProcessorStatus:
-    """Gets the status of the session queue"""
-    return ApiDependencies.invoker.services.session_processor.get_status()
+    queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id)
+    processor = ApiDependencies.invoker.services.session_processor.get_status()
+    return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
 
 
 @session_queue_router.get(

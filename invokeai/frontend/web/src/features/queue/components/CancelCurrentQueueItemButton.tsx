@@ -5,9 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 import {
   useCancelQueueItemMutation,
-  useGetCurrentQueueItemQuery,
+  useGetQueueStatusQuery,
 } from 'services/api/endpoints/queue';
-import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import QueueButton from './common/QueueButton';
 
 type Props = {
@@ -17,18 +16,17 @@ type Props = {
 const CancelCurrentQueueItemButton = ({ asIconButton }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { data: currentQueueItem } = useGetCurrentQueueItemQuery();
-  const [cancelQueueItem] = useCancelQueueItemMutation({
+  const { data: queueStatus } = useGetQueueStatusQuery();
+  const [cancelQueueItem, { isLoading }] = useCancelQueueItemMutation({
     fixedCacheKey: 'cancelQueueItem',
   });
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
 
   const handleClick = useCallback(async () => {
-    if (!currentQueueItem) {
+    if (!queueStatus?.queue.item_id) {
       return;
     }
     try {
-      await cancelQueueItem(currentQueueItem.item_id).unwrap();
+      await cancelQueueItem(queueStatus.queue.item_id).unwrap();
       dispatch(
         addToast({
           title: t('queue.cancelSucceeded'),
@@ -43,14 +41,15 @@ const CancelCurrentQueueItemButton = ({ asIconButton }: Props) => {
         })
       );
     }
-  }, [cancelQueueItem, currentQueueItem, dispatch, t]);
+  }, [cancelQueueItem, dispatch, queueStatus?.queue.item_id, t]);
 
   return (
     <QueueButton
+      isDisabled={!queueStatus?.queue.item_id}
+      isLoading={isLoading}
       asIconButton={asIconButton}
       label={t('queue.cancel')}
       tooltip={t('queue.cancelTooltip')}
-      isDisabled={!currentQueueItem || isQueueMutationInProgress}
       icon={<FaTimes />}
       onClick={handleClick}
       colorScheme="error"

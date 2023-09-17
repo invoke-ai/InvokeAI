@@ -8,7 +8,6 @@ import {
   InvocationStartedEvent,
   ModelLoadCompletedEvent,
   ModelLoadStartedEvent,
-  ProcessorStatusChangedEvent,
   QueueItemStatusChangedEvent,
   SessionRetrievalErrorEvent,
 } from 'services/events/types';
@@ -233,19 +232,3 @@ export const socketQueueItemStatusChanged = createAction<{
 export const appSocketQueueItemStatusChanged = createAction<{
   data: QueueItemStatusChangedEvent;
 }>('socket/appSocketQueueItemStatusChanged');
-
-/**
- * Socket.IO Processor Status Changed
- *
- * Do not use. Only for use in middleware.
- */
-export const socketProcessorStatusChanged = createAction<{
-  data: ProcessorStatusChangedEvent;
-}>('socket/socketProcessorStatusChanged');
-
-/**
- * App-level Processor Status Changed
- */
-export const appSocketProcessorStatusChanged = createAction<{
-  data: ProcessorStatusChangedEvent;
-}>('socket/appSocketProcessorStatusChanged');

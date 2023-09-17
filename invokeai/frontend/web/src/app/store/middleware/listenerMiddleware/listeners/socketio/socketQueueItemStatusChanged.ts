@@ -43,7 +43,6 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
           'SessionQueueStatus',
-          'SessionProcessorStatus',
           { type: 'SessionQueueItem', id: item_id },
           { type: 'SessionQueueItemDTO', id: item_id },
           { type: 'BatchStatus', id: batch_id },

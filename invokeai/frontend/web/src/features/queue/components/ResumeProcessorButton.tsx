@@ -4,10 +4,9 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
 import {
-  useGetProcessorStatusQuery,
+  useGetQueueStatusQuery,
   useResumeProcessorMutation,
 } from 'services/api/endpoints/queue';
-import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import QueueButton from './common/QueueButton';
 
 type Props = {
@@ -15,13 +14,12 @@ type Props = {
 };
 
 const ResumeProcessorButton = ({ asIconButton }: Props) => {
-  const { data: processorStatus } = useGetProcessorStatusQuery();
+  const { data: queueStatus } = useGetQueueStatusQuery();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [resumeProcessor] = useResumeProcessorMutation({
+  const [resumeProcessor, { isLoading }] = useResumeProcessorMutation({
     fixedCacheKey: 'resumeProcessor',
   });
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
 
   const handleClick = useCallback(async () => {
     try {
@@ -47,11 +45,8 @@ const ResumeProcessorButton = ({ asIconButton }: Props) => {
       asIconButton={asIconButton}
       label={t('queue.resume')}
       tooltip={t('queue.resumeTooltip')}
-      isDisabled={
-        processorStatus?.is_started ||
-        processorStatus?.is_processing ||
-        isQueueMutationInProgress
-      }
+      isDisabled={queueStatus?.processor.is_started}
+      isLoading={isLoading}
       icon={<FaPlay />}
       onClick={handleClick}
       colorScheme="green"

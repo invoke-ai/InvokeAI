@@ -4,7 +4,6 @@ from typing import Any, Optional
 
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo, ModelType, SubModelType
-from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import EnqueueBatchResult, SessionQueueItem
 from invokeai.app.util.misc import get_timestamp
 
@@ -243,7 +242,3 @@ class EventServiceBase:
             event_name="queue_cleared",
             payload=dict(queue_id=queue_id),
         )
-
-    def emit_processor_status_changed(self, processor_status: SessionProcessorStatus) -> None:
-        """Emitted when the queue is cleared"""
-        self.__emit_processor_event(event_name="processor_status_changed", payload=processor_status.dict())

@@ -787,17 +787,21 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 (queue_id,),
             )
-            result = cast(list[sqlite3.Row], self.__cursor.fetchall())
-            total = sum(row[1] for row in result)
-            counts: dict[str, int] = {row[0]: row[1] for row in result}
+            counts_result = cast(list[sqlite3.Row], self.__cursor.fetchall())
         except Exception:
             self.__conn.rollback()
             raise
         finally:
             self.__lock.release()
 
+        current_item = self.get_current(queue_id=queue_id)
+        total = sum(row[1] for row in counts_result)
+        counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
         return SessionQueueStatus(
             queue_id=queue_id,
+            item_id=current_item.item_id if current_item else None,
+            session_id=current_item.session_id if current_item else None,
+            batch_id=current_item.batch_id if current_item else None,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
             completed=counts.get("completed", 0),

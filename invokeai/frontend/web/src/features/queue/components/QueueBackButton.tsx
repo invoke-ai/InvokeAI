@@ -7,16 +7,18 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
-import EnqueueButtonTooltip from './QueueButtonTooltip';
+import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useIsQueueEmpty } from '../hooks/useIsQueueEmpty';
+import EnqueueButtonTooltip from './QueueButtonTooltip';
 
 const QueueBackButton = () => {
   const tabName = useAppSelector(activeTabNameSelector);
   const { t } = useTranslation();
   const { isReady } = useIsReadyToEnqueue();
   const dispatch = useAppDispatch();
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+  const [_, { isLoading }] = useEnqueueBatchMutation({
+    fixedCacheKey: 'enqueueBatch',
+  });
   const isEmpty = useIsQueueEmpty();
 
   const handleEnqueue = useCallback(() => {
@@ -28,15 +30,16 @@ const QueueBackButton = () => {
     ['ctrl+enter', 'meta+enter'],
     handleEnqueue,
     {
-      enabled: () => !isQueueMutationInProgress,
+      enabled: () => !isLoading,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
-    [isQueueMutationInProgress, tabName]
+    [tabName, isLoading]
   );
   return (
     <IAIButton
-      isDisabled={!isReady || isQueueMutationInProgress}
+      isDisabled={!isReady}
+      isLoading={isLoading}
       colorScheme="accent"
       onClick={handleEnqueue}
       tooltip={<EnqueueButtonTooltip />}

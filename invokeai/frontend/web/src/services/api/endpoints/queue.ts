@@ -4,11 +4,11 @@ import {
   ThunkDispatch,
   createEntityAdapter,
 } from '@reduxjs/toolkit';
+import { $queueId } from 'features/queue/store/nanoStores';
+import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
 import { ApiTagDescription, api } from '..';
 import { components, paths } from '../schema';
-import { $queueId } from 'features/queue/store/nanoStores';
-import { listParamsReset } from 'features/queue/store/queueSlice';
 
 const getListQueueItemsUrl = (
   queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']
@@ -70,7 +70,6 @@ export const queueApi = api.injectEndpoints({
       }),
       invalidatesTags: [
         'SessionQueueStatus',
-        'SessionProcessorStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
       ],
@@ -95,7 +94,6 @@ export const queueApi = api.injectEndpoints({
       }),
       invalidatesTags: [
         'SessionQueueStatus',
-        'SessionProcessorStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
       ],
@@ -109,19 +107,25 @@ export const queueApi = api.injectEndpoints({
         }
       },
     }),
-    resumeProcessor: build.mutation<void, void>({
+    resumeProcessor: build.mutation<
+      paths['/api/v1/queue/{queue_id}/processor/resume']['put']['responses']['200']['content']['application/json'],
+      void
+    >({
       query: () => ({
-        url: `queue/${$queueId.get()}/resume`,
+        url: `queue/${$queueId.get()}/processor/resume`,
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionProcessorStatus', 'CurrentSessionQueueItem'],
+      invalidatesTags: ['CurrentSessionQueueItem', 'SessionQueueStatus'],
     }),
-    pauseProcessor: build.mutation<void, void>({
+    pauseProcessor: build.mutation<
+      paths['/api/v1/queue/{queue_id}/processor/pause']['put']['responses']['200']['content']['application/json'],
+      void
+    >({
       query: () => ({
-        url: `queue/${$queueId.get()}/pause`,
+        url: `queue/${$queueId.get()}/processor/pause`,
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionProcessorStatus', 'CurrentSessionQueueItem'],
+      invalidatesTags: ['CurrentSessionQueueItem', 'SessionQueueStatus'],
     }),
     pruneQueue: build.mutation<
       paths['/api/v1/queue/{queue_id}/prune']['put']['responses']['200']['content']['application/json'],
@@ -133,7 +137,6 @@ export const queueApi = api.injectEndpoints({
       }),
       invalidatesTags: [
         'SessionQueueStatus',
-        'SessionProcessorStatus',
         'BatchStatus',
         'SessionQueueItem',
         'SessionQueueItemDTO',
@@ -216,16 +219,6 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: ['SessionQueueStatus'],
-    }),
-    getProcessorStatus: build.query<
-      paths['/api/v1/queue/{queue_id}/processor/status']['get']['responses']['200']['content']['application/json'],
-      void
-    >({
-      query: () => ({
-        url: `queue/${$queueId.get()}/processor/status`,
-        method: 'GET',
-      }),
-      providesTags: ['SessionProcessorStatus'],
     }),
     getBatchStatus: build.query<
       paths['/api/v1/queue/{queue_id}/b/{batch_id}/status']['get']['responses']['200']['content']['application/json'],
@@ -368,7 +361,6 @@ export const {
   useGetNextQueueItemQuery,
   useListQueueItemsQuery,
   useCancelQueueItemMutation,
-  useGetProcessorStatusQuery,
   useGetBatchStatusQuery,
 } = queueApi;
 
