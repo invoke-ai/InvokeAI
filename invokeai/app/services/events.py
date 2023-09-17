@@ -7,6 +7,8 @@ from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.download import DownloadJobBase
 
+from invokeai.backend.util.logging import InvokeAILogger
+
 
 class EventServiceBase:
     """Basic event bus, to have an empty stand-in when not needed."""
@@ -180,6 +182,9 @@ class EventServiceBase:
 
     def emit_model_event(self, job: DownloadJobBase):
         """Emit event when the status of a download/install job changes."""
+        logger = InvokeAILogger.getLogger()
+        progress = 100 * (job.bytes / job.total_bytes) if job.total_bytes > 0 else 0
+        logger.info(f"Dispatch model_event for job {job.id}, status={job.status.value}, progress={progress:5.2f}%")
         self.dispatch(  # use dispatch() directly here because we are not a session event.
             event_name="model_event", payload=dict(job=job)
         )
