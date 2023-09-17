@@ -9,7 +9,7 @@ from typing import List, Optional, Set, Union
 from ..config import BaseModelType, ModelConfigBase, ModelType
 
 # should match the InvokeAI version when this is first released.
-CONFIG_FILE_VERSION = "3.1.1"
+CONFIG_FILE_VERSION = "3.2"
 
 
 class DuplicateModelException(Exception):
