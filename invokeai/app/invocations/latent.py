@@ -34,7 +34,6 @@ from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager import BaseModelType, ModelType, SilenceWarnings
 
 from ...backend.model_manager.lora import ModelPatcher
-from ...backend.model_manager.models import BaseModelType
 from ...backend.model_manager.seamless import set_seamless
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (

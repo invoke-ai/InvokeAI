@@ -1,16 +1,13 @@
 import json
 import os
 from enum import Enum
-from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from omegaconf import OmegaConf
-from pydantic import Field
 
-from ..config import CheckpointConfig, MainCheckpointConfig, MainDiffusersConfig
+from ..config import MainDiffusersConfig
 from .base import (
     BaseModelType,
-    DiffusersModel,
     InvalidModelException,
     ModelConfigBase,
     ModelType,

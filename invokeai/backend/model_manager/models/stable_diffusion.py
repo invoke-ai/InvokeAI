@@ -2,7 +2,7 @@ import json
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 
 from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
 from omegaconf import OmegaConf

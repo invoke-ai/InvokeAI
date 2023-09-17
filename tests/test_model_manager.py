@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend import BaseModelType, ModelConfigStore, ModelType, SubModelType
+from invokeai.backend import SubModelType
 from invokeai.backend.model_manager import ModelLoad
 
 BASIC_MODEL_NAME = "sdxl-base-1-0"

@@ -8,7 +8,6 @@ its base type, model type, format and variant.
 
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 

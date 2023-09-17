@@ -18,7 +18,6 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
 from . import ModelConfigBase, ModelConfigStore, ModelInstall, ModelType
-from .probe import ModelProbe, ModelProbeInfo
 
 
 class MergeInterpolationMethod(str, Enum):

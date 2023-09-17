@@ -12,7 +12,6 @@ These will mostly be empty after conversion, but will be populated
 when new models are downloaded from HuggingFace or Civitae.
 """
 import argparse
-import sys
 from pathlib import Path
 
 from omegaconf import OmegaConf

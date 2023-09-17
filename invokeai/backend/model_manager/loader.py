@@ -226,7 +226,6 @@ class ModelLoad(ModelLoadBase):
         model_path, is_submodel_override = self._get_model_path(model_config, submodel_type)
 
         if is_submodel_override:
-            model_type = submodel_type
             submodel_type = None
 
         model_class = self._get_implementation(model_config.base_model, model_config.model_type)
