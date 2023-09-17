@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import math
 from contextlib import nullcontext
 from dataclasses import dataclass
-import math
 from typing import Any, Callable, List, Optional, Union
 
 import einops
