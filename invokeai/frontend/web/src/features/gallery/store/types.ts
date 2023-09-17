@@ -11,7 +11,7 @@ export const INITIAL_IMAGE_LIMIT = 100;
 export const IMAGE_LIMIT = 20;
 
 export type GalleryView = 'images' | 'assets';
-export type BoardId = 'none' | (string & Record<never, never>);
+export type BoardId = 'none' | string;
 
 export type GalleryState = {
   selection: ImageDTO[];
@@ -22,4 +22,5 @@ export type GalleryState = {
   selectedBoardId: BoardId;
   galleryView: GalleryView;
   boardSearchText: string;
+  lockedBoards: BoardId[];
 };

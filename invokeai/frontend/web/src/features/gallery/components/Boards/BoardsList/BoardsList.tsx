@@ -77,15 +77,18 @@ const BoardsList = (props: Props) => {
                 <NoBoardBoard isSelected={selectedBoardId === 'none'} />
               </GridItem>
               {filteredBoards &&
-                filteredBoards.map((board) => (
-                  <GridItem key={board.board_id} sx={{ p: 1.5 }}>
-                    <GalleryBoard
-                      board={board}
-                      isSelected={selectedBoardId === board.board_id}
-                      setBoardToDelete={setBoardToDelete}
-                    />
-                  </GridItem>
-                ))}
+                filteredBoards.map((board) => {
+                  return (
+                    <GridItem key={board.board_id}>
+                      <GalleryBoard
+                        board={board}
+                        isSelected={selectedBoardId === board.board_id}
+                        setBoardToDelete={setBoardToDelete}
+                        isLocked={board.isLocked}
+                      />
+                    </GridItem>
+                  );
+                })}
             </Grid>
           </OverlayScrollbarsComponent>
         </Flex>

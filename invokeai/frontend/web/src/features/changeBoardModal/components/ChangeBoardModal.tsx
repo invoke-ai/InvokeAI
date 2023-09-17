@@ -15,7 +15,10 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
+import {
+  useListAllBoardsQuery,
+  useToggleBoardLockMutation,
+} from 'services/api/endpoints/boards';
 import {
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
@@ -27,7 +30,6 @@ const selector = createSelector(
   [stateSelector],
   ({ changeBoardModal }) => {
     const { isModalOpen, imagesToChange } = changeBoardModal;
-
     return {
       isModalOpen,
       imagesToChange,
@@ -39,6 +41,7 @@ const selector = createSelector(
 const ChangeBoardModal = () => {
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
+  const [isLocked, setIsLocked] = useState(false); // New State
   const { data: boards, isFetching } = useListAllBoardsQuery();
   const { imagesToChange, isModalOpen } = useAppSelector(selector);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
@@ -55,7 +58,6 @@ const ChangeBoardModal = () => {
         value: board.board_id,
       })
     );
-
     return data;
   }, [boards, t]);
 
@@ -68,7 +70,6 @@ const ChangeBoardModal = () => {
     if (!imagesToChange.length || !selectedBoard) {
       return;
     }
-
     if (selectedBoard === 'none') {
       removeImagesFromBoard({ imageDTOs: imagesToChange });
     } else {
@@ -87,6 +88,20 @@ const ChangeBoardModal = () => {
     selectedBoard,
   ]);
 
+  const [toggleBoardLock] = useToggleBoardLockMutation();
+
+  const handleLockToggle = async () => {
+    if (!selectedBoard) {
+      return;
+    }
+    try {
+      await toggleBoardLock({ board_id: selectedBoard, isLocked: !isLocked });
+      setIsLocked((prevState) => !prevState);
+    } catch (error) {
+      console.error('Failed to toggle lock status:', error);
+    }
+  };
+
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   return (
@@ -101,7 +116,6 @@ const ChangeBoardModal = () => {
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
             {t('boards.changeBoard')}
           </AlertDialogHeader>
-
           <AlertDialogBody>
             <Flex sx={{ flexDir: 'column', gap: 4 }}>
               <Text>
@@ -117,6 +131,9 @@ const ChangeBoardModal = () => {
                 value={selectedBoard}
                 data={data}
               />
+              <IAIButton onClick={handleLockToggle}>
+                {isLocked ? t('boards.unlock') : t('boards.lock')}
+              </IAIButton>
             </Flex>
           </AlertDialogBody>
           <AlertDialogFooter>

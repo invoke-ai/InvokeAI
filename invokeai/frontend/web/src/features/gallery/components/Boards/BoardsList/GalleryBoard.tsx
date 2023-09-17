@@ -1,3 +1,4 @@
+import { HTMLAttributes } from 'react';
 import {
   Box,
   Editable,
@@ -21,7 +22,7 @@ import {
   boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaUser } from 'react-icons/fa';
+import { FaUser, FaLock } from 'react-icons/fa';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
@@ -33,17 +34,20 @@ import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
 import { AddToBoardDropData } from 'features/dnd/types';
 
-interface GalleryBoardProps {
+interface GalleryBoardProps extends HTMLAttributes<HTMLDivElement> {
   board: BoardDTO;
   isSelected: boolean;
   setBoardToDelete: (board?: BoardDTO) => void;
+  isLocked: boolean;
 }
 
 const GalleryBoard = ({
   board,
   isSelected,
   setBoardToDelete,
+  isLocked,
 }: GalleryBoardProps) => {
+  console.log(`isLocked for board: ${board.board_id} is ${isLocked}`);
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
@@ -65,7 +69,6 @@ const GalleryBoard = ({
       ),
     [board.board_id]
   );
-
   const { isSelectedForAutoAdd, autoAssignBoardOnClick, isProcessing } =
     useAppSelector(selector);
   const [isHovered, setIsHovered] = useState(false);
@@ -94,12 +97,19 @@ const GalleryBoard = ({
   const { board_name, board_id } = board;
   const [localBoardName, setLocalBoardName] = useState(board_name);
 
-  const handleSelectBoard = useCallback(() => {
+  const handleClick = () => {
+    console.log(`Clicked on board: ${board.board_id}`);
+    if (isLocked) {
+      // If the board is locked, do nothing on click
+      return;
+    }
+
+    // Handle the click event for an unlocked board
     dispatch(boardIdSelected(board_id));
     if (autoAssignBoardOnClick && !isProcessing) {
       dispatch(autoAddBoardIdChanged(board_id));
     }
-  }, [board_id, autoAssignBoardOnClick, isProcessing, dispatch]);
+  };
 
   const [updateBoard, { isLoading: isUpdateBoardLoading }] =
     useUpdateBoardMutation();
@@ -121,7 +131,7 @@ const GalleryBoard = ({
         return;
       }
 
-      // don't updated the board name if it hasn't changed
+      // don't update the board name if it hasn't changed
       if (newBoardName === board_name) {
         return;
       }
@@ -147,7 +157,15 @@ const GalleryBoard = ({
   }, []);
 
   return (
-    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+    <Box
+      sx={{
+        w: 'full',
+        h: 'full',
+        touchAction: 'none',
+        userSelect: 'none',
+        cursor: isLocked ? 'not-allowed' : 'pointer',
+      }}
+    >
       <Flex
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
@@ -164,12 +182,13 @@ const GalleryBoard = ({
           board={board}
           board_id={board_id}
           setBoardToDelete={setBoardToDelete}
+          locked={isLocked}
         >
           {(ref) => (
             <Tooltip label={tooltip} openDelay={1000} hasArrow>
               <Flex
                 ref={ref}
-                onClick={handleSelectBoard}
+                onClick={handleClick}
                 sx={{
                   w: 'full',
                   h: 'full',
@@ -177,13 +196,27 @@ const GalleryBoard = ({
                   justifyContent: 'center',
                   alignItems: 'center',
                   borderRadius: 'base',
-                  cursor: 'pointer',
                   bg: 'base.200',
                   _dark: {
                     bg: 'base.800',
                   },
+                  overflow: 'hidden',
                 }}
               >
+                {isLocked && (
+                  <Icon
+                    as={FaLock}
+                    boxSize={12}
+                    sx={{
+                      position: 'absolute',
+                      top: '40%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      color: 'white',
+                      zIndex: 2,
+                    }}
+                  />
+                )}
                 {coverImage?.thumbnail_url ? (
                   <Image
                     src={coverImage?.thumbnail_url}
@@ -195,6 +228,7 @@ const GalleryBoard = ({
                       maxH: 'full',
                       borderRadius: 'base',
                       borderBottomRadius: 'lg',
+                      filter: isLocked ? 'blur(8px)' : 'none',
                     }}
                   />
                 ) : (
@@ -220,18 +254,6 @@ const GalleryBoard = ({
                     />
                   </Flex>
                 )}
-                {/* <Flex
-                  sx={{
-                    position: 'absolute',
-                    insetInlineEnd: 0,
-                    top: 0,
-                    p: 1,
-                  }}
-                >
-                  <Badge variant="solid" sx={BASE_BADGE_STYLES}>
-                    {totalImages}/{totalAssets}
-                  </Badge>
-                </Flex> */}
                 {isSelectedForAutoAdd && <AutoAddIcon />}
                 <SelectionOverlay
                   isSelected={isSelected}

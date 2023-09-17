@@ -2,6 +2,7 @@ import { MenuItem } from '@chakra-ui/react';
 import { memo, useCallback } from 'react';
 import { FaTrash } from 'react-icons/fa';
 import { BoardDTO } from 'services/api/types';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   board: BoardDTO;
@@ -15,6 +16,7 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
     }
     setBoardToDelete(board);
   }, [board, setBoardToDelete]);
+  const { t } = useTranslation();
 
   return (
     <>
@@ -34,7 +36,7 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
         icon={<FaTrash />}
         onClick={handleDelete}
       >
-        Delete Board
+        {t('boards.deleteBoard')}
       </MenuItem>
     </>
   );

@@ -14,6 +14,7 @@ export const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
+  lockedBoards: [],
 };
 
 export const gallerySlice = createSlice({
@@ -51,6 +52,14 @@ export const gallerySlice = createSlice({
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
+    },
+    lockBoard: (state, action: PayloadAction<BoardId>) => {
+      state.lockedBoards.push(action.payload);
+    },
+    unlockBoard: (state, action: PayloadAction<BoardId>) => {
+      state.lockedBoards = state.lockedBoards.filter(
+        (boardId) => boardId !== action.payload
+      );
     },
   },
   extraReducers: (builder) => {
@@ -90,6 +99,8 @@ export const {
   galleryViewChanged,
   selectionChanged,
   boardSearchTextChanged,
+  lockBoard,
+  unlockBoard,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

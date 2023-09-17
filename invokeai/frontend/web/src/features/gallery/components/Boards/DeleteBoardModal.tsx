@@ -136,7 +136,7 @@ const DeleteBoardModal = (props: Props) => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>Deleted boards cannot be restored.</Text>
+              <Text>{t('boards.deletedBoardsCannotRestored')}</Text>
               <Text>
                 {canRestoreDeletedImagesFromBin
                   ? t('gallery.deleteImageBin')
@@ -149,21 +149,21 @@ const DeleteBoardModal = (props: Props) => {
               sx={{ justifyContent: 'space-between', width: 'full', gap: 2 }}
             >
               <IAIButton ref={cancelRef} onClick={handleClose}>
-                Cancel
+                {t('boards.cancel')}
               </IAIButton>
               <IAIButton
                 colorScheme="warning"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardOnly}
               >
-                Delete Board Only
+                {t('boards.deleteBoardOnly')}
               </IAIButton>
               <IAIButton
                 colorScheme="error"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardAndImages}
               >
-                Delete Board and Images
+                {t('boards.deleteBoardImages')}
               </IAIButton>
             </Flex>
           </AlertDialogFooter>

@@ -6,10 +6,14 @@ import {
   IAIContextMenu,
   IAIContextMenuProps,
 } from 'common/components/IAIContextMenu';
-import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
+import {
+  autoAddBoardIdChanged,
+  lockBoard,
+  unlockBoard,
+} from 'features/gallery/store/gallerySlice';
 import { BoardId } from 'features/gallery/store/types';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaLock, FaUnlock } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
@@ -23,15 +27,33 @@ type Props = {
   board_id: BoardId;
   children: IAIContextMenuProps<HTMLDivElement>['children'];
   setBoardToDelete?: (board?: BoardDTO) => void;
+  locked: boolean;
 };
 
 const BoardContextMenu = ({
   board,
   board_id,
   setBoardToDelete,
+  locked,
   children,
 }: Props) => {
   const dispatch = useAppDispatch();
+
+  const isBoardLocked = useAppSelector((state) =>
+    state.gallery.lockedBoards.includes(board_id)
+  );
+
+  const handleLockBoard = useCallback(() => {
+    if (locked) {
+      dispatch(unlockBoard(board_id));
+    } else {
+      dispatch(lockBoard(board_id));
+    }
+  }, [board_id, dispatch, locked]);
+
+  const handleUnlockBoard = useCallback(() => {
+    dispatch(unlockBoard(board_id));
+  }, [board_id, dispatch]);
 
   const selector = useMemo(
     () =>
@@ -82,6 +104,14 @@ const BoardContextMenu = ({
               onClick={handleSetAutoAdd}
             >
               {t('boards.menuItemAutoAdd')}
+            </MenuItem>
+            <MenuItem
+              icon={isBoardLocked ? <FaUnlock /> : <FaLock />}
+              onClick={isBoardLocked ? handleUnlockBoard : handleLockBoard}
+            >
+              {isBoardLocked
+                ? t('boards.menuItemUnlock')
+                : t('boards.menuItemLock')}
             </MenuItem>
             {!board && <NoBoardContextMenuItems />}
             {board && (

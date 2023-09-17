@@ -13,6 +13,7 @@ from invokeai.app.services.models.board_record import BoardRecord, deserialize_b
 class BoardChanges(BaseModel, extra=Extra.forbid):
     board_name: Optional[str] = Field(description="The board's new name.")
     cover_image_name: Optional[str] = Field(description="The name of the board's new cover image.")
+    isLocked: Optional[bool] = Field(description="The board's lock status.")
 
 
 class BoardRecordNotFoundException(Exception):
@@ -125,6 +126,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Soft delete, currently unused
                 deleted_at DATETIME,
+                isLocked BOOLEAN NOT NULL DEFAULT 0,
                 FOREIGN KEY (cover_image_name) REFERENCES images (image_name) ON DELETE SET NULL
             );
             """
@@ -172,16 +174,17 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def save(
         self,
         board_name: str,
+        isLocked: bool = False,
     ) -> BoardRecord:
         try:
             board_id = str(uuid.uuid4())
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                INSERT OR IGNORE INTO boards (board_id, board_name)
-                VALUES (?, ?);
+                INSERT OR IGNORE INTO boards (board_id, board_name, isLocked)
+                VALUES (?, ?, ?);
                 """,
-                (board_id, board_name),
+                (board_id, board_name, int(isLocked)),
             )
             self._conn.commit()
         except sqlite3.Error as e:
@@ -244,6 +247,16 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                     WHERE board_id = ?;
                     """,
                     (changes.cover_image_name, board_id),
+                )
+
+            if hasattr(changes, "isLocked"):
+                self._cursor.execute(
+                    """--sql
+                    UPDATE boards
+                    SET isLocked = ?
+                    WHERE board_id = ?;
+                    """,
+                    (int(changes.isLocked), board_id),
                 )
 
             self._conn.commit()
