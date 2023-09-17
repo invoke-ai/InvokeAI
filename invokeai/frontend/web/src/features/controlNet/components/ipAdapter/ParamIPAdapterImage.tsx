@@ -3,7 +3,7 @@ import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
-import IAIIconButton from 'common/components/IAIIconButton';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { ipAdapterImageChanged } from 'features/controlNet/store/controlNetSlice';
 import {
@@ -14,6 +14,7 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { PostUploadAction } from 'services/api/types';
 
 const ParamIPAdapterImage = () => {
   const ipAdapterInfo = useAppSelector(
@@ -49,6 +50,13 @@ const ParamIPAdapterImage = () => {
     []
   );
 
+  const postUploadAction = useMemo<PostUploadAction>(
+    () => ({
+      type: 'SET_IP_ADAPTER_IMAGE',
+    }),
+    []
+  );
+
   return (
     <Flex
       sx={{
@@ -62,7 +70,8 @@ const ParamIPAdapterImage = () => {
         imageDTO={imageDTO}
         droppableData={droppableData}
         draggableData={draggableData}
-        isUploadDisabled={true}
+        postUploadAction={postUploadAction}
+        isUploadDisabled={!isIPAdapterEnabled}
         isDropDisabled={!isIPAdapterEnabled}
         dropLabel={t('toast.setIPAdapterImage')}
         noContentFallback={
@@ -72,21 +81,11 @@ const ParamIPAdapterImage = () => {
         }
       />
 
-      {ipAdapterInfo.adapterImage && (
-        <IAIIconButton
-          tooltip={t('controlnet.resetIPAdapterImage')}
-          aria-label={t('controlnet.resetIPAdapterImage')}
-          icon={<FaUndo />}
-          onClick={() => dispatch(ipAdapterImageChanged(null))}
-          isDisabled={!imageDTO}
-          size="sm"
-          sx={{
-            position: 'absolute',
-            top: 3,
-            right: 3,
-          }}
-        />
-      )}
+      <IAIDndImageIcon
+        onClick={() => dispatch(ipAdapterImageChanged(null))}
+        icon={ipAdapterInfo.adapterImage ? <FaUndo /> : undefined}
+        tooltip={t('controlnet.resetIPAdapterImage')}
+      />
     </Flex>
   );
 };
