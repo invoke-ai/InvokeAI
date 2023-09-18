@@ -10,6 +10,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -53,14 +54,10 @@ export const buildCanvasTextToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const {
-    scaledBoundingBoxDimensions,
-    boundingBoxScaleMethod,
-    shouldAutoSave,
-  } = state.canvas;
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -89,7 +86,7 @@ export const buildCanvasTextToImageGraph = (
       ? {
           type: 't2l_onnx',
           id: DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -97,7 +94,7 @@ export const buildCanvasTextToImageGraph = (
       : {
           type: 'denoise_latents',
           id: DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -122,31 +119,31 @@ export const buildCanvasTextToImageGraph = (
       [modelLoaderNodeId]: {
         type: modelLoaderNodeType,
         id: modelLoaderNodeId,
-        is_intermediate: true,
+        is_intermediate,
         model,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
-        is_intermediate: true,
+        is_intermediate,
         skipped_layers: clipSkip,
       },
       [POSITIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: negativePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-        is_intermediate: true,
+        is_intermediate,
         width: !isUsingScaledDimensions
           ? width
           : scaledBoundingBoxDimensions.width,
@@ -239,14 +236,14 @@ export const buildCanvasTextToImageGraph = (
     graph.nodes[LATENTS_TO_IMAGE] = {
       id: LATENTS_TO_IMAGE,
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
-      is_intermediate: true,
+      is_intermediate,
       fp32,
     };
 
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       width: width,
       height: height,
     };
@@ -277,7 +274,7 @@ export const buildCanvasTextToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       fp32,
     };
 
@@ -355,6 +352,8 @@ export const buildCanvasTextToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

@@ -23,6 +23,7 @@ import {
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { addSaveImageNode } from './addSaveImageNode';
 
 export const buildLinearSDXLTextToImageGraph = (
   state: RootState
@@ -56,13 +57,13 @@ export const buildLinearSDXLTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
-
   if (!model) {
     log.error('No model found in state');
     throw new Error('No model found in state');
   }
 
   const fp32 = vaePrecision === 'fp32';
+  const is_intermediate = true;
 
   // Construct Style Prompt
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
@@ -88,18 +89,21 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_model_loader',
         id: modelLoaderNodeId,
         model,
+        is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
         style: craftedPositiveStylePrompt,
+        is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
         style: craftedNegativeStylePrompt,
+        is_intermediate,
       },
       [NOISE]: {
         type: 'noise',
@@ -107,6 +111,7 @@ export const buildLinearSDXLTextToImageGraph = (
         width,
         height,
         use_cpu,
+        is_intermediate,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -116,11 +121,13 @@ export const buildLinearSDXLTextToImageGraph = (
         steps,
         denoising_start: 0,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        is_intermediate,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
+        is_intermediate,
       },
     },
     edges: [
@@ -290,6 +297,8 @@ export const buildLinearSDXLTextToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

@@ -1,6 +1,9 @@
+import logging
+
 import pytest
 
 from invokeai.app.services.graph import Graph, GraphExecutionState, LibraryGraph
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_queue import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats import InvocationStatsService
@@ -39,7 +42,7 @@ def mock_services() -> InvocationServices:
     return InvocationServices(
         model_manager=None,  # type: ignore
         events=TestEventService(),
-        logger=None,  # type: ignore
+        logger=logging,  # type: ignore
         images=None,  # type: ignore
         latents=None,  # type: ignore
         boards=None,  # type: ignore
@@ -50,6 +53,7 @@ def mock_services() -> InvocationServices:
         processor=DefaultInvocationProcessor(),
         performance_statistics=InvocationStatsService(graph_execution_manager),
         configuration=None,  # type: ignore
+        invocation_cache=MemoryInvocationCache(),
     )
 
 

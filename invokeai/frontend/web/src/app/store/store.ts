@@ -31,6 +31,7 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
+import { $store } from './nanostores/store';
 
 const allReducers = {
   canvas: canvasReducer,
@@ -121,3 +122,4 @@ export type RootState = ReturnType<typeof store.getState>;
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
 export type AppDispatch = typeof store.dispatch;
 export const stateSelector = (state: RootState) => state;
+$store.set(store);

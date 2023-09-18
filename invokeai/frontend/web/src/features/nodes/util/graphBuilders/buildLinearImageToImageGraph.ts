@@ -27,6 +27,7 @@ import {
   RESIZE,
   SEAMLESS,
 } from './constants';
+import { addSaveImageNode } from './addSaveImageNode';
 
 /**
  * Builds the Image to Image tab graph.
@@ -85,6 +86,7 @@ export const buildLinearImageToImageGraph = (
   }
 
   const fp32 = vaePrecision === 'fp32';
+  const is_intermediate = true;
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
@@ -100,31 +102,37 @@ export const buildLinearImageToImageGraph = (
         type: 'main_model_loader',
         id: modelLoaderNodeId,
         model,
+        is_intermediate,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
         skipped_layers: clipSkip,
+        is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
+        is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'compel',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
+        is_intermediate,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         use_cpu,
+        is_intermediate,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
+        is_intermediate,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -134,6 +142,7 @@ export const buildLinearImageToImageGraph = (
         steps,
         denoising_start: 1 - strength,
         denoising_end: 1,
+        is_intermediate,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -143,6 +152,7 @@ export const buildLinearImageToImageGraph = (
         //   image_name: initialImage.image_name,
         // },
         fp32,
+        is_intermediate,
       },
     },
     edges: [
@@ -374,6 +384,8 @@ export const buildLinearImageToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

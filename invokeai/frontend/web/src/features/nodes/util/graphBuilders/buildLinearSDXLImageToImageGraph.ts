@@ -29,6 +29,7 @@ import {
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { addSaveImageNode } from './addSaveImageNode';
 
 /**
  * Builds the Image to Image tab graph.
@@ -85,6 +86,7 @@ export const buildLinearSDXLImageToImageGraph = (
   }
 
   const fp32 = vaePrecision === 'fp32';
+  const is_intermediate = true;
 
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
@@ -105,28 +107,33 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_model_loader',
         id: modelLoaderNodeId,
         model,
+        is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
         style: craftedPositiveStylePrompt,
+        is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
         style: craftedNegativeStylePrompt,
+        is_intermediate,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         use_cpu,
+        is_intermediate,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
+        is_intermediate,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -138,6 +145,7 @@ export const buildLinearSDXLImageToImageGraph = (
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        is_intermediate,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -147,6 +155,7 @@ export const buildLinearSDXLImageToImageGraph = (
         //   image_name: initialImage.image_name,
         // },
         fp32,
+        is_intermediate,
       },
     },
     edges: [
@@ -397,6 +406,8 @@ export const buildLinearSDXLImageToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

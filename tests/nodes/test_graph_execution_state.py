@@ -1,4 +1,8 @@
+import logging
+
 import pytest
+
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 
 # This import must happen before other invoke imports or test in other files(!!) break
 from .test_nodes import (  # isort: split
@@ -42,7 +46,7 @@ def mock_services() -> InvocationServices:
     return InvocationServices(
         model_manager=None,  # type: ignore
         events=TestEventService(),
-        logger=None,  # type: ignore
+        logger=logging,  # type: ignore
         images=None,  # type: ignore
         latents=None,  # type: ignore
         boards=None,  # type: ignore
@@ -53,6 +57,7 @@ def mock_services() -> InvocationServices:
         performance_statistics=InvocationStatsService(graph_execution_manager),
         processor=DefaultInvocationProcessor(),
         configuration=None,  # type: ignore
+        invocation_cache=MemoryInvocationCache(),  # type: ignore
     )
 
 

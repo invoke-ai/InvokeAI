@@ -9,6 +9,7 @@ from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
@@ -126,6 +127,7 @@ class ApiDependencies:
             configuration=config,
             performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
+            invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),
         )
 
         create_system_graphs(services.graph_library)
