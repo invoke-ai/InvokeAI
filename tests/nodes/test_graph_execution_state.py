@@ -59,8 +59,8 @@ def mock_services() -> InvocationServices:
         performance_statistics=InvocationStatsService(graph_execution_manager),
         processor=DefaultInvocationProcessor(),
         configuration=None,  # type: ignore
-        session_execution=None,  # type: ignore
         session_queue=None,  # type: ignore
+        session_processor=None,  # type: ignore
     )
 
 

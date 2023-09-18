@@ -65,7 +65,7 @@ def test_populate_graph_with_subgraph():
 
 def test_create_sessions_from_batch_with_runs(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    t = create_session_nfv_tuples(batch=b, maximum=1000)
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 2 list[BatchDatum] * length 2 * 2 runs = 8
     assert len(t) == 8
 
@@ -113,28 +113,28 @@ def test_create_sessions_from_batch_with_runs(batch_data_collection, batch_graph
 
 def test_create_sessions_from_batch_without_runs(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection)
-    t = create_session_nfv_tuples(batch=b, maximum=1000)
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 2 list[BatchDatum] * length 2 * 1 runs = 8
     assert len(t) == 4
 
 
 def test_create_sessions_from_batch_without_batch(batch_graph):
     b = Batch(graph=batch_graph, runs=2)
-    t = create_session_nfv_tuples(batch=b, maximum=1000)
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 2 runs
     assert len(t) == 2
 
 
 def test_create_sessions_from_batch_without_batch_or_runs(batch_graph):
     b = Batch(graph=batch_graph)
-    t = create_session_nfv_tuples(batch=b, maximum=1000)
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 1 run
     assert len(t) == 1
 
 
 def test_create_sessions_from_batch_with_runs_and_max(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    t = create_session_nfv_tuples(batch=b, maximum=5)
+    t = list(create_session_nfv_tuples(batch=b, maximum=5))
     # 2 list[BatchDatum] * length 2 * 2 runs = 8, but max is 5
     assert len(t) == 5
 
@@ -147,7 +147,7 @@ def test_calc_session_count(batch_data_collection, batch_graph):
 
 def test_prepare_values_to_insert(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    values = prepare_values_to_insert(batch=b, priority=0, max_new_queue_items=1000)
+    values = prepare_values_to_insert(queue_id="default", batch=b, priority=0, max_new_queue_items=1000, order_id=0)
     assert len(values) == 8
 
     # graph should be serialized
@@ -167,8 +167,8 @@ def test_prepare_values_to_insert(batch_data_collection, batch_graph):
     assert len(sids) == len(set(sids))
 
     # should have 3 node field values
-    assert type(values[0].node_field_values) is str
-    assert len(parse_raw_as(list[NodeFieldValue], values[0].node_field_values)) == 3
+    assert type(values[0].field_values) is str
+    assert len(parse_raw_as(list[NodeFieldValue], values[0].field_values)) == 3
 
     # should have batch id and priority
     assert all(v.batch_id == b.batch_id for v in values)
@@ -177,18 +177,18 @@ def test_prepare_values_to_insert(batch_data_collection, batch_graph):
 
 def test_prepare_values_to_insert_with_priority(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    values = prepare_values_to_insert(batch=b, priority=1, max_new_queue_items=1000)
+    values = prepare_values_to_insert(queue_id="default", batch=b, priority=1, max_new_queue_items=1000, order_id=0)
     assert all(v.priority == 1 for v in values)
 
 
 def test_prepare_values_to_insert_with_max(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    values = prepare_values_to_insert(batch=b, priority=1, max_new_queue_items=5)
+    values = prepare_values_to_insert(queue_id="default", batch=b, priority=1, max_new_queue_items=5, order_id=0)
     assert len(values) == 5
 
 
 def test_cannot_create_bad_batch_items_length(batch_graph):
-    with pytest.raises(ValidationError, match="Zipped batch items must have all have same length"):
+    with pytest.raises(ValidationError, match="Zipped batch items must all have the same length"):
         Batch(
             graph=batch_graph,
             data=[
@@ -201,7 +201,7 @@ def test_cannot_create_bad_batch_items_length(batch_graph):
 
 
 def test_cannot_create_bad_batch_items_type(batch_graph):
-    with pytest.raises(ValidationError, match="All items in a batch must have have same type"):
+    with pytest.raises(ValidationError, match="All items in a batch must have the same type"):
         Batch(
             graph=batch_graph,
             data=[

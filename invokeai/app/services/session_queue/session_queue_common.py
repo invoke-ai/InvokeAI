@@ -1,7 +1,7 @@
 import datetime
 import json
 from itertools import chain, product
-from typing import Iterable, Literal, Optional, TypeAlias, Union, cast
+from typing import Generator, Iterable, Literal, NamedTuple, Optional, TypeAlias, Union, cast
 
 from pydantic import BaseModel, Field, StrictStr, parse_raw_as, root_validator, validator
 from pydantic.json import pydantic_encoder
@@ -71,12 +71,14 @@ class Batch(BaseModel):
     )
 
     @validator("data")
-    def validate_len(cls, v: Optional[BatchDataCollection]):
+    def validate_lengths(cls, v: Optional[BatchDataCollection]):
         if v is None:
             return v
         for batch_data_list in v:
-            if any(len(batch_data_list[0].items) != len(i.items) for i in batch_data_list):
-                raise BatchZippedLengthError("Zipped batch items must have all have same length")
+            first_item_length = len(batch_data_list[0].items) if batch_data_list and batch_data_list[0].items else 0
+            for i in batch_data_list:
+                if len(i.items) != first_item_length:
+                    raise BatchZippedLengthError("Zipped batch items must all have the same length")
         return v
 
     @validator("data")
@@ -85,9 +87,11 @@ class Batch(BaseModel):
             return v
         for batch_data_list in v:
             for datum in batch_data_list:
+                # Get the type of the first item in the list
+                first_item_type = type(datum.items[0]) if datum.items else None
                 for item in datum.items:
-                    if not all(isinstance(item, type(i)) for i in datum.items):
-                        raise BatchItemsTypeError("All items in a batch must have have same type")
+                    if type(item) != first_item_type:
+                        raise BatchItemsTypeError("All items in a batch must have the same type")
         return v
 
     @validator("data")
@@ -95,13 +99,12 @@ class Batch(BaseModel):
         if v is None:
             return v
         paths: set[tuple[str, str]] = set()
-        count: int = 0
         for batch_data_list in v:
             for datum in batch_data_list:
-                paths.add((datum.node_path, datum.field_name))
-                count += 1
-        if len(paths) != count:
-            raise BatchDuplicateNodeFieldError("Each batch data must have unique node_id and field_name")
+                pair = (datum.node_path, datum.field_name)
+                if pair in paths:
+                    raise BatchDuplicateNodeFieldError("Each batch data must have unique node_id and field_name")
+                paths.add(pair)
         return v
 
     @root_validator(skip_on_failure=True)
@@ -316,51 +319,51 @@ def populate_graph(graph: Graph, node_field_values: Iterable[NodeFieldValue]) ->
     """
     Populates the given graph with the given batch data items.
     """
-    graph = graph.copy(deep=True)
+    graph_clone = graph.copy(deep=True)
     for item in node_field_values:
-        node = graph.get_node(item.node_path)
+        node = graph_clone.get_node(item.node_path)
         if node is None:
             continue
         setattr(node, item.field_name, item.value)
-        graph.update_node(item.node_path, node)
-    return graph
+        graph_clone.update_node(item.node_path, node)
+    return graph_clone
 
 
-def create_session_nfv_tuples(batch: Batch, maximum: int) -> list[tuple[GraphExecutionState, list[NodeFieldValue]]]:
+def create_session_nfv_tuples(
+    batch: Batch, maximum: int
+) -> Generator[tuple[GraphExecutionState, list[NodeFieldValue]], None, None]:
     """
-    Create all graph permutations from the given batch data and graph. Returns a list of tuples
+    Create all graph permutations from the given batch data and graph. Yields tuples
     of the form (graph, batch_data_items) where batch_data_items is the list of BatchDataItems
     that was applied to the graph.
     """
+
     # TODO: Should this be a class method on Batch?
+
     data: list[list[tuple[NodeFieldValue]]] = []
     batch_data_collection = batch.data if batch.data is not None else []
     for batch_datum_list in batch_data_collection:
-        # each batch_datum_list contains a list of BatchDatums to be convered to NodeFieldValues and then zipped
+        # each batch_datum_list needs to be convered to NodeFieldValues and then zipped
+
         node_field_values_to_zip: list[list[NodeFieldValue]] = []
         for batch_datum in batch_datum_list:
-            # derive NodeFieldValues from the BatchDatum by mapping over its items
             node_field_values = [
                 NodeFieldValue(node_path=batch_datum.node_path, field_name=batch_datum.field_name, value=item)
                 for item in batch_datum.items
             ]
             node_field_values_to_zip.append(node_field_values)
-        # zip the NodeFieldValues together
         data.append(list(zip(*node_field_values_to_zip)))
-    # take the cartesian product of the zipped lists of NodeFieldValue, then flatten them
-    node_field_values = [list(chain.from_iterable(d)) for d in product(*data)]
-    # create graphs for each permutation
-    graphs = [populate_graph(batch.graph, nfv) for nfv in node_field_values]
-    sessions_and_node_field_values = []
-    # create sessions and NodeFieldValues for permutations * runs, bailing if/when we hit the max
+
+    # create generator to yield session,nfv tuples
+    count = 0
     for _ in range(batch.runs):
-        if len(sessions_and_node_field_values) >= maximum:
-            break
-        for idx, nfv in enumerate(node_field_values):
-            if len(sessions_and_node_field_values) >= maximum:
-                break
-            sessions_and_node_field_values.append((GraphExecutionState(graph=graphs[idx]), nfv))
-    return sessions_and_node_field_values
+        for d in product(*data):
+            if count >= maximum:
+                return
+            flat_node_field_values = list(chain.from_iterable(d))
+            graph = populate_graph(batch.graph, flat_node_field_values)
+            yield (GraphExecutionState(graph=graph), flat_node_field_values)
+            count += 1
 
 
 def calc_session_count(batch: Batch) -> int:
@@ -382,31 +385,31 @@ def calc_session_count(batch: Batch) -> int:
     return len(data_product) * batch.runs
 
 
-ValuesToInsert: TypeAlias = list[
-    tuple[
-        str,  # item_id
-        str,  # queue_id
-        str,  # session json
-        str,  # session_id
-        str,  # batch_id
-        Optional[str],  # field_values json
-        int,  # priority
-        int,  # order_id
-    ]
-]
-"""(item_id, queue_id, session (json), session_id, batch_id, field_values (json), priority)"""
+class SessionQueueValueToInsert(NamedTuple):
+    """A tuple of values to insert into the session_queue table"""
+
+    item_id: str  # item_id
+    queue_id: str  # queue_id
+    session: str  # session json
+    session_id: str  # session_id
+    batch_id: str  # batch_id
+    field_values: Optional[str]  # field_values json
+    priority: int  # priority
+    order_id: int  # order_id
+
+
+ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
 
 
 def prepare_values_to_insert(
     queue_id: str, batch: Batch, priority: int, max_new_queue_items: int, order_id: int
 ) -> ValuesToInsert:
     values_to_insert: ValuesToInsert = []
-    session_and_field_value_tuples = create_session_nfv_tuples(batch, max_new_queue_items)
-    for session, field_values in session_and_field_value_tuples:
+    for session, field_values in create_session_nfv_tuples(batch, max_new_queue_items):
         # sessions must have unique id
         session.id = uuid_string()
         values_to_insert.append(
-            (
+            SessionQueueValueToInsert(
                 uuid_string(),  # item_id
                 queue_id,  # queue_id
                 session.json(),  # session (json)
