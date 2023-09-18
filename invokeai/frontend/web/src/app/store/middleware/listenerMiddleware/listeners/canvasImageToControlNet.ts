@@ -5,6 +5,7 @@ import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlic
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addCanvasImageToControlNetListener = () => {
   startAppListening({
@@ -19,8 +20,8 @@ export const addCanvasImageToControlNetListener = () => {
         log.error('Problem getting base layer blob');
         dispatch(
           addToast({
-            title: 'Problem Saving Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemSavingCanvas'),
+            description: t('toast.problemSavingCanvasDesc'),
             status: 'error',
           })
         );
@@ -40,7 +41,7 @@ export const addCanvasImageToControlNetListener = () => {
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: 'Canvas Sent to ControlNet & Assets' },
+            toastOptions: { title: t('toast.canvasSentControlnetAssets') },
           },
         })
       ).unwrap();
