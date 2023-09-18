@@ -936,11 +936,11 @@
             "heading": "Coherence Pass",
             "paragraph": "Composite the Inpainted/Outpainted images."
         },
-        "compositingMode": {
+        "compositingCoherenceMode": {
             "heading": "Mode",
             "paragraph": "The mode of the Coherence Pass."
         },
-        "compositingSteps": {
+        "compositingCoherenceSteps": {
             "heading": "Steps",
             "paragraph": "Number of steps in the Coherence Pass. Similar to Denoising Steps."
         },
