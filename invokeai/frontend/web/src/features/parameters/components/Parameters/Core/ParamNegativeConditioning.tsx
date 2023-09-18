@@ -9,6 +9,7 @@ import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const ParamNegativeConditioning = () => {
   const negativePrompt = useAppSelector(
@@ -81,18 +82,20 @@ const ParamNegativeConditioning = () => {
         onClose={onClose}
         onSelect={handleSelectEmbedding}
       >
-        <IAITextarea
-          id="negativePrompt"
-          name="negativePrompt"
-          ref={promptRef}
-          value={negativePrompt}
-          placeholder={t('parameters.negativePromptPlaceholder')}
-          onChange={handleChangePrompt}
-          resize="vertical"
-          fontSize="sm"
-          minH={16}
-          {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
-        />
+        <IAIInformationalPopover details="paramNegativeConditioning">
+          <IAITextarea
+            id="negativePrompt"
+            name="negativePrompt"
+            ref={promptRef}
+            value={negativePrompt}
+            placeholder={t('parameters.negativePromptPlaceholder')}
+            onChange={handleChangePrompt}
+            resize="vertical"
+            fontSize="sm"
+            minH={16}
+            {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
+          />
+        </IAIInformationalPopover>
       </ParamEmbeddingPopover>
       {!isOpen && isEmbeddingEnabled && (
         <Box
