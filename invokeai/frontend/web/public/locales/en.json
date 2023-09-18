@@ -925,7 +925,7 @@
         "positivePromptPlaceholder": "Positive Prompt",
         "randomizeSeed": "Randomize Seed",
         "restoreFaces": "Restore Faces",
-        "runs": "Runs",
+        "iterations": "Iterations",
         "scale": "Scale",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledHeight": "Scaled H",
@@ -969,6 +969,15 @@
         "dynamicPrompts": "Dynamic Prompts",
         "enableDynamicPrompts": "Enable Dynamic Prompts",
         "maxPrompts": "Max Prompts"
+    },
+    "dynamicPrompts": {
+        "seedBehaviour": {
+            "label": "Seed Behaviour",
+            "perIterationLabel": "Per Iteration",
+            "perIterationDesc": "Use a different seed for each iteration",
+            "perPromptLabel": "Per Prompt",
+            "perPromptDesc": "Use a different seed for each prompt"
+        }
     },
     "sdxl": {
         "cfgScale": "CFG Scale",

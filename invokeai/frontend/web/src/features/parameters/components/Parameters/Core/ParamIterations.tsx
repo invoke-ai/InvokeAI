@@ -57,7 +57,7 @@ const ParamIterations = () => {
 
   return shouldUseSliders ? (
     <IAISlider
-      label={t('parameters.runs')}
+      label={t('parameters.iterations')}
       step={step}
       min={min}
       max={sliderMax}
@@ -71,7 +71,7 @@ const ParamIterations = () => {
     />
   ) : (
     <IAINumberInput
-      label={t('parameters.runs')}
+      label={t('parameters.iterations')}
       step={step}
       min={min}
       max={inputMax}

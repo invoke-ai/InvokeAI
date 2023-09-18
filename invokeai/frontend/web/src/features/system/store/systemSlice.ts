@@ -137,7 +137,6 @@ export const systemSlice = createSlice({
       state.enableImageDebugging = action.payload;
     },
     addToast: (state, action: PayloadAction<UseToastOptions>) => {
-      console.log(action.payload);
       state.toastQueue.push(action.payload);
     },
     clearToastQueue: (state) => {

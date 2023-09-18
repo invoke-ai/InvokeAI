@@ -1,72 +1,183 @@
+import { NUMPY_RAND_MAX } from 'app/constants';
 import { RootState } from 'app/store/store';
+import { generateSeeds } from 'common/util/generateSeeds';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { unset } from 'lodash-es';
+import { range, unset } from 'lodash-es';
 import { components } from 'services/api/schema';
-import { BatchConfig } from 'services/api/types';
-import { METADATA_ACCUMULATOR, POSITIVE_CONDITIONING } from './constants';
+import { Batch, BatchConfig } from 'services/api/types';
+import {
+  CANVAS_COHERENCE_NOISE,
+  METADATA_ACCUMULATOR,
+  NOISE,
+  POSITIVE_CONDITIONING,
+} from './constants';
 
 export const prepareLinearUIBatch = (
   state: RootState,
   graph: NonNullableGraph,
   prepend: boolean
 ): BatchConfig => {
-  const { iterations, model } = state.generation;
+  const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
   const { shouldConcatSDXLStylePrompt, positiveStylePrompt } = state.sdxl;
-  const { prompts } = state.dynamicPrompts;
+  const { prompts, seedBehaviour } = state.dynamicPrompts;
 
-  const data: BatchConfig['batch']['data'] = [];
-  const hasMetadataAccumulator = METADATA_ACCUMULATOR in graph.nodes;
+  const data: Batch['data'] = [];
 
-  if (prompts.length > 1) {
-    hasMetadataAccumulator &&
-      unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_prompt');
-
-    const zippedPrompts: components['schemas']['BatchDatum'][] = [];
-    // zipped batch of prompts
-    zippedPrompts.push({
-      node_path: POSITIVE_CONDITIONING,
-      field_name: 'prompt',
-      items: prompts,
+  if (prompts.length === 1) {
+    unset(graph.nodes[METADATA_ACCUMULATOR], 'seed');
+    const seeds = generateSeeds({
+      count: iterations,
+      start: shouldRandomizeSeed ? undefined : seed,
     });
 
-    hasMetadataAccumulator &&
-      zippedPrompts.push({
+    const zipped: components['schemas']['BatchDatum'][] = [];
+
+    if (graph.nodes[NOISE]) {
+      zipped.push({
+        node_path: NOISE,
+        field_name: 'seed',
+        items: seeds,
+      });
+    }
+
+    if (graph.nodes[METADATA_ACCUMULATOR]) {
+      zipped.push({
         node_path: METADATA_ACCUMULATOR,
-        field_name: 'positive_prompt',
-        items: prompts,
+        field_name: 'seed',
+        items: seeds,
+      });
+    }
+
+    if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
+      zipped.push({
+        node_path: CANVAS_COHERENCE_NOISE,
+        field_name: 'seed',
+        items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
+      });
+    }
+
+    data.push(zipped);
+  } else {
+    // prompts.length > 1 aka dynamic prompts
+    const firstBatchDatumList: components['schemas']['BatchDatum'][] = [];
+    const secondBatchDatumList: components['schemas']['BatchDatum'][] = [];
+
+    // add seeds first to ensure the output order groups the prompts
+    if (seedBehaviour === 'PER_PROMPT') {
+      const seeds = generateSeeds({
+        count: prompts.length * iterations,
+        start: shouldRandomizeSeed ? undefined : seed,
       });
 
-    if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
-      hasMetadataAccumulator &&
-        unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
+      if (graph.nodes[NOISE]) {
+        firstBatchDatumList.push({
+          node_path: NOISE,
+          field_name: 'seed',
+          items: seeds,
+        });
+      }
 
-      const stylePrompts = prompts.map((p) =>
+      if (graph.nodes[METADATA_ACCUMULATOR]) {
+        firstBatchDatumList.push({
+          node_path: METADATA_ACCUMULATOR,
+          field_name: 'seed',
+          items: seeds,
+        });
+      }
+
+      if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
+        firstBatchDatumList.push({
+          node_path: CANVAS_COHERENCE_NOISE,
+          field_name: 'seed',
+          items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
+        });
+      }
+    } else {
+      // seedBehaviour = SeedBehaviour.PerRun
+      const seeds = generateSeeds({
+        count: iterations,
+        start: shouldRandomizeSeed ? undefined : seed,
+      });
+
+      if (graph.nodes[NOISE]) {
+        secondBatchDatumList.push({
+          node_path: NOISE,
+          field_name: 'seed',
+          items: seeds,
+        });
+      }
+      if (graph.nodes[METADATA_ACCUMULATOR]) {
+        secondBatchDatumList.push({
+          node_path: METADATA_ACCUMULATOR,
+          field_name: 'seed',
+          items: seeds,
+        });
+      }
+      if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
+        secondBatchDatumList.push({
+          node_path: CANVAS_COHERENCE_NOISE,
+          field_name: 'seed',
+          items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
+        });
+      }
+      data.push(secondBatchDatumList);
+    }
+
+    const extendedPrompts =
+      seedBehaviour === 'PER_PROMPT'
+        ? range(iterations).flatMap(() => prompts)
+        : prompts;
+
+    // zipped batch of prompts
+    if (graph.nodes[POSITIVE_CONDITIONING]) {
+      firstBatchDatumList.push({
+        node_path: POSITIVE_CONDITIONING,
+        field_name: 'prompt',
+        items: extendedPrompts,
+      });
+    }
+
+    if (graph.nodes[METADATA_ACCUMULATOR]) {
+      firstBatchDatumList.push({
+        node_path: METADATA_ACCUMULATOR,
+        field_name: 'positive_prompt',
+        items: extendedPrompts,
+      });
+    }
+
+    if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
+      unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
+
+      const stylePrompts = extendedPrompts.map((p) =>
         [p, positiveStylePrompt].join(' ')
       );
 
-      zippedPrompts.push({
-        node_path: POSITIVE_CONDITIONING,
-        field_name: 'style',
-        items: stylePrompts,
-      });
+      if (graph.nodes[POSITIVE_CONDITIONING]) {
+        firstBatchDatumList.push({
+          node_path: POSITIVE_CONDITIONING,
+          field_name: 'style',
+          items: stylePrompts,
+        });
+      }
 
-      hasMetadataAccumulator &&
-        zippedPrompts.push({
+      if (graph.nodes[METADATA_ACCUMULATOR]) {
+        firstBatchDatumList.push({
           node_path: METADATA_ACCUMULATOR,
           field_name: 'positive_style_prompt',
           items: stylePrompts,
         });
+      }
     }
 
-    data.push(zippedPrompts);
+    data.push(firstBatchDatumList);
   }
 
   const enqueueBatchArg: BatchConfig = {
     prepend,
     batch: {
       graph,
-      runs: iterations,
-      data: data.length ? data : undefined,
+      runs: 1,
+      data,
     },
   };
 

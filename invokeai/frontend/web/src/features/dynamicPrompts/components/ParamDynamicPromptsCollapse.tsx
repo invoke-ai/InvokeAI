@@ -9,12 +9,12 @@ import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
+import ParamDynamicPromptsSeedBehaviour from './ParamDynamicPromptsSeedBehaviour';
 
 const selector = createSelector(
   stateSelector,
   (state) => {
     const { prompts } = state.dynamicPrompts;
-
     return {
       activeLabel: `${prompts.length} Prompt${prompts.length !== 1 ? 's' : ''}`,
     };
@@ -36,6 +36,7 @@ const ParamDynamicPromptsCollapse = () => {
   return (
     <IAICollapse label={t('prompt.dynamicPrompts')} activeLabel={activeLabel}>
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
+        <ParamDynamicPromptsSeedBehaviour />
         <ParamDynamicPromptsPreview />
         <ParamDynamicPromptsMaxPrompts />
       </Flex>
