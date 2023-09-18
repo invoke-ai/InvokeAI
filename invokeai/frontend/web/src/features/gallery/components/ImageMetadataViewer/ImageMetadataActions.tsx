@@ -1,9 +1,9 @@
 import { CoreMetadata, LoRAMetadataType } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useCallback } from 'react';
-import ImageMetadataItem from './ImageMetadataItem';
 import { useTranslation } from 'react-i18next';
 import { isValidLoRAModel } from '../../../parameters/types/parameterSchemas';
+import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
   metadata?: CoreMetadata;
