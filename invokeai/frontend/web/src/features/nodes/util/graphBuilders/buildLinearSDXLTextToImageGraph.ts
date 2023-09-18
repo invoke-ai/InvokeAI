@@ -4,7 +4,6 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -254,8 +253,6 @@ export const buildLinearSDXLTextToImageGraph = (
       field: 'metadata',
     },
   });
-
-  addRandomizeSeedToLinearGraph(state, graph);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

@@ -9,7 +9,6 @@ import {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -265,8 +264,6 @@ export const buildLinearTextToImageGraph = (
       field: 'metadata',
     },
   });
-
-  addRandomizeSeedToLinearGraph(state, graph);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

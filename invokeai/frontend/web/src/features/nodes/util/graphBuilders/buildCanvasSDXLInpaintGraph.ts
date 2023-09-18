@@ -11,7 +11,6 @@ import {
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -655,8 +654,6 @@ export const buildCanvasSDXLInpaintGraph = (
       },
     });
   }
-
-  addRandomizeSeedToLinearGraph(state, graph);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
