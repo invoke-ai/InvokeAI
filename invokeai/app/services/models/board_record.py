@@ -22,6 +22,8 @@ class BoardRecord(BaseModelExcludeNull):
     """The updated timestamp of the image."""
     cover_image_name: Optional[str] = Field(description="The name of the cover image of the board.")
     """The name of the cover image of the board."""
+    isLocked: bool = Field(description="Whether the board is locked or not.")
+    """Whether the board is locked or not."""
 
 
 class BoardDTO(BoardRecord):
@@ -44,6 +46,7 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
     created_at = board_dict.get("created_at", get_iso_timestamp())
     updated_at = board_dict.get("updated_at", get_iso_timestamp())
     deleted_at = board_dict.get("deleted_at", get_iso_timestamp())
+    isLocked = board_dict.get("isLocked", False)
 
     return BoardRecord(
         board_id=board_id,
@@ -52,4 +55,5 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
         created_at=created_at,
         updated_at=updated_at,
         deleted_at=deleted_at,
+        isLocked=isLocked,
     )

@@ -557,6 +557,11 @@ export type components = {
        * @description The number of images in the board.
        */
       image_count: number;
+      /**
+       * isLocked
+       * @description Whether the board is locked or not.
+       */
+       isLocked: boolean;
     };
     /** Body_add_image_to_board */
     Body_add_image_to_board: {

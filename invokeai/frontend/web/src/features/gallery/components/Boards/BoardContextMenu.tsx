@@ -9,7 +9,7 @@ import {
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { BoardId } from 'features/gallery/store/types';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaLock, FaUnlock } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
@@ -17,6 +17,7 @@ import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useTranslation } from 'react-i18next';
+import { useToggleBoardLockMutation } from 'services/api/endpoints/boards';
 
 type Props = {
   board?: BoardDTO;
@@ -32,6 +33,17 @@ const BoardContextMenu = ({
   children,
 }: Props) => {
   const dispatch = useAppDispatch();
+
+  const [toggleBoardLock, { isLoading }] = useToggleBoardLockMutation();
+
+  const handleToggleLock = useCallback(() => {
+    if (board) {
+      toggleBoardLock({
+        board_id: board.board_id,
+        isLocked: !board.isLocked,
+      });
+    }
+  }, [board, toggleBoardLock]);
 
   const selector = useMemo(
     () =>
@@ -85,10 +97,21 @@ const BoardContextMenu = ({
             </MenuItem>
             {!board && <NoBoardContextMenuItems />}
             {board && (
-              <GalleryBoardContextMenuItems
-                board={board}
-                setBoardToDelete={setBoardToDelete}
-              />
+              <>
+                <MenuItem
+                  icon={board.isLocked ? <FaUnlock /> : <FaLock />}
+                  isDisabled={isLoading}
+                  onClick={handleToggleLock}
+                >
+                  {board.isLocked
+                    ? t('boards.menuItemUnlock')
+                    : t('boards.menuItemLock')}
+                </MenuItem>
+                <GalleryBoardContextMenuItems
+                  board={board}
+                  setBoardToDelete={setBoardToDelete}
+                />
+              </>
             )}
           </MenuGroup>
         </MenuList>
