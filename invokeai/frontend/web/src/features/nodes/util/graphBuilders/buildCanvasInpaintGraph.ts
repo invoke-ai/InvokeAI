@@ -79,8 +79,8 @@ export const buildCanvasInpaintGraph = (
   } = state.generation;
 
   if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
+    log.error('No Image found in state');
+    throw new Error('No Image found in state');
   }
 
   // The bounding box determines width and height, not the width and height params
