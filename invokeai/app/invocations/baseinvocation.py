@@ -68,6 +68,7 @@ class FieldDescriptions:
     height = "Height of output (px)"
     control = "ControlNet(s) to apply"
     ip_adapter = "IP-Adapter to apply"
+    t2i_adapter = "T2I-Adapter(s) to apply"
     denoised_latents = "Denoised latents tensor"
     latents = "Latents tensor"
     strength = "Strength of denoising (proportional to steps)"
