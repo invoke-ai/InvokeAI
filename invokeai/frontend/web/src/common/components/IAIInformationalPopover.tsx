@@ -81,7 +81,7 @@ function IAIInformationalPopover({
                 sx={{
                   gap: 3,
                   flexDirection: 'column',
-
+                  width: '100%',
                   p: 3,
                   pt: heading ? 0 : 3,
                 }}

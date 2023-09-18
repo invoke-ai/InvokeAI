@@ -29,7 +29,7 @@ export default function ParamMaskBlurMethod() {
   };
 
   return (
-    <IAIInformationalPopover details="compositingBlur">
+    <IAIInformationalPopover details="compositingBlurMethod">
       <IAIMantineSelect
         value={maskBlurMethod}
         onChange={handleMaskBlurMethodChange}
