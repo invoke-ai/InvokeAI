@@ -121,6 +121,20 @@ export const boardsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'Board', id: LIST_TAG }],
     }),
 
+    toggleBoardLock: build.mutation<
+      BoardDTO,
+      { board_id: string; isLocked: boolean }
+    >({
+      query: ({ board_id, isLocked }) => ({
+        url: `boards/${board_id}`,
+        method: 'PATCH',
+        body: { isLocked },
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Board', id: arg.board_id },
+      ],
+    }),
+
     updateBoard: build.mutation<BoardDTO, UpdateBoardArg>({
       query: ({ board_id, changes }) => ({
         url: `boards/${board_id}`,
@@ -142,4 +156,5 @@ export const {
   useCreateBoardMutation,
   useUpdateBoardMutation,
   useListAllImageNamesForBoardQuery,
+  useToggleBoardLockMutation,
 } = boardsApi;

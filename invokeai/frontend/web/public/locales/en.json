@@ -31,6 +31,8 @@
         "clearSearch": "Clear Search",
         "loading": "Loading...",
         "menuItemAutoAdd": "Auto-add to this Board",
+        "menuItemLock": "Lock Board",
+        "menuItemUnlock": "Unlock Board",
         "move": "Move",
         "myBoard": "My Board",
         "noMatching": "No matching Boards",
