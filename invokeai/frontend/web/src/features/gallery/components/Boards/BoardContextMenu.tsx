@@ -90,7 +90,12 @@ const BoardContextMenu = ({
           <MenuGroup title={boardName}>
             <MenuItem
               icon={<FaPlus />}
-              isDisabled={isAutoAdd || isProcessing || autoAssignBoardOnClick}
+              isDisabled={
+                isAutoAdd ||
+                isProcessing ||
+                autoAssignBoardOnClick ||
+                (board?.isLocked ?? false)
+              }
               onClick={handleSetAutoAdd}
             >
               {t('boards.menuItemAutoAdd')}
@@ -110,6 +115,7 @@ const BoardContextMenu = ({
                 <GalleryBoardContextMenuItems
                   board={board}
                   setBoardToDelete={setBoardToDelete}
+                  isLocked={board.isLocked}
                 />
               </>
             )}
