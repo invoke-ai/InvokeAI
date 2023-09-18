@@ -1,4 +1,4 @@
-import { CoreMetadata, LoRAMetadataType } from 'features/nodes/types/types';
+import { CoreMetadata, LoRAMetadataItem } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -69,7 +69,7 @@ const ImageMetadataActions = (props: Props) => {
   }, [metadata?.strength, recallStrength]);
 
   const handleRecallLoRA = useCallback(
-    (lora: LoRAMetadataType) => {
+    (lora: LoRAMetadataItem) => {
       recallLoRA(lora);
     },
     [recallLoRA]
