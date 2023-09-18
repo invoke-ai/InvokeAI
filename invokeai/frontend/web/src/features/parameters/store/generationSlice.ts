@@ -80,7 +80,7 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
-  canvasCoherenceMode: 'edge',
+  canvasCoherenceMode: 'unmasked',
   canvasCoherenceSteps: 20,
   canvasCoherenceStrength: 0.3,
   seed: 0,

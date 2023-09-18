@@ -3,6 +3,7 @@ import { NodesState } from '../store/types';
 import { Workflow, zWorkflowEdge, zWorkflowNode } from '../types/types';
 import { fromZodError } from 'zod-validation-error';
 import { parseify } from 'common/util/serialize';
+import i18n from 'i18next';
 
 export const buildWorkflow = (nodesState: NodesState): Workflow => {
   const { workflow: workflowMeta, nodes, edges } = nodesState;
@@ -20,7 +21,7 @@ export const buildWorkflow = (nodesState: NodesState): Workflow => {
       const result = zWorkflowNode.safeParse(node);
       if (!result.success) {
         const { message } = fromZodError(result.error, {
-          prefix: 'Unable to parse node',
+          prefix: i18n.t('nodes.unableToParseNode'),
         });
         logger('nodes').warn({ node: parseify(node) }, message);
         return;
@@ -32,7 +33,7 @@ export const buildWorkflow = (nodesState: NodesState): Workflow => {
     const result = zWorkflowEdge.safeParse(edge);
     if (!result.success) {
       const { message } = fromZodError(result.error, {
-        prefix: 'Unable to parse edge',
+        prefix: i18n.t('nodes.unableToParseEdge'),
       });
       logger('nodes').warn({ edge: parseify(edge) }, message);
       return;
