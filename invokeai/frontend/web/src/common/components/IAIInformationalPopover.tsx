@@ -12,18 +12,17 @@ import {
   Text,
   Image,
 } from '@chakra-ui/react';
-import { ReactNode } from 'react';
 import { useAppSelector } from '../../app/store/storeHooks';
 import { systemSelector } from '../../features/system/store/systemSelectors';
 import { useTranslation } from 'react-i18next';
 
 interface Props extends PopoverProps {
   details: string;
-  children: ReactNode;
+  children: JSX.Element;
   image?: string;
   buttonLabel?: string;
   buttonHref?: string;
-  placement?: string;
+  placement?: PopoverProps['placement'];
 }
 
 function IAIInformationalPopover({
@@ -33,7 +32,7 @@ function IAIInformationalPopover({
   buttonHref,
   children,
   placement,
-}: Props) {
+}: Props): JSX.Element {
   const { shouldDisableInformationalPopovers } = useAppSelector(systemSelector);
   const { t } = useTranslation();
 
