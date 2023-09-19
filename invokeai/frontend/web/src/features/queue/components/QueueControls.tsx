@@ -16,6 +16,7 @@ import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 const QueueControls = () => {
   const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
   const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
+  const isPrependEnabled = useFeatureStatus('prependQueue').isFeatureEnabled;
   return (
     <Flex
       layerStyle="first"
@@ -31,7 +32,7 @@ const QueueControls = () => {
       <Flex gap={2} w="full">
         <ButtonGroup isAttached flexGrow={2}>
           <QueueBackButton />
-          <QueueFrontButton asIconButton />
+          {isPrependEnabled ? <QueueFrontButton asIconButton /> : <></>}
           <CancelCurrentQueueItemButton asIconButton />
         </ButtonGroup>
         <ButtonGroup isAttached>

@@ -20,7 +20,8 @@ export type AppFeature =
   | 'syncModels'
   | 'multiselect'
   | 'pauseQueue'
-  | 'resumeQueue';
+  | 'resumeQueue'
+  | 'prependQueue';
 
 /**
  * A disable-able Stable Diffusion feature
