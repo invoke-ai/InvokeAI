@@ -46,6 +46,7 @@ import {
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -764,6 +765,9 @@ export const buildCanvasSDXLInpaintGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+
+  // Add IP Adapter
+  addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
