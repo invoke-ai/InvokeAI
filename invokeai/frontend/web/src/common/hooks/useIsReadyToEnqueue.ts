@@ -10,8 +10,10 @@ import { getConnectedEdges } from 'reactflow';
 
 const selector = createSelector(
   [stateSelector, activeTabNameSelector],
-  (state, activeTabName) => {
-    const { generation, system, nodes } = state;
+  (
+    { controlNet, generation, system, nodes, dynamicPrompts },
+    activeTabName
+  ) => {
     const { initialImage, model } = generation;
 
     const { isConnected } = system;
@@ -77,12 +79,16 @@ const selector = createSelector(
         });
       }
     } else {
+      if (dynamicPrompts.prompts.length === 0) {
+        reasons.push(i18n.t('parameters.invoke.noPrompts'));
+      }
+
       if (!model) {
         reasons.push(i18n.t('parameters.invoke.noModelSelected'));
       }
 
-      if (state.controlNet.isEnabled) {
-        map(state.controlNet.controlNets).forEach((controlNet, i) => {
+      if (controlNet.isEnabled) {
+        map(controlNet.controlNets).forEach((controlNet, i) => {
           if (!controlNet.isEnabled) {
             return;
           }
