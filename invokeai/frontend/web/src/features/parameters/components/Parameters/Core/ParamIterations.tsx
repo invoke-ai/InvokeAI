@@ -31,7 +31,11 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ParamIterations = () => {
+type Props = {
+  asSlider?: boolean;
+};
+
+const ParamIterations = ({ asSlider }: Props) => {
   const {
     iterations,
     initial,
@@ -55,7 +59,7 @@ const ParamIterations = () => {
     dispatch(setIterations(initial));
   }, [dispatch, initial]);
 
-  return shouldUseSliders ? (
+  return asSlider || shouldUseSliders ? (
     <IAISlider
       label={t('parameters.iterations')}
       step={step}

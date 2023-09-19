@@ -11,6 +11,7 @@ import {
 import 'reactflow/dist/style.css';
 import InspectorPanel from './inspector/InspectorPanel';
 import WorkflowPanel from './workflow/WorkflowPanel';
+import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
 
 const NodeEditorPanelGroup = () => {
   const [isTopPanelCollapsed, setIsTopPanelCollapsed] = useState(false);
@@ -27,6 +28,20 @@ const NodeEditorPanelGroup = () => {
   return (
     <Flex sx={{ flexDir: 'column', gap: 2, height: '100%', width: '100%' }}>
       <QueueControls />
+      <Flex
+        layerStyle="first"
+        sx={{
+          w: 'full',
+          position: 'relative',
+          borderRadius: 'base',
+          p: 2,
+          pb: 3,
+          gap: 2,
+          flexDir: 'column',
+        }}
+      >
+        <ParamIterations asSlider />
+      </Flex>
       <PanelGroup
         ref={panelGroupRef}
         id="workflow-panel-group"
