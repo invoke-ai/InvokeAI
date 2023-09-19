@@ -109,6 +109,7 @@
         "statusModelChanged": "Model Changed",
         "statusModelConverted": "Model Converted",
         "statusPreparing": "Preparing",
+        "statusProcessing": "Processing",
         "statusProcessingCanceled": "Processing Canceled",
         "statusProcessingComplete": "Processing Complete",
         "statusRestoringFaces": "Restoring Faces",

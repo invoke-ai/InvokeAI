@@ -1,7 +1,5 @@
 import { ChakraProps, Flex, Portal } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
-import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
-import InvokeButton from 'features/parameters/components/ProcessButtons/InvokeButton';
 import { RefObject, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -51,8 +49,6 @@ const FloatingSidePanelButtons = ({
           sx={floatingButtonStyles}
           icon={<FaSlidersH />}
         />
-        <InvokeButton asIconButton sx={floatingButtonStyles} />
-        <CancelButton sx={floatingButtonStyles} asIconButton />
       </Flex>
     </Portal>
   );

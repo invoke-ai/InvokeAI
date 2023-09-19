@@ -144,6 +144,7 @@ export const buildLinearTextToImageGraph = (
         type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
+        is_intermediate,
       },
     },
     edges: [

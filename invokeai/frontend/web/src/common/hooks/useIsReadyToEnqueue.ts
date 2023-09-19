@@ -14,7 +14,7 @@ const selector = createSelector(
     const { generation, system, nodes } = state;
     const { initialImage, model } = generation;
 
-    const { isProcessing, isConnected } = system;
+    const { isConnected } = system;
 
     const reasons: string[] = [];
 
@@ -107,12 +107,12 @@ const selector = createSelector(
       }
     }
 
-    return { isReady: !reasons.length, isProcessing, reasons };
+    return { isReady: !reasons.length, reasons };
   },
   defaultSelectorOptions
 );
 
 export const useIsReadyToEnqueue = () => {
-  const { isReady, isProcessing, reasons } = useAppSelector(selector);
-  return { isReady, isProcessing, reasons };
+  const { isReady, reasons } = useAppSelector(selector);
+  return { isReady, reasons };
 };

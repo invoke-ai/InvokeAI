@@ -21,6 +21,7 @@ import { workflowLoadRequested } from 'features/nodes/store/actions';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
@@ -46,13 +47,11 @@ import {
 import { menuListMotionProps } from 'theme/components/menu';
 import { sentImageToImg2Img } from '../../store/actions';
 import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
-import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
   ({ gallery, system, ui, config }, activeTabName) => {
-    const { isProcessing, isConnected, shouldConfirmOnDelete, progressImage } =
-      system;
+    const { isConnected, shouldConfirmOnDelete, denoiseProgress } = system;
 
     const {
       shouldShowImageDetails,
@@ -65,11 +64,10 @@ const currentImageButtonsSelector = createSelector(
     const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
 
     return {
-      canDeleteImage: isConnected && !isProcessing,
       shouldConfirmOnDelete,
-      isProcessing,
       isConnected,
-      shouldDisableToolbarButtons: Boolean(progressImage) || !lastSelectedImage,
+      shouldDisableToolbarButtons:
+        Boolean(denoiseProgress?.progress_image) || !lastSelectedImage,
       shouldShowImageDetails,
       activeTabName,
       shouldHidePreview,
@@ -90,7 +88,6 @@ type CurrentImageButtonsProps = FlexProps;
 const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const dispatch = useAppDispatch();
   const {
-    isProcessing,
     isConnected,
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
@@ -203,19 +200,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     {
       enabled: () =>
         Boolean(
-          isUpscalingEnabled &&
-            !shouldDisableToolbarButtons &&
-            isConnected &&
-            !isProcessing
+          isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected
         ),
     },
-    [
-      isUpscalingEnabled,
-      imageDTO,
-      shouldDisableToolbarButtons,
-      isConnected,
-      isProcessing,
-    ]
+    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
   );
 
   const handleClickShowImageDetails = useCallback(

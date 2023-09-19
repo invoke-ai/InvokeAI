@@ -1,4 +1,5 @@
 import i18n from 'i18n';
+import { SystemStatus } from './types';
 
 export const LANGUAGES = {
   ar: i18n.t('common.langArabic', { lng: 'ar' }),
@@ -17,4 +18,12 @@ export const LANGUAGES = {
   zh_CN: i18n.t('common.langSimplifiedChinese', { lng: 'zh_CN' }),
   es: i18n.t('common.langSpanish', { lng: 'es' }),
   uk: i18n.t('common.langUkranian', { lng: 'ua' }),
+};
+
+export const STATUS_TRANSLATION_KEYS: Record<SystemStatus, string> = {
+  CONNECTED: 'common.statusConnected',
+  DISCONNECTED: 'common.statusDisconnected',
+  PROCESSING: 'common.statusProcessing',
+  ERROR: 'common.statusError',
+  LOADING_MODEL: 'common.statusLoadingModel',
 };

@@ -10,7 +10,6 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
@@ -233,7 +232,6 @@ const InvokeTabs = () => {
       >
         {tabs}
         <Spacer />
-        <AuxiliaryProgressIndicator />
       </TabList>
       <PanelGroup
         id="app"
@@ -262,7 +260,6 @@ const InvokeTabs = () => {
             </Panel>
             <ResizeHandle
               onDoubleClick={resetSidePanel}
-              // isCollapsed={isSidePanelCollapsed}
               collapsedDirection={isSidePanelCollapsed ? 'left' : undefined}
             />
             <FloatingSidePanelButtons
@@ -280,7 +277,6 @@ const InvokeTabs = () => {
           <>
             <ResizeHandle
               onDoubleClick={resetGalleryPanel}
-              // isCollapsed={isGalleryPanelCollapsed}
               collapsedDirection={isGalleryPanelCollapsed ? 'right' : undefined}
             />
             <Panel

@@ -64,10 +64,11 @@ export type GeneratorProgressEvent = {
   queue_id: string;
   queue_item_id: string;
   graph_execution_state_id: string;
-  node: BaseNode;
+  node_id: string;
   source_node_id: string;
   progress_image?: ProgressImage;
   step: number;
+  order: number;
   total_steps: number;
 };
 
