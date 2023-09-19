@@ -37,7 +37,7 @@ const FloatingGalleryButton = ({
         <IAIIconButton
           tooltip="Show Gallery (G)"
           tooltipProps={{ placement: 'top' }}
-          aria-label={t('common.showGalleryPanel')}
+          aria-label={t('accessibility.showGalleryPanel')}
           onClick={handleShowGallery}
           icon={<MdPhotoLibrary />}
           sx={{

@@ -49,7 +49,7 @@ export default function SimpleAddModels() {
         dispatch(
           addToast(
             makeToast({
-              title: t('toast.modelAddSimple'),
+              title: t('toast.modelAddedSimple'),
               status: 'success',
             })
           )

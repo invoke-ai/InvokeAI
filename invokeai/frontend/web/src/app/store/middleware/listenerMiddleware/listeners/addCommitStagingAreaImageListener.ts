@@ -33,7 +33,7 @@ export const addCommitStagingAreaImageListener = () => {
           log.debug(`Canceled ${canceled} canvas batches`);
           dispatch(
             addToast({
-              title: t('queue.cancelByBatchIdsSucceeded'),
+              title: t('queue.cancelBatchSucceeded'),
               status: 'success',
             })
           );
@@ -43,7 +43,7 @@ export const addCommitStagingAreaImageListener = () => {
         log.error('Failed to cancel canvas batches');
         dispatch(
           addToast({
-            title: t('queue.cancelByBatchIdsFailed'),
+            title: t('queue.cancelBatchFailed'),
             status: 'error',
           })
         );

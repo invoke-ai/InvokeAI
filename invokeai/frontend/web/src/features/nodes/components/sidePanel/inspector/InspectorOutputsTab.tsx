@@ -83,7 +83,7 @@ const InspectorOutputsTab = () => {
               />
             ))
           ) : (
-            <DataViewer data={nes.outputs} label={t('nodes.nodesOutputs')} />
+            <DataViewer data={nes.outputs} label={t('nodes.nodeOutputs')} />
           )}
         </Flex>
       </ScrollableContent>

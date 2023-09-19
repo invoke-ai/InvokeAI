@@ -28,7 +28,7 @@ const ParamDynamicPromptsCombinatorial = () => {
 
   return (
     <IAISwitch
-      label={t('prompt.combinatorial')}
+      label={t('dynamicPrompts.combinatorial')}
       isChecked={combinatorial}
       onChange={handleChange}
     />

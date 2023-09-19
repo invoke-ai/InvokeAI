@@ -47,8 +47,8 @@ const FloatingSidePanelButtons = ({
       >
         <ButtonGroup isAttached orientation="vertical" flexGrow={3}>
           <IAIIconButton
-            tooltip="Show Side Panel (O, T)"
-            aria-label={t('common.showOptionsPanel')}
+            tooltip={t('parameters.showOptionsPanel')}
+            aria-label={t('parameters.showOptionsPanel')}
             onClick={handleShowSidePanel}
             sx={floatingButtonStyles}
             icon={<FaSlidersH />}

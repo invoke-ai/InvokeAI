@@ -47,7 +47,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
 
   return (
     <IAISlider
-      label={t('prompt.maxPrompts')}
+      label={t('dynamicPrompts.maxPrompts')}
       isDisabled={isDisabled}
       min={min}
       max={sliderMax}
