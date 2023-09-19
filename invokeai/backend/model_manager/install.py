@@ -529,6 +529,9 @@ class ModelInstall(ModelInstallBase):
             return old_path
 
         new_path = models_dir / model.base_model.value / model.model_type.value / model.name
+        self._logger.info(
+            f"{old_path.name} is not in the right directory for a model of its type. Moving to {new_path}."
+        )
         model.path = self._move_model(old_path, new_path).as_posix()
         self._store.update_model(key, model)
         return model
@@ -652,7 +655,8 @@ class ModelInstall(ModelInstallBase):
     def _scan_register(self, model: Path) -> bool:
         try:
             id = self.register_path(model)
-            self._logger.info(f"Registered {model} with id {id}")
+            self.sync_model_path(id)  # possibly move it to right place in `models`
+            self._logger.info(f"Registered {model.name} with id {id}")
             self._installed.add(id)
         except DuplicateModelException:
             pass

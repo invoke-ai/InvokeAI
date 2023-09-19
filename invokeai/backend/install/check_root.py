@@ -8,7 +8,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 
 def check_invokeai_root(config: InvokeAIAppConfig):
     try:
-        assert config.model_conf_path.exists(), f"{config.model_conf_path} not found"
+        assert config.model_conf_path.parent.exists(), f"{config.model_conf_path.parent} not found"
         assert config.db_path.parent.exists(), f"{config.db_path.parent} not found"
         assert config.models_path.exists(), f"{config.models_path} not found"
         if not config.ignore_missing_core_models:
