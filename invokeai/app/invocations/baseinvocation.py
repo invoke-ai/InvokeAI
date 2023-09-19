@@ -577,6 +577,11 @@ class BaseInvocation(ABC, BaseModel):
                     raise RequiredConnectionException(self.__fields__["type"].default, field_name)
                 elif _input == Input.Any:
                     raise MissingInputException(self.__fields__["type"].default, field_name)
+
+        # skip node cache codepath if it's disabled
+        if context.services.configuration.node_cache_size == 0:
+            return self.invoke(context)
+
         output: BaseInvocationOutput
         if self.use_cache:
             key = context.services.invocation_cache.create_key(self)
