@@ -44,9 +44,8 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
-                item_id=queue_item_id,
                 graph_execution_state_id=graph_execution_state_id,
-                node=node,
+                node_id=node.get("id"),
                 source_node_id=source_node_id,
                 progress_image=progress_image.dict() if progress_image is not None else None,
                 step=step,
