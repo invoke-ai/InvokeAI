@@ -20,8 +20,7 @@ import {
 } from 'services/events/actions';
 import { calculateStepPercentage } from '../util/calculateStepPercentage';
 import { makeToast } from '../util/makeToast';
-import { LANGUAGES } from './constants';
-import { SystemState } from './types';
+import { SystemState, LANGUAGES } from './types';
 import { zPydanticValidationError } from './zodSchemas';
 
 export const initialSystemState: SystemState = {
