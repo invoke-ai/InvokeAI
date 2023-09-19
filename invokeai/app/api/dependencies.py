@@ -1,6 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-import logging
 import sqlite3
 from logging import Logger
 
@@ -59,7 +58,6 @@ class ApiDependencies:
 
     @staticmethod
     def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
-        logger.setLevel(logging.DEBUG)
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
@@ -157,7 +155,5 @@ class ApiDependencies:
 
     @staticmethod
     def shutdown():
-        print("SHUTTING DOWN")
         if ApiDependencies.invoker:
-            print("SHUTTING DOWN INVOKER")
             ApiDependencies.invoker.stop()
