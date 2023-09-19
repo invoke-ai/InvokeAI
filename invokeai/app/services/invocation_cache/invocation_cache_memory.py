@@ -16,9 +16,15 @@ class MemoryInvocationCache(InvocationCacheBase):
         self.__cache_ids = Queue()
 
     def get(self, key: Union[int, str]) -> Optional[BaseInvocationOutput]:
+        if self.__max_cache_size == 0:
+            return None
+
         return self.__cache.get(key, None)
 
     def save(self, key: Union[int, str], value: BaseInvocationOutput) -> None:
+        if self.__max_cache_size == 0:
+            return None
+
         if key not in self.__cache:
             self.__cache[key] = value
             self.__cache_ids.put(key)
@@ -26,6 +32,9 @@ class MemoryInvocationCache(InvocationCacheBase):
                 self.__cache.pop(self.__cache_ids.get())
 
     def delete(self, key: Union[int, str]) -> None:
+        if self.__max_cache_size == 0:
+            return None
+
         if key in self.__cache:
             del self.__cache[key]
 
