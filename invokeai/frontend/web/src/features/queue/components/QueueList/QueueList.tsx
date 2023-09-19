@@ -127,30 +127,34 @@ const QueueList = () => {
 
   return (
     <Flex w="full" h="full" flexDir="column">
-      <QueueListHeader />
-      <Flex
-        ref={rootRef}
-        w="full"
-        h="full"
-        alignItems="center"
-        justifyContent="center"
-      >
-        {queueItems.length ? (
-          <Virtuoso<SessionQueueItemDTO, ListContext>
-            data={queueItems}
-            endReached={handleLoadMore}
-            scrollerRef={setScroller as TableVirtuosoScrollerRef}
-            itemContent={itemContent}
-            computeItemKey={computeItemKey}
-            components={components}
-            context={context}
-          />
-        ) : (
+      {queueItems.length ? (
+        <>
+          <QueueListHeader />
+          <Flex
+            ref={rootRef}
+            w="full"
+            h="full"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Virtuoso<SessionQueueItemDTO, ListContext>
+              data={queueItems}
+              endReached={handleLoadMore}
+              scrollerRef={setScroller as TableVirtuosoScrollerRef}
+              itemContent={itemContent}
+              computeItemKey={computeItemKey}
+              components={components}
+              context={context}
+            />
+          </Flex>
+        </>
+      ) : (
+        <Flex w="full" h="full" alignItems="center" justifyContent="center">
           <Heading color="base.400" _dark={{ color: 'base.500' }}>
             {t('queue.queueEmpty')}
           </Heading>
-        )}
-      </Flex>
+        </Flex>
+      )}
     </Flex>
   );
 };

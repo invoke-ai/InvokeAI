@@ -156,15 +156,15 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
   });
 
   socket.on('queue_item_status_changed', (data) => {
-    const { status, graph_execution_state_id } = data;
+    const { status, session_id } = data;
     if (status === 'in_progress') {
       socket.emit('subscribe_session', {
-        session: graph_execution_state_id,
+        session: session_id,
       });
     }
     if (['new', 'completed', 'failed', 'canceled'].includes(status)) {
       socket.emit('unsubscribe_session', {
-        session: graph_execution_state_id,
+        session: session_id,
       });
     }
     dispatch(socketQueueItemStatusChanged({ data }));

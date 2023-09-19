@@ -141,11 +141,17 @@ export type InvocationRetrievalErrorEvent = {
  * @example socket.on('queue_item_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
  */
 export type QueueItemStatusChangedEvent = {
-  queue_id: string;
   item_id: string;
-  graph_execution_state_id: string;
   batch_id: string;
+  session_id: string;
+  queue_id: string;
+  graph_execution_state_id: string;
   status: components['schemas']['SessionQueueItemDTO']['status'];
+  error: string | undefined;
+  created_at: string;
+  updated_at: string;
+  started_at: string | undefined;
+  completed_at: string | undefined;
 };
 
 export type ClientEmitSubscribeSession = {

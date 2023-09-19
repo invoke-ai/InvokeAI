@@ -7,6 +7,7 @@ import {
 } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
@@ -47,6 +48,17 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
     [context.openQueueItems, item.item_id]
   );
 
+  const executionTime = useMemo(() => {
+    if (!item.completed_at || !item.started_at) {
+      return;
+    }
+    const seconds = getSecondsFromTimestamps(
+      item.started_at,
+      item.completed_at
+    );
+    return `${seconds}s`;
+  }, [item]);
+
   return (
     <Flex
       flexDir="column"
@@ -74,6 +86,9 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
         </Flex>
+        <Flex w={COLUMN_WIDTHS.time} alignItems="center" flexShrink={0}>
+          {executionTime || '-'}
+        </Flex>
         <Flex w={COLUMN_WIDTHS.batchId} flexShrink={0}>
           <Text
             overflow="hidden"
@@ -87,19 +102,22 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         <Flex
           alignItems="center"
           w={COLUMN_WIDTHS.fieldValues}
-          flexGrow={1}
           overflow="hidden"
         >
           {item.field_values && (
-            <Flex gap={2} overflow="hidden">
+            <Flex
+              gap={2}
+              w="full"
+              whiteSpace="nowrap"
+              textOverflow="ellipsis"
+              overflow="hidden"
+            >
               {item.field_values
                 .filter((v) => v.node_path !== 'metadata_accumulator')
                 .map(({ node_path, field_name, value }) => (
                   <Text
+                    as="span"
                     key={`${item.item_id}.${node_path}.${field_name}.${value}`}
-                    whiteSpace="nowrap"
-                    textOverflow="ellipsis"
-                    overflow="hidden"
                   >
                     <Text as="span" fontWeight={600}>
                       {node_path}.{field_name}

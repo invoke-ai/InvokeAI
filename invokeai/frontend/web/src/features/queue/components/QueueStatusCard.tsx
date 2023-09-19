@@ -25,7 +25,7 @@ const QueueStatusCard = () => {
       </Text>
       <Text>
         <Text as="span" fontWeight={600}>
-          {t('queue.inProgress')}:{' '}
+          {t('queue.in_progress')}:{' '}
         </Text>
         {queueStatus?.queue.in_progress}
       </Text>

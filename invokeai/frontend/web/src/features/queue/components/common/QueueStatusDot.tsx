@@ -1,6 +1,5 @@
-import { Badge } from '@chakra-ui/react';
-import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Box } from '@chakra-ui/react';
+import { memo, useMemo } from 'react';
 import { SessionQueueItemStatus } from 'services/api/endpoints/queue';
 
 const STATUSES = {
@@ -11,12 +10,19 @@ const STATUSES = {
   canceled: { colorScheme: 'orange', translationKey: 'queue.canceled' },
 };
 
-const StatusBadge = ({ status }: { status: SessionQueueItemStatus }) => {
-  const { t } = useTranslation();
-  return (
-    <Badge colorScheme={STATUSES[status].colorScheme}>
-      {t(STATUSES[status].translationKey)}
-    </Badge>
+const QueueStatusDot = ({ status }: { status: SessionQueueItemStatus }) => {
+  const sx = useMemo(
+    () => ({
+      w: 2,
+      h: 2,
+      bg: `${STATUSES[status].colorScheme}.${500}`,
+      _dark: {
+        bg: `${STATUSES[status].colorScheme}.${400}`,
+      },
+      borderRadius: '100%',
+    }),
+    [status]
   );
+  return <Box sx={sx} />;
 };
-export default memo(StatusBadge);
+export default memo(QueueStatusDot);

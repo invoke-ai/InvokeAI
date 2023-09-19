@@ -24,6 +24,9 @@ const QueueListHeader = () => {
       <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center">
         <Text variant="subtext">status</Text>
       </Flex>
+      <Flex w={COLUMN_WIDTHS.time} alignItems="center">
+        <Text variant="subtext">time</Text>
+      </Flex>
       <Flex w={COLUMN_WIDTHS.batchId} alignItems="center">
         <Text variant="subtext">batch</Text>
       </Flex>

@@ -221,11 +221,16 @@ class EventServiceBase:
         self.__emit_queue_event(
             event_name="queue_item_status_changed",
             payload=dict(
-                queue_id=session_queue_item.queue_id,
                 item_id=session_queue_item.item_id,
-                graph_execution_state_id=session_queue_item.session_id,
-                batch_id=session_queue_item.batch_id,
                 status=session_queue_item.status,
+                batch_id=session_queue_item.batch_id,
+                session_id=session_queue_item.session_id,
+                queue_id=session_queue_item.queue_id,
+                error=session_queue_item.error,
+                created_at=str(session_queue_item.created_at) if session_queue_item.created_at else None,
+                updated_at=str(session_queue_item.updated_at) if session_queue_item.updated_at else None,
+                started_at=str(session_queue_item.started_at) if session_queue_item.started_at else None,
+                completed_at=str(session_queue_item.completed_at) if session_queue_item.completed_at else None,
             ),
         )
 

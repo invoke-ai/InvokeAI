@@ -4,6 +4,7 @@ import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataView
 import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
@@ -28,17 +29,20 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
 
   const { data: queueItem } = useGetQueueItemQuery(item_id);
 
-  const executionTime = useMemo(() => {
-    if (!queueItem?.completed_at || !queueItem?.started_at) {
-      if (queueItem?.status === 'in_progress') {
-        return t('queue.inProgress');
-      }
-      return t('queue.pending');
+  const statusAndTiming = useMemo(() => {
+    if (!queueItem) {
+      return '';
     }
-    const seconds = (
-      (Date.parse(queueItem.completed_at) - Date.parse(queueItem.started_at)) /
-      1000
-    ).toFixed(2);
+    if (!queueItem.completed_at || !queueItem.started_at) {
+      return t(`queue.${queueItem.status}`);
+    }
+    const seconds = getSecondsFromTimestamps(
+      queueItem.started_at,
+      queueItem.completed_at
+    );
+    if (queueItem.status === 'completed') {
+      return `${t('queue.completedIn')} ${seconds}${seconds === 1 ? '' : 's'}`;
+    }
     return `${seconds}s`;
   }, [queueItem, t]);
 
@@ -59,10 +63,10 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         alignItems="center"
         borderRadius="base"
       >
-        <QueueItemData label="Item ID" data={item_id} />
-        <QueueItemData label="Batch ID" data={batch_id} />
-        <QueueItemData label="Session ID" data={session_id} />
-        <QueueItemData label="Execution Time" data={executionTime} />
+        <QueueItemData label={t('queue.status')} data={statusAndTiming} />
+        <QueueItemData label={t('queue.item')} data={item_id} />
+        <QueueItemData label={t('queue.batch')} data={batch_id} />
+        <QueueItemData label={t('queue.session')} data={session_id} />
         <ButtonGroup size="xs" orientation="vertical">
           <IAIButton
             onClick={cancelQueueItem}
@@ -132,11 +136,18 @@ type QueueItemDataProps = { label: string; data: string };
 
 const QueueItemData = ({ label, data }: QueueItemDataProps) => {
   return (
-    <Flex flexDir="column" p={1} gap={1}>
-      <Heading size="sm" color="base.400">
+    <Flex flexDir="column" p={1} gap={1} overflow="hidden">
+      <Heading
+        size="sm"
+        overflow="hidden"
+        textOverflow="ellipsis"
+        whiteSpace="nowrap"
+      >
         {label}
       </Heading>
-      <Text>{data}</Text>
+      <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+        {data}
+      </Text>
     </Flex>
   );
 };

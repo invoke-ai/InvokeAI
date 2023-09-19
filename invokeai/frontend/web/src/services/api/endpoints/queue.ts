@@ -218,6 +218,7 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/status`,
         method: 'GET',
       }),
+
       providesTags: ['SessionQueueStatus'],
     }),
     getBatchStatus: build.query<

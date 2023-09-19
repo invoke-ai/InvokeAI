@@ -733,6 +733,7 @@ class SqliteSessionQueue(SessionQueueBase):
                     created_at,
                     updated_at,
                     completed_at,
+                    started_at,
                     session_id,
                     batch_id,
                     queue_id
