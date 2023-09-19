@@ -19,6 +19,13 @@ from .baseinvocation import (
 )
 
 
+class SeamlessSettings(BaseModel):
+    axes: List[str] = Field(description="Axes('x' and 'y') to which apply seamless")
+    skipped_layers: int = Field(description="How much down layers skip when applying seamless")
+    skip_second_resnet: bool = Field(description="Skip or not second resnet in down blocks when applying seamless")
+    skip_conv2: bool = Field(description="Skip or not conv2 in down blocks when applying seamless")
+
+
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load submodel")
     base_model: BaseModelType = Field(description="Base model")
@@ -36,8 +43,8 @@ class UNetField(BaseModel):
     unet: ModelInfo = Field(description="Info to load unet submodel")
     scheduler: ModelInfo = Field(description="Info to load scheduler submodel")
     loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
-    seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
     freeu_config: Optional[FreeUConfig] = Field(default=None, description="FreeU configuration")
+    seamless: Optional[SeamlessSettings] = Field(default=None, description="Seamless settings applied to model")
 
 
 class ClipField(BaseModel):
@@ -50,7 +57,7 @@ class ClipField(BaseModel):
 class VaeField(BaseModel):
     # TODO: better naming?
     vae: ModelInfo = Field(description="Info to load vae submodel")
-    seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
+    seamless: Optional[SeamlessSettings] = Field(default=None, description="Seamless settings applied to model")
 
 
 @invocation_output("unet_output")
@@ -451,6 +458,11 @@ class SeamlessModeInvocation(BaseInvocation):
     )
     seamless_y: bool = InputField(default=True, input=Input.Any, description="Specify whether Y axis is seamless")
     seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
+    skipped_layers: int = InputField(default=0, input=Input.Any, description="How much model's down layers to skip")
+    skip_second_resnet: bool = InputField(
+        default=True, input=Input.Any, description="Skip or not second resnet in down layers"
+    )
+    skip_conv2: bool = InputField(default=True, input=Input.Any, description="Skip or not conv2 in down layers")
 
     def invoke(self, context: InvocationContext) -> SeamlessModeOutput:
         # Conditionally append 'x' and 'y' based on seamless_x and seamless_y
@@ -465,9 +477,19 @@ class SeamlessModeInvocation(BaseInvocation):
             seamless_axes_list.append("y")
 
         if unet is not None:
-            unet.seamless_axes = seamless_axes_list
+            unet.seamless = SeamlessSettings(
+                axes=seamless_axes_list,
+                skipped_layers=self.skipped_layers,
+                skip_second_resnet=self.skip_second_resnet,
+                skip_conv2=self.skip_conv2,
+            )
         if vae is not None:
-            vae.seamless_axes = seamless_axes_list
+            vae.seamless = SeamlessSettings(
+                axes=seamless_axes_list,
+                skipped_layers=self.skipped_layers,
+                skip_second_resnet=self.skip_second_resnet,
+                skip_conv2=self.skip_conv2,
+            )
 
         return SeamlessModeOutput(unet=unet, vae=vae)
 

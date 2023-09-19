@@ -719,7 +719,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             with (
                 ExitStack() as exit_stack,
                 ModelPatcher.apply_freeu(unet_info.context.model, self.unet.freeu_config),
-                set_seamless(unet_info.context.model, self.unet.seamless_axes),
+                set_seamless(unet_info.context.model, **self.unet.seamless.dict()),
                 unet_info as unet,
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
                 ModelPatcher.apply_lora_unet(unet, _lora_loader()),
@@ -826,7 +826,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata):
             context=context,
         )
 
-        with set_seamless(vae_info.context.model, self.vae.seamless_axes), vae_info as vae:
+        with set_seamless(vae_info.context.model, **self.vae.seamless.dict()), vae_info as vae:
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)
