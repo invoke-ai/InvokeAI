@@ -67,10 +67,12 @@ class ApiDependencies:
         output_folder = config.output_path
 
         # TODO: build a file/path manager?
-        db_path = config.db_path
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        db_location = str(db_path)
-        # db_location = ":memory:"
+        if config.use_memory_db:
+            db_location = ":memory:"
+        else:
+            db_path = config.db_path
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            db_location = str(db_path)
 
         logger.info(f"Using database at {db_location}")
         db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
