@@ -114,7 +114,7 @@ class SqliteSessionQueue(SessionQueueBase):
                     session_id TEXT NOT NULL UNIQUE, -- duplicated data from the session column, for ease of access
                     field_values TEXT, -- NULL if no values are associated with this queue item
                     session TEXT NOT NULL, -- the session to be executed
-                    status TEXT NOT NULL DEFAULT 'pending', -- the status of the queue item, one of 'pending', 'in_progress', 'complete', 'error', 'canceled'
+                    status TEXT NOT NULL DEFAULT 'pending', -- the status of the queue item, one of 'pending', 'in_progress', 'completed', 'failed', 'canceled'
                     priority INTEGER NOT NULL DEFAULT 0, -- the priority, higher is more important
                     error TEXT, -- any errors associated with this queue item
                     created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
@@ -217,7 +217,7 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def _set_in_progress_to_canceled(self) -> None:
         """
-        Sets all in_progress queue items to canceled.
+        Sets all in_progress queue items to canceled. Run on app startup, not associated with any queue.
         This is necessary because the invoker may have been killed while processing a queue item.
         """
         try:
@@ -433,8 +433,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 """--sql
                 UPDATE session_queue
                 SET status = ?, error = ?
-                WHERE
-                  item_id = ?
+                WHERE item_id = ?
                 """,
                 (status, error, item_id),
             )
