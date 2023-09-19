@@ -8,6 +8,8 @@ import torch
 from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
 
+from invokeai.backend.model_management.models.ip_adapter import IPAdapterModelFormat
+
 from .models import (
     BaseModelType,
     InvalidModelException,
@@ -52,6 +54,7 @@ class ModelProbe(object):
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
+        "CLIPVisionModelWithProjection": ModelType.CLIPVision,
     }
 
     @classmethod
@@ -118,14 +121,18 @@ class ModelProbe(object):
                     and prediction_type == SchedulerPredictionType.VPrediction
                 ),
                 format=format,
-                image_size=1024
-                if (base_type in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner})
-                else 768
-                if (
-                    base_type == BaseModelType.StableDiffusion2
-                    and prediction_type == SchedulerPredictionType.VPrediction
-                )
-                else 512,
+                image_size=(
+                    1024
+                    if (base_type in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner})
+                    else (
+                        768
+                        if (
+                            base_type == BaseModelType.StableDiffusion2
+                            and prediction_type == SchedulerPredictionType.VPrediction
+                        )
+                        else 512
+                    )
+                ),
             )
         except Exception:
             raise
@@ -177,9 +184,10 @@ class ModelProbe(object):
                 return ModelType.ONNX
             if (folder_path / "learned_embeds.bin").exists():
                 return ModelType.TextualInversion
-
             if (folder_path / "pytorch_lora_weights.bin").exists():
                 return ModelType.Lora
+            if (folder_path / "image_encoder.txt").exists():
+                return ModelType.IPAdapter
 
             i = folder_path / "model_index.json"
             c = folder_path / "config.json"
@@ -188,7 +196,12 @@ class ModelProbe(object):
             if config_path:
                 with open(config_path, "r") as file:
                     conf = json.load(file)
-                class_name = conf["_class_name"]
+                if "_class_name" in conf:
+                    class_name = conf["_class_name"]
+                elif "architectures" in conf:
+                    class_name = conf["architectures"][0]
+                else:
+                    class_name = None
 
         if class_name and (type := cls.CLASS2TYPE.get(class_name)):
             return type
@@ -366,6 +379,16 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
         raise InvalidModelException("Unable to determine base type for {self.checkpoint_path}")
 
 
+class IPAdapterCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
+class CLIPVisionCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ########################################################
 # classes for probing folders
 #######################################################
@@ -485,11 +508,13 @@ class ControlNetFolderProbe(FolderProbeBase):
         base_model = (
             BaseModelType.StableDiffusion1
             if dimension == 768
-            else BaseModelType.StableDiffusion2
-            if dimension == 1024
-            else BaseModelType.StableDiffusionXL
-            if dimension == 2048
-            else None
+            else (
+                BaseModelType.StableDiffusion2
+                if dimension == 1024
+                else BaseModelType.StableDiffusionXL
+                if dimension == 2048
+                else None
+            )
         )
         if not base_model:
             raise InvalidModelException(f"Unable to determine model base for {self.folder_path}")
@@ -509,15 +534,47 @@ class LoRAFolderProbe(FolderProbeBase):
         return LoRACheckpointProbe(model_file, None).get_base_type()
 
 
+class IPAdapterFolderProbe(FolderProbeBase):
+    def get_format(self) -> str:
+        return IPAdapterModelFormat.InvokeAI.value
+
+    def get_base_type(self) -> BaseModelType:
+        model_file = self.folder_path / "ip_adapter.bin"
+        if not model_file.exists():
+            raise InvalidModelException("Unknown IP-Adapter model format.")
+
+        state_dict = torch.load(model_file, map_location="cpu")
+        cross_attention_dim = state_dict["ip_adapter"]["1.to_k_ip.weight"].shape[-1]
+        if cross_attention_dim == 768:
+            return BaseModelType.StableDiffusion1
+        elif cross_attention_dim == 1024:
+            return BaseModelType.StableDiffusion2
+        elif cross_attention_dim == 2048:
+            return BaseModelType.StableDiffusionXL
+        else:
+            raise InvalidModelException(f"IP-Adapter had unexpected cross-attention dimension: {cross_attention_dim}.")
+
+
+class CLIPVisionFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Lora, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
+
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
+
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)
