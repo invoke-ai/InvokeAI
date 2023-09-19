@@ -27,6 +27,13 @@ export const loraSlice = createSlice({
       const { model_name, id, base_model } = action.payload;
       state.loras[id] = { id, model_name, base_model, ...defaultLoRAConfig };
     },
+    loraRecalled: (
+      state,
+      action: PayloadAction<LoRAModelConfigEntity & { weight: number }>
+    ) => {
+      const { model_name, id, base_model, weight } = action.payload;
+      state.loras[id] = { id, model_name, base_model, weight };
+    },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const id = action.payload;
       delete state.loras[id];
@@ -62,6 +69,7 @@ export const {
   loraWeightChanged,
   loraWeightReset,
   lorasCleared,
+  loraRecalled,
 } = loraSlice.actions;
 
 export default loraSlice.reducer;
