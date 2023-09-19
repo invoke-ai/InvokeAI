@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -37,6 +37,27 @@ if TYPE_CHECKING:
 
 class ImageServiceABC(ABC):
     """High-level service for image management."""
+
+    _on_changed_callbacks: list[Callable[[ImageDTO], None]]
+    _on_deleted_callbacks: list[Callable[[str], None]]
+
+    @abstractmethod
+    def on_changed(self, on_changed: Callable[[ImageDTO], None]) -> None:
+        """Register a callback for when an item is changed"""
+        pass
+
+    @abstractmethod
+    def on_deleted(self, on_deleted: Callable[[str], None]) -> None:
+        """Register a callback for when an item is deleted"""
+        pass
+
+    @abstractmethod
+    def _on_changed(self, item: ImageDTO) -> None:
+        pass
+
+    @abstractmethod
+    def _on_deleted(self, item_id: str) -> None:
+        pass
 
     @abstractmethod
     def create(
@@ -159,6 +180,24 @@ class ImageServiceDependencies:
 
 class ImageService(ImageServiceABC):
     _services: ImageServiceDependencies
+    _on_changed_callbacks: list[Callable[[ImageDTO], None]] = list()
+    _on_deleted_callbacks: list[Callable[[str], None]] = list()
+
+    def on_changed(self, on_changed: Callable[[ImageDTO], None]) -> None:
+        """Register a callback for when an item is changed"""
+        self._on_changed_callbacks.append(on_changed)
+
+    def on_deleted(self, on_deleted: Callable[[str], None]) -> None:
+        """Register a callback for when an item is deleted"""
+        self._on_deleted_callbacks.append(on_deleted)
+
+    def _on_changed(self, item: ImageDTO) -> None:
+        for callback in self._on_changed_callbacks:
+            callback(item)
+
+    def _on_deleted(self, item_id: str) -> None:
+        for callback in self._on_deleted_callbacks:
+            callback(item_id)
 
     def __init__(self, services: ImageServiceDependencies):
         self._services = services
@@ -217,6 +256,7 @@ class ImageService(ImageServiceABC):
             self._services.image_files.save(image_name=image_name, image=image, metadata=metadata, workflow=workflow)
             image_dto = self.get_dto(image_name)
 
+            self._on_changed(image_dto)
             return image_dto
         except ImageRecordSaveException:
             self._services.logger.error("Failed to save image record")
@@ -235,7 +275,9 @@ class ImageService(ImageServiceABC):
     ) -> ImageDTO:
         try:
             self._services.image_records.update(image_name, changes)
-            return self.get_dto(image_name)
+            image_dto = self.get_dto(image_name)
+            self._on_changed(image_dto)
+            return image_dto
         except ImageRecordSaveException:
             self._services.logger.error("Failed to update image record")
             raise
@@ -374,6 +416,7 @@ class ImageService(ImageServiceABC):
         try:
             self._services.image_files.delete(image_name)
             self._services.image_records.delete(image_name)
+            self._on_deleted(image_name)
         except ImageRecordDeleteException:
             self._services.logger.error("Failed to delete image record")
             raise
@@ -390,6 +433,8 @@ class ImageService(ImageServiceABC):
             for image_name in image_names:
                 self._services.image_files.delete(image_name)
             self._services.image_records.delete_many(image_names)
+            for image_name in image_names:
+                self._on_deleted(image_name)
         except ImageRecordDeleteException:
             self._services.logger.error("Failed to delete image records")
             raise
@@ -406,6 +451,7 @@ class ImageService(ImageServiceABC):
             count = len(image_names)
             for image_name in image_names:
                 self._services.image_files.delete(image_name)
+                self._on_deleted(image_name)
             return count
         except ImageRecordDeleteException:
             self._services.logger.error("Failed to delete image records")

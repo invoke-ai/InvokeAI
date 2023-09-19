@@ -13,13 +13,18 @@ class InvocationCacheBase(ABC):
         pass
 
     @abstractmethod
-    def save(self, key: Union[int, str], value: BaseInvocationOutput) -> None:
+    def save(self, value: BaseInvocationOutput) -> None:
         """Stores an invocation output in the cache"""
         pass
 
     @abstractmethod
     def delete(self, key: Union[int, str]) -> None:
         """Deleted an invocation output from the cache"""
+        pass
+
+    @abstractmethod
+    def clear(self) -> None:
+        """Clears the cache"""
         pass
 
     @classmethod

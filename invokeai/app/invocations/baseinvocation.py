@@ -589,7 +589,7 @@ class BaseInvocation(ABC, BaseModel):
             if cached_value is None:
                 context.services.logger.debug(f'Invocation cache miss for type "{self.get_type()}": {self.id}')
                 output = self.invoke(context)
-                context.services.invocation_cache.save(key, output)
+                context.services.invocation_cache.save(output)
                 return output
             else:
                 context.services.logger.debug(f'Invocation cache hit for type "{self.get_type()}": {self.id}')
