@@ -9,8 +9,8 @@ import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 const progressBarSelector = createSelector(
   stateSelector,
   ({ system }) => {
-    console.log(system.denoiseProgress);
     return {
+      isConnected: system.isConnected,
       hasSteps: Boolean(system.denoiseProgress),
       value: (system.denoiseProgress?.percentage ?? 0) * 100,
     };
@@ -21,13 +21,15 @@ const progressBarSelector = createSelector(
 const ProgressBar = () => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
-  const { hasSteps, value } = useAppSelector(progressBarSelector);
+  const { hasSteps, value, isConnected } = useAppSelector(progressBarSelector);
 
   return (
     <Progress
       value={value}
       aria-label={t('accessibility.invokeProgressBar')}
-      isIndeterminate={Boolean(queueStatus?.queue.in_progress) && !hasSteps}
+      isIndeterminate={
+        isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps
+      }
       h="full"
       w="full"
       borderRadius={2}

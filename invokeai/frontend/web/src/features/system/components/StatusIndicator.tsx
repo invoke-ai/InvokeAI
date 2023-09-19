@@ -46,15 +46,15 @@ const StatusIndicator = () => {
   const { data: queueStatus } = useGetQueueStatusQuery();
 
   const statusColor = useMemo(() => {
+    if (!isConnected) {
+      return 'error';
+    }
+
     if (queueStatus?.queue.in_progress) {
       return 'working';
     }
 
-    if (isConnected) {
-      return 'ok';
-    }
-
-    return 'error';
+    return 'ok';
   }, [queueStatus?.queue.in_progress, isConnected]);
 
   const isHovered = useHoverDirty(ref);
