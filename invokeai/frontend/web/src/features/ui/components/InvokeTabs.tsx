@@ -21,9 +21,9 @@ import { isEqual } from 'lodash-es';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaCube, FaFont, FaImage } from 'react-icons/fa';
-import { FaListOl } from 'react-icons/fa6';
-import { MdDeviceHub, MdGridOn } from 'react-icons/md';
+import { FaCube, FaFont, FaImage, FaStream } from 'react-icons/fa';
+import { FaCircleNodes } from 'react-icons/fa6';
+import { MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import { usePanel } from '../hooks/usePanel';
 import { usePanelStorage } from '../hooks/usePanelStorage';
@@ -71,7 +71,9 @@ const tabs: InvokeTabInfo[] = [
   {
     id: 'nodes',
     translationKey: 'common.nodes',
-    icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    icon: (
+      <Icon as={FaCircleNodes} sx={{ boxSize: 6, pointerEvents: 'none' }} />
+    ),
     content: <NodesTab />,
   },
   {
@@ -83,7 +85,7 @@ const tabs: InvokeTabInfo[] = [
   {
     id: 'queue',
     translationKey: 'queue.queue',
-    icon: <Icon as={FaListOl} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    icon: <Icon as={FaStream} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <QueueTab />,
   },
 ];

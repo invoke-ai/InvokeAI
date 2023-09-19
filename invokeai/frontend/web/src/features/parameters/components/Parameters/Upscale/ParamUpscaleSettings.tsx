@@ -7,7 +7,7 @@ import IAIPopover from 'common/components/IAIPopover';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExpandArrowsAlt } from 'react-icons/fa';
+import { FaExpand } from 'react-icons/fa';
 import { ImageDTO } from 'services/api/types';
 import ParamESRGANModel from './ParamRealESRGANModel';
 
@@ -34,8 +34,9 @@ const ParamUpscalePopover = (props: Props) => {
       onClose={onClose}
       triggerComponent={
         <IAIIconButton
+          tooltip={t('parameters.upscale')}
           onClick={onOpen}
-          icon={<FaExpandArrowsAlt />}
+          icon={<FaExpand />}
           aria-label={t('parameters.upscale')}
         />
       }

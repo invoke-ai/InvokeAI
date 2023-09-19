@@ -8869,12 +8869,6 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -8898,6 +8892,12 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;

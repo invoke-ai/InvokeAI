@@ -1,24 +1,31 @@
-import IAIButton from 'common/components/IAIButton';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FaPlus } from 'react-icons/fa';
 import { useQueueBack } from '../hooks/useQueueBack';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
+import QueueButton from './common/QueueButton';
+import { ChakraProps } from '@chakra-ui/react';
 
-const QueueBackButton = () => {
+type Props = {
+  asIconButton?: boolean;
+  sx?: ChakraProps['sx'];
+};
+
+const QueueBackButton = ({ asIconButton, sx }: Props) => {
   const { t } = useTranslation();
   const { queueBack, isLoading, isDisabled } = useQueueBack();
   return (
-    <IAIButton
+    <QueueButton
+      asIconButton={asIconButton}
+      colorScheme="accent"
+      label={t('queue.queueBack')}
       isDisabled={isDisabled}
       isLoading={isLoading}
-      colorScheme="accent"
       onClick={queueBack}
       tooltip={<EnqueueButtonTooltip />}
-      flexGrow={3}
-      minW={44}
-    >
-      {t('queue.queueBack')}
-    </IAIButton>
+      icon={<FaPlus />}
+      sx={sx}
+    />
   );
 };
 

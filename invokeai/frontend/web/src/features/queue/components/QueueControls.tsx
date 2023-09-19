@@ -28,7 +28,7 @@ const QueueControls = () => {
       <Flex gap={2} w="full">
         <ButtonGroup isAttached flexGrow={2}>
           <QueueBackButton />
-          <QueueFrontButton />
+          <QueueFrontButton asIconButton />
           <CancelCurrentQueueItemButton asIconButton />
         </ButtonGroup>
         <ButtonGroup isAttached>

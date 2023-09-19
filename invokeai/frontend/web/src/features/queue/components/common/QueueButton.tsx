@@ -1,11 +1,11 @@
-import { ThemeTypings } from '@chakra-ui/react';
+import { ChakraProps, ThemeTypings } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { ReactElement, memo } from 'react';
+import { ReactElement, ReactNode, memo } from 'react';
 
 type Props = {
   label: string;
-  tooltip: string;
+  tooltip: ReactNode;
   icon: ReactElement;
   onClick: () => void;
   isDisabled?: boolean;
@@ -13,6 +13,7 @@ type Props = {
   asIconButton?: boolean;
   isLoading?: boolean;
   loadingText?: string;
+  sx?: ChakraProps['sx'];
 };
 
 const QueueButton = ({
@@ -25,6 +26,7 @@ const QueueButton = ({
   asIconButton,
   isLoading,
   loadingText,
+  sx,
 }: Props) => {
   if (asIconButton) {
     return (
@@ -36,6 +38,7 @@ const QueueButton = ({
         isDisabled={isDisabled}
         colorScheme={colorScheme}
         isLoading={isLoading}
+        sx={sx}
       />
     );
   }
@@ -51,6 +54,7 @@ const QueueButton = ({
       isLoading={isLoading}
       loadingText={loadingText ?? label}
       flexGrow={1}
+      sx={sx}
     >
       {label}
     </IAIButton>

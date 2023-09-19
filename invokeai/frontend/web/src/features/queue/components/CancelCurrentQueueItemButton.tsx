@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 import { useCancelCurrentQueueItem } from '../hooks/useCancelCurrentQueueItem';
 import QueueButton from './common/QueueButton';
+import { ChakraProps } from '@chakra-ui/react';
 
 type Props = {
   asIconButton?: boolean;
+  sx?: ChakraProps['sx'];
 };
 
-const CancelCurrentQueueItemButton = ({ asIconButton }: Props) => {
+const CancelCurrentQueueItemButton = ({ asIconButton, sx }: Props) => {
   const { t } = useTranslation();
   const { cancelQueueItem, isLoading, currentQueueItemId } =
     useCancelCurrentQueueItem();
@@ -23,6 +25,7 @@ const CancelCurrentQueueItemButton = ({ asIconButton }: Props) => {
       icon={<FaTimes />}
       onClick={cancelQueueItem}
       colorScheme="error"
+      sx={sx}
     />
   );
 };

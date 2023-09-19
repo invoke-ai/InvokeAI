@@ -1,22 +1,30 @@
-import IAIIconButton from 'common/components/IAIIconButton';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaBoltLightning } from 'react-icons/fa6';
 import { useQueueFront } from '../hooks/useQueueFront';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
+import QueueButton from './common/QueueButton';
+import { ChakraProps } from '@chakra-ui/react';
 
-const QueueFrontButton = () => {
+type Props = {
+  asIconButton?: boolean;
+  sx?: ChakraProps['sx'];
+};
+
+const QueueFrontButton = ({ asIconButton, sx }: Props) => {
   const { t } = useTranslation();
   const { queueFront, isLoading, isDisabled } = useQueueFront();
   return (
-    <IAIIconButton
+    <QueueButton
+      asIconButton={asIconButton}
       colorScheme="base"
-      aria-label={t('queue.queueFront')}
+      label={t('queue.queueFront')}
       isDisabled={isDisabled}
       isLoading={isLoading}
       onClick={queueFront}
       tooltip={<EnqueueButtonTooltip prepend />}
       icon={<FaBoltLightning />}
+      sx={sx}
     />
   );
 };

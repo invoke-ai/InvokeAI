@@ -37,9 +37,8 @@ import {
   FaHourglassHalf,
   FaQuoteRight,
   FaSeedling,
-  FaShareAlt,
 } from 'react-icons/fa';
-import { MdDeviceHub } from 'react-icons/md';
+import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
 import {
   useGetImageDTOQuery,
   useGetImageMetadataFromFileQuery,
@@ -255,10 +254,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           <Menu>
             <MenuButton
               as={IAIIconButton}
-              aria-label={`${t('parameters.sendTo')}...`}
-              tooltip={`${t('parameters.sendTo')}...`}
+              aria-label={t('parameters.imageActions')}
+              tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
-              icon={<FaShareAlt />}
+              icon={<FaEllipsis />}
             />
             <MenuList motionProps={menuListMotionProps}>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
@@ -269,7 +268,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
             isLoading={isLoading}
-            icon={<MdDeviceHub />}
+            icon={<FaCircleNodes />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
             isDisabled={!workflow}
