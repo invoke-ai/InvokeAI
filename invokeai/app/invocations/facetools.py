@@ -479,7 +479,7 @@ class FaceMaskInvocation(BaseInvocation):
             self.y_offset,
         )
 
-        mask_pil = Image.new(mode="L", size=((image.size)), color=0)
+        mask_pil = Image.new(mode="L", size=((image.size)), color=255)
 
         id_range = range(0, len(all_faces))
 
@@ -496,7 +496,7 @@ class FaceMaskInvocation(BaseInvocation):
                     context, image, all_faces, face_id, 0
                 )
                 mask_pil.paste(
-                    Image.new(mode="L", size=((x_max - x_min, y_max - y_min)), color=255),
+                    Image.new(mode="L", size=((x_max - x_min, y_max - y_min)), color=0),
                     box=(x_min, y_min),
                     mask=ImageOps.invert(face_mask_pil),
                 )
