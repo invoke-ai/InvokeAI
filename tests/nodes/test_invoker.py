@@ -14,6 +14,7 @@ from .test_nodes import (  # isort: split
     wait_until,
 )
 
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.graph import Graph, GraphExecutionState, GraphInvocation, LibraryGraph
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_queue import MemoryInvocationQueue
@@ -69,7 +70,7 @@ def mock_services() -> InvocationServices:
         graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
         performance_statistics=InvocationStatsService(graph_execution_manager),
-        configuration=None,  # type: ignore
+        configuration=InvokeAIAppConfig(),
         session_queue=None,  # type: ignore
         session_processor=None,  # type: ignore
         invocation_cache=MemoryInvocationCache(),
