@@ -1,6 +1,8 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { CoreMetadata } from 'features/nodes/types/types';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { CoreMetadata, LoRAMetadataItem } from 'features/nodes/types/types';
 import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
@@ -15,6 +17,11 @@ import {
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageDTO } from 'services/api/types';
+import {
+  loraModelsAdapter,
+  useGetLoRAModelsQuery,
+} from '../../../services/api/endpoints/models';
+import { loraRecalled } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
@@ -30,6 +37,7 @@ import {
 import {
   isValidCfgScale,
   isValidHeight,
+  isValidLoRAModel,
   isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
@@ -46,10 +54,16 @@ import {
   isValidWidth,
 } from '../types/parameterSchemas';
 
+const selector = createSelector(stateSelector, ({ generation }) => {
+  const { model } = generation;
+  return { model };
+});
+
 export const useRecallParameters = () => {
   const dispatch = useAppDispatch();
   const toaster = useAppToaster();
   const { t } = useTranslation();
+  const { model } = useAppSelector(selector);
 
   const parameterSetToast = useCallback(() => {
     toaster({
@@ -60,14 +74,18 @@ export const useRecallParameters = () => {
     });
   }, [t, toaster]);
 
-  const parameterNotSetToast = useCallback(() => {
-    toaster({
-      title: t('toast.parameterNotSet'),
-      status: 'warning',
-      duration: 2500,
-      isClosable: true,
-    });
-  }, [t, toaster]);
+  const parameterNotSetToast = useCallback(
+    (description?: string) => {
+      toaster({
+        title: t('toast.parameterNotSet'),
+        description,
+        status: 'warning',
+        duration: 2500,
+        isClosable: true,
+      });
+    },
+    [t, toaster]
+  );
 
   const allParameterSetToast = useCallback(() => {
     toaster({
@@ -78,14 +96,18 @@ export const useRecallParameters = () => {
     });
   }, [t, toaster]);
 
-  const allParameterNotSetToast = useCallback(() => {
-    toaster({
-      title: t('toast.parametersNotSet'),
-      status: 'warning',
-      duration: 2500,
-      isClosable: true,
-    });
-  }, [t, toaster]);
+  const allParameterNotSetToast = useCallback(
+    (description?: string) => {
+      toaster({
+        title: t('toast.parametersNotSet'),
+        status: 'warning',
+        description,
+        duration: 2500,
+        isClosable: true,
+      });
+    },
+    [t, toaster]
+  );
 
   /**
    * Recall both prompts with toast
@@ -307,6 +329,67 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
+  /**
+   * Recall LoRA with toast
+   */
+
+  const { loras } = useGetLoRAModelsQuery(undefined, {
+    selectFromResult: (result) => ({
+      loras: result.data
+        ? loraModelsAdapter.getSelectors().selectAll(result.data)
+        : [],
+    }),
+  });
+
+  const prepareLoRAMetadataItem = useCallback(
+    (loraMetadataItem: LoRAMetadataItem) => {
+      if (!isValidLoRAModel(loraMetadataItem.lora)) {
+        return { lora: null, error: 'Invalid LoRA model' };
+      }
+
+      const { base_model, model_name } = loraMetadataItem.lora;
+
+      const matchingLoRA = loras.find(
+        (l) => l.base_model === base_model && l.model_name === model_name
+      );
+
+      if (!matchingLoRA) {
+        return { lora: null, error: 'LoRA model is not installed' };
+      }
+
+      const isCompatibleBaseModel =
+        matchingLoRA?.base_model === model?.base_model;
+
+      if (!isCompatibleBaseModel) {
+        return {
+          lora: null,
+          error: 'LoRA incompatible with currently-selected model',
+        };
+      }
+
+      return { lora: matchingLoRA, error: null };
+    },
+    [loras, model?.base_model]
+  );
+
+  const recallLoRA = useCallback(
+    (loraMetadataItem: LoRAMetadataItem) => {
+      const result = prepareLoRAMetadataItem(loraMetadataItem);
+
+      if (!result.lora) {
+        parameterNotSetToast(result.error);
+        return;
+      }
+
+      dispatch(
+        loraRecalled({ ...result.lora, weight: loraMetadataItem.weight })
+      );
+
+      parameterSetToast();
+    },
+    [prepareLoRAMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
   /*
    * Sets image as initial image with toast
    */
@@ -344,6 +427,7 @@ export const useRecallParameters = () => {
         refiner_positive_aesthetic_score,
         refiner_negative_aesthetic_score,
         refiner_start,
+        loras,
       } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
@@ -425,9 +509,21 @@ export const useRecallParameters = () => {
         dispatch(setRefinerStart(refiner_start));
       }
 
+      loras?.forEach((lora) => {
+        const result = prepareLoRAMetadataItem(lora);
+        if (result.lora) {
+          dispatch(loraRecalled({ ...result.lora, weight: lora.weight }));
+        }
+      });
+
       allParameterSetToast();
     },
-    [allParameterNotSetToast, allParameterSetToast, dispatch]
+    [
+      allParameterNotSetToast,
+      allParameterSetToast,
+      dispatch,
+      prepareLoRAMetadataItem,
+    ]
   );
 
   return {
@@ -444,6 +540,7 @@ export const useRecallParameters = () => {
     recallWidth,
     recallHeight,
     recallStrength,
+    recallLoRA,
     recallAllParameters,
     sendToImageToImage,
   };

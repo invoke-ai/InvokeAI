@@ -197,6 +197,13 @@ output = "coverage/index.xml"
 max-line-length = 120
 ignore = ["E203", "E266", "E501", "W503"]
 select = ["B", "C", "E", "F", "W", "T4"]
+exclude = [
+  ".git",
+  "__pycache__",
+  "build",
+  "dist",
+  "invokeai/frontend/web/node_modules/"
+]
 
 [tool.black]
 line-length = 120
