@@ -545,7 +545,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             with (
                 ExitStack() as exit_stack,
                 ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),
-                set_seamless(unet_info.context.model, self.unet.seamless_axes),
+                set_seamless(unet_info.context.model, **self.unet.seamless.dict()),
                 unet_info as unet,
             ):
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
@@ -648,7 +648,7 @@ class LatentsToImageInvocation(BaseInvocation):
             context=context,
         )
 
-        with set_seamless(vae_info.context.model, self.vae.seamless_axes), vae_info as vae:
+        with set_seamless(vae_info.context.model, **self.vae.seamless.dict()), vae_info as vae:
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)
