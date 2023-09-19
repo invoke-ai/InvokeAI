@@ -54,11 +54,8 @@ face must reach for it to be processed. Lowering this value may help if
 detection is failing. If the detected masks are imperfect and stray too far
 outside/inside of faces, the node gives you X & Y offsets to shrink/grow
 the masks by a multiplier. All masks shrink/grow together by the X & Y
-offset values. By default, masks are created to protect faces, with only
-surrounding areas being affected by inpainting (ie. putting the same faces
-on new bodies). When masks are inverted, they protect surrounding areas,
-with only the faces being affected by inpainting (ie. putting new faces on
-the same bodies).
+offset values. By default, masks are created to change faces. When masks
+are inverted they change surrounding areas, protecting faces.
 
 ###### Inputs/Outputs
 
