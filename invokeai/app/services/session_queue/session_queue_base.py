@@ -110,8 +110,3 @@ class SessionQueueBase(ABC):
     def get_queue_item(self, item_id: str) -> SessionQueueItem:
         """Gets a session queue item by ID"""
         pass
-
-    @abstractmethod
-    def get_queue_item_by_session_id(self, session_id: str) -> SessionQueueItem:
-        """Gets a queue item by session ID"""
-        pass

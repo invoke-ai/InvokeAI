@@ -12,8 +12,12 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
     actionCreator: socketQueueItemStatusChanged,
     effect: (action, { dispatch, getState }) => {
       const log = logger('socketio');
-      const { item_id, batch_id, graph_execution_state_id, status } =
-        action.payload.data;
+      const {
+        queue_item_id: item_id,
+        batch_id,
+        graph_execution_state_id,
+        status,
+      } = action.payload.data;
       log.debug(
         action.payload,
         `Queue item ${item_id} status updated: ${status}`

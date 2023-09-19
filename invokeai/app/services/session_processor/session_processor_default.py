@@ -26,20 +26,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self.__stop_event = ThreadEvent()
         self.__poll_now_event = ThreadEvent()
 
-        local_handler.register(event_name=EventServiceBase.session_event, _func=self._on_session_event)
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_queue_event)
 
         self.__threadLimit = BoundedSemaphore(THREAD_LIMIT)
-        self._start_thread()
-
-    def stop(self, *args, **kwargs) -> None:
-        self.__stop_event.set()
-
-    def _poll_now(self) -> None:
-        self.__poll_now_event.set()
-
-    def _start_thread(self) -> None:
-        # threads only live once, so we need to create a new one whenever we start the session processor
         self.__thread = Thread(
             name="session_processor",
             target=self.__process,
@@ -49,40 +38,29 @@ class DefaultSessionProcessor(SessionProcessorBase):
         )
         self.__thread.start()
 
-    async def _on_session_event(self, event: FastAPIEvent) -> None:
-        event_name = event[1]["event"]
-        if event_name in [
-            "graph_execution_state_complete",
-            "invocation_error",
-            "session_retrieval_error",
-            "invocation_retrieval_error",
-        ] or (
-            event_name == "session_canceled"
-            and self.__queue_item is not None
-            and self.__queue_item.session_id == event[1]["data"]["graph_execution_state_id"]
-        ):
-            self.__queue_item = None
-            self._poll_now()
+    def stop(self, *args, **kwargs) -> None:
+        self.__stop_event.set()
+
+    def _poll_now(self) -> None:
+        self.__poll_now_event.set()
 
     async def _on_queue_event(self, event: FastAPIEvent) -> None:
         event_name = event[1]["event"]
-        if event_name == "batch_enqueued":
-            self._poll_now()
-        if event_name == "queue_cleared":
-            self.__queue_item = None
-            self._poll_now()
 
-    def _is_started(self) -> bool:
-        return self.__resume_event.is_set()
-
-    def _is_processing(self) -> bool:
-        return self.__queue_item is not None
-
-    def get_status(self) -> SessionProcessorStatus:
-        return SessionProcessorStatus(
-            is_started=self._is_started(),
-            is_processing=self._is_processing(),
-        )
+        match event_name:
+            case "graph_execution_state_complete" | "invocation_error" | "session_retrieval_error" | "invocation_retrieval_error":
+                self.__queue_item = None
+                self._poll_now()
+            case "session_canceled" if self.__queue_item is not None and self.__queue_item.session_id == event[1][
+                "data"
+            ]["graph_execution_state_id"]:
+                self.__queue_item = None
+                self._poll_now()
+            case "batch_enqueued":
+                self._poll_now()
+            case "queue_cleared":
+                self.__queue_item = None
+                self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
         if not self.__resume_event.is_set():
@@ -93,6 +71,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
         if self.__resume_event.is_set():
             self.__resume_event.clear()
         return self.get_status()
+
+    def get_status(self) -> SessionProcessorStatus:
+        return SessionProcessorStatus(
+            is_started=self.__resume_event.is_set(),
+            is_processing=self.__queue_item is not None,
+        )
 
     def __process(
         self,
@@ -114,19 +98,23 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     queue_item = self.__invoker.services.session_queue.dequeue()
 
                     if queue_item is not None:
-                        # TODO: Why isn't the log level specified in dependencies.py working?
-                        # Within the thread, it is always INFO and `logger.debug()` doesn't display.
-                        # self.__invoker.services.logger.debug(f"Executing queue item {queue_item.item_id}")
+                        self.__invoker.services.logger.debug(f"Executing queue item {queue_item.item_id}")
                         self.__queue_item = queue_item
                         self.__invoker.services.graph_execution_manager.set(queue_item.session)
-                        self.__invoker.invoke(queue_item.session, invoke_all=True)
+                        self.__invoker.invoke(
+                            queue_item_id=queue_item.item_id,
+                            queue_id=queue_item.queue_id,
+                            graph_execution_state=queue_item.session,
+                            invoke_all=True,
+                        )
                         queue_item = None
 
                 if queue_item is None:
-                    # self.__invoker.services.logger.debug("Waiting for next polling interval or event")
+                    self.__invoker.services.logger.debug("Waiting for next polling interval or event")
                     poll_now_event.wait(POLLING_INTERVAL)
                     continue
-        except Exception:
+        except Exception as e:
+            self.__invoker.services.logger.error(f"Error in session processor: {e}")
             pass
         finally:
             stop_event.clear()

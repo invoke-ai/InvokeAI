@@ -33,6 +33,8 @@ export type BaseNode = {
 };
 
 export type ModelLoadStartedEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   model_name: string;
   base_model: BaseModelType;
@@ -41,6 +43,8 @@ export type ModelLoadStartedEvent = {
 };
 
 export type ModelLoadCompletedEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   model_name: string;
   base_model: BaseModelType;
@@ -57,6 +61,8 @@ export type ModelLoadCompletedEvent = {
  * @example socket.on('generator_progress', (data: GeneratorProgressEvent) => { ... }
  */
 export type GeneratorProgressEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -73,6 +79,8 @@ export type GeneratorProgressEvent = {
  * @example socket.on('invocation_complete', (data: InvocationCompleteEvent) => { ... }
  */
 export type InvocationCompleteEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -85,6 +93,8 @@ export type InvocationCompleteEvent = {
  * @example socket.on('invocation_error', (data: InvocationErrorEvent) => { ... }
  */
 export type InvocationErrorEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -98,6 +108,8 @@ export type InvocationErrorEvent = {
  * @example socket.on('invocation_started', (data: InvocationStartedEvent) => { ... }
  */
 export type InvocationStartedEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -109,6 +121,8 @@ export type InvocationStartedEvent = {
  * @example socket.on('graph_execution_state_complete', (data: GraphExecutionStateCompleteEvent) => { ... }
  */
 export type GraphExecutionStateCompleteEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
 };
 
@@ -118,6 +132,8 @@ export type GraphExecutionStateCompleteEvent = {
  * @example socket.on('session_retrieval_error', (data: SessionRetrievalErrorEvent) => { ... }
  */
 export type SessionRetrievalErrorEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   error_type: string;
   error: string;
@@ -129,6 +145,8 @@ export type SessionRetrievalErrorEvent = {
  * @example socket.on('invocation_retrieval_error', (data: InvocationRetrievalErrorEvent) => { ... }
  */
 export type InvocationRetrievalErrorEvent = {
+  queue_id: string;
+  queue_item_id: string;
   graph_execution_state_id: string;
   node_id: string;
   error_type: string;
@@ -141,10 +159,10 @@ export type InvocationRetrievalErrorEvent = {
  * @example socket.on('queue_item_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
  */
 export type QueueItemStatusChangedEvent = {
-  item_id: string;
+  queue_id: string;
+  queue_item_id: string;
   batch_id: string;
   session_id: string;
-  queue_id: string;
   graph_execution_state_id: string;
   status: components['schemas']['SessionQueueItemDTO']['status'];
   error: string | undefined;
@@ -152,14 +170,6 @@ export type QueueItemStatusChangedEvent = {
   updated_at: string;
   started_at: string | undefined;
   completed_at: string | undefined;
-};
-
-export type ClientEmitSubscribeSession = {
-  session: string;
-};
-
-export type ClientEmitUnsubscribeSession = {
-  session: string;
 };
 
 export type ClientEmitSubscribeQueue = {
@@ -188,8 +198,6 @@ export type ServerToClientEvents = {
 export type ClientToServerEvents = {
   connect: () => void;
   disconnect: () => void;
-  subscribe_session: (payload: ClientEmitSubscribeSession) => void;
-  unsubscribe_session: (payload: ClientEmitUnsubscribeSession) => void;
   subscribe_queue: (payload: ClientEmitSubscribeQueue) => void;
   unsubscribe_queue: (payload: ClientEmitUnsubscribeQueue) => void;
 };

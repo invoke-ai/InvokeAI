@@ -90,7 +90,7 @@ class Batch(BaseModel):
                 # Get the type of the first item in the list
                 first_item_type = type(datum.items[0]) if datum.items else None
                 for item in datum.items:
-                    if type(item) != first_item_type:
+                    if type(item) is not first_item_type:
                         raise BatchItemsTypeError("All items in a batch must have the same type")
         return v
 

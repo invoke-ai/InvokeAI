@@ -8,11 +8,13 @@ export type paths = {
   "/api/v1/sessions/": {
     /**
      * List Sessions
+     * @deprecated
      * @description Gets a list of sessions, optionally searching
      */
     get: operations["list_sessions"];
     /**
      * Create Session
+     * @deprecated
      * @description Creates a new session, optionally initializing it with an invocation graph
      */
     post: operations["create_session"];
@@ -20,6 +22,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}": {
     /**
      * Get Session
+     * @deprecated
      * @description Gets a session
      */
     get: operations["get_session"];
@@ -27,6 +30,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}/nodes": {
     /**
      * Add Node
+     * @deprecated
      * @description Adds a node to the graph
      */
     post: operations["add_node"];
@@ -34,11 +38,13 @@ export type paths = {
   "/api/v1/sessions/{session_id}/nodes/{node_path}": {
     /**
      * Update Node
+     * @deprecated
      * @description Updates a node in the graph and removes all linked edges
      */
     put: operations["update_node"];
     /**
      * Delete Node
+     * @deprecated
      * @description Deletes a node in the graph and removes all linked edges
      */
     delete: operations["delete_node"];
@@ -46,6 +52,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}/edges": {
     /**
      * Add Edge
+     * @deprecated
      * @description Adds an edge to the graph
      */
     post: operations["add_edge"];
@@ -53,6 +60,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}/edges/{from_node_id}/{from_field}/{to_node_id}/{to_field}": {
     /**
      * Delete Edge
+     * @deprecated
      * @description Deletes an edge from the graph
      */
     delete: operations["delete_edge"];
@@ -60,11 +68,13 @@ export type paths = {
   "/api/v1/sessions/{session_id}/invoke": {
     /**
      * Invoke Session
+     * @deprecated
      * @description Invokes a session
      */
     put: operations["invoke_session"];
     /**
      * Cancel Session Invoke
+     * @deprecated
      * @description Invokes a session
      */
     delete: operations["cancel_session_invoke"];
@@ -8161,11 +8171,11 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * ControlNetModelFormat
+     * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
@@ -8173,23 +8183,23 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionXLModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -8206,6 +8216,7 @@ export type operations = {
 
   /**
    * List Sessions
+   * @deprecated
    * @description Gets a list of sessions, optionally searching
    */
   list_sessions: {
@@ -8236,9 +8247,16 @@ export type operations = {
   };
   /**
    * Create Session
+   * @deprecated
    * @description Creates a new session, optionally initializing it with an invocation graph
    */
   create_session: {
+    parameters: {
+      query?: {
+        /** @description The id of the queue to associate the session with */
+        queue_id?: string;
+      };
+    };
     requestBody?: {
       content: {
         "application/json": components["schemas"]["Graph"];
@@ -8265,6 +8283,7 @@ export type operations = {
   };
   /**
    * Get Session
+   * @deprecated
    * @description Gets a session
    */
   get_session: {
@@ -8295,6 +8314,7 @@ export type operations = {
   };
   /**
    * Add Node
+   * @deprecated
    * @description Adds a node to the graph
    */
   add_node: {
@@ -8334,6 +8354,7 @@ export type operations = {
   };
   /**
    * Update Node
+   * @deprecated
    * @description Updates a node in the graph and removes all linked edges
    */
   update_node: {
@@ -8375,6 +8396,7 @@ export type operations = {
   };
   /**
    * Delete Node
+   * @deprecated
    * @description Deletes a node in the graph and removes all linked edges
    */
   delete_node: {
@@ -8411,6 +8433,7 @@ export type operations = {
   };
   /**
    * Add Edge
+   * @deprecated
    * @description Adds an edge to the graph
    */
   add_edge: {
@@ -8450,6 +8473,7 @@ export type operations = {
   };
   /**
    * Delete Edge
+   * @deprecated
    * @description Deletes an edge from the graph
    */
   delete_edge: {
@@ -8492,11 +8516,14 @@ export type operations = {
   };
   /**
    * Invoke Session
+   * @deprecated
    * @description Invokes a session
    */
   invoke_session: {
     parameters: {
-      query?: {
+      query: {
+        /** @description The id of the queue to associate the session with */
+        queue_id: string;
         /** @description Whether or not to invoke all remaining invocations */
         all?: boolean;
       };
@@ -8534,6 +8561,7 @@ export type operations = {
   };
   /**
    * Cancel Session Invoke
+   * @deprecated
    * @description Invokes a session
    */
   cancel_session_invoke: {

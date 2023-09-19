@@ -253,49 +253,53 @@ class Graph(BaseModel):
     @root_validator
     def validate_nodes_and_edges(cls, values):
         """Validates that all edges match nodes in the graph"""
-        nodes = cast(dict[str, BaseInvocation], values.get("nodes"))
-        edges = cast(list[Edge], values.get("edges"))
+        nodes = cast(Optional[dict[str, BaseInvocation]], values.get("nodes"))
+        edges = cast(Optional[list[Edge]], values.get("edges"))
 
-        # Validate that all node ids are unique
-        node_ids = [n.id for n in nodes.values()]
-        duplicate_node_ids = set([node_id for node_id in node_ids if node_ids.count(node_id) >= 2])
-        if duplicate_node_ids:
-            raise DuplicateNodeIdError(f"Node ids must be unique, found duplicates {duplicate_node_ids}")
+        if nodes is not None:
+            # Validate that all node ids are unique
+            node_ids = [n.id for n in nodes.values()]
+            duplicate_node_ids = set([node_id for node_id in node_ids if node_ids.count(node_id) >= 2])
+            if duplicate_node_ids:
+                raise DuplicateNodeIdError(f"Node ids must be unique, found duplicates {duplicate_node_ids}")
 
-        # Validate that all node ids match the keys in the nodes dict
-        for k, v in nodes.items():
-            if k != v.id:
-                raise NodeIdMismatchError(f"Node ids must match, got {k} and {v.id}")
+            # Validate that all node ids match the keys in the nodes dict
+            for k, v in nodes.items():
+                if k != v.id:
+                    raise NodeIdMismatchError(f"Node ids must match, got {k} and {v.id}")
 
-        # Validate that all edges match nodes in the graph
-        node_ids = set([e.source.node_id for e in edges] + [e.destination.node_id for e in edges])
-        missing_node_ids = [node_id for node_id in node_ids if node_id not in nodes]
-        if missing_node_ids:
-            raise NodeNotFoundError(f"All edges must reference nodes in the graph, missing nodes: {missing_node_ids}")
-
-        # Validate that all edge fields match node fields in the graph
-        for edge in edges:
-            source_node = nodes.get(edge.source.node_id, None)
-            if source_node is None:
-                raise NodeFieldNotFoundError(f"Edge source node {edge.source.node_id} does not exist in the graph")
-
-            destination_node = nodes.get(edge.destination.node_id, None)
-            if destination_node is None:
-                raise NodeFieldNotFoundError(
-                    f"Edge destination node {edge.destination.node_id} does not exist in the graph"
+        if edges is not None and nodes is not None:
+            # Validate that all edges match nodes in the graph
+            node_ids = set([e.source.node_id for e in edges] + [e.destination.node_id for e in edges])
+            missing_node_ids = [node_id for node_id in node_ids if node_id not in nodes]
+            if missing_node_ids:
+                raise NodeNotFoundError(
+                    f"All edges must reference nodes in the graph, missing nodes: {missing_node_ids}"
                 )
 
-            # output fields are not on the node object directly, they are on the output type
-            if edge.source.field not in source_node.get_output_type().__fields__:
-                raise NodeFieldNotFoundError(
-                    f"Edge source field {edge.source.field} does not exist in node {edge.source.node_id}"
-                )
+            # Validate that all edge fields match node fields in the graph
+            for edge in edges:
+                source_node = nodes.get(edge.source.node_id, None)
+                if source_node is None:
+                    raise NodeFieldNotFoundError(f"Edge source node {edge.source.node_id} does not exist in the graph")
 
-            # input fields are on the node
-            if edge.destination.field not in destination_node.__fields__:
-                raise NodeFieldNotFoundError(
-                    f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
-                )
+                destination_node = nodes.get(edge.destination.node_id, None)
+                if destination_node is None:
+                    raise NodeFieldNotFoundError(
+                        f"Edge destination node {edge.destination.node_id} does not exist in the graph"
+                    )
+
+                # output fields are not on the node object directly, they are on the output type
+                if edge.source.field not in source_node.get_output_type().__fields__:
+                    raise NodeFieldNotFoundError(
+                        f"Edge source field {edge.source.field} does not exist in node {edge.source.node_id}"
+                    )
+
+                # input fields are on the node
+                if edge.destination.field not in destination_node.__fields__:
+                    raise NodeFieldNotFoundError(
+                        f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
+                    )
 
         return values
 
@@ -760,7 +764,6 @@ class GraphExecutionState(BaseModel):
     """Tracks the state of a graph execution"""
 
     id: str = Field(description="The id of the execution state", default_factory=uuid_string)
-
     # TODO: Store a reference to the graph instead of the actual graph?
     graph: Graph = Field(description="The graph being executed")
 

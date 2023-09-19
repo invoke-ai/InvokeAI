@@ -9,7 +9,6 @@ from .test_nodes import (  # isort: split
     TestEventService,
     TextToImageTestInvocation,
 )
-
 import sqlite3
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
@@ -20,6 +19,7 @@ from invokeai.app.services.invocation_queue import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats import InvocationStatsService
 from invokeai.app.services.processor import DefaultInvocationProcessor
+from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
 from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
 
 from .test_invoker import create_edge
@@ -70,7 +70,9 @@ def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[B
         return (None, None)
 
     print(f"invoking {n.id}: {type(n)}")
-    o = n.invoke(InvocationContext(services, "1"))
+    o = n.invoke(
+        InvocationContext(queue_item_id="1", queue_id=DEFAULT_QUEUE_ID, services=services, graph_execution_state_id="1")
+    )
     g.complete(n.id, o)
 
     return (n, o)

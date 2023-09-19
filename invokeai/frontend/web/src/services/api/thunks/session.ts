@@ -1,4 +1,5 @@
 import { createAsyncThunk, isAnyOf } from '@reduxjs/toolkit';
+import { $queueId } from 'features/queue/store/nanoStores';
 import { isObject } from 'lodash-es';
 import { $client } from 'services/api/client';
 import { paths } from 'services/api/schema';
@@ -33,6 +34,7 @@ export const sessionCreated = createAsyncThunk<
   const { POST } = $client.get();
   const { data, error, response } = await POST('/api/v1/sessions/', {
     body: graph,
+    params: { query: { queue_id: $queueId.get() } },
   });
 
   if (error) {
@@ -76,7 +78,10 @@ export const sessionInvoked = createAsyncThunk<
   const { error, response } = await PUT(
     '/api/v1/sessions/{session_id}/invoke',
     {
-      params: { query: { all: true }, path: { session_id } },
+      params: {
+        query: { queue_id: $queueId.get(), all: true },
+        path: { session_id },
+      },
     }
   );
 

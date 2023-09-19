@@ -417,12 +417,18 @@ class UIConfigBase(BaseModel):
 
 
 class InvocationContext:
+    """Initialized and provided to on execution of invocations."""
+
     services: InvocationServices
     graph_execution_state_id: str
+    queue_id: str
+    queue_item_id: str
 
-    def __init__(self, services: InvocationServices, graph_execution_state_id: str):
+    def __init__(self, services: InvocationServices, queue_id: str, queue_item_id: str, graph_execution_state_id: str):
         self.services = services
         self.graph_execution_state_id = graph_execution_state_id
+        self.queue_id = queue_id
+        self.queue_item_id = queue_item_id
 
 
 class BaseInvocationOutput(BaseModel):

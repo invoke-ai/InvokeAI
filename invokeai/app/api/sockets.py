@@ -14,28 +14,9 @@ class SocketIO:
     def __init__(self, app: FastAPI):
         self.__sio = SocketManager(app=app)
 
-        self.__sio.on("subscribe_session", handler=self._handle_sub_session)
-        self.__sio.on("unsubscribe_session", handler=self._handle_unsub_session)
-        local_handler.register(event_name=EventServiceBase.session_event, _func=self._handle_session_event)
-
         self.__sio.on("subscribe_queue", handler=self._handle_sub_queue)
         self.__sio.on("unsubscribe_queue", handler=self._handle_unsub_queue)
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._handle_queue_event)
-
-    async def _handle_session_event(self, event: Event):
-        await self.__sio.emit(
-            event=event[1]["event"],
-            data=event[1]["data"],
-            room=event[1]["data"]["graph_execution_state_id"],
-        )
-
-    async def _handle_sub_session(self, sid, data, *args, **kwargs):
-        if "session" in data:
-            self.__sio.enter_room(sid, data["session"])
-
-    async def _handle_unsub_session(self, sid, data, *args, **kwargs):
-        if "session" in data:
-            self.__sio.leave_room(sid, data["session"])
 
     async def _handle_queue_event(self, event: Event):
         await self.__sio.emit(

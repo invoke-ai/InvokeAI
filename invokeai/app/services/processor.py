@@ -1,6 +1,7 @@
 import time
 import traceback
 from threading import BoundedSemaphore, Event, Thread
+from typing import Optional
 
 import invokeai.backend.util.logging as logger
 
@@ -37,10 +38,11 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
         try:
             self.__threadLimit.acquire()
             statistics: InvocationStatsServiceBase = self.__invoker.services.performance_statistics
+            queue_item: Optional[InvocationQueueItem] = None
 
             while not stop_event.is_set():
                 try:
-                    queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
+                    queue_item = self.__invoker.services.queue.get()
                 except Exception as e:
                     self.__invoker.services.logger.error("Exception while getting from queue:\n%s" % e)
 
@@ -48,7 +50,6 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # do not hammer the queue
                     time.sleep(0.5)
                     continue
-
                 try:
                     graph_execution_state = self.__invoker.services.graph_execution_manager.get(
                         queue_item.graph_execution_state_id
@@ -56,6 +57,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 except Exception as e:
                     self.__invoker.services.logger.error("Exception while retrieving session:\n%s" % e)
                     self.__invoker.services.events.emit_session_retrieval_error(
+                        queue_item_id=queue_item.session_queue_item_id,
+                        queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=queue_item.graph_execution_state_id,
                         error_type=e.__class__.__name__,
                         error=traceback.format_exc(),
@@ -67,6 +70,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 except Exception as e:
                     self.__invoker.services.logger.error("Exception while retrieving invocation:\n%s" % e)
                     self.__invoker.services.events.emit_invocation_retrieval_error(
+                        queue_item_id=queue_item.session_queue_item_id,
+                        queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=queue_item.graph_execution_state_id,
                         node_id=queue_item.invocation_id,
                         error_type=e.__class__.__name__,
@@ -79,6 +84,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 # Send starting event
                 self.__invoker.services.events.emit_invocation_started(
+                    queue_item_id=queue_item.session_queue_item_id,
+                    queue_id=queue_item.session_queue_id,
                     graph_execution_state_id=graph_execution_state.id,
                     node=invocation.dict(),
                     source_node_id=source_node_id,
@@ -89,13 +96,16 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     graph_id = graph_execution_state.id
                     model_manager = self.__invoker.services.model_manager
                     with statistics.collect_stats(invocation, graph_id, model_manager):
-                        # use the internal invoke_internal(), which wraps the node's invoke() method in
-                        # this accomodates nodes which require a value, but get it only from a
-                        # connection
+                        # use the internal invoke_internal(), which wraps the node's invoke() method,
+                        # which handles a few things:
+                        # - nodes that require a value, but get it only from a connection
+                        # - referencing the invocation cache instead of executing the node
                         outputs = invocation.invoke_internal(
                             InvocationContext(
                                 services=self.__invoker.services,
                                 graph_execution_state_id=graph_execution_state.id,
+                                queue_item_id=queue_item.session_queue_item_id,
+                                queue_id=queue_item.session_queue_id,
                             )
                         )
 
@@ -111,6 +121,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                         # Send complete event
                         self.__invoker.services.events.emit_invocation_complete(
+                            queue_item_id=queue_item.session_queue_item_id,
+                            queue_id=queue_item.session_queue_id,
                             graph_execution_state_id=graph_execution_state.id,
                             node=invocation.dict(),
                             source_node_id=source_node_id,
@@ -138,6 +150,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                     # Send error event
                     self.__invoker.services.events.emit_invocation_error(
+                        queue_item_id=queue_item.session_queue_item_id,
+                        queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=graph_execution_state.id,
                         node=invocation.dict(),
                         source_node_id=source_node_id,
@@ -155,10 +169,17 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 is_complete = graph_execution_state.is_complete()
                 if queue_item.invoke_all and not is_complete:
                     try:
-                        self.__invoker.invoke(graph_execution_state, invoke_all=True)
+                        self.__invoker.invoke(
+                            queue_item_id=queue_item.session_queue_item_id,
+                            queue_id=queue_item.session_queue_id,
+                            graph_execution_state=graph_execution_state,
+                            invoke_all=True,
+                        )
                     except Exception as e:
                         self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                         self.__invoker.services.events.emit_invocation_error(
+                            queue_item_id=queue_item.session_queue_item_id,
+                            queue_id=queue_item.session_queue_id,
                             graph_execution_state_id=graph_execution_state.id,
                             node=invocation.dict(),
                             source_node_id=source_node_id,
@@ -166,7 +187,11 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             error=traceback.format_exc(),
                         )
                 elif is_complete:
-                    self.__invoker.services.events.emit_graph_execution_complete(graph_execution_state.id)
+                    self.__invoker.services.events.emit_graph_execution_complete(
+                        queue_item_id=queue_item.session_queue_item_id,
+                        queue_id=queue_item.session_queue_id,
+                        graph_execution_state_id=graph_execution_state.id,
+                    )
 
         except KeyboardInterrupt:
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
