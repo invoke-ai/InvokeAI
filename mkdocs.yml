@@ -131,7 +131,7 @@ nav:
       - Community Nodes: 'nodes/communityNodes.md'
       - Example Workflows: 'nodes/exampleWorkflows.md'
       - Nodes Overview: 'nodes/overview.md'
-      - List of Default Nodes: 'nodes/defaultNodes.md'
+      - Default Nodes: 'nodes/defaultNodes.md'
       - Node Editor Usage: 'nodes/NODES.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
