@@ -1,4 +1,5 @@
-import { ButtonGroup, Flex, Spacer, Text } from '@chakra-ui/react';
+import { Button, ButtonGroup, Flex, Spacer } from '@chakra-ui/react';
+import { useAppDispatch } from 'app/store/storeHooks';
 import CancelCurrentQueueItemButton from 'features/queue/components/CancelCurrentQueueItemButton';
 import ClearQueueButton from 'features/queue/components/ClearQueueButton';
 import PauseProcessorButton from 'features/queue/components/PauseProcessorButton';
@@ -6,7 +7,8 @@ import QueueBackButton from 'features/queue/components/QueueBackButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
 import ResumeProcessorButton from 'features/queue/components/ResumeProcessorButton';
 import ProgressBar from 'features/system/components/ProgressBar';
-import { memo } from 'react';
+import { setActiveTab } from 'features/ui/store/uiSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -46,6 +48,8 @@ const QueueControls = () => {
 export default memo(QueueControls);
 
 const QueueCounts = memo(() => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const { hasItems, pending } = useGetQueueStatusQuery(undefined, {
     selectFromResult: ({ data }) => {
       if (!data) {
@@ -63,23 +67,28 @@ const QueueCounts = memo(() => {
       };
     },
   });
-  const { t } = useTranslation();
+
+  const handleClick = useCallback(() => {
+    dispatch(setActiveTab('queue'));
+  }, [dispatch]);
+
   return (
-    <Flex justifyContent="space-between" alignItems="center">
+    <Flex justifyContent="space-between" alignItems="center" pe={1}>
       <Spacer />
-      <Text
-        variant="subtext"
-        fontSize="sm"
+      <Button
+        onClick={handleClick}
+        size="sm"
+        variant="link"
         fontWeight={400}
+        opacity={0.7}
         fontStyle="oblique 10deg"
-        pe={1}
       >
         {hasItems
           ? t('queue.queuedCount', {
               pending,
             })
           : t('queue.queueEmpty')}
-      </Text>
+      </Button>
     </Flex>
   );
 });
