@@ -29,7 +29,10 @@ class MemoryInvocationCache(InvocationCacheBase):
             self.__cache[key] = value
             self.__cache_ids.put(key)
             if self.__cache_ids.qsize() > self.__max_cache_size:
-                self.__cache.pop(self.__cache_ids.get())
+                try:
+                    self.__cache.pop(self.__cache_ids.get())
+                except KeyError:
+                    pass
 
     def delete(self, key: Union[int, str]) -> None:
         if self.__max_cache_size == 0:
