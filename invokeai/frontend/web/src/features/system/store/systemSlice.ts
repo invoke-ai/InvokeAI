@@ -3,7 +3,6 @@ import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { t } from 'i18next';
 import { get, startCase, truncate, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
-import { queueApi } from 'services/api/endpoints/queue';
 import { isAnySessionRejected } from 'services/api/thunks/session';
 import {
   appSocketConnected,
@@ -16,13 +15,14 @@ import {
   appSocketInvocationStarted,
   appSocketModelLoadCompleted,
   appSocketModelLoadStarted,
+  appSocketQueueItemStatusChanged,
   appSocketSessionRetrievalError,
 } from 'services/events/actions';
+import { calculateStepPercentage } from '../util/calculateStepPercentage';
 import { makeToast } from '../util/makeToast';
 import { LANGUAGES } from './constants';
 import { SystemState } from './types';
 import { zPydanticValidationError } from './zodSchemas';
-import { calculateStepPercentage } from '../util/calculateStepPercentage';
 
 export const initialSystemState: SystemState = {
   isConnected: false,
@@ -152,12 +152,16 @@ export const systemSlice = createSlice({
       state.status = 'CONNECTED';
     });
 
-    // *** Matchers - must be after all cases ***
-
-    builder.addMatcher(isAnyCancelQueueItem, (state) => {
-      state.denoiseProgress = null;
-      state.status = 'CONNECTED';
+    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+      if (
+        ['completed', 'canceled', 'failed'].includes(action.payload.data.status)
+      ) {
+        state.status = 'CONNECTED';
+        state.denoiseProgress = null;
+      }
     });
+
+    // *** Matchers - must be after all cases ***
 
     /**
      * Session Invoked - REJECTED
@@ -237,9 +241,4 @@ const isAnyServerError = isAnyOf(
   appSocketInvocationError,
   appSocketSessionRetrievalError,
   appSocketInvocationRetrievalError
-);
-
-const isAnyCancelQueueItem = isAnyOf(
-  queueApi.endpoints.cancelQueueItem.matchFulfilled,
-  queueApi.endpoints.clearQueue.matchFulfilled
 );

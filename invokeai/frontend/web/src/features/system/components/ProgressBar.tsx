@@ -9,6 +9,7 @@ import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 const progressBarSelector = createSelector(
   stateSelector,
   ({ system }) => {
+    console.log(system.denoiseProgress);
     return {
       hasSteps: Boolean(system.denoiseProgress),
       value: (system.denoiseProgress?.percentage ?? 0) * 100,
@@ -21,14 +22,6 @@ const ProgressBar = () => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const { hasSteps, value } = useAppSelector(progressBarSelector);
-
-  console.log(value);
-  // const value = useMemo(() => {
-  //   if (currentStep && Boolean(queueStatus?.queue.in_progress)) {
-  //     return Math.round((currentStep * 100) / totalSteps);
-  //   }
-  //   return 0;
-  // }, [currentStep, queueStatus?.queue.in_progress, totalSteps]);
 
   return (
     <Progress
