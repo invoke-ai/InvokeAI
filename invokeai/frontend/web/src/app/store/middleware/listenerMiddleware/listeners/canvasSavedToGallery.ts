@@ -4,6 +4,7 @@ import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addCanvasSavedToGalleryListener = () => {
   startAppListening({
@@ -18,8 +19,8 @@ export const addCanvasSavedToGalleryListener = () => {
         log.error('Problem getting base layer blob');
         dispatch(
           addToast({
-            title: 'Problem Saving Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemSavingCanvas'),
+            description: t('toast.problemSavingCanvasDesc'),
             status: 'error',
           })
         );
@@ -39,7 +40,7 @@ export const addCanvasSavedToGalleryListener = () => {
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: 'Canvas Saved to Gallery' },
+            toastOptions: { title: t('toast.canvasSavedGallery') },
           },
         })
       );
