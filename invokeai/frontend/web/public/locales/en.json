@@ -928,8 +928,12 @@
         "perlinNoise": "Perlin Noise",
         "positivePromptPlaceholder": "Positive Prompt",
         "randomizeSeed": "Randomize Seed",
+        "manualSeed": "Manual Seed",
+        "randomSeed": "Random Seed",
         "restoreFaces": "Restore Faces",
         "iterations": "Iterations",
+        "iterationsWithCount_one": "{{count}} Iteration",
+        "iterationsWithCount_other": "{{count}} Iterations",
         "scale": "Scale",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledHeight": "Scaled H",
@@ -968,18 +972,18 @@
         "vSymmetryStep": "V Symmetry Step",
         "width": "Width"
     },
-    "prompt": {
+    "dynamicPrompts": {
         "combinatorial": "Combinatorial Generation",
         "dynamicPrompts": "Dynamic Prompts",
         "enableDynamicPrompts": "Enable Dynamic Prompts",
-        "maxPrompts": "Max Prompts"
-    },
-    "dynamicPrompts": {
+        "maxPrompts": "Max Prompts",
+        "promptsWithCount_one": "{{count}} Prompt",
+        "promptsWithCount_other": "{{count}} Prompts",
         "seedBehaviour": {
             "label": "Seed Behaviour",
-            "perIterationLabel": "Per Iteration",
+            "perIterationLabel": "Seed per Iteration",
             "perIterationDesc": "Use a different seed for each iteration",
-            "perPromptLabel": "Per Prompt",
+            "perPromptLabel": "Seed per Prompt",
             "perPromptDesc": "Use a different seed for each prompt"
         }
     },
