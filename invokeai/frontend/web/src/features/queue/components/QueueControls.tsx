@@ -11,8 +11,11 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const QueueControls = () => {
+  const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
+  const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
   return (
     <Flex
       layerStyle="first"
@@ -32,8 +35,8 @@ const QueueControls = () => {
           <CancelCurrentQueueItemButton asIconButton />
         </ButtonGroup>
         <ButtonGroup isAttached>
-          <ResumeProcessorButton asIconButton />
-          <PauseProcessorButton asIconButton />
+          {isResumeEnabled ? <ResumeProcessorButton asIconButton /> : <></>}
+          {isPauseEnabled ? <PauseProcessorButton asIconButton /> : <></>}
         </ButtonGroup>
         <ClearQueueButton asIconButton />
       </Flex>

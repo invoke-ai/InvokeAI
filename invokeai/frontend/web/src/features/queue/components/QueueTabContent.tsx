@@ -6,8 +6,12 @@ import PruneQueueButton from './PruneQueueButton';
 import QueueList from './QueueList/QueueList';
 import QueueStatus from './QueueStatus';
 import ResumeProcessorButton from './ResumeProcessorButton';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const QueueTabContent = () => {
+  const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
+  const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
+
   return (
     <Flex
       layerStyle="first"
@@ -20,10 +24,14 @@ const QueueTabContent = () => {
     >
       <Flex gap={2} w="full">
         <Flex layerStyle="second" borderRadius="base" p={2} gap={2}>
-          <ButtonGroup w={28} orientation="vertical" isAttached size="sm">
-            <ResumeProcessorButton />
-            <PauseProcessorButton />
-          </ButtonGroup>
+          {isPauseEnabled || isResumeEnabled ? (
+            <ButtonGroup w={28} orientation="vertical" isAttached size="sm">
+              {isResumeEnabled ? <ResumeProcessorButton /> : <></>}
+              {isPauseEnabled ? <PauseProcessorButton /> : <></>}
+            </ButtonGroup>
+          ) : (
+            <></>
+          )}
           <ButtonGroup w={28} orientation="vertical" isAttached size="sm">
             <PruneQueueButton />
             <ClearQueueButton />

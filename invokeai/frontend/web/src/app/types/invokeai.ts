@@ -18,7 +18,9 @@ export type AppFeature =
   | 'dynamicPrompting'
   | 'batches'
   | 'syncModels'
-  | 'multiselect';
+  | 'multiselect'
+  | 'pauseQueue'
+  | 'resumeQueue';
 
 /**
  * A disable-able Stable Diffusion feature
