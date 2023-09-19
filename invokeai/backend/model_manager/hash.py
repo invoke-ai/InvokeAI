@@ -55,7 +55,7 @@ class FastModelHash(object):
         for root, dirs, files in os.walk(model_location):
             for file in files:
                 # only tally tensor files
-                if not file.endswith(('.ckpt', '.safetensors', '.bin', '.pt', '.pth')):
+                if not file.endswith((".ckpt", ".safetensors", ".bin", ".pt", ".pth")):
                     continue
                 path = Path(root) / file
                 fast_hash = cls._hash_file(path)
