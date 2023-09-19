@@ -99,11 +99,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
             {item.batch_id}
           </Text>
         </Flex>
-        <Flex
-          alignItems="center"
-          w={COLUMN_WIDTHS.fieldValues}
-          overflow="hidden"
-        >
+        <Flex alignItems="center" overflow="hidden" flexGrow={1}>
           {item.field_values && (
             <Flex
               gap={2}
