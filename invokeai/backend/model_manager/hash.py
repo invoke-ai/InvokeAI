@@ -54,9 +54,8 @@ class FastModelHash(object):
 
         for root, dirs, files in os.walk(model_location):
             for file in files:
-                # Ignore the config files, which change locally,
-                # and just look at the bin files.
-                if file in ["config.json", "model_index.json"]:
+                # only tally tensor files
+                if not file.endswith(('.ckpt', '.safetensors', '.bin', '.pt', '.pth')):
                     continue
                 path = Path(root) / file
                 fast_hash = cls._hash_file(path)
