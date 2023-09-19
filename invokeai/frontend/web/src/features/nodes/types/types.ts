@@ -94,6 +94,8 @@ export const zFieldType = z.enum([
   'integer',
   'IntegerCollection',
   'IntegerPolymorphic',
+  'IPAdapterField',
+  'IPAdapterModelField',
   'LatentsCollection',
   'LatentsField',
   'LatentsPolymorphic',
@@ -389,6 +391,25 @@ export type ControlCollectionInputFieldValue = z.infer<
   typeof zControlCollectionInputFieldValue
 >;
 
+export const zIPAdapterModel = zModelIdentifier;
+export type IPAdapterModel = z.infer<typeof zIPAdapterModel>;
+
+export const zIPAdapterField = z.object({
+  image: zImageField,
+  ip_adapter_model: zIPAdapterModel,
+  image_encoder_model: z.string().trim().min(1),
+  weight: z.number(),
+});
+export type IPAdapterField = z.infer<typeof zIPAdapterField>;
+
+export const zIPAdapterInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterField'),
+  value: zIPAdapterField.optional(),
+});
+export type IPAdapterInputFieldValue = z.infer<
+  typeof zIPAdapterInputFieldValue
+>;
+
 export const zModelType = z.enum([
   'onnx',
   'main',
@@ -538,6 +559,17 @@ export type ControlNetModelInputFieldValue = z.infer<
   typeof zControlNetModelInputFieldValue
 >;
 
+export const zIPAdapterModelField = zModelIdentifier;
+export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
+
+export const zIPAdapterModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterModelField'),
+  value: zIPAdapterModelField.optional(),
+});
+export type IPAdapterModelInputFieldValue = z.infer<
+  typeof zIPAdapterModelInputFieldValue
+>;
+
 export const zCollectionInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('Collection'),
   value: z.array(z.any()).optional(), // TODO: should this field ever have a value?
@@ -620,6 +652,8 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zIntegerCollectionInputFieldValue,
   zIntegerPolymorphicInputFieldValue,
   zIntegerInputFieldValue,
+  zIPAdapterInputFieldValue,
+  zIPAdapterModelInputFieldValue,
   zLatentsInputFieldValue,
   zLatentsCollectionInputFieldValue,
   zLatentsPolymorphicInputFieldValue,
@@ -822,6 +856,11 @@ export type ControlPolymorphicInputFieldTemplate = Omit<
   type: 'ControlPolymorphic';
 };
 
+export type IPAdapterInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'IPAdapterField';
+};
+
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'enum';
@@ -857,6 +896,11 @@ export type LoRAModelInputFieldTemplate = InputFieldTemplateBase & {
 export type ControlNetModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'ControlNetModelField';
+};
+
+export type IPAdapterModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'IPAdapterModelField';
 };
 
 export type CollectionInputFieldTemplate = InputFieldTemplateBase & {
@@ -930,6 +974,8 @@ export type InputFieldTemplate =
   | IntegerCollectionInputFieldTemplate
   | IntegerPolymorphicInputFieldTemplate
   | IntegerInputFieldTemplate
+  | IPAdapterInputFieldTemplate
+  | IPAdapterModelInputFieldTemplate
   | LatentsInputFieldTemplate
   | LatentsCollectionInputFieldTemplate
   | LatentsPolymorphicInputFieldTemplate
