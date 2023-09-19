@@ -234,6 +234,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal['plain', 'color', 'syslog', 'legacy'] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
     log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
+    log_sql             : bool = Field(default=False, description="Log SQL queries", category="Logging")
 
     dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed.", category="Development")
 

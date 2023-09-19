@@ -76,8 +76,9 @@ class ApiDependencies:
 
         logger.info(f"Using database at {db_location}")
         db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
-        # enable logging of SQL statements
-        # db_conn.set_trace_callback(print)
+
+        if config.log_sql:
+            db_conn.set_trace_callback(print)
         db_conn.execute("PRAGMA foreign_keys = ON;")
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
