@@ -260,6 +260,20 @@ const nodesSlice = createSlice({
       }
       node.data.embedWorkflow = embedWorkflow;
     },
+    nodeUseCacheChanged: (
+      state,
+      action: PayloadAction<{ nodeId: string; useCache: boolean }>
+    ) => {
+      const { nodeId, useCache } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      const node = state.nodes?.[nodeIndex];
+
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      node.data.useCache = useCache;
+    },
     nodeIsIntermediateChanged: (
       state,
       action: PayloadAction<{ nodeId: string; isIntermediate: boolean }>
@@ -904,6 +918,7 @@ export const {
   nodeIsIntermediateChanged,
   mouseOverNodeChanged,
   nodeExclusivelySelected,
+  nodeUseCacheChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

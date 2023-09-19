@@ -26,6 +26,9 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
 
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
+          if (!draft) {
+            console.log('no draft!');
+          }
           queueItemsAdapter.updateOne(draft, {
             id: item_id,
             changes: action.payload.data,

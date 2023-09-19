@@ -10,6 +10,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -55,14 +56,10 @@ export const buildCanvasSDXLTextToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const {
-    scaledBoundingBoxDimensions,
-    boundingBoxScaleMethod,
-    shouldAutoSave,
-  } = state.canvas;
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -93,7 +90,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       ? {
           type: 't2l_onnx',
           id: SDXL_DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -101,7 +98,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       : {
           type: 'denoise_latents',
           id: SDXL_DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -130,27 +127,27 @@ export const buildCanvasSDXLTextToImageGraph = (
       [modelLoaderNodeId]: {
         type: modelLoaderNodeType,
         id: modelLoaderNodeId,
-        is_intermediate: true,
+        is_intermediate,
         model,
       },
       [POSITIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: positivePrompt,
         style: joinedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: negativePrompt,
         style: joinedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-        is_intermediate: true,
+        is_intermediate,
         seed,
         width: !isUsingScaledDimensions
           ? width
@@ -253,14 +250,14 @@ export const buildCanvasSDXLTextToImageGraph = (
     graph.nodes[LATENTS_TO_IMAGE] = {
       id: LATENTS_TO_IMAGE,
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
-      is_intermediate: true,
+      is_intermediate,
       fp32,
     };
 
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       width: width,
       height: height,
     };
@@ -291,7 +288,7 @@ export const buildCanvasSDXLTextToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       fp32,
     };
 
@@ -379,6 +376,8 @@ export const buildCanvasSDXLTextToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

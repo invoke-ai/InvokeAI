@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
+import { SAVE_IMAGE } from 'features/nodes/util/graphBuilders/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -33,7 +34,25 @@ export const addControlNetImageProcessedListener = () => {
             is_intermediate: true,
             image: { image_name: controlNet.controlImage },
           },
+          [SAVE_IMAGE]: {
+            id: SAVE_IMAGE,
+            type: 'save_image',
+            is_intermediate: true,
+            use_cache: false,
+          },
         },
+        edges: [
+          {
+            source: {
+              node_id: controlNet.processorNode.id,
+              field: 'image',
+            },
+            destination: {
+              node_id: SAVE_IMAGE,
+              field: 'image',
+            },
+          },
+        ],
       };
       try {
         const req = dispatch(
@@ -46,7 +65,7 @@ export const addControlNetImageProcessedListener = () => {
         );
         const enqueueResult = await req.unwrap();
         req.reset();
-
+        console.log(enqueueResult.queue_item.session_id);
         log.debug(
           { enqueueResult: parseify(enqueueResult) },
           t('queue.graphQueued')
@@ -56,7 +75,8 @@ export const addControlNetImageProcessedListener = () => {
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
             action.payload.data.graph_execution_state_id ===
-              enqueueResult.queue_item.session_id
+              enqueueResult.queue_item.session_id &&
+            action.payload.data.source_node_id === SAVE_IMAGE
         );
 
         // We still have to check the output type

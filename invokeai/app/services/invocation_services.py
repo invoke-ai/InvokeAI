@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
     from invokeai.app.services.images import ImageServiceABC
+    from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
     from invokeai.app.services.invocation_queue import InvocationQueueABC
     from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
     from invokeai.app.services.invoker import InvocationProcessorABC
@@ -41,6 +42,7 @@ class InvocationServices:
     queue: "InvocationQueueABC"
     session_queue: "SessionQueueBase"
     session_processor: "SessionProcessorBase"
+    invocation_cache: "InvocationCacheBase"
 
     def __init__(
         self,
@@ -59,6 +61,7 @@ class InvocationServices:
         queue: "InvocationQueueABC",
         session_queue: "SessionQueueBase",
         session_processor: "SessionProcessorBase",
+        invocation_cache: "InvocationCacheBase",
     ):
         self.board_images = board_images
         self.boards = boards
@@ -75,3 +78,4 @@ class InvocationServices:
         self.queue = queue
         self.session_queue = session_queue
         self.session_processor = session_processor
+        self.invocation_cache = invocation_cache

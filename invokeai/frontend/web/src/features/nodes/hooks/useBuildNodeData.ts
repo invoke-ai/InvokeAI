@@ -146,6 +146,7 @@ export const useBuildNodeData = () => {
           isIntermediate: true,
           inputs,
           outputs,
+          useCache: template.useCache,
         },
       };
 

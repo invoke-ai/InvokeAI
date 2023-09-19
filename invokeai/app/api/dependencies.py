@@ -10,6 +10,7 @@ from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
@@ -142,6 +143,7 @@ class ApiDependencies:
             logger=logger,
             session_queue=SqliteSessionQueue(conn=db_conn, lock=lock),
             session_processor=DefaultSessionProcessor(),
+            invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),
         )
 
         create_system_graphs(services.graph_library)

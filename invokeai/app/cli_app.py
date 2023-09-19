@@ -1,5 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+
 from .services.config import InvokeAIAppConfig
 
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
@@ -309,6 +311,7 @@ def invoke_cli():
         performance_statistics=InvocationStatsService(graph_execution_manager),
         logger=logger,
         configuration=config,
+        invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),
     )
 
     system_graphs = create_system_graphs(services.graph_library)

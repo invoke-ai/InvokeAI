@@ -2,12 +2,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { some } from 'lodash-es';
 import { useMemo } from 'react';
-import { FOOTER_FIELDS } from '../types/constants';
 import { isInvocationNode } from '../types/types';
 
-export const useHasImageOutputs = (nodeId: string) => {
+export const useUseCache = (nodeId: string) => {
   const selector = useMemo(
     () =>
       createSelector(
@@ -17,15 +15,15 @@ export const useHasImageOutputs = (nodeId: string) => {
           if (!isInvocationNode(node)) {
             return false;
           }
-          return some(node.data.outputs, (output) =>
-            FOOTER_FIELDS.includes(output.type)
-          );
+          // cast to boolean to support older workflows that didn't have useCache
+          // TODO: handle this better somehow
+          return node.data.useCache;
         },
         defaultSelectorOptions
       ),
     [nodeId]
   );
 
-  const withFooter = useAppSelector(selector);
-  return withFooter;
+  const useCache = useAppSelector(selector);
+  return useCache;
 };

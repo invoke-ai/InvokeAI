@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 import threading
 
@@ -14,6 +15,7 @@ from .test_nodes import (  # isort: split
 )
 
 from invokeai.app.services.graph import Graph, GraphExecutionState, GraphInvocation, LibraryGraph
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_queue import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats import InvocationStatsService
@@ -57,7 +59,7 @@ def mock_services() -> InvocationServices:
     return InvocationServices(
         model_manager=None,  # type: ignore
         events=TestEventService(),
-        logger=None,  # type: ignore
+        logger=logging,  # type: ignore
         images=None,  # type: ignore
         latents=None,  # type: ignore
         boards=None,  # type: ignore
@@ -70,6 +72,7 @@ def mock_services() -> InvocationServices:
         configuration=None,  # type: ignore
         session_queue=None,  # type: ignore
         session_processor=None,  # type: ignore
+        invocation_cache=MemoryInvocationCache(),
     )
 
 

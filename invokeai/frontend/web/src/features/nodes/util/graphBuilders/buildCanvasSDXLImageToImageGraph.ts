@@ -7,6 +7,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -60,14 +61,10 @@ export const buildCanvasSDXLImageToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const {
-    scaledBoundingBoxDimensions,
-    boundingBoxScaleMethod,
-    shouldAutoSave,
-  } = state.canvas;
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -121,7 +118,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-        is_intermediate: true,
+        is_intermediate,
         use_cpu,
         seed,
         width: !isUsingScaledDimensions
@@ -134,13 +131,13 @@ export const buildCanvasSDXLImageToImageGraph = (
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
         id: IMAGE_TO_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
         fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: SDXL_DENOISE_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
         cfg_scale,
         scheduler,
         steps,
@@ -251,7 +248,7 @@ export const buildCanvasSDXLImageToImageGraph = (
     graph.nodes[IMG2IMG_RESIZE] = {
       id: IMG2IMG_RESIZE,
       type: 'img_resize',
-      is_intermediate: true,
+      is_intermediate,
       image: initialImage,
       width: scaledBoundingBoxDimensions.width,
       height: scaledBoundingBoxDimensions.height,
@@ -259,13 +256,13 @@ export const buildCanvasSDXLImageToImageGraph = (
     graph.nodes[LATENTS_TO_IMAGE] = {
       id: LATENTS_TO_IMAGE,
       type: 'l2i',
-      is_intermediate: true,
+      is_intermediate,
       fp32,
     };
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       width: width,
       height: height,
     };
@@ -306,7 +303,7 @@ export const buildCanvasSDXLImageToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       type: 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       fp32,
     };
 
@@ -399,6 +396,8 @@ export const buildCanvasSDXLImageToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

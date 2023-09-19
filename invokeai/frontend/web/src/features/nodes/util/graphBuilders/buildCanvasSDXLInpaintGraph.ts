@@ -13,6 +13,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -86,14 +87,10 @@ export const buildCanvasSDXLInpaintGraph = (
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   // We may need to set the inpaint width and height to scale the image
-  const {
-    scaledBoundingBoxDimensions,
-    boundingBoxScaleMethod,
-    shouldAutoSave,
-  } = state.canvas;
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -131,14 +128,14 @@ export const buildCanvasSDXLInpaintGraph = (
       [MASK_BLUR]: {
         type: 'img_blur',
         id: MASK_BLUR,
-        is_intermediate: true,
+        is_intermediate,
         radius: maskBlur,
         blur_type: maskBlurMethod,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
-        is_intermediate: true,
+        is_intermediate,
         fp32,
       },
       [NOISE]: {
@@ -146,18 +143,18 @@ export const buildCanvasSDXLInpaintGraph = (
         id: NOISE,
         use_cpu,
         seed,
-        is_intermediate: true,
+        is_intermediate,
       },
       [INPAINT_CREATE_MASK]: {
         type: 'create_denoise_mask',
         id: INPAINT_CREATE_MASK,
-        is_intermediate: true,
+        is_intermediate,
         fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: SDXL_DENOISE_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
         steps: steps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
@@ -171,18 +168,18 @@ export const buildCanvasSDXLInpaintGraph = (
         id: CANVAS_COHERENCE_NOISE,
         use_cpu,
         seed: seed + 1,
-        is_intermediate: true,
+        is_intermediate,
       },
       [CANVAS_COHERENCE_NOISE_INCREMENT]: {
         type: 'add',
         id: CANVAS_COHERENCE_NOISE_INCREMENT,
         b: 1,
-        is_intermediate: true,
+        is_intermediate,
       },
       [CANVAS_COHERENCE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: CANVAS_COHERENCE_DENOISE_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
         steps: canvasCoherenceSteps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
@@ -192,13 +189,13 @@ export const buildCanvasSDXLInpaintGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        is_intermediate: true,
+        is_intermediate,
         fp32,
       },
       [CANVAS_OUTPUT]: {
         type: 'color_correct',
         id: CANVAS_OUTPUT,
-        is_intermediate: !shouldAutoSave,
+        is_intermediate,
         reference: canvasInitImage,
       },
     },
@@ -390,7 +387,7 @@ export const buildCanvasSDXLInpaintGraph = (
     graph.nodes[INPAINT_IMAGE_RESIZE_UP] = {
       type: 'img_resize',
       id: INPAINT_IMAGE_RESIZE_UP,
-      is_intermediate: true,
+      is_intermediate,
       width: scaledWidth,
       height: scaledHeight,
       image: canvasInitImage,
@@ -398,7 +395,7 @@ export const buildCanvasSDXLInpaintGraph = (
     graph.nodes[MASK_RESIZE_UP] = {
       type: 'img_resize',
       id: MASK_RESIZE_UP,
-      is_intermediate: true,
+      is_intermediate,
       width: scaledWidth,
       height: scaledHeight,
       image: canvasMaskImage,
@@ -406,14 +403,14 @@ export const buildCanvasSDXLInpaintGraph = (
     graph.nodes[INPAINT_IMAGE_RESIZE_DOWN] = {
       type: 'img_resize',
       id: INPAINT_IMAGE_RESIZE_DOWN,
-      is_intermediate: true,
+      is_intermediate,
       width: width,
       height: height,
     };
     graph.nodes[MASK_RESIZE_DOWN] = {
       type: 'img_resize',
       id: MASK_RESIZE_DOWN,
-      is_intermediate: true,
+      is_intermediate,
       width: width,
       height: height,
     };
@@ -551,7 +548,7 @@ export const buildCanvasSDXLInpaintGraph = (
     graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
       type: 'create_denoise_mask',
       id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-      is_intermediate: true,
+      is_intermediate,
       fp32,
     };
 
@@ -604,7 +601,7 @@ export const buildCanvasSDXLInpaintGraph = (
       graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
         type: 'mask_edge',
         id: CANVAS_COHERENCE_MASK_EDGE,
-        is_intermediate: true,
+        is_intermediate,
         edge_blur: maskBlur,
         edge_size: maskBlur * 2,
         low_threshold: 100,
@@ -694,6 +691,8 @@ export const buildCanvasSDXLInpaintGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };
