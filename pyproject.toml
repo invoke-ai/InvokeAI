@@ -32,7 +32,7 @@ classifiers = [
   'Topic :: Scientific/Engineering :: Image Processing',
 ]
 dependencies = [
-  "accelerate~=0.21.0",
+  "accelerate~=0.23.0",
   "albumentations",
   "click",
   "clip_anytorch",  # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
