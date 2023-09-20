@@ -9,7 +9,7 @@ import { startAppListening } from '../..';
 export const addSocketQueueItemStatusChangedEventListener = () => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
-    effect: async (action, { dispatch, getState }) => {
+    effect: async (action, { dispatch }) => {
       const log = logger('socketio');
       const {
         queue_item_id: item_id,
