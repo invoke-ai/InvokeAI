@@ -474,6 +474,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if len(t2i_adapter) == 0:
             return None
 
+        t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
             t2i_adapter_model_info = context.services.model_manager.get_model(
                 model_name=t2i_adapter_field.t2i_adapter_model.model_name,
@@ -493,7 +494,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     f"Unexpected T2I-Adapter base model type: '{t2i_adapter_field.t2i_adapter_model.base_model}'."
                 )
 
-            t2i_adapter_data = []
             with t2i_adapter_model_info as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
                 if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
