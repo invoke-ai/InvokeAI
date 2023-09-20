@@ -55,6 +55,7 @@ class ModelProbe(object):
         "AutoencoderKL": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
+        "T2IAdapter": ModelType.T2IAdapter,
     }
 
     @classmethod
@@ -389,6 +390,11 @@ class CLIPVisionCheckpointProbe(CheckpointProbeBase):
         raise NotImplementedError()
 
 
+class T2IAdapterCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ########################################################
 # classes for probing folders
 #######################################################
@@ -511,9 +517,7 @@ class ControlNetFolderProbe(FolderProbeBase):
             else (
                 BaseModelType.StableDiffusion2
                 if dimension == 1024
-                else BaseModelType.StableDiffusionXL
-                if dimension == 2048
-                else None
+                else BaseModelType.StableDiffusionXL if dimension == 2048 else None
             )
         )
         if not base_model:
@@ -560,6 +564,26 @@ class CLIPVisionFolderProbe(FolderProbeBase):
         return BaseModelType.Any
 
 
+class T2IAdapterFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        config_file = self.folder_path / "config.json"
+        if not config_file.exists():
+            raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
+        with open(config_file, "r") as file:
+            config = json.load(file)
+
+        adapter_type = config.get("adapter_type", None)
+        if adapter_type == "full_adapter_xl":
+            return BaseModelType.StableDiffusionXL
+        elif adapter_type == "full_adapter" or "light_adapter":
+            # I haven't seen any T2I adapter models for SD2, so assume that this is an SD1 adapter.
+            return BaseModelType.StableDiffusion1
+        else:
+            raise InvalidModelException(
+                f"Unable to determine base model for '{self.folder_path}' (adapter_type = {adapter_type})."
+            )
+
+
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
@@ -568,6 +592,7 @@ ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInvers
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
@@ -576,5 +601,6 @@ ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInver
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
 
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)
