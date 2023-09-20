@@ -26,6 +26,7 @@ const ImageMetadataActions = (props: Props) => {
     recallHeight,
     recallStrength,
     recallLoRA,
+    recallControlnet,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {

@@ -2,7 +2,11 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { CoreMetadata, LoRAMetadataItem } from 'features/nodes/types/types';
+import {
+  CoreMetadata,
+  LoRAMetadataItem,
+  ControlNetMetadataItem,
+} from 'features/nodes/types/types';
 import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
@@ -18,10 +22,13 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageDTO } from 'services/api/types';
 import {
+  controlNetModelsAdapter,
   loraModelsAdapter,
+  useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
 import { loraRecalled } from '../../lora/store/loraSlice';
+import { controlnetRecalled } from '../../controlNet/store/controlNetSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
@@ -36,6 +43,7 @@ import {
 } from '../store/generationSlice';
 import {
   isValidCfgScale,
+  isValidControlNetModel,
   isValidHeight,
   isValidLoRAModel,
   isValidMainModel,
@@ -390,6 +398,75 @@ export const useRecallParameters = () => {
     [prepareLoRAMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
+  /**
+   * Recall ControlNet with toast
+   */
+
+  const { controlnets } = useGetControlNetModelsQuery(undefined, {
+    selectFromResult: (result) => ({
+      controlnets: result.data
+        ? controlNetModelsAdapter.getSelectors().selectAll(result.data)
+        : [],
+    }),
+  });
+
+  const prepareControlNetMetadataItem = useCallback(
+    (controlnetMetadataItem: ControlNetMetadataItem) => {
+      if (!isValidControlNetModel(controlnetMetadataItem.controlnet)) {
+        return { controlnet: null, error: 'Invalid ControlNet model' };
+      }
+
+      const { base_model, model_name } = controlnetMetadataItem.controlnet;
+
+      const matchingControlNet = controlnets.find(
+        (l) => l.base_model === base_model && l.model_name === model_name
+      );
+
+      if (!matchingControlNet) {
+        return { controlnet: null, error: 'ControlNet model is not installed' };
+      }
+
+      const isCompatibleBaseModel =
+        matchingControlNet?.base_model === model?.base_model;
+
+      if (!isCompatibleBaseModel) {
+        return {
+          controlnet: null,
+          error: 'ControlNet incompatible with currently-selected model',
+        };
+      }
+
+      return { controlnet: matchingControlNet, error: null };
+    },
+    [controlnets, model?.base_model]
+  );
+
+  const recallControlnet = useCallback(
+    (controlnetMetadataItem: ControlNetMetadataItem) => {
+      const result = prepareControlNetMetadataItem(controlnetMetadataItem);
+
+      if (!result.controlnet) {
+        parameterNotSetToast(result.error);
+        return;
+      }
+
+      dispatch(
+        controlnetRecalled({
+          ...result.controlnet,
+          weight: controlnetMetadataItem.weight,
+        })
+      );
+
+      parameterSetToast();
+    },
+    [
+      prepareControlNetMetadataItem,
+      dispatch,
+      parameterSetToast,
+      parameterNotSetToast,
+    ]
+  );
+
   /*
    * Sets image as initial image with toast
    */
@@ -428,6 +505,7 @@ export const useRecallParameters = () => {
         refiner_negative_aesthetic_score,
         refiner_start,
         loras,
+        controlnets,
       } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
@@ -541,6 +619,7 @@ export const useRecallParameters = () => {
     recallHeight,
     recallStrength,
     recallLoRA,
+    recallControlnet,
     recallAllParameters,
     sendToImageToImage,
   };
