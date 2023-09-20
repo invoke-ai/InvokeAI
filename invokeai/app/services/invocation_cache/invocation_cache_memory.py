@@ -12,13 +12,15 @@ class MemoryInvocationCache(InvocationCacheBase):
     __cache_ids: Queue
     __invoker: Invoker
 
-    def __init__(self, max_cache_size: int = 512) -> None:
+    def __init__(self, max_cache_size: int = 0) -> None:
         self.__cache = dict()
         self.__max_cache_size = max_cache_size
         self.__cache_ids = Queue()
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
+        if self.__max_cache_size == 0:
+            return
         self.__invoker.services.images.on_deleted(self._delete_by_match)
         self.__invoker.services.latents.on_deleted(self._delete_by_match)
 
