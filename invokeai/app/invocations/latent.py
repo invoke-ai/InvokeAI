@@ -8,7 +8,8 @@ import numpy as np
 import torch
 import torchvision.transforms as T
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.models import MultiAdapter, T2IAdapter, UNet2DConditionModel
+from diffusers.models import UNet2DConditionModel
+from diffusers.models.adapter import FullAdapterXL
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -482,13 +483,28 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
             image = context.services.images.get_pil_image(t2i_adapter_field.image.image_name)
 
+            # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
+            if t2i_adapter_field.t2i_adapter_model.base_model == BaseModelType.StableDiffusion1:
+                max_unet_downscale = 8
+            elif t2i_adapter_field.t2i_adapter_model.base_model == BaseModelType.StableDiffusionXL:
+                max_unet_downscale = 4
+            else:
+                raise ValueError(
+                    f"Unexpected T2I-Adapter base model type: '{t2i_adapter_field.t2i_adapter_model.base_model}'."
+                )
+
             t2i_adapter_data = []
             with t2i_adapter_model_info as t2i_adapter_model:
+                total_downscale_factor = t2i_adapter_model.total_downscale_factor
+                if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
+                    # HACK(ryand): Work around a bug in FullAdapterXL. This will be fixed upstream in diffusers.
+                    total_downscale_factor = total_downscale_factor // 2
+
                 # Resize the T2I-Adapter input image.
-                # We select the resize dimensions so that after the T2I-Adapter's downsampling factor is applied, the result
-                # will match the latents_shape.
-                t2i_input_height = latents_shape[2] * t2i_adapter_model.total_downscale_factor
-                t2i_input_width = latents_shape[3] * t2i_adapter_model.total_downscale_factor
+                # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
+                # result will match the latent image's dimensions after max_unet_downscale is applied.
+                t2i_input_height = latents_shape[2] // max_unet_downscale * total_downscale_factor
+                t2i_input_width = latents_shape[3] // max_unet_downscale * total_downscale_factor
 
                 # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
                 # a single image. If CFG is enabled, we will duplicate the resultant tensor after applying the
