@@ -562,6 +562,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__invoker.services.events.emit_session_canceled(
                 queue_item_id=queue_item.item_id,
                 queue_id=queue_item.queue_id,
+                queue_batch_id=queue_item.batch_id,
                 graph_execution_state_id=queue_item.session_id,
             )
             self.__invoker.services.events.emit_queue_item_status_changed(queue_item)
@@ -604,6 +605,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 self.__invoker.services.events.emit_session_canceled(
                     queue_item_id=current_queue_item.item_id,
                     queue_id=current_queue_item.queue_id,
+                    queue_batch_id=current_queue_item.batch_id,
                     graph_execution_state_id=current_queue_item.session_id,
                 )
                 self.__invoker.services.events.emit_queue_item_status_changed(current_queue_item)
@@ -649,6 +651,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 self.__invoker.services.events.emit_session_canceled(
                     queue_item_id=current_queue_item.item_id,
                     queue_id=current_queue_item.queue_id,
+                    queue_batch_id=current_queue_item.batch_id,
                     graph_execution_state_id=current_queue_item.session_id,
                 )
                 self.__invoker.services.events.emit_queue_item_status_changed(current_queue_item)

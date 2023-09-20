@@ -11,12 +11,12 @@ const selector = createSelector(
   ({ system, canvas }) => {
     const { denoiseProgress } = system;
     const { boundingBox } = canvas.layerState.stagingArea;
-    const { sessionIds } = canvas;
+    const { batchIds } = canvas;
 
     return {
       boundingBox,
       progressImage:
-        denoiseProgress && sessionIds.includes(denoiseProgress.session_id)
+        denoiseProgress && batchIds.includes(denoiseProgress.batch_id)
           ? denoiseProgress.progress_image
           : undefined,
     };
