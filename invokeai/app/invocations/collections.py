@@ -56,6 +56,7 @@ class RangeOfSizeInvocation(BaseInvocation):
     tags=["range", "integer", "random", "collection"],
     category="collections",
     version="1.0.0",
+    use_cache=False,
 )
 class RandomRangeInvocation(BaseInvocation):
     """Creates a collection of random numbers"""

@@ -1,4 +1,3 @@
-# Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from .services.config import InvokeAIAppConfig
 
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
@@ -33,7 +32,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
-    from .api.routers import app_info, board_images, boards, images, models, sessions
+    from .api.routers import app_info, board_images, boards, images, models, session_queue, sessions, utilities
     from .api.sockets import SocketIO
     from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
 
@@ -92,6 +91,8 @@ async def shutdown_event():
 
 app.include_router(sessions.session_router, prefix="/api")
 
+app.include_router(utilities.utilities_router, prefix="/api")
+
 app.include_router(models.models_router, prefix="/api")
 
 app.include_router(images.images_router, prefix="/api")
@@ -101,6 +102,8 @@ app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 
 app.include_router(app_info.app_router, prefix="/api")
+
+app.include_router(session_queue.session_queue_router, prefix="/api")
 
 
 # Build a custom OpenAPI to include all outputs

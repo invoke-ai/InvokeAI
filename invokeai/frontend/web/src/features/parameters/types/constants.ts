@@ -1,6 +1,7 @@
 import { components } from 'services/api/schema';
 
 export const MODEL_TYPE_MAP = {
+  any: 'Any',
   'sd-1': 'Stable Diffusion 1.x',
   'sd-2': 'Stable Diffusion 2.x',
   sdxl: 'Stable Diffusion XL',
@@ -8,6 +9,7 @@ export const MODEL_TYPE_MAP = {
 };
 
 export const MODEL_TYPE_SHORT_MAP = {
+  any: 'Any',
   'sd-1': 'SD1',
   'sd-2': 'SD2',
   sdxl: 'SDXL',
@@ -15,6 +17,10 @@ export const MODEL_TYPE_SHORT_MAP = {
 };
 
 export const clipSkipMap = {
+  any: {
+    maxClip: 0,
+    markers: [],
+  },
   'sd-1': {
     maxClip: 12,
     markers: [0, 1, 2, 3, 4, 8, 12],

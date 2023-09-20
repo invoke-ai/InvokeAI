@@ -16,6 +16,8 @@ import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 import ParamAspectRatio, { mappedAspectRatios } from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 const sizeOptsSelector = createSelector(
   [generationSelector, activeTabNameSelector],
@@ -30,7 +32,8 @@ const sizeOptsSelector = createSelector(
       width,
       height,
     };
-  }
+  },
+  defaultSelectorOptions
 );
 
 export default function ParamSize() {
@@ -81,18 +84,20 @@ export default function ParamSize() {
       }}
     >
       <Flex alignItems="center" gap={2}>
-        <Text
-          sx={{
-            fontSize: 'sm',
-            width: 'full',
-            color: 'base.700',
-            _dark: {
-              color: 'base.300',
-            },
-          }}
-        >
-          {t('parameters.aspectRatio')}
-        </Text>
+        <IAIInformationalPopover details="paramRatio">
+          <Text
+            sx={{
+              fontSize: 'sm',
+              width: 'full',
+              color: 'base.700',
+              _dark: {
+                color: 'base.300',
+              },
+            }}
+          >
+            {t('parameters.aspectRatio')}
+          </Text>
+        </IAIInformationalPopover>
         <Spacer />
         <ParamAspectRatio />
         <IAIIconButton

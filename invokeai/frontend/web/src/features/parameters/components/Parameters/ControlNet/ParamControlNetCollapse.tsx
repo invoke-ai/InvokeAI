@@ -6,6 +6,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import IAIIconButton from 'common/components/IAIIconButton';
 import ControlNet from 'features/controlNet/components/ControlNet';
+import IPAdapterPanel from 'features/controlNet/components/ipAdapter/IPAdapterPanel';
 import ParamControlNetFeatureToggle from 'features/controlNet/components/parameters/ParamControlNetFeatureToggle';
 import {
   controlNetAdded,
@@ -14,25 +15,31 @@ import {
 import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
-import { Fragment, memo, useCallback } from 'react';
+import { Fragment, memo, useCallback, useMemo } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import {
-  controlNetModelsAdapter,
-  useGetControlNetModelsQuery,
-} from 'services/api/endpoints/models';
+import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
   [stateSelector],
   ({ controlNet }) => {
-    const { controlNets, isEnabled } = controlNet;
+    const { controlNets, isEnabled, isIPAdapterEnabled } = controlNet;
 
     const validControlNets = getValidControlNets(controlNets);
 
-    const activeLabel =
-      isEnabled && validControlNets.length > 0
-        ? `${validControlNets.length} Active`
-        : undefined;
+    let activeLabel = undefined;
+
+    if (isEnabled && validControlNets.length > 0) {
+      activeLabel = `${validControlNets.length} ControlNet`;
+    }
+
+    if (isIPAdapterEnabled) {
+      if (activeLabel) {
+        activeLabel = `${activeLabel}, IP Adapter`;
+      } else {
+        activeLabel = 'IP Adapter';
+      }
+    }
 
     return { controlNetsArray: map(controlNets), activeLabel };
   },
@@ -43,16 +50,22 @@ const ParamControlNetCollapse = () => {
   const { controlNetsArray, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();
-  const { firstModel } = useGetControlNetModelsQuery(undefined, {
-    selectFromResult: (result) => {
-      const firstModel = result.data
-        ? controlNetModelsAdapter.getSelectors().selectAll(result.data)[0]
-        : undefined;
-      return {
-        firstModel,
-      };
-    },
-  });
+  const { data: controlnetModels } = useGetControlNetModelsQuery();
+
+  const firstModel = useMemo(() => {
+    if (!controlnetModels || !Object.keys(controlnetModels.entities).length) {
+      return undefined;
+    }
+    const firstModelId = Object.keys(controlnetModels.entities)[0];
+
+    if (!firstModelId) {
+      return undefined;
+    }
+
+    const firstModel = controlnetModels.entities[firstModelId];
+
+    return firstModel ? firstModel : undefined;
+  }, [controlnetModels]);
 
   const handleClickedAddControlNet = useCallback(() => {
     if (!firstModel) {
@@ -101,6 +114,7 @@ const ParamControlNetCollapse = () => {
             <ControlNet controlNet={c} />
           </Fragment>
         ))}
+        <IPAdapterPanel />
       </Flex>
     </IAICollapse>
   );

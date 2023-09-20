@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { maxPrompts, combinatorial, isEnabled } = state.dynamicPrompts;
+    const { maxPrompts, combinatorial } = state.dynamicPrompts;
     const { min, sliderMax, inputMax } =
       state.config.sd.dynamicPrompts.maxPrompts;
 
@@ -22,7 +22,7 @@ const selector = createSelector(
       min,
       sliderMax,
       inputMax,
-      isDisabled: !isEnabled || !combinatorial,
+      isDisabled: !combinatorial,
     };
   },
   defaultSelectorOptions
@@ -47,7 +47,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
 
   return (
     <IAISlider
-      label={t('prompt.maxPrompts')}
+      label={t('dynamicPrompts.maxPrompts')}
       isDisabled={isDisabled}
       min={min}
       max={sliderMax}

@@ -8,23 +8,14 @@ import { startAppListening } from '../..';
 export const addInvocationStartedEventListener = () => {
   startAppListening({
     actionCreator: socketInvocationStarted,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
-      if (
-        getState().system.canceledSession ===
-        action.payload.data.graph_execution_state_id
-      ) {
-        log.trace(
-          action.payload,
-          'Ignored invocation started for canceled session'
-        );
-        return;
-      }
 
       log.debug(
         action.payload,
         `Invocation started (${action.payload.data.node.type})`
       );
+
       dispatch(appSocketInvocationStarted(action.payload));
     },
   });
