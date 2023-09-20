@@ -1,9 +1,10 @@
+import { ChakraProps } from '@chakra-ui/react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueueBack } from '../hooks/useQueueBack';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
 import QueueButton from './common/QueueButton';
-import { ChakraProps } from '@chakra-ui/react';
+import GreyscaleInvokeAIIcon from 'common/components/GreyscaleInvokeAIIcon';
 
 type Props = {
   asIconButton?: boolean;
@@ -23,6 +24,7 @@ const QueueBackButton = ({ asIconButton, sx }: Props) => {
       onClick={queueBack}
       tooltip={<EnqueueButtonTooltip />}
       sx={sx}
+      icon={asIconButton ? <GreyscaleInvokeAIIcon /> : undefined}
     />
   );
 };
