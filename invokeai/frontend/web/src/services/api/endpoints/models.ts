@@ -486,7 +486,7 @@ export const modelsApi = api.injectEndpoints({
     >({
       query: () => ({ url: 'models/', params: { model_type: 't2i_adapter' } }),
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
+        const tags: ApiTagDescription[] = [
           { type: 'T2IAdapterModel', id: LIST_TAG },
         ];
 
