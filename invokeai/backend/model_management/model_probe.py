@@ -517,7 +517,9 @@ class ControlNetFolderProbe(FolderProbeBase):
             else (
                 BaseModelType.StableDiffusion2
                 if dimension == 1024
-                else BaseModelType.StableDiffusionXL if dimension == 2048 else None
+                else BaseModelType.StableDiffusionXL
+                if dimension == 2048
+                else None
             )
         )
         if not base_model:

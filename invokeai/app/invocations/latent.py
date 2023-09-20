@@ -32,12 +32,11 @@ from invokeai.app.invocations.primitives import (
     LatentsOutput,
     build_latents_output,
 )
-from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterModelField
+from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
-from invokeai.backend.model_management.models.t2i_adapter import T2IAdapterModel
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 
 from ...backend.model_management.lora import ModelPatcher
