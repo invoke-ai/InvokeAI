@@ -30,7 +30,7 @@ export const addInvocationCompleteEventListener = () => {
         `Invocation complete (${action.payload.data.node.type})`
       );
 
-      const { result, node, graph_execution_state_id } = data;
+      const { result, node, queue_batch_id } = data;
 
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
@@ -43,7 +43,7 @@ export const addInvocationCompleteEventListener = () => {
 
         // Add canvas images to the staging area
         if (
-          canvas.sessionIds.includes(graph_execution_state_id) &&
+          canvas.batchIds.includes(queue_batch_id) &&
           [CANVAS_OUTPUT].includes(data.source_node_id)
         ) {
           dispatch(addImageToStagingArea(imageDTO));
