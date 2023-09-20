@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import {
 
 export const useResumeProcessor = () => {
   const dispatch = useAppDispatch();
+  const isConnected = useAppSelector((state) => state.system.isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const { t } = useTranslation();
   const [trigger, { isLoading }] = useResumeProcessorMutation({
@@ -42,5 +43,10 @@ export const useResumeProcessor = () => {
     }
   }, [isStarted, trigger, dispatch, t]);
 
-  return { resumeProcessor, isLoading, isStarted };
+  const isDisabled = useMemo(
+    () => !isConnected || isStarted,
+    [isConnected, isStarted]
+  );
+
+  return { resumeProcessor, isLoading, isStarted, isDisabled };
 };
