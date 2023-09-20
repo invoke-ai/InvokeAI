@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -47,7 +46,6 @@ export const buildCanvasImageToImageGraph = (
     vaePrecision,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
@@ -70,9 +68,7 @@ export const buildCanvasImageToImageGraph = (
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
