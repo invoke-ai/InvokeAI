@@ -10,7 +10,7 @@ import { startAppListening } from '../..';
 export const addSocketQueueItemStatusChangedEventListener = () => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
-    effect: (action, { dispatch, getState }) => {
+    effect: async (action, { dispatch, getState }) => {
       const log = logger('socketio');
       const {
         queue_item_id: item_id,
@@ -26,9 +26,6 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
 
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
-          if (!draft) {
-            console.log('no draft!');
-          }
           queueItemsAdapter.updateOne(draft, {
             id: item_id,
             changes: action.payload.data,
@@ -45,12 +42,19 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         queueApi.util.invalidateTags([
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
-          'SessionQueueStatus',
           { type: 'SessionQueueItem', id: item_id },
           { type: 'SessionQueueItemDTO', id: item_id },
           { type: 'BatchStatus', id: batch_id },
         ])
       );
+
+      const req = dispatch(
+        queueApi.endpoints.getQueueStatus.initiate(undefined, {
+          forceRefetch: true,
+        })
+      );
+      await req.unwrap();
+      req.unsubscribe();
     },
   });
 };
