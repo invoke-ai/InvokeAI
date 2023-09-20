@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 import { useClearQueue } from '../hooks/useClearQueue';
 import QueueButton from './common/QueueButton';
-import { ChakraProps } from '@chakra-ui/react';
+import { ChakraProps, Text } from '@chakra-ui/react';
+import IAIAlertDialog from 'common/components/IAIAlertDialog';
 
 type Props = {
   asIconButton?: boolean;
@@ -15,17 +16,27 @@ const ClearQueueButton = ({ asIconButton, sx }: Props) => {
   const { clearQueue, isLoading, queueStatus } = useClearQueue();
 
   return (
-    <QueueButton
-      isDisabled={!queueStatus?.queue.total}
-      isLoading={isLoading}
-      asIconButton={asIconButton}
-      label={t('queue.clear')}
-      tooltip={t('queue.clearTooltip')}
-      icon={<FaTrash />}
-      onClick={clearQueue}
-      colorScheme="error"
-      sx={sx}
-    />
+    <IAIAlertDialog
+      title={t('queue.clearTooltip')}
+      acceptCallback={clearQueue}
+      acceptButtonText={t('queue.clear')}
+      triggerComponent={
+        <QueueButton
+          isDisabled={!queueStatus?.queue.total}
+          isLoading={isLoading}
+          asIconButton={asIconButton}
+          label={t('queue.clear')}
+          tooltip={t('queue.clearTooltip')}
+          icon={<FaTrash />}
+          colorScheme="error"
+          sx={sx}
+        />
+      }
+    >
+      <Text>{t('queue.clearQueueAlertDialog')}</Text>
+      <br />
+      <Text>{t('queue.clearQueueAlertDialog2')}</Text>
+    </IAIAlertDialog>
   );
 };
 

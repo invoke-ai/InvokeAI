@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
@@ -41,7 +40,6 @@ export const buildLinearSDXLTextToImageGraph = (
     height,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
@@ -54,9 +52,8 @@ export const buildLinearSDXLTextToImageGraph = (
     refinerStart,
   } = state.sdxl;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
+
   if (!model) {
     log.error('No model found in state');
     throw new Error('No model found in state');

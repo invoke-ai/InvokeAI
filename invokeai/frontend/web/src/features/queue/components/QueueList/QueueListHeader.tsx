@@ -21,16 +21,16 @@ const QueueListHeader = () => {
       >
         <Text variant="subtext">#</Text>
       </Flex>
-      <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center">
+      <Flex ps={0.5} w={COLUMN_WIDTHS.statusBadge} alignItems="center">
         <Text variant="subtext">status</Text>
       </Flex>
-      <Flex w={COLUMN_WIDTHS.time} alignItems="center">
+      <Flex ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center">
         <Text variant="subtext">time</Text>
       </Flex>
-      <Flex w={COLUMN_WIDTHS.batchId} alignItems="center">
+      <Flex ps={0.5} w={COLUMN_WIDTHS.batchId} alignItems="center">
         <Text variant="subtext">batch</Text>
       </Flex>
-      <Flex alignItems="center" w={COLUMN_WIDTHS.fieldValues}>
+      <Flex ps={0.5} w={COLUMN_WIDTHS.fieldValues} alignItems="center">
         <Text variant="subtext">batch field values</Text>
       </Flex>
     </Flex>

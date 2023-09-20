@@ -62,7 +62,6 @@ export const buildCanvasSDXLInpaintGraph = (
     steps,
     seed,
     vaePrecision,
-    shouldUseNoiseSettings,
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
@@ -98,9 +97,7 @@ export const buildCanvasSDXLInpaintGraph = (
 
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
   const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =

@@ -425,12 +425,21 @@ class InvocationContext:
     graph_execution_state_id: str
     queue_id: str
     queue_item_id: int
+    queue_batch_id: str
 
-    def __init__(self, services: InvocationServices, queue_id: str, queue_item_id: int, graph_execution_state_id: str):
+    def __init__(
+        self,
+        services: InvocationServices,
+        queue_id: str,
+        queue_item_id: int,
+        queue_batch_id: str,
+        graph_execution_state_id: str,
+    ):
         self.services = services
         self.graph_execution_state_id = graph_execution_state_id
         self.queue_id = queue_id
         self.queue_item_id = queue_item_id
+        self.queue_batch_id = queue_batch_id
 
 
 class BaseInvocationOutput(BaseModel):

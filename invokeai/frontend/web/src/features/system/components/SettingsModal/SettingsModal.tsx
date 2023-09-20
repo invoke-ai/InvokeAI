@@ -19,7 +19,6 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { setShouldShowAdvancedOptions } from 'features/parameters/store/generationSlice';
 import {
   consoleLogLevelChanged,
   setEnableImageDebugging,
@@ -29,6 +28,7 @@ import {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
+import { LANGUAGES } from 'features/system/store/types';
 import {
   setShouldAutoChangeDimensions,
   setShouldShowProgressInViewer,
@@ -54,11 +54,10 @@ import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
 import StyledFlex from './StyledFlex';
-import { LANGUAGES } from 'features/system/store/types';
 
 const selector = createSelector(
   [stateSelector],
-  ({ system, ui, generation }) => {
+  ({ system, ui }) => {
     const {
       shouldConfirmOnDelete,
       enableImageDebugging,
@@ -75,8 +74,6 @@ const selector = createSelector(
       shouldAutoChangeDimensions,
     } = ui;
 
-    const { shouldShowAdvancedOptions } = generation;
-
     return {
       shouldConfirmOnDelete,
       enableImageDebugging,
@@ -85,7 +82,6 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
-      shouldShowAdvancedOptions,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
       shouldAutoChangeDimensions,
@@ -118,8 +114,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
-  const shouldShowAdvancedOptionsSettings =
-    config?.shouldShowAdvancedOptionsSettings ?? true;
   const shouldShowClearIntermediates =
     config?.shouldShowClearIntermediates ?? true;
   const shouldShowLocalizationToggle =
@@ -161,7 +155,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     consoleLogLevel,
     shouldLogToConsole,
     shouldAntialiasProgressImage,
-    shouldShowAdvancedOptions,
     shouldUseNSFWChecker,
     shouldUseWatermarker,
     shouldAutoChangeDimensions,
@@ -242,15 +235,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
-                {shouldShowAdvancedOptionsSettings && (
-                  <SettingSwitch
-                    label={t('settings.showAdvancedOptions')}
-                    isChecked={shouldShowAdvancedOptions}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setShouldShowAdvancedOptions(e.target.checked))
-                    }
-                  />
-                )}
               </StyledFlex>
 
               <StyledFlex>

@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   DenoiseLatentsInvocation,
   ONNXTextToLatentsInvocation,
@@ -43,16 +42,13 @@ export const buildLinearTextToImageGraph = (
     height,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
     seed,
   } = state.generation;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   if (!model) {
     log.error('No model found in state');

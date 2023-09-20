@@ -7,7 +7,7 @@ type Props = {
   label: string;
   tooltip: ReactNode;
   icon: ReactElement;
-  onClick: () => void;
+  onClick?: () => void;
   isDisabled?: boolean;
   colorScheme: ThemeTypings['colorSchemes'];
   asIconButton?: boolean;

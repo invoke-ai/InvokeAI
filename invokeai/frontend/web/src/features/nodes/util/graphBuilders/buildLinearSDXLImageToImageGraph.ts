@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
@@ -52,7 +51,6 @@ export const buildLinearSDXLImageToImageGraph = (
     height,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
@@ -91,9 +89,7 @@ export const buildLinearSDXLImageToImageGraph = (
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
   const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =

@@ -103,7 +103,12 @@ def test_can_create_graph_state_from_graph(mock_invoker: Invoker, simple_graph):
 # @pytest.mark.xfail(reason = "Requires fixing following the model manager refactor")
 def test_can_invoke(mock_invoker: Invoker, simple_graph):
     g = mock_invoker.create_execution_state(graph=simple_graph)
-    invocation_id = mock_invoker.invoke(queue_item_id=1, queue_id=DEFAULT_QUEUE_ID, graph_execution_state=g)
+    invocation_id = mock_invoker.invoke(
+        session_queue_batch_id="1",
+        session_queue_item_id=1,
+        session_queue_id=DEFAULT_QUEUE_ID,
+        graph_execution_state=g,
+    )
     assert invocation_id is not None
 
     def has_executed_any(g: GraphExecutionState):
@@ -121,7 +126,11 @@ def test_can_invoke(mock_invoker: Invoker, simple_graph):
 def test_can_invoke_all(mock_invoker: Invoker, simple_graph):
     g = mock_invoker.create_execution_state(graph=simple_graph)
     invocation_id = mock_invoker.invoke(
-        queue_item_id=1, queue_id=DEFAULT_QUEUE_ID, graph_execution_state=g, invoke_all=True
+        session_queue_batch_id="1",
+        session_queue_item_id=1,
+        session_queue_id=DEFAULT_QUEUE_ID,
+        graph_execution_state=g,
+        invoke_all=True,
     )
     assert invocation_id is not None
 
@@ -141,7 +150,13 @@ def test_handles_errors(mock_invoker: Invoker):
     g = mock_invoker.create_execution_state()
     g.graph.add_node(ErrorInvocation(id="1"))
 
-    mock_invoker.invoke(queue_item_id=1, queue_id=DEFAULT_QUEUE_ID, graph_execution_state=g, invoke_all=True)
+    mock_invoker.invoke(
+        session_queue_batch_id="1",
+        session_queue_item_id=1,
+        session_queue_id=DEFAULT_QUEUE_ID,
+        graph_execution_state=g,
+        invoke_all=True,
+    )
 
     def has_executed_all(g: GraphExecutionState):
         g = mock_invoker.services.graph_execution_manager.get(g.id)
