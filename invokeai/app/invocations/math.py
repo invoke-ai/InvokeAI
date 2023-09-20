@@ -54,7 +54,14 @@ class DivideInvocation(BaseInvocation):
         return IntegerOutput(value=int(self.a / self.b))
 
 
-@invocation("rand_int", title="Random Integer", tags=["math", "random"], category="math", version="1.0.0")
+@invocation(
+    "rand_int",
+    title="Random Integer",
+    tags=["math", "random"],
+    category="math",
+    version="1.0.0",
+    use_cache=False,
+)
 class RandomIntInvocation(BaseInvocation):
     """Outputs a single random integer."""
 

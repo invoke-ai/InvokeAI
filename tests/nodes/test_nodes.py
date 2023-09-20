@@ -53,6 +53,7 @@ class ImageTestInvocationOutput(BaseInvocationOutput):
 @invocation("test_text_to_image")
 class TextToImageTestInvocation(BaseInvocation):
     prompt: str = Field(default="")
+    prompt2: str = Field(default="")
 
     def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))

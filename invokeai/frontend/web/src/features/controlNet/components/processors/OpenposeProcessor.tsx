@@ -1,13 +1,11 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredOpenposeImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.openpose_image_processor
   .default as RequiredOpenposeImageProcessorInvocation;
@@ -22,7 +20,6 @@ const OpenposeProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, hand_and_face } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
   const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
@@ -70,7 +67,7 @@ const OpenposeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
         label={t('controlnet.imageResolution')}
@@ -82,13 +79,13 @@ const OpenposeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISwitch
         label={t('controlnet.handAndFace')}
         isChecked={hand_and_face}
         onChange={handleHandAndFaceChanged}
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

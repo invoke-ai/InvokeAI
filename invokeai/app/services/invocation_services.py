@@ -12,12 +12,15 @@ if TYPE_CHECKING:
     from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
     from invokeai.app.services.images import ImageServiceABC
+    from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
     from invokeai.app.services.invocation_queue import InvocationQueueABC
     from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
     from invokeai.app.services.invoker import InvocationProcessorABC
     from invokeai.app.services.item_storage import ItemStorageABC
     from invokeai.app.services.latent_storage import LatentsStorageBase
     from invokeai.app.services.model_manager_service import ModelManagerServiceBase
+    from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
+    from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 
 
 class InvocationServices:
@@ -28,8 +31,8 @@ class InvocationServices:
     boards: "BoardServiceABC"
     configuration: "InvokeAIAppConfig"
     events: "EventServiceBase"
-    graph_execution_manager: "ItemStorageABC"["GraphExecutionState"]
-    graph_library: "ItemStorageABC"["LibraryGraph"]
+    graph_execution_manager: "ItemStorageABC[GraphExecutionState]"
+    graph_library: "ItemStorageABC[LibraryGraph]"
     images: "ImageServiceABC"
     latents: "LatentsStorageBase"
     logger: "Logger"
@@ -37,6 +40,9 @@ class InvocationServices:
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
     queue: "InvocationQueueABC"
+    session_queue: "SessionQueueBase"
+    session_processor: "SessionProcessorBase"
+    invocation_cache: "InvocationCacheBase"
 
     def __init__(
         self,
@@ -44,8 +50,8 @@ class InvocationServices:
         boards: "BoardServiceABC",
         configuration: "InvokeAIAppConfig",
         events: "EventServiceBase",
-        graph_execution_manager: "ItemStorageABC"["GraphExecutionState"],
-        graph_library: "ItemStorageABC"["LibraryGraph"],
+        graph_execution_manager: "ItemStorageABC[GraphExecutionState]",
+        graph_library: "ItemStorageABC[LibraryGraph]",
         images: "ImageServiceABC",
         latents: "LatentsStorageBase",
         logger: "Logger",
@@ -53,9 +59,11 @@ class InvocationServices:
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
         queue: "InvocationQueueABC",
+        session_queue: "SessionQueueBase",
+        session_processor: "SessionProcessorBase",
+        invocation_cache: "InvocationCacheBase",
     ):
         self.board_images = board_images
-        self.boards = boards
         self.boards = boards
         self.configuration = configuration
         self.events = events
@@ -68,3 +76,6 @@ class InvocationServices:
         self.processor = processor
         self.performance_statistics = performance_statistics
         self.queue = queue
+        self.session_queue = session_queue
+        self.session_processor = session_processor
+        self.invocation_cache = invocation_cache

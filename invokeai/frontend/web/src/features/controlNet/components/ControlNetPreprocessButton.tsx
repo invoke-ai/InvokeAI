@@ -3,7 +3,7 @@ import { memo, useCallback } from 'react';
 import { ControlNetConfig } from '../store/controlNetSlice';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlNetImageProcessed } from '../store/actions';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -12,7 +12,7 @@ type Props = {
 const ControlNetPreprocessButton = (props: Props) => {
   const { controlNetId, controlImage } = props.controlNet;
   const dispatch = useAppDispatch();
-  const isReady = useIsReadyToInvoke();
+  const isReady = useIsReadyToEnqueue();
 
   const handleProcess = useCallback(() => {
     dispatch(

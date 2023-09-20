@@ -8,10 +8,9 @@ import {
   ImageToLatentsInvocation,
   MaskEdgeInvocation,
   NoiseInvocation,
-  RandomIntInvocation,
-  RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
+import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -31,7 +30,6 @@ import {
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
-  ITERATE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   MASK_BLUR,
@@ -40,10 +38,9 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RANDOM_INT,
-  RANGE_OF_SIZE,
   SEAMLESS,
 } from './constants';
+import { addSaveImageNode } from './addSaveImageNode';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -62,9 +59,7 @@ export const buildCanvasInpaintGraph = (
     scheduler,
     steps,
     img2imgStrength: strength,
-    iterations,
     seed,
-    shouldRandomizeSeed,
     vaePrecision,
     shouldUseNoiseSettings,
     shouldUseCpuNoise,
@@ -87,12 +82,8 @@ export const buildCanvasInpaintGraph = (
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   // We may need to set the inpaint width and height to scale the image
-  const {
-    scaledBoundingBoxDimensions,
-    boundingBoxScaleMethod,
-    shouldAutoSave,
-  } = state.canvas;
-
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
+  const is_intermediate = true;
   const fp32 = vaePrecision === 'fp32';
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
@@ -111,56 +102,57 @@ export const buildCanvasInpaintGraph = (
       [modelLoaderNodeId]: {
         type: 'main_model_loader',
         id: modelLoaderNodeId,
-        is_intermediate: true,
+        is_intermediate,
         model,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
-        is_intermediate: true,
+        is_intermediate,
         skipped_layers: clipSkip,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'compel',
         id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: negativePrompt,
       },
       [MASK_BLUR]: {
         type: 'img_blur',
         id: MASK_BLUR,
-        is_intermediate: true,
+        is_intermediate,
         radius: maskBlur,
         blur_type: maskBlurMethod,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
-        is_intermediate: true,
+        is_intermediate,
         fp32,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         use_cpu,
-        is_intermediate: true,
+        seed,
+        is_intermediate,
       },
       [INPAINT_CREATE_MASK]: {
         type: 'create_denoise_mask',
         id: INPAINT_CREATE_MASK,
-        is_intermediate: true,
+        is_intermediate,
         fp32,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: DENOISE_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
         steps: steps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
@@ -169,20 +161,21 @@ export const buildCanvasInpaintGraph = (
       },
       [CANVAS_COHERENCE_NOISE]: {
         type: 'noise',
-        id: NOISE,
+        id: CANVAS_COHERENCE_NOISE,
         use_cpu,
-        is_intermediate: true,
+        seed: seed + 1,
+        is_intermediate,
       },
       [CANVAS_COHERENCE_NOISE_INCREMENT]: {
         type: 'add',
         id: CANVAS_COHERENCE_NOISE_INCREMENT,
         b: 1,
-        is_intermediate: true,
+        is_intermediate,
       },
       [CANVAS_COHERENCE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: CANVAS_COHERENCE_DENOISE_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
         steps: canvasCoherenceSteps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
@@ -192,28 +185,14 @@ export const buildCanvasInpaintGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        is_intermediate: true,
+        is_intermediate,
         fp32,
       },
       [CANVAS_OUTPUT]: {
         type: 'color_correct',
         id: CANVAS_OUTPUT,
-        is_intermediate: !shouldAutoSave,
+        is_intermediate,
         reference: canvasInitImage,
-      },
-      [RANGE_OF_SIZE]: {
-        type: 'range_of_size',
-        id: RANGE_OF_SIZE,
-        is_intermediate: true,
-        // seed - must be connected manually
-        // start: 0,
-        size: iterations,
-        step: 1,
-      },
-      [ITERATE]: {
-        type: 'iterate',
-        id: ITERATE,
-        is_intermediate: true,
       },
     },
     edges: [
@@ -321,48 +300,7 @@ export const buildCanvasInpaintGraph = (
           field: 'denoise_mask',
         },
       },
-      // Iterate
-      {
-        source: {
-          node_id: RANGE_OF_SIZE,
-          field: 'collection',
-        },
-        destination: {
-          node_id: ITERATE,
-          field: 'collection',
-        },
-      },
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: NOISE,
-          field: 'seed',
-        },
-      },
       // Canvas Refine
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
-          field: 'a',
-        },
-      },
-      {
-        source: {
-          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
-          field: 'value',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_NOISE,
-          field: 'seed',
-        },
-      },
       {
         source: {
           node_id: modelLoaderNodeId,
@@ -436,7 +374,7 @@ export const buildCanvasInpaintGraph = (
     graph.nodes[INPAINT_IMAGE_RESIZE_UP] = {
       type: 'img_resize',
       id: INPAINT_IMAGE_RESIZE_UP,
-      is_intermediate: true,
+      is_intermediate,
       width: scaledWidth,
       height: scaledHeight,
       image: canvasInitImage,
@@ -444,7 +382,7 @@ export const buildCanvasInpaintGraph = (
     graph.nodes[MASK_RESIZE_UP] = {
       type: 'img_resize',
       id: MASK_RESIZE_UP,
-      is_intermediate: true,
+      is_intermediate,
       width: scaledWidth,
       height: scaledHeight,
       image: canvasMaskImage,
@@ -452,14 +390,14 @@ export const buildCanvasInpaintGraph = (
     graph.nodes[INPAINT_IMAGE_RESIZE_DOWN] = {
       type: 'img_resize',
       id: INPAINT_IMAGE_RESIZE_DOWN,
-      is_intermediate: true,
+      is_intermediate,
       width: width,
       height: height,
     };
     graph.nodes[MASK_RESIZE_DOWN] = {
       type: 'img_resize',
       id: MASK_RESIZE_DOWN,
-      is_intermediate: true,
+      is_intermediate,
       width: width,
       height: height,
     };
@@ -597,7 +535,7 @@ export const buildCanvasInpaintGraph = (
     graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
       type: 'create_denoise_mask',
       id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-      is_intermediate: true,
+      is_intermediate,
       fp32,
     };
 
@@ -650,7 +588,7 @@ export const buildCanvasInpaintGraph = (
       graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
         type: 'mask_edge',
         id: CANVAS_COHERENCE_MASK_EDGE,
-        is_intermediate: true,
+        is_intermediate,
         edge_blur: maskBlur,
         edge_size: maskBlur * 2,
         low_threshold: 100,
@@ -701,26 +639,6 @@ export const buildCanvasInpaintGraph = (
     });
   }
 
-  // Handle Seed
-  if (shouldRandomizeSeed) {
-    // Random int node to generate the starting seed
-    const randomIntNode: RandomIntInvocation = {
-      id: RANDOM_INT,
-      type: 'rand_int',
-    };
-
-    graph.nodes[RANDOM_INT] = randomIntNode;
-
-    // Connect random int to the start of the range of size so the range starts on the random first seed
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'value' },
-      destination: { node_id: RANGE_OF_SIZE, field: 'start' },
-    });
-  } else {
-    // User specified seed, so set the start of the range of size to the seed
-    (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
-  }
-
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
     addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
@@ -736,6 +654,9 @@ export const buildCanvasInpaintGraph = (
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
+  // Add IP Adapter
+  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
@@ -746,6 +667,8 @@ export const buildCanvasInpaintGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

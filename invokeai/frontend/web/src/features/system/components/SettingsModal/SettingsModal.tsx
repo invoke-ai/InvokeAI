@@ -48,13 +48,13 @@ import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 import { useFeatureStatus } from '../../hooks/useFeatureStatus';
-import { LANGUAGES } from '../../store/constants';
 import { languageSelector } from '../../store/systemSelectors';
 import { languageChanged } from '../../store/systemSlice';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
 import StyledFlex from './StyledFlex';
+import { LANGUAGES } from 'features/system/store/types';
 
 const selector = createSelector(
   [stateSelector],

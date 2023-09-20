@@ -53,24 +53,20 @@ class BoardImageRecordStorageBase(ABC):
 
 
 class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
-    _filename: str
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, filename: str) -> None:
+    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
         super().__init__()
-        self._filename = filename
-        self._conn = sqlite3.connect(filename, check_same_thread=False)
+        self._conn = conn
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
         self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
-        self._lock = threading.Lock()
+        self._lock = lock
 
         try:
             self._lock.acquire()
-            # Enable foreign keys
-            self._conn.execute("PRAGMA foreign_keys = ON;")
             self._create_tables()
             self._conn.commit()
         finally:

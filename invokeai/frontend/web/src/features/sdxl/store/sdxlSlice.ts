@@ -6,7 +6,7 @@ import {
   SchedulerParam,
 } from 'features/parameters/types/parameterSchemas';
 
-type SDXLInitialState = {
+type SDXLState = {
   positiveStylePrompt: PositiveStylePromptSDXLParam;
   negativeStylePrompt: NegativeStylePromptSDXLParam;
   shouldConcatSDXLStylePrompt: boolean;
@@ -21,7 +21,7 @@ type SDXLInitialState = {
   refinerStart: number;
 };
 
-const sdxlInitialState: SDXLInitialState = {
+export const initialSDXLState: SDXLState = {
   positiveStylePrompt: '',
   negativeStylePrompt: '',
   shouldConcatSDXLStylePrompt: true,
@@ -38,7 +38,7 @@ const sdxlInitialState: SDXLInitialState = {
 
 const sdxlSlice = createSlice({
   name: 'sdxl',
-  initialState: sdxlInitialState,
+  initialState: initialSDXLState,
   reducers: {
     setPositiveStylePromptSDXL: (state, action: PayloadAction<string>) => {
       state.positiveStylePrompt = action.payload;
