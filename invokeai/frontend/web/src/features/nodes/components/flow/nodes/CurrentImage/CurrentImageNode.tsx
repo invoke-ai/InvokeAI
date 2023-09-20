@@ -16,7 +16,7 @@ const selector = createSelector(stateSelector, ({ system, gallery }) => {
 
   return {
     imageDTO,
-    progressImage: system.progressImage,
+    progressImage: system.denoiseProgress?.progress_image,
   };
 });
 

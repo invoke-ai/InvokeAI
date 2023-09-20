@@ -1,6 +1,7 @@
-import uuid
 from abc import ABC, abstractmethod
 from enum import Enum, EnumMeta
+
+from invokeai.app.util.misc import uuid_string
 
 
 class ResourceType(str, Enum, metaclass=EnumMeta):
@@ -25,6 +26,6 @@ class SimpleNameService(NameServiceBase):
 
     # TODO: Add customizable naming schemes
     def create_image_name(self) -> str:
-        uuid_str = str(uuid.uuid4())
+        uuid_str = uuid_string()
         filename = f"{uuid_str}.png"
         return filename

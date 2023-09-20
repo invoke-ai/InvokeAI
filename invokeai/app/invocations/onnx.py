@@ -95,9 +95,10 @@ class ONNXPromptInvocation(BaseInvocation):
                     print(f'Warn: trigger: "{trigger}" not found')
             if loras or ti_list:
                 text_encoder.release_session()
-            with ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras), ONNXModelPatcher.apply_ti(
-                orig_tokenizer, text_encoder, ti_list
-            ) as (tokenizer, ti_manager):
+            with (
+                ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras),
+                ONNXModelPatcher.apply_ti(orig_tokenizer, text_encoder, ti_list) as (tokenizer, ti_manager),
+            ):
                 text_encoder.create_session()
 
                 # copy from

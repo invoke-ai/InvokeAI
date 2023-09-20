@@ -73,7 +73,7 @@ export const validateWorkflow = (
       !(edge.sourceHandle in sourceNode.data.outputs)
     ) {
       issues.push(
-        `${i18n.t('nodes.outputNodes')} "${edge.source}.${
+        `${i18n.t('nodes.outputNode')} "${edge.source}.${
           edge.sourceHandle
         }" ${i18n.t('nodes.doesNotExist')}`
       );
@@ -89,7 +89,7 @@ export const validateWorkflow = (
       !(edge.targetHandle in targetNode.data.inputs)
     ) {
       issues.push(
-        `${i18n.t('nodes.inputFeilds')} "${edge.target}.${
+        `${i18n.t('nodes.inputField')} "${edge.target}.${
           edge.targetHandle
         }" ${i18n.t('nodes.doesNotExist')}`
       );
