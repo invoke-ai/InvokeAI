@@ -341,6 +341,17 @@ export const zIPAdapterModel = z.object({
  */
 export type IPAdapterModelParam = z.infer<typeof zIPAdapterModel>;
 /**
+ * Zod schema for T2I-Adapter models
+ */
+export const zT2IAdapterModel = z.object({
+  model_name: z.string().min(1),
+  base_model: zBaseModel,
+});
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type T2IAdapterModelParam = z.infer<typeof zT2IAdapterModel>;
+/**
  * Zod schema for l2l strength parameter
  */
 export const zStrength = z.number().min(0).max(1);

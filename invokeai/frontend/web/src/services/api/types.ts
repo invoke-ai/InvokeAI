@@ -67,6 +67,7 @@ export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
 export type ControlNetModelField = s['ControlNetModelField'];
 export type IPAdapterModelField = s['IPAdapterModelField'];
+export type T2IAdapterModelField = s['T2IAdapterModelField'];
 export type ModelsList = s['ModelsList'];
 export type ControlField = s['ControlField'];
 export type IPAdapterField = s['IPAdapterField'];
@@ -83,6 +84,9 @@ export type ControlNetModelConfig =
   | ControlNetModelDiffusersConfig;
 export type IPAdapterModelInvokeAIConfig = s['IPAdapterModelInvokeAIConfig'];
 export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
+export type T2IAdapterModelDiffusersConfig =
+  s['T2IAdapterModelDiffusersConfig'];
+export type T2IAdapterModelConfig = T2IAdapterModelDiffusersConfig;
 export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | s['StableDiffusion1ModelDiffusersConfig']
@@ -99,6 +103,7 @@ export type AnyModelConfig =
   | VaeModelConfig
   | ControlNetModelConfig
   | IPAdapterModelConfig
+  | T2IAdapterModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
   | OnnxModelConfig;

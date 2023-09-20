@@ -26,6 +26,7 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ConditioningCollection',
   'ControlCollection',
   'ColorCollection',
+  'T2IAdapterCollection',
 ];
 
 export const POLYMORPHIC_TYPES = [
@@ -38,6 +39,7 @@ export const POLYMORPHIC_TYPES = [
   'ConditioningPolymorphic',
   'ControlPolymorphic',
   'ColorPolymorphic',
+  'T2IAdapterPolymorphic',
 ];
 
 export const MODEL_TYPES = [
@@ -52,6 +54,7 @@ export const MODEL_TYPES = [
   'UNetField',
   'VaeField',
   'ClipField',
+  'T2IAdapterModelField',
 ];
 
 export const COLLECTION_MAP = {
@@ -65,6 +68,7 @@ export const COLLECTION_MAP = {
   ConditioningField: 'ConditioningCollection',
   ControlField: 'ControlCollection',
   ColorField: 'ColorCollection',
+  T2IAdapterField: 'T2IAdapterCollection',
 };
 export const isCollectionItemType = (
   itemType: string | undefined
@@ -82,6 +86,7 @@ export const SINGLE_TO_POLYMORPHIC_MAP = {
   ConditioningField: 'ConditioningPolymorphic',
   ControlField: 'ControlPolymorphic',
   ColorField: 'ColorPolymorphic',
+  T2IAdapterField: 'T2IAdapterPolymorphic',
 };
 
 export const POLYMORPHIC_TO_SINGLE_MAP = {
@@ -94,6 +99,7 @@ export const POLYMORPHIC_TO_SINGLE_MAP = {
   ConditioningPolymorphic: 'ConditioningField',
   ControlPolymorphic: 'ControlField',
   ColorPolymorphic: 'ColorField',
+  T2IAdapterPolymorphic: 'T2IAdapterField',
 };
 
 export const isPolymorphicItemType = (
@@ -238,7 +244,7 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: t('nodes.integerPolymorphic'),
   },
   IPAdapterField: {
-    color: 'green.300',
+    color: 'teal.500',
     description: 'IP-Adapter info passed between nodes.',
     title: 'IP-Adapter',
   },
@@ -306,6 +312,26 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'yellow.500',
     description: t('nodes.stringPolymorphicDescription'),
     title: t('nodes.stringPolymorphic'),
+  },
+  T2IAdapterCollection: {
+    color: 'teal.500',
+    description: t('nodes.t2iAdapterCollectionDescription'),
+    title: t('nodes.t2iAdapterCollection'),
+  },
+  T2IAdapterField: {
+    color: 'teal.500',
+    description: t('nodes.t2iAdapterFieldDescription'),
+    title: t('nodes.t2iAdapterField'),
+  },
+  T2IAdapterModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'T2I-Adapter',
+  },
+  T2IAdapterPolymorphic: {
+    color: 'teal.500',
+    description: 'T2I-Adapter info passed between nodes.',
+    title: 'T2I-Adapter Polymorphic',
   },
   UNetField: {
     color: 'red.500',

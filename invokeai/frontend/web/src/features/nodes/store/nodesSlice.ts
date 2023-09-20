@@ -53,6 +53,7 @@ import {
   SchedulerInputFieldValue,
   SDXLRefinerModelInputFieldValue,
   StringInputFieldValue,
+  T2IAdapterModelInputFieldValue,
   VaeModelInputFieldValue,
   Workflow,
 } from '../types/types';
@@ -542,6 +543,12 @@ const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action);
     },
+    fieldT2IAdapterModelValueChanged: (
+      state,
+      action: FieldValueAction<T2IAdapterModelInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
     fieldEnumModelValueChanged: (
       state,
       action: FieldValueAction<EnumInputFieldValue>
@@ -902,6 +909,7 @@ export const {
   fieldEnumModelValueChanged,
   fieldControlNetModelValueChanged,
   fieldIPAdapterModelValueChanged,
+  fieldT2IAdapterModelValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   nodeIsOpenChanged,
