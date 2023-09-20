@@ -1120,36 +1120,45 @@ export type LoRAMetadataItem = z.infer<typeof zLoRAMetadataItem>;
 
 export const zCoreMetadata = z
   .object({
-    app_version: z.string().nullish(),
-    generation_mode: z.string().nullish(),
-    created_by: z.string().nullish(),
-    positive_prompt: z.string().nullish(),
-    negative_prompt: z.string().nullish(),
-    width: z.number().int().nullish(),
-    height: z.number().int().nullish(),
-    seed: z.number().int().nullish(),
-    rand_device: z.string().nullish(),
-    cfg_scale: z.number().nullish(),
-    steps: z.number().int().nullish(),
-    scheduler: z.string().nullish(),
-    clip_skip: z.number().int().nullish(),
+    app_version: z.string().nullish().catch(null),
+    generation_mode: z.string().nullish().catch(null),
+    created_by: z.string().nullish().catch(null),
+    positive_prompt: z.string().nullish().catch(null),
+    negative_prompt: z.string().nullish().catch(null),
+    width: z.number().int().nullish().catch(null),
+    height: z.number().int().nullish().catch(null),
+    seed: z.number().int().nullish().catch(null),
+    rand_device: z.string().nullish().catch(null),
+    cfg_scale: z.number().nullish().catch(null),
+    steps: z.number().int().nullish().catch(null),
+    scheduler: z.string().nullish().catch(null),
+    clip_skip: z.number().int().nullish().catch(null),
     model: z
       .union([zMainModel.deepPartial(), zOnnxModel.deepPartial()])
-      .nullish(),
-    controlnets: z.array(zControlField.deepPartial()).nullish(),
-    loras: z.array(zLoRAMetadataItem).nullish(),
-    vae: zVaeModelField.nullish(),
-    strength: z.number().nullish(),
-    init_image: z.string().nullish(),
-    positive_style_prompt: z.string().nullish(),
-    negative_style_prompt: z.string().nullish(),
-    refiner_model: zSDXLRefinerModel.deepPartial().nullish(),
-    refiner_cfg_scale: z.number().nullish(),
-    refiner_steps: z.number().int().nullish(),
-    refiner_scheduler: z.string().nullish(),
-    refiner_positive_aesthetic_score: z.number().nullish(),
-    refiner_negative_aesthetic_score: z.number().nullish(),
-    refiner_start: z.number().nullish(),
+      .nullish()
+      .catch(null),
+    controlnets: z.array(zControlField.deepPartial()).nullish().catch(null),
+    loras: z
+      .array(
+        z.object({
+          lora: zLoRAModelField.deepPartial(),
+          weight: z.number(),
+        })
+      )
+      .nullish()
+      .catch(null),
+    vae: zVaeModelField.nullish().catch(null),
+    strength: z.number().nullish().catch(null),
+    init_image: z.string().nullish().catch(null),
+    positive_style_prompt: z.string().nullish().catch(null),
+    negative_style_prompt: z.string().nullish().catch(null),
+    refiner_model: zSDXLRefinerModel.deepPartial().nullish().catch(null),
+    refiner_cfg_scale: z.number().nullish().catch(null),
+    refiner_steps: z.number().int().nullish().catch(null),
+    refiner_scheduler: z.string().nullish().catch(null),
+    refiner_positive_aesthetic_score: z.number().nullish().catch(null),
+    refiner_negative_aesthetic_score: z.number().nullish().catch(null),
+    refiner_start: z.number().nullish().catch(null),
   })
   .passthrough();
 
