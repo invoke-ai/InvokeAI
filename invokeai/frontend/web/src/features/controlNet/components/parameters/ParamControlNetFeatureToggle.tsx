@@ -1,3 +1,4 @@
+import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -26,16 +27,15 @@ const ParamControlNetFeatureToggle = () => {
   }, [dispatch]);
 
   return (
-    <IAIInformationalPopover details="controlNetToggle">
-      <IAISwitch
-        label="Enable ControlNet"
-        isChecked={isEnabled}
-        onChange={handleChange}
-        formControlProps={{
-          width: '100%',
-        }}
-      />
-    </IAIInformationalPopover>
+    <Box width="100%">
+      <IAIInformationalPopover details="controlNetToggle">
+        <IAISwitch
+          label="Enable ControlNet"
+          isChecked={isEnabled}
+          onChange={handleChange}
+        />
+      </IAIInformationalPopover>
+    </Box>
   );
 };
 
