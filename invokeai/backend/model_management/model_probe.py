@@ -474,7 +474,7 @@ class VaeFolderProbe(FolderProbeBase):
             return BaseModelType.StableDiffusionXL
         elif self._name_looks_like_sdxl():
             # but SD and SDXL VAE are the same shape (3-channel RGB to 4-channel float scaled down
-            # by a factor of 8), necessarily tell them apart by config hyperparameters.
+            # by a factor of 8), we can't necessarily tell them apart by config hyperparameters.
             return BaseModelType.StableDiffusionXL
         else:
             return BaseModelType.StableDiffusion1
