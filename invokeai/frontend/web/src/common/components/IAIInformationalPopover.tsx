@@ -32,15 +32,15 @@ function IAIInformationalPopover({
   children,
   placement,
 }: Props): JSX.Element {
-  const shouldDisableInformationalPopovers = useAppSelector(
-    (state) => state.system.shouldDisableInformationalPopovers
+  const shouldEnableInformationalPopovers = useAppSelector(
+    (state) => state.system.shouldEnableInformationalPopovers
   );
   const { t } = useTranslation();
 
   const heading = t(`popovers.${details}.heading`);
   const paragraph = t(`popovers.${details}.paragraph`);
 
-  if (shouldDisableInformationalPopovers) {
+  if (!shouldEnableInformationalPopovers) {
     return children;
   } else {
     return (
