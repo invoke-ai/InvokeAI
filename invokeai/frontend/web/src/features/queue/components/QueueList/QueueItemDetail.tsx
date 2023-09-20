@@ -31,7 +31,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
 
   const statusAndTiming = useMemo(() => {
     if (!queueItem) {
-      return '';
+      return t('common.loading');
     }
     if (!queueItem.completed_at || !queueItem.started_at) {
       return t(`queue.${queueItem.status}`);
@@ -62,6 +62,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         justifyContent="space-between"
         alignItems="center"
         borderRadius="base"
+        h={20}
       >
         <QueueItemData label={t('queue.status')} data={statusAndTiming} />
         <QueueItemData label={t('queue.item')} data={item_id} />
@@ -136,9 +137,17 @@ type QueueItemDataProps = { label: string; data: ReactNode };
 
 const QueueItemData = ({ label, data }: QueueItemDataProps) => {
   return (
-    <Flex flexDir="column" p={1} gap={1} overflow="hidden">
+    <Flex
+      flexDir="column"
+      justifyContent="flex-start"
+      p={1}
+      gap={1}
+      overflow="hidden"
+      h="full"
+      w="full"
+    >
       <Heading
-        size="sm"
+        size="md"
         overflow="hidden"
         textOverflow="ellipsis"
         whiteSpace="nowrap"

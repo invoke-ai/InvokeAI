@@ -58,7 +58,6 @@ export default function SimpleAddModels() {
       })
       .catch((error) => {
         if (error) {
-          console.log(error);
           dispatch(
             addToast(
               makeToast({
