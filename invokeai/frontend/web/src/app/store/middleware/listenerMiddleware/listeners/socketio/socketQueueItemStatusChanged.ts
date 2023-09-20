@@ -1,5 +1,4 @@
 import { logger } from 'app/logging/logger';
-import { canvasSessionIdAdded } from 'features/canvas/store/canvasSlice';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import {
   appSocketQueueItemStatusChanged,
@@ -10,12 +9,11 @@ import { startAppListening } from '../..';
 export const addSocketQueueItemStatusChangedEventListener = () => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
       const {
         queue_item_id: item_id,
-        batch_id,
-        graph_execution_state_id,
+        queue_batch_id,
         status,
       } = action.payload.data;
       log.debug(
@@ -36,11 +34,6 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         })
       );
 
-      const state = getState();
-      if (state.canvas.batchIds.includes(batch_id)) {
-        dispatch(canvasSessionIdAdded(graph_execution_state_id));
-      }
-
       dispatch(
         queueApi.util.invalidateTags([
           'CurrentSessionQueueItem',
@@ -48,7 +41,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
           'SessionQueueStatus',
           { type: 'SessionQueueItem', id: item_id },
           { type: 'SessionQueueItemDTO', id: item_id },
-          { type: 'BatchStatus', id: batch_id },
+          { type: 'BatchStatus', id: queue_batch_id },
         ])
       );
     },

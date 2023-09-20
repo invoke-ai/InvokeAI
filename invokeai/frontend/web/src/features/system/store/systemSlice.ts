@@ -113,6 +113,7 @@ export const systemSlice = createSlice({
         order,
         progress_image,
         graph_execution_state_id: session_id,
+        queue_batch_id: batch_id,
       } = action.payload.data;
 
       state.denoiseProgress = {
@@ -122,6 +123,7 @@ export const systemSlice = createSlice({
         percentage: calculateStepPercentage(step, total_steps, order),
         progress_image,
         session_id,
+        batch_id,
       };
 
       state.status = 'PROCESSING';
