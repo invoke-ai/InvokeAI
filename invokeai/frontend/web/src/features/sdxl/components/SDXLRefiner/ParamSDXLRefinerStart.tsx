@@ -6,6 +6,7 @@ import IAISlider from 'common/components/IAISlider';
 import { setRefinerStart } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -26,6 +27,7 @@ const ParamSDXLRefinerStart = () => {
     (v: number) => dispatch(setRefinerStart(v)),
     [dispatch]
   );
+  const { t } = useTranslation();
 
   const handleReset = useCallback(
     () => dispatch(setRefinerStart(0.8)),
@@ -34,7 +36,7 @@ const ParamSDXLRefinerStart = () => {
 
   return (
     <IAISlider
-      label="Refiner Start"
+      label={t('sdxl.refinerStart')}
       step={0.01}
       min={0}
       max={1}

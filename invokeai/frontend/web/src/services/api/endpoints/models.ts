@@ -5,6 +5,7 @@ import {
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
+  IPAdapterModelConfig,
   DiffusersModelConfig,
   ImportModelConfig,
   LoRAModelConfig,
@@ -36,6 +37,10 @@ export type ControlNetModelConfigEntity = ControlNetModelConfig & {
   id: string;
 };
 
+export type IPAdapterModelConfigEntity = IPAdapterModelConfig & {
+  id: string;
+};
+
 export type TextualInversionModelConfigEntity = TextualInversionModelConfig & {
   id: string;
 };
@@ -47,6 +52,7 @@ type AnyModelConfigEntity =
   | OnnxModelConfigEntity
   | LoRAModelConfigEntity
   | ControlNetModelConfigEntity
+  | IPAdapterModelConfigEntity
   | TextualInversionModelConfigEntity
   | VaeModelConfigEntity;
 
@@ -128,11 +134,15 @@ export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
 const onnxModelsAdapter = createEntityAdapter<OnnxModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
+export const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 export const controlNetModelsAdapter =
   createEntityAdapter<ControlNetModelConfigEntity>({
+    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+  });
+export const ipAdapterModelsAdapter =
+  createEntityAdapter<IPAdapterModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
 export const textualInversionModelsAdapter =
@@ -435,6 +445,37 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    getIPAdapterModels: build.query<
+      EntityState<IPAdapterModelConfigEntity>,
+      void
+    >({
+      query: () => ({ url: 'models/', params: { model_type: 'ip_adapter' } }),
+      providesTags: (result) => {
+        const tags: ApiFullTagDescription[] = [
+          { type: 'IPAdapterModel', id: LIST_TAG },
+        ];
+
+        if (result) {
+          tags.push(
+            ...result.ids.map((id) => ({
+              type: 'IPAdapterModel' as const,
+              id,
+            }))
+          );
+        }
+
+        return tags;
+      },
+      transformResponse: (response: { models: IPAdapterModelConfig[] }) => {
+        const entities = createModelEntities<IPAdapterModelConfigEntity>(
+          response.models
+        );
+        return ipAdapterModelsAdapter.setAll(
+          ipAdapterModelsAdapter.getInitialState(),
+          entities
+        );
+      },
+    }),
     getVaeModels: build.query<EntityState<VaeModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
       providesTags: (result) => {
@@ -533,6 +574,7 @@ export const {
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
   useGetControlNetModelsQuery,
+  useGetIPAdapterModelsQuery,
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,

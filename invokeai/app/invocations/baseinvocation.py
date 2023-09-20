@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-import re
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -23,10 +23,12 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field, validator
-from pydantic.fields import Undefined, ModelField
-from pydantic.typing import NoArgAnyCallable
 import semver
+from pydantic import BaseModel, Field, validator
+from pydantic.fields import ModelField, Undefined
+from pydantic.typing import NoArgAnyCallable
+
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
@@ -65,6 +67,7 @@ class FieldDescriptions:
     width = "Width of output (px)"
     height = "Height of output (px)"
     control = "ControlNet(s) to apply"
+    ip_adapter = "IP-Adapter to apply"
     denoised_latents = "Denoised latents tensor"
     latents = "Latents tensor"
     strength = "Strength of denoising (proportional to steps)"
@@ -153,6 +156,7 @@ class UIType(str, Enum):
     VaeModel = "VaeModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
+    IPAdapterModel = "IPAdapterModelField"
     UNet = "UNetField"
     Vae = "VaeField"
     CLIP = "ClipField"
@@ -196,6 +200,7 @@ class _InputField(BaseModel):
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
     ui_order: Optional[int]
+    ui_choice_labels: Optional[dict[str, str]]
     item_default: Optional[Any]
 
 
@@ -244,6 +249,7 @@ def InputField(
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
     ui_order: Optional[int] = None,
+    ui_choice_labels: Optional[dict[str, str]] = None,
     item_default: Optional[Any] = None,
     **kwargs: Any,
 ) -> Any:
@@ -310,6 +316,7 @@ def InputField(
         ui_hidden=ui_hidden,
         ui_order=ui_order,
         item_default=item_default,
+        ui_choice_labels=ui_choice_labels,
         **kwargs,
     )
 
@@ -470,6 +477,7 @@ class BaseInvocation(ABC, BaseModel):
 
     @classmethod
     def get_all_subclasses(cls):
+        app_config = InvokeAIAppConfig.get_config()
         subclasses = []
         toprocess = [cls]
         while len(toprocess) > 0:
@@ -477,7 +485,23 @@ class BaseInvocation(ABC, BaseModel):
             next_subclasses = next.__subclasses__()
             subclasses.extend(next_subclasses)
             toprocess.extend(next_subclasses)
-        return subclasses
+        allowed_invocations = []
+        for sc in subclasses:
+            is_in_allowlist = (
+                sc.__fields__.get("type").default in app_config.allow_nodes
+                if isinstance(app_config.allow_nodes, list)
+                else True
+            )
+
+            is_in_denylist = (
+                sc.__fields__.get("type").default in app_config.deny_nodes
+                if isinstance(app_config.deny_nodes, list)
+                else False
+            )
+
+            if is_in_allowlist and not is_in_denylist:
+                allowed_invocations.append(sc)
+        return allowed_invocations
 
     @classmethod
     def get_invocations(cls):

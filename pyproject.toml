@@ -101,6 +101,8 @@ dependencies = [
   "black",
   "flake8",
   "Flake8-pyproject",
+  "isort",
+  "pre-commit",
   "pytest>6.0.0",
   "pytest-cov",
   "pytest-datadir",
@@ -196,6 +198,17 @@ output = "coverage/index.xml"
 max-line-length = 120
 ignore = ["E203", "E266", "E501", "W503"]
 select = ["B", "C", "E", "F", "W", "T4"]
+exclude = [
+  ".git",
+  "__pycache__",
+  "build",
+  "dist",
+  "invokeai/frontend/web/node_modules/"
+]
 
 [tool.black]
 line-length = 120
+
+[tool.isort]
+profile = "black"
+line_length = 120

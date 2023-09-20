@@ -15,7 +15,8 @@ title: Home
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.1/css/fontawesome.min.css">
 <style>
     .button {
-      width: 300px;
+      width: 100%;
+      max-width: 100%;
       height: 50px;
       background-color: #448AFF;
       color: #fff;
@@ -27,8 +28,9 @@ title: Home
 
     .button-container {
       display: grid;
-      grid-template-columns: repeat(3, 300px);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 20px;
+      justify-content: center;
     }
 
     .button:hover {

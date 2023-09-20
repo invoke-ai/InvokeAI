@@ -87,8 +87,8 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      immutableCheck: false,
       serializableCheck: false,
+      immutableCheck: false,
     })
       .concat(api.middleware)
       .concat(dynamicMiddlewares)

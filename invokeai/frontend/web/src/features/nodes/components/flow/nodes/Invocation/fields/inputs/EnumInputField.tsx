@@ -35,7 +35,11 @@ const EnumInputFieldComponent = (
       value={field.value}
     >
       {fieldTemplate.options.map((option) => (
-        <option key={option}>{option}</option>
+        <option key={option} value={option}>
+          {fieldTemplate.ui_choice_labels
+            ? fieldTemplate.ui_choice_labels[option]
+            : option}
+        </option>
       ))}
     </Select>
   );

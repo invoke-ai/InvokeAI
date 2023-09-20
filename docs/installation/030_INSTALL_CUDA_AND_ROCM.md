@@ -57,6 +57,30 @@ familiar with containerization technologies such as Docker.
 For downloads and instructions, visit the [NVIDIA CUDA Container
 Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 
+### cuDNN Installation for 40/30 Series Optimization* (Optional)
+
+1. Find the InvokeAI folder
+2. Click on .venv folder - e.g., YourInvokeFolderHere\\.venv
+3. Click on Lib folder - e.g., YourInvokeFolderHere\\.venv\Lib
+4. Click on site-packages folder - e.g., YourInvokeFolderHere\\.venv\Lib\site-packages
+5. Click on Torch directory - e.g., YourInvokeFolderHere\InvokeAI\\.venv\Lib\site-packages\torch
+6. Click on the lib folder - e.g., YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib
+7. Copy everything inside the folder and save it elsewhere as a backup.
+8. Go to __https://developer.nvidia.com/cudnn__
+9. Login or create an Account. 
+10. Choose the newer version of cuDNN. **Note:** 
+There are two versions, 11.x or 12.x for the differents architectures(Turing,Maxwell Etc...) of GPUs.
+You can find which version you should download from [this link](https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html).
+13. Download the latest version and extract it from the download location
+14. Find the bin folder E\cudnn-windows-x86_64-__Whatever Version__\bin
+15. Copy and paste the .dll files into YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
+16. If prompted, replace any existing files 
+
+**Notes:** 
+* If no change is seen or any issues are encountered, follow the same steps as above and paste the torch/lib backup folder you made earlier and replace it. If you didn't make a backup, you can also uninstall and reinstall torch through the command line to repair this folder. 
+* This optimization is  intended for the newer version of graphics card (40/30 series) but results have been seen with older graphics card.
+
+
 ### Torch Installation
 
 When installing torch and torchvision manually with `pip`, remember to provide

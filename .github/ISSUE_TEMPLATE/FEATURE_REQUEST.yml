@@ -1,5 +1,5 @@
 name: Feature Request
-description: Commit a idea or Request a new feature
+description: Contribute a idea or request a new feature
 title: '[enhancement]: '
 labels: ['enhancement']
 # assignees:
@@ -9,14 +9,14 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this Feature request!
+        Thanks for taking the time to fill out this feature request!
 
   - type: checkboxes
     attributes:
       label: Is there an existing issue for this?
       description: |
         Please make use of the [search function](https://github.com/invoke-ai/InvokeAI/labels/enhancement)
-        to see if a simmilar issue already exists for the feature you want to request
+        to see if a similar issue already exists for the feature you want to request
       options:
         - label: I have searched the existing issues
           required: true
@@ -34,12 +34,9 @@ body:
     id: whatisexpected
     attributes:
       label: What should this feature add?
-      description: Please try to explain the functionality this feature should add
+      description: Explain the functionality this feature should add. Feature requests should be for single features. Please create multiple requests if you want to request multiple features.
       placeholder: |
-        Instead of one huge textfield, it would be nice to have forms for bug-reports, feature-requests, ...
-        Great benefits with automatic labeling, assigning and other functionalitys not available in that form
-        via old-fashioned markdown-templates. I would also love to see the use of a moderator bot 🤖 like
-        https://github.com/marketplace/actions/issue-moderator-with-commands to auto close old issues and other things
+        I'd like a button that creates an image of banana sushi every time I press it. Each image should be different. There should be a toggle next to the button that enables strawberry mode, in which the images are of strawberry sushi instead.
     validations:
       required: true
 
@@ -51,6 +48,6 @@ body:
 
   - type: textarea
     attributes:
-      label: Aditional Content
+      label: Additional Content
       description: Add any other context or screenshots about the feature request here.
-      placeholder: This is a Mockup of the design how I imagine it <screenshot>
+      placeholder: This is a mockup of the design how I imagine it <screenshot>

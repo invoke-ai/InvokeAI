@@ -1,45 +1,47 @@
 # Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
-import asyncio
-import logging
-import socket
-from inspect import signature
-from pathlib import Path
-
-import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.openapi.utils import get_openapi
-from fastapi.staticfiles import StaticFiles
-from fastapi_events.handlers.local import local_handler
-from fastapi_events.middleware import EventHandlerASGIMiddleware
-from pydantic.schema import schema
-
 from .services.config import InvokeAIAppConfig
-from ..backend.util.logging import InvokeAILogger
 
-from invokeai.version.invokeai_version import __version__
-
-import invokeai.frontend.web as web_dir
-import mimetypes
-
-from .api.dependencies import ApiDependencies
-from .api.routers import sessions, models, images, boards, board_images, app_info
-from .api.sockets import SocketIO
-from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, UIConfigBase
-
-import torch
-
-# noinspection PyUnresolvedReferences
-import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
-
-if torch.backends.mps.is_available():
-    # noinspection PyUnresolvedReferences
-    import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
-
-
+# parse_args() must be called before any other imports. if it is not called first, consumers of the config
+# which are imported/used before parse_args() is called will get the default config values instead of the
+# values from the command line or config file.
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
+
+if True:  # hack to make flake8 happy with imports coming after setting up the config
+    import asyncio
+    import logging
+    import mimetypes
+    import socket
+    from inspect import signature
+    from pathlib import Path
+
+    import torch
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+    from fastapi.openapi.utils import get_openapi
+    from fastapi.staticfiles import StaticFiles
+    from fastapi_events.handlers.local import local_handler
+    from fastapi_events.middleware import EventHandlerASGIMiddleware
+    from pydantic.schema import schema
+
+    # noinspection PyUnresolvedReferences
+    import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+    import invokeai.frontend.web as web_dir
+    from invokeai.version.invokeai_version import __version__
+
+    from ..backend.util.logging import InvokeAILogger
+    from .api.dependencies import ApiDependencies
+    from .api.routers import app_info, board_images, boards, images, models, sessions
+    from .api.sockets import SocketIO
+    from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
+
+    if torch.backends.mps.is_available():
+        # noinspection PyUnresolvedReferences
+        import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+
+
 logger = InvokeAILogger.getLogger(config=app_config)
 
 # fix for windows mimetypes registry entries being borked

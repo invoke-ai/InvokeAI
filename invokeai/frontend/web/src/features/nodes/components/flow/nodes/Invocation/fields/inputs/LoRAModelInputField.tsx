@@ -14,6 +14,7 @@ import { modelIdToLoRAModelParam } from 'features/parameters/util/modelIdToLoRAM
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
+import { useTranslation } from 'react-i18next';
 
 const LoRAModelInputFieldComponent = (
   props: FieldComponentProps<
@@ -25,6 +26,7 @@ const LoRAModelInputFieldComponent = (
   const lora = field.value;
   const dispatch = useAppDispatch();
   const { data: loraModels } = useGetLoRAModelsQuery();
+  const { t } = useTranslation();
 
   const data = useMemo(() => {
     if (!loraModels) {
@@ -92,9 +94,11 @@ const LoRAModelInputFieldComponent = (
     <IAIMantineSearchableSelect
       className="nowheel nodrag"
       value={selectedLoRAModel?.id ?? null}
-      placeholder={data.length > 0 ? 'Select a LoRA' : 'No LoRAs available'}
+      placeholder={
+        data.length > 0 ? t('models.selectLoRA') : t('models.noLoRAsAvailable')
+      }
       data={data}
-      nothingFound="No matching LoRAs"
+      nothingFound={t('models.noMatchingLoRAs')}
       itemComponent={IAIMantineSelectItemWithTooltip}
       disabled={data.length === 0}
       filter={(value, item: SelectItem) =>

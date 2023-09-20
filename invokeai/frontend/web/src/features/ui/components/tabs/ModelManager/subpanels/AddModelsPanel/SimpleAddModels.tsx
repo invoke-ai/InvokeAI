@@ -55,7 +55,7 @@ export default function SimpleAddModels() {
         dispatch(
           addToast(
             makeToast({
-              title: 'Model Added',
+              title: t('toast.modelAddSimple'),
               status: 'success',
             })
           )
@@ -84,13 +84,13 @@ export default function SimpleAddModels() {
     >
       <Flex flexDirection="column" width="100%" gap={4}>
         <IAIMantineTextInput
-          label="Model Location"
-          placeholder="Provide a path to a local Diffusers model, local checkpoint / safetensors model a HuggingFace Repo ID, or a checkpoint/diffusers model URL."
+          label={t('modelManager.modelLocation')}
+          placeholder={t('modelManager.simpleModelDesc')}
           w="100%"
           {...addModelForm.getInputProps('location')}
         />
         <IAIMantineSelect
-          label="Prediction Type (for Stable Diffusion 2.x Models only)"
+          label={t('modelManager.predictionType')}
           data={predictionSelectData}
           defaultValue="none"
           {...addModelForm.getInputProps('prediction_type')}

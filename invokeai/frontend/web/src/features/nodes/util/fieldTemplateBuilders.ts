@@ -60,6 +60,8 @@ import {
   ImageField,
   LatentsField,
   ConditioningField,
+  IPAdapterInputFieldTemplate,
+  IPAdapterModelInputFieldTemplate,
 } from '../types/types';
 import { ControlField } from 'services/api/types';
 
@@ -435,6 +437,19 @@ const buildControlNetModelInputFieldTemplate = ({
   return template;
 };
 
+const buildIPAdapterModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterModelInputFieldTemplate => {
+  const template: IPAdapterModelInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterModelField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildImageInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -648,6 +663,19 @@ const buildControlCollectionInputFieldTemplate = ({
   return template;
 };
 
+const buildIPAdapterInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterInputFieldTemplate => {
+  const template: IPAdapterInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -656,8 +684,8 @@ const buildEnumInputFieldTemplate = ({
   const template: EnumInputFieldTemplate = {
     ...baseField,
     type: 'enum',
-    enumType: (schemaObject.type as 'string' | 'number') ?? 'string', // TODO: dangerous?
-    options: options,
+    options,
+    ui_choice_labels: schemaObject.ui_choice_labels,
     default: schemaObject.default ?? options[0],
   };
 
@@ -851,6 +879,8 @@ const TEMPLATE_BUILDER_MAP = {
   integer: buildIntegerInputFieldTemplate,
   IntegerCollection: buildIntegerCollectionInputFieldTemplate,
   IntegerPolymorphic: buildIntegerPolymorphicInputFieldTemplate,
+  IPAdapterField: buildIPAdapterInputFieldTemplate,
+  IPAdapterModelField: buildIPAdapterModelInputFieldTemplate,
   LatentsCollection: buildLatentsCollectionInputFieldTemplate,
   LatentsField: buildLatentsInputFieldTemplate,
   LatentsPolymorphic: buildLatentsPolymorphicInputFieldTemplate,

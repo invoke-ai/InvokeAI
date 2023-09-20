@@ -1,29 +1,25 @@
+import inspect
 import json
 import os
 import sys
 import typing
-import inspect
 import warnings
 from abc import ABCMeta, abstractmethod
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from picklescan.scanner import scan_file_path
+from typing import Any, Callable, Dict, Generic, List, Literal, Optional, Type, TypeVar, Union
 
-import torch
 import numpy as np
 import onnx
 import safetensors.torch
-from diffusers import DiffusionPipeline, ConfigMixin
-from onnx import numpy_helper
-from onnxruntime import (
-    InferenceSession,
-    SessionOptions,
-    get_available_providers,
-)
-from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
+import torch
+from diffusers import ConfigMixin, DiffusionPipeline
 from diffusers import logging as diffusers_logging
+from onnx import numpy_helper
+from onnxruntime import InferenceSession, SessionOptions, get_available_providers
+from picklescan.scanner import scan_file_path
+from pydantic import BaseModel, Field
 from transformers import logging as transformers_logging
 
 
@@ -40,6 +36,7 @@ class ModelNotFoundException(Exception):
 
 
 class BaseModelType(str, Enum):
+    Any = "any"  # For models that are not associated with any particular base model.
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
     StableDiffusionXL = "sdxl"
@@ -54,6 +51,8 @@ class ModelType(str, Enum):
     Lora = "lora"
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
+    IPAdapter = "ip_adapter"
+    CLIPVision = "clip_vision"
 
 
 class SubModelType(str, Enum):

@@ -12,6 +12,7 @@ import {
   RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
+import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -79,8 +80,8 @@ export const buildCanvasInpaintGraph = (
   } = state.generation;
 
   if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
+    log.error('No Image found in state');
+    throw new Error('No Image found in state');
   }
 
   // The bounding box determines width and height, not the width and height params
@@ -735,6 +736,9 @@ export const buildCanvasInpaintGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  // Add IP Adapter
+  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

@@ -8,6 +8,7 @@ import {
 import { ControlNetConfig } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 import { FaImage, FaMask } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 type ControlNetCanvasImageImportsProps = {
   controlNet: ControlNetConfig;
@@ -18,6 +19,7 @@ const ControlNetCanvasImageImports = (
 ) => {
   const { controlNet } = props;
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleImportImageFromCanvas = useCallback(() => {
     dispatch(canvasImageToControlNet({ controlNet }));
@@ -36,15 +38,15 @@ const ControlNetCanvasImageImports = (
       <IAIIconButton
         size="sm"
         icon={<FaImage />}
-        tooltip="Import Image From Canvas"
-        aria-label="Import Image From Canvas"
+        tooltip={t('controlnet.importImageFromCanvas')}
+        aria-label={t('controlnet.importImageFromCanvas')}
         onClick={handleImportImageFromCanvas}
       />
       <IAIIconButton
         size="sm"
         icon={<FaMask />}
-        tooltip="Import Mask From Canvas"
-        aria-label="Import Mask From Canvas"
+        tooltip={t('controlnet.importMaskFromCanvas')}
+        aria-label={t('controlnet.importMaskFromCanvas')}
         onClick={handleImportMaskFromCanvas}
       />
     </Flex>

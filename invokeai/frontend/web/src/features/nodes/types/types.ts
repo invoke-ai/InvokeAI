@@ -20,6 +20,7 @@ import {
 import { O } from 'ts-toolbelt';
 import { JsonObject } from 'type-fest';
 import { z } from 'zod';
+import i18n from 'i18next';
 
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 
@@ -93,6 +94,8 @@ export const zFieldType = z.enum([
   'integer',
   'IntegerCollection',
   'IntegerPolymorphic',
+  'IPAdapterField',
+  'IPAdapterModelField',
   'LatentsCollection',
   'LatentsField',
   'LatentsPolymorphic',
@@ -286,7 +289,7 @@ export type BooleanPolymorphicInputFieldValue = z.infer<
 
 export const zEnumInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('enum'),
-  value: z.union([z.string(), z.number()]).optional(),
+  value: z.string().optional(),
 });
 export type EnumInputFieldValue = z.infer<typeof zEnumInputFieldValue>;
 
@@ -386,6 +389,25 @@ export const zControlCollectionInputFieldValue = zInputFieldValueBase.extend({
 });
 export type ControlCollectionInputFieldValue = z.infer<
   typeof zControlCollectionInputFieldValue
+>;
+
+export const zIPAdapterModel = zModelIdentifier;
+export type IPAdapterModel = z.infer<typeof zIPAdapterModel>;
+
+export const zIPAdapterField = z.object({
+  image: zImageField,
+  ip_adapter_model: zIPAdapterModel,
+  image_encoder_model: z.string().trim().min(1),
+  weight: z.number(),
+});
+export type IPAdapterField = z.infer<typeof zIPAdapterField>;
+
+export const zIPAdapterInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterField'),
+  value: zIPAdapterField.optional(),
+});
+export type IPAdapterInputFieldValue = z.infer<
+  typeof zIPAdapterInputFieldValue
 >;
 
 export const zModelType = z.enum([
@@ -537,6 +559,17 @@ export type ControlNetModelInputFieldValue = z.infer<
   typeof zControlNetModelInputFieldValue
 >;
 
+export const zIPAdapterModelField = zModelIdentifier;
+export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
+
+export const zIPAdapterModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterModelField'),
+  value: zIPAdapterModelField.optional(),
+});
+export type IPAdapterModelInputFieldValue = z.infer<
+  typeof zIPAdapterModelInputFieldValue
+>;
+
 export const zCollectionInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('Collection'),
   value: z.array(z.any()).optional(), // TODO: should this field ever have a value?
@@ -619,6 +652,8 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zIntegerCollectionInputFieldValue,
   zIntegerPolymorphicInputFieldValue,
   zIntegerInputFieldValue,
+  zIPAdapterInputFieldValue,
+  zIPAdapterModelInputFieldValue,
   zLatentsInputFieldValue,
   zLatentsCollectionInputFieldValue,
   zLatentsPolymorphicInputFieldValue,
@@ -821,11 +856,16 @@ export type ControlPolymorphicInputFieldTemplate = Omit<
   type: 'ControlPolymorphic';
 };
 
+export type IPAdapterInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'IPAdapterField';
+};
+
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {
-  default: string | number;
+  default: string;
   type: 'enum';
-  enumType: 'string' | 'number';
-  options: Array<string | number>;
+  options: string[];
+  labels?: { [key: string]: string };
 };
 
 export type MainModelInputFieldTemplate = InputFieldTemplateBase & {
@@ -856,6 +896,11 @@ export type LoRAModelInputFieldTemplate = InputFieldTemplateBase & {
 export type ControlNetModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'ControlNetModelField';
+};
+
+export type IPAdapterModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'IPAdapterModelField';
 };
 
 export type CollectionInputFieldTemplate = InputFieldTemplateBase & {
@@ -929,6 +974,8 @@ export type InputFieldTemplate =
   | IntegerCollectionInputFieldTemplate
   | IntegerPolymorphicInputFieldTemplate
   | IntegerInputFieldTemplate
+  | IPAdapterInputFieldTemplate
+  | IPAdapterModelInputFieldTemplate
   | LatentsInputFieldTemplate
   | LatentsCollectionInputFieldTemplate
   | LatentsPolymorphicInputFieldTemplate
@@ -1056,6 +1103,13 @@ export const isInvocationFieldSchema = (
 
 export type InvocationEdgeExtra = { type: 'default' | 'collapsed' };
 
+const zLoRAMetadataItem = z.object({
+  lora: zLoRAModelField.deepPartial(),
+  weight: z.number(),
+});
+
+export type LoRAMetadataItem = z.infer<typeof zLoRAMetadataItem>;
+
 export const zCoreMetadata = z
   .object({
     app_version: z.string().nullish(),
@@ -1075,14 +1129,7 @@ export const zCoreMetadata = z
       .union([zMainModel.deepPartial(), zOnnxModel.deepPartial()])
       .nullish(),
     controlnets: z.array(zControlField.deepPartial()).nullish(),
-    loras: z
-      .array(
-        z.object({
-          lora: zLoRAModelField.deepPartial(),
-          weight: z.number(),
-        })
-      )
-      .nullish(),
+    loras: z.array(zLoRAMetadataItem).nullish(),
     vae: zVaeModelField.nullish(),
     strength: z.number().nullish(),
     init_image: z.string().nullish(),
@@ -1258,23 +1305,35 @@ export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
     const targetNode = keyedNodes[edge.target];
     const issues: string[] = [];
     if (!sourceNode) {
-      issues.push(`Output node ${edge.source} does not exist`);
+      issues.push(
+        `${i18n.t('nodes.outputNode')} ${edge.source} ${i18n.t(
+          'nodes.doesNotExist'
+        )}`
+      );
     } else if (
       edge.type === 'default' &&
       !(edge.sourceHandle in sourceNode.data.outputs)
     ) {
       issues.push(
-        `Output field "${edge.source}.${edge.sourceHandle}" does not exist`
+        `${i18n.t('nodes.outputField')}"${edge.source}.${
+          edge.sourceHandle
+        }" ${i18n.t('nodes.doesNotExist')}`
       );
     }
     if (!targetNode) {
-      issues.push(`Input node ${edge.target} does not exist`);
+      issues.push(
+        `${i18n.t('nodes.inputNode')} ${edge.target} ${i18n.t(
+          'nodes.doesNotExist'
+        )}`
+      );
     } else if (
       edge.type === 'default' &&
       !(edge.targetHandle in targetNode.data.inputs)
     ) {
       issues.push(
-        `Input field "${edge.target}.${edge.targetHandle}" does not exist`
+        `${i18n.t('nodes.inputField')} "${edge.target}.${
+          edge.targetHandle
+        }" ${i18n.t('nodes.doesNotExist')}`
       );
     }
     if (issues.length) {
@@ -1282,7 +1341,9 @@ export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
       const src = edge.type === 'default' ? edge.sourceHandle : edge.source;
       const tgt = edge.type === 'default' ? edge.targetHandle : edge.target;
       warnings.push({
-        message: `Edge "${src} -> ${tgt}" skipped`,
+        message: `${i18n.t('nodes.edge')} "${src} -> ${tgt}" ${i18n.t(
+          'nodes.skipped'
+        )}`,
         issues,
         data: edge,
       });

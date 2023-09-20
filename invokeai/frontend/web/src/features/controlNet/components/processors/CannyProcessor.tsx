@@ -6,6 +6,7 @@ import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor
   .default as RequiredCannyImageProcessorInvocation;
@@ -21,6 +22,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
   const { low_threshold, high_threshold } = processorNode;
   const isBusy = useAppSelector(selectIsBusy);
   const processorChanged = useProcessorNodeChanged();
+  const { t } = useTranslation();
 
   const handleLowThresholdChanged = useCallback(
     (v: number) => {
@@ -52,7 +54,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
     <ProcessorWrapper>
       <IAISlider
         isDisabled={isBusy || !isEnabled}
-        label="Low Threshold"
+        label={t('controlnet.lowThreshold')}
         value={low_threshold}
         onChange={handleLowThresholdChanged}
         handleReset={handleLowThresholdReset}
@@ -64,7 +66,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
       />
       <IAISlider
         isDisabled={isBusy || !isEnabled}
-        label="High Threshold"
+        label={t('controlnet.highThreshold')}
         value={high_threshold}
         onChange={handleHighThresholdChanged}
         handleReset={handleHighThresholdReset}

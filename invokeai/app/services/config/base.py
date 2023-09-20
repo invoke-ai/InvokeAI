@@ -9,15 +9,17 @@ the command line.
 """
 
 from __future__ import annotations
+
 import argparse
 import os
 import pydoc
 import sys
 from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig, ListConfig
 from pathlib import Path
+from typing import ClassVar, Dict, List, Literal, Union, get_args, get_origin, get_type_hints
+
+from omegaconf import DictConfig, ListConfig, OmegaConf
 from pydantic import BaseSettings
-from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
 
 class PagingArgumentParser(argparse.ArgumentParser):
@@ -42,7 +44,9 @@ class InvokeAISettings(BaseSettings):
 
     def parse_args(self, argv: list = sys.argv[1:]):
         parser = self.get_parser()
-        opt = parser.parse_args(argv)
+        opt, unknown_opts = parser.parse_known_args(argv)
+        if len(unknown_opts) > 0:
+            print("Unknown args:", unknown_opts)
         for name in self.__fields__:
             if name not in self._excluded():
                 value = getattr(opt, name)

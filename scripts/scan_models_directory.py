@@ -4,11 +4,11 @@
 Scan the models directory and print out a new models.yaml
 """
 
+import argparse
 import os
 import sys
-import argparse
-
 from pathlib import Path
+
 from omegaconf import OmegaConf
 
 
