@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
 import { setIterations } from 'features/parameters/store/generationSlice';
@@ -60,29 +61,33 @@ const ParamIterations = ({ asSlider }: Props) => {
   }, [dispatch, initial]);
 
   return asSlider || shouldUseSliders ? (
-    <IAISlider
-      label={t('parameters.iterations')}
-      step={step}
-      min={min}
-      max={sliderMax}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={iterations}
-      withInput
-      withReset
-      withSliderMarks
-      sliderNumberInputProps={{ max: inputMax }}
-    />
+    <IAIInformationalPopover details="paramImages">
+      <IAISlider
+        label={t('parameters.iterations')}
+        step={step}
+        min={min}
+        max={sliderMax}
+        onChange={handleChange}
+        handleReset={handleReset}
+        value={iterations}
+        withInput
+        withReset
+        withSliderMarks
+        sliderNumberInputProps={{ max: inputMax }}
+      />
+    </IAIInformationalPopover>
   ) : (
-    <IAINumberInput
-      label={t('parameters.iterations')}
-      step={step}
-      min={min}
-      max={inputMax}
-      onChange={handleChange}
-      value={iterations}
-      numberInputFieldProps={{ textAlign: 'center' }}
-    />
+    <IAIInformationalPopover details="paramImages">
+      <IAINumberInput
+        label={t('parameters.iterations')}
+        step={step}
+        min={min}
+        max={inputMax}
+        onChange={handleChange}
+        value={iterations}
+        numberInputFieldProps={{ textAlign: 'center' }}
+      />
+    </IAIInformationalPopover>
   );
 };
 
