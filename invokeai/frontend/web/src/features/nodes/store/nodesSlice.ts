@@ -55,7 +55,6 @@ import {
   VaeModelInputFieldValue,
   Workflow,
 } from '../types/types';
-
 import { NodesState } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
@@ -103,7 +102,7 @@ export const initialNodesState: NodesState = {
   workflow: initialWorkflow,
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
-  mousePosition: { x: 100, y: 100 },
+  mousePosition: { x: 0, y: 0 },
   mouseOverField: null,
   mouseOverNode: null,
   nodesToCopy: [],

@@ -4,7 +4,6 @@ import {
   OnConnectStartParams,
   SelectionMode,
   Viewport,
-  XYPosition,
 } from 'reactflow';
 import {
   FieldIdentifier,
@@ -34,7 +33,7 @@ export type NodesState = {
   workflow: Omit<Workflow, 'nodes' | 'edges'>;
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
-  mousePosition: XYPosition;
+  mousePosition: object;
   isReady: boolean;
   mouseOverField: FieldIdentifier | null;
   mouseOverNode: string | null;
