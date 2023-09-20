@@ -86,3 +86,17 @@ class T2IAdapterModel(ModelBase):
                 return T2IAdapterModelFormat.Diffusers
 
         raise InvalidModelException(f"Unsupported T2I-Adapter format: '{path}'.")
+
+    @classmethod
+    def convert_if_required(
+        cls,
+        model_path: str,
+        output_path: str,
+        config: ModelConfigBase,
+        base_model: BaseModelType,
+    ) -> str:
+        format = cls.detect_format(model_path)
+        if format == T2IAdapterModelFormat.Diffusers:
+            return model_path
+        else:
+            raise ValueError(f"Unsupported format: '{format}'.")
