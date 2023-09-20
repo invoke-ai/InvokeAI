@@ -1,12 +1,10 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredMidasDepthImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor
   .default as RequiredMidasDepthImageProcessorInvocation;
@@ -21,7 +19,6 @@ const MidasDepthProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { a_mult, bg_th } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
   const { t } = useTranslation();
 
   const handleAMultChanged = useCallback(
@@ -59,7 +56,7 @@ const MidasDepthProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
         label={t('controlnet.bgth')}
@@ -72,7 +69,7 @@ const MidasDepthProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

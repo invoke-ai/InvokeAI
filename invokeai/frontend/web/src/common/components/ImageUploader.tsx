@@ -4,7 +4,6 @@ import { useAppToaster } from 'app/components/Toaster';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -51,7 +50,6 @@ type ImageUploaderProps = {
 const ImageUploader = (props: ImageUploaderProps) => {
   const { children } = props;
   const { autoAddBoardId, postUploadAction } = useAppSelector(selector);
-  const isBusy = useAppSelector(selectIsBusy);
   const toaster = useAppToaster();
   const { t } = useTranslation();
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
@@ -106,6 +104,10 @@ const ImageUploader = (props: ImageUploaderProps) => {
     [t, toaster, fileAcceptedCallback, fileRejectionCallback]
   );
 
+  const onDragOver = useCallback(() => {
+    setIsHandlingUpload(true);
+  }, []);
+
   const {
     getRootProps,
     getInputProps,
@@ -117,8 +119,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
     noClick: true,
     onDrop,
-    onDragOver: () => setIsHandlingUpload(true),
-    disabled: isBusy,
+    onDragOver,
     multiple: false,
   });
 

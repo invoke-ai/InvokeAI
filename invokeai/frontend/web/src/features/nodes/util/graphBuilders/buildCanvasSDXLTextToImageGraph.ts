@@ -7,11 +7,11 @@ import {
   ONNXTextToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -29,7 +29,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -44,6 +44,7 @@ export const buildCanvasSDXLTextToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     vaePrecision,
     clipSkip,
@@ -56,20 +57,15 @@ export const buildCanvasSDXLTextToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const {
-    scaledBoundingBoxDimensions,
-    boundingBoxScaleMethod,
-    shouldAutoSave,
-  } = state.canvas;
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
 
-  const { shouldUseSDXLRefiner, refinerStart, shouldConcatSDXLStylePrompt } =
-    state.sdxl;
+  const { shouldUseSDXLRefiner, refinerStart } = state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
@@ -95,7 +91,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       ? {
           type: 't2l_onnx',
           id: SDXL_DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -103,7 +99,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       : {
           type: 'denoise_latents',
           id: SDXL_DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -112,8 +108,8 @@ export const buildCanvasSDXLTextToImageGraph = (
         };
 
   // Construct Style Prompt
-  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
-    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
+    buildSDXLStylePrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -132,27 +128,28 @@ export const buildCanvasSDXLTextToImageGraph = (
       [modelLoaderNodeId]: {
         type: modelLoaderNodeType,
         id: modelLoaderNodeId,
-        is_intermediate: true,
+        is_intermediate,
         model,
       },
       [POSITIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: positivePrompt,
-        style: craftedPositiveStylePrompt,
+        style: joinedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: negativePrompt,
-        style: craftedNegativeStylePrompt,
+        style: joinedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-        is_intermediate: true,
+        is_intermediate,
+        seed,
         width: !isUsingScaledDimensions
           ? width
           : scaledBoundingBoxDimensions.width,
@@ -254,14 +251,14 @@ export const buildCanvasSDXLTextToImageGraph = (
     graph.nodes[LATENTS_TO_IMAGE] = {
       id: LATENTS_TO_IMAGE,
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
-      is_intermediate: true,
+      is_intermediate,
       fp32,
     };
 
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       width: width,
       height: height,
     };
@@ -292,7 +289,7 @@ export const buildCanvasSDXLTextToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       fp32,
     };
 
@@ -318,10 +315,10 @@ export const buildCanvasSDXLTextToImageGraph = (
     height: !isUsingScaledDimensions
       ? height
       : scaledBoundingBoxDimensions.height,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -367,9 +364,6 @@ export const buildCanvasSDXLTextToImageGraph = (
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
 
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
-
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
@@ -386,6 +380,8 @@ export const buildCanvasSDXLTextToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

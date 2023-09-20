@@ -1,3 +1,4 @@
+import { $store } from 'app/store/nanostores/store';
 import {
   SchedulerParam,
   zBaseModel,
@@ -7,7 +8,8 @@ import {
   zSDXLRefinerModel,
   zScheduler,
 } from 'features/parameters/types/parameterSchemas';
-import { keyBy } from 'lodash-es';
+import i18n from 'i18next';
+import { has, keyBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Node } from 'reactflow';
@@ -20,7 +22,6 @@ import {
 import { O } from 'ts-toolbelt';
 import { JsonObject } from 'type-fest';
 import { z } from 'zod';
-import i18n from 'i18next';
 
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 
@@ -57,6 +58,10 @@ export type InvocationTemplate = {
    * The invocation's version.
    */
   version?: string;
+  /**
+   * Whether or not this node should use the cache
+   */
+  useCache: boolean;
 };
 
 export type FieldUIConfig = {
@@ -1022,6 +1027,9 @@ export type InvocationSchemaExtra = {
     type: Omit<OpenAPIV3.SchemaObject, 'default'> & {
       default: AnyInvocationType;
     };
+    use_cache: Omit<OpenAPIV3.SchemaObject, 'default'> & {
+      default: boolean;
+    };
   };
 };
 
@@ -1185,9 +1193,37 @@ export const zInvocationNodeData = z.object({
   version: zSemVer.optional(),
 });
 
+export const zInvocationNodeDataV2 = z.preprocess(
+  (arg) => {
+    try {
+      const data = zInvocationNodeData.parse(arg);
+      if (!has(data, 'useCache')) {
+        const nodeTemplates = $store.get()?.getState().nodes.nodeTemplates as
+          | Record<string, InvocationTemplate>
+          | undefined;
+
+        const template = nodeTemplates?.[data.type];
+
+        let useCache = true;
+        if (template) {
+          useCache = template.useCache;
+        }
+
+        Object.assign(data, { useCache });
+      }
+      return data;
+    } catch {
+      return arg;
+    }
+  },
+  zInvocationNodeData.extend({
+    useCache: z.boolean(),
+  })
+);
+
 // Massage this to get better type safety while developing
 export type InvocationNodeData = Omit<
-  z.infer<typeof zInvocationNodeData>,
+  z.infer<typeof zInvocationNodeDataV2>,
   'type'
 > & {
   type: AnyInvocationType;
@@ -1215,7 +1251,7 @@ const zDimension = z.number().gt(0).nullish();
 export const zWorkflowInvocationNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('invocation'),
-  data: zInvocationNodeData,
+  data: zInvocationNodeDataV2,
   width: zDimension,
   height: zDimension,
   position: zPosition,
@@ -1277,6 +1313,8 @@ export type WorkflowWarning = {
   data: JsonObject;
 };
 
+const CURRENT_WORKFLOW_VERSION = '1.0.0';
+
 export const zWorkflow = z.object({
   name: z.string().default(''),
   author: z.string().default(''),
@@ -1292,7 +1330,7 @@ export const zWorkflow = z.object({
     .object({
       version: zSemVer,
     })
-    .default({ version: '1.0.0' }),
+    .default({ version: CURRENT_WORKFLOW_VERSION }),
 });
 
 export const zValidatedWorkflow = zWorkflow.transform((workflow) => {

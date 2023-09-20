@@ -114,7 +114,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
           borderRadius: 'md',
           pointerEvents: 'none',
           transitionProperty: 'common',
-          transitionDuration: 'normal',
+          transitionDuration: '0.1s',
           opacity: 0.7,
           shadow: isInProgress ? inProgressShadow : undefined,
           zIndex: -1,

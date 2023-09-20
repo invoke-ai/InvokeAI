@@ -194,8 +194,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     setting environment variables INVOKEAI_<setting>.
     """
 
-    singleton_config: ClassVar[InvokeAIAppConfig] = None
-    singleton_init: ClassVar[Dict] = None
+    singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
+    singleton_init: ClassVar[Optional[Dict]] = None
 
     # fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
@@ -234,6 +234,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal['plain', 'color', 'syslog', 'legacy'] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
     log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
+    log_sql             : bool = Field(default=False, description="Log SQL queries", category="Logging")
 
     dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed.", category="Development")
 
@@ -245,18 +246,23 @@ class InvokeAIAppConfig(InvokeAISettings):
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", category="Model Cache", )
 
     # DEVICE
-    device              : Literal[tuple(["auto", "cpu", "cuda", "cuda:1", "mps"])] = Field(default="auto", description="Generation device", category="Device", )
-    precision: Literal[tuple(["auto", "float16", "float32", "autocast"])] = Field(default="auto", description="Floating point precision", category="Device", )
+    device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Generation device", category="Device", )
+    precision           : Literal["auto", "float16", "float32", "autocast"] = Field(default="auto", description="Floating point precision", category="Device", )
 
     # GENERATION
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category="Generation", )
-    attention_type      : Literal[tuple(["auto", "normal", "xformers", "sliced", "torch-sdp"])] = Field(default="auto", description="Attention type", category="Generation", )
-    attention_slice_size: Literal[tuple(["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8])] = Field(default="auto", description='Slice size, valid when attention_type=="sliced"', category="Generation", )
+    attention_type      : Literal["auto", "normal", "xformers", "sliced", "torch-sdp"] = Field(default="auto", description="Attention type", category="Generation", )
+    attention_slice_size: Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8] = Field(default="auto", description='Slice size, valid when attention_type=="sliced"', category="Generation", )
+    force_tiled_decode  : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category="Generation",)
     force_tiled_decode: bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category="Generation",)
+
+    # QUEUE
+    max_queue_size      : int = Field(default=10000, gt=0, description="Maximum number of items in the session queue", category="Queue", )
 
     # NODES
     allow_nodes         : Optional[List[str]] = Field(default=None, description="List of nodes to allow. Omit to allow all.", category="Nodes")
     deny_nodes          : Optional[List[str]] = Field(default=None, description="List of nodes to deny. Omit to deny none.", category="Nodes")
+    node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory", category="Nodes", )
 
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
@@ -272,7 +278,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     class Config:
         validate_assignment = True
 
-    def parse_args(self, argv: List[str] = None, conf: DictConfig = None, clobber=False):
+    def parse_args(self, argv: Optional[list[str]] = None, conf: Optional[DictConfig] = None, clobber=False):
         """
         Update settings with contents of init file, environment, and
         command-line settings.
@@ -283,12 +289,16 @@ class InvokeAIAppConfig(InvokeAISettings):
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
         super().parse_args(argv)
+        loaded_conf = None
         if conf is None:
             try:
-                conf = OmegaConf.load(self.root_dir / INIT_FILE)
+                loaded_conf = OmegaConf.load(self.root_dir / INIT_FILE)
             except Exception:
                 pass
-        InvokeAISettings.initconf = conf
+        if isinstance(loaded_conf, DictConfig):
+            InvokeAISettings.initconf = loaded_conf
+        else:
+            InvokeAISettings.initconf = conf
 
         # parse args again in order to pick up settings in configuration file
         super().parse_args(argv)
@@ -376,13 +386,6 @@ class InvokeAIAppConfig(InvokeAISettings):
         """
         return self._resolve(self.models_dir)
 
-    @property
-    def autoconvert_path(self) -> Path:
-        """
-        Path to the directory containing models to be imported automatically at startup.
-        """
-        return self._resolve(self.autoconvert_dir) if self.autoconvert_dir else None
-
     # the following methods support legacy calls leftover from the Globals era
     @property
     def full_precision(self) -> bool:
@@ -405,11 +408,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         return True
 
     @property
-    def ram_cache_size(self) -> float:
+    def ram_cache_size(self) -> Union[Literal["auto"], float]:
         return self.max_cache_size or self.ram
 
     @property
-    def vram_cache_size(self) -> float:
+    def vram_cache_size(self) -> Union[Literal["auto"], float]:
         return self.max_vram_cache_size or self.vram
 
     @property

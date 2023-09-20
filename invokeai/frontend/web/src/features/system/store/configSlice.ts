@@ -24,8 +24,8 @@ export const initialConfigState: AppConfig = {
     iterations: {
       initial: 1,
       min: 1,
-      sliderMax: 20,
-      inputMax: 9999,
+      sliderMax: 1000,
+      inputMax: 10000,
       fineStep: 1,
       coarseStep: 1,
     },

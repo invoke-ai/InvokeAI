@@ -18,6 +18,7 @@ import postprocessingReducer from 'features/parameters/store/postprocessingSlice
 import sdxlReducer from 'features/sdxl/store/sdxlSlice';
 import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
+import queueReducer from 'features/queue/store/queueSlice';
 import modelmanagerReducer from 'features/ui/components/tabs/ModelManager/store/modelManagerSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
@@ -31,6 +32,7 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
+import { $store } from './nanostores/store';
 
 const allReducers = {
   canvas: canvasReducer,
@@ -49,6 +51,7 @@ const allReducers = {
   lora: loraReducer,
   modelmanager: modelmanagerReducer,
   sdxl: sdxlReducer,
+  queue: queueReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -124,3 +127,4 @@ export type RootState = ReturnType<typeof store.getState>;
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
 export type AppDispatch = typeof store.dispatch;
 export const stateSelector = (state: RootState) => state;
+$store.set(store);

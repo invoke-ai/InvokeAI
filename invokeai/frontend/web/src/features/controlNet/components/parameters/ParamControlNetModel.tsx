@@ -11,11 +11,10 @@ import {
 } from 'features/controlNet/store/controlNetSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { useTranslation } from 'react-i18next';
+import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
 type ParamControlNetModelProps = {
   controlNet: ControlNetConfig;
@@ -33,7 +32,6 @@ const selector = createSelector(
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const { controlNetId, model: controlNetModel, isEnabled } = props.controlNet;
   const dispatch = useAppDispatch();
-  const isBusy = useAppSelector(selectIsBusy);
 
   const { mainModel } = useAppSelector(selector);
   const { t } = useTranslation();
@@ -110,7 +108,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       placeholder={t('controlnet.selectModel')}
       value={selectedModel?.id ?? null}
       onChange={handleModelChanged}
-      disabled={isBusy || !isEnabled}
+      disabled={!isEnabled}
       tooltip={selectedModel?.description}
     />
   );
