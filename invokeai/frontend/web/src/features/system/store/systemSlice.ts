@@ -35,7 +35,7 @@ export const initialSystemState: SystemState = {
   language: 'en',
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
-  shouldDisableInformationalPopovers: false,
+  shouldEnableInformationalPopovers: false,
   status: 'DISCONNECTED',
 };
 
@@ -76,11 +76,11 @@ export const systemSlice = createSlice({
     shouldUseWatermarkerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseWatermarker = action.payload;
     },
-    setShouldDisableInformationalPopovers(
+    setShouldEnableInformationalPopovers(
       state,
       action: PayloadAction<boolean>
     ) {
-      state.shouldDisableInformationalPopovers = action.payload;
+      state.shouldEnableInformationalPopovers = action.payload;
     },
   },
   extraReducers(builder) {
@@ -241,7 +241,7 @@ export const {
   languageChanged,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
-  setShouldDisableInformationalPopovers,
+  setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

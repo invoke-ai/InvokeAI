@@ -23,7 +23,7 @@ import {
   consoleLogLevelChanged,
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
-  setShouldDisableInformationalPopovers,
+  setShouldEnableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
   shouldUseNSFWCheckerChanged,
@@ -67,7 +67,7 @@ const selector = createSelector(
       shouldAntialiasProgressImage,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
-      shouldDisableInformationalPopovers,
+      shouldEnableInformationalPopovers,
     } = system;
 
     const {
@@ -87,7 +87,7 @@ const selector = createSelector(
       shouldUseNSFWChecker,
       shouldUseWatermarker,
       shouldAutoChangeDimensions,
-      shouldDisableInformationalPopovers,
+      shouldEnableInformationalPopovers,
     };
   },
   {
@@ -161,7 +161,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldUseNSFWChecker,
     shouldUseWatermarker,
     shouldAutoChangeDimensions,
-    shouldDisableInformationalPopovers,
+    shouldEnableInformationalPopovers,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -312,11 +312,11 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   />
                 )}
                 <SettingSwitch
-                  label="Disable informational popovers"
-                  isChecked={shouldDisableInformationalPopovers}
+                  label="Enable informational popovers"
+                  isChecked={shouldEnableInformationalPopovers}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     dispatch(
-                      setShouldDisableInformationalPopovers(e.target.checked)
+                      setShouldEnableInformationalPopovers(e.target.checked)
                     )
                   }
                 />
