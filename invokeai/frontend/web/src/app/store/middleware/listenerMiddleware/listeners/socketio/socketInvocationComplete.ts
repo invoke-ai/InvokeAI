@@ -76,7 +76,6 @@ export const addInvocationCompleteEventListener = () => {
                   categories: IMAGE_CATEGORIES,
                 },
                 (draft) => {
-                  console.log(draft);
                   imagesAdapter.addOne(draft, imageDTO);
                 }
               )
