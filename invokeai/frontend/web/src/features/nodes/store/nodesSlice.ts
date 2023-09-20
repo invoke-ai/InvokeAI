@@ -55,6 +55,7 @@ import {
   VaeModelInputFieldValue,
   Workflow,
 } from '../types/types';
+
 import { NodesState } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
@@ -102,6 +103,7 @@ export const initialNodesState: NodesState = {
   workflow: initialWorkflow,
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
+  mousePosition: { x: 100, y: 100 },
   mouseOverField: null,
   mouseOverNode: null,
   nodesToCopy: [],
@@ -697,9 +699,28 @@ const nodesSlice = createSlice({
         state.edges
       );
     },
+    mouseMoved: (state, action) => {
+      state.mousePosition = action.payload;
+    },
     selectionCopied: (state) => {
       state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
       state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
+
+      if (state.nodesToCopy.length > 0) {
+        const averagePosition = { x: 0, y: 0 };
+        state.nodesToCopy.forEach((e) => {
+          averagePosition.x += e.position.x;
+          averagePosition.y += e.position.y;
+        });
+
+        averagePosition.x /= state.nodesToCopy.length;
+        averagePosition.y /= state.nodesToCopy.length;
+
+        state.nodesToCopy.forEach((e) => {
+          e.position.x -= averagePosition.x;
+          e.position.y -= averagePosition.y;
+        });
+      }
     },
     selectionPasted: (state) => {
       const newNodes = state.nodesToCopy.map(cloneDeep);
@@ -730,8 +751,8 @@ const nodesSlice = createSlice({
 
         const position = findUnoccupiedPosition(
           state.nodes,
-          node.position.x,
-          node.position.y
+          node.position.x + state.mousePosition.x,
+          node.position.y + state.mousePosition.y
         );
 
         node.position = position;
@@ -901,6 +922,7 @@ export const {
   fieldLabelChanged,
   viewportChanged,
   mouseOverFieldChanged,
+  mouseMoved,
   selectionCopied,
   selectionPasted,
   selectedAll,

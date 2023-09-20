@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
   Background,
@@ -34,6 +34,7 @@ import {
   selectedAll,
   selectedEdgesChanged,
   selectedNodesChanged,
+  mouseMoved,
   selectionCopied,
   selectionPasted,
   viewportChanged,
@@ -79,6 +80,7 @@ export const Flow = () => {
   const edges = useAppSelector((state) => state.nodes.edges);
   const viewport = useAppSelector((state) => state.nodes.viewport);
   const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
+  const flowWrapper = useRef<HTMLBaseElement>(null);
 
   const isValidConnection = useIsValidConnection();
 
@@ -152,7 +154,18 @@ export const Flow = () => {
   const onInit: OnInit = useCallback((flow) => {
     $flow.set(flow);
     flow.fitView();
+    flowWrapper.current = document.getElementById('workflow-editor');
   }, []);
+
+  const onMouseMove = (event: MouseEvent) => {
+    const bounds = flowWrapper.current?.getBoundingClientRect();
+    const pos = $flow.get().project({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+
+    dispatch(mouseMoved(pos));
+  };
 
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
     e.preventDefault();
@@ -178,6 +191,7 @@ export const Flow = () => {
       nodes={nodes}
       edges={edges}
       onInit={onInit}
+      onMouseMove={onMouseMove}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onEdgesDelete={onEdgesDelete}
