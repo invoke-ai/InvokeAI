@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -48,7 +47,6 @@ export const buildCanvasSDXLImageToImageGraph = (
     vaePrecision,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
@@ -78,9 +76,7 @@ export const buildCanvasSDXLImageToImageGraph = (
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
   const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =

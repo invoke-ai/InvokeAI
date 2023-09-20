@@ -61,7 +61,6 @@ export const buildCanvasInpaintGraph = (
     img2imgStrength: strength,
     seed,
     vaePrecision,
-    shouldUseNoiseSettings,
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
@@ -92,9 +91,7 @@ export const buildCanvasInpaintGraph = (
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   const graph: NonNullableGraph = {
     id: CANVAS_INPAINT_GRAPH,
