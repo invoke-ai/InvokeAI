@@ -6,7 +6,6 @@ import IAISwitch from 'common/components/IAISwitch';
 import { isIPAdapterEnableToggled } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -28,16 +27,14 @@ const ParamIPAdapterFeatureToggle = () => {
   }, [dispatch]);
 
   return (
-    <IAIInformationalPopover details="dynamicPromptsToggle">
-      <IAISwitch
-        label={t('controlnet.enableIPAdapter')}
-        isChecked={isIPAdapterEnabled}
-        onChange={handleChange}
-        formControlProps={{
-          width: '100%',
-        }}
-      />
-    </IAIInformationalPopover>
+    <IAISwitch
+      label={t('controlnet.enableIPAdapter')}
+      isChecked={isIPAdapterEnabled}
+      onChange={handleChange}
+      formControlProps={{
+        width: '100%',
+      }}
+    />
   );
 };
 

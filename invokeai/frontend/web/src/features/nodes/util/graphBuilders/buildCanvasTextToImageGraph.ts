@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   DenoiseLatentsInvocation,
   ONNXTextToLatentsInvocation,
@@ -47,7 +46,6 @@ export const buildCanvasTextToImageGraph = (
     vaePrecision,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
@@ -68,9 +66,7 @@ export const buildCanvasTextToImageGraph = (
     throw new Error('No model found in state');
   }
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   const isUsingOnnxModel = model.model_type === 'onnx';
 

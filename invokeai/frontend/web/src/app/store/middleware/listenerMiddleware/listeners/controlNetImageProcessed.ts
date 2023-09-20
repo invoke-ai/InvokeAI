@@ -65,7 +65,6 @@ export const addControlNetImageProcessedListener = () => {
         );
         const enqueueResult = await req.unwrap();
         req.reset();
-        console.log(enqueueResult.queue_item.session_id);
         log.debug(
           { enqueueResult: parseify(enqueueResult) },
           t('queue.graphQueued')

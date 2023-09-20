@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
@@ -51,7 +50,6 @@ export const buildLinearImageToImageGraph = (
     height,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
@@ -81,9 +79,7 @@ export const buildLinearImageToImageGraph = (
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {

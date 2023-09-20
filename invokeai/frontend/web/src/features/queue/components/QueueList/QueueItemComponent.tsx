@@ -59,16 +59,22 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
     return `${seconds}s`;
   }, [item]);
 
+  const isCanceled = useMemo(
+    () => ['canceled', 'completed', 'failed'].includes(item.status),
+    [item.status]
+  );
+
   return (
     <Flex
       flexDir="column"
-      borderRadius="base"
       aria-selected={isOpen}
       fontSize="sm"
+      borderRadius="base"
       justifyContent="center"
       sx={sx}
     >
       <Flex
+        minH={9}
         alignItems="center"
         gap={4}
         p={1.5}
@@ -128,10 +134,8 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           <ButtonGroup size="xs" variant="ghost">
             <IAIIconButton
               onClick={handleCancelQueueItem}
+              isDisabled={isCanceled}
               isLoading={isLoading}
-              isDisabled={['canceled', 'completed', 'failed'].includes(
-                item.status
-              )}
               aria-label={t('queue.cancelItem')}
               icon={<FaTimes />}
             />

@@ -102,8 +102,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         self.__queue_item = queue_item
                         self.__invoker.services.graph_execution_manager.set(queue_item.session)
                         self.__invoker.invoke(
-                            queue_item_id=queue_item.item_id,
-                            queue_id=queue_item.queue_id,
+                            session_queue_batch_id=queue_item.batch_id,
+                            session_queue_id=queue_item.queue_id,
+                            session_queue_item_id=queue_item.item_id,
                             graph_execution_state=queue_item.session,
                             invoke_all=True,
                         )

@@ -1,7 +1,7 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import {
-  canvasBatchesAndSessionsReset,
+  canvasBatchIdsReset,
   commitStagingAreaImage,
   discardStagedImages,
 } from 'features/canvas/store/canvasSlice';
@@ -38,7 +38,7 @@ export const addCommitStagingAreaImageListener = () => {
             })
           );
         }
-        dispatch(canvasBatchesAndSessionsReset());
+        dispatch(canvasBatchIdsReset());
       } catch {
         log.error('Failed to cancel canvas batches');
         dispatch(

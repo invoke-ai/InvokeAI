@@ -13,7 +13,6 @@ import {
   Image,
 } from '@chakra-ui/react';
 import { useAppSelector } from '../../app/store/storeHooks';
-import { systemSelector } from '../../features/system/store/systemSelectors';
 import { useTranslation } from 'react-i18next';
 
 interface Props extends PopoverProps {
@@ -33,7 +32,9 @@ function IAIInformationalPopover({
   children,
   placement,
 }: Props): JSX.Element {
-  const { shouldDisableInformationalPopovers } = useAppSelector(systemSelector);
+  const shouldDisableInformationalPopovers = useAppSelector(
+    (state) => state.system.shouldDisableInformationalPopovers
+  );
   const { t } = useTranslation();
 
   const heading = t(`popovers.${details}.heading`);

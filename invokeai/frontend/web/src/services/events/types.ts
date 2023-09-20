@@ -34,7 +34,8 @@ export type BaseNode = {
 
 export type ModelLoadStartedEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   model_name: string;
   base_model: BaseModelType;
@@ -44,7 +45,8 @@ export type ModelLoadStartedEvent = {
 
 export type ModelLoadCompletedEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   model_name: string;
   base_model: BaseModelType;
@@ -62,7 +64,8 @@ export type ModelLoadCompletedEvent = {
  */
 export type GeneratorProgressEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node_id: string;
   source_node_id: string;
@@ -81,7 +84,8 @@ export type GeneratorProgressEvent = {
  */
 export type InvocationCompleteEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -95,7 +99,8 @@ export type InvocationCompleteEvent = {
  */
 export type InvocationErrorEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -110,7 +115,8 @@ export type InvocationErrorEvent = {
  */
 export type InvocationStartedEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -123,7 +129,8 @@ export type InvocationStartedEvent = {
  */
 export type GraphExecutionStateCompleteEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
 };
 
@@ -134,7 +141,8 @@ export type GraphExecutionStateCompleteEvent = {
  */
 export type SessionRetrievalErrorEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   error_type: string;
   error: string;
@@ -147,7 +155,8 @@ export type SessionRetrievalErrorEvent = {
  */
 export type InvocationRetrievalErrorEvent = {
   queue_id: string;
-  queue_item_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node_id: string;
   error_type: string;
@@ -161,8 +170,8 @@ export type InvocationRetrievalErrorEvent = {
  */
 export type QueueItemStatusChangedEvent = {
   queue_id: string;
-  queue_item_id: string;
-  batch_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   session_id: string;
   graph_execution_state_id: string;
   status: components['schemas']['SessionQueueItemDTO']['status'];
