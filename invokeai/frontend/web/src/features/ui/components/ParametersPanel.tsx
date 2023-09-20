@@ -1,7 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
+import QueueControls from 'features/queue/components/QueueControls';
 import SDXLImageToImageTabParameters from 'features/sdxl/components/SDXLImageToImageTabParameters';
 import SDXLTextToImageTabParameters from 'features/sdxl/components/SDXLTextToImageTabParameters';
 import SDXLUnifiedCanvasTabParameters from 'features/sdxl/components/SDXLUnifiedCanvasTabParameters';
@@ -67,7 +67,7 @@ const ParametersPanelWrapper = memo((props: PropsWithChildren) => {
         gap: 2,
       }}
     >
-      <ProcessButtons />
+      <QueueControls />
       <Flex
         layerStyle="first"
         sx={{

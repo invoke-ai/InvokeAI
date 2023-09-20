@@ -1,6 +1,5 @@
 import sqlite3
 import threading
-import uuid
 from abc import ABC, abstractmethod
 from typing import Optional, Union, cast
 
@@ -8,6 +7,7 @@ from pydantic import BaseModel, Extra, Field
 
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
+from invokeai.app.util.misc import uuid_string
 
 
 class BoardChanges(BaseModel, extra=Extra.forbid):
@@ -87,24 +87,20 @@ class BoardRecordStorageBase(ABC):
 
 
 class SqliteBoardRecordStorage(BoardRecordStorageBase):
-    _filename: str
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, filename: str) -> None:
+    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
         super().__init__()
-        self._filename = filename
-        self._conn = sqlite3.connect(filename, check_same_thread=False)
+        self._conn = conn
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
         self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
-        self._lock = threading.Lock()
+        self._lock = lock
 
         try:
             self._lock.acquire()
-            # Enable foreign keys
-            self._conn.execute("PRAGMA foreign_keys = ON;")
             self._create_tables()
             self._conn.commit()
         finally:
@@ -174,7 +170,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         board_name: str,
     ) -> BoardRecord:
         try:
-            board_id = str(uuid.uuid4())
+            board_id = uuid_string()
             self._lock.acquire()
             self._cursor.execute(
                 """--sql

@@ -1,13 +1,11 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredLineartImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor
   .default as RequiredLineartImageProcessorInvocation;
@@ -22,7 +20,6 @@ const LineartProcessor = (props: LineartProcessorProps) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, coarse } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
   const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
@@ -70,7 +67,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
         label={t('controlnet.imageResolution')}
@@ -82,13 +79,13 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISwitch
         label={t('controlnet.coarse')}
         isChecked={coarse}
         onChange={handleCoarseChanged}
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

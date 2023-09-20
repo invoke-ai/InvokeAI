@@ -7,10 +7,10 @@ import {
   ONNXTextToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -47,6 +47,7 @@ export const buildLinearTextToImageGraph = (
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
+    seed,
   } = state.generation;
 
   const use_cpu = shouldUseNoiseSettings
@@ -59,7 +60,7 @@ export const buildLinearTextToImageGraph = (
   }
 
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingOnnxModel = model.model_type === 'onnx';
 
   let modelLoaderNodeId = isUsingOnnxModel
@@ -75,7 +76,7 @@ export const buildLinearTextToImageGraph = (
       ? {
           type: 't2l_onnx',
           id: DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -83,7 +84,7 @@ export const buildLinearTextToImageGraph = (
       : {
           type: 'denoise_latents',
           id: DENOISE_LATENTS,
-          is_intermediate: true,
+          is_intermediate,
           cfg_scale,
           scheduler,
           steps,
@@ -109,40 +110,42 @@ export const buildLinearTextToImageGraph = (
       [modelLoaderNodeId]: {
         type: modelLoaderNodeType,
         id: modelLoaderNodeId,
-        is_intermediate: true,
+        is_intermediate,
         model,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
         skipped_layers: clipSkip,
-        is_intermediate: true,
+        is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        is_intermediate: true,
+        is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        is_intermediate: true,
+        is_intermediate,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        seed,
         width,
         height,
         use_cpu,
-        is_intermediate: true,
+        is_intermediate,
       },
       [t2lNode.id]: t2lNode,
       [LATENTS_TO_IMAGE]: {
         type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
+        is_intermediate,
       },
     },
     edges: [
@@ -241,10 +244,10 @@ export const buildLinearTextToImageGraph = (
     cfg_scale,
     height,
     width,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -277,9 +280,6 @@ export const buildLinearTextToImageGraph = (
   // add LoRA support
   addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
-
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
@@ -296,6 +296,8 @@ export const buildLinearTextToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

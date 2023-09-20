@@ -27,7 +27,7 @@ const EmbedWorkflowCheckbox = ({ nodeId }: { nodeId: string }) => {
 
   return (
     <FormControl as={Flex} sx={{ alignItems: 'center', gap: 2, w: 'auto' }}>
-      <FormLabel sx={{ fontSize: 'xs', mb: '1px' }}>Embed Workflow</FormLabel>
+      <FormLabel sx={{ fontSize: 'xs', mb: '1px' }}>Workflow</FormLabel>
       <Checkbox
         className="nopan"
         size="sm"

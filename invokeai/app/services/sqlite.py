@@ -1,5 +1,5 @@
 import sqlite3
-from threading import Lock
+import threading
 from typing import Generic, Optional, TypeVar, get_args
 
 from pydantic import BaseModel, parse_raw_as
@@ -12,23 +12,19 @@ sqlite_memory = ":memory:"
 
 
 class SqliteItemStorage(ItemStorageABC, Generic[T]):
-    _filename: str
     _table_name: str
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _id_field: str
-    _lock: Lock
+    _lock: threading.Lock
 
-    def __init__(self, filename: str, table_name: str, id_field: str = "id"):
+    def __init__(self, conn: sqlite3.Connection, table_name: str, lock: threading.Lock, id_field: str = "id"):
         super().__init__()
 
-        self._filename = filename
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
-        self._lock = Lock()
-        self._conn = sqlite3.connect(
-            self._filename, check_same_thread=False
-        )  # TODO: figure out a better threading solution
+        self._lock = lock
+        self._conn = conn
         self._cursor = self._conn.cursor()
 
         self._create_table()
@@ -49,8 +45,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
     def _parse_item(self, item: str) -> T:
         item_type = get_args(self.__orig_class__)[0]
-        parsed = parse_raw_as(item_type, item)
-        return parsed
+        return parse_raw_as(item_type, item)
 
     def set(self, item: T):
         try:

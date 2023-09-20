@@ -1,17 +1,16 @@
 import { Divider, Flex, Text } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'features/system/util/makeToast';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
-import { addToast } from 'features/system/store/systemSlice';
-import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   LORA_MODEL_FORMAT_MAP,
   MODEL_TYPE_MAP,
 } from 'features/parameters/types/constants';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LoRAModelConfigEntity,
   useUpdateLoRAModelsMutation,
@@ -24,8 +23,6 @@ type LoRAModelEditProps = {
 };
 
 export default function LoRAModelEdit(props: LoRAModelEditProps) {
-  const isBusy = useAppSelector(selectIsBusy);
-
   const { model } = props;
 
   const [updateLoRAModel, { isLoading }] = useUpdateLoRAModelsMutation();
@@ -123,11 +120,7 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
             label={t('modelManager.modelLocation')}
             {...loraEditForm.getInputProps('path')}
           />
-          <IAIButton
-            type="submit"
-            isDisabled={isBusy || isLoading}
-            isLoading={isLoading}
-          >
+          <IAIButton type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}
           </IAIButton>
         </Flex>

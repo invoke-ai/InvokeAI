@@ -9,6 +9,7 @@ import {
 import type { AppDispatch, RootState } from '../../store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
+import { addAnyEnqueuedListener } from './listeners/anyEnqueued';
 import { addAppConfigReceivedListener } from './listeners/appConfigReceived';
 import { addAppStartedListener } from './listeners/appStarted';
 import { addDeleteBoardAndImagesFulfilledListener } from './listeners/boardAndImagesDeleted';
@@ -22,6 +23,9 @@ import { addCanvasMergedListener } from './listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGallery';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
+import { addEnqueueRequestedCanvasListener } from './listeners/enqueueRequestedCanvas';
+import { addEnqueueRequestedLinear } from './listeners/enqueueRequestedLinear';
+import { addEnqueueRequestedNodes } from './listeners/enqueueRequestedNodes';
 import {
   addImageAddedToBoardFulfilledListener,
   addImageAddedToBoardRejectedListener,
@@ -48,6 +52,7 @@ import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
+import { addDynamicPromptsListener } from './listeners/promptChanged';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
 import {
   addSessionCanceledFulfilledListener,
@@ -64,7 +69,6 @@ import {
   addSessionInvokedPendingListener,
   addSessionInvokedRejectedListener,
 } from './listeners/sessionInvoked';
-import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
 import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
@@ -74,16 +78,13 @@ import { addInvocationErrorEventListener as addInvocationErrorListener } from '.
 import { addInvocationRetrievalErrorEventListener } from './listeners/socketio/socketInvocationRetrievalError';
 import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
 import { addModelLoadEventListener } from './listeners/socketio/socketModelLoad';
+import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
 import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
-import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
-import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
-import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
-import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
 import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
 
 export const listenerMiddleware = createListenerMiddleware();
@@ -131,11 +132,10 @@ addImagesStarredListener();
 addImagesUnstarredListener();
 
 // User Invoked
-addUserInvokedCanvasListener();
-addUserInvokedNodesListener();
-addUserInvokedTextToImageListener();
-addUserInvokedImageToImageListener();
-addSessionReadyToInvokeListener();
+addEnqueueRequestedCanvasListener();
+addEnqueueRequestedNodes();
+addEnqueueRequestedLinear();
+addAnyEnqueuedListener();
 
 // Canvas actions
 addCanvasSavedToGalleryListener();
@@ -173,6 +173,7 @@ addSocketUnsubscribedListener();
 addModelLoadEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
+addSocketQueueItemStatusChangedEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();
@@ -223,3 +224,6 @@ addUpscaleRequestedListener();
 
 // Tab Change
 addTabChangedListener();
+
+// Dynamic prompts
+addDynamicPromptsListener();

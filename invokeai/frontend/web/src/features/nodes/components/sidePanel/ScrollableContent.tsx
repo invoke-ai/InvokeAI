@@ -1,13 +1,18 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex, StyleProps } from '@chakra-ui/react';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { PropsWithChildren, memo } from 'react';
 
-const ScrollableContent = (props: PropsWithChildren) => {
+type Props = PropsWithChildren & {
+  maxHeight?: StyleProps['maxHeight'];
+};
+
+const ScrollableContent = ({ children, maxHeight }: Props) => {
   return (
     <Flex
       sx={{
         w: 'full',
         h: 'full',
+        maxHeight,
         position: 'relative',
       }}
     >
@@ -35,7 +40,7 @@ const ScrollableContent = (props: PropsWithChildren) => {
             },
           }}
         >
-          {props.children}
+          {children}
         </OverlayScrollbarsComponent>
       </Box>
     </Flex>
