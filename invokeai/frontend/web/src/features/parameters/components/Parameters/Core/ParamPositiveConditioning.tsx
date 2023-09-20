@@ -12,6 +12,7 @@ import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import IAIInformationalPopover from '../../../../../common/components/IAIInformationalPopover';
 
 const promptInputSelector = createSelector(
   [stateSelector],
@@ -109,17 +110,19 @@ const ParamPositiveConditioning = () => {
           onClose={onClose}
           onSelect={handleSelectEmbedding}
         >
-          <IAITextarea
-            id="prompt"
-            name="prompt"
-            ref={promptRef}
-            value={prompt}
-            placeholder={t('parameters.positivePromptPlaceholder')}
-            onChange={handleChangePrompt}
-            onKeyDown={handleKeyDown}
-            resize="vertical"
-            minH={32}
-          />
+          <IAIInformationalPopover details="paramPositiveConditioning">
+            <IAITextarea
+              id="prompt"
+              name="prompt"
+              ref={promptRef}
+              value={prompt}
+              placeholder={t('parameters.positivePromptPlaceholder')}
+              onChange={handleChangePrompt}
+              onKeyDown={handleKeyDown}
+              resize="vertical"
+              minH={32}
+            />
+          </IAIInformationalPopover>
         </ParamEmbeddingPopover>
       </FormControl>
       {!isOpen && isEmbeddingEnabled && (

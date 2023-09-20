@@ -63,7 +63,6 @@ export const buildCanvasOutpaintGraph = (
     img2imgStrength: strength,
     seed,
     vaePrecision,
-    shouldUseNoiseSettings,
     shouldUseCpuNoise,
     maskBlur,
     canvasCoherenceMode,
@@ -96,9 +95,7 @@ export const buildCanvasOutpaintGraph = (
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   const graph: NonNullableGraph = {
     id: CANVAS_OUTPAINT_GRAPH,

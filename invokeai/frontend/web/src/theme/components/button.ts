@@ -80,6 +80,13 @@ const invokeAIOutline = defineStyle((props) => {
   return {
     border: '1px solid',
     borderColor: c === 'gray' ? borderColor : 'currentColor',
+    _hover: {
+      bg: mode(`${c}.500`, `${c}.500`)(props),
+      color: mode('white', `base.50`)(props),
+      svg: {
+        fill: mode('white', `base.50`)(props),
+      },
+    },
     '.chakra-button__group[data-attached][data-orientation=horizontal] > &:not(:last-of-type)':
       {
         marginEnd: '-1px',

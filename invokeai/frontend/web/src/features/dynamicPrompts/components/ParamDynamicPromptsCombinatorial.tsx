@@ -6,6 +6,7 @@ import IAISwitch from 'common/components/IAISwitch';
 import { memo, useCallback } from 'react';
 import { combinatorialToggled } from '../store/dynamicPromptsSlice';
 import { useTranslation } from 'react-i18next';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -27,11 +28,13 @@ const ParamDynamicPromptsCombinatorial = () => {
   }, [dispatch]);
 
   return (
-    <IAISwitch
-      label={t('dynamicPrompts.combinatorial')}
-      isChecked={combinatorial}
-      onChange={handleChange}
-    />
+    <IAIInformationalPopover details="dynamicPromptsCombinatorial">
+      <IAISwitch
+        label={t('dynamicPrompts.combinatorial')}
+        isChecked={combinatorial}
+        onChange={handleChange}
+      />
+    </IAIInformationalPopover>
   );
 };
 

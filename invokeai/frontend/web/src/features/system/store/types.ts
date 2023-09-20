@@ -33,6 +33,7 @@ export interface SystemState {
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
   status: SystemStatus;
+  shouldEnableInformationalPopovers: boolean;
 }
 
 export const LANGUAGES = {

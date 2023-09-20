@@ -15,12 +15,9 @@ import {
 import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
-import { Fragment, memo, useCallback } from 'react';
+import { Fragment, memo, useCallback, useMemo } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import {
-  controlNetModelsAdapter,
-  useGetControlNetModelsQuery,
-} from 'services/api/endpoints/models';
+import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
@@ -53,16 +50,22 @@ const ParamControlNetCollapse = () => {
   const { controlNetsArray, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();
-  const { firstModel } = useGetControlNetModelsQuery(undefined, {
-    selectFromResult: (result) => {
-      const firstModel = result.data
-        ? controlNetModelsAdapter.getSelectors().selectAll(result.data)[0]
-        : undefined;
-      return {
-        firstModel,
-      };
-    },
-  });
+  const { data: controlnetModels } = useGetControlNetModelsQuery();
+
+  const firstModel = useMemo(() => {
+    if (!controlnetModels || !Object.keys(controlnetModels.entities).length) {
+      return undefined;
+    }
+    const firstModelId = Object.keys(controlnetModels.entities)[0];
+
+    if (!firstModelId) {
+      return undefined;
+    }
+
+    const firstModel = controlnetModels.entities[firstModelId];
+
+    return firstModel ? firstModel : undefined;
+  }, [controlnetModels]);
 
   const handleClickedAddControlNet = useCallback(() => {
     if (!firstModel) {
