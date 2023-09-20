@@ -445,7 +445,7 @@ export const modelsApi = api.injectEndpoints({
     >({
       query: () => ({ url: 'models/', params: { model_type: 'ip_adapter' } }),
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
+        const tags: ApiTagDescription[] = [
           { type: 'IPAdapterModel', id: LIST_TAG },
         ];
 

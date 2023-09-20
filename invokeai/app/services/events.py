@@ -29,7 +29,7 @@ class EventServiceBase:
     def emit_generator_progress(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
         node: dict,
         source_node_id: str,
@@ -57,7 +57,7 @@ class EventServiceBase:
     def emit_invocation_complete(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
         result: dict,
         node: dict,
@@ -79,7 +79,7 @@ class EventServiceBase:
     def emit_invocation_error(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
         node: dict,
         source_node_id: str,
@@ -101,7 +101,7 @@ class EventServiceBase:
         )
 
     def emit_invocation_started(
-        self, queue_id: str, queue_item_id: str, graph_execution_state_id: str, node: dict, source_node_id: str
+        self, queue_id: str, queue_item_id: int, graph_execution_state_id: str, node: dict, source_node_id: str
     ) -> None:
         """Emitted when an invocation has started"""
         self.__emit_queue_event(
@@ -115,7 +115,7 @@ class EventServiceBase:
             ),
         )
 
-    def emit_graph_execution_complete(self, queue_id: str, queue_item_id: str, graph_execution_state_id: str) -> None:
+    def emit_graph_execution_complete(self, queue_id: str, queue_item_id: int, graph_execution_state_id: str) -> None:
         """Emitted when a session has completed all invocations"""
         self.__emit_queue_event(
             event_name="graph_execution_state_complete",
@@ -129,7 +129,7 @@ class EventServiceBase:
     def emit_model_load_started(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
         model_name: str,
         base_model: BaseModelType,
@@ -153,7 +153,7 @@ class EventServiceBase:
     def emit_model_load_completed(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
         model_name: str,
         base_model: BaseModelType,
@@ -181,7 +181,7 @@ class EventServiceBase:
     def emit_session_retrieval_error(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
         error_type: str,
         error: str,
@@ -201,7 +201,7 @@ class EventServiceBase:
     def emit_invocation_retrieval_error(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
         node_id: str,
         error_type: str,
@@ -223,7 +223,7 @@ class EventServiceBase:
     def emit_session_canceled(
         self,
         queue_id: str,
-        queue_item_id: str,
+        queue_item_id: int,
         graph_execution_state_id: str,
     ) -> None:
         """Emitted when a session is canceled"""

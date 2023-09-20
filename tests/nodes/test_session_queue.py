@@ -147,7 +147,7 @@ def test_calc_session_count(batch_data_collection, batch_graph):
 
 def test_prepare_values_to_insert(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    values = prepare_values_to_insert(queue_id="default", batch=b, priority=0, max_new_queue_items=1000, order_id=0)
+    values = prepare_values_to_insert(queue_id="default", batch=b, priority=0, max_new_queue_items=1000)
     assert len(values) == 8
 
     # graph should be serialized
@@ -177,13 +177,13 @@ def test_prepare_values_to_insert(batch_data_collection, batch_graph):
 
 def test_prepare_values_to_insert_with_priority(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    values = prepare_values_to_insert(queue_id="default", batch=b, priority=1, max_new_queue_items=1000, order_id=0)
+    values = prepare_values_to_insert(queue_id="default", batch=b, priority=1, max_new_queue_items=1000)
     assert all(v.priority == 1 for v in values)
 
 
 def test_prepare_values_to_insert_with_max(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    values = prepare_values_to_insert(queue_id="default", batch=b, priority=1, max_new_queue_items=5, order_id=0)
+    values = prepare_values_to_insert(queue_id="default", batch=b, priority=1, max_new_queue_items=5)
     assert len(values) == 5
 
 

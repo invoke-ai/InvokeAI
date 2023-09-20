@@ -49,7 +49,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const computeItemKey = (index: number, item: SessionQueueItemDTO): string =>
+const computeItemKey = (index: number, item: SessionQueueItemDTO): number =>
   item.item_id;
 
 const components: Components<SessionQueueItemDTO, ListContext> = {
@@ -105,13 +105,13 @@ const QueueList = () => {
     if (!lastItem) {
       return;
     }
-    dispatch(listCursorChanged(lastItem.order_id));
+    dispatch(listCursorChanged(lastItem.item_id));
     dispatch(listPriorityChanged(lastItem.priority));
   }, [dispatch, listQueueItemsData?.has_more, queueItems]);
 
-  const [openQueueItems, setOpenQueueItems] = useState<string[]>([]);
+  const [openQueueItems, setOpenQueueItems] = useState<number[]>([]);
 
-  const toggleQueueItem = useCallback((item_id: string) => {
+  const toggleQueueItem = useCallback((item_id: number) => {
     setOpenQueueItems((prev) => {
       if (prev.includes(item_id)) {
         return prev.filter((id) => id !== item_id);

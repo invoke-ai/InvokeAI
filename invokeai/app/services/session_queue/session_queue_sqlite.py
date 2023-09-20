@@ -107,8 +107,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__cursor.execute(
                 """--sql
                 CREATE TABLE IF NOT EXISTS session_queue (
-                    item_id TEXT NOT NULL PRIMARY KEY, -- the unique identifier of this queue item
-                    order_id INTEGER NOT NULL, -- used for ordering, cursor pagination
+                    item_id INTEGER PRIMARY KEY AUTOINCREMENT, -- used for ordering, cursor pagination
                     batch_id TEXT NOT NULL, -- identifier of the batch this queue item belongs to
                     queue_id TEXT NOT NULL, -- identifier of the queue this queue item belongs to
                     session_id TEXT NOT NULL UNIQUE, -- duplicated data from the session column, for ease of access
@@ -130,12 +129,6 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__cursor.execute(
                 """--sql
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_session_queue_item_id ON session_queue(item_id);
-                """
-            )
-
-            self.__cursor.execute(
-                """--sql
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_session_queue_order_id ON session_queue(order_id);
                 """
             )
 
@@ -302,21 +295,12 @@ class SqliteSessionQueue(SessionQueueBase):
             if prepend:
                 priority = self._get_highest_priority(queue_id) + 1
 
-            self.__cursor.execute(
-                """--sql
-                SELECT MAX(order_id)
-                FROM session_queue
-                """
-            )
-            max_order_id = cast(Optional[int], self.__cursor.fetchone()[0]) or 0
-
             requested_count = calc_session_count(batch)
             values_to_insert = prepare_values_to_insert(
                 queue_id=queue_id,
                 batch=batch,
                 priority=priority,
                 max_new_queue_items=max_new_queue_items,
-                order_id=max_order_id + 1,
             )
             enqueued_count = len(values_to_insert)
 
@@ -325,8 +309,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             self.__cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (item_id, queue_id, session, session_id, batch_id, field_values, priority, order_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )
@@ -356,7 +340,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 WHERE status = 'pending'
                 ORDER BY
                   priority DESC,
-                  order_id ASC
+                  item_id ASC
                 LIMIT 1
                 """
             )
@@ -425,7 +409,7 @@ class SqliteSessionQueue(SessionQueueBase):
         return SessionQueueItem.from_dict(dict(result))
 
     def _set_queue_item_status(
-        self, item_id: str, status: QUEUE_ITEM_STATUS, error: Optional[str] = None
+        self, item_id: int, status: QUEUE_ITEM_STATUS, error: Optional[str] = None
     ) -> SessionQueueItem:
         try:
             self.__lock.acquire()
@@ -484,7 +468,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return IsFullResult(is_full=is_full)
 
-    def delete_queue_item(self, item_id: str) -> SessionQueueItem:
+    def delete_queue_item(self, item_id: int) -> SessionQueueItem:
         queue_item = self.get_queue_item(item_id=item_id)
         try:
             self.__lock.acquire()
@@ -570,7 +554,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return PruneResult(deleted=count)
 
-    def cancel_queue_item(self, item_id: str) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         queue_item = self.get_queue_item(item_id)
         if queue_item.status not in ["canceled", "failed", "completed"]:
             queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
@@ -675,7 +659,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return CancelByQueueIDResult(canceled=count)
 
-    def get_queue_item(self, item_id: str) -> SessionQueueItem:
+    def get_queue_item(self, item_id: int) -> SessionQueueItem:
         try:
             self.__lock.acquire()
             self.__cursor.execute(
@@ -701,14 +685,14 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_id: str,
         limit: int,
         priority: int,
-        order_id: Optional[int] = None,
+        cursor: Optional[int] = None,
         status: Optional[QUEUE_ITEM_STATUS] = None,
     ) -> CursorPaginatedResults[SessionQueueItemDTO]:
         try:
+            item_id = cursor
             self.__lock.acquire()
             query = """--sql
                 SELECT item_id,
-                    order_id,
                     status,
                     priority,
                     field_values,
@@ -731,16 +715,16 @@ class SqliteSessionQueue(SessionQueueBase):
                     """
                 params.append(status)
 
-            if order_id is not None:
+            if item_id is not None:
                 query += """--sql
-                    AND (priority < ?) OR (priority = ? AND order_id > ?)
+                    AND (priority < ?) OR (priority = ? AND item_id > ?)
                     """
-                params.extend([priority, priority, order_id])
+                params.extend([priority, priority, item_id])
 
             query += """--sql
                 ORDER BY
                   priority DESC,
-                  order_id ASC
+                  item_id ASC
                 LIMIT ?
                 """
             params.append(limit + 1)

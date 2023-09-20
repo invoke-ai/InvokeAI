@@ -424,9 +424,9 @@ class InvocationContext:
     services: InvocationServices
     graph_execution_state_id: str
     queue_id: str
-    queue_item_id: str
+    queue_item_id: int
 
-    def __init__(self, services: InvocationServices, queue_id: str, queue_item_id: str, graph_execution_state_id: str):
+    def __init__(self, services: InvocationServices, queue_id: str, queue_item_id: int, graph_execution_state_id: str):
         self.services = services
         self.graph_execution_state_id = graph_execution_state_id
         self.queue_id = queue_id

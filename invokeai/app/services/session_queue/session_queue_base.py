@@ -80,7 +80,7 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_queue_item(self, item_id: str) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         """Cancels a session queue item"""
         pass
 
@@ -100,13 +100,13 @@ class SessionQueueBase(ABC):
         queue_id: str,
         limit: int,
         priority: int,
-        order_id: Optional[int] = None,
+        cursor: Optional[int] = None,
         status: Optional[QUEUE_ITEM_STATUS] = None,
     ) -> CursorPaginatedResults[SessionQueueItemDTO]:
         """Gets a page of session queue items"""
         pass
 
     @abstractmethod
-    def get_queue_item(self, item_id: str) -> SessionQueueItem:
+    def get_queue_item(self, item_id: int) -> SessionQueueItem:
         """Gets a session queue item by ID"""
         pass

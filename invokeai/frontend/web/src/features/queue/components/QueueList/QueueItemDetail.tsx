@@ -5,7 +5,7 @@ import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableCon
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
-import { memo, useMemo } from 'react';
+import { ReactNode, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
@@ -132,7 +132,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
 
 export default memo(QueueItemComponent);
 
-type QueueItemDataProps = { label: string; data: string };
+type QueueItemDataProps = { label: string; data: ReactNode };
 
 const QueueItemData = ({ label, data }: QueueItemDataProps) => {
   return (

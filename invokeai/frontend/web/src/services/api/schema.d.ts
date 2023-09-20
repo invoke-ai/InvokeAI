@@ -7783,14 +7783,9 @@ export type components = {
     SessionQueueItem: {
       /**
        * Item Id
-       * @description The unique identifier of the session queue item
+       * @description The identifier of the session queue item
        */
-      item_id: string;
-      /**
-       * Order Id
-       * @description The auto-incrementing ID of the session queue item
-       */
-      order_id: number;
+      item_id: number;
       /**
        * Status
        * @description The status of this queue item
@@ -7862,14 +7857,9 @@ export type components = {
     SessionQueueItemDTO: {
       /**
        * Item Id
-       * @description The unique identifier of the session queue item
+       * @description The identifier of the session queue item
        */
-      item_id: string;
-      /**
-       * Order Id
-       * @description The auto-incrementing ID of the session queue item
-       */
-      order_id: number;
+      item_id: number;
       /**
        * Status
        * @description The status of this queue item
@@ -7940,7 +7930,7 @@ export type components = {
        * Item Id
        * @description The current queue item id
        */
-      item_id?: string;
+      item_id?: number;
       /**
        * Batch Id
        * @description The current queue item's batch id
@@ -9053,23 +9043,23 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * IPAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    IPAdapterModelFormat: "invokeai";
+    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
-     * CLIPVisionModelFormat
+     * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    CLIPVisionModelFormat: "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
@@ -9077,17 +9067,17 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * IPAdapterModelFormat
+     * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    IPAdapterModelFormat: "invokeai";
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusionOnnxModelFormat
+     * CLIPVisionModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    CLIPVisionModelFormat: "diffusers";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
@@ -10876,7 +10866,7 @@ export type operations = {
         /** @description The queue id to perform this operation on */
         queue_id: string;
         /** @description The queue item to get */
-        item_id: string;
+        item_id: number;
       };
     };
     responses: {
@@ -10904,7 +10894,7 @@ export type operations = {
         /** @description The queue id to perform this operation on */
         queue_id: string;
         /** @description The queue item to cancel */
-        item_id: string;
+        item_id: number;
       };
     };
     responses: {

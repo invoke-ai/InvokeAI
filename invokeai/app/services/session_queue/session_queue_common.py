@@ -155,8 +155,7 @@ def get_session(queue_item_dict: dict) -> GraphExecutionState:
 class SessionQueueItemWithoutGraph(BaseModel):
     """Session queue item without the full graph. Used for serialization."""
 
-    item_id: str = Field(description="The unique identifier of the session queue item")
-    order_id: int = Field(description="The auto-incrementing ID of the session queue item")
+    item_id: int = Field(description="The identifier of the session queue item")
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
@@ -183,7 +182,6 @@ class SessionQueueItemWithoutGraph(BaseModel):
         schema_extra = {
             "required": [
                 "item_id",
-                "order_id",
                 "status",
                 "batch_id",
                 "queue_id",
@@ -214,7 +212,6 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
         schema_extra = {
             "required": [
                 "item_id",
-                "order_id",
                 "status",
                 "batch_id",
                 "queue_id",
@@ -235,7 +232,7 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
 
 class SessionQueueStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
-    item_id: Optional[str] = Field(description="The current queue item id")
+    item_id: Optional[int] = Field(description="The current queue item id")
     batch_id: Optional[str] = Field(description="The current queue item's batch id")
     session_id: Optional[str] = Field(description="The current queue item's session id")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
@@ -388,29 +385,24 @@ def calc_session_count(batch: Batch) -> int:
 class SessionQueueValueToInsert(NamedTuple):
     """A tuple of values to insert into the session_queue table"""
 
-    item_id: str  # item_id
     queue_id: str  # queue_id
     session: str  # session json
     session_id: str  # session_id
     batch_id: str  # batch_id
     field_values: Optional[str]  # field_values json
     priority: int  # priority
-    order_id: int  # order_id
 
 
 ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
 
 
-def prepare_values_to_insert(
-    queue_id: str, batch: Batch, priority: int, max_new_queue_items: int, order_id: int
-) -> ValuesToInsert:
+def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new_queue_items: int) -> ValuesToInsert:
     values_to_insert: ValuesToInsert = []
     for session, field_values in create_session_nfv_tuples(batch, max_new_queue_items):
         # sessions must have unique id
         session.id = uuid_string()
         values_to_insert.append(
             SessionQueueValueToInsert(
-                uuid_string(),  # item_id
                 queue_id,  # queue_id
                 session.json(),  # session (json)
                 session.id,  # session_id
@@ -418,10 +410,8 @@ def prepare_values_to_insert(
                 # must use pydantic_encoder bc field_values is a list of models
                 json.dumps(field_values, default=pydantic_encoder) if field_values else None,  # field_values (json)
                 priority,  # priority
-                order_id,
             )
         )
-        order_id += 1
     return values_to_insert
 
 

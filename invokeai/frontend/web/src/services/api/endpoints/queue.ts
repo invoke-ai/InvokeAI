@@ -46,10 +46,10 @@ export const queueItemsAdapter = createEntityAdapter<
     }
 
     // If priority is the same, sort by id in ascending order
-    if (a.order_id < b.order_id) {
+    if (a.item_id < b.item_id) {
       return -1;
     }
-    if (a.order_id > b.order_id) {
+    if (a.item_id > b.item_id) {
       return 1;
     }
 
@@ -238,7 +238,7 @@ export const queueApi = api.injectEndpoints({
     }),
     getQueueItem: build.query<
       paths['/api/v1/queue/{queue_id}/i/{item_id}']['get']['responses']['200']['content']['application/json'],
-      string
+      number
     >({
       query: (item_id) => ({
         url: `queue/${$queueId.get()}/i/${item_id}`,
@@ -253,7 +253,7 @@ export const queueApi = api.injectEndpoints({
     }),
     cancelQueueItem: build.mutation<
       paths['/api/v1/queue/{queue_id}/i/{item_id}/cancel']['put']['responses']['200']['content']['application/json'],
-      string
+      number
     >({
       query: (item_id) => ({
         url: `queue/${$queueId.get()}/i/${item_id}/cancel`,

@@ -1,4 +1,4 @@
 export type ListContext = {
-  openQueueItems: string[];
-  toggleQueueItem: (item_id: string) => void;
+  openQueueItems: number[];
+  toggleQueueItem: (item_id: number) => void;
 };

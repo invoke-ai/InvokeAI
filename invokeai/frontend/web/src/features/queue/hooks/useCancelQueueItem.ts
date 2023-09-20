@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCancelQueueItemMutation } from 'services/api/endpoints/queue';
 
-export const useCancelQueueItem = (item_id: string) => {
+export const useCancelQueueItem = (item_id: number) => {
   const [trigger, { isLoading }] = useCancelQueueItemMutation();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

@@ -84,7 +84,7 @@ async def list_queue_items(
     """Gets all queue items (without graphs)"""
 
     return ApiDependencies.invoker.services.session_queue.list_queue_items(
-        queue_id=queue_id, limit=limit, status=status, order_id=cursor, priority=priority
+        queue_id=queue_id, limit=limit, status=status, cursor=cursor, priority=priority
     )
 
 
@@ -225,7 +225,7 @@ async def get_batch_status(
 )
 async def get_queue_item(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    item_id: str = Path(description="The queue item to get"),
+    item_id: int = Path(description="The queue item to get"),
 ) -> SessionQueueItem:
     """Gets a queue item"""
     return ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
@@ -240,7 +240,7 @@ async def get_queue_item(
 )
 async def cancel_queue_item(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    item_id: str = Path(description="The queue item to cancel"),
+    item_id: int = Path(description="The queue item to cancel"),
 ) -> SessionQueueItem:
     """Deletes a queue item"""
 

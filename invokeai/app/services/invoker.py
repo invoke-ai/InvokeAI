@@ -18,7 +18,7 @@ class Invoker:
         self._start()
 
     def invoke(
-        self, queue_id: str, queue_item_id: str, graph_execution_state: GraphExecutionState, invoke_all: bool = False
+        self, queue_id: str, queue_item_id: int, graph_execution_state: GraphExecutionState, invoke_all: bool = False
     ) -> Optional[str]:
         """Determines the next node to invoke and enqueues it, preparing if needed.
         Returns the id of the queued node, or `None` if there are no nodes left to enqueue."""
