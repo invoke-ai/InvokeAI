@@ -21,6 +21,7 @@ export type DenoiseProgress = {
 };
 
 export interface SystemState {
+  isInitialized: boolean;
   isConnected: boolean;
   shouldConfirmOnDelete: boolean;
   enableImageDebugging: boolean;
