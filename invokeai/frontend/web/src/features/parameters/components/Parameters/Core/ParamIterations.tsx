@@ -16,8 +16,6 @@ const selector = createSelector(
       state.config.sd.iterations;
     const { iterations } = state.generation;
     const { shouldUseSliders } = state.ui;
-    const isDisabled =
-      state.dynamicPrompts.isEnabled && state.dynamicPrompts.combinatorial;
 
     const step = state.hotkeys.shift ? fineStep : coarseStep;
 
@@ -29,13 +27,16 @@ const selector = createSelector(
       inputMax,
       step,
       shouldUseSliders,
-      isDisabled,
     };
   },
   defaultSelectorOptions
 );
 
-const ParamIterations = () => {
+type Props = {
+  asSlider?: boolean;
+};
+
+const ParamIterations = ({ asSlider }: Props) => {
   const {
     iterations,
     initial,
@@ -44,7 +45,6 @@ const ParamIterations = () => {
     inputMax,
     step,
     shouldUseSliders,
-    isDisabled,
   } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -60,11 +60,10 @@ const ParamIterations = () => {
     dispatch(setIterations(initial));
   }, [dispatch, initial]);
 
-  return shouldUseSliders ? (
+  return asSlider || shouldUseSliders ? (
     <IAIInformationalPopover details="paramImages">
       <IAISlider
-        isDisabled={isDisabled}
-        label={t('parameters.images')}
+        label={t('parameters.iterations')}
         step={step}
         min={min}
         max={sliderMax}
@@ -80,8 +79,7 @@ const ParamIterations = () => {
   ) : (
     <IAIInformationalPopover details="paramImages">
       <IAINumberInput
-        isDisabled={isDisabled}
-        label={t('parameters.images')}
+        label={t('parameters.iterations')}
         step={step}
         min={min}
         max={inputMax}

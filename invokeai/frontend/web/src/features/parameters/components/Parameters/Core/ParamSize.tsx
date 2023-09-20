@@ -17,6 +17,7 @@ import ParamAspectRatio, { mappedAspectRatios } from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 const sizeOptsSelector = createSelector(
   [generationSelector, activeTabNameSelector],
@@ -31,7 +32,8 @@ const sizeOptsSelector = createSelector(
       width,
       height,
     };
-  }
+  },
+  defaultSelectorOptions
 );
 
 export default function ParamSize() {

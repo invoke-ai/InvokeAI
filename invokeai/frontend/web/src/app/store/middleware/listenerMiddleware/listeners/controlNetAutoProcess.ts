@@ -52,11 +52,9 @@ const predicate: AnyListenerPredicate<RootState> = (
 
   const isProcessorSelected = processorType !== 'none';
 
-  const isBusy = state.system.isProcessing;
-
   const hasControlImage = Boolean(controlImage);
 
-  return isProcessorSelected && !isBusy && hasControlImage;
+  return isProcessorSelected && hasControlImage;
 };
 
 /**

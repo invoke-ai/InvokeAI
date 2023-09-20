@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 import numpy as np
 
@@ -21,3 +22,8 @@ SEED_MAX = np.iinfo(np.uint32).max
 def get_random_seed():
     rng = np.random.default_rng(seed=None)
     return int(rng.integers(0, SEED_MAX))
+
+
+def uuid_string():
+    res = uuid.uuid4()
+    return str(res)

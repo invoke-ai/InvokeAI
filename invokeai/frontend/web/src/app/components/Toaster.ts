@@ -1,6 +1,5 @@
 import { useToast } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { toastQueueSelector } from 'features/system/store/systemSelectors';
 import { addToast, clearToastQueue } from 'features/system/store/systemSlice';
 import { MakeToastArg, makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useEffect } from 'react';
@@ -11,7 +10,7 @@ import { memo, useCallback, useEffect } from 'react';
  */
 const Toaster = () => {
   const dispatch = useAppDispatch();
-  const toastQueue = useAppSelector(toastQueueSelector);
+  const toastQueue = useAppSelector((state) => state.system.toastQueue);
   const toast = useToast();
   useEffect(() => {
     toastQueue.forEach((t) => {

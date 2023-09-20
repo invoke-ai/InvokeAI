@@ -23,12 +23,14 @@ session_router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
         200: {"model": GraphExecutionState},
         400: {"description": "Invalid json"},
     },
+    deprecated=True,
 )
 async def create_session(
-    graph: Optional[Graph] = Body(default=None, description="The graph to initialize the session with")
+    queue_id: str = Query(default="", description="The id of the queue to associate the session with"),
+    graph: Optional[Graph] = Body(default=None, description="The graph to initialize the session with"),
 ) -> GraphExecutionState:
     """Creates a new session, optionally initializing it with an invocation graph"""
-    session = ApiDependencies.invoker.create_execution_state(graph)
+    session = ApiDependencies.invoker.create_execution_state(queue_id=queue_id, graph=graph)
     return session
 
 
@@ -36,6 +38,7 @@ async def create_session(
     "/",
     operation_id="list_sessions",
     responses={200: {"model": PaginatedResults[GraphExecutionState]}},
+    deprecated=True,
 )
 async def list_sessions(
     page: int = Query(default=0, description="The page of results to get"),
@@ -57,6 +60,7 @@ async def list_sessions(
         200: {"model": GraphExecutionState},
         404: {"description": "Session not found"},
     },
+    deprecated=True,
 )
 async def get_session(
     session_id: str = Path(description="The id of the session to get"),
@@ -77,6 +81,7 @@ async def get_session(
         400: {"description": "Invalid node or link"},
         404: {"description": "Session not found"},
     },
+    deprecated=True,
 )
 async def add_node(
     session_id: str = Path(description="The id of the session"),
@@ -109,6 +114,7 @@ async def add_node(
         400: {"description": "Invalid node or link"},
         404: {"description": "Session not found"},
     },
+    deprecated=True,
 )
 async def update_node(
     session_id: str = Path(description="The id of the session"),
@@ -142,6 +148,7 @@ async def update_node(
         400: {"description": "Invalid node or link"},
         404: {"description": "Session not found"},
     },
+    deprecated=True,
 )
 async def delete_node(
     session_id: str = Path(description="The id of the session"),
@@ -172,6 +179,7 @@ async def delete_node(
         400: {"description": "Invalid node or link"},
         404: {"description": "Session not found"},
     },
+    deprecated=True,
 )
 async def add_edge(
     session_id: str = Path(description="The id of the session"),
@@ -203,6 +211,7 @@ async def add_edge(
         400: {"description": "Invalid node or link"},
         404: {"description": "Session not found"},
     },
+    deprecated=True,
 )
 async def delete_edge(
     session_id: str = Path(description="The id of the session"),
@@ -241,8 +250,10 @@ async def delete_edge(
         400: {"description": "The session has no invocations ready to invoke"},
         404: {"description": "Session not found"},
     },
+    deprecated=True,
 )
 async def invoke_session(
+    queue_id: str = Query(description="The id of the queue to associate the session with"),
     session_id: str = Path(description="The id of the session to invoke"),
     all: bool = Query(default=False, description="Whether or not to invoke all remaining invocations"),
 ) -> Response:
@@ -254,7 +265,7 @@ async def invoke_session(
     if session.is_complete():
         raise HTTPException(status_code=400)
 
-    ApiDependencies.invoker.invoke(session, invoke_all=all)
+    ApiDependencies.invoker.invoke(queue_id, session, invoke_all=all)
     return Response(status_code=202)
 
 
@@ -262,6 +273,7 @@ async def invoke_session(
     "/{session_id}/invoke",
     operation_id="cancel_session_invoke",
     responses={202: {"description": "The invocation is canceled"}},
+    deprecated=True,
 )
 async def cancel_session_invoke(
     session_id: str = Path(description="The id of the session to cancel"),

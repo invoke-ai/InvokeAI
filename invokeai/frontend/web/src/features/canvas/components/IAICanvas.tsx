@@ -153,8 +153,8 @@ const IAICanvas = () => {
     });
 
     resizeObserver.observe(containerRef.current);
-
-    dispatch(canvasResized(containerRef.current.getBoundingClientRect()));
+    const { width, height } = containerRef.current.getBoundingClientRect();
+    dispatch(canvasResized({ width, height }));
 
     return () => {
       resizeObserver.disconnect();

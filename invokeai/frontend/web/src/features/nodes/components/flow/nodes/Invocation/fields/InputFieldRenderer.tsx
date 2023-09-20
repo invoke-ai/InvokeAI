@@ -15,6 +15,7 @@ import SDXLMainModelInputField from './inputs/SDXLMainModelInputField';
 import SchedulerInputField from './inputs/SchedulerInputField';
 import StringInputField from './inputs/StringInputField';
 import VaeModelInputField from './inputs/VaeModelInputField';
+import IPAdapterModelInputField from './inputs/IPAdapterModelInputField';
 
 type InputFieldProps = {
   nodeId: string;
@@ -140,6 +141,19 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   ) {
     return (
       <ControlNetModelInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'IPAdapterModelField' &&
+    fieldTemplate?.type === 'IPAdapterModelField'
+  ) {
+    return (
+      <IPAdapterModelInputField
         nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}

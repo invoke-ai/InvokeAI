@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { FOOTER_FIELDS } from '../types/constants';
 import { isInvocationNode } from '../types/types';
 
-export const useWithFooter = (nodeId: string) => {
+export const useHasImageOutputs = (nodeId: string) => {
   const selector = useMemo(
     () =>
       createSelector(

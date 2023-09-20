@@ -51,6 +51,7 @@ export const addWatermarkerToGraph = (
 
   // no matter the situation, we want the l2i node to be intermediate
   nodeToAddTo.is_intermediate = true;
+  nodeToAddTo.use_cache = true;
 
   if (nsfwCheckerNode) {
     // if we are using NSFW checker, we need to "disable" it output by marking it intermediate,

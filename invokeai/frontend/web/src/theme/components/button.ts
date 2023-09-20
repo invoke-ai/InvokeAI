@@ -10,7 +10,7 @@ const invokeAI = defineStyle((props) => {
       bg: mode('base.150', 'base.700')(props),
       color: mode('base.300', 'base.500')(props),
       svg: {
-        fill: mode('base.500', 'base.500')(props),
+        fill: mode('base.300', 'base.500')(props),
       },
       opacity: 1,
     };
@@ -45,25 +45,14 @@ const invokeAI = defineStyle((props) => {
   }
 
   const _disabled = {
-    bg: mode(`${c}.250`, `${c}.700`)(props),
-    color: mode(`${c}.50`, `${c}.500`)(props),
+    bg: mode(`${c}.400`, `${c}.700`)(props),
+    color: mode(`${c}.600`, `${c}.500`)(props),
     svg: {
-      fill: mode(`${c}.50`, `${c}.500`)(props),
-      filter: 'unset',
-    },
-    opacity: 1,
-    filter: mode(undefined, 'saturate(65%)')(props),
-  };
-
-  const data_progress = {
-    // bg: 'none',
-    color: mode(`${c}.50`, `${c}.500`)(props),
-    svg: {
-      fill: mode(`${c}.50`, `${c}.500`)(props),
+      fill: mode(`${c}.600`, `${c}.500`)(props),
       filter: 'unset',
     },
     opacity: 0.7,
-    filter: mode(undefined, 'saturate(65%)')(props),
+    filter: 'saturate(65%)',
   };
 
   return {
@@ -82,7 +71,6 @@ const invokeAI = defineStyle((props) => {
       },
       _disabled,
     },
-    '&[data-progress="true"]': { ...data_progress, _hover: data_progress },
   };
 });
 
