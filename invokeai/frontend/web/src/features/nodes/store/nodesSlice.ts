@@ -723,8 +723,10 @@ const nodesSlice = createSlice({
       if (state.nodesToCopy.length > 0) {
         const averagePosition = { x: 0, y: 0 };
         state.nodesToCopy.forEach((e) => {
-          averagePosition.x += e.position.x;
-          averagePosition.y += e.position.y;
+          const xOffset = 0.15 * (e.width ?? 0);
+          const yOffset = 0.5 * (e.height ?? 0);
+          averagePosition.x += e.position.x + xOffset;
+          averagePosition.y += e.position.y + yOffset;
         });
 
         averagePosition.x /= state.nodesToCopy.length;
