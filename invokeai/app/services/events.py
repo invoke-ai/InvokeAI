@@ -30,6 +30,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
         node: dict,
         source_node_id: str,
@@ -44,6 +45,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 node_id=node.get("id"),
                 source_node_id=source_node_id,
@@ -58,6 +60,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
         result: dict,
         node: dict,
@@ -69,6 +72,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
@@ -80,6 +84,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
         node: dict,
         source_node_id: str,
@@ -92,6 +97,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
@@ -101,7 +107,13 @@ class EventServiceBase:
         )
 
     def emit_invocation_started(
-        self, queue_id: str, queue_item_id: int, graph_execution_state_id: str, node: dict, source_node_id: str
+        self,
+        queue_id: str,
+        queue_item_id: int,
+        queue_batch_id: str,
+        graph_execution_state_id: str,
+        node: dict,
+        source_node_id: str,
     ) -> None:
         """Emitted when an invocation has started"""
         self.__emit_queue_event(
@@ -109,19 +121,23 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
             ),
         )
 
-    def emit_graph_execution_complete(self, queue_id: str, queue_item_id: int, graph_execution_state_id: str) -> None:
+    def emit_graph_execution_complete(
+        self, queue_id: str, queue_item_id: int, queue_batch_id: str, graph_execution_state_id: str
+    ) -> None:
         """Emitted when a session has completed all invocations"""
         self.__emit_queue_event(
             event_name="graph_execution_state_complete",
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
             ),
         )
@@ -130,6 +146,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
         model_name: str,
         base_model: BaseModelType,
@@ -142,6 +159,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 model_name=model_name,
                 base_model=base_model,
@@ -154,6 +172,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
         model_name: str,
         base_model: BaseModelType,
@@ -167,6 +186,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 model_name=model_name,
                 base_model=base_model,
@@ -182,6 +202,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
         error_type: str,
         error: str,
@@ -192,6 +213,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 error_type=error_type,
                 error=error,
@@ -202,6 +224,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
         node_id: str,
         error_type: str,
@@ -213,6 +236,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
                 node_id=node_id,
                 error_type=error_type,
@@ -224,6 +248,7 @@ class EventServiceBase:
         self,
         queue_id: str,
         queue_item_id: int,
+        queue_batch_id: str,
         graph_execution_state_id: str,
     ) -> None:
         """Emitted when a session is canceled"""
@@ -232,6 +257,7 @@ class EventServiceBase:
             payload=dict(
                 queue_id=queue_id,
                 queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
                 graph_execution_state_id=graph_execution_state_id,
             ),
         )
