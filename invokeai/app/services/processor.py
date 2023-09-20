@@ -57,6 +57,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 except Exception as e:
                     self.__invoker.services.logger.error("Exception while retrieving session:\n%s" % e)
                     self.__invoker.services.events.emit_session_retrieval_error(
+                        queue_batch_id=queue_item.session_queue_batch_id,
                         queue_item_id=queue_item.session_queue_item_id,
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=queue_item.graph_execution_state_id,
@@ -70,6 +71,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 except Exception as e:
                     self.__invoker.services.logger.error("Exception while retrieving invocation:\n%s" % e)
                     self.__invoker.services.events.emit_invocation_retrieval_error(
+                        queue_batch_id=queue_item.session_queue_batch_id,
                         queue_item_id=queue_item.session_queue_item_id,
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=queue_item.graph_execution_state_id,
@@ -84,6 +86,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 # Send starting event
                 self.__invoker.services.events.emit_invocation_started(
+                    queue_batch_id=queue_item.session_queue_batch_id,
                     queue_item_id=queue_item.session_queue_item_id,
                     queue_id=queue_item.session_queue_id,
                     graph_execution_state_id=graph_execution_state.id,
@@ -106,6 +109,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                                 graph_execution_state_id=graph_execution_state.id,
                                 queue_item_id=queue_item.session_queue_item_id,
                                 queue_id=queue_item.session_queue_id,
+                                queue_batch_id=queue_item.session_queue_batch_id,
                             )
                         )
 
@@ -121,6 +125,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                         # Send complete event
                         self.__invoker.services.events.emit_invocation_complete(
+                            queue_batch_id=queue_item.session_queue_batch_id,
                             queue_item_id=queue_item.session_queue_item_id,
                             queue_id=queue_item.session_queue_id,
                             graph_execution_state_id=graph_execution_state.id,
@@ -150,6 +155,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                     # Send error event
                     self.__invoker.services.events.emit_invocation_error(
+                        queue_batch_id=queue_item.session_queue_batch_id,
                         queue_item_id=queue_item.session_queue_item_id,
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=graph_execution_state.id,
@@ -170,14 +176,16 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 if queue_item.invoke_all and not is_complete:
                     try:
                         self.__invoker.invoke(
-                            queue_item_id=queue_item.session_queue_item_id,
-                            queue_id=queue_item.session_queue_id,
+                            session_queue_batch_id=queue_item.session_queue_batch_id,
+                            session_queue_item_id=queue_item.session_queue_item_id,
+                            session_queue_id=queue_item.session_queue_id,
                             graph_execution_state=graph_execution_state,
                             invoke_all=True,
                         )
                     except Exception as e:
                         self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                         self.__invoker.services.events.emit_invocation_error(
+                            queue_batch_id=queue_item.session_queue_batch_id,
                             queue_item_id=queue_item.session_queue_item_id,
                             queue_id=queue_item.session_queue_id,
                             graph_execution_state_id=graph_execution_state.id,
@@ -188,6 +196,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         )
                 elif is_complete:
                     self.__invoker.services.events.emit_graph_execution_complete(
+                        queue_batch_id=queue_item.session_queue_batch_id,
                         queue_item_id=queue_item.session_queue_item_id,
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=graph_execution_state.id,

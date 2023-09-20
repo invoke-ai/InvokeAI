@@ -3,13 +3,20 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Dict, Optional, Union
+from typing import Callable, Dict, Optional, Union
 
 import torch
 
 
 class LatentsStorageBase(ABC):
     """Responsible for storing and retrieving latents."""
+
+    _on_changed_callbacks: list[Callable[[torch.Tensor], None]]
+    _on_deleted_callbacks: list[Callable[[str], None]]
+
+    def __init__(self) -> None:
+        self._on_changed_callbacks = list()
+        self._on_deleted_callbacks = list()
 
     @abstractmethod
     def get(self, name: str) -> torch.Tensor:
@@ -23,6 +30,22 @@ class LatentsStorageBase(ABC):
     def delete(self, name: str) -> None:
         pass
 
+    def on_changed(self, on_changed: Callable[[torch.Tensor], None]) -> None:
+        """Register a callback for when an item is changed"""
+        self._on_changed_callbacks.append(on_changed)
+
+    def on_deleted(self, on_deleted: Callable[[str], None]) -> None:
+        """Register a callback for when an item is deleted"""
+        self._on_deleted_callbacks.append(on_deleted)
+
+    def _on_changed(self, item: torch.Tensor) -> None:
+        for callback in self._on_changed_callbacks:
+            callback(item)
+
+    def _on_deleted(self, item_id: str) -> None:
+        for callback in self._on_deleted_callbacks:
+            callback(item_id)
+
 
 class ForwardCacheLatentsStorage(LatentsStorageBase):
     """Caches the latest N latents in memory, writing-thorugh to and reading from underlying storage"""
@@ -33,6 +56,7 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
     __underlying_storage: LatentsStorageBase
 
     def __init__(self, underlying_storage: LatentsStorageBase, max_cache_size: int = 20):
+        super().__init__()
         self.__underlying_storage = underlying_storage
         self.__cache = dict()
         self.__cache_ids = Queue()
@@ -50,11 +74,13 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
     def save(self, name: str, data: torch.Tensor) -> None:
         self.__underlying_storage.save(name, data)
         self.__set_cache(name, data)
+        self._on_changed(data)
 
     def delete(self, name: str) -> None:
         self.__underlying_storage.delete(name)
         if name in self.__cache:
             del self.__cache[name]
+        self._on_deleted(name)
 
     def __get_cache(self, name: str) -> Optional[torch.Tensor]:
         return None if name not in self.__cache else self.__cache[name]

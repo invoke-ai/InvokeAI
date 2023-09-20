@@ -6,8 +6,8 @@ import { ReactElement, ReactNode, memo } from 'react';
 type Props = {
   label: string;
   tooltip: ReactNode;
-  icon: ReactElement;
-  onClick: () => void;
+  icon?: ReactElement;
+  onClick?: () => void;
   isDisabled?: boolean;
   colorScheme: ThemeTypings['colorSchemes'];
   asIconButton?: boolean;

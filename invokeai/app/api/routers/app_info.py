@@ -103,3 +103,13 @@ async def set_log_level(
     """Sets the log verbosity level"""
     ApiDependencies.invoker.services.logger.setLevel(level)
     return LogLevel(ApiDependencies.invoker.services.logger.level)
+
+
+@app_router.delete(
+    "/invocation_cache",
+    operation_id="clear_invocation_cache",
+    responses={200: {"description": "The operation was successful"}},
+)
+async def clear_invocation_cache() -> None:
+    """Clears the invocation cache"""
+    ApiDependencies.invoker.services.invocation_cache.clear()

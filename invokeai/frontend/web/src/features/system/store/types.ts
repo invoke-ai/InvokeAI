@@ -12,6 +12,7 @@ export type SystemStatus =
 
 export type DenoiseProgress = {
   session_id: string;
+  batch_id: string;
   progress_image: ProgressImage | null | undefined;
   step: number;
   total_steps: number;
@@ -32,6 +33,7 @@ export interface SystemState {
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
   status: SystemStatus;
+  shouldDisableInformationalPopovers: boolean;
 }
 
 export const LANGUAGES = {

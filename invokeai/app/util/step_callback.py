@@ -112,6 +112,7 @@ def stable_diffusion_step_callback(
     context.services.events.emit_generator_progress(
         queue_id=context.queue_id,
         queue_item_id=context.queue_item_id,
+        queue_batch_id=context.queue_batch_id,
         graph_execution_state_id=context.graph_execution_state_id,
         node=node,
         source_node_id=source_node_id,

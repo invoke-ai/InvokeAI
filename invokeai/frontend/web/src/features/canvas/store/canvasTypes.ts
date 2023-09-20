@@ -166,7 +166,6 @@ export interface CanvasState {
   tool: CanvasTool;
   generationMode?: GenerationMode;
   batchIds: string[];
-  sessionIds: string[];
 }
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';

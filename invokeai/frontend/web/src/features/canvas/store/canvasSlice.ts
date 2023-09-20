@@ -85,7 +85,6 @@ export const initialCanvasState: CanvasState = {
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
   tool: 'brush',
-  sessionIds: [],
   batchIds: [],
 };
 
@@ -302,11 +301,7 @@ export const canvasSlice = createSlice({
     canvasBatchIdAdded: (state, action: PayloadAction<string>) => {
       state.batchIds.push(action.payload);
     },
-    canvasSessionIdAdded: (state, action: PayloadAction<string>) => {
-      state.sessionIds.push(action.payload);
-    },
-    canvasBatchesAndSessionsReset: (state) => {
-      state.sessionIds = [];
+    canvasBatchIdsReset: (state) => {
       state.batchIds = [];
     },
     stagingAreaInitialized: (
@@ -879,8 +874,7 @@ export const {
   setShouldAntialias,
   canvasResized,
   canvasBatchIdAdded,
-  canvasSessionIdAdded,
-  canvasBatchesAndSessionsReset,
+  canvasBatchIdsReset,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

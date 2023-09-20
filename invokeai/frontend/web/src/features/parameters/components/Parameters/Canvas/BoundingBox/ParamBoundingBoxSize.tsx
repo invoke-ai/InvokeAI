@@ -18,6 +18,7 @@ import ParamAspectRatio, {
 } from '../../Core/ParamAspectRatio';
 import ParamBoundingBoxHeight from './ParamBoundingBoxHeight';
 import ParamBoundingBoxWidth from './ParamBoundingBoxWidth';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const sizeOptsSelector = createSelector(
   [generationSelector, canvasSelector],
@@ -93,18 +94,20 @@ export default function ParamBoundingBoxSize() {
       }}
     >
       <Flex alignItems="center" gap={2}>
-        <Text
-          sx={{
-            fontSize: 'sm',
-            width: 'full',
-            color: 'base.700',
-            _dark: {
-              color: 'base.300',
-            },
-          }}
-        >
-          {t('parameters.aspectRatio')}
-        </Text>
+        <IAIInformationalPopover details="paramRatio">
+          <Text
+            sx={{
+              fontSize: 'sm',
+              width: 'full',
+              color: 'base.700',
+              _dark: {
+                color: 'base.300',
+              },
+            }}
+          >
+            {t('parameters.aspectRatio')}
+          </Text>
+        </IAIInformationalPopover>
         <Spacer />
         <ParamAspectRatio />
         <IAIIconButton

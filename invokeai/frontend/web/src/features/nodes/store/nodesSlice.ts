@@ -891,7 +891,7 @@ const nodesSlice = createSlice({
           nes.error = null;
           nes.progress = null;
           nes.progressImage = null;
-          // do not reset nes.outputs, this allows a user to inspect the output of a node across batches
+          nes.outputs = [];
         });
       }
     });

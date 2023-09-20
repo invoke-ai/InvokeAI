@@ -1,5 +1,4 @@
 import { logger } from 'app/logging/logger';
-import { canvasSessionIdAdded } from 'features/canvas/store/canvasSlice';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import {
   appSocketQueueItemStatusChanged,
@@ -10,12 +9,11 @@ import { startAppListening } from '../..';
 export const addSocketQueueItemStatusChangedEventListener = () => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
-    effect: (action, { dispatch, getState }) => {
+    effect: async (action, { dispatch }) => {
       const log = logger('socketio');
       const {
         queue_item_id: item_id,
-        batch_id,
-        graph_execution_state_id,
+        queue_batch_id,
         status,
       } = action.payload.data;
       log.debug(
@@ -26,9 +24,6 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
 
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
-          if (!draft) {
-            console.log('no draft!');
-          }
           queueItemsAdapter.updateOne(draft, {
             id: item_id,
             changes: action.payload.data,
@@ -36,21 +31,23 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         })
       );
 
-      const state = getState();
-      if (state.canvas.batchIds.includes(batch_id)) {
-        dispatch(canvasSessionIdAdded(graph_execution_state_id));
-      }
-
       dispatch(
         queueApi.util.invalidateTags([
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
-          'SessionQueueStatus',
           { type: 'SessionQueueItem', id: item_id },
           { type: 'SessionQueueItemDTO', id: item_id },
-          { type: 'BatchStatus', id: batch_id },
+          { type: 'BatchStatus', id: queue_batch_id },
         ])
       );
+
+      const req = dispatch(
+        queueApi.endpoints.getQueueStatus.initiate(undefined, {
+          forceRefetch: true,
+        })
+      );
+      await req.unwrap();
+      req.unsubscribe();
     },
   });
 };

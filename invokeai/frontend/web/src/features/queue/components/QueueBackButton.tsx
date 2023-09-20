@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
 import { useQueueBack } from '../hooks/useQueueBack';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
 import QueueButton from './common/QueueButton';
@@ -18,12 +17,11 @@ const QueueBackButton = ({ asIconButton, sx }: Props) => {
     <QueueButton
       asIconButton={asIconButton}
       colorScheme="accent"
-      label={t('queue.queueBack')}
+      label={t('parameters.invoke.invoke')}
       isDisabled={isDisabled}
       isLoading={isLoading}
       onClick={queueBack}
       tooltip={<EnqueueButtonTooltip />}
-      icon={<FaPlus />}
       sx={sx}
     />
   );
