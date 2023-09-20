@@ -80,7 +80,7 @@ export const Flow = () => {
   const edges = useAppSelector((state) => state.nodes.edges);
   const viewport = useAppSelector((state) => state.nodes.viewport);
   const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
-  const flowWrapper = useRef<HTMLBaseElement>(null);
+  const flowWrapper = useRef<HTMLElement | null>(null);
 
   const isValidConnection = useIsValidConnection();
 
@@ -151,20 +151,25 @@ export const Flow = () => {
     dispatch(contextMenusClosed());
   }, [dispatch]);
 
-  const onInit: OnInit = useCallback((flow) => {
-    $flow.set(flow);
-    flow.fitView();
-    flowWrapper.current = document.getElementById('workflow-editor');
-  }, []);
+  const onInit: OnInit = useCallback(
+    (flow) => {
+      $flow.set(flow);
+      flow.fitView();
+      flowWrapper.current = document.getElementById('workflow-editor');
+    },
+    [flowWrapper]
+  );
 
   const onMouseMove = (event: MouseEvent) => {
     const bounds = flowWrapper.current?.getBoundingClientRect();
-    const pos = $flow.get().project({
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top,
-    });
+    if (bounds) {
+      const pos = $flow.get()?.project({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      });
 
-    dispatch(mouseMoved(pos));
+      dispatch(mouseMoved(pos));
+    }
   };
 
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
@@ -191,7 +196,7 @@ export const Flow = () => {
       nodes={nodes}
       edges={edges}
       onInit={onInit}
-      onMouseMove={onMouseMove}
+      onMouseMove={(event) => onMouseMove(event.nativeEvent)}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onEdgesDelete={onEdgesDelete}
