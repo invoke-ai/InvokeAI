@@ -559,9 +559,31 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 conditioning_data=conditioning_data,
             )
         elif t2i_adapter_data is not None:
-            # TODO(ryand): Finish this.
-            pass
-            # down_block_additional_residuals = [state.clone() for state in t2i_adapter_data]
+            accum_adapter_state = None
+            for single_t2i_adapter_data in t2i_adapter_data:
+                # Determine the T2I-Adapter weights for the current denoising step.
+                first_t2i_adapter_step = math.floor(single_t2i_adapter_data.begin_step_percent * total_step_count)
+                last_t2i_adapter_step = math.ceil(single_t2i_adapter_data.end_step_percent * total_step_count)
+                t2i_adapter_weight = (
+                    single_t2i_adapter_data.weight[step_index]
+                    if isinstance(single_t2i_adapter_data.weight, list)
+                    else single_t2i_adapter_data.weight
+                )
+                if step_index < first_t2i_adapter_step or step_index > last_t2i_adapter_step:
+                    # If the current step is outside of the T2I-Adapter's begin/end step range, then set its weight to 0
+                    # so it has no effect.
+                    t2i_adapter_weight = 0.0
+
+                # Apply the t2i_adapter_weight, and accumulate.
+                if accum_adapter_state is None:
+                    # Handle the first T2I-Adapter.
+                    accum_adapter_state = [val * t2i_adapter_weight for val in single_t2i_adapter_data.adapter_state]
+                else:
+                    # Add to the previous adapter states.
+                    for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
+                        accum_adapter_state[idx] += value * t2i_adapter_weight
+
+            down_block_additional_residuals = accum_adapter_state
 
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
             sample=latent_model_input,
@@ -570,8 +592,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
             # extra:
-            down_block_additional_residuals=down_block_additional_residuals,  # from controlnet(s)
-            mid_block_additional_residual=mid_block_additional_residual,  # from controlnet(s)
+            down_block_additional_residuals=down_block_additional_residuals,
+            mid_block_additional_residual=mid_block_additional_residual,
         )
 
         guidance_scale = conditioning_data.guidance_scale

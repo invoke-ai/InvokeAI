@@ -509,8 +509,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 adapter_state = t2i_adapter_model(t2i_image)
 
             if do_classifier_free_guidance:
-                for k, v in enumerate(adapter_state):
-                    adapter_state[k] = torch.cat([v] * 2, dim=0)
+                for idx, value in enumerate(adapter_state):
+                    adapter_state[idx] = torch.cat([value] * 2, dim=0)
 
             t2i_adapter_data.append(
                 T2IAdapterData(
