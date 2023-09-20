@@ -3,16 +3,19 @@
 from fastapi import FastAPI
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
-from fastapi_socketio import SocketManager
+from socketio import ASGIApp, AsyncServer
 
 from ..services.events import EventServiceBase
 
 
 class SocketIO:
-    __sio: SocketManager
+    __sio: AsyncServer
+    __app: ASGIApp
 
     def __init__(self, app: FastAPI):
-        self.__sio = SocketManager(app=app)
+        self.__sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+        self.__app = ASGIApp(socketio_server=self.__sio, socketio_path="socket.io")
+        app.mount("/ws", self.__app)
 
         self.__sio.on("subscribe_queue", handler=self._handle_sub_queue)
         self.__sio.on("unsubscribe_queue", handler=self._handle_unsub_queue)
