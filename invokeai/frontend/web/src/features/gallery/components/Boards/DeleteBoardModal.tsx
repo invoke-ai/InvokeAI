@@ -53,6 +53,7 @@ const DeleteBoardModal = (props: Props) => {
           isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
           isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
           isControlNetImage: some(allImageUsage, (i) => i.isControlNetImage),
+          isIPAdapterImage: some(allImageUsage, (i) => i.isIPAdapterImage),
         };
         return { imageUsageSummary };
       }),

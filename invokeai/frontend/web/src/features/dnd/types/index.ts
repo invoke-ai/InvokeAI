@@ -35,6 +35,10 @@ export type ControlNetDropData = BaseDropData & {
   };
 };
 
+export type IPAdapterImageDropData = BaseDropData & {
+  actionType: 'SET_IP_ADAPTER_IMAGE';
+};
+
 export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
@@ -73,6 +77,7 @@ export type TypesafeDroppableData =
   | CurrentImageDropData
   | InitialImageDropData
   | ControlNetDropData
+  | IPAdapterImageDropData
   | CanvasInitialImageDropData
   | NodesImageDropData
   | AddToBatchDropData

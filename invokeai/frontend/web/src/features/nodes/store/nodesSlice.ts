@@ -42,6 +42,7 @@ import {
   IntegerInputFieldValue,
   InvocationNodeData,
   InvocationTemplate,
+  IPAdapterModelInputFieldValue,
   isInvocationNode,
   isNotesNode,
   LoRAModelInputFieldValue,
@@ -535,6 +536,12 @@ const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action);
     },
+    fieldIPAdapterModelValueChanged: (
+      state,
+      action: FieldValueAction<IPAdapterModelInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
     fieldEnumModelValueChanged: (
       state,
       action: FieldValueAction<EnumInputFieldValue>
@@ -894,6 +901,7 @@ export const {
   fieldLoRAModelValueChanged,
   fieldEnumModelValueChanged,
   fieldControlNetModelValueChanged,
+  fieldIPAdapterModelValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   nodeIsOpenChanged,

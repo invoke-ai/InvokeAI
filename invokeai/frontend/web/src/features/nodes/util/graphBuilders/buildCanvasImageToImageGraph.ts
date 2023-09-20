@@ -4,8 +4,10 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
+import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -24,7 +26,6 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
-import { addSaveImageNode } from './addSaveImageNode';
 
 /**
  * Builds the Canvas tab's Image to Image graph.
@@ -349,6 +350,9 @@ export const buildCanvasImageToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  // Add IP Adapter
+  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

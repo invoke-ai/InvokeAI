@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Any, Callable, Optional, Union
 
 import torch
@@ -10,9 +9,14 @@ from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningData,
+    ExtraConditioningInfo,
+    PostprocessingSettings,
+    SDXLConditioningInfo,
+)
 
 from .cross_attention_control import (
-    Arguments,
     Context,
     CrossAttentionType,
     SwapCrossAttnContext,
@@ -31,37 +35,6 @@ ModelForwardCallback: TypeAlias = Union[
 ]
 
 
-@dataclass
-class BasicConditioningInfo:
-    embeds: torch.Tensor
-    extra_conditioning: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo]
-    # weight: float
-    # mode: ConditioningAlgo
-
-    def to(self, device, dtype=None):
-        self.embeds = self.embeds.to(device=device, dtype=dtype)
-        return self
-
-
-@dataclass
-class SDXLConditioningInfo(BasicConditioningInfo):
-    pooled_embeds: torch.Tensor
-    add_time_ids: torch.Tensor
-
-    def to(self, device, dtype=None):
-        self.pooled_embeds = self.pooled_embeds.to(device=device, dtype=dtype)
-        self.add_time_ids = self.add_time_ids.to(device=device, dtype=dtype)
-        return super().to(device=device, dtype=dtype)
-
-
-@dataclass(frozen=True)
-class PostprocessingSettings:
-    threshold: float
-    warmup: float
-    h_symmetry_time_pct: Optional[float]
-    v_symmetry_time_pct: Optional[float]
-
-
 class InvokeAIDiffuserComponent:
     """
     The aim of this component is to provide a single place for code that can be applied identically to
@@ -74,15 +47,6 @@ class InvokeAIDiffuserComponent:
 
     debug_thresholding = False
     sequential_guidance = False
-
-    @dataclass
-    class ExtraConditioningInfo:
-        tokens_count_including_eos_bos: int
-        cross_attention_control_args: Optional[Arguments] = None
-
-        @property
-        def wants_cross_attention_control(self):
-            return self.cross_attention_control_args is not None
 
     def __init__(
         self,
@@ -103,30 +67,26 @@ class InvokeAIDiffuserComponent:
     @contextmanager
     def custom_attention_context(
         self,
-        unet: UNet2DConditionModel,  # note: also may futz with the text encoder depending on requested LoRAs
+        unet: UNet2DConditionModel,
         extra_conditioning_info: Optional[ExtraConditioningInfo],
         step_count: int,
     ):
-        old_attn_processors = None
-        if extra_conditioning_info and (extra_conditioning_info.wants_cross_attention_control):
-            old_attn_processors = unet.attn_processors
-            # Load lora conditions into the model
-            if extra_conditioning_info.wants_cross_attention_control:
-                self.cross_attention_control_context = Context(
-                    arguments=extra_conditioning_info.cross_attention_control_args,
-                    step_count=step_count,
-                )
-                setup_cross_attention_control_attention_processors(
-                    unet,
-                    self.cross_attention_control_context,
-                )
+        old_attn_processors = unet.attn_processors
 
         try:
+            self.cross_attention_control_context = Context(
+                arguments=extra_conditioning_info.cross_attention_control_args,
+                step_count=step_count,
+            )
+            setup_cross_attention_control_attention_processors(
+                unet,
+                self.cross_attention_control_context,
+            )
+
             yield None
         finally:
             self.cross_attention_control_context = None
-            if old_attn_processors is not None:
-                unet.set_attn_processor(old_attn_processors)
+            unet.set_attn_processor(old_attn_processors)
             # TODO resuscitate attention map saving
             # self.remove_attention_map_saving()
 
@@ -376,10 +336,23 @@ class InvokeAIDiffuserComponent:
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
-    def _apply_standard_conditioning(self, x, sigma, conditioning_data, **kwargs):
-        # fast batched path
+    def _apply_standard_conditioning(self, x, sigma, conditioning_data: ConditioningData, **kwargs):
+        """Runs the conditioned and unconditioned UNet forward passes in a single batch for faster inference speed at
+        the cost of higher memory usage.
+        """
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
+
+        cross_attention_kwargs = None
+        if conditioning_data.ip_adapter_conditioning is not None:
+            cross_attention_kwargs = {
+                "ip_adapter_image_prompt_embeds": torch.cat(
+                    [
+                        conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds,
+                        conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds,
+                    ]
+                )
+            }
 
         added_cond_kwargs = None
         if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
@@ -408,6 +381,7 @@ class InvokeAIDiffuserComponent:
             x_twice,
             sigma_twice,
             both_conditionings,
+            cross_attention_kwargs=cross_attention_kwargs,
             encoder_attention_mask=encoder_attention_mask,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
@@ -419,9 +393,12 @@ class InvokeAIDiffuserComponent:
         self,
         x: torch.Tensor,
         sigma,
-        conditioning_data,
+        conditioning_data: ConditioningData,
         **kwargs,
     ):
+        """Runs the conditioned and unconditioned UNet forward passes sequentially for lower memory usage at the cost of
+        slower execution speed.
+        """
         # low-memory sequential path
         uncond_down_block, cond_down_block = None, None
         down_block_additional_residuals = kwargs.pop("down_block_additional_residuals", None)
@@ -437,6 +414,13 @@ class InvokeAIDiffuserComponent:
         if mid_block_additional_residual is not None:
             uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
 
+        # Run unconditional UNet denoising.
+        cross_attention_kwargs = None
+        if conditioning_data.ip_adapter_conditioning is not None:
+            cross_attention_kwargs = {
+                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds
+            }
+
         added_cond_kwargs = None
         is_sdxl = type(conditioning_data.text_embeddings) is SDXLConditioningInfo
         if is_sdxl:
@@ -449,12 +433,21 @@ class InvokeAIDiffuserComponent:
             x,
             sigma,
             conditioning_data.unconditioned_embeddings.embeds,
+            cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
 
+        # Run conditional UNet denoising.
+        cross_attention_kwargs = None
+        if conditioning_data.ip_adapter_conditioning is not None:
+            cross_attention_kwargs = {
+                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds
+            }
+
+        added_cond_kwargs = None
         if is_sdxl:
             added_cond_kwargs = {
                 "text_embeds": conditioning_data.text_embeddings.pooled_embeds,
@@ -465,6 +458,7 @@ class InvokeAIDiffuserComponent:
             x,
             sigma,
             conditioning_data.text_embeddings.embeds,
+            cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
             added_cond_kwargs=added_cond_kwargs,

@@ -66,8 +66,10 @@ export type OnnxModelField = s['OnnxModelField'];
 export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
 export type ControlNetModelField = s['ControlNetModelField'];
+export type IPAdapterModelField = s['IPAdapterModelField'];
 export type ModelsList = s['ModelsList'];
 export type ControlField = s['ControlField'];
+export type IPAdapterField = s['IPAdapterField'];
 
 // Model Configs
 export type LoRAModelConfig = s['LoRAModelConfig'];
@@ -79,6 +81,8 @@ export type ControlNetModelDiffusersConfig =
 export type ControlNetModelConfig =
   | ControlNetModelCheckpointConfig
   | ControlNetModelDiffusersConfig;
+export type IPAdapterModelInvokeAIConfig = s['IPAdapterModelInvokeAIConfig'];
+export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
 export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | s['StableDiffusion1ModelDiffusersConfig']
@@ -94,6 +98,7 @@ export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
   | ControlNetModelConfig
+  | IPAdapterModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
   | OnnxModelConfig;
@@ -145,6 +150,7 @@ export type SaveImageInvocation = s['SaveImageInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];
+export type IPAdapterInvocation = s['IPAdapterInvocation'];
 export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
 export type ContentShuffleImageProcessorInvocation =
   s['ContentShuffleImageProcessorInvocation'];
@@ -183,6 +189,10 @@ export type ControlNetAction = {
   controlNetId: string;
 };
 
+export type IPAdapterAction = {
+  type: 'SET_IP_ADAPTER_IMAGE';
+};
+
 export type InitialImageAction = {
   type: 'SET_INITIAL_IMAGE';
 };
@@ -208,6 +218,7 @@ export type AddToBatchAction = {
 
 export type PostUploadAction =
   | ControlNetAction
+  | IPAdapterAction
   | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction
