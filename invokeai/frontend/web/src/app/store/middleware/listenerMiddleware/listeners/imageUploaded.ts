@@ -3,7 +3,9 @@ import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   controlNetImageChanged,
+  controlNetIsEnabledChanged,
   ipAdapterImageChanged,
+  isIPAdapterEnabledChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
@@ -88,6 +90,12 @@ export const addImageUploadedFulfilledListener = () => {
       if (postUploadAction?.type === 'SET_CONTROLNET_IMAGE') {
         const { controlNetId } = postUploadAction;
         dispatch(
+          controlNetIsEnabledChanged({
+            controlNetId,
+            isEnabled: true,
+          })
+        );
+        dispatch(
           controlNetImageChanged({
             controlNetId,
             controlImage: imageDTO.image_name,
@@ -104,6 +112,7 @@ export const addImageUploadedFulfilledListener = () => {
 
       if (postUploadAction?.type === 'SET_IP_ADAPTER_IMAGE') {
         dispatch(ipAdapterImageChanged(imageDTO));
+        dispatch(isIPAdapterEnabledChanged(true));
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
