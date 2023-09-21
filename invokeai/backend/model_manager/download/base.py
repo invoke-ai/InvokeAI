@@ -9,8 +9,11 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Callable, List, Optional, Union
 
+import requests
 from pydantic import BaseModel, Field
 from pydantic.networks import AnyHttpUrl
+
+from invokeai.app.services.config import InvokeAIAppConfig
 
 # Used to distinguish between repo_id sources and URL sources
 REPO_ID_RE = r"^[\w-]+/[.\w-]+$"
@@ -106,6 +109,26 @@ class DownloadJobBase(BaseModel):
 
 class DownloadQueueBase(ABC):
     """Abstract base class for managing model downloads."""
+
+    @abstractmethod
+    def __init__(
+        self,
+        max_parallel_dl: int = 5,
+        event_handlers: List[DownloadEventHandler] = [],
+        requests_session: Optional[requests.sessions.Session] = None,
+        config: Optional[InvokeAIAppConfig] = None,
+        quiet: bool = False,
+    ):
+        """
+        Initialize DownloadQueue.
+
+        :param max_parallel_dl: Number of simultaneous downloads allowed [5].
+        :param event_handler: Optional callable that will be called each time a job status changes.
+        :param requests_session: Optional requests.sessions.Session object, for unit tests.
+        :param config: InvokeAIAppConfig object, used to configure the logger and other options.
+        :param quiet: If true, don't log the start of download jobs. Useful for subrequests.
+        """
+        pass
 
     @abstractmethod
     def create_download_job(

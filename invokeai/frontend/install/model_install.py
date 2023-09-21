@@ -79,7 +79,7 @@ class UnifiedModelInfo(BaseModel):
 @dataclass
 class InstallSelections:
     install_models: List[UnifiedModelInfo] = field(default_factory=list)
-    remove_models: List[UnifiedModelInfo] = field(default_factory=list)
+    remove_models: List[str] = field(default_factory=list)
 
 
 def make_printable(s: str) -> str:
@@ -576,7 +576,11 @@ def add_or_delete(installer: ModelInstall, selections: InstallSelections):
         )
 
     for model in selections.remove_models:
-        base_model, model_type, model_name = model.split("/")
+        parts = model.split("/")
+        if len(parts) == 1:
+            base_model, model_type, model_name = (None, None, model)
+        else:
+            base_model, model_type, model_name = parts
         matches = installer.store.search_by_name(base_model=base_model, model_type=model_type, model_name=model_name)
         if len(matches) > 1:
             print(f"{model} is ambiguous. Please use model_type:model_name (e.g. main:my_model) to disambiguate.")
@@ -601,7 +605,9 @@ def select_and_download_models(opt: Namespace):
         list_models(installer, opt.list_models)
 
     elif opt.add or opt.delete:
-        selections = InstallSelections(install_models=opt.add, remove_models=opt.delete)
+        selections = InstallSelections(
+            install_models=[UnifiedModelInfo(source=x) for x in (opt.add or [])], remove_models=opt.delete or []
+        )
         add_or_delete(installer, selections)
 
     elif opt.default_only:

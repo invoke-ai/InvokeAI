@@ -359,10 +359,16 @@ class DownloadQueue(DownloadQueueBase):
 
                 metadata.author = metadata.author or resp["creator"]["username"]
                 metadata.tags = metadata.tags or resp["tags"]
-                metadata.thumbnail_url = metadata.thumbnail_url or resp["modelVersions"][0]["images"][0]["url"]
                 metadata.license = (
                     metadata.license
                     or f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
+                )
+                first_version = resp["modelVersions"][0]
+                metadata.thumbnail_url = metadata.thumbnail_url or first_version.get("url")
+                metadata.description = metadata.description or (
+                    f"Trigger terms: {(', ').join(first_version.get('trainedWords'))}"
+                    if first_version.get("trainedWords")
+                    else first_version.get("description")
                 )
 
         except (HTTPError, KeyError, TypeError, JSONDecodeError) as excp:
