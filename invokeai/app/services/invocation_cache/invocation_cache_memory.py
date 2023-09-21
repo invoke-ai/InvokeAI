@@ -75,16 +75,20 @@ class MemoryInvocationCache(InvocationCacheBase):
         return hash(invocation.json(exclude={"id"}))
 
     def disable(self) -> None:
+        if self.__max_cache_size == 0:
+            return
         self.__disabled = True
 
     def enable(self) -> None:
+        if self.__max_cache_size == 0:
+            return
         self.__disabled = False
 
     def get_status(self) -> InvocationCacheStatus:
         return InvocationCacheStatus(
             hits=self.__hits,
             misses=self.__misses,
-            enabled=not self.__disabled,
+            enabled=not self.__disabled and self.__max_cache_size > 0,
             size=len(self.__cache),
             max_size=self.__max_cache_size,
         )
