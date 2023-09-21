@@ -341,7 +341,6 @@ class DownloadQueue(DownloadQueueBase):
             if match := re.match(CIVITAI_MODEL_DOWNLOAD + r"(\d+)", metadata_url):
                 version = match.group(1)
                 resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
-                print(f"DEBUG: resp={resp}")
                 metadata.thumbnail_url = metadata.thumbnail_url or resp["images"][0]["url"]
                 metadata.description = metadata.description or (
                     f"Trigger terms: {(', ').join(resp['trainedWords'])}"
@@ -365,6 +364,7 @@ class DownloadQueue(DownloadQueueBase):
                     metadata.license
                     or f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
                 )
+
         except (HTTPError, KeyError, TypeError, JSONDecodeError) as excp:
             self._logger.warn(excp)
 
