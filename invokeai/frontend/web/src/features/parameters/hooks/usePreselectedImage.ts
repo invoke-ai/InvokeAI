@@ -1,7 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { CoreMetadata } from 'features/nodes/types/types';
 import { t } from 'i18next';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useAppToaster } from '../../../app/components/Toaster';
 import { useAppDispatch } from '../../../app/store/storeHooks';
 import {
