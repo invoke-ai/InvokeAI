@@ -10,11 +10,11 @@ type Props = {
 
 const PruneQueueButton = ({ asIconButton }: Props) => {
   const { t } = useTranslation();
-  const { pruneQueue, isLoading, finishedCount } = usePruneQueue();
+  const { pruneQueue, isLoading, finishedCount, isDisabled } = usePruneQueue();
 
   return (
     <QueueButton
-      isDisabled={!finishedCount}
+      isDisabled={isDisabled}
       isLoading={isLoading}
       asIconButton={asIconButton}
       label={t('queue.prune')}

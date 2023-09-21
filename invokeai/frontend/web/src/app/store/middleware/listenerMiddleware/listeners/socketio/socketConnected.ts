@@ -4,6 +4,7 @@ import { api } from 'services/api';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { startAppListening } from '../..';
+import { isInitializedChanged } from 'features/system/store/systemSlice';
 
 export const addSocketConnectedEventListener = () => {
   startAppListening({
@@ -13,7 +14,7 @@ export const addSocketConnectedEventListener = () => {
 
       log.debug('Connected');
 
-      const { nodes, config } = getState();
+      const { nodes, config, system } = getState();
 
       const { disabledTabs } = config;
 
@@ -21,7 +22,12 @@ export const addSocketConnectedEventListener = () => {
         dispatch(receivedOpenAPISchema());
       }
 
-      dispatch(api.util.resetApiState());
+      if (system.isInitialized) {
+        // only reset the query caches if this connect event is a *reconnect* event
+        dispatch(api.util.resetApiState());
+      } else {
+        dispatch(isInitializedChanged(true));
+      }
 
       // pass along the socket event as an application action
       dispatch(appSocketConnected(action.payload));

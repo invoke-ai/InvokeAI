@@ -10,14 +10,14 @@ type Props = {
 
 const PauseProcessorButton = ({ asIconButton }: Props) => {
   const { t } = useTranslation();
-  const { pauseProcessor, isLoading, isStarted } = usePauseProcessor();
+  const { pauseProcessor, isLoading, isDisabled } = usePauseProcessor();
 
   return (
     <QueueButton
       asIconButton={asIconButton}
       label={t('queue.pause')}
       tooltip={t('queue.pauseTooltip')}
-      isDisabled={!isStarted}
+      isDisabled={isDisabled}
       isLoading={isLoading}
       icon={<FaPause />}
       onClick={pauseProcessor}

@@ -1,10 +1,11 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCancelQueueItemMutation } from 'services/api/endpoints/queue';
 
 export const useCancelQueueItem = (item_id: number) => {
+  const isConnected = useAppSelector((state) => state.system.isConnected);
   const [trigger, { isLoading }] = useCancelQueueItemMutation();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -27,5 +28,5 @@ export const useCancelQueueItem = (item_id: number) => {
     }
   }, [dispatch, item_id, t, trigger]);
 
-  return { cancelQueueItem, isLoading };
+  return { cancelQueueItem, isLoading, isDisabled: !isConnected };
 };

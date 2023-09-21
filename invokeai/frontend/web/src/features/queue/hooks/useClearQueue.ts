@@ -1,6 +1,6 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useClearQueueMutation,
@@ -10,10 +10,9 @@ import { listCursorChanged, listPriorityChanged } from '../store/queueSlice';
 
 export const useClearQueue = () => {
   const { t } = useTranslation();
-
   const dispatch = useAppDispatch();
   const { data: queueStatus } = useGetQueueStatusQuery();
-
+  const isConnected = useAppSelector((state) => state.system.isConnected);
   const [trigger, { isLoading }] = useClearQueueMutation({
     fixedCacheKey: 'clearQueue',
   });
@@ -43,5 +42,10 @@ export const useClearQueue = () => {
     }
   }, [queueStatus?.queue.total, trigger, dispatch, t]);
 
-  return { clearQueue, isLoading, queueStatus };
+  const isDisabled = useMemo(
+    () => !isConnected || !queueStatus?.queue.total,
+    [isConnected, queueStatus?.queue.total]
+  );
+
+  return { clearQueue, isLoading, queueStatus, isDisabled };
 };

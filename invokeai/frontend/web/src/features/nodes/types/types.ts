@@ -220,7 +220,7 @@ export type IntegerCollectionInputFieldValue = z.infer<
 
 export const zIntegerPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('IntegerPolymorphic'),
-  value: z.union([z.number().int(), z.array(z.number().int())]).optional(),
+  value: z.number().int().optional(),
 });
 export type IntegerPolymorphicInputFieldValue = z.infer<
   typeof zIntegerPolymorphicInputFieldValue
@@ -242,7 +242,7 @@ export type FloatCollectionInputFieldValue = z.infer<
 
 export const zFloatPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('FloatPolymorphic'),
-  value: z.union([z.number(), z.array(z.number())]).optional(),
+  value: z.number().optional(),
 });
 export type FloatPolymorphicInputFieldValue = z.infer<
   typeof zFloatPolymorphicInputFieldValue
@@ -264,7 +264,7 @@ export type StringCollectionInputFieldValue = z.infer<
 
 export const zStringPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('StringPolymorphic'),
-  value: z.union([z.string(), z.array(z.string())]).optional(),
+  value: z.string().optional(),
 });
 export type StringPolymorphicInputFieldValue = z.infer<
   typeof zStringPolymorphicInputFieldValue
@@ -286,7 +286,7 @@ export type BooleanCollectionInputFieldValue = z.infer<
 
 export const zBooleanPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('BooleanPolymorphic'),
-  value: z.union([z.boolean(), z.array(z.boolean())]).optional(),
+  value: z.boolean().optional(),
 });
 export type BooleanPolymorphicInputFieldValue = z.infer<
   typeof zBooleanPolymorphicInputFieldValue
@@ -496,7 +496,7 @@ export type ImageInputFieldValue = z.infer<typeof zImageInputFieldValue>;
 
 export const zImagePolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ImagePolymorphic'),
-  value: z.union([zImageField, z.array(zImageField)]).optional(),
+  value: zImageField.optional(),
 });
 export type ImagePolymorphicInputFieldValue = z.infer<
   typeof zImagePolymorphicInputFieldValue
