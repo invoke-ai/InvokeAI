@@ -37,7 +37,7 @@ const informationalContent = defineStyle((props) => {
       'colors.base.400',
       'colors.base.400'
     )(props),
-    p: 0,
+    p: 4,
     bg: mode('base.100', 'base.600')(props),
     border: 'none',
     shadow: 'dark-lg',

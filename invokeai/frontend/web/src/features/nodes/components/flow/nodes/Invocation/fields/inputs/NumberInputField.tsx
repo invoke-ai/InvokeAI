@@ -12,15 +12,25 @@ import {
   FieldComponentProps,
   FloatInputFieldTemplate,
   FloatInputFieldValue,
+  FloatPolymorphicInputFieldTemplate,
+  FloatPolymorphicInputFieldValue,
   IntegerInputFieldTemplate,
   IntegerInputFieldValue,
+  IntegerPolymorphicInputFieldTemplate,
+  IntegerPolymorphicInputFieldValue,
 } from 'features/nodes/types/types';
 import { memo, useEffect, useMemo, useState } from 'react';
 
 const NumberInputFieldComponent = (
   props: FieldComponentProps<
-    IntegerInputFieldValue | FloatInputFieldValue,
-    IntegerInputFieldTemplate | FloatInputFieldTemplate
+    | IntegerInputFieldValue
+    | IntegerPolymorphicInputFieldValue
+    | FloatInputFieldValue
+    | FloatPolymorphicInputFieldValue,
+    | IntegerInputFieldTemplate
+    | IntegerPolymorphicInputFieldTemplate
+    | FloatInputFieldTemplate
+    | FloatPolymorphicInputFieldTemplate
   >
 ) => {
   const { nodeId, field, fieldTemplate } = props;

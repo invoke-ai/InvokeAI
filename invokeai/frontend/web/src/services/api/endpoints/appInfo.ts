@@ -1,4 +1,5 @@
 import { api } from '..';
+import { paths } from '../schema';
 import { AppConfig, AppVersion } from '../types';
 
 export const appInfoApi = api.injectEndpoints({
@@ -19,7 +20,45 @@ export const appInfoApi = api.injectEndpoints({
       providesTags: ['AppConfig'],
       keepUnusedDataFor: 86400000, // 1 day
     }),
+    getInvocationCacheStatus: build.query<
+      paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: `app/invocation_cache/status`,
+        method: 'GET',
+      }),
+      providesTags: ['InvocationCacheStatus'],
+    }),
+    clearInvocationCache: build.mutation<void, void>({
+      query: () => ({
+        url: `app/invocation_cache`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['InvocationCacheStatus'],
+    }),
+    enableInvocationCache: build.mutation<void, void>({
+      query: () => ({
+        url: `app/invocation_cache/enable`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['InvocationCacheStatus'],
+    }),
+    disableInvocationCache: build.mutation<void, void>({
+      query: () => ({
+        url: `app/invocation_cache/disable`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['InvocationCacheStatus'],
+    }),
   }),
 });
 
-export const { useGetAppVersionQuery, useGetAppConfigQuery } = appInfoApi;
+export const {
+  useGetAppVersionQuery,
+  useGetAppConfigQuery,
+  useClearInvocationCacheMutation,
+  useDisableInvocationCacheMutation,
+  useEnableInvocationCacheMutation,
+  useGetInvocationCacheStatusQuery,
+} = appInfoApi;

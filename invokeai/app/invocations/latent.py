@@ -1,12 +1,14 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
 from contextlib import ExitStack
+from functools import singledispatchmethod
 from typing import List, Literal, Optional, Union
 
 import einops
 import numpy as np
 import torch
 import torchvision.transforms as T
+from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models import UNet2DConditionModel
 from diffusers.models.adapter import FullAdapterXL, T2IAdapter
@@ -211,7 +213,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     noise: Optional[LatentsField] = InputField(description=FieldDescriptions.noise, input=Input.Connection, ui_order=3)
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     cfg_scale: Union[float, List[float]] = InputField(
-        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type=UIType.Float, title="CFG Scale"
+        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, title="CFG Scale"
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
@@ -221,7 +223,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
     unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet", ui_order=2)
     control: Union[ControlField, list[ControlField]] = InputField(
         default=None,
-        description=FieldDescriptions.control,
         input=Input.Connection,
         ui_order=5,
     )
@@ -955,8 +956,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             # non_noised_latents_from_image
             image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
             with torch.inference_mode():
-                image_tensor_dist = vae.encode(image_tensor).latent_dist
-                latents = image_tensor_dist.sample().to(dtype=vae.dtype)  # FIXME: uses torch.randn. make reproducible!
+                latents = ImageToLatentsInvocation._encode_to_tensor(vae, image_tensor)
 
             latents = vae.config.scaling_factor * latents
             latents = latents.to(dtype=orig_dtype)
@@ -982,6 +982,18 @@ class ImageToLatentsInvocation(BaseInvocation):
         latents = latents.to("cpu")
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents, seed=None)
+
+    @singledispatchmethod
+    @staticmethod
+    def _encode_to_tensor(vae: AutoencoderKL, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
+        image_tensor_dist = vae.encode(image_tensor).latent_dist
+        latents = image_tensor_dist.sample().to(dtype=vae.dtype)  # FIXME: uses torch.randn. make reproducible!
+        return latents
+
+    @_encode_to_tensor.register
+    @staticmethod
+    def _(vae: AutoencoderTiny, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
+        return vae.encode(image_tensor).latents
 
 
 @invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents", version="1.0.0")

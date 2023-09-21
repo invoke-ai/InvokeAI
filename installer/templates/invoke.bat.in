@@ -17,9 +17,10 @@ echo 6. Change InvokeAI startup options
 echo 7. Re-run the configure script to fix a broken install or to complete a major upgrade
 echo 8. Open the developer console
 echo 9. Update InvokeAI
-echo 10. Command-line help
+echo 10. Run the InvokeAI image database maintenance script
+echo 11. Command-line help
 echo Q - Quit
-set /P choice="Please enter 1-10, Q: [1] "
+set /P choice="Please enter 1-11, Q: [1] "
 if not defined choice set choice=1
 IF /I "%choice%" == "1" (
     echo Starting the InvokeAI browser-based UI..
@@ -58,8 +59,11 @@ IF /I "%choice%" == "1" (
    echo Running invokeai-update...
    python -m invokeai.frontend.install.invokeai_update
 ) ELSE IF /I "%choice%" == "10" (
+   echo Running the db maintenance script...
+   python .venv\Scripts\invokeai-db-maintenance.exe
+) ELSE IF /I "%choice%" == "11" (
     echo Displaying command line help...
-    python .venv\Scripts\invokeai.exe --help %*
+    python .venv\Scripts\invokeai-web.exe --help %*
     pause
     exit /b
 ) ELSE IF /I "%choice%" == "q" (

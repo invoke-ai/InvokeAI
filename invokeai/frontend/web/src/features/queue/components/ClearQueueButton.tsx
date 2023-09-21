@@ -13,7 +13,7 @@ type Props = {
 
 const ClearQueueButton = ({ asIconButton, sx }: Props) => {
   const { t } = useTranslation();
-  const { clearQueue, isLoading, queueStatus } = useClearQueue();
+  const { clearQueue, isLoading, isDisabled } = useClearQueue();
 
   return (
     <IAIAlertDialog
@@ -22,7 +22,7 @@ const ClearQueueButton = ({ asIconButton, sx }: Props) => {
       acceptButtonText={t('queue.clear')}
       triggerComponent={
         <QueueButton
-          isDisabled={!queueStatus?.queue.total}
+          isDisabled={isDisabled}
           isLoading={isLoading}
           asIconButton={asIconButton}
           label={t('queue.clear')}

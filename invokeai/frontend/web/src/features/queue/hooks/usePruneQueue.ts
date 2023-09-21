@@ -1,6 +1,6 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useGetQueueStatusQuery,
@@ -11,6 +11,7 @@ import { listCursorChanged, listPriorityChanged } from '../store/queueSlice';
 export const usePruneQueue = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const isConnected = useAppSelector((state) => state.system.isConnected);
   const [trigger, { isLoading }] = usePruneQueueMutation({
     fixedCacheKey: 'pruneQueue',
   });
@@ -51,5 +52,10 @@ export const usePruneQueue = () => {
     }
   }, [finishedCount, trigger, dispatch, t]);
 
-  return { pruneQueue, isLoading, finishedCount };
+  const isDisabled = useMemo(
+    () => !isConnected || !finishedCount,
+    [finishedCount, isConnected]
+  );
+
+  return { pruneQueue, isLoading, finishedCount, isDisabled };
 };

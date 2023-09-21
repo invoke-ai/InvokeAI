@@ -31,7 +31,7 @@ const IAIDroppable = (props: IAIDroppableProps) => {
       insetInlineStart={0}
       w="full"
       h="full"
-      pointerEvents="none"
+      pointerEvents={active ? 'auto' : 'none'}
     >
       <AnimatePresence>
         {isValidDrop(data, active) && (

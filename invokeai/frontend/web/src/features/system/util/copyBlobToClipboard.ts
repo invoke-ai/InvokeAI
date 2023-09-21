@@ -1,10 +1,13 @@
 /**
  * Copies a blob to the clipboard by calling navigator.clipboard.write().
  */
-export const copyBlobToClipboard = (blob: Blob) => {
+export const copyBlobToClipboard = (
+  blob: Promise<Blob>,
+  type = 'image/png'
+) => {
   navigator.clipboard.write([
     new ClipboardItem({
-      [blob.type]: blob,
+      [type]: blob,
     }),
   ]);
 };

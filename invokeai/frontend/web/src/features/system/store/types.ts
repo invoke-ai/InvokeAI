@@ -21,6 +21,7 @@ export type DenoiseProgress = {
 };
 
 export interface SystemState {
+  isInitialized: boolean;
   isConnected: boolean;
   shouldConfirmOnDelete: boolean;
   enableImageDebugging: boolean;
@@ -33,7 +34,7 @@ export interface SystemState {
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
   status: SystemStatus;
-  shouldDisableInformationalPopovers: boolean;
+  shouldEnableInformationalPopovers: boolean;
 }
 
 export const LANGUAGES = {

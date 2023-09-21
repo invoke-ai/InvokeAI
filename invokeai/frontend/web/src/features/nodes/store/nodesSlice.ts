@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { cloneDeep, forEach, isEqual, map, uniqBy } from 'lodash-es';
+import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
 import {
   addEdge,
   applyEdgeChanges,
@@ -16,9 +16,9 @@ import {
   OnConnectStartParams,
   SelectionMode,
   Viewport,
+  XYPosition,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import { sessionCanceled, sessionInvoked } from 'services/api/thunks/session';
 import { ImageField } from 'services/api/types';
 import {
   appSocketGeneratorProgress,
@@ -722,8 +722,30 @@ const nodesSlice = createSlice({
     selectionCopied: (state) => {
       state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
       state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
+
+      if (state.nodesToCopy.length > 0) {
+        const averagePosition = { x: 0, y: 0 };
+        state.nodesToCopy.forEach((e) => {
+          const xOffset = 0.15 * (e.width ?? 0);
+          const yOffset = 0.5 * (e.height ?? 0);
+          averagePosition.x += e.position.x + xOffset;
+          averagePosition.y += e.position.y + yOffset;
+        });
+
+        averagePosition.x /= state.nodesToCopy.length;
+        averagePosition.y /= state.nodesToCopy.length;
+
+        state.nodesToCopy.forEach((e) => {
+          e.position.x -= averagePosition.x;
+          e.position.y -= averagePosition.y;
+        });
+      }
     },
-    selectionPasted: (state) => {
+    selectionPasted: (
+      state,
+      action: PayloadAction<{ cursorPosition?: XYPosition }>
+    ) => {
+      const { cursorPosition } = action.payload;
       const newNodes = state.nodesToCopy.map(cloneDeep);
       const oldNodeIds = newNodes.map((n) => n.data.id);
       const newEdges = state.edgesToCopy
@@ -752,8 +774,8 @@ const nodesSlice = createSlice({
 
         const position = findUnoccupiedPosition(
           state.nodes,
-          node.position.x,
-          node.position.y
+          node.position.x + (cursorPosition?.x ?? 0),
+          node.position.y + (cursorPosition?.y ?? 0)
         );
 
         node.position = position;
@@ -853,28 +875,10 @@ const nodesSlice = createSlice({
         node.progressImage = progress_image ?? null;
       }
     });
-    builder.addCase(sessionInvoked.fulfilled, (state) => {
-      forEach(state.nodeExecutionStates, (nes) => {
-        nes.status = NodeStatus.PENDING;
-        nes.error = null;
-        nes.progress = null;
-        nes.progressImage = null;
-        nes.outputs = [];
-      });
-    });
-    builder.addCase(sessionCanceled.fulfilled, (state) => {
-      map(state.nodeExecutionStates, (nes) => {
-        if (nes.status === NodeStatus.IN_PROGRESS) {
-          nes.status = NodeStatus.PENDING;
-        }
-      });
-    });
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
-      if (
-        ['completed', 'canceled', 'failed'].includes(action.payload.data.status)
-      ) {
+      if (['in_progress'].includes(action.payload.data.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
-          nes.status = NodeStatus.PENDING;
+          nes.status = NodeStatus.IN_PROGRESS;
           nes.error = null;
           nes.progress = null;
           nes.progressImage = null;

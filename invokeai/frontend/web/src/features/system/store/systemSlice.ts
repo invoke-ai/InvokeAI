@@ -24,6 +24,7 @@ import { SystemState, LANGUAGES } from './types';
 import { zPydanticValidationError } from './zodSchemas';
 
 export const initialSystemState: SystemState = {
+  isInitialized: false,
   isConnected: false,
   shouldConfirmOnDelete: true,
   enableImageDebugging: false,
@@ -35,7 +36,7 @@ export const initialSystemState: SystemState = {
   language: 'en',
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
-  shouldDisableInformationalPopovers: false,
+  shouldEnableInformationalPopovers: false,
   status: 'DISCONNECTED',
 };
 
@@ -76,11 +77,14 @@ export const systemSlice = createSlice({
     shouldUseWatermarkerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseWatermarker = action.payload;
     },
-    setShouldDisableInformationalPopovers(
+    setShouldEnableInformationalPopovers(
       state,
       action: PayloadAction<boolean>
     ) {
-      state.shouldDisableInformationalPopovers = action.payload;
+      state.shouldEnableInformationalPopovers = action.payload;
+    },
+    isInitializedChanged(state, action: PayloadAction<boolean>) {
+      state.isInitialized = action.payload;
     },
   },
   extraReducers(builder) {
@@ -241,7 +245,8 @@ export const {
   languageChanged,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
-  setShouldDisableInformationalPopovers,
+  setShouldEnableInformationalPopovers,
+  isInitializedChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

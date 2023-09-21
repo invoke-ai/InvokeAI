@@ -10,14 +10,14 @@ type Props = {
 
 const ResumeProcessorButton = ({ asIconButton }: Props) => {
   const { t } = useTranslation();
-  const { resumeProcessor, isLoading, isStarted } = useResumeProcessor();
+  const { resumeProcessor, isLoading, isDisabled } = useResumeProcessor();
 
   return (
     <QueueButton
       asIconButton={asIconButton}
       label={t('queue.resume')}
       tooltip={t('queue.resumeTooltip')}
-      isDisabled={isStarted}
+      isDisabled={isDisabled}
       isLoading={isLoading}
       icon={<FaPlay />}
       onClick={resumeProcessor}

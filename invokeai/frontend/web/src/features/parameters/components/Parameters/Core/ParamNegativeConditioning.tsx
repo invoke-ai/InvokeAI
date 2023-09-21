@@ -1,6 +1,7 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAITextarea from 'common/components/IAITextarea';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
@@ -9,7 +10,6 @@ import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const ParamNegativeConditioning = () => {
   const negativePrompt = useAppSelector(
@@ -76,13 +76,16 @@ const ParamNegativeConditioning = () => {
   const isEmbeddingEnabled = useFeatureStatus('embedding').isFeatureEnabled;
 
   return (
-    <FormControl>
-      <ParamEmbeddingPopover
-        isOpen={isOpen}
-        onClose={onClose}
-        onSelect={handleSelectEmbedding}
-      >
-        <IAIInformationalPopover details="paramNegativeConditioning">
+    <IAIInformationalPopover
+      placement="right"
+      details="paramNegativeConditioning"
+    >
+      <FormControl>
+        <ParamEmbeddingPopover
+          isOpen={isOpen}
+          onClose={onClose}
+          onSelect={handleSelectEmbedding}
+        >
           <IAITextarea
             id="negativePrompt"
             name="negativePrompt"
@@ -95,20 +98,20 @@ const ParamNegativeConditioning = () => {
             minH={16}
             {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
           />
-        </IAIInformationalPopover>
-      </ParamEmbeddingPopover>
-      {!isOpen && isEmbeddingEnabled && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            insetInlineEnd: 0,
-          }}
-        >
-          <AddEmbeddingButton onClick={onOpen} />
-        </Box>
-      )}
-    </FormControl>
+        </ParamEmbeddingPopover>
+        {!isOpen && isEmbeddingEnabled && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              insetInlineEnd: 0,
+            }}
+          >
+            <AddEmbeddingButton onClick={onOpen} />
+          </Box>
+        )}
+      </FormControl>
+    </IAIInformationalPopover>
   );
 };
 

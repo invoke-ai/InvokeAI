@@ -46,7 +46,6 @@ export const buildCanvasSDXLTextToImageGraph = (
     seed,
     steps,
     vaePrecision,
-    clipSkip,
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
@@ -321,7 +320,6 @@ export const buildCanvasSDXLTextToImageGraph = (
     vae: undefined, // option; set in addVAEToGraph
     controlnets: [], // populated in addControlNetToLinearGraph
     loras: [], // populated in addLoRAsToGraph
-    clip_skip: clipSkip,
   };
 
   graph.edges.push({

@@ -42,6 +42,10 @@ export default function ParamClipSkip() {
     return clipSkipMap[model.base_model].markers;
   }, [model]);
 
+  if (model?.base_model === 'sdxl') {
+    return null;
+  }
+
   return (
     <IAIInformationalPopover details="clipSkip">
       <IAISlider

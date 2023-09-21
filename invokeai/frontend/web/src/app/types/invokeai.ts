@@ -21,7 +21,8 @@ export type AppFeature =
   | 'multiselect'
   | 'pauseQueue'
   | 'resumeQueue'
-  | 'prependQueue';
+  | 'prependQueue'
+  | 'invocationCache';
 
 /**
  * A disable-able Stable Diffusion feature

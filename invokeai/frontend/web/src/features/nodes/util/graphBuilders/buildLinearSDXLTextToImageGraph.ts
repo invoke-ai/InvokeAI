@@ -38,7 +38,6 @@ export const buildLinearSDXLTextToImageGraph = (
     steps,
     width,
     height,
-    clipSkip,
     shouldUseCpuNoise,
     vaePrecision,
     seamlessXAxis,
@@ -243,7 +242,6 @@ export const buildLinearSDXLTextToImageGraph = (
     vae: undefined,
     controlnets: [],
     loras: [],
-    clip_skip: clipSkip,
     positive_style_prompt: positiveStylePrompt,
     negative_style_prompt: negativeStylePrompt,
   };

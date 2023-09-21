@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import {
 export const usePauseProcessor = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const isConnected = useAppSelector((state) => state.system.isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const [trigger, { isLoading }] = usePauseProcessorMutation({
     fixedCacheKey: 'pauseProcessor',
@@ -42,5 +43,10 @@ export const usePauseProcessor = () => {
     }
   }, [isStarted, trigger, dispatch, t]);
 
-  return { pauseProcessor, isLoading, isStarted };
+  const isDisabled = useMemo(
+    () => !isConnected || !isStarted,
+    [isConnected, isStarted]
+  );
+
+  return { pauseProcessor, isLoading, isStarted, isDisabled };
 };

@@ -1,7 +1,9 @@
 import { Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { RootState } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -16,15 +18,17 @@ import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 
+const selector = createSelector(
+  stateSelector,
+  ({ controlNet }) => {
+    const { ipAdapterInfo } = controlNet;
+    return { ipAdapterInfo };
+  },
+  defaultSelectorOptions
+);
+
 const ParamIPAdapterImage = () => {
-  const ipAdapterInfo = useAppSelector(
-    (state: RootState) => state.controlNet.ipAdapterInfo
-  );
-
-  const isIPAdapterEnabled = useAppSelector(
-    (state: RootState) => state.controlNet.isIPAdapterEnabled
-  );
-
+  const { ipAdapterInfo } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -71,8 +75,6 @@ const ParamIPAdapterImage = () => {
         droppableData={droppableData}
         draggableData={draggableData}
         postUploadAction={postUploadAction}
-        isUploadDisabled={!isIPAdapterEnabled}
-        isDropDisabled={!isIPAdapterEnabled}
         dropLabel={t('toast.setIPAdapterImage')}
         noContentFallback={
           <IAINoContentFallback
