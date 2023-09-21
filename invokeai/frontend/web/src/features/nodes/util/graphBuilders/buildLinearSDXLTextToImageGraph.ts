@@ -11,6 +11,8 @@ import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CLIP2_SKIP,
+  CLIP_SKIP,
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
@@ -39,6 +41,7 @@ export const buildLinearSDXLTextToImageGraph = (
     width,
     height,
     clipSkip,
+    clip2Skip,
     shouldUseCpuNoise,
     vaePrecision,
     seamlessXAxis,
@@ -86,6 +89,18 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_model_loader',
         id: modelLoaderNodeId,
         model,
+        is_intermediate,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+        is_intermediate,
+      },
+      [CLIP2_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP2_SKIP,
+        skipped_layers: clip2Skip,
         is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
@@ -146,7 +161,7 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'clip',
         },
         destination: {
-          node_id: POSITIVE_CONDITIONING,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
       },
@@ -156,13 +171,33 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'clip2',
         },
         destination: {
+          node_id: CLIP2_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP2_SKIP,
+          field: 'clip',
+        },
+        destination: {
           node_id: POSITIVE_CONDITIONING,
           field: 'clip2',
         },
       },
       {
         source: {
-          node_id: modelLoaderNodeId,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -172,8 +207,8 @@ export const buildLinearSDXLTextToImageGraph = (
       },
       {
         source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip2',
+          node_id: CLIP2_SKIP,
+          field: 'clip',
         },
         destination: {
           node_id: NEGATIVE_CONDITIONING,
@@ -244,6 +279,7 @@ export const buildLinearSDXLTextToImageGraph = (
     controlnets: [],
     loras: [],
     clip_skip: clipSkip,
+    clip2_skip: clipSkip,
     positive_style_prompt: positiveStylePrompt,
     negative_style_prompt: negativeStylePrompt,
   };

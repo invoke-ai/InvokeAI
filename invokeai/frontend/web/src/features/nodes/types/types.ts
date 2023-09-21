@@ -1133,6 +1133,7 @@ export const zCoreMetadata = z
     steps: z.number().int().nullish().catch(null),
     scheduler: z.string().nullish().catch(null),
     clip_skip: z.number().int().nullish().catch(null),
+    clip2_skip: z.number().int().nullish().catch(null),
     model: z
       .union([zMainModel.deepPartial(), zOnnxModel.deepPartial()])
       .nullish()

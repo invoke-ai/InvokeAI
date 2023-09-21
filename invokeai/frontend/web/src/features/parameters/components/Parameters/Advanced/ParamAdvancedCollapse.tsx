@@ -9,21 +9,41 @@ import { useTranslation } from 'react-i18next';
 import { ParamCpuNoiseToggle } from '../Noise/ParamCpuNoise';
 import ParamSeamless from '../Seamless/ParamSeamless';
 import ParamClipSkip from './ParamClipSkip';
+import ParamClip2Skip from './ParamClip2Skip';
 
 const selector = createSelector(
   stateSelector,
   (state: RootState) => {
-    const { clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
-      state.generation;
+    const {
+      clipSkip,
+      clip2Skip,
+      seamlessXAxis,
+      seamlessYAxis,
+      shouldUseCpuNoise,
+      model,
+    } = state.generation;
 
-    return { clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise };
+    return {
+      clipSkip,
+      clip2Skip,
+      seamlessXAxis,
+      seamlessYAxis,
+      shouldUseCpuNoise,
+      shouldShowClip2Skip: model?.base_model === 'sdxl',
+    };
   },
   defaultSelectorOptions
 );
 
 export default function ParamAdvancedCollapse() {
-  const { clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
-    useAppSelector(selector);
+  const {
+    clipSkip,
+    clip2Skip,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldUseCpuNoise,
+    shouldShowClip2Skip,
+  } = useAppSelector(selector);
   const { t } = useTranslation();
   const activeLabel = useMemo(() => {
     const activeLabel: string[] = [];
@@ -34,7 +54,14 @@ export default function ParamAdvancedCollapse() {
       activeLabel.push(t('parameters.gpuNoise'));
     }
 
-    if (clipSkip > 0) {
+    if ((clipSkip > 0 || clip2Skip > 0) && shouldShowClip2Skip) {
+      activeLabel.push(
+        t('parameters.clip12SkipWithLayerCount', {
+          clipLayerCount: clipSkip,
+          clip2LayerCount: clip2Skip,
+        })
+      );
+    } else if (clipSkip > 0) {
       activeLabel.push(
         t('parameters.clipSkipWithLayerCount', { layerCount: clipSkip })
       );
@@ -49,7 +76,15 @@ export default function ParamAdvancedCollapse() {
     }
 
     return activeLabel.join(', ');
-  }, [clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise, t]);
+  }, [
+    clip2Skip,
+    clipSkip,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldShowClip2Skip,
+    shouldUseCpuNoise,
+    t,
+  ]);
 
   return (
     <IAICollapse label={t('common.advanced')} activeLabel={activeLabel}>
@@ -58,6 +93,13 @@ export default function ParamAdvancedCollapse() {
         <Divider />
         <ParamClipSkip />
         <Divider pt={2} />
+        {shouldShowClip2Skip && (
+          <>
+            <ParamClip2Skip />
+            <Divider pt={2} />
+          </>
+        )}
+
         <ParamCpuNoiseToggle />
       </Flex>
     </IAICollapse>

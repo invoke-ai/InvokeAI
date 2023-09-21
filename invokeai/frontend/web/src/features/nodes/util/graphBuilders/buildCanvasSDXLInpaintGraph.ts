@@ -25,6 +25,8 @@ import {
   CANVAS_COHERENCE_NOISE,
   CANVAS_COHERENCE_NOISE_INCREMENT,
   CANVAS_OUTPUT,
+  CLIP2_SKIP,
+  CLIP_SKIP,
   INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
@@ -58,6 +60,8 @@ export const buildCanvasSDXLInpaintGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    clipSkip,
+    clip2Skip,
     scheduler,
     steps,
     seed,
@@ -110,6 +114,18 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'sdxl_model_loader',
         id: modelLoaderNodeId,
         model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+        is_intermediate,
+      },
+      [CLIP2_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP2_SKIP,
+        skipped_layers: clip2Skip,
+        is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
@@ -215,7 +231,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'clip',
         },
         destination: {
-          node_id: POSITIVE_CONDITIONING,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
       },
@@ -225,13 +241,33 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'clip2',
         },
         destination: {
+          node_id: CLIP2_SKIP,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP2_SKIP,
+          field: 'clip',
+        },
+        destination: {
           node_id: POSITIVE_CONDITIONING,
           field: 'clip2',
         },
       },
       {
         source: {
-          node_id: modelLoaderNodeId,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -241,7 +277,7 @@ export const buildCanvasSDXLInpaintGraph = (
       },
       {
         source: {
-          node_id: modelLoaderNodeId,
+          node_id: CLIP2_SKIP,
           field: 'clip2',
         },
         destination: {
