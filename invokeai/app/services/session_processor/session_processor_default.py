@@ -116,6 +116,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         continue
                 except Exception as e:
                     self.__invoker.services.logger.error(f"Error in session processor: {e}")
+                    poll_now_event.wait(POLLING_INTERVAL)
                     continue
         except Exception as e:
             self.__invoker.services.logger.error(f"Fatal Error in session processor: {e}")
