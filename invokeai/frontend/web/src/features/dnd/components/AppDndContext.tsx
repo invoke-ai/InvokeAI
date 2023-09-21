@@ -87,7 +87,7 @@ const AppDndContext = (props: PropsWithChildren) => {
         style={{
           width: 'min-content',
           height: 'min-content',
-          cursor: 'none',
+          cursor: 'grabbing',
           userSelect: 'none',
           // expand overlay to prevent cursor from going outside it and displaying
           padding: '10rem',
