@@ -92,30 +92,33 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self.__invoker.services.logger
             while not stop_event.is_set():
                 poll_now_event.clear()
+                try:
+                    # do not dequeue if there is already a session running
+                    if self.__queue_item is None and resume_event.is_set():
+                        queue_item = self.__invoker.services.session_queue.dequeue()
 
-                # do not dequeue if there is already a session running
-                if self.__queue_item is None and resume_event.is_set():
-                    queue_item = self.__invoker.services.session_queue.dequeue()
+                        if queue_item is not None:
+                            self.__invoker.services.logger.debug(f"Executing queue item {queue_item.item_id}")
+                            self.__queue_item = queue_item
+                            self.__invoker.services.graph_execution_manager.set(queue_item.session)
+                            self.__invoker.invoke(
+                                session_queue_batch_id=queue_item.batch_id,
+                                session_queue_id=queue_item.queue_id,
+                                session_queue_item_id=queue_item.item_id,
+                                graph_execution_state=queue_item.session,
+                                invoke_all=True,
+                            )
+                            queue_item = None
 
-                    if queue_item is not None:
-                        self.__invoker.services.logger.debug(f"Executing queue item {queue_item.item_id}")
-                        self.__queue_item = queue_item
-                        self.__invoker.services.graph_execution_manager.set(queue_item.session)
-                        self.__invoker.invoke(
-                            session_queue_batch_id=queue_item.batch_id,
-                            session_queue_id=queue_item.queue_id,
-                            session_queue_item_id=queue_item.item_id,
-                            graph_execution_state=queue_item.session,
-                            invoke_all=True,
-                        )
-                        queue_item = None
-
-                if queue_item is None:
-                    self.__invoker.services.logger.debug("Waiting for next polling interval or event")
-                    poll_now_event.wait(POLLING_INTERVAL)
+                    if queue_item is None:
+                        self.__invoker.services.logger.debug("Waiting for next polling interval or event")
+                        poll_now_event.wait(POLLING_INTERVAL)
+                        continue
+                except Exception as e:
+                    self.__invoker.services.logger.error(f"Error in session processor: {e}")
                     continue
         except Exception as e:
-            self.__invoker.services.logger.error(f"Error in session processor: {e}")
+            self.__invoker.services.logger.error(f"Fatal Error in session processor: {e}")
             pass
         finally:
             stop_event.clear()
