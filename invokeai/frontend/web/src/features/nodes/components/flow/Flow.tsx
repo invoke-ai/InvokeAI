@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
-import { useCallback, useRef } from 'react';
+import { MouseEvent, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
   Background,
@@ -160,17 +160,20 @@ export const Flow = () => {
     [flowWrapper]
   );
 
-  const onMouseMove = (event: MouseEvent) => {
-    const bounds = flowWrapper.current?.getBoundingClientRect();
-    if (bounds) {
-      const pos = $flow.get()?.project({
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top,
-      });
+  const onMouseMove = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const bounds = flowWrapper.current?.getBoundingClientRect();
+      if (bounds) {
+        const pos = $flow.get()?.project({
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        });
 
-      dispatch(mouseMoved(pos));
-    }
-  };
+        dispatch(mouseMoved(pos));
+      }
+    },
+    [dispatch]
+  );
 
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
     e.preventDefault();
@@ -196,7 +199,7 @@ export const Flow = () => {
       nodes={nodes}
       edges={edges}
       onInit={onInit}
-      onMouseMove={(event) => onMouseMove(event.nativeEvent)}
+      onMouseMove={onMouseMove}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onEdgesDelete={onEdgesDelete}
