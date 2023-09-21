@@ -96,7 +96,7 @@ const AddNodePopover = () => {
     (nodeType: AnyInvocationType) => {
       const invocation = buildInvocation(nodeType);
       if (!invocation) {
-        const errorMessage = t('nodes.unknownInvocation', {
+        const errorMessage = t('nodes.unknownNode', {
           nodeType: nodeType,
         });
         toaster({

@@ -965,3 +965,42 @@ class ImageChannelMultiplyInvocation(BaseInvocation):
             width=image_dto.width,
             height=image_dto.height,
         )
+
+
+@invocation(
+    "save_image",
+    title="Save Image",
+    tags=["primitives", "image"],
+    category="primitives",
+    version="1.0.0",
+    use_cache=False,
+)
+class SaveImageInvocation(BaseInvocation):
+    """Saves an image. Unlike an image primitive, this invocation stores a copy of the image."""
+
+    image: ImageField = InputField(description="The image to load")
+    metadata: CoreMetadata = InputField(
+        default=None,
+        description=FieldDescriptions.core_metadata,
+        ui_hidden=True,
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get_pil_image(self.image.image_name)
+
+        image_dto = context.services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
+            workflow=self.workflow,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )

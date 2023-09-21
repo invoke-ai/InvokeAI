@@ -48,7 +48,6 @@ dependencies = [
   "facexlib",
   "fastapi==0.88.0",
   "fastapi-events==0.8.0",
-  "fastapi-socketio==0.0.10",
   "huggingface-hub~=0.16.4",
   "invisible-watermark~=0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                 # needed for plotting of Penner easing functions
@@ -142,10 +141,11 @@ dependencies = [
 "invokeai-model-install" = "invokeai.frontend.install.model_install:main"
 "invokeai-migrate3" = "invokeai.backend.install.migrate_to_3:main"
 "invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
-"invokeai-metadata" = "invokeai.frontend.CLI.sd_metadata:print_metadata"
+"invokeai-metadata" = "invokeai.backend.image_util.invoke_metadata:main"
 "invokeai-node-cli" = "invokeai.app.cli_app:invoke_cli"
 "invokeai-node-web" = "invokeai.app.api_app:invoke_api"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
+"invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"

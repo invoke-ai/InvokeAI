@@ -13,7 +13,7 @@ import {
 } from 'features/nodes/types/types';
 import { getMetadataAndWorkflowFromImageBlob } from 'features/nodes/util/getMetadataAndWorkflowFromImageBlob';
 import { keyBy } from 'lodash-es';
-import { ApiFullTagDescription, LIST_TAG, api } from '..';
+import { ApiTagDescription, LIST_TAG, api } from '..';
 import { $authToken, $projectId } from '../client';
 import { components, paths } from '../schema';
 import {
@@ -1310,7 +1310,7 @@ export const imagesApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { imageDTOs }) => {
         const touchedBoardIds: string[] = [];
-        const tags: ApiFullTagDescription[] = [
+        const tags: ApiTagDescription[] = [
           { type: 'BoardImagesTotal', id: 'none' },
           { type: 'BoardAssetsTotal', id: 'none' },
         ];

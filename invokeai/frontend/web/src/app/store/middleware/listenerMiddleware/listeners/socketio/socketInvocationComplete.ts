@@ -8,10 +8,8 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graphBuilders/constants';
-import { progressImageSet } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
-import { sessionCanceled } from 'services/api/thunks/session';
 import { imagesAdapter } from 'services/api/util';
 import {
   appSocketInvocationComplete,
@@ -31,16 +29,8 @@ export const addInvocationCompleteEventListener = () => {
         { data: parseify(data) },
         `Invocation complete (${action.payload.data.node.type})`
       );
-      const session_id = action.payload.data.graph_execution_state_id;
 
-      const { cancelType, isCancelScheduled } = getState().system;
-
-      // Handle scheduled cancelation
-      if (cancelType === 'scheduled' && isCancelScheduled) {
-        dispatch(sessionCanceled({ session_id }));
-      }
-
-      const { result, node, graph_execution_state_id } = data;
+      const { result, node, queue_batch_id } = data;
 
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
@@ -53,8 +43,7 @@ export const addInvocationCompleteEventListener = () => {
 
         // Add canvas images to the staging area
         if (
-          graph_execution_state_id ===
-            canvas.layerState.stagingArea.sessionId &&
+          canvas.batchIds.includes(queue_batch_id) &&
           [CANVAS_OUTPUT].includes(data.source_node_id)
         ) {
           dispatch(addImageToStagingArea(imageDTO));
@@ -114,8 +103,6 @@ export const addInvocationCompleteEventListener = () => {
             dispatch(imageSelected(imageDTO));
           }
         }
-
-        dispatch(progressImageSet(null));
       }
       // pass along the socket event as an application action
       dispatch(appSocketInvocationComplete(action.payload));

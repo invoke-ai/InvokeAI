@@ -1,4 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   ControlNetConfig,
@@ -33,12 +34,14 @@ export default function ParamControlNetResizeMode(
   );
 
   return (
-    <IAIMantineSelect
-      disabled={!isEnabled}
-      label={t('controlnet.resizeMode')}
-      data={RESIZE_MODE_DATA}
-      value={String(resizeMode)}
-      onChange={handleResizeModeChange}
-    />
+    <IAIInformationalPopover details="controlNetResizeMode">
+      <IAIMantineSelect
+        disabled={!isEnabled}
+        label={t('controlnet.resizeMode')}
+        data={RESIZE_MODE_DATA}
+        value={String(resizeMode)}
+        onChange={handleResizeModeChange}
+      />
+    </IAIInformationalPopover>
   );
 }

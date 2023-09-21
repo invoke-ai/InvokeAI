@@ -25,6 +25,7 @@ import {
   appSocketInvocationComplete,
   appSocketInvocationError,
   appSocketInvocationStarted,
+  appSocketQueueItemStatusChanged,
 } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
 import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
@@ -260,6 +261,20 @@ const nodesSlice = createSlice({
         return;
       }
       node.data.embedWorkflow = embedWorkflow;
+    },
+    nodeUseCacheChanged: (
+      state,
+      action: PayloadAction<{ nodeId: string; useCache: boolean }>
+    ) => {
+      const { nodeId, useCache } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      const node = state.nodes?.[nodeIndex];
+
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      node.data.useCache = useCache;
     },
     nodeIsIntermediateChanged: (
       state,
@@ -847,6 +862,19 @@ const nodesSlice = createSlice({
         }
       });
     });
+    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+      if (
+        ['completed', 'canceled', 'failed'].includes(action.payload.data.status)
+      ) {
+        forEach(state.nodeExecutionStates, (nes) => {
+          nes.status = NodeStatus.PENDING;
+          nes.error = null;
+          nes.progress = null;
+          nes.progressImage = null;
+          nes.outputs = [];
+        });
+      }
+    });
   },
 });
 
@@ -912,6 +940,7 @@ export const {
   nodeIsIntermediateChanged,
   mouseOverNodeChanged,
   nodeExclusivelySelected,
+  nodeUseCacheChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

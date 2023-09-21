@@ -147,6 +147,7 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
 ### InvokeAI Configuration
 - [Guide to InvokeAI Runtime Settings](features/CONFIGURATION.md)
+- [Database Maintenance and other Command Line Utilities](features/UTILITIES.md)
 
 ## :octicons-log-16: Important Changes Since Version 2.3
 

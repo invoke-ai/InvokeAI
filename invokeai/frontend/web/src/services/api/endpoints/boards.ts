@@ -9,7 +9,7 @@ import {
   OffsetPaginatedResults_ImageDTO_,
   UpdateBoardArg,
 } from 'services/api/types';
-import { ApiFullTagDescription, LIST_TAG, api } from '..';
+import { ApiTagDescription, LIST_TAG, api } from '..';
 import { getListImagesUrl } from '../util';
 
 export const boardsApi = api.injectEndpoints({
@@ -21,7 +21,7 @@ export const boardsApi = api.injectEndpoints({
       query: (arg) => ({ url: 'boards/', params: arg }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiFullTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
+        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
 
         if (result) {
           // and individual tags for each board
@@ -44,7 +44,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiFullTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
+        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
 
         if (result) {
           // and individual tags for each board

@@ -11,8 +11,9 @@ import {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
-import { isEqual } from 'lodash-es';
 
+import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -25,16 +26,15 @@ import {
   FaPlus,
   FaSave,
 } from 'react-icons/fa';
-import { stagingAreaImageSaved } from '../store/actions';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { stagingAreaImageSaved } from '../store/actions';
 
 const selector = createSelector(
   [canvasSelector],
   (canvas) => {
     const {
       layerState: {
-        stagingArea: { images, selectedImageIndex, sessionId },
+        stagingArea: { images, selectedImageIndex },
       },
       shouldShowStagingOutline,
       shouldShowStagingImage,
@@ -47,14 +47,9 @@ const selector = createSelector(
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,
       shouldShowStagingOutline,
-      sessionId,
     };
   },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
+  defaultSelectorOptions
 );
 
 const IAICanvasStagingAreaToolbar = () => {
@@ -64,7 +59,6 @@ const IAICanvasStagingAreaToolbar = () => {
     isOnLastImage,
     currentStagingAreaImage,
     shouldShowStagingImage,
-    sessionId,
   } = useAppSelector(selector);
 
   const { t } = useTranslation();
@@ -121,8 +115,8 @@ const IAICanvasStagingAreaToolbar = () => {
   );
 
   const handleAccept = useCallback(
-    () => dispatch(commitStagingAreaImage(sessionId)),
-    [dispatch, sessionId]
+    () => dispatch(commitStagingAreaImage()),
+    [dispatch]
   );
 
   const { data: imageDTO } = useGetImageDTOQuery(
