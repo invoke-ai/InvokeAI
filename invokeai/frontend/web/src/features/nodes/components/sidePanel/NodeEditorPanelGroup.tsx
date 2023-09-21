@@ -45,6 +45,7 @@ const NodeEditorPanelGroup = () => {
       <PanelGroup
         ref={panelGroupRef}
         id="workflow-panel-group"
+        autoSaveId="workflow-panel-group"
         direction="vertical"
         style={{ height: '100%', width: '100%' }}
         storage={panelStorage}
