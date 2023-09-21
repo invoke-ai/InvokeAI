@@ -80,7 +80,7 @@ export const Flow = () => {
   const edges = useAppSelector((state) => state.nodes.edges);
   const viewport = useAppSelector((state) => state.nodes.viewport);
   const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
-  const flowWrapper = useRef<HTMLElement | null>(null);
+  const flowWrapper = useRef<HTMLDivElement>(null);
 
   const isValidConnection = useIsValidConnection();
 
@@ -151,14 +151,10 @@ export const Flow = () => {
     dispatch(contextMenusClosed());
   }, [dispatch]);
 
-  const onInit: OnInit = useCallback(
-    (flow) => {
-      $flow.set(flow);
-      flow.fitView();
-      flowWrapper.current = document.getElementById('workflow-editor');
-    },
-    [flowWrapper]
-  );
+  const onInit: OnInit = useCallback((flow) => {
+    $flow.set(flow);
+    flow.fitView();
+  }, []);
 
   const onMouseMove = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
@@ -193,6 +189,7 @@ export const Flow = () => {
   return (
     <ReactFlow
       id="workflow-editor"
+      ref={flowWrapper}
       defaultViewport={viewport}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
