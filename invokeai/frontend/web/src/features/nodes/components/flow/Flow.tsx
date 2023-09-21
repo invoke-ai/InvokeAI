@@ -21,6 +21,7 @@ import {
   OnSelectionChangeFunc,
   ProOptions,
   ReactFlow,
+  XYPosition,
 } from 'reactflow';
 import { useIsValidConnection } from '../../hooks/useIsValidConnection';
 import {
@@ -34,7 +35,6 @@ import {
   selectedAll,
   selectedEdgesChanged,
   selectedNodesChanged,
-  mouseMoved,
   selectionCopied,
   selectionPasted,
   viewportChanged,
@@ -81,7 +81,7 @@ export const Flow = () => {
   const viewport = useAppSelector((state) => state.nodes.viewport);
   const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
   const flowWrapper = useRef<HTMLDivElement>(null);
-
+  const cursorPosition = useRef<XYPosition>();
   const isValidConnection = useIsValidConnection();
 
   const [borderRadius] = useToken('radii', ['base']);
@@ -156,20 +156,16 @@ export const Flow = () => {
     flow.fitView();
   }, []);
 
-  const onMouseMove = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      const bounds = flowWrapper.current?.getBoundingClientRect();
-      if (bounds) {
-        const pos = $flow.get()?.project({
-          x: event.clientX - bounds.left,
-          y: event.clientY - bounds.top,
-        });
-
-        dispatch(mouseMoved(pos));
-      }
-    },
-    [dispatch]
-  );
+  const onMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    const bounds = flowWrapper.current?.getBoundingClientRect();
+    if (bounds) {
+      const pos = $flow.get()?.project({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      });
+      cursorPosition.current = pos;
+    }
+  }, []);
 
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
     e.preventDefault();
@@ -183,7 +179,7 @@ export const Flow = () => {
 
   useHotkeys(['Ctrl+v', 'Meta+v'], (e) => {
     e.preventDefault();
-    dispatch(selectionPasted());
+    dispatch(selectionPasted({ cursorPosition: cursorPosition.current }));
   });
 
   return (

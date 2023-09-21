@@ -16,6 +16,7 @@ import {
   OnConnectStartParams,
   SelectionMode,
   Viewport,
+  XYPosition,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { sessionCanceled, sessionInvoked } from 'services/api/thunks/session';
@@ -103,7 +104,6 @@ export const initialNodesState: NodesState = {
   workflow: initialWorkflow,
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
-  mousePosition: { x: 0, y: 0 },
   mouseOverField: null,
   mouseOverNode: null,
   nodesToCopy: [],
@@ -713,9 +713,6 @@ const nodesSlice = createSlice({
         state.edges
       );
     },
-    mouseMoved: (state, action) => {
-      state.mousePosition = action.payload;
-    },
     selectionCopied: (state) => {
       state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
       state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
@@ -738,7 +735,11 @@ const nodesSlice = createSlice({
         });
       }
     },
-    selectionPasted: (state) => {
+    selectionPasted: (
+      state,
+      action: PayloadAction<{ cursorPosition?: XYPosition }>
+    ) => {
+      const { cursorPosition } = action.payload;
       const newNodes = state.nodesToCopy.map(cloneDeep);
       const oldNodeIds = newNodes.map((n) => n.data.id);
       const newEdges = state.edgesToCopy
@@ -767,8 +768,8 @@ const nodesSlice = createSlice({
 
         const position = findUnoccupiedPosition(
           state.nodes,
-          node.position.x + state.mousePosition.x,
-          node.position.y + state.mousePosition.y
+          node.position.x + (cursorPosition?.x ?? 0),
+          node.position.y + (cursorPosition?.y ?? 0)
         );
 
         node.position = position;
@@ -951,7 +952,6 @@ export const {
   fieldLabelChanged,
   viewportChanged,
   mouseOverFieldChanged,
-  mouseMoved,
   selectionCopied,
   selectionPasted,
   selectedAll,
