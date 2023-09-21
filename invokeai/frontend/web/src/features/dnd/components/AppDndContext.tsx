@@ -2,7 +2,6 @@ import {
   DragOverlay,
   MouseSensor,
   TouchSensor,
-  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -14,6 +13,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { PropsWithChildren, memo, useCallback, useState } from 'react';
 import { useScaledModifer } from '../hooks/useScaledCenteredModifer';
 import { DragEndEvent, DragStartEvent, TypesafeDraggableData } from '../types';
+import { customPointerWithin } from '../util/customPointerWithin';
 import { DndContextTypesafe } from './DndContextTypesafe';
 import DragPreview from './DragPreview';
 
@@ -77,7 +77,7 @@ const AppDndContext = (props: PropsWithChildren) => {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={customPointerWithin}
       autoScroll={false}
     >
       {props.children}
@@ -87,7 +87,7 @@ const AppDndContext = (props: PropsWithChildren) => {
         style={{
           width: 'min-content',
           height: 'min-content',
-          cursor: 'none',
+          cursor: 'grabbing',
           userSelect: 'none',
           // expand overlay to prevent cursor from going outside it and displaying
           padding: '10rem',

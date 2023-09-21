@@ -13,16 +13,16 @@ import ParamClipSkip from './ParamClipSkip';
 const selector = createSelector(
   stateSelector,
   (state: RootState) => {
-    const { clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
+    const { clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
       state.generation;
 
-    return { clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise };
+    return { clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise };
   },
   defaultSelectorOptions
 );
 
 export default function ParamAdvancedCollapse() {
-  const { clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
+  const { clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
     useAppSelector(selector);
   const { t } = useTranslation();
   const activeLabel = useMemo(() => {
@@ -34,7 +34,7 @@ export default function ParamAdvancedCollapse() {
       activeLabel.push(t('parameters.gpuNoise'));
     }
 
-    if (clipSkip > 0) {
+    if (clipSkip > 0 && model && model.base_model !== 'sdxl') {
       activeLabel.push(
         t('parameters.clipSkipWithLayerCount', { layerCount: clipSkip })
       );
@@ -49,15 +49,19 @@ export default function ParamAdvancedCollapse() {
     }
 
     return activeLabel.join(', ');
-  }, [clipSkip, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise, t]);
+  }, [clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise, t]);
 
   return (
     <IAICollapse label={t('common.advanced')} activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamSeamless />
         <Divider />
-        <ParamClipSkip />
-        <Divider pt={2} />
+        {model && model?.base_model !== 'sdxl' && (
+          <>
+            <ParamClipSkip />
+            <Divider pt={2} />
+          </>
+        )}
         <ParamCpuNoiseToggle />
       </Flex>
     </IAICollapse>

@@ -1,7 +1,7 @@
 import { RootState } from 'app/store/store';
 import { IPAdapterInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
-import { IP_ADAPTER } from './constants';
+import { CANVAS_COHERENCE_DENOISE_LATENTS, IP_ADAPTER } from './constants';
 
 export const addIPAdapterToLinearGraph = (
   state: RootState,
@@ -55,5 +55,15 @@ export const addIPAdapterToLinearGraph = (
         field: 'ip_adapter',
       },
     });
+
+    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+      graph.edges.push({
+        source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          field: 'ip_adapter',
+        },
+      });
+    }
   }
 };

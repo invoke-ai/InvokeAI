@@ -4,7 +4,9 @@ import { parseify } from 'common/util/serialize';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   controlNetImageChanged,
+  controlNetIsEnabledChanged,
   ipAdapterImageChanged,
+  isIPAdapterEnabledChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import {
   TypesafeDraggableData,
@@ -99,6 +101,12 @@ export const addImageDroppedListener = () => {
             controlNetId,
           })
         );
+        dispatch(
+          controlNetIsEnabledChanged({
+            controlNetId,
+            isEnabled: true,
+          })
+        );
         return;
       }
 
@@ -111,6 +119,7 @@ export const addImageDroppedListener = () => {
         activeData.payload.imageDTO
       ) {
         dispatch(ipAdapterImageChanged(activeData.payload.imageDTO));
+        dispatch(isIPAdapterEnabledChanged(true));
         return;
       }
 

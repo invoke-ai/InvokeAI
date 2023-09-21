@@ -32,7 +32,7 @@ classifiers = [
   'Topic :: Scientific/Engineering :: Image Processing',
 ]
 dependencies = [
-  "accelerate~=0.21.0",
+  "accelerate~=0.23.0",
   "albumentations",
   "click",
   "clip_anytorch",  # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
@@ -40,7 +40,7 @@ dependencies = [
   "controlnet-aux>=0.0.6",
   "timm==0.6.13",   # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
-  "diffusers[torch]~=0.20.0",
+  "diffusers[torch]~=0.21.0",
   "dnspython~=2.4.0",
   "dynamicprompts",
   "easing-functions",
@@ -67,6 +67,7 @@ dependencies = [
   'pyperclip',
   "pyreadline3",
   "python-multipart",
+  "python-socketio",
   "pytorch-lightning",
   "realesrgan",
   "requests~=2.28.2",
