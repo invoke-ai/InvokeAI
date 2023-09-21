@@ -101,6 +101,7 @@ def get_obj_from_str(string, reload=False):
     return getattr(importlib.import_module(module, package=None), cls)
 
 
+# DEAD CODE?
 def _do_parallel_data_prefetch(func, Q, data, idx, idx_to_fn=False):
     # create dummy dataset instance
 
@@ -113,6 +114,7 @@ def _do_parallel_data_prefetch(func, Q, data, idx, idx_to_fn=False):
     Q.put("Done")
 
 
+# DEAD CODE?
 def parallel_data_prefetch(
     func: callable,
     data,
@@ -361,6 +363,19 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
     mime_type = Image.MIME.get(image_format.upper(), "image/" + image_format.lower())
     image_base64 = f"data:{mime_type};base64," + base64.b64encode(buffered.getvalue()).decode("UTF-8")
     return image_base64
+
+
+def directory_size(directory: Path) -> int:
+    """
+    Returns the aggregate size of all files in a directory (bytes).
+    """
+    sum = 0
+    for root, dirs, files in os.walk(directory):
+        for f in files:
+            sum += Path(root, f).stat().st_size
+        for d in dirs:
+            sum += Path(root, d).stat().st_size
+    return sum
 
 
 class Chdir(object):

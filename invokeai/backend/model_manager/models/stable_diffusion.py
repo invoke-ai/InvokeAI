@@ -40,8 +40,6 @@ class StableDiffusionModelBase(DiffusersModel):
         output_path: str,
     ) -> str:
         if isinstance(model_config, MainCheckpointConfig):
-            from invokeai.backend.model_manager.models.stable_diffusion import _convert_ckpt_and_cache
-
             return _convert_ckpt_and_cache(
                 model_config=model_config,
                 output_path=output_path,
@@ -225,7 +223,6 @@ class StableDiffusion2Model(StableDiffusionModelBase):
 
 
 # TODO: rework
-# pass precision - currently defaulting to fp16
 def _convert_ckpt_and_cache(
     model_config: ModelConfigBase,
     output_path: str,

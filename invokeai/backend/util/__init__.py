@@ -12,4 +12,11 @@ from .devices import (  # noqa: F401
     torch_dtype,
 )
 from .logging import InvokeAILogger  # noqa: F401
-from .util import Chdir, ask_user, download_with_resume, instantiate_from_config, url_attachment_name  # noqa: F401
+from .util import (  # noqa: F401
+    Chdir,
+    ask_user,
+    directory_size,
+    download_with_resume,
+    instantiate_from_config,
+    url_attachment_name,
+)

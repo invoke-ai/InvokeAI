@@ -138,31 +138,28 @@ class ModelCache(object):
         self._cached_models = dict()
         self._cache_stack = list()
 
+    # Note that the combination of model_path and submodel_type
+    # are sufficient to generate a unique cache key. This key
+    # is not the same as the unique hash used to identify models
+    # in invokeai.backend.model_manager.storage
     def get_key(
         self,
-        model_path: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
+        model_path: Path,
         submodel_type: Optional[SubModelType] = None,
     ):
-        key = f"{model_path}:{base_model}:{model_type}"
+        key = model_path.as_posix()
         if submodel_type:
             key += f":{submodel_type}"
         return key
 
     def _get_model_info(
         self,
-        model_path: str,
+        model_path: Path,
         model_class: Type[ModelBase],
         base_model: BaseModelType,
         model_type: ModelType,
     ):
-        model_info_key = self.get_key(
-            model_path=model_path,
-            base_model=base_model,
-            model_type=model_type,
-            submodel_type=None,
-        )
+        model_info_key = self.get_key(model_path=model_path)
 
         if model_info_key not in self.model_infos:
             self.model_infos[model_info_key] = model_class(
@@ -195,12 +192,8 @@ class ModelCache(object):
             base_model=base_model,
             model_type=model_type,
         )
-        key = self.get_key(
-            model_path=model_path,
-            base_model=base_model,
-            model_type=model_type,
-            submodel_type=submodel,
-        )
+        key = self.get_key(model_path, submodel)
+
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
@@ -305,18 +298,6 @@ class ModelCache(object):
             self._cache_stack.remove(cache_id)
         self._cached_models.pop(cache_id, None)
 
-    def model_hash(
-        self,
-        model_path: Union[str, Path],
-    ) -> str:
-        """
-        Given the HF repo id or path to a model on disk, returns a unique
-        hash. Works for legacy checkpoint files, HF models on disk, and HF repo IDs
-
-        :param model_path: Path to model file/directory on disk.
-        """
-        return self._local_model_hash(model_path)
-
     def cache_size(self) -> float:
         """Return the current size of the cache, in GB."""
         return self._cache_size() / GIG
@@ -366,8 +347,8 @@ class ModelCache(object):
 
             refs = sys.getrefcount(cache_entry.model)
 
-            # manualy clear local variable references of just finished function calls
-            # for some reason python don't want to collect it even by gc.collect() immidiately
+            # Manually clear local variable references of just finished function calls.
+            # For some reason python doesn't want to garbage collect it even when gc.collect() is called
             if refs > 2:
                 while True:
                     cleared = False
@@ -434,26 +415,6 @@ class ModelCache(object):
         torch.cuda.empty_cache()
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
-
-    def _local_model_hash(self, model_path: Union[str, Path]) -> str:
-        sha = hashlib.sha256()
-        path = Path(model_path)
-
-        hashpath = path / "checksum.sha256"
-        if hashpath.exists() and path.stat().st_mtime <= hashpath.stat().st_mtime:
-            with open(hashpath) as f:
-                hash = f.read()
-            return hash
-
-        self.logger.debug(f"computing hash of model {path.name}")
-        for file in list(path.rglob("*.ckpt")) + list(path.rglob("*.safetensors")) + list(path.rglob("*.pth")):
-            with open(file, "rb") as f:
-                while chunk := f.read(self.sha_chunksize):
-                    sha.update(chunk)
-        hash = sha.hexdigest()
-        with open(hashpath, "w") as f:
-            f.write(hash)
-        return hash
 
 
 class VRAMUsage(object):

@@ -183,6 +183,7 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_MAX_VRAM = 0.5
+DEFAULT_MAX_DISK_CACHE = 15  # gigs, enough for two sdxl models, or 5 sd-1 models
 
 
 class InvokeAIAppConfig(InvokeAISettings):
@@ -242,6 +243,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     # CACHE
     ram                 : Union[float, Literal["auto"]] = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number or 'auto')", category="Model Cache", )
     vram                : Union[float, Literal["auto"]] = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number or 'auto')", category="Model Cache", )
+    disk                : float = Field(default=DEFAULT_MAX_DISK_CACHE, ge=0, description="Maximum size (in GB) for the disk-based diffusers model conversion cache", category="Model Cache", )
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", category="Model Cache", )
 
     # DEVICE
@@ -407,6 +409,10 @@ class InvokeAIAppConfig(InvokeAISettings):
     @property
     def ram_cache_size(self) -> float:
         return self.max_cache_size or self.ram
+
+    @property
+    def conversion_cache_size(self) -> float:
+        return self.disk
 
     @property
     def vram_cache_size(self) -> float:

@@ -2,6 +2,7 @@
 """Model loader for InvokeAI."""
 
 import hashlib
+import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,9 +11,9 @@ from typing import List, Optional, Union
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import Chdir, InvokeAILogger, choose_precision, choose_torch_device
+from invokeai.backend.util import InvokeAILogger, choose_precision, choose_torch_device, directory_size
 
-from .cache import CacheStats, ModelCache, ModelLocker
+from .cache import GIG, CacheStats, ModelCache, ModelLocker
 from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
 from .download import DownloadEventHandler
 from .install import ModelInstall, ModelInstallBase
@@ -174,8 +175,6 @@ class ModelLoad(ModelLoadBase):
             logger=self._logger,
         )
 
-        self._scan_models_directory()
-
     @property
     def store(self) -> ModelConfigStore:
         """Return the ModelConfigStore instance used by this class."""
@@ -232,11 +231,12 @@ class ModelLoad(ModelLoadBase):
         if not model_path.exists():
             raise InvalidModelException(f"Files for model '{key}' not found at {model_path}")
 
-        dst_convert_path = self._get_model_cache_path(model_path)
+        dst_convert_path = self._get_model_convert_cache_path(model_path)
         model_path = model_class.convert_if_required(
             model_config=model_config,
             output_path=dst_convert_path,
         )
+        self._trim_model_convert_cache()  # keeps cache size under control
 
         model_context = self._cache.get_model(
             model_path=model_path,
@@ -273,8 +273,36 @@ class ModelLoad(ModelLoadBase):
         model_class = MODEL_CLASSES[base_model][model_type]
         return model_class
 
-    def _get_model_cache_path(self, model_path):
+    def _get_model_convert_cache_path(self, model_path):
         return self.resolve_model_path(Path(".cache") / hashlib.md5(str(model_path).encode()).hexdigest())
+
+    def _trim_model_convert_cache(self):
+        max_cache_size = self._app_config.conversion_cache_size * GIG
+        cache_path = self.resolve_model_path(Path(".cache"))
+        current_size = directory_size(cache_path)
+
+        if current_size <= max_cache_size:
+            return
+
+        self.logger.debug("Convert cache has gotten too large. Trimming.")
+
+        # For this to work, we make the assumption that the directory contains
+        # either a 'unet/config.json' file, or a 'config.json' file at top level
+        def by_atime(path: Path) -> float:
+            for config in ["unet/config.json", "config.json"]:
+                sentinel = path / sentinel
+                if sentinel.exists():
+                    return sentinel.stat().m_atime
+            return 0.0
+
+        # sort by last access time - least accessed files will be at the end
+        lru_models = sorted(cache_dir.iterdir(), key=by_atime, reverse=True)
+        while current_size > max_cache_size:
+            next_victim = lru_models.pop()
+            victim_size = directory_size(next_victim)
+            self.logger.debug(f"Removing cached converted model {next_victim} to free {victim_size / GIG} GB")
+            shutil.rmtree(next_victim)
+            current_size -= victim_size
 
     def _get_model_path(
         self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None
@@ -298,25 +326,4 @@ class ModelLoad(ModelLoadBase):
 
     def sync_to_config(self):
         self._store = get_config_store(self._models_file)
-        self._scan_models_directory()
-
-    def _scan_models_directory(self):
-        defunct_models = set()
-        installed = set()
-
-        with Chdir(self._app_config.models_path):
-            self._logger.info("Checking for models that have been moved or deleted from disk.")
-            for model_config in self._store.all_models():
-                path = self.resolve_model_path(model_config.path)
-                if not path.exists():
-                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering.")
-                    defunct_models.add(model_config.key)
-            for key in defunct_models:
-                self._installer.unregister(key)
-
-            self._logger.info(f"Scanning {self._app_config.models_path} for new models")
-            for cur_base_model in BaseModelType:
-                for cur_model_type in ModelType:
-                    models_dir = self.resolve_model_path(Path(cur_base_model.value, cur_model_type.value))
-                    installed.update(self._installer.scan_directory(models_dir))
-            self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
+        self.installer.scan_models_directory()

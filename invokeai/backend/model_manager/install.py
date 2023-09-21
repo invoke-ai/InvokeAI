@@ -39,8 +39,9 @@ Typical usage:
   # scan directory recursively and install all new models found
   ids: List[str] = installer.scan_directory('/path/to/directory')
 
-  # unregister any model whose path is no longer valid
-  ids: List[str] = installer.garbage_collect()
+  # Synchronize with the models directory, adding missing models and
+  # removing orphans
+  installer.scan_models_directory()
 
   hash: str = installer.hash('/path/to/model')  # should be same as id above
 
@@ -59,7 +60,7 @@ from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util import Chdir, InvokeAILogger
 
 from .config import (
     BaseModelType,
@@ -183,7 +184,9 @@ class ModelInstallBase(ABC):
         source: Union[str, Path, AnyHttpUrl],
         inplace: bool = True,
         variant: Optional[str] = None,
-        info: Optional[ModelProbeInfo] = None,
+        probe_override: Optional[Dict[str, Any]] = None,
+        metadata: Optional[ModelSourceMetadata] = None,
+        access_token: Optional[str] = None,
     ) -> DownloadJobBase:
         """
         Download and install the indicated model.
@@ -202,7 +205,11 @@ class ModelInstallBase(ABC):
         the models directory, but registered in place (the default).
         :param variant: For HuggingFace models, this optional parameter
         specifies which variant to download (e.g. 'fp16')
-        :param info: Optional ModelProbeInfo object. If not provided, model will be probed.
+        :param probe_override: Optional dict. Any fields in this dict
+        will override corresponding probe fields. Use it to override
+        `base_type`, `model_type`, `format`, `prediction_type` and `image_size`.
+        :param metadata: Use this to override the fields 'description`,
+        `author`, `tags`, `source` and `license`.
         :returns DownloadQueueBase object.
 
         The `inplace` flag does not affect the behavior of downloaded
@@ -259,6 +266,11 @@ class ModelInstallBase(ABC):
         pass
 
     @abstractmethod
+    def conditionally_delete(self, key: str):  # noqa D102
+        """Unregister the model. Delete its files only if they are within our models directory."""
+        pass
+
+    @abstractmethod
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:
         """
         Recursively scan directory for new models and register or install them.
@@ -266,18 +278,6 @@ class ModelInstallBase(ABC):
         :param scan_dir: Path to the directory to scan.
         :param install: Install if True, otherwise register in place.
         :returns list of IDs: Returns list of IDs of models registered/installed
-        """
-        pass
-
-    @abstractmethod
-    def garbage_collect(self) -> List[str]:
-        """
-        Unregister any models whose paths are no longer valid.
-
-        This checks each registered model's path. Models with paths that are
-        no longer found on disk will be unregistered.
-
-        :return List[str]: Return the list of model IDs that were unregistered.
         """
         pass
 
@@ -305,11 +305,21 @@ class ModelInstallBase(ABC):
         """
         pass
 
+    @abstractmethod
+    def scan_models_directory(self):
+        """
+        Scan the models directory for new and missing models.
+
+        New models will be added to the storage backend. Missing models
+        will be deleted.
+        """
+        pass
+
 
 class ModelInstall(ModelInstallBase):
     """Model installer class handles installation from a local path."""
 
-    _config: InvokeAIAppConfig
+    _app_config: InvokeAIAppConfig
     _logger: InvokeAILogger
     _store: ModelConfigStore
     _download_queue: DownloadQueueBase
@@ -348,13 +358,16 @@ class ModelInstall(ModelInstallBase):
         download: Optional[DownloadQueueBase] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ):  # noqa D107 - use base class docstrings
-        self._config = config or InvokeAIAppConfig.get_config()
-        self._logger = logger or InvokeAILogger.getLogger(config=self._config)
-        self._store = store or get_config_store(self._config.model_conf_path)
-        self._download_queue = download or DownloadQueue(config=self._config, event_handlers=event_handlers)
+        self._app_config = config or InvokeAIAppConfig.get_config()
+        self._logger = logger or InvokeAILogger.getLogger(config=self._app_config)
+        self._store = store or get_config_store(self._app_config.model_conf_path)
+        self._download_queue = download or DownloadQueue(config=self._app_config, event_handlers=event_handlers)
         self._async_installs = dict()
         self._installed = set()
         self._tmpdir = None
+
+        # this step synchronizes the `models` directory with the models db
+        self.scan_models_directory()
 
     @property
     def queue(self) -> DownloadQueueBase:
@@ -397,7 +410,7 @@ class ModelInstall(ModelInstallBase):
                             )
                             config_file = config_file[SchedulerPredictionType.VPrediction]
                     registration_data.update(
-                        config=Path(self._config.legacy_conf_dir, config_file).as_posix(),
+                        config=Path(self._app_config.legacy_conf_dir, config_file).as_posix(),
                     )
                 except KeyError as exc:
                     raise InvalidModelException(
@@ -414,7 +427,7 @@ class ModelInstall(ModelInstallBase):
         model_path = Path(model_path)
         info: ModelProbeInfo = self._probe_model(model_path, overrides)
 
-        dest_path = self._config.models_path / info.base_type.value / info.model_type.value / model_path.name
+        dest_path = self._app_config.models_path / info.base_type.value / info.model_type.value / model_path.name
         return self._register(
             self._move_model(model_path, dest_path),
             info,
@@ -437,7 +450,10 @@ class ModelInstall(ModelInstallBase):
         info: ModelProbeInfo = ModelProbe.probe(model_path)
         if overrides:  # used to override probe fields
             for key, value in overrides.items():
-                setattr(info, key, value)  # may generate a pydantic validation error
+                try:
+                    setattr(info, key, value)  # skip validation errors
+                except:
+                    pass
         return info
 
     def unregister(self, key: str):  # noqa D102
@@ -448,12 +464,23 @@ class ModelInstall(ModelInstallBase):
         rmtree(model.path)
         self.unregister(key)
 
+    def conditionally_delete(self, key: str):  # noqa D102
+        """Unregister the model. Delete its files only if they are within our models directory."""
+        model = self._store.get_model(key)
+        models_dir = self._app_config.models_path
+        model_path = models_dir / model.path
+        if model_path.is_relative_to(models_dir):
+            self.delete(key)
+        else:
+            self.unregister(key)
+
     def install(
         self,
         source: Union[str, Path, AnyHttpUrl],
         inplace: bool = True,
         variant: Optional[str] = None,
         probe_override: Optional[Dict[str, Any]] = None,
+        metadata: Optional[ModelSourceMetadata] = None,
         access_token: Optional[str] = None,
     ) -> DownloadJobBase:  # noqa D102
         queue = self._download_queue
@@ -465,6 +492,7 @@ class ModelInstall(ModelInstallBase):
             else self._complete_installation_handler
         )
         job.probe_override = probe_override
+        job.metadata = metadata
         job.add_event_handler(handler)
 
         self._async_installs[source] = None
@@ -523,7 +551,7 @@ class ModelInstall(ModelInstallBase):
         """
         model = self._store.get_model(key)
         old_path = Path(model.path)
-        models_dir = self._config.models_path
+        models_dir = self._app_config.models_path
 
         if not old_path.is_relative_to(models_dir):
             return old_path
@@ -542,6 +570,10 @@ class ModelInstall(ModelInstallBase):
         variant: Optional[str] = None,
         access_token: Optional[str] = None,
     ) -> DownloadJobBase:
+        # Clean up a common source of error. Doesn't work with Paths.
+        if isinstance(source, str):
+            source = source.strip()
+
         # In the event that we are being asked to install a path that is already on disk,
         # we simply probe and register/install it. The job does not actually do anything, but we
         # create one anyway in order to have similar behavior for local files, URLs and repo_ids.
@@ -551,7 +583,7 @@ class ModelInstall(ModelInstallBase):
             return ModelInstallPathJob(source=source, destination=Path(destdir))
 
         # choose a temporary directory inside the models directory
-        models_dir = self._config.models_path
+        models_dir = self._app_config.models_path
         self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
 
         if re.match(REPO_ID_RE, str(source)):
@@ -576,15 +608,6 @@ class ModelInstall(ModelInstallBase):
         self._installed = set()
         search.search(scan_dir)
         return list(self._installed)
-
-    def garbage_collect(self) -> List[str]:  # noqa D102
-        unregistered = list()
-        for model in self._store.all_models():
-            path = Path(model.path)
-            if not path.exists():
-                self._store.del_model(model.key)
-                unregistered.append(model.key)
-        return unregistered
 
     def hash(self, model_path: Union[Path, str]) -> str:  # noqa D102
         return FastModelHash.hash(model_path)
@@ -618,7 +641,7 @@ class ModelInstall(ModelInstallBase):
             # We are taking advantage of a side effect of get_model() that converts check points
             # into cached diffusers directories stored at `path`. It doesn't matter
             # what submodel type we request here, so we get the smallest.
-            loader = ModelLoad(self._config)
+            loader = ModelLoad(self._app_config)
             submodel = {"submodel_type": SubModelType.Scheduler} if info.model_type == ModelType.Main else {}
             converted_model: ModelInfo = loader.get_model(key, **submodel)
 
@@ -646,7 +669,7 @@ class ModelInstall(ModelInstallBase):
                 rmtree(new_diffusers_path)
             raise excp
 
-        if checkpoint_path.exists() and checkpoint_path.is_relative_to(self._config.models_path):
+        if checkpoint_path.exists() and checkpoint_path.is_relative_to(self._app_config.models_path):
             checkpoint_path.unlink()
 
         return result
@@ -670,3 +693,30 @@ class ModelInstall(ModelInstallBase):
         except DuplicateModelException:
             pass
         return True
+
+    def scan_models_directory(self):
+        """
+        Scan the models directory for new and missing models.
+
+        New models will be added to the storage backend. Missing models
+        will be deleted.
+        """
+        defunct_models = set()
+        installed = set()
+
+        with Chdir(self._app_config.models_path):
+            self._logger.info("Checking for models that have been moved or deleted from disk.")
+            for model_config in self._store.all_models():
+                path = Path(model_config.path)
+                if not path.exists():
+                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering.")
+                    defunct_models.add(model_config.key)
+            for key in defunct_models:
+                self.unregister(key)
+
+            self._logger.info(f"Scanning {self._app_config.models_path} for new models")
+            for cur_base_model in BaseModelType:
+                for cur_model_type in ModelType:
+                    models_dir = Path(cur_base_model.value, cur_model_type.value)
+                    installed.update(self.scan_directory(models_dir))
+            self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
