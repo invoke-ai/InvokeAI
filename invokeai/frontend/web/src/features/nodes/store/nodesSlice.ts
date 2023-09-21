@@ -16,6 +16,7 @@ import {
   OnConnectStartParams,
   SelectionMode,
   Viewport,
+  XYPosition,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { sessionCanceled, sessionInvoked } from 'services/api/thunks/session';
@@ -715,8 +716,30 @@ const nodesSlice = createSlice({
     selectionCopied: (state) => {
       state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
       state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
+
+      if (state.nodesToCopy.length > 0) {
+        const averagePosition = { x: 0, y: 0 };
+        state.nodesToCopy.forEach((e) => {
+          const xOffset = 0.15 * (e.width ?? 0);
+          const yOffset = 0.5 * (e.height ?? 0);
+          averagePosition.x += e.position.x + xOffset;
+          averagePosition.y += e.position.y + yOffset;
+        });
+
+        averagePosition.x /= state.nodesToCopy.length;
+        averagePosition.y /= state.nodesToCopy.length;
+
+        state.nodesToCopy.forEach((e) => {
+          e.position.x -= averagePosition.x;
+          e.position.y -= averagePosition.y;
+        });
+      }
     },
-    selectionPasted: (state) => {
+    selectionPasted: (
+      state,
+      action: PayloadAction<{ cursorPosition?: XYPosition }>
+    ) => {
+      const { cursorPosition } = action.payload;
       const newNodes = state.nodesToCopy.map(cloneDeep);
       const oldNodeIds = newNodes.map((n) => n.data.id);
       const newEdges = state.edgesToCopy
@@ -745,8 +768,8 @@ const nodesSlice = createSlice({
 
         const position = findUnoccupiedPosition(
           state.nodes,
-          node.position.x,
-          node.position.y
+          node.position.x + (cursorPosition?.x ?? 0),
+          node.position.y + (cursorPosition?.y ?? 0)
         );
 
         node.position = position;
