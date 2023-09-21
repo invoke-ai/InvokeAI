@@ -13,10 +13,11 @@ export const addCanvasSavedToGalleryListener = () => {
       const log = logger('canvas');
       const state = getState();
 
-      const blob = await getBaseLayerBlob(state);
-
-      if (!blob) {
-        log.error('Problem getting base layer blob');
+      let blob;
+      try {
+        blob = await getBaseLayerBlob(state);
+      } catch (err) {
+        log.error(String(err));
         dispatch(
           addToast({
             title: t('toast.problemSavingCanvas'),
