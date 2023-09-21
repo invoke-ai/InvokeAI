@@ -497,7 +497,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             with t2i_adapter_model_info as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
                 if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
-                    # HACK(ryand): Work around a bug in FullAdapterXL. This will be fixed upstream in diffusers.
+                    # HACK(ryand): Work around a bug in FullAdapterXL. This is being addressed upstream in diffusers by
+                    # this PR: https://github.com/huggingface/diffusers/pull/5134.
                     total_downscale_factor = total_downscale_factor // 2
 
                 # Resize the T2I-Adapter input image.
