@@ -264,6 +264,22 @@
         "graphQueued": "Graph queued",
         "graphFailedToQueue": "Failed to queue graph"
     },
+    "invocationCache": {
+        "invocationCache": "Invocation Cache",
+        "cacheSize": "Cache Size",
+        "maxCacheSize": "Max Cache Size",
+        "hits": "Cache Hits",
+        "misses": "Cache Misses",
+        "clear": "Clear",
+        "clearSucceeded": "Invocation Cache Cleared",
+        "clearFailed": "Problem Clearing Invocation Cache",
+        "enable": "Enable",
+        "enableSucceeded": "Invocation Cache Enabled",
+        "enableFailed": "Problem Enabling Invocation Cache",
+        "disable": "Disable",
+        "disableSucceeded": "Invocation Cache Disabled",
+        "disableFailed": "Problem Disabling Invocation Cache"
+    },
     "gallery": {
         "allImagesLoaded": "All Images Loaded",
         "assets": "Assets",
