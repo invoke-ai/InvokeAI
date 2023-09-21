@@ -17,10 +17,7 @@ import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useTranslation } from 'react-i18next';
 import { useToggleBoardLockMutation } from 'services/api/endpoints/boards';
-
 
 type Props = {
   board?: BoardDTO;
@@ -93,7 +90,6 @@ const BoardContextMenu = ({
               icon={<FaPlus />}
               isDisabled={
                 isAutoAdd ||
-                isProcessing ||
                 autoAssignBoardOnClick ||
                 (board?.isLocked ?? false)
               }

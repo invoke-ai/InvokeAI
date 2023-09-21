@@ -66,7 +66,7 @@ const GalleryBoard = ({
       ),
     [board.board_id]
   );
-  const { isSelectedForAutoAdd, autoAssignBoardOnClick, isProcessing } =
+  const { isSelectedForAutoAdd, autoAssignBoardOnClick } =
     useAppSelector(selector);
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(() => {

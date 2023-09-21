@@ -83,7 +83,6 @@ const BoardsList = (props: Props) => {
                       board={board}
                       isSelected={selectedBoardId === board.board_id}
                       setBoardToDelete={setBoardToDelete}
-                      isLocked={board.isLocked}
                     />
                   </GridItem>
                 ))}
