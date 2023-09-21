@@ -226,7 +226,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         input=Input.Connection,
         ui_order=5,
     )
-    ip_adapter: Optional[IPAdapterField] = InputField(
+    ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]] = InputField(
         description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection, ui_order=6
     )
     t2i_adapter: Union[T2IAdapterField, list[T2IAdapterField]] = InputField(
@@ -410,52 +410,65 @@ class DenoiseLatentsInvocation(BaseInvocation):
     def prep_ip_adapter_data(
         self,
         context: InvocationContext,
-        ip_adapter: Optional[IPAdapterField],
+        ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]],
         conditioning_data: ConditioningData,
-        unet: UNet2DConditionModel,
         exit_stack: ExitStack,
-    ) -> Optional[IPAdapterData]:
+    ) -> Optional[list[IPAdapterData]]:
         """If IP-Adapter is enabled, then this function loads the requisite models, and adds the image prompt embeddings
         to the `conditioning_data` (in-place).
         """
         if ip_adapter is None:
             return None
 
-        image_encoder_model_info = context.services.model_manager.get_model(
-            model_name=ip_adapter.image_encoder_model.model_name,
-            model_type=ModelType.CLIPVision,
-            base_model=ip_adapter.image_encoder_model.base_model,
-            context=context,
-        )
+        # ip_adapter could be a list or a single IPAdapterField. Normalize to a list here.
+        if not isinstance(ip_adapter, list):
+            ip_adapter = [ip_adapter]
 
-        ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
-            context.services.model_manager.get_model(
-                model_name=ip_adapter.ip_adapter_model.model_name,
-                model_type=ModelType.IPAdapter,
-                base_model=ip_adapter.ip_adapter_model.base_model,
+        if len(ip_adapter) == 0:
+            return None
+
+        ip_adapter_data_list = []
+        conditioning_data.ip_adapter_conditioning = []
+        for single_ip_adapter in ip_adapter:
+            ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
+                context.services.model_manager.get_model(
+                    model_name=single_ip_adapter.ip_adapter_model.model_name,
+                    model_type=ModelType.IPAdapter,
+                    base_model=single_ip_adapter.ip_adapter_model.base_model,
+                    context=context,
+                )
+            )
+
+            image_encoder_model_info = context.services.model_manager.get_model(
+                model_name=single_ip_adapter.image_encoder_model.model_name,
+                model_type=ModelType.CLIPVision,
+                base_model=single_ip_adapter.image_encoder_model.base_model,
                 context=context,
             )
-        )
 
-        input_image = context.services.images.get_pil_image(ip_adapter.image.image_name)
+            input_image = context.services.images.get_pil_image(single_ip_adapter.image.image_name)
 
-        # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
-        # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
-        with image_encoder_model_info as image_encoder_model:
-            # Get image embeddings from CLIP and ImageProjModel.
-            image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
-                input_image, image_encoder_model
+            # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
+            # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
+            with image_encoder_model_info as image_encoder_model:
+                # Get image embeddings from CLIP and ImageProjModel.
+                image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
+                    input_image, image_encoder_model
+                )
+                conditioning_data.ip_adapter_conditioning.append(
+                    IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds)
+                )
+
+            ip_adapter_data_list.append(
+                IPAdapterData(
+                    ip_adapter_model=ip_adapter_model,
+                    weight=ip_adapter.weight,
+                    begin_step_percent=ip_adapter.begin_step_percent,
+                    end_step_percent=ip_adapter.end_step_percent,
+                )
             )
-            conditioning_data.ip_adapter_conditioning = IPAdapterConditioningInfo(
-                image_prompt_embeds, uncond_image_prompt_embeds
-            )
 
-        return IPAdapterData(
-            ip_adapter_model=ip_adapter_model,
-            weight=ip_adapter.weight,
-            begin_step_percent=ip_adapter.begin_step_percent,
-            end_step_percent=ip_adapter.end_step_percent,
-        )
+        return ip_adapter_data_list
 
     def run_t2i_adapters(
         self,
@@ -677,7 +690,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     context=context,
                     ip_adapter=self.ip_adapter,
                     conditioning_data=conditioning_data,
-                    unet=unet,
                     exit_stack=exit_stack,
                 )
 
