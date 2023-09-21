@@ -1,12 +1,10 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredNormalbaeImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.normalbae_image_processor
   .default as RequiredNormalbaeImageProcessorInvocation;
@@ -21,7 +19,6 @@ const NormalBaeProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
   const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
@@ -62,7 +59,7 @@ const NormalBaeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
         label={t('controlnet.imageResolution')}
@@ -74,7 +71,7 @@ const NormalBaeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

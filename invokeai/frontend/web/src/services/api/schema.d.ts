@@ -8,11 +8,13 @@ export type paths = {
   "/api/v1/sessions/": {
     /**
      * List Sessions
+     * @deprecated
      * @description Gets a list of sessions, optionally searching
      */
     get: operations["list_sessions"];
     /**
      * Create Session
+     * @deprecated
      * @description Creates a new session, optionally initializing it with an invocation graph
      */
     post: operations["create_session"];
@@ -20,6 +22,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}": {
     /**
      * Get Session
+     * @deprecated
      * @description Gets a session
      */
     get: operations["get_session"];
@@ -27,6 +30,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}/nodes": {
     /**
      * Add Node
+     * @deprecated
      * @description Adds a node to the graph
      */
     post: operations["add_node"];
@@ -34,11 +38,13 @@ export type paths = {
   "/api/v1/sessions/{session_id}/nodes/{node_path}": {
     /**
      * Update Node
+     * @deprecated
      * @description Updates a node in the graph and removes all linked edges
      */
     put: operations["update_node"];
     /**
      * Delete Node
+     * @deprecated
      * @description Deletes a node in the graph and removes all linked edges
      */
     delete: operations["delete_node"];
@@ -46,6 +52,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}/edges": {
     /**
      * Add Edge
+     * @deprecated
      * @description Adds an edge to the graph
      */
     post: operations["add_edge"];
@@ -53,6 +60,7 @@ export type paths = {
   "/api/v1/sessions/{session_id}/edges/{from_node_id}/{from_field}/{to_node_id}/{to_field}": {
     /**
      * Delete Edge
+     * @deprecated
      * @description Deletes an edge from the graph
      */
     delete: operations["delete_edge"];
@@ -60,14 +68,23 @@ export type paths = {
   "/api/v1/sessions/{session_id}/invoke": {
     /**
      * Invoke Session
+     * @deprecated
      * @description Invokes a session
      */
     put: operations["invoke_session"];
     /**
      * Cancel Session Invoke
+     * @deprecated
      * @description Invokes a session
      */
     delete: operations["cancel_session_invoke"];
+  };
+  "/api/v1/utilities/dynamicprompts": {
+    /**
+     * Parse Dynamicprompts
+     * @description Creates a batch process
+     */
+    post: operations["parse_dynamicprompts"];
   };
   "/api/v1/models/": {
     /**
@@ -300,6 +317,104 @@ export type paths = {
      */
     post: operations["set_log_level"];
   };
+  "/api/v1/queue/{queue_id}/enqueue_graph": {
+    /**
+     * Enqueue Graph
+     * @description Enqueues a graph for single execution.
+     */
+    post: operations["enqueue_graph"];
+  };
+  "/api/v1/queue/{queue_id}/enqueue_batch": {
+    /**
+     * Enqueue Batch
+     * @description Processes a batch and enqueues the output graphs for execution.
+     */
+    post: operations["enqueue_batch"];
+  };
+  "/api/v1/queue/{queue_id}/list": {
+    /**
+     * List Queue Items
+     * @description Gets all queue items (without graphs)
+     */
+    get: operations["list_queue_items"];
+  };
+  "/api/v1/queue/{queue_id}/processor/resume": {
+    /**
+     * Resume
+     * @description Resumes session processor
+     */
+    put: operations["resume"];
+  };
+  "/api/v1/queue/{queue_id}/processor/pause": {
+    /**
+     * Pause
+     * @description Pauses session processor
+     */
+    put: operations["pause"];
+  };
+  "/api/v1/queue/{queue_id}/cancel_by_batch_ids": {
+    /**
+     * Cancel By Batch Ids
+     * @description Immediately cancels all queue items from the given batch ids
+     */
+    put: operations["cancel_by_batch_ids"];
+  };
+  "/api/v1/queue/{queue_id}/clear": {
+    /**
+     * Clear
+     * @description Clears the queue entirely, immediately canceling the currently-executing session
+     */
+    put: operations["clear"];
+  };
+  "/api/v1/queue/{queue_id}/prune": {
+    /**
+     * Prune
+     * @description Prunes all completed or errored queue items
+     */
+    put: operations["prune"];
+  };
+  "/api/v1/queue/{queue_id}/current": {
+    /**
+     * Get Current Queue Item
+     * @description Gets the currently execution queue item
+     */
+    get: operations["get_current_queue_item"];
+  };
+  "/api/v1/queue/{queue_id}/next": {
+    /**
+     * Get Next Queue Item
+     * @description Gets the next queue item, without executing it
+     */
+    get: operations["get_next_queue_item"];
+  };
+  "/api/v1/queue/{queue_id}/status": {
+    /**
+     * Get Queue Status
+     * @description Gets the status of the session queue
+     */
+    get: operations["get_queue_status"];
+  };
+  "/api/v1/queue/{queue_id}/b/{batch_id}/status": {
+    /**
+     * Get Batch Status
+     * @description Gets the status of the session queue
+     */
+    get: operations["get_batch_status"];
+  };
+  "/api/v1/queue/{queue_id}/i/{item_id}": {
+    /**
+     * Get Queue Item
+     * @description Gets a queue item
+     */
+    get: operations["get_queue_item"];
+  };
+  "/api/v1/queue/{queue_id}/i/{item_id}/cancel": {
+    /**
+     * Cancel Queue Item
+     * @description Deletes a queue item
+     */
+    put: operations["cancel_queue_item"];
+  };
 };
 
 export type webhooks = Record<string, never>;
@@ -340,6 +455,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * A
        * @description The first number
@@ -402,6 +523,91 @@ export type components = {
      * @enum {string}
      */
     BaseModelType: "any" | "sd-1" | "sd-2" | "sdxl" | "sdxl-refiner";
+    /** Batch */
+    Batch: {
+      /**
+       * Batch Id
+       * @description The ID of the batch
+       */
+      batch_id?: string;
+      /**
+       * Data
+       * @description The batch data collection.
+       */
+      data?: components["schemas"]["BatchDatum"][][];
+      /**
+       * Graph
+       * @description The graph to initialize the session with
+       */
+      graph: components["schemas"]["Graph"];
+      /**
+       * Runs
+       * @description Int stating how many times to iterate through all possible batch indices
+       * @default 1
+       */
+      runs: number;
+    };
+    /** BatchDatum */
+    BatchDatum: {
+      /**
+       * Node Path
+       * @description The node into which this batch data collection will be substituted.
+       */
+      node_path: string;
+      /**
+       * Field Name
+       * @description The field into which this batch data collection will be substituted.
+       */
+      field_name: string;
+      /**
+       * Items
+       * @description The list of items to substitute into the node/field.
+       */
+      items?: (string | number)[];
+    };
+    /** BatchStatus */
+    BatchStatus: {
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Batch Id
+       * @description The ID of the batch
+       */
+      batch_id: string;
+      /**
+       * Pending
+       * @description Number of queue items with status 'pending'
+       */
+      pending: number;
+      /**
+       * In Progress
+       * @description Number of queue items with status 'in_progress'
+       */
+      in_progress: number;
+      /**
+       * Completed
+       * @description Number of queue items with status 'complete'
+       */
+      completed: number;
+      /**
+       * Failed
+       * @description Number of queue items with status 'error'
+       */
+      failed: number;
+      /**
+       * Canceled
+       * @description Number of queue items with status 'canceled'
+       */
+      canceled: number;
+      /**
+       * Total
+       * @description Total number of queue items
+       */
+      total: number;
+    };
     /**
      * Blank Image
      * @description Creates a blank image and forwards it to the pipeline
@@ -423,6 +629,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Width
        * @description The width of the image
@@ -481,6 +693,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Latents A
        * @description Latents tensor
@@ -589,6 +807,14 @@ export type components = {
        */
       image_names: string[];
     };
+    /** Body_cancel_by_batch_ids */
+    Body_cancel_by_batch_ids: {
+      /**
+       * Batch Ids
+       * @description The list of batch_ids to cancel all queue items for
+       */
+      batch_ids: string[];
+    };
     /** Body_delete_images_from_list */
     Body_delete_images_from_list: {
       /**
@@ -596,6 +822,34 @@ export type components = {
        * @description The list of names of images to delete
        */
       image_names: string[];
+    };
+    /** Body_enqueue_batch */
+    Body_enqueue_batch: {
+      /**
+       * Batch
+       * @description Batch to process
+       */
+      batch: components["schemas"]["Batch"];
+      /**
+       * Prepend
+       * @description Whether or not to prepend this batch in the queue
+       * @default false
+       */
+      prepend?: boolean;
+    };
+    /** Body_enqueue_graph */
+    Body_enqueue_graph: {
+      /**
+       * Graph
+       * @description The graph to enqueue
+       */
+      graph: components["schemas"]["Graph"];
+      /**
+       * Prepend
+       * @description Whether or not to prepend this batch in the queue
+       * @default false
+       */
+      prepend?: boolean;
     };
     /** Body_import_model */
     Body_import_model: {
@@ -643,6 +897,26 @@ export type components = {
        * @description Save the merged model to the designated directory (with 'merged_model_name' appended)
        */
       merge_dest_directory?: string;
+    };
+    /** Body_parse_dynamicprompts */
+    Body_parse_dynamicprompts: {
+      /**
+       * Prompt
+       * @description The prompt to parse with dynamicprompts
+       */
+      prompt: string;
+      /**
+       * Max Prompts
+       * @description The max number of prompts to generate
+       * @default 1000
+       */
+      max_prompts?: number;
+      /**
+       * Combinatorial
+       * @description Whether to use the combinatorial generator
+       * @default true
+       */
+      combinatorial?: boolean;
     };
     /** Body_remove_image_from_board */
     Body_remove_image_from_board: {
@@ -706,6 +980,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Collection
        * @description The collection of boolean values
        */
@@ -755,6 +1035,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Value
        * @description The boolean value
@@ -838,6 +1124,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to infill
        */
@@ -848,6 +1140,17 @@ export type components = {
        * @enum {string}
        */
       type: "infill_cv2";
+    };
+    /**
+     * CancelByBatchIDsResult
+     * @description Result of canceling by list of batch ids
+     */
+    CancelByBatchIDsResult: {
+      /**
+       * Canceled
+       * @description Number of queue items canceled
+       */
+      canceled: number;
     };
     /**
      * Canny Processor
@@ -871,6 +1174,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to process
        */
@@ -893,6 +1202,17 @@ export type components = {
        * @default 200
        */
       high_threshold?: number;
+    };
+    /**
+     * ClearResult
+     * @description Result of clearing the session queue
+     */
+    ClearResult: {
+      /**
+       * Deleted
+       * @description Number of queue items deleted
+       */
+      deleted: number;
     };
     /** ClipField */
     ClipField: {
@@ -938,6 +1258,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
@@ -994,6 +1320,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Collection Item
        * @description The item to collect (all inputs must be of the same type)
@@ -1070,6 +1402,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to color-correct
        */
@@ -1145,6 +1483,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Color
        * @description The color value
        * @default {
@@ -1201,6 +1545,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Prompt
        * @description Prompt to be parsed by Compel to create a conditioning tensor
        * @default
@@ -1239,6 +1589,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Collection
        * @description The collection of conditioning tensors
@@ -1301,6 +1657,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Conditioning
        * @description Conditioning tensor
        */
@@ -1350,6 +1712,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -1458,6 +1826,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The control image
@@ -1750,6 +2124,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Vae
        * @description VAE
        */
@@ -1784,6 +2164,27 @@ export type components = {
       type: "create_denoise_mask";
     };
     /**
+     * CursorPaginatedResults[SessionQueueItemDTO]
+     * @description Cursor-paginated results
+     */
+    CursorPaginatedResults_SessionQueueItemDTO_: {
+      /**
+       * Limit
+       * @description Limit of items to get
+       */
+      limit: number;
+      /**
+       * Has More
+       * @description Whether there are more items available
+       */
+      has_more: boolean;
+      /**
+       * Items
+       * @description Items
+       */
+      items: components["schemas"]["SessionQueueItemDTO"][];
+    };
+    /**
      * OpenCV Inpaint
      * @description Simple inpaint using opencv.
      */
@@ -1804,6 +2205,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to inpaint
@@ -1865,6 +2272,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Noise
        * @description Noise tensor
@@ -1998,6 +2411,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * A
        * @description The first number
        * @default 0
@@ -2038,6 +2457,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default false
+       */
+      use_cache?: boolean;
+      /**
        * Prompt
        * @description The prompt to parse with dynamicprompts
        */
@@ -2061,6 +2486,13 @@ export type components = {
        */
       type: "dynamic_prompt";
     };
+    /** DynamicPromptsResponse */
+    DynamicPromptsResponse: {
+      /** Prompts */
+      prompts: string[];
+      /** Error */
+      error?: string;
+    };
     /**
      * Upscale (RealESRGAN)
      * @description Upscales an image using RealESRGAN.
@@ -2082,6 +2514,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The input image
@@ -2127,6 +2565,62 @@ export type components = {
        */
       field: string;
     };
+    /** EnqueueBatchResult */
+    EnqueueBatchResult: {
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Enqueued
+       * @description The total number of queue items enqueued
+       */
+      enqueued: number;
+      /**
+       * Requested
+       * @description The total number of queue items requested to be enqueued
+       */
+      requested: number;
+      /**
+       * Batch
+       * @description The batch that was enqueued
+       */
+      batch: components["schemas"]["Batch"];
+      /**
+       * Priority
+       * @description The priority of the enqueued batch
+       */
+      priority: number;
+    };
+    /** EnqueueGraphResult */
+    EnqueueGraphResult: {
+      /**
+       * Enqueued
+       * @description The total number of queue items enqueued
+       */
+      enqueued: number;
+      /**
+       * Requested
+       * @description The total number of queue items requested to be enqueued
+       */
+      requested: number;
+      /**
+       * Batch
+       * @description The batch that was enqueued
+       */
+      batch: components["schemas"]["Batch"];
+      /**
+       * Priority
+       * @description The priority of the enqueued batch
+       */
+      priority: number;
+      /**
+       * Queue Item
+       * @description The queue item that was enqueued
+       */
+      queue_item: components["schemas"]["SessionQueueItemDTO"];
+    };
     /**
      * Float Collection Primitive
      * @description A collection of float primitive values
@@ -2148,6 +2642,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Collection
        * @description The collection of float values
@@ -2199,6 +2699,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Value
        * @description The float value
        * @default 0
@@ -2232,6 +2738,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Start
        * @description The first value of the range
@@ -2278,6 +2790,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Operation
        * @description The operation to perform
@@ -2343,6 +2861,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Value
        * @description The value to round
        * @default 0
@@ -2380,7 +2904,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
+        [key: string]: components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
       };
       /**
        * Edges
@@ -2423,7 +2947,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["BooleanOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["VaeLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["MetadataAccumulatorOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["String2Output"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["CollectInvocationOutput"];
+        [key: string]: components["schemas"]["BooleanOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["VaeLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["MetadataAccumulatorOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["String2Output"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["CollectInvocationOutput"];
       };
       /**
        * Errors
@@ -2468,6 +2992,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Graph
        * @description The graph to run
@@ -2520,6 +3050,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -2607,6 +3143,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The IP-Adapter image prompt.
@@ -2714,6 +3256,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to blur
        */
@@ -2772,6 +3320,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to get the channel from
        */
@@ -2811,6 +3365,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to adjust
@@ -2863,6 +3423,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to adjust
        */
@@ -2907,6 +3473,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Collection
        * @description The collection of image values
@@ -2958,6 +3530,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to convert
        */
@@ -2997,6 +3575,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to crop
@@ -3141,6 +3725,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to adjust
        */
@@ -3179,6 +3769,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to lerp
@@ -3225,6 +3821,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to load
        */
@@ -3257,6 +3859,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to lerp
@@ -3319,6 +3927,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image1
        * @description The first image to multiply
        */
@@ -3356,6 +3970,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Metadata
        * @description Optional core metadata to be written to image
@@ -3422,6 +4042,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Base Image
        * @description The base image
        */
@@ -3482,6 +4108,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -3545,6 +4177,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to resize
        */
@@ -3602,6 +4240,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to scale
        */
@@ -3647,6 +4291,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to encode
@@ -3719,6 +4369,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to check
        */
@@ -3771,6 +4427,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to infill
        */
@@ -3814,6 +4476,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to infill
@@ -3861,6 +4529,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to infill
        */
@@ -3904,6 +4578,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Collection
        * @description The collection of integer values
@@ -3955,6 +4635,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Value
        * @description The integer value
        * @default 0
@@ -3988,6 +4674,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Operation
        * @description The operation to perform
@@ -4053,6 +4745,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Collection
        * @description The list of items to iterate over
        */
@@ -4109,6 +4807,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to infill
        */
@@ -4141,6 +4845,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Collection
        * @description The collection of latents tensors
@@ -4208,6 +4918,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Latents
        * @description The latents tensor
        */
@@ -4268,6 +4984,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
        * @default false
@@ -4322,6 +5044,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -4386,6 +5114,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to process
        */
@@ -4430,6 +5164,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -4559,6 +5299,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * LoRA
        * @description LoRA model to load
        */
@@ -4645,6 +5391,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Model
        * @description Main model (UNet, VAE, CLIP) to load
        */
@@ -4677,6 +5429,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Mask1
        * @description The first mask to combine
@@ -4715,6 +5473,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to apply the mask to
@@ -4769,6 +5533,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to create the mask from
        */
@@ -4807,6 +5577,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -4858,6 +5634,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Generation Mode
        * @description The generation mode that output this image
@@ -5034,6 +5816,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to process
        */
@@ -5078,6 +5866,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -5200,6 +5994,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * A
        * @description The first number
        * @default 0
@@ -5217,6 +6017,24 @@ export type components = {
        * @enum {string}
        */
       type: "mul";
+    };
+    /** NodeFieldValue */
+    NodeFieldValue: {
+      /**
+       * Node Path
+       * @description The node into which this batch data item will be substituted.
+       */
+      node_path: string;
+      /**
+       * Field Name
+       * @description The field into which this batch data item will be substituted.
+       */
+      field_name: string;
+      /**
+       * Value
+       * @description The value to substitute into the node/field.
+       */
+      value: string | number;
     };
     /**
      * Noise
@@ -5239,6 +6057,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Seed
        * @description Seed for random number generation
@@ -5318,6 +6142,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to process
        */
@@ -5362,6 +6192,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Latents
        * @description Denoised latents tensor
@@ -5440,6 +6276,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Prompt
        * @description Raw prompt text (no parsing)
@@ -5526,6 +6368,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Positive Conditioning
        * @description Positive conditioning tensor
@@ -5673,6 +6521,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Model
        * @description ONNX Main model (UNet, VAE, CLIP) to load
        */
@@ -5705,6 +6559,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -5788,6 +6648,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to process
        */
@@ -5845,6 +6711,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * File Path
        * @description Path to prompt text file
        */
@@ -5879,6 +6751,17 @@ export type components = {
       type: "prompt_from_file";
     };
     /**
+     * PruneResult
+     * @description Result of pruning the session queue
+     */
+    PruneResult: {
+      /**
+       * Deleted
+       * @description Number of queue items deleted
+       */
+      deleted: number;
+    };
+    /**
      * Random Integer
      * @description Outputs a single random integer.
      */
@@ -5899,6 +6782,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default false
+       */
+      use_cache?: boolean;
       /**
        * Low
        * @description The inclusive low value
@@ -5939,6 +6828,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default false
+       */
+      use_cache?: boolean;
       /**
        * Low
        * @description The inclusive low value
@@ -5991,6 +6886,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Start
        * @description The start of the range
        * @default 0
@@ -6036,6 +6937,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Start
        * @description The start of the range
@@ -6090,6 +6997,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Latents
        * @description Latents tensor
@@ -6157,6 +7070,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Value
        * @description The float value
        * @default 0
@@ -6196,6 +7115,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Prompt
        * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -6276,6 +7201,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * LoRA
        * @description LoRA model to load
@@ -6358,6 +7289,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Model
        * @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load
        */
@@ -6422,6 +7359,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Style
        * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -6488,6 +7431,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Model
        * @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load
        */
@@ -6527,6 +7476,50 @@ export type components = {
       type: "sdxl_refiner_model_loader_output";
     };
     /**
+     * Save Image
+     * @description Saves an image. Unlike an image primitive, this invocation stores a copy of the image.
+     */
+    SaveImageInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default false
+       */
+      use_cache?: boolean;
+      /**
+       * Image
+       * @description The image to load
+       */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Metadata
+       * @description Optional core metadata to be written to image
+       */
+      metadata?: components["schemas"]["CoreMetadata"];
+      /**
+       * Type
+       * @default save_image
+       * @enum {string}
+       */
+      type: "save_image";
+    };
+    /**
      * Scale Latents
      * @description Scales latents by a given factor.
      */
@@ -6547,6 +7540,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Latents
        * @description Latents tensor
@@ -6598,6 +7597,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Scheduler
        * @description Scheduler to use during inference
@@ -6659,6 +7664,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -6732,6 +7743,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Image
        * @description The image to process
        */
@@ -6742,6 +7759,223 @@ export type components = {
        * @enum {string}
        */
       type: "segment_anything_processor";
+    };
+    /** SessionProcessorStatus */
+    SessionProcessorStatus: {
+      /**
+       * Is Started
+       * @description Whether the session processor is started
+       */
+      is_started: boolean;
+      /**
+       * Is Processing
+       * @description Whether a session is being processed
+       */
+      is_processing: boolean;
+    };
+    /**
+     * SessionQueueAndProcessorStatus
+     * @description The overall status of session queue and processor
+     */
+    SessionQueueAndProcessorStatus: {
+      queue: components["schemas"]["SessionQueueStatus"];
+      processor: components["schemas"]["SessionProcessorStatus"];
+    };
+    /**
+     * SessionQueueItem
+     * @description Session queue item without the full graph. Used for serialization.
+     */
+    SessionQueueItem: {
+      /**
+       * Item Id
+       * @description The identifier of the session queue item
+       */
+      item_id: number;
+      /**
+       * Status
+       * @description The status of this queue item
+       * @default pending
+       * @enum {string}
+       */
+      status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+      /**
+       * Priority
+       * @description The priority of this queue item
+       * @default 0
+       */
+      priority: number;
+      /**
+       * Batch Id
+       * @description The ID of the batch associated with this queue item
+       */
+      batch_id: string;
+      /**
+       * Session Id
+       * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
+       */
+      session_id: string;
+      /**
+       * Field Values
+       * @description The field values that were used for this queue item
+       */
+      field_values?: components["schemas"]["NodeFieldValue"][];
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
+      /**
+       * Error
+       * @description The error message if this queue item errored
+       */
+      error?: string;
+      /**
+       * Created At
+       * @description When this queue item was created
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * @description When this queue item was updated
+       */
+      updated_at: string;
+      /**
+       * Started At
+       * @description When this queue item was started
+       */
+      started_at?: string;
+      /**
+       * Completed At
+       * @description When this queue item was completed
+       */
+      completed_at?: string;
+      /**
+       * Session
+       * @description The fully-populated session to be executed
+       */
+      session: components["schemas"]["GraphExecutionState"];
+    };
+    /**
+     * SessionQueueItemDTO
+     * @description Session queue item without the full graph. Used for serialization.
+     */
+    SessionQueueItemDTO: {
+      /**
+       * Item Id
+       * @description The identifier of the session queue item
+       */
+      item_id: number;
+      /**
+       * Status
+       * @description The status of this queue item
+       * @default pending
+       * @enum {string}
+       */
+      status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+      /**
+       * Priority
+       * @description The priority of this queue item
+       * @default 0
+       */
+      priority: number;
+      /**
+       * Batch Id
+       * @description The ID of the batch associated with this queue item
+       */
+      batch_id: string;
+      /**
+       * Session Id
+       * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
+       */
+      session_id: string;
+      /**
+       * Field Values
+       * @description The field values that were used for this queue item
+       */
+      field_values?: components["schemas"]["NodeFieldValue"][];
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
+      /**
+       * Error
+       * @description The error message if this queue item errored
+       */
+      error?: string;
+      /**
+       * Created At
+       * @description When this queue item was created
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * @description When this queue item was updated
+       */
+      updated_at: string;
+      /**
+       * Started At
+       * @description When this queue item was started
+       */
+      started_at?: string;
+      /**
+       * Completed At
+       * @description When this queue item was completed
+       */
+      completed_at?: string;
+    };
+    /** SessionQueueStatus */
+    SessionQueueStatus: {
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Item Id
+       * @description The current queue item id
+       */
+      item_id?: number;
+      /**
+       * Batch Id
+       * @description The current queue item's batch id
+       */
+      batch_id?: string;
+      /**
+       * Session Id
+       * @description The current queue item's session id
+       */
+      session_id?: string;
+      /**
+       * Pending
+       * @description Number of queue items with status 'pending'
+       */
+      pending: number;
+      /**
+       * In Progress
+       * @description Number of queue items with status 'in_progress'
+       */
+      in_progress: number;
+      /**
+       * Completed
+       * @description Number of queue items with status 'complete'
+       */
+      completed: number;
+      /**
+       * Failed
+       * @description Number of queue items with status 'error'
+       */
+      failed: number;
+      /**
+       * Canceled
+       * @description Number of queue items with status 'canceled'
+       */
+      canceled: number;
+      /**
+       * Total
+       * @description Total number of queue items
+       */
+      total: number;
     };
     /**
      * Show Image
@@ -6764,6 +7998,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to show
@@ -6948,6 +8188,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Easing
        * @description The easing function to use
        * @default Linear
@@ -7057,6 +8303,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Collection
        * @description The collection of string values
        */
@@ -7107,6 +8359,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * Value
        * @description The string value
        * @default
@@ -7140,6 +8398,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * String Left
        * @description String Left
@@ -7180,6 +8444,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * String Left
        * @description String Left
@@ -7266,6 +8536,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * String
        * @description String to work on
        * @default
@@ -7318,6 +8594,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * String
        * @description String to split
        * @default
@@ -7358,6 +8640,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * String
        * @description String to split
        * @default
@@ -7397,6 +8685,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * A
        * @description The first number
@@ -7455,6 +8749,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -7557,6 +8857,12 @@ export type components = {
        */
       workflow?: string;
       /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
        * VAE
        * @description VAE model to load
        */
@@ -7638,6 +8944,12 @@ export type components = {
        * @description The workflow to save with the image
        */
       workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
       /**
        * Image
        * @description The image to process
@@ -7736,11 +9048,17 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusionXLModelFormat
+     * IPAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    IPAdapterModelFormat: "invokeai";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
@@ -7748,11 +9066,11 @@ export type components = {
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
-     * CLIPVisionModelFormat
+     * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    CLIPVisionModelFormat: "diffusers";
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
@@ -7760,23 +9078,17 @@ export type components = {
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
-     * IPAdapterModelFormat
+     * CLIPVisionModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    IPAdapterModelFormat: "invokeai";
+    CLIPVisionModelFormat: "diffusers";
     /**
-     * StableDiffusion2ModelFormat
+     * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -7793,6 +9105,7 @@ export type operations = {
 
   /**
    * List Sessions
+   * @deprecated
    * @description Gets a list of sessions, optionally searching
    */
   list_sessions: {
@@ -7823,9 +9136,16 @@ export type operations = {
   };
   /**
    * Create Session
+   * @deprecated
    * @description Creates a new session, optionally initializing it with an invocation graph
    */
   create_session: {
+    parameters: {
+      query?: {
+        /** @description The id of the queue to associate the session with */
+        queue_id?: string;
+      };
+    };
     requestBody?: {
       content: {
         "application/json": components["schemas"]["Graph"];
@@ -7852,6 +9172,7 @@ export type operations = {
   };
   /**
    * Get Session
+   * @deprecated
    * @description Gets a session
    */
   get_session: {
@@ -7882,6 +9203,7 @@ export type operations = {
   };
   /**
    * Add Node
+   * @deprecated
    * @description Adds a node to the graph
    */
   add_node: {
@@ -7893,7 +9215,7 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
+        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
       };
     };
     responses: {
@@ -7921,6 +9243,7 @@ export type operations = {
   };
   /**
    * Update Node
+   * @deprecated
    * @description Updates a node in the graph and removes all linked edges
    */
   update_node: {
@@ -7934,7 +9257,7 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
+        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
       };
     };
     responses: {
@@ -7962,6 +9285,7 @@ export type operations = {
   };
   /**
    * Delete Node
+   * @deprecated
    * @description Deletes a node in the graph and removes all linked edges
    */
   delete_node: {
@@ -7998,6 +9322,7 @@ export type operations = {
   };
   /**
    * Add Edge
+   * @deprecated
    * @description Adds an edge to the graph
    */
   add_edge: {
@@ -8037,6 +9362,7 @@ export type operations = {
   };
   /**
    * Delete Edge
+   * @deprecated
    * @description Deletes an edge from the graph
    */
   delete_edge: {
@@ -8079,11 +9405,14 @@ export type operations = {
   };
   /**
    * Invoke Session
+   * @deprecated
    * @description Invokes a session
    */
   invoke_session: {
     parameters: {
-      query?: {
+      query: {
+        /** @description The id of the queue to associate the session with */
+        queue_id: string;
         /** @description Whether or not to invoke all remaining invocations */
         all?: boolean;
       };
@@ -8121,6 +9450,7 @@ export type operations = {
   };
   /**
    * Cancel Session Invoke
+   * @deprecated
    * @description Invokes a session
    */
   cancel_session_invoke: {
@@ -8140,6 +9470,31 @@ export type operations = {
       /** @description The invocation is canceled */
       202: {
         content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Parse Dynamicprompts
+   * @description Creates a batch process
+   */
+  parse_dynamicprompts: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_parse_dynamicprompts"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DynamicPromptsResponse"];
+        };
       };
       /** @description Validation Error */
       422: {
@@ -9145,6 +10500,413 @@ export type operations = {
       200: {
         content: {
           "application/json": components["schemas"]["LogLevel"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Enqueue Graph
+   * @description Enqueues a graph for single execution.
+   */
+  enqueue_graph: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_enqueue_graph"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Created */
+      201: {
+        content: {
+          "application/json": components["schemas"]["EnqueueGraphResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Enqueue Batch
+   * @description Processes a batch and enqueues the output graphs for execution.
+   */
+  enqueue_batch: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_enqueue_batch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Created */
+      201: {
+        content: {
+          "application/json": components["schemas"]["EnqueueBatchResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List Queue Items
+   * @description Gets all queue items (without graphs)
+   */
+  list_queue_items: {
+    parameters: {
+      query?: {
+        /** @description The number of items to fetch */
+        limit?: number;
+        /** @description The status of items to fetch */
+        status?: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+        /** @description The pagination cursor */
+        cursor?: number;
+        /** @description The pagination cursor priority */
+        priority?: number;
+      };
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItemDTO_"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Resume
+   * @description Resumes session processor
+   */
+  resume: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionProcessorStatus"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Pause
+   * @description Pauses session processor
+   */
+  pause: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionProcessorStatus"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Cancel By Batch Ids
+   * @description Immediately cancels all queue items from the given batch ids
+   */
+  cancel_by_batch_ids: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_cancel_by_batch_ids"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CancelByBatchIDsResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Clear
+   * @description Clears the queue entirely, immediately canceling the currently-executing session
+   */
+  clear: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ClearResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Prune
+   * @description Prunes all completed or errored queue items
+   */
+  prune: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PruneResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Current Queue Item
+   * @description Gets the currently execution queue item
+   */
+  get_current_queue_item: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionQueueItem"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Next Queue Item
+   * @description Gets the next queue item, without executing it
+   */
+  get_next_queue_item: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionQueueItem"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Queue Status
+   * @description Gets the status of the session queue
+   */
+  get_queue_status: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionQueueAndProcessorStatus"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Batch Status
+   * @description Gets the status of the session queue
+   */
+  get_batch_status: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+        /** @description The batch to get the status of */
+        batch_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BatchStatus"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Queue Item
+   * @description Gets a queue item
+   */
+  get_queue_item: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+        /** @description The queue item to get */
+        item_id: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionQueueItem"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Cancel Queue Item
+   * @description Deletes a queue item
+   */
+  cancel_queue_item: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+        /** @description The queue item to cancel */
+        item_id: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SessionQueueItem"];
         };
       };
       /** @description Validation Error */

@@ -11,6 +11,9 @@ import { useTranslation } from 'react-i18next';
 import { useGetIPAdapterModelsQuery } from 'services/api/endpoints/models';
 
 const ParamIPAdapterModelSelect = () => {
+  const isEnabled = useAppSelector(
+    (state: RootState) => state.controlNet.isIPAdapterEnabled
+  );
   const ipAdapterModel = useAppSelector(
     (state: RootState) => state.controlNet.ipAdapterInfo.model
   );
@@ -90,6 +93,7 @@ const ParamIPAdapterModelSelect = () => {
       data={data}
       onChange={handleValueChanged}
       sx={{ width: '100%' }}
+      disabled={!isEnabled}
     />
   );
 };

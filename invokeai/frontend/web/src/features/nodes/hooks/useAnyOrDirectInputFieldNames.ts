@@ -5,6 +5,10 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map } from 'lodash-es';
 import { useMemo } from 'react';
 import { isInvocationNode } from '../types/types';
+import {
+  POLYMORPHIC_TYPES,
+  TYPES_WITH_INPUT_COMPONENTS,
+} from '../types/constants';
 
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
@@ -21,7 +25,12 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
             return [];
           }
           return map(nodeTemplate.inputs)
-            .filter((field) => ['any', 'direct'].includes(field.input))
+            .filter(
+              (field) =>
+                (['any', 'direct'].includes(field.input) ||
+                  POLYMORPHIC_TYPES.includes(field.type)) &&
+                TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
+            )
             .filter((field) => !field.ui_hidden)
             .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0))
             .map((field) => field.name)

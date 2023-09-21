@@ -7,19 +7,17 @@ import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSe
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
-import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useTranslation } from 'react-i18next';
+import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 const selector = createSelector(
   [stateSelector],
-  ({ gallery, system }) => {
+  ({ gallery }) => {
     const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-    const { isProcessing } = system;
 
     return {
       autoAddBoardId,
       autoAssignBoardOnClick,
-      isProcessing,
     };
   },
   defaultSelectorOptions
@@ -28,8 +26,7 @@ const selector = createSelector(
 const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { autoAddBoardId, autoAssignBoardOnClick, isProcessing } =
-    useAppSelector(selector);
+  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
   const inputRef = useRef<HTMLInputElement>(null);
   const { boards, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -73,7 +70,7 @@ const BoardAutoAddSelect = () => {
       data={boards}
       nothingFound={t('boards.noMatching')}
       itemComponent={IAIMantineSelectItemWithTooltip}
-      disabled={!hasBoards || autoAssignBoardOnClick || isProcessing}
+      disabled={!hasBoards || autoAssignBoardOnClick}
       filter={(value, item: SelectItem) =>
         item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
         item.value.toLowerCase().includes(value.toLowerCase().trim())

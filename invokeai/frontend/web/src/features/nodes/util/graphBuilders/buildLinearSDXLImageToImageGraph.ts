@@ -1,17 +1,16 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -29,7 +28,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Image to Image tab graph.
@@ -44,14 +43,13 @@ export const buildLinearSDXLImageToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     initialImage,
     shouldFitToWidthHeight,
     width,
     height,
-    clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
@@ -60,7 +58,6 @@ export const buildLinearSDXLImageToImageGraph = (
   const {
     positiveStylePrompt,
     negativeStylePrompt,
-    shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
     sdxlImg2ImgDenoisingStrength: strength,
@@ -86,17 +83,16 @@ export const buildLinearSDXLImageToImageGraph = (
   }
 
   const fp32 = vaePrecision === 'fp32';
+  const is_intermediate = true;
 
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
-    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
+    buildSDXLStylePrompts(state);
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -106,28 +102,34 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_model_loader',
         id: modelLoaderNodeId,
         model,
+        is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: craftedPositiveStylePrompt,
+        style: joinedPositiveStylePrompt,
+        is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: craftedNegativeStylePrompt,
+        style: joinedNegativeStylePrompt,
+        is_intermediate,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         use_cpu,
+        seed,
+        is_intermediate,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
+        is_intermediate,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -139,6 +141,7 @@ export const buildLinearSDXLImageToImageGraph = (
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        is_intermediate,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -148,6 +151,7 @@ export const buildLinearSDXLImageToImageGraph = (
         //   image_name: initialImage.image_name,
         // },
         fp32,
+        is_intermediate,
       },
     },
     edges: [
@@ -334,17 +338,16 @@ export const buildLinearSDXLImageToImageGraph = (
     cfg_scale,
     height,
     width,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
     vae: undefined,
     controlnets: [],
     loras: [],
-    clip_skip: clipSkip,
     strength: strength,
     init_image: initialImage.imageName,
     positive_style_prompt: positiveStylePrompt,
@@ -388,9 +391,6 @@ export const buildLinearSDXLImageToImageGraph = (
   // Add IP Adapter
   addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
-
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
@@ -401,6 +401,8 @@ export const buildLinearSDXLImageToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };

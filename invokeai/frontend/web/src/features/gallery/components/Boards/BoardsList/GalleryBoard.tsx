@@ -17,6 +17,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
+import { AddToBoardDropData } from 'features/dnd/types';
 import {
   autoAddBoardIdChanged,
   boardIdSelected,
@@ -32,7 +33,6 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-import { AddToBoardDropData } from 'features/dnd/types';
 
 interface GalleryBoardProps extends HTMLAttributes<HTMLDivElement> {
   board: BoardDTO;
@@ -52,16 +52,14 @@ const GalleryBoard = ({
     () =>
       createSelector(
         stateSelector,
-        ({ gallery, system }) => {
+        ({ gallery }) => {
           const isSelectedForAutoAdd =
             board.board_id === gallery.autoAddBoardId;
           const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-          const isProcessing = system.isProcessing;
 
           return {
             isSelectedForAutoAdd,
             autoAssignBoardOnClick,
-            isProcessing,
           };
         },
         defaultSelectorOptions
@@ -102,7 +100,7 @@ const GalleryBoard = ({
     }
 
     dispatch(boardIdSelected(board_id));
-    if (autoAssignBoardOnClick && !isProcessing) {
+    if (autoAssignBoardOnClick) {
       dispatch(autoAddBoardIdChanged(board_id));
     }
   };

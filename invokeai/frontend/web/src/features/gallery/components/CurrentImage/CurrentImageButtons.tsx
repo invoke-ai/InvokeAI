@@ -21,6 +21,7 @@ import { workflowLoadRequested } from 'features/nodes/store/actions';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
@@ -36,9 +37,8 @@ import {
   FaHourglassHalf,
   FaQuoteRight,
   FaSeedling,
-  FaShareAlt,
 } from 'react-icons/fa';
-import { MdDeviceHub } from 'react-icons/md';
+import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
 import {
   useGetImageDTOQuery,
   useGetImageMetadataFromFileQuery,
@@ -50,8 +50,7 @@ import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuIte
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
   ({ gallery, system, ui, config }, activeTabName) => {
-    const { isProcessing, isConnected, shouldConfirmOnDelete, progressImage } =
-      system;
+    const { isConnected, shouldConfirmOnDelete, denoiseProgress } = system;
 
     const {
       shouldShowImageDetails,
@@ -64,11 +63,10 @@ const currentImageButtonsSelector = createSelector(
     const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
 
     return {
-      canDeleteImage: isConnected && !isProcessing,
       shouldConfirmOnDelete,
-      isProcessing,
       isConnected,
-      shouldDisableToolbarButtons: Boolean(progressImage) || !lastSelectedImage,
+      shouldDisableToolbarButtons:
+        Boolean(denoiseProgress?.progress_image) || !lastSelectedImage,
       shouldShowImageDetails,
       activeTabName,
       shouldHidePreview,
@@ -89,7 +87,6 @@ type CurrentImageButtonsProps = FlexProps;
 const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const dispatch = useAppDispatch();
   const {
-    isProcessing,
     isConnected,
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
@@ -99,7 +96,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   } = useAppSelector(currentImageButtonsSelector);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
-
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
@@ -202,19 +199,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     {
       enabled: () =>
         Boolean(
-          isUpscalingEnabled &&
-            !shouldDisableToolbarButtons &&
-            isConnected &&
-            !isProcessing
+          isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected
         ),
     },
-    [
-      isUpscalingEnabled,
-      imageDTO,
-      shouldDisableToolbarButtons,
-      isConnected,
-      isProcessing,
-    ]
+    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
   );
 
   const handleClickShowImageDetails = useCallback(
@@ -266,10 +254,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           <Menu>
             <MenuButton
               as={IAIIconButton}
-              aria-label={`${t('parameters.sendTo')}...`}
-              tooltip={`${t('parameters.sendTo')}...`}
+              aria-label={t('parameters.imageActions')}
+              tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
-              icon={<FaShareAlt />}
+              icon={<FaEllipsis />}
             />
             <MenuList motionProps={menuListMotionProps}>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
@@ -280,7 +268,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
             isLoading={isLoading}
-            icon={<MdDeviceHub />}
+            icon={<FaCircleNodes />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
             isDisabled={!workflow}
@@ -313,15 +301,12 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         {isUpscalingEnabled && (
-          <ButtonGroup
-            isAttached={true}
-            isDisabled={shouldDisableToolbarButtons}
-          >
+          <ButtonGroup isAttached={true} isDisabled={isQueueMutationInProgress}>
             {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
           </ButtonGroup>
         )}
 
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
+        <ButtonGroup isAttached={true}>
           <IAIIconButton
             icon={<FaCode />}
             tooltip={`${t('parameters.info')} (I)`}
@@ -342,10 +327,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         <ButtonGroup isAttached={true}>
-          <DeleteImageButton
-            onClick={handleDelete}
-            isDisabled={shouldDisableToolbarButtons}
-          />
+          <DeleteImageButton onClick={handleDelete} />
         </ButtonGroup>
       </Flex>
     </>

@@ -38,7 +38,7 @@ const NodeTemplateInspector = () => {
     );
   }
 
-  return <DataViewer data={template} label={t('nodes.NodeTemplate')} />;
+  return <DataViewer data={template} label={t('nodes.nodeTemplate')} />;
 };
 
 export default memo(NodeTemplateInspector);

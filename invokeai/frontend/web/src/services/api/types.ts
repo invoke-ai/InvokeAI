@@ -22,6 +22,12 @@ export type UpdateBoardArg =
     changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
   };
 
+export type BatchConfig =
+  paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
+
+export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
+export type EnqueueGraphResult = components['schemas']['EnqueueGraphResult'];
+
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
  */
@@ -104,6 +110,9 @@ export type ImportModelConfig = s['Body_import_model'];
 export type Graph = s['Graph'];
 export type Edge = s['Edge'];
 export type GraphExecutionState = s['GraphExecutionState'];
+export type Batch = s['Batch'];
+export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
+export type SessionQueueItem = s['SessionQueueItem'];
 
 // General nodes
 export type CollectInvocation = s['CollectInvocation'];
@@ -137,6 +146,7 @@ export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
+export type SaveImageInvocation = s['SaveImageInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];

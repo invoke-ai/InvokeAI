@@ -1,12 +1,11 @@
 import { Divider, Flex, Text } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'features/system/util/makeToast';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,8 +21,6 @@ type DiffusersModelEditProps = {
 };
 
 export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
-  const isBusy = useAppSelector(selectIsBusy);
-
   const { model } = props;
 
   const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
@@ -134,11 +131,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
             label={t('modelManager.vaeLocation')}
             {...diffusersEditForm.getInputProps('vae')}
           />
-          <IAIButton
-            type="submit"
-            isDisabled={isBusy || isLoading}
-            isLoading={isLoading}
-          >
+          <IAIButton type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}
           </IAIButton>
         </Flex>

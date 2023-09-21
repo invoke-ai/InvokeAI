@@ -38,7 +38,6 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
@@ -100,7 +99,7 @@ class ControlNetInvocation(BaseInvocation):
     image: ImageField = InputField(description="The control image")
     control_model: ControlNetModelField = InputField(description=FieldDescriptions.controlnet_model, input=Input.Direct)
     control_weight: Union[float, List[float]] = InputField(
-        default=1.0, description="The weight given to the ControlNet", ui_type=UIType.Float
+        default=1.0, description="The weight given to the ControlNet"
     )
     begin_step_percent: float = InputField(
         default=0, ge=-1, le=2, description="When the ControlNet is first applied (% of total steps)"

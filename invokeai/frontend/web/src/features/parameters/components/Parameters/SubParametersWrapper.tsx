@@ -1,9 +1,11 @@
 import { Flex, Text } from '@chakra-ui/react';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import { ReactNode, memo } from 'react';
 
 type SubParameterWrapperProps = {
   children: ReactNode | ReactNode[];
   label?: string;
+  headerInfoPopover?: string;
 };
 
 const SubParametersWrapper = (props: SubParameterWrapperProps) => (
@@ -21,7 +23,18 @@ const SubParametersWrapper = (props: SubParameterWrapperProps) => (
       },
     }}
   >
-    {props.label && (
+    {props.headerInfoPopover && props.label && (
+      <IAIInformationalPopover details={props.headerInfoPopover}>
+        <Text
+          fontSize="sm"
+          fontWeight="bold"
+          sx={{ color: 'base.600', _dark: { color: 'base.300' } }}
+        >
+          {props.label}
+        </Text>
+      </IAIInformationalPopover>
+    )}
+    {!props.headerInfoPopover && props.label && (
       <Text
         fontSize="sm"
         fontWeight="bold"
