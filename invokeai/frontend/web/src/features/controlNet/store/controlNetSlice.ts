@@ -146,16 +146,16 @@ export const controlNetSlice = createSlice({
       const { controlNetId } = action.payload;
       delete state.controlNets[controlNetId];
     },
-    controlNetToggled: (
+    controlNetIsEnabledChanged: (
       state,
-      action: PayloadAction<{ controlNetId: string }>
+      action: PayloadAction<{ controlNetId: string; isEnabled: boolean }>
     ) => {
-      const { controlNetId } = action.payload;
+      const { controlNetId, isEnabled } = action.payload;
       const cn = state.controlNets[controlNetId];
       if (!cn) {
         return;
       }
-      cn.isEnabled = !cn.isEnabled;
+      cn.isEnabled = isEnabled;
     },
     controlNetImageChanged: (
       state,
@@ -377,8 +377,8 @@ export const controlNetSlice = createSlice({
     controlNetReset: () => {
       return { ...initialControlNetState };
     },
-    isIPAdapterEnableToggled: (state) => {
-      state.isIPAdapterEnabled = !state.isIPAdapterEnabled;
+    isIPAdapterEnabledChanged: (state, action: PayloadAction<boolean>) => {
+      state.isIPAdapterEnabled = action.payload;
     },
     ipAdapterImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.ipAdapterInfo.adapterImage = action.payload;
@@ -450,7 +450,7 @@ export const {
   controlNetRemoved,
   controlNetImageChanged,
   controlNetProcessedImageChanged,
-  controlNetToggled,
+  controlNetIsEnabledChanged,
   controlNetModelChanged,
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
@@ -461,7 +461,7 @@ export const {
   controlNetProcessorTypeChanged,
   controlNetReset,
   controlNetAutoConfigToggled,
-  isIPAdapterEnableToggled,
+  isIPAdapterEnabledChanged,
   ipAdapterImageChanged,
   ipAdapterWeightChanged,
   ipAdapterModelChanged,

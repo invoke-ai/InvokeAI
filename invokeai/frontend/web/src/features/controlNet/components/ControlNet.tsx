@@ -1,12 +1,12 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { memo, useCallback } from 'react';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
   ControlNetConfig,
   controlNetDuplicated,
   controlNetRemoved,
-  controlNetToggled,
+  controlNetIsEnabledChanged,
 } from '../store/controlNetSlice';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
@@ -77,9 +77,17 @@ const ControlNet = (props: ControlNetProps) => {
     );
   }, [controlNetId, dispatch]);
 
-  const handleToggleIsEnabled = useCallback(() => {
-    dispatch(controlNetToggled({ controlNetId }));
-  }, [controlNetId, dispatch]);
+  const handleToggleIsEnabled = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(
+        controlNetIsEnabledChanged({
+          controlNetId,
+          isEnabled: e.target.checked,
+        })
+      );
+    },
+    [controlNetId, dispatch]
+  );
 
   return (
     <Flex
@@ -106,8 +114,8 @@ const ControlNet = (props: ControlNetProps) => {
           sx={{
             w: 'full',
             minW: 0,
-            opacity: isEnabled ? 1 : 0.5,
-            pointerEvents: isEnabled ? 'auto' : 'none',
+            // opacity: isEnabled ? 1 : 0.5,
+            // pointerEvents: isEnabled ? 'auto' : 'none',
             transitionProperty: 'common',
             transitionDuration: '0.1s',
           }}
