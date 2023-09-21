@@ -58,9 +58,7 @@ class IPAdapterInvocation(BaseInvocation):
     # Inputs
     image: ImageField = InputField(description="The IP-Adapter image prompt.")
     ip_adapter_model: IPAdapterModelField = InputField(
-        description="The IP-Adapter model.",
-        title="IP-Adapter Model",
-        input=Input.Direct,
+        description="The IP-Adapter model.", title="IP-Adapter Model", input=Input.Direct, ui_order=-1
     )
 
     # weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)

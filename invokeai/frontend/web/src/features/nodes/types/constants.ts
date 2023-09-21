@@ -116,6 +116,7 @@ export const TYPES_WITH_INPUT_COMPONENTS = [
   'ColorField',
   'SDXLMainModelField',
   'Scheduler',
+  'IPAdapterModelField',
 ];
 
 export const isPolymorphicItemType = (
