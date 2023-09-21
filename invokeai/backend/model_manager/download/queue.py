@@ -82,6 +82,7 @@ class DownloadQueue(DownloadQueueBase):
     _next_job_id: int = 0
     _sequence: int = 0  # This is for debugging and used to tag jobs in dequeueing order
     _requests: requests.sessions.Session
+    _quiet: bool = False
 
     def __init__(
         self,
@@ -89,6 +90,7 @@ class DownloadQueue(DownloadQueueBase):
         event_handlers: List[DownloadEventHandler] = [],
         requests_session: Optional[requests.sessions.Session] = None,
         config: Optional[InvokeAIAppConfig] = None,
+        quiet: bool = False,
     ):
         """
         Initialize DownloadQueue.
@@ -105,6 +107,7 @@ class DownloadQueue(DownloadQueueBase):
         self._logger = InvokeAILogger.getLogger(config=config)
         self._event_handlers = event_handlers
         self._requests = requests_session or requests.Session()
+        self._quiet = quiet
 
         self._start_workers(max_parallel_dl)
 
@@ -304,6 +307,8 @@ class DownloadQueue(DownloadQueueBase):
 
             if job.status == DownloadJobStatus.ENQUEUED:  # Don't do anything for non-enqueued jobs (shouldn't happen)
                 # There should be a better way to dispatch on the job type
+                if not self._quiet:
+                    self._logger.info(f"{job.source}: Downloading to {job.destination}")
                 if isinstance(job, DownloadJobURL):
                     self._download_with_resume(job)
                 elif isinstance(job, DownloadJobRepoID):
@@ -336,6 +341,7 @@ class DownloadQueue(DownloadQueueBase):
             if match := re.match(CIVITAI_MODEL_DOWNLOAD + r"(\d+)", metadata_url):
                 version = match.group(1)
                 resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
+                print(f"DEBUG: resp={resp}")
                 metadata.thumbnail_url = metadata.thumbnail_url or resp["images"][0]["url"]
                 metadata.description = metadata.description or (
                     f"Trigger terms: {(', ').join(resp['trainedWords'])}"
@@ -418,7 +424,7 @@ class DownloadQueue(DownloadQueueBase):
             elif resp.status_code != 200:
                 raise HTTPError(resp.reason)
             else:
-                self._logger.info(f"{job.source}: Downloading {job.destination}")
+                self._logger.debug(f"{job.source}: Downloading {job.destination}")
 
             report_delta = job.total_bytes / 100  # report every 1% change
             last_report_bytes = 0
@@ -500,6 +506,7 @@ class DownloadQueue(DownloadQueueBase):
         job.subqueue = self.__class__(
             event_handlers=[subdownload_event],
             requests_session=self._requests,
+            quiet=True,
         )
         try:
             repo_id = job.source
@@ -564,7 +571,8 @@ class DownloadQueue(DownloadQueueBase):
             (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name, sizes[x.as_posix()])
             for x in self._select_variants(paths, variant)
         ]
-        metadata.license = metadata.license or model_info.cardData.get("license")
+        if hasattr(model_info, "cardData"):
+            metadata.license = metadata.license or model_info.cardData.get("license")
         metadata.tags = metadata.tags or model_info.tags
         metadata.author = metadata.author or model_info.author
         return urls

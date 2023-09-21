@@ -461,7 +461,11 @@ class ModelInstall(ModelInstallBase):
 
     def delete(self, key: str):  # noqa D102
         model = self._store.get_model(key)
-        rmtree(model.path)
+        path = self._app_config.models_path / model.path
+        if path.is_dir():
+            rmtree(path)
+        else:
+            path.unlink()
         self.unregister(key)
 
     def conditionally_delete(self, key: str):  # noqa D102
@@ -507,6 +511,7 @@ class ModelInstall(ModelInstallBase):
             info.source = str(job.source)
             metadata: ModelSourceMetadata = job.metadata
             info.description = metadata.description or f"Imported model {info.name}"
+            info.name = metadata.name or info.name
             info.author = metadata.author
             info.tags = metadata.tags
             info.license = metadata.license

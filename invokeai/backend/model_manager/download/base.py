@@ -36,6 +36,7 @@ class UnknownJobIDException(Exception):
 class ModelSourceMetadata(BaseModel):
     """Information collected on a downloadable model from its source site."""
 
+    name: Optional[str] = Field(description="Human-readable name of this model")
     author: Optional[str] = Field(description="Author/creator of the model")
     description: Optional[str] = Field(description="Description of the model")
     license: Optional[str] = Field(description="Model license terms")

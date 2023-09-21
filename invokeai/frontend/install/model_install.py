@@ -10,17 +10,13 @@ This is the npyscreen frontend to the model installation application.
 
 import argparse
 import curses
-import logging
 import sys
-import textwrap
 import traceback
 from argparse import Namespace
 from dataclasses import dataclass, field
-from multiprocessing import Process
-from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import npyscreen
 import omegaconf
@@ -28,6 +24,7 @@ import torch
 from huggingface_hub import HfFolder
 from npyscreen import widget
 from pydantic import BaseModel
+from tqdm import tqdm
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -69,9 +66,9 @@ ACCESS_TOKEN = HfFolder.get_token()
 
 
 class UnifiedModelInfo(BaseModel):
-    name: str
-    base_model: BaseModelType
-    model_type: ModelType
+    name: Optional[str] = None
+    base_model: Optional[BaseModelType] = None
+    model_type: Optional[ModelType] = None
     source: Optional[str] = None
     description: Optional[str] = None
     recommended: bool = False
@@ -92,6 +89,7 @@ def make_printable(s: str) -> str:
 
 class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     """Main form for interactive TUI."""
+
     # for responsive resizing set to False, but this seems to cause a crash!
     FIX_MINIMUM_SIZE_WHEN_CREATED = True
 
@@ -171,13 +169,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         bottom_of_table = max(bottom_of_table, self.nextrely)
 
         self.nextrely = bottom_of_table + 1
-
-        self.monitor = self.add_widget_intelligent(
-            BufferBox,
-            name="Log Messages",
-            editable=False,
-            max_height=6,
-        )
 
         self.nextrely += 1
         back_label = "BACK"
@@ -326,7 +317,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             download_ids=self.add_widget_intelligent(
                 TextBox,
                 name="Additional URLs, or HuggingFace repo_ids to install (Space separated. Use shift-control-V to paste):",
-                max_height=4,
+                max_height=6,
                 scroll_exit=True,
                 editable=True,
             )
@@ -518,7 +509,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         # models located in the 'download_ids" section
         for section in ui_sections:
             if downloads := section.get("download_ids"):
-                selections.install_models.extend(downloads.value.split())
+                models = [UnifiedModelInfo(source=x) for x in downloads.value.split()]
+                selections.install_models.extend(models)
 
 
 class AddModelApplication(npyscreen.NPSAppManaged):
@@ -539,17 +531,6 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         )
 
 
-class StderrToMessage:
-    def __init__(self, connection: Connection):
-        self.connection = connection
-
-    def write(self, data: str):
-        self.connection.send_bytes(data.encode("utf-8"))
-
-    def flush(self):
-        pass
-
-
 def list_models(installer: ModelInstall, model_type: ModelType):
     """Print out all models of type model_type."""
     models = installer.store.search_by_name(model_type=model_type)
@@ -559,14 +540,34 @@ def list_models(installer: ModelInstall, model_type: ModelType):
         print(f"{model.name:40}{model.base_model:10}{path}")
 
 
-def tqdm_progress(job: ModelInstallJob):
-    pass
+class TqdmProgress(object):
+    _bars: Dict[int, tqdm]  # the tqdm object
+    _last: Dict[int, int]  # last bytes downloaded
+
+    def __init__(self):
+        self._bars = dict()
+        self._last = dict()
+
+    def job_update(self, job: ModelInstallJob):
+        job_id = job.id
+        if job.status == "running":
+            if job_id not in self._bars:
+                dest = Path(job.destination).name
+                self._bars[job_id] = tqdm(
+                    desc=dest,
+                    initial=0,
+                    total=job.total_bytes,
+                    unit="iB",
+                    unit_scale=True,
+                )
+                self._last[job_id] = 0
+            self._bars[job_id].update(job.bytes - self._last[job_id])
+            self._last[job_id] = job.bytes
 
 
 def add_or_delete(installer: ModelInstall, selections: InstallSelections):
     for model in selections.install_models:
-        print(f"Installing {model.name}")
-        metadata = ModelSourceMetadata(description=model.description)
+        metadata = ModelSourceMetadata(description=model.description, name=model.name)
         installer.install(
             model.source,
             variant="fp16" if config.precision == "float16" else None,
@@ -594,7 +595,7 @@ def select_and_download_models(opt: Namespace):
     """Prompt user for install/delete selections and execute."""
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     config.precision = precision
-    installer = ModelInstall(config=config, event_handlers=[tqdm_progress])
+    installer = ModelInstall(config=config, event_handlers=[TqdmProgress().job_update])
 
     if opt.list_models:
         list_models(installer, opt.list_models)
