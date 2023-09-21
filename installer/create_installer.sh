@@ -4,14 +4,14 @@ set -e
 
 cd "$(dirname "$0")"
 
-if [[ -v "VIRTUAL_ENV" ]]; then
-    # we can't just call 'deactivate' because this function is not exported
-    # to the environment of this script from the bash process that runs the script
-    echo "A virtual environment is activated. Please deactivate it before proceeding".
-    exit -1
-fi
+# if [[ -v "VIRTUAL_ENV" ]]; then
+#     # we can't just call 'deactivate' because this function is not exported
+#     # to the environment of this script from the bash process that runs the script
+#     echo "A virtual environment is activated. Please deactivate it before proceeding".
+#     exit -1
+# fi
 
-VERSION=$(cd ..; python -c "from invokeai.version import __version__ as version; print(version)")
+VERSION=$(cd ..; python3 -c "from invokeai.version import __version__ as version; print(version)")
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
 LATEST_TAG="v3-latest"
@@ -42,12 +42,12 @@ echo Building the wheel
 
 # install the 'build' package in the user site packages, if needed
 # could be improved by using a temporary venv, but it's tiny and harmless
-if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
+if [[ $(python3 -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
     pip install --user build
 fi
 
 rm -r ../build
-python -m build --wheel --outdir dist/ ../.
+python3 -m build --wheel --outdir dist/ ../.
 
 # ----------------------
 
