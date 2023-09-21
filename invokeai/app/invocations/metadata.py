@@ -45,6 +45,9 @@ class CoreMetadata(BaseModelExcludeNull):
     clip_skip: int = Field(
         description="The number of skipped CLIP layers",
     )
+    clip2_skip: int = Field(
+        description="The number of skipped CLIP2 layers",
+    )
     model: MainModelField = Field(description="The main model used for inference")
     controlnets: list[ControlField] = Field(description="The ControlNets used for inference")
     loras: list[LoRAMetadataField] = Field(description="The LoRAs used for inference")
@@ -118,6 +121,9 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     scheduler: str = InputField(description="The scheduler used for inference")
     clip_skip: int = InputField(
         description="The number of skipped CLIP layers",
+    )
+    clip2_skip: int = InputField(
+        description="The number of skipped CLIP2 layers",
     )
     model: MainModelField = InputField(description="The main model used for inference")
     controlnets: list[ControlField] = InputField(description="The ControlNets used for inference")

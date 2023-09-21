@@ -15,6 +15,7 @@ export const ONNX_MODEL_LOADER = 'onnx_model_loader';
 export const VAE_LOADER = 'vae_loader';
 export const LORA_LOADER = 'lora_loader';
 export const CLIP_SKIP = 'clip_skip';
+export const CLIP2_SKIP = 'clip2_skip';
 export const IMAGE_TO_LATENTS = 'image_to_latents';
 export const LATENTS_TO_LATENTS = 'latents_to_latents';
 export const RESIZE = 'resize_image';

@@ -61,6 +61,7 @@ export interface GenerationState {
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
+  clip2Skip: number;
   shouldUseCpuNoise: boolean;
   shouldShowAdvancedOptions: boolean;
   aspectRatio: number | null;
@@ -102,6 +103,7 @@ export const initialGenerationState: GenerationState = {
   seamlessXAxis: false,
   seamlessYAxis: false,
   clipSkip: 0,
+  clip2Skip: 0,
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
   aspectRatio: null,
@@ -270,6 +272,9 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
+    setClip2Skip: (state, action: PayloadAction<number>) => {
+      state.clip2Skip = action.payload;
+    },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
@@ -345,6 +350,7 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
+  setClip2Skip,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
   setShouldLockAspectRatio,

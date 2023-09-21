@@ -317,6 +317,13 @@ export type paths = {
      */
     post: operations["set_log_level"];
   };
+  "/api/v1/app/invocation_cache": {
+    /**
+     * Clear Invocation Cache
+     * @description Clears the invocation cache
+     */
+    delete: operations["clear_invocation_cache"];
+  };
   "/api/v1/queue/{queue_id}/enqueue_graph": {
     /**
      * Enqueue Graph
@@ -2022,6 +2029,11 @@ export type components = {
        */
       clip_skip: number;
       /**
+       * Clip2 Skip
+       * @description The number of skipped CLIP2 layers
+       */
+      clip2_skip: number;
+      /**
        * Model
        * @description The main model used for inference
        */
@@ -2309,10 +2321,7 @@ export type components = {
        * @enum {string}
        */
       scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc";
-      /**
-       * Control
-       * @description ControlNet(s) to apply
-       */
+      /** Control */
       control?: components["schemas"]["ControlField"] | components["schemas"]["ControlField"][];
       /**
        * IP-Adapter
@@ -5691,6 +5700,11 @@ export type components = {
        */
       clip_skip?: number;
       /**
+       * Clip2 Skip
+       * @description The number of skipped CLIP2 layers
+       */
+      clip2_skip?: number;
+      /**
        * Model
        * @description The main model used for inference
        */
@@ -9043,17 +9057,29 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * CLIPVisionModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    CLIPVisionModelFormat: "diffusers";
+    /**
+     * StableDiffusionXLModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
      * IPAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     IPAdapterModelFormat: "invokeai";
     /**
-     * ControlNetModelFormat
+     * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
@@ -9067,23 +9093,11 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusion1ModelFormat
+     * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
-    /**
-     * StableDiffusionXLModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    ControlNetModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -10501,6 +10515,20 @@ export type operations = {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Clear Invocation Cache
+   * @description Clears the invocation cache
+   */
+  clear_invocation_cache: {
+    responses: {
+      /** @description The operation was successful */
+      200: {
+        content: {
+          "application/json": unknown;
         };
       };
     };
