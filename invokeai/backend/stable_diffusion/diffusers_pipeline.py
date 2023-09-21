@@ -336,7 +336,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
-        ip_adapter_data: Optional[IPAdapterData] = None,
+        ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
@@ -410,7 +410,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         *,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
-        ip_adapter_data: Optional[IPAdapterData] = None,
+        ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
     ):
