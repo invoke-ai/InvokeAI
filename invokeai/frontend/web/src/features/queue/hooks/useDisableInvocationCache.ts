@@ -17,8 +17,8 @@ export const useDisableInvocationCache = () => {
   });
 
   const isDisabled = useMemo(
-    () => !cacheStatus?.enabled || !isConnected,
-    [cacheStatus?.enabled, isConnected]
+    () => !cacheStatus?.enabled || !isConnected || cacheStatus?.max_size === 0,
+    [cacheStatus?.enabled, cacheStatus?.max_size, isConnected]
   );
 
   const disableInvocationCache = useCallback(async () => {
