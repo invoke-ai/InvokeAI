@@ -61,7 +61,7 @@ const ParamIterations = ({ asSlider }: Props) => {
   }, [dispatch, initial]);
 
   return asSlider || shouldUseSliders ? (
-    <IAIInformationalPopover details="paramImages">
+    <IAIInformationalPopover details="paramIterations">
       <IAISlider
         label={t('parameters.iterations')}
         step={step}
@@ -77,7 +77,7 @@ const ParamIterations = ({ asSlider }: Props) => {
       />
     </IAIInformationalPopover>
   ) : (
-    <IAIInformationalPopover details="paramImages">
+    <IAIInformationalPopover details="paramIterations">
       <IAINumberInput
         label={t('parameters.iterations')}
         step={step}

@@ -1213,14 +1213,14 @@
         },
         "dynamicPromptsCombinatorial": {
             "heading": "Combinatorial Generation",
-            "paragraph": "Generate an image for every possible combination of Dynamic Prompt until the Max Prompts is reached."
+            "paragraph": "Generate an image for every possible combination of Dynamic Prompts until the Max Prompts is reached."
         },
         "infillMethod": {
             "heading": "Infill Method",
             "paragraph": "Method to infill the selected area."
         },
         "lora": {
-            "heading": "LoRA",
+            "heading": "LoRA Weight",
             "paragraph": "Weight of the LoRA. Higher weight will lead to larger impacts on the final image."
         },
         "noiseEnable": {
@@ -1239,21 +1239,21 @@
             "heading": "Denoising Strength",
             "paragraph": "How much noise is added to the input image. 0 will result in an identical image, while 1 will result in a completely new image."
         },
-        "paramImages": {
-            "heading": "Images",
-            "paragraph": "Number of images that will be generated."
+        "paramIterations": {
+            "heading": "Iterations",
+            "paragraph": "The number of images to generate. If Dynamic Prompts is enabled, each of the prompts will be generated this many times."
         },
         "paramModel": {
             "heading": "Model",
             "paragraph": "Model used for the denoising steps. Different models are trained to specialize in producing different aesthetic results and content."
         },
         "paramNegativeConditioning": {
-            "heading": "Negative Prompts",
-            "paragraph": "This is where you enter your negative prompts."
+            "heading": "Negative Prompt",
+            "paragraph": "The generation process avoids the concepts in the negative prompt. Use this to exclude qualities or objects from the output. Supports Compel syntax and embeddings."
         },
         "paramPositiveConditioning": {
-            "heading": "Positive Prompts",
-            "paragraph": "This is where you enter your positive prompts."
+            "heading": "Positive Prompt",
+            "paragraph": "Guides the generation process. You may use any words or phrases. Supports Compel and Dynamic Prompts syntaxes and embeddings."
         },
         "paramRatio": {
             "heading": "Ratio",

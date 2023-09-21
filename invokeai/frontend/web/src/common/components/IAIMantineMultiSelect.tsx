@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
+import { FormControl, FormLabel, Tooltip, forwardRef } from '@chakra-ui/react';
 import { MultiSelect, MultiSelectProps } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
@@ -11,7 +11,7 @@ type IAIMultiSelectProps = Omit<MultiSelectProps, 'label'> & {
   label?: string;
 };
 
-const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
+const IAIMantineMultiSelect = forwardRef((props: IAIMultiSelectProps, ref) => {
   const {
     searchable = true,
     tooltip,
@@ -47,7 +47,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
       <MultiSelect
         label={
           label ? (
-            <FormControl isDisabled={disabled}>
+            <FormControl ref={ref} isDisabled={disabled}>
               <FormLabel>{label}</FormLabel>
             </FormControl>
           ) : undefined
@@ -63,6 +63,8 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
       />
     </Tooltip>
   );
-};
+});
+
+IAIMantineMultiSelect.displayName = 'IAIMantineMultiSelect';
 
 export default memo(IAIMantineMultiSelect);
