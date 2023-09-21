@@ -9,7 +9,7 @@ import torch
 import torchvision.transforms as T
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models import UNet2DConditionModel
-from diffusers.models.adapter import FullAdapterXL
+from diffusers.models.adapter import FullAdapterXL, T2IAdapter
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -493,6 +493,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     f"Unexpected T2I-Adapter base model type: '{t2i_adapter_field.t2i_adapter_model.base_model}'."
                 )
 
+            t2i_adapter_model: T2IAdapter
             with t2i_adapter_model_info as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
                 if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
@@ -516,6 +517,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     do_classifier_free_guidance=False,
                     width=t2i_input_width,
                     height=t2i_input_height,
+                    num_channels=t2i_adapter_model.config.in_channels,
                     device=t2i_adapter_model.device,
                     dtype=t2i_adapter_model.dtype,
                     resize_mode=t2i_adapter_field.resize_mode,
