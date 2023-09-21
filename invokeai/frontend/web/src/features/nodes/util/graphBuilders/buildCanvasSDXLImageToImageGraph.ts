@@ -45,7 +45,6 @@ export const buildCanvasSDXLImageToImageGraph = (
     seed,
     steps,
     vaePrecision,
-    clipSkip,
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
@@ -339,7 +338,6 @@ export const buildCanvasSDXLImageToImageGraph = (
     vae: undefined, // option; set in addVAEToGraph
     controlnets: [], // populated in addControlNetToLinearGraph
     loras: [], // populated in addLoRAsToGraph
-    clip_skip: clipSkip,
     strength,
     init_image: initialImage.image_name,
   };
