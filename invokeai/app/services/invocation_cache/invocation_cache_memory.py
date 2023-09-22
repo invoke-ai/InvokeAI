@@ -3,8 +3,10 @@ from typing import Optional, Union
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
-from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
+from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus, ThreadLock
 from invokeai.app.services.invoker import Invoker
+
+thread_lock = ThreadLock()
 
 
 class MemoryInvocationCache(InvocationCacheBase):
@@ -31,6 +33,7 @@ class MemoryInvocationCache(InvocationCacheBase):
         self._invoker.services.images.on_deleted(self._delete_by_match)
         self._invoker.services.latents.on_deleted(self._delete_by_match)
 
+    @thread_lock.read
     def get(self, key: Union[int, str]) -> Optional[BaseInvocationOutput]:
         if self._max_cache_size == 0 or self._disabled:
             return
@@ -41,8 +44,9 @@ class MemoryInvocationCache(InvocationCacheBase):
             return item[0]
         self._misses += 1
 
+    @thread_lock.write
     def save(self, key: Union[int, str], invocation_output: BaseInvocationOutput) -> None:
-        if self._max_cache_size == 0 or self._disabled:
+        if self._max_cache_size == 0 or self._disabled or key:
             return
 
         if key not in self._cache:
@@ -55,13 +59,17 @@ class MemoryInvocationCache(InvocationCacheBase):
                     # this means the cache_ids are somehow out of sync w/ the cache
                     pass
 
-    def delete(self, key: Union[int, str]) -> None:
+    def _delete(self, key: Union[int, str]) -> None:
         if self._max_cache_size == 0:
             return
-
         if key in self._cache:
             del self._cache[key]
 
+    @thread_lock.write
+    def delete(self, key: Union[int, str]) -> None:
+        return self._delete(key)
+
+    @thread_lock.write
     def clear(self, *args, **kwargs) -> None:
         if self._max_cache_size == 0:
             return
@@ -71,19 +79,23 @@ class MemoryInvocationCache(InvocationCacheBase):
         self._misses = 0
         self._hits = 0
 
-    def create_key(self, invocation: BaseInvocation) -> int:
+    @staticmethod
+    def create_key(invocation: BaseInvocation) -> int:
         return hash(invocation.json(exclude={"id"}))
 
+    @thread_lock.write
     def disable(self) -> None:
         if self._max_cache_size == 0:
             return
         self._disabled = True
 
+    @thread_lock.write
     def enable(self) -> None:
         if self._max_cache_size == 0:
             return
         self._disabled = False
 
+    @thread_lock.read
     def get_status(self) -> InvocationCacheStatus:
         return InvocationCacheStatus(
             hits=self._hits,
@@ -93,6 +105,7 @@ class MemoryInvocationCache(InvocationCacheBase):
             max_size=self._max_cache_size,
         )
 
+    @thread_lock.write
     def _delete_by_match(self, to_match: str) -> None:
         if self._max_cache_size == 0:
             return
@@ -106,6 +119,6 @@ class MemoryInvocationCache(InvocationCacheBase):
             return
 
         for key in keys_to_delete:
-            self.delete(key)
+            self._delete(key)
 
         self._invoker.services.logger.debug(f"Deleted {len(keys_to_delete)} cached invocation outputs for {to_match}")
