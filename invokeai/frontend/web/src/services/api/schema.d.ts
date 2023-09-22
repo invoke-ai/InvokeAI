@@ -317,6 +317,34 @@ export type paths = {
      */
     post: operations["set_log_level"];
   };
+  "/api/v1/app/invocation_cache": {
+    /**
+     * Clear Invocation Cache
+     * @description Clears the invocation cache
+     */
+    delete: operations["clear_invocation_cache"];
+  };
+  "/api/v1/app/invocation_cache/enable": {
+    /**
+     * Enable Invocation Cache
+     * @description Clears the invocation cache
+     */
+    put: operations["enable_invocation_cache"];
+  };
+  "/api/v1/app/invocation_cache/disable": {
+    /**
+     * Disable Invocation Cache
+     * @description Clears the invocation cache
+     */
+    put: operations["disable_invocation_cache"];
+  };
+  "/api/v1/app/invocation_cache/status": {
+    /**
+     * Get Invocation Cache Status
+     * @description Clears the invocation cache
+     */
+    get: operations["get_invocation_cache_status"];
+  };
   "/api/v1/queue/{queue_id}/enqueue_graph": {
     /**
      * Enqueue Graph
@@ -1265,11 +1293,6 @@ export type components = {
        */
       use_cache?: boolean;
       /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
-      /**
        * Skipped Layers
        * @description Number of layers to skip in text encoder
        * @default 0
@@ -1281,6 +1304,11 @@ export type components = {
        * @enum {string}
        */
       type: "clip_skip";
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
     };
     /**
      * ClipSkipInvocationOutput
@@ -2025,7 +2053,7 @@ export type components = {
        * Clip Skip
        * @description The number of skipped CLIP layers
        */
-      clip_skip: number;
+      clip_skip?: number;
       /**
        * Model
        * @description The main model used for inference
@@ -2314,10 +2342,7 @@ export type components = {
        * @enum {string}
        */
       scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc";
-      /**
-       * Control
-       * @description ControlNet(s) to apply
-       */
+      /** Control */
       control?: components["schemas"]["ControlField"] | components["schemas"]["ControlField"][];
       /**
        * IP-Adapter
@@ -4722,6 +4747,34 @@ export type components = {
        * @enum {string}
        */
       type: "integer_output";
+    };
+    /** InvocationCacheStatus */
+    InvocationCacheStatus: {
+      /**
+       * Size
+       * @description The current size of the invocation cache
+       */
+      size: number;
+      /**
+       * Hits
+       * @description The number of cache hits
+       */
+      hits: number;
+      /**
+       * Misses
+       * @description The number of cache misses
+       */
+      misses: number;
+      /**
+       * Enabled
+       * @description Whether the invocation cache is enabled
+       */
+      enabled: boolean;
+      /**
+       * Max Size
+       * @description The maximum size of the invocation cache
+       */
+      max_size: number;
     };
     /**
      * IterateInvocation
@@ -7503,11 +7556,6 @@ export type components = {
        */
       use_cache?: boolean;
       /**
-       * Image
-       * @description The image to load
-       */
-      image?: components["schemas"]["ImageField"];
-      /**
        * Metadata
        * @description Optional core metadata to be written to image
        */
@@ -7518,6 +7566,11 @@ export type components = {
        * @enum {string}
        */
       type: "save_image";
+      /**
+       * Image
+       * @description The image to load
+       */
+      image?: components["schemas"]["ImageField"];
     };
     /**
      * Scale Latents
@@ -9048,18 +9101,6 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * IPAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    IPAdapterModelFormat: "invokeai";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -9072,23 +9113,35 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
      * CLIPVisionModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     CLIPVisionModelFormat: "diffusers";
     /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * IPAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    IPAdapterModelFormat: "invokeai";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -10506,6 +10559,62 @@ export type operations = {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Clear Invocation Cache
+   * @description Clears the invocation cache
+   */
+  clear_invocation_cache: {
+    responses: {
+      /** @description The operation was successful */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  /**
+   * Enable Invocation Cache
+   * @description Clears the invocation cache
+   */
+  enable_invocation_cache: {
+    responses: {
+      /** @description The operation was successful */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  /**
+   * Disable Invocation Cache
+   * @description Clears the invocation cache
+   */
+  disable_invocation_cache: {
+    responses: {
+      /** @description The operation was successful */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  /**
+   * Get Invocation Cache Status
+   * @description Clears the invocation cache
+   */
+  get_invocation_cache_status: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["InvocationCacheStatus"];
         };
       };
     };

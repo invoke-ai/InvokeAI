@@ -67,6 +67,7 @@ dependencies = [
   'pyperclip',
   "pyreadline3",
   "python-multipart",
+  "python-socketio",
   "pytorch-lightning",
   "realesrgan",
   "requests~=2.28.2",

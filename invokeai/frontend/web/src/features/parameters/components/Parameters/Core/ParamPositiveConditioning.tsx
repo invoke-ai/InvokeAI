@@ -104,13 +104,16 @@ const ParamPositiveConditioning = () => {
 
   return (
     <Box position="relative">
-      <FormControl>
-        <ParamEmbeddingPopover
-          isOpen={isOpen}
-          onClose={onClose}
-          onSelect={handleSelectEmbedding}
-        >
-          <IAIInformationalPopover details="paramPositiveConditioning">
+      <IAIInformationalPopover
+        placement="right"
+        details="paramPositiveConditioning"
+      >
+        <FormControl>
+          <ParamEmbeddingPopover
+            isOpen={isOpen}
+            onClose={onClose}
+            onSelect={handleSelectEmbedding}
+          >
             <IAITextarea
               id="prompt"
               name="prompt"
@@ -122,9 +125,9 @@ const ParamPositiveConditioning = () => {
               resize="vertical"
               minH={32}
             />
-          </IAIInformationalPopover>
-        </ParamEmbeddingPopover>
-      </FormControl>
+          </ParamEmbeddingPopover>
+        </FormControl>
+      </IAIInformationalPopover>
       {!isOpen && isEmbeddingEnabled && (
         <Box
           sx={{

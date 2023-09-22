@@ -1,37 +1,43 @@
 import {
+  Box,
   Button,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverArrow,
-  PopoverCloseButton,
-  PopoverHeader,
-  PopoverBody,
-  PopoverProps,
+  Divider,
   Flex,
-  Text,
+  Heading,
   Image,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverProps,
+  PopoverTrigger,
+  Portal,
+  Text,
 } from '@chakra-ui/react';
-import { useAppSelector } from '../../app/store/storeHooks';
+import { ReactNode, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAppSelector } from '../../app/store/storeHooks';
 
-interface Props extends PopoverProps {
+const OPEN_DELAY = 1500;
+
+type Props = Omit<PopoverProps, 'children'> & {
   details: string;
-  children: JSX.Element;
+  children: ReactNode;
   image?: string;
   buttonLabel?: string;
   buttonHref?: string;
   placement?: PopoverProps['placement'];
-}
+};
 
-function IAIInformationalPopover({
+const IAIInformationalPopover = ({
   details,
   image,
   buttonLabel,
   buttonHref,
   children,
   placement,
-}: Props): JSX.Element {
+}: Props) => {
   const shouldEnableInformationalPopovers = useAppSelector(
     (state) => state.system.shouldEnableInformationalPopovers
   );
@@ -41,18 +47,21 @@ function IAIInformationalPopover({
   const paragraph = t(`popovers.${details}.paragraph`);
 
   if (!shouldEnableInformationalPopovers) {
-    return children;
-  } else {
-    return (
-      <Popover
-        placement={placement || 'top'}
-        closeOnBlur={false}
-        trigger="hover"
-        variant="informational"
-      >
-        <PopoverTrigger>
-          <div>{children}</div>
-        </PopoverTrigger>
+    return <>{children}</>;
+  }
+
+  return (
+    <Popover
+      placement={placement || 'top'}
+      closeOnBlur={false}
+      trigger="hover"
+      variant="informational"
+      openDelay={OPEN_DELAY}
+    >
+      <PopoverTrigger>
+        <Box w="full">{children}</Box>
+      </PopoverTrigger>
+      <Portal>
         <PopoverContent>
           <PopoverArrow />
           <PopoverCloseButton />
@@ -83,14 +92,17 @@ function IAIInformationalPopover({
                   gap: 3,
                   flexDirection: 'column',
                   width: '100%',
-                  p: 3,
-                  pt: heading ? 0 : 3,
                 }}
               >
-                {heading && <PopoverHeader>{heading}</PopoverHeader>}
-                <Text sx={{ px: 3 }}>{paragraph}</Text>
+                {heading && (
+                  <>
+                    <Heading size="sm">{heading}</Heading>
+                    <Divider />
+                  </>
+                )}
+                <Text>{paragraph}</Text>
                 {buttonLabel && (
-                  <Flex sx={{ px: 3 }} justifyContent="flex-end">
+                  <Flex justifyContent="flex-end">
                     <Button
                       onClick={() => window.open(buttonHref)}
                       size="sm"
@@ -104,9 +116,9 @@ function IAIInformationalPopover({
             </Flex>
           </PopoverBody>
         </PopoverContent>
-      </Popover>
-    );
-  }
-}
+      </Portal>
+    </Popover>
+  );
+};
 
-export default IAIInformationalPopover;
+export default memo(IAIInformationalPopover);

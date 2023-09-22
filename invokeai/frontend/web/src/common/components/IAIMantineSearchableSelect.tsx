@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
+import { FormControl, FormLabel, Tooltip, forwardRef } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
@@ -17,7 +17,7 @@ type IAISelectProps = Omit<SelectProps, 'label'> & {
   inputRef?: RefObject<HTMLInputElement>;
 };
 
-const IAIMantineSearchableSelect = (props: IAISelectProps) => {
+const IAIMantineSearchableSelect = forwardRef((props: IAISelectProps, ref) => {
   const {
     searchable = true,
     tooltip,
@@ -74,7 +74,7 @@ const IAIMantineSearchableSelect = (props: IAISelectProps) => {
         ref={inputRef}
         label={
           label ? (
-            <FormControl isDisabled={disabled}>
+            <FormControl ref={ref} isDisabled={disabled}>
               <FormLabel>{label}</FormLabel>
             </FormControl>
           ) : undefined
@@ -92,6 +92,8 @@ const IAIMantineSearchableSelect = (props: IAISelectProps) => {
       />
     </Tooltip>
   );
-};
+});
+
+IAIMantineSearchableSelect.displayName = 'IAIMantineSearchableSelect';
 
 export default memo(IAIMantineSearchableSelect);

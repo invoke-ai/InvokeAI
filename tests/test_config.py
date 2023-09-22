@@ -121,6 +121,12 @@ def test_env_override(patch_rootdir):
     conf.parse_args(conf=init1, argv=[])
     assert conf.max_cache_size == 20
 
+    # make sure that prefix is respected
+    del os.environ["INVOKEAI_always_use_cpu"]
+    os.environ["always_use_cpu"] = "True"
+    conf.parse_args(conf=init1, argv=[])
+    assert conf.always_use_cpu is False
+
 
 def test_root_resists_cwd(patch_rootdir):
     from invokeai.app.services.config import InvokeAIAppConfig

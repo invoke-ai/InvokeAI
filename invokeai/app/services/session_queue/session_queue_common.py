@@ -162,15 +162,15 @@ class SessionQueueItemWithoutGraph(BaseModel):
     session_id: str = Field(
         description="The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed."
     )
-    field_values: Optional[list[NodeFieldValue]] = Field(
-        default=None, description="The field values that were used for this queue item"
-    )
-    queue_id: str = Field(description="The id of the queue with which this item is associated")
     error: Optional[str] = Field(default=None, description="The error message if this queue item errored")
     created_at: Union[datetime.datetime, str] = Field(description="When this queue item was created")
     updated_at: Union[datetime.datetime, str] = Field(description="When this queue item was updated")
     started_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was started")
     completed_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was completed")
+    queue_id: str = Field(description="The id of the queue with which this item is associated")
+    field_values: Optional[list[NodeFieldValue]] = Field(
+        default=None, description="The field values that were used for this queue item"
+    )
 
     @classmethod
     def from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemDTO":
