@@ -2,7 +2,6 @@
 
 from typing import Literal
 
-import random 
 import numpy as np
 from pydantic import validator
 
@@ -75,7 +74,7 @@ class RandomFloatInvocation(BaseInvocation):
     decimals: int = InputField(default=2, description="The number of decimal places in the generated float")
 
     def invoke(self, context:InvocationContext) -> FloatOutput:
-        random_float = random.uniform(self.min, self.max)
+        random_float = np.random.uniform(self.min, self.max)
         rounded_float = round(random_float, self.decimals)
         return FloatOutput(value=rounded_float)
 
