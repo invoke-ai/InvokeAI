@@ -578,11 +578,14 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
         image = np.array(image, dtype=np.uint8)
         height, width = image.shape[:2]
 
+        width_tile_size = min(self.color_map_tile_size, width)
+        height_tile_size = min(self.color_map_tile_size, height)
+
         color_map = cv2.resize(
             image,
-            (width // self.color_map_tile_size, height // self.color_map_tile_size),
+            (width // width_tile_size, height // height_tile_size),
             interpolation=cv2.INTER_CUBIC,
         )
         color_map = cv2.resize(color_map, (width, height), interpolation=cv2.INTER_NEAREST)
-        color_map = Image.fromarray(color_map)        
+        color_map = Image.fromarray(color_map)
         return color_map
