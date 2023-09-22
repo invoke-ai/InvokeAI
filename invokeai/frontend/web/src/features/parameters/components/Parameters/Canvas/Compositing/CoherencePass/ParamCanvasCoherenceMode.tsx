@@ -34,7 +34,7 @@ const ParamCanvasCoherenceMode = () => {
     <IAIInformationalPopover
       details="compositingCoherenceMode"
       buttonLabel="Learn More"
-      buttonHref="https://support.invoke.ai/a/solutions/articles/151000158838?portalId=151000075831"
+      buttonHref="https://support.invoke.ai/support/solutions/articles/151000158838"
     >
       <IAIMantineSelect
         label={t('parameters.coherenceMode')}

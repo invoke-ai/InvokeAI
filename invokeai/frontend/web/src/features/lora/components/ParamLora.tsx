@@ -39,7 +39,7 @@ const ParamLora = (props: Props) => {
     <IAIInformationalPopover
       details="lora"
       buttonLabel="Learn More"
-      buttonHref="https://support.invoke.ai/a/solutions/articles/151000159072?portalId=151000075831"
+      buttonHref="https://support.invoke.ai/support/solutions/articles/151000159072"
     >
       <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>
         <IAISlider

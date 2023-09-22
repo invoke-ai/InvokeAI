@@ -31,7 +31,7 @@ const ParamControlNetFeatureToggle = () => {
       <IAIInformationalPopover
         details="controlNetToggle"
         buttonLabel="Learn More"
-        buttonHref="https://support.invoke.ai/a/solutions/articles/151000105880?portalId=151000075831"
+        buttonHref="https://support.invoke.ai/support/solutions/articles/151000105880"
       >
         <IAISwitch
           label="Enable ControlNet"

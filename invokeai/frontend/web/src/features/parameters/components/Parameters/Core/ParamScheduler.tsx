@@ -55,7 +55,7 @@ const ParamScheduler = () => {
     <IAIInformationalPopover
       details="paramScheduler"
       buttonLabel="Learn More"
-      buttonHref="https://support.invoke.ai/a/solutions/articles/151000159073?portalId=151000075831"
+      buttonHref="https://support.invoke.ai/support/solutions/articles/151000159073"
     >
       <IAIMantineSearchableSelect
         label={t('parameters.scheduler')}
