@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setCanvasCoherenceSteps } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
@@ -14,7 +14,7 @@ const ParamCanvasCoherenceSteps = () => {
   const { t } = useTranslation();
 
   return (
-    <IAIInformationalPopover details="compositingCoherenceSteps">
+    <IAIInformationalPopover feature="compositingCoherenceSteps">
       <IAISlider
         label={t('parameters.coherenceSteps')}
         min={1}

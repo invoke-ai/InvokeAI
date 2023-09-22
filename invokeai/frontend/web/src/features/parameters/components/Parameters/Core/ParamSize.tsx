@@ -1,7 +1,9 @@
-import { Box, Flex, Spacer, Text } from '@chakra-ui/react';
+import { Flex, FormControl, FormLabel, Spacer } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import {
   setAspectRatio,
@@ -16,8 +18,6 @@ import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 import ParamAspectRatio, { mappedAspectRatios } from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 const sizeOptsSelector = createSelector(
   [generationSelector, activeTabNameSelector],
@@ -83,47 +83,35 @@ export default function ParamSize() {
         },
       }}
     >
-      <Flex alignItems="center" gap={2}>
-        <Box width="full">
-          <IAIInformationalPopover details="paramRatio">
-            <Text
-              sx={{
-                fontSize: 'sm',
-                color: 'base.700',
-                _dark: {
-                  color: 'base.300',
-                },
-              }}
-            >
-              {t('parameters.aspectRatio')}
-            </Text>
-          </IAIInformationalPopover>
-        </Box>
-        <Spacer />
-        <ParamAspectRatio />
-        <IAIIconButton
-          tooltip={t('ui.swapSizes')}
-          aria-label={t('ui.swapSizes')}
-          size="sm"
-          icon={<MdOutlineSwapVert />}
-          fontSize={20}
-          isDisabled={
-            activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
-          }
-          onClick={handleToggleSize}
-        />
-        <IAIIconButton
-          tooltip={t('ui.lockRatio')}
-          aria-label={t('ui.lockRatio')}
-          size="sm"
-          icon={<FaLock />}
-          isChecked={shouldLockAspectRatio}
-          isDisabled={
-            activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
-          }
-          onClick={handleLockRatio}
-        />
-      </Flex>
+      <IAIInformationalPopover feature="paramRatio">
+        <FormControl as={Flex} flexDir="row" alignItems="center" gap={2}>
+          <FormLabel>{t('parameters.aspectRatio')}</FormLabel>
+          <Spacer />
+          <ParamAspectRatio />
+          <IAIIconButton
+            tooltip={t('ui.swapSizes')}
+            aria-label={t('ui.swapSizes')}
+            size="sm"
+            icon={<MdOutlineSwapVert />}
+            fontSize={20}
+            isDisabled={
+              activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+            }
+            onClick={handleToggleSize}
+          />
+          <IAIIconButton
+            tooltip={t('ui.lockRatio')}
+            aria-label={t('ui.lockRatio')}
+            size="sm"
+            icon={<FaLock />}
+            isChecked={shouldLockAspectRatio}
+            isDisabled={
+              activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+            }
+            onClick={handleLockRatio}
+          />
+        </FormControl>
+      </IAIInformationalPopover>
       <Flex gap={2} alignItems="center">
         <Flex gap={2} flexDirection="column" width="full">
           <ParamWidth
