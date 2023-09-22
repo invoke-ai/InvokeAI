@@ -80,22 +80,6 @@ class RandomFloatInvocation(BaseInvocation):
         return FloatOutput(value=rounded_float)
 
 
-@invocation("rand_seed_float",title="Random Seeded Float",tags=["math","float","random"],category="math",version="1.0.0")
-class RandomSeededFloatInvocation(BaseInvocation):
-    """Output a random value between min and max (but using seed)"""
-    
-    min: float = InputField(default=0.0, description="The mimimum returned value")
-    max: float = InputField(default=1.0, description="The maximum returned value")
-    seed: int = InputField(default=None, description="The seed used for randomization")
-    decimals: int = InputField(default=2, description="The number of decimal places in the generated float")
-
-    def invoke(self, context:InvocationContext) -> FloatOutput:
-        random.seed(self.seed)  # Set the random seed
-        random_float = random.uniform(self.min, self.max)
-        rounded_float = round(random_float, self.decimals)
-        return FloatOutput(value=rounded_float)
-
-
 @invocation(
     "float_to_int",
     title="Float To Integer",
