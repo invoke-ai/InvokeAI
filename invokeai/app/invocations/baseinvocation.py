@@ -90,6 +90,7 @@ class FieldDescriptions:
     mask = "The mask to use for the operation"
     board = "The board to save the image to"
     image = "The image to process"
+    tile_size = "Tile size"
 
 
 class Input(str, Enum):
