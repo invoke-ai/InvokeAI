@@ -1,8 +1,8 @@
+import i18n from 'i18next';
 import {
   ControlNetProcessorType,
   RequiredControlNetProcessorNode,
 } from './types';
-import i18n from 'i18next';
 
 type ControlNetProcessorsDict = Record<
   ControlNetProcessorType,
@@ -48,6 +48,20 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       type: 'canny_image_processor',
       low_threshold: 100,
       high_threshold: 200,
+    },
+  },
+  color_map_image_processor: {
+    type: 'color_map_image_processor',
+    get label() {
+      return i18n.t('controlnet.colorMap');
+    },
+    get description() {
+      return i18n.t('controlnet.colorMapDescription');
+    },
+    default: {
+      id: 'color_map_image_processor',
+      type: 'color_map_image_processor',
+      map_resolution: 512,
     },
   },
   content_shuffle_image_processor: {
