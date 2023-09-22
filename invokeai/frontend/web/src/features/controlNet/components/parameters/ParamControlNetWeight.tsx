@@ -1,5 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import {
   ControlNetConfig,
@@ -24,7 +24,7 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   );
 
   return (
-    <IAIInformationalPopover details="controlNetWeight">
+    <IAIInformationalPopover feature="controlNetWeight">
       <IAISlider
         isDisabled={!isEnabled}
         label={t('controlnet.weight')}

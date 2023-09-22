@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISwitch from 'common/components/IAISwitch';
 import { isControlNetEnabledToggled } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
@@ -28,7 +28,7 @@ const ParamControlNetFeatureToggle = () => {
 
   return (
     <Box width="100%">
-      <IAIInformationalPopover details="controlNetToggle">
+      <IAIInformationalPopover feature="controlNet">
         <IAISwitch
           label="Enable ControlNet"
           isChecked={isEnabled}

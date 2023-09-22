@@ -30,6 +30,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
 import {
+  BoardInputFieldValue,
   BooleanInputFieldValue,
   ColorInputFieldValue,
   ControlNetModelInputFieldValue,
@@ -494,6 +495,12 @@ const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action);
     },
+    fieldBoardValueChanged: (
+      state,
+      action: FieldValueAction<BoardInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
     fieldImageValueChanged: (
       state,
       action: FieldValueAction<ImageInputFieldValue>
@@ -897,6 +904,7 @@ export const {
   imageCollectionFieldValueChanged,
   fieldStringValueChanged,
   fieldNumberValueChanged,
+  fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldImageValueChanged,
   fieldColorValueChanged,

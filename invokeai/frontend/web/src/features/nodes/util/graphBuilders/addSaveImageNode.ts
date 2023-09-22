@@ -24,12 +24,14 @@ export const addSaveImageNode = (
   const activeTabName = activeTabNameSelector(state);
   const is_intermediate =
     activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
+  const { autoAddBoardId } = state.gallery;
 
   const saveImageNode: SaveImageInvocation = {
     id: SAVE_IMAGE,
     type: 'save_image',
     is_intermediate,
     use_cache: false,
+    board: autoAddBoardId === 'none' ? undefined : { board_id: autoAddBoardId },
   };
 
   graph.nodes[SAVE_IMAGE] = saveImageNode;

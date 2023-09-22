@@ -31,14 +31,14 @@ const invokeAIContent = defineStyle((props) => {
 
 const informationalContent = defineStyle((props) => {
   return {
-    [$arrowBg.variable]: mode('colors.base.100', 'colors.base.600')(props),
-    [$popperBg.variable]: mode('colors.base.100', 'colors.base.600')(props),
+    [$arrowBg.variable]: mode('colors.base.100', 'colors.base.700')(props),
+    [$popperBg.variable]: mode('colors.base.100', 'colors.base.700')(props),
     [$arrowShadowColor.variable]: mode(
       'colors.base.400',
       'colors.base.400'
     )(props),
     p: 4,
-    bg: mode('base.100', 'base.600')(props),
+    bg: mode('base.100', 'base.700')(props),
     border: 'none',
     shadow: 'dark-lg',
   };
@@ -46,6 +46,7 @@ const informationalContent = defineStyle((props) => {
 
 const invokeAI = definePartsStyle((props) => ({
   content: invokeAIContent(props),
+  body: { padding: 0 },
 }));
 
 const informational = definePartsStyle((props) => ({
