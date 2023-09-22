@@ -878,7 +878,7 @@ const nodesSlice = createSlice({
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
       if (['in_progress'].includes(action.payload.data.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
-          nes.status = NodeStatus.IN_PROGRESS;
+          nes.status = NodeStatus.PENDING;
           nes.error = null;
           nes.progress = null;
           nes.progressImage = null;
