@@ -25,8 +25,8 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
         justifyContent: 'space-between',
       }}
     >
-      {hasImageOutput && <EmbedWorkflowCheckbox nodeId={nodeId} />}
       <UseCacheCheckbox nodeId={nodeId} />
+      {hasImageOutput && <EmbedWorkflowCheckbox nodeId={nodeId} />}
       {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
     </Flex>
   );
