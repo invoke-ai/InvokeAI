@@ -3,11 +3,12 @@ import sqlite3
 import threading
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Generic, Optional, TypeVar, cast
+from typing import Generic, Optional, TypeVar, Union, cast
 
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
+from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.models.image_record import ImageRecord, ImageRecordChanges, deserialize_image_record
 
@@ -81,7 +82,7 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_metadata(self, image_name: str) -> Optional[dict]:
+    def get_metadata(self, image_name: str) -> ImageMetadata:
         """Gets an image's metadata'."""
         pass
 
@@ -134,7 +135,8 @@ class ImageRecordStorageBase(ABC):
         height: int,
         session_id: Optional[str],
         node_id: Optional[str],
-        metadata: Optional[dict],
+        metadata: Optional[Union[str, dict]],
+        workflow: Optional[str],
         is_intermediate: bool = False,
         starred: bool = False,
     ) -> datetime:
@@ -204,6 +206,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
             )
 
+        if "workflow" not in columns:
+            self._cursor.execute(
+                """--sql
+                ALTER TABLE images ADD COLUMN workflow TEXT;
+                """
+            )
+
         # Create the `images` table indices.
         self._cursor.execute(
             """--sql
@@ -269,22 +278,31 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
         return deserialize_image_record(dict(result))
 
-    def get_metadata(self, image_name: str) -> Optional[dict]:
+    def get_metadata(self, image_name: str) -> ImageMetadata:
         try:
             self._lock.acquire()
 
             self._cursor.execute(
                 """--sql
-                SELECT images.metadata FROM images
+                SELECT metadata, workflow FROM images
                 WHERE image_name = ?;
                 """,
                 (image_name,),
             )
 
             result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
-            if not result or not result[0]:
-                return None
-            return json.loads(result[0])
+
+            if not result:
+                return ImageMetadata()
+
+            as_dict = dict(result)
+            metadata_raw = cast(Optional[str], as_dict.get("metadata", None))
+            workflow_raw = cast(Optional[str], as_dict.get("workflow", None))
+
+            return ImageMetadata(
+                metadata=json.loads(metadata_raw) if metadata_raw is not None else None,
+                workflow=json.loads(workflow_raw) if workflow_raw is not None else None,
+            )
         except sqlite3.Error as e:
             self._conn.rollback()
             raise ImageRecordNotFoundException from e
@@ -519,12 +537,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         width: int,
         height: int,
         node_id: Optional[str],
-        metadata: Optional[dict],
+        metadata: Optional[Union[str, dict]],
+        workflow: Optional[str],
         is_intermediate: bool = False,
         starred: bool = False,
     ) -> datetime:
         try:
-            metadata_json = None if metadata is None else json.dumps(metadata)
+            metadata_json: Optional[str] = None
+            if metadata is not None:
+                metadata_json = metadata if type(metadata) is str else json.dumps(metadata)
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
@@ -537,10 +558,11 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata,
+                    workflow,
                     is_intermediate,
                     starred
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -551,6 +573,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata_json,
+                    workflow,
                     is_intermediate,
                     starred,
                 ),

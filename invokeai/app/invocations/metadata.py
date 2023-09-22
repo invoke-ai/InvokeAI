@@ -85,11 +85,8 @@ class CoreMetadata(BaseModelExcludeNull):
 class ImageMetadata(BaseModelExcludeNull):
     """An image's generation metadata"""
 
-    metadata: Optional[dict] = Field(
-        default=None,
-        description="The image's core metadata, if it was created in the Linear or Canvas UI",
-    )
-    graph: Optional[dict] = Field(default=None, description="The graph that created the image")
+    metadata: Optional[dict] = Field(default=None, description="The metadata associated with the image")
+    workflow: Optional[dict] = Field(default=None, description="The workflow associated with the image")
 
 
 @invocation_output("metadata_accumulator_output")

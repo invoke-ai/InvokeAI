@@ -28,7 +28,7 @@ import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -41,9 +41,10 @@ import {
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
 import {
   useGetImageDTOQuery,
-  useGetImageMetadataFromFileQuery,
+  useGetImageMetadataQuery,
 } from 'services/api/endpoints/images';
 import { menuListMotionProps } from 'theme/components/menu';
+import { useDebounce } from 'use-debounce';
 import { sentImageToImg2Img } from '../../store/actions';
 import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
 
@@ -92,7 +93,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     shouldShowImageDetails,
     lastSelectedImage,
     shouldShowProgressInViewer,
-    shouldFetchMetadataFromApi,
   } = useAppSelector(currentImageButtonsSelector);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
@@ -107,16 +107,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     lastSelectedImage?.image_name ?? skipToken
   );
 
-  const getMetadataArg = useMemo(() => {
-    if (lastSelectedImage) {
-      return { image: lastSelectedImage, shouldFetchMetadataFromApi };
-    } else {
-      return skipToken;
-    }
-  }, [lastSelectedImage, shouldFetchMetadataFromApi]);
+  const [debouncedImageName] = useDebounce(lastSelectedImage?.image_name, 300);
 
-  const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    getMetadataArg,
+  const { metadata, workflow, isLoading } = useGetImageMetadataQuery(
+    debouncedImageName ?? skipToken,
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,

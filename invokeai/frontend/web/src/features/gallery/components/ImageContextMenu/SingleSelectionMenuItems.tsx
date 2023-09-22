@@ -1,8 +1,9 @@
 import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
@@ -32,12 +33,12 @@ import {
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
-  useGetImageMetadataFromFileQuery,
+  useGetImageMetadataQuery,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
-import { configSelector } from '../../../system/store/configSelectors';
+import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 
 type SingleSelectionMenuItemsProps = {
@@ -53,11 +54,12 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const toaster = useAppToaster();
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
   const customStarUi = useStore($customStarUI);
 
-  const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    { image: imageDTO, shouldFetchMetadataFromApi },
+  const [debouncedImageName] = useDebounce(imageDTO.image_name, 300);
+
+  const { metadata, workflow, isLoading } = useGetImageMetadataQuery(
+    debouncedImageName ?? skipToken,
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,

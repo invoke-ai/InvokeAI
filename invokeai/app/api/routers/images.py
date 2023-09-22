@@ -45,13 +45,17 @@ async def upload_image(
     if not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
-    contents = await file.read()
+    metadata: Optional[str] = None
+    workflow: Optional[str] = None
 
+    contents = await file.read()
     try:
         pil_image = Image.open(io.BytesIO(contents))
         if crop_visible:
             bbox = pil_image.getbbox()
             pil_image = pil_image.crop(bbox)
+        metadata = pil_image.info.get("invokeai_metadata", None)
+        workflow = pil_image.info.get("invokeai_workflow", None)
     except Exception:
         # Error opening the image
         raise HTTPException(status_code=415, detail="Failed to read image")
@@ -63,6 +67,8 @@ async def upload_image(
             image_category=image_category,
             session_id=session_id,
             board_id=board_id,
+            metadata=metadata,
+            workflow=workflow,
             is_intermediate=is_intermediate,
         )
 

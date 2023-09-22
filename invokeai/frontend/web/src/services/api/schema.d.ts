@@ -1288,6 +1288,11 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
+      /**
        * Skipped Layers
        * @description Number of layers to skip in text encoder
        * @default 0
@@ -1299,11 +1304,6 @@ export type components = {
        * @enum {string}
        */
       type: "clip_skip";
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
     };
     /**
      * ClipSkipInvocationOutput
@@ -3916,14 +3916,14 @@ export type components = {
     ImageMetadata: {
       /**
        * Metadata
-       * @description The image's core metadata, if it was created in the Linear or Canvas UI
+       * @description The metadata associated with the image
        */
       metadata?: Record<string, never>;
       /**
-       * Graph
-       * @description The graph that created the image
+       * Workflow
+       * @description The workflow associated with the image
        */
-      graph?: Record<string, never>;
+      workflow?: Record<string, never>;
     };
     /**
      * Multiply Images
@@ -7551,6 +7551,11 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Image
+       * @description The image to load
+       */
+      image?: components["schemas"]["ImageField"];
+      /**
        * Metadata
        * @description Optional core metadata to be written to image
        */
@@ -7561,11 +7566,6 @@ export type components = {
        * @enum {string}
        */
       type: "save_image";
-      /**
-       * Image
-       * @description The image to load
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
      * Scale Latents
@@ -7863,16 +7863,6 @@ export type components = {
        */
       session_id: string;
       /**
-       * Field Values
-       * @description The field values that were used for this queue item
-       */
-      field_values?: components["schemas"]["NodeFieldValue"][];
-      /**
-       * Queue Id
-       * @description The id of the queue with which this item is associated
-       */
-      queue_id: string;
-      /**
        * Error
        * @description The error message if this queue item errored
        */
@@ -7897,6 +7887,16 @@ export type components = {
        * @description When this queue item was completed
        */
       completed_at?: string;
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
+      /**
+       * Field Values
+       * @description The field values that were used for this queue item
+       */
+      field_values?: components["schemas"]["NodeFieldValue"][];
       /**
        * Session
        * @description The fully-populated session to be executed
@@ -7937,16 +7937,6 @@ export type components = {
        */
       session_id: string;
       /**
-       * Field Values
-       * @description The field values that were used for this queue item
-       */
-      field_values?: components["schemas"]["NodeFieldValue"][];
-      /**
-       * Queue Id
-       * @description The id of the queue with which this item is associated
-       */
-      queue_id: string;
-      /**
        * Error
        * @description The error message if this queue item errored
        */
@@ -7971,6 +7961,16 @@ export type components = {
        * @description When this queue item was completed
        */
       completed_at?: string;
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
+      /**
+       * Field Values
+       * @description The field values that were used for this queue item
+       */
+      field_values?: components["schemas"]["NodeFieldValue"][];
     };
     /** SessionQueueStatus */
     SessionQueueStatus: {
@@ -9096,6 +9096,12 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -9108,17 +9114,17 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
-    /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * CLIPVisionModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    CLIPVisionModelFormat: "diffusers";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
@@ -9131,12 +9137,6 @@ export type components = {
      * @enum {string}
      */
     IPAdapterModelFormat: "invokeai";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

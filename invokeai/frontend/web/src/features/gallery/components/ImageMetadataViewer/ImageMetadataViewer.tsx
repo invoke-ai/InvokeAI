@@ -9,15 +9,15 @@ import {
   Tabs,
   Text,
 } from '@chakra-ui/react';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
-import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
+import { useTranslation } from 'react-i18next';
+import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
+import { useDebounce } from 'use-debounce';
 import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
-import { useAppSelector } from '../../../../app/store/storeHooks';
-import { configSelector } from '../../../system/store/configSelectors';
-import { useTranslation } from 'react-i18next';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -31,10 +31,10 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // });
   const { t } = useTranslation();
 
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
+  const [debouncedImageName] = useDebounce(image.image_name, 300);
 
-  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
-    { image, shouldFetchMetadataFromApi },
+  const { metadata, workflow } = useGetImageMetadataQuery(
+    debouncedImageName ?? skipToken,
     {
       selectFromResult: (res) => ({
         metadata: res?.currentData?.metadata,

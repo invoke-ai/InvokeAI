@@ -10,6 +10,7 @@ import {
 import {
   ImageMetadataAndWorkflow,
   zCoreMetadata,
+  zWorkflow,
 } from 'features/nodes/types/types';
 import { getMetadataAndWorkflowFromImageBlob } from 'features/nodes/util/getMetadataAndWorkflowFromImageBlob';
 import { keyBy } from 'lodash-es';
@@ -23,7 +24,6 @@ import {
   ListImagesArgs,
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
-  UnsafeImageMetadata,
 } from '../types';
 import {
   getCategories,
@@ -33,6 +33,7 @@ import {
   imagesSelectors,
 } from '../util';
 import { boardsApi } from './boards';
+import { logger } from 'app/logging/logger';
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -113,11 +114,33 @@ export const imagesApi = api.injectEndpoints({
       ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    getImageMetadata: build.query<UnsafeImageMetadata, string>({
+    getImageMetadata: build.query<ImageMetadataAndWorkflow, string>({
       query: (image_name) => ({ url: `images/i/${image_name}/metadata` }),
       providesTags: (result, error, image_name) => [
         { type: 'ImageMetadata', id: image_name },
       ],
+      transformResponse: (
+        response: paths['/api/v1/images/i/{image_name}/metadata']['get']['responses']['200']['content']['application/json']
+      ) => {
+        const imageMetadataAndWorkflow: ImageMetadataAndWorkflow = {};
+        if (response?.metadata) {
+          const metadataResult = zCoreMetadata.safeParse(response.metadata);
+          if (metadataResult.success) {
+            imageMetadataAndWorkflow.metadata = metadataResult.data;
+          } else {
+            logger('images').warn('Problem parsing metadata');
+          }
+        }
+        if (response?.workflow) {
+          const workflowResult = zWorkflow.safeParse(response.workflow);
+          if (workflowResult.success) {
+            imageMetadataAndWorkflow.workflow = workflowResult.data;
+          } else {
+            logger('images').warn('Problem parsing workflow');
+          }
+        }
+        return imageMetadataAndWorkflow;
+      },
       keepUnusedDataFor: 86400, // 24 hours
     }),
     getImageMetadataFromFile: build.query<

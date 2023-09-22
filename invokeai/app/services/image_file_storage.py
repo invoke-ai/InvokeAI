@@ -59,7 +59,7 @@ class ImageFileStorageBase(ABC):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[dict] = None,
+        metadata: Optional[Union[str, dict]] = None,
         workflow: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
@@ -109,7 +109,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[dict] = None,
+        metadata: Optional[Union[str, dict]] = None,
         workflow: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
@@ -119,20 +119,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             pnginfo = PngImagePlugin.PngInfo()
 
-            if metadata is not None or workflow is not None:
-                if metadata is not None:
-                    pnginfo.add_text("invokeai_metadata", json.dumps(metadata))
-                if workflow is not None:
-                    pnginfo.add_text("invokeai_workflow", workflow)
-            else:
-                # For uploaded images, we want to retain metadata. PIL strips it on save; manually add it back
-                # TODO: retain non-invokeai metadata on save...
-                original_metadata = image.info.get("invokeai_metadata", None)
-                if original_metadata is not None:
-                    pnginfo.add_text("invokeai_metadata", original_metadata)
-                original_workflow = image.info.get("invokeai_workflow", None)
-                if original_workflow is not None:
-                    pnginfo.add_text("invokeai_workflow", original_workflow)
+            if metadata is not None:
+                pnginfo.add_text("invokeai_metadata", json.dumps(metadata) if type(metadata) is dict else metadata)
+            if workflow is not None:
+                pnginfo.add_text("invokeai_workflow", workflow)
 
             image.save(image_path, "PNG", pnginfo=pnginfo)
 
