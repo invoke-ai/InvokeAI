@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 
 import IAISlider from 'common/components/IAISlider';
@@ -57,7 +57,7 @@ const ParamSteps = () => {
   }, [dispatch]);
 
   return shouldUseSliders ? (
-    <IAIInformationalPopover details="paramSteps">
+    <IAIInformationalPopover feature="paramSteps">
       <IAISlider
         label={t('parameters.steps')}
         min={min}
@@ -73,7 +73,7 @@ const ParamSteps = () => {
       />
     </IAIInformationalPopover>
   ) : (
-    <IAIInformationalPopover details="paramSteps">
+    <IAIInformationalPopover feature="paramSteps">
       <IAINumberInput
         label={t('parameters.steps')}
         min={min}

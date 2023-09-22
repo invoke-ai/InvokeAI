@@ -1,40 +1,28 @@
-import { Flex, Text } from '@chakra-ui/react';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import { Flex, Text, forwardRef } from '@chakra-ui/react';
 import { ReactNode, memo } from 'react';
 
 type SubParameterWrapperProps = {
-  children: ReactNode | ReactNode[];
+  children: ReactNode;
   label?: string;
-  headerInfoPopover?: string;
 };
 
-const SubParametersWrapper = (props: SubParameterWrapperProps) => (
-  <Flex
-    sx={{
-      flexDir: 'column',
-      gap: 2,
-      bg: 'base.100',
-      px: 4,
-      pt: 2,
-      pb: 4,
-      borderRadius: 'base',
-      _dark: {
-        bg: 'base.750',
-      },
-    }}
-  >
-    {props.headerInfoPopover && props.label && (
-      <IAIInformationalPopover details={props.headerInfoPopover}>
-        <Text
-          fontSize="sm"
-          fontWeight="bold"
-          sx={{ color: 'base.600', _dark: { color: 'base.300' } }}
-        >
-          {props.label}
-        </Text>
-      </IAIInformationalPopover>
-    )}
-    {!props.headerInfoPopover && props.label && (
+const SubParametersWrapper = forwardRef(
+  (props: SubParameterWrapperProps, ref) => (
+    <Flex
+      ref={ref}
+      sx={{
+        flexDir: 'column',
+        gap: 2,
+        bg: 'base.100',
+        px: 4,
+        pt: 2,
+        pb: 4,
+        borderRadius: 'base',
+        _dark: {
+          bg: 'base.750',
+        },
+      }}
+    >
       <Text
         fontSize="sm"
         fontWeight="bold"
@@ -42,9 +30,9 @@ const SubParametersWrapper = (props: SubParameterWrapperProps) => (
       >
         {props.label}
       </Text>
-    )}
-    {props.children}
-  </Flex>
+      {props.children}
+    </Flex>
+  )
 );
 
 SubParametersWrapper.displayName = 'SubSettingsWrapper';

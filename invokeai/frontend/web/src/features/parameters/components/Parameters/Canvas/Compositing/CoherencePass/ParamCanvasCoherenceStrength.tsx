@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setCanvasCoherenceStrength } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
@@ -14,7 +14,7 @@ const ParamCanvasCoherenceStrength = () => {
   const { t } = useTranslation();
 
   return (
-    <IAIInformationalPopover details="compositingStrength">
+    <IAIInformationalPopover feature="compositingStrength">
       <IAISlider
         label={t('parameters.coherenceStrength')}
         min={0}

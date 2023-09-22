@@ -10,7 +10,7 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import {
   ControlNetConfig,
   controlNetBeginStepPctChanged,
@@ -50,7 +50,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
   );
 
   return (
-    <IAIInformationalPopover details="controlNetBeginEnd">
+    <IAIInformationalPopover feature="controlNetBeginEnd">
       <FormControl isDisabled={!isEnabled}>
         <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
         <HStack w="100%" gap={2} alignItems="center">
