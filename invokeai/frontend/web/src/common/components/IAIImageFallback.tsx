@@ -1,7 +1,7 @@
 import {
   As,
-  ChakraProps,
   Flex,
+  FlexProps,
   Icon,
   Skeleton,
   Spinner,
@@ -47,15 +47,14 @@ export const IAILoadingImageFallback = (props: Props) => {
   );
 };
 
-type IAINoImageFallbackProps = {
+type IAINoImageFallbackProps = FlexProps & {
   label?: string;
   icon?: As | null;
   boxSize?: StyleProps['boxSize'];
-  sx?: ChakraProps['sx'];
 };
 
 export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
-  const { icon = FaImage, boxSize = 16 } = props;
+  const { icon = FaImage, boxSize = 16, sx, ...rest } = props;
 
   return (
     <Flex
@@ -73,8 +72,9 @@ export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
         _dark: {
           color: 'base.500',
         },
-        ...props.sx,
+        ...sx,
       }}
+      {...rest}
     >
       {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
       {props.label && <Text textAlign="center">{props.label}</Text>}

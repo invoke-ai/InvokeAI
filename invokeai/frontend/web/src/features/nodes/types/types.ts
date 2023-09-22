@@ -1,3 +1,4 @@
+import { $store } from 'app/store/nanostores/store';
 import {
   SchedulerParam,
   zBaseModel,
@@ -7,7 +8,8 @@ import {
   zSDXLRefinerModel,
   zScheduler,
 } from 'features/parameters/types/parameterSchemas';
-import { keyBy } from 'lodash-es';
+import i18n from 'i18next';
+import { has, keyBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Node } from 'reactflow';
@@ -20,7 +22,6 @@ import {
 import { O } from 'ts-toolbelt';
 import { JsonObject } from 'type-fest';
 import { z } from 'zod';
-import i18n from 'i18next';
 
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 
@@ -57,6 +58,10 @@ export type InvocationTemplate = {
    * The invocation's version.
    */
   version?: string;
+  /**
+   * Whether or not this node should use the cache
+   */
+  useCache: boolean;
 };
 
 export type FieldUIConfig = {
@@ -94,6 +99,8 @@ export const zFieldType = z.enum([
   'integer',
   'IntegerCollection',
   'IntegerPolymorphic',
+  'IPAdapterField',
+  'IPAdapterModelField',
   'LatentsCollection',
   'LatentsField',
   'LatentsPolymorphic',
@@ -213,7 +220,7 @@ export type IntegerCollectionInputFieldValue = z.infer<
 
 export const zIntegerPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('IntegerPolymorphic'),
-  value: z.union([z.number().int(), z.array(z.number().int())]).optional(),
+  value: z.number().int().optional(),
 });
 export type IntegerPolymorphicInputFieldValue = z.infer<
   typeof zIntegerPolymorphicInputFieldValue
@@ -235,7 +242,7 @@ export type FloatCollectionInputFieldValue = z.infer<
 
 export const zFloatPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('FloatPolymorphic'),
-  value: z.union([z.number(), z.array(z.number())]).optional(),
+  value: z.number().optional(),
 });
 export type FloatPolymorphicInputFieldValue = z.infer<
   typeof zFloatPolymorphicInputFieldValue
@@ -257,7 +264,7 @@ export type StringCollectionInputFieldValue = z.infer<
 
 export const zStringPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('StringPolymorphic'),
-  value: z.union([z.string(), z.array(z.string())]).optional(),
+  value: z.string().optional(),
 });
 export type StringPolymorphicInputFieldValue = z.infer<
   typeof zStringPolymorphicInputFieldValue
@@ -279,7 +286,7 @@ export type BooleanCollectionInputFieldValue = z.infer<
 
 export const zBooleanPolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('BooleanPolymorphic'),
-  value: z.union([z.boolean(), z.array(z.boolean())]).optional(),
+  value: z.boolean().optional(),
 });
 export type BooleanPolymorphicInputFieldValue = z.infer<
   typeof zBooleanPolymorphicInputFieldValue
@@ -389,6 +396,25 @@ export type ControlCollectionInputFieldValue = z.infer<
   typeof zControlCollectionInputFieldValue
 >;
 
+export const zIPAdapterModel = zModelIdentifier;
+export type IPAdapterModel = z.infer<typeof zIPAdapterModel>;
+
+export const zIPAdapterField = z.object({
+  image: zImageField,
+  ip_adapter_model: zIPAdapterModel,
+  image_encoder_model: z.string().trim().min(1),
+  weight: z.number(),
+});
+export type IPAdapterField = z.infer<typeof zIPAdapterField>;
+
+export const zIPAdapterInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterField'),
+  value: zIPAdapterField.optional(),
+});
+export type IPAdapterInputFieldValue = z.infer<
+  typeof zIPAdapterInputFieldValue
+>;
+
 export const zModelType = z.enum([
   'onnx',
   'main',
@@ -470,7 +496,7 @@ export type ImageInputFieldValue = z.infer<typeof zImageInputFieldValue>;
 
 export const zImagePolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ImagePolymorphic'),
-  value: z.union([zImageField, z.array(zImageField)]).optional(),
+  value: zImageField.optional(),
 });
 export type ImagePolymorphicInputFieldValue = z.infer<
   typeof zImagePolymorphicInputFieldValue
@@ -536,6 +562,17 @@ export const zControlNetModelInputFieldValue = zInputFieldValueBase.extend({
 });
 export type ControlNetModelInputFieldValue = z.infer<
   typeof zControlNetModelInputFieldValue
+>;
+
+export const zIPAdapterModelField = zModelIdentifier;
+export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
+
+export const zIPAdapterModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterModelField'),
+  value: zIPAdapterModelField.optional(),
+});
+export type IPAdapterModelInputFieldValue = z.infer<
+  typeof zIPAdapterModelInputFieldValue
 >;
 
 export const zCollectionInputFieldValue = zInputFieldValueBase.extend({
@@ -620,6 +657,8 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zIntegerCollectionInputFieldValue,
   zIntegerPolymorphicInputFieldValue,
   zIntegerInputFieldValue,
+  zIPAdapterInputFieldValue,
+  zIPAdapterModelInputFieldValue,
   zLatentsInputFieldValue,
   zLatentsCollectionInputFieldValue,
   zLatentsPolymorphicInputFieldValue,
@@ -822,6 +861,11 @@ export type ControlPolymorphicInputFieldTemplate = Omit<
   type: 'ControlPolymorphic';
 };
 
+export type IPAdapterInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'IPAdapterField';
+};
+
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'enum';
@@ -857,6 +901,11 @@ export type LoRAModelInputFieldTemplate = InputFieldTemplateBase & {
 export type ControlNetModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'ControlNetModelField';
+};
+
+export type IPAdapterModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'IPAdapterModelField';
 };
 
 export type CollectionInputFieldTemplate = InputFieldTemplateBase & {
@@ -930,6 +979,8 @@ export type InputFieldTemplate =
   | IntegerCollectionInputFieldTemplate
   | IntegerPolymorphicInputFieldTemplate
   | IntegerInputFieldTemplate
+  | IPAdapterInputFieldTemplate
+  | IPAdapterModelInputFieldTemplate
   | LatentsInputFieldTemplate
   | LatentsCollectionInputFieldTemplate
   | LatentsPolymorphicInputFieldTemplate
@@ -975,6 +1026,9 @@ export type InvocationSchemaExtra = {
   > & {
     type: Omit<OpenAPIV3.SchemaObject, 'default'> & {
       default: AnyInvocationType;
+    };
+    use_cache: Omit<OpenAPIV3.SchemaObject, 'default'> & {
+      default: boolean;
     };
   };
 };
@@ -1066,36 +1120,45 @@ export type LoRAMetadataItem = z.infer<typeof zLoRAMetadataItem>;
 
 export const zCoreMetadata = z
   .object({
-    app_version: z.string().nullish(),
-    generation_mode: z.string().nullish(),
-    created_by: z.string().nullish(),
-    positive_prompt: z.string().nullish(),
-    negative_prompt: z.string().nullish(),
-    width: z.number().int().nullish(),
-    height: z.number().int().nullish(),
-    seed: z.number().int().nullish(),
-    rand_device: z.string().nullish(),
-    cfg_scale: z.number().nullish(),
-    steps: z.number().int().nullish(),
-    scheduler: z.string().nullish(),
-    clip_skip: z.number().int().nullish(),
+    app_version: z.string().nullish().catch(null),
+    generation_mode: z.string().nullish().catch(null),
+    created_by: z.string().nullish().catch(null),
+    positive_prompt: z.string().nullish().catch(null),
+    negative_prompt: z.string().nullish().catch(null),
+    width: z.number().int().nullish().catch(null),
+    height: z.number().int().nullish().catch(null),
+    seed: z.number().int().nullish().catch(null),
+    rand_device: z.string().nullish().catch(null),
+    cfg_scale: z.number().nullish().catch(null),
+    steps: z.number().int().nullish().catch(null),
+    scheduler: z.string().nullish().catch(null),
+    clip_skip: z.number().int().nullish().catch(null),
     model: z
       .union([zMainModel.deepPartial(), zOnnxModel.deepPartial()])
-      .nullish(),
-    controlnets: z.array(zControlField.deepPartial()).nullish(),
-    loras: z.array(zLoRAMetadataItem).nullish(),
-    vae: zVaeModelField.nullish(),
-    strength: z.number().nullish(),
-    init_image: z.string().nullish(),
-    positive_style_prompt: z.string().nullish(),
-    negative_style_prompt: z.string().nullish(),
-    refiner_model: zSDXLRefinerModel.deepPartial().nullish(),
-    refiner_cfg_scale: z.number().nullish(),
-    refiner_steps: z.number().int().nullish(),
-    refiner_scheduler: z.string().nullish(),
-    refiner_positive_aesthetic_score: z.number().nullish(),
-    refiner_negative_aesthetic_score: z.number().nullish(),
-    refiner_start: z.number().nullish(),
+      .nullish()
+      .catch(null),
+    controlnets: z.array(zControlField.deepPartial()).nullish().catch(null),
+    loras: z
+      .array(
+        z.object({
+          lora: zLoRAModelField.deepPartial(),
+          weight: z.number(),
+        })
+      )
+      .nullish()
+      .catch(null),
+    vae: zVaeModelField.nullish().catch(null),
+    strength: z.number().nullish().catch(null),
+    init_image: z.string().nullish().catch(null),
+    positive_style_prompt: z.string().nullish().catch(null),
+    negative_style_prompt: z.string().nullish().catch(null),
+    refiner_model: zSDXLRefinerModel.deepPartial().nullish().catch(null),
+    refiner_cfg_scale: z.number().nullish().catch(null),
+    refiner_steps: z.number().int().nullish().catch(null),
+    refiner_scheduler: z.string().nullish().catch(null),
+    refiner_positive_aesthetic_score: z.number().nullish().catch(null),
+    refiner_negative_aesthetic_score: z.number().nullish().catch(null),
+    refiner_start: z.number().nullish().catch(null),
   })
   .passthrough();
 
@@ -1139,9 +1202,37 @@ export const zInvocationNodeData = z.object({
   version: zSemVer.optional(),
 });
 
+export const zInvocationNodeDataV2 = z.preprocess(
+  (arg) => {
+    try {
+      const data = zInvocationNodeData.parse(arg);
+      if (!has(data, 'useCache')) {
+        const nodeTemplates = $store.get()?.getState().nodes.nodeTemplates as
+          | Record<string, InvocationTemplate>
+          | undefined;
+
+        const template = nodeTemplates?.[data.type];
+
+        let useCache = true;
+        if (template) {
+          useCache = template.useCache;
+        }
+
+        Object.assign(data, { useCache });
+      }
+      return data;
+    } catch {
+      return arg;
+    }
+  },
+  zInvocationNodeData.extend({
+    useCache: z.boolean(),
+  })
+);
+
 // Massage this to get better type safety while developing
 export type InvocationNodeData = Omit<
-  z.infer<typeof zInvocationNodeData>,
+  z.infer<typeof zInvocationNodeDataV2>,
   'type'
 > & {
   type: AnyInvocationType;
@@ -1169,7 +1260,7 @@ const zDimension = z.number().gt(0).nullish();
 export const zWorkflowInvocationNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('invocation'),
-  data: zInvocationNodeData,
+  data: zInvocationNodeDataV2,
   width: zDimension,
   height: zDimension,
   position: zPosition,
@@ -1231,6 +1322,8 @@ export type WorkflowWarning = {
   data: JsonObject;
 };
 
+const CURRENT_WORKFLOW_VERSION = '1.0.0';
+
 export const zWorkflow = z.object({
   name: z.string().default(''),
   author: z.string().default(''),
@@ -1246,7 +1339,7 @@ export const zWorkflow = z.object({
     .object({
       version: zSemVer,
     })
-    .default({ version: '1.0.0' }),
+    .default({ version: CURRENT_WORKFLOW_VERSION }),
 });
 
 export const zValidatedWorkflow = zWorkflow.transform((workflow) => {

@@ -3,7 +3,7 @@ import { startAppListening } from '..';
 import { $logger } from 'app/logging/logger';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
-import { copyBlobToClipboard } from 'features/canvas/util/copyBlobToClipboard';
+import { copyBlobToClipboard } from 'features/system/util/copyBlobToClipboard';
 import { t } from 'i18next';
 
 export const addCanvasCopiedToClipboardListener = () => {
@@ -15,10 +15,12 @@ export const addCanvasCopiedToClipboardListener = () => {
         .child({ namespace: 'canvasCopiedToClipboardListener' });
       const state = getState();
 
-      const blob = await getBaseLayerBlob(state);
+      try {
+        const blob = getBaseLayerBlob(state);
 
-      if (!blob) {
-        moduleLog.error('Problem getting base layer blob');
+        copyBlobToClipboard(blob);
+      } catch (err) {
+        moduleLog.error(String(err));
         dispatch(
           addToast({
             title: t('toast.problemCopyingCanvas'),
@@ -28,8 +30,6 @@ export const addCanvasCopiedToClipboardListener = () => {
         );
         return;
       }
-
-      copyBlobToClipboard(blob);
 
       dispatch(
         addToast({

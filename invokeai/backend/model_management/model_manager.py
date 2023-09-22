@@ -25,6 +25,7 @@ Models are described using four attributes:
          ModelType.Lora -- a LoRA or LyCORIS fine-tune
          ModelType.TextualInversion -- a textual inversion embedding
          ModelType.ControlNet -- a ControlNet model
+         ModelType.IPAdapter -- an IPAdapter model
 
   3) BaseModelType -- an enum indicating the stable diffusion base model, one of:
          BaseModelType.StableDiffusion1
@@ -1000,8 +1001,8 @@ class ModelManager(object):
                                 new_models_found = True
                             except DuplicateModelException as e:
                                 self.logger.warning(e)
-                            except InvalidModelException:
-                                self.logger.warning(f"Not a valid model: {model_path}")
+                            except InvalidModelException as e:
+                                self.logger.warning(f"Not a valid model: {model_path}. {e}")
                             except NotImplementedError as e:
                                 self.logger.warning(e)
 

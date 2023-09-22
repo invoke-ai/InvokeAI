@@ -4,12 +4,17 @@ import { fieldBooleanValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   BooleanInputFieldTemplate,
   BooleanInputFieldValue,
+  BooleanPolymorphicInputFieldTemplate,
+  BooleanPolymorphicInputFieldValue,
   FieldComponentProps,
 } from 'features/nodes/types/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 
 const BooleanInputFieldComponent = (
-  props: FieldComponentProps<BooleanInputFieldValue, BooleanInputFieldTemplate>
+  props: FieldComponentProps<
+    BooleanInputFieldValue | BooleanPolymorphicInputFieldValue,
+    BooleanInputFieldTemplate | BooleanPolymorphicInputFieldTemplate
+  >
 ) => {
   const { nodeId, field } = props;
 

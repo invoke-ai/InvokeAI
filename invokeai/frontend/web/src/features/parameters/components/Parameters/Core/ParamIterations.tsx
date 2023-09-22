@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
 import { setIterations } from 'features/parameters/store/generationSlice';
@@ -15,8 +16,6 @@ const selector = createSelector(
       state.config.sd.iterations;
     const { iterations } = state.generation;
     const { shouldUseSliders } = state.ui;
-    const isDisabled =
-      state.dynamicPrompts.isEnabled && state.dynamicPrompts.combinatorial;
 
     const step = state.hotkeys.shift ? fineStep : coarseStep;
 
@@ -28,13 +27,16 @@ const selector = createSelector(
       inputMax,
       step,
       shouldUseSliders,
-      isDisabled,
     };
   },
   defaultSelectorOptions
 );
 
-const ParamIterations = () => {
+type Props = {
+  asSlider?: boolean;
+};
+
+const ParamIterations = ({ asSlider }: Props) => {
   const {
     iterations,
     initial,
@@ -43,7 +45,6 @@ const ParamIterations = () => {
     inputMax,
     step,
     shouldUseSliders,
-    isDisabled,
   } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -59,32 +60,34 @@ const ParamIterations = () => {
     dispatch(setIterations(initial));
   }, [dispatch, initial]);
 
-  return shouldUseSliders ? (
-    <IAISlider
-      isDisabled={isDisabled}
-      label={t('parameters.images')}
-      step={step}
-      min={min}
-      max={sliderMax}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={iterations}
-      withInput
-      withReset
-      withSliderMarks
-      sliderNumberInputProps={{ max: inputMax }}
-    />
+  return asSlider || shouldUseSliders ? (
+    <IAIInformationalPopover details="paramIterations">
+      <IAISlider
+        label={t('parameters.iterations')}
+        step={step}
+        min={min}
+        max={sliderMax}
+        onChange={handleChange}
+        handleReset={handleReset}
+        value={iterations}
+        withInput
+        withReset
+        withSliderMarks
+        sliderNumberInputProps={{ max: inputMax }}
+      />
+    </IAIInformationalPopover>
   ) : (
-    <IAINumberInput
-      isDisabled={isDisabled}
-      label={t('parameters.images')}
-      step={step}
-      min={min}
-      max={inputMax}
-      onChange={handleChange}
-      value={iterations}
-      numberInputFieldProps={{ textAlign: 'center' }}
-    />
+    <IAIInformationalPopover details="paramIterations">
+      <IAINumberInput
+        label={t('parameters.iterations')}
+        step={step}
+        min={min}
+        max={inputMax}
+        onChange={handleChange}
+        value={iterations}
+        numberInputFieldProps={{ textAlign: 'center' }}
+      />
+    </IAIInformationalPopover>
   );
 };
 

@@ -1,39 +1,53 @@
+import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { commitStagingAreaImage } from 'features/canvas/store/canvasSlice';
-import { sessionCanceled } from 'services/api/thunks/session';
+import {
+  canvasBatchIdsReset,
+  commitStagingAreaImage,
+  discardStagedImages,
+} from 'features/canvas/store/canvasSlice';
+import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
+import { queueApi } from 'services/api/endpoints/queue';
 import { startAppListening } from '..';
+
+const matcher = isAnyOf(commitStagingAreaImage, discardStagedImages);
 
 export const addCommitStagingAreaImageListener = () => {
   startAppListening({
-    actionCreator: commitStagingAreaImage,
-    effect: async (action, { dispatch, getState }) => {
+    matcher,
+    effect: async (_, { dispatch, getState }) => {
       const log = logger('canvas');
       const state = getState();
-      const { sessionId: session_id, isProcessing } = state.system;
-      const canvasSessionId = action.payload;
+      const { batchIds } = state.canvas;
 
-      if (!isProcessing) {
-        // Only need to cancel if we are processing
-        return;
-      }
-
-      if (!canvasSessionId) {
-        log.debug('No canvas session, skipping cancel');
-        return;
-      }
-
-      if (canvasSessionId !== session_id) {
-        log.debug(
-          {
-            canvasSessionId,
-            session_id,
-          },
-          'Canvas session does not match global session, skipping cancel'
+      try {
+        const req = dispatch(
+          queueApi.endpoints.cancelByBatchIds.initiate(
+            { batch_ids: batchIds },
+            { fixedCacheKey: 'cancelByBatchIds' }
+          )
         );
-        return;
+        const { canceled } = await req.unwrap();
+        req.reset();
+        if (canceled > 0) {
+          log.debug(`Canceled ${canceled} canvas batches`);
+          dispatch(
+            addToast({
+              title: t('queue.cancelBatchSucceeded'),
+              status: 'success',
+            })
+          );
+        }
+        dispatch(canvasBatchIdsReset());
+      } catch {
+        log.error('Failed to cancel canvas batches');
+        dispatch(
+          addToast({
+            title: t('queue.cancelBatchFailed'),
+            status: 'error',
+          })
+        );
       }
-
-      dispatch(sessionCanceled({ session_id }));
     },
   });
 };

@@ -10,6 +10,7 @@ import {
   loraWeightChanged,
   loraWeightReset,
 } from '../store/loraSlice';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 type Props = {
   lora: LoRA;
@@ -35,30 +36,32 @@ const ParamLora = (props: Props) => {
   }, [dispatch, lora.id]);
 
   return (
-    <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>
-      <IAISlider
-        label={lora.model_name}
-        value={lora.weight}
-        onChange={handleChange}
-        min={-1}
-        max={2}
-        step={0.01}
-        withInput
-        withReset
-        handleReset={handleReset}
-        withSliderMarks
-        sliderMarks={[-1, 0, 1, 2]}
-        sliderNumberInputProps={{ min: -50, max: 50 }}
-      />
-      <IAIIconButton
-        size="sm"
-        onClick={handleRemoveLora}
-        tooltip="Remove LoRA"
-        aria-label="Remove LoRA"
-        icon={<FaTrash />}
-        colorScheme="error"
-      />
-    </Flex>
+    <IAIInformationalPopover details="lora">
+      <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>
+        <IAISlider
+          label={lora.model_name}
+          value={lora.weight}
+          onChange={handleChange}
+          min={-1}
+          max={2}
+          step={0.01}
+          withInput
+          withReset
+          handleReset={handleReset}
+          withSliderMarks
+          sliderMarks={[-1, 0, 1, 2]}
+          sliderNumberInputProps={{ min: -50, max: 50 }}
+        />
+        <IAIIconButton
+          size="sm"
+          onClick={handleRemoveLora}
+          tooltip="Remove LoRA"
+          aria-label="Remove LoRA"
+          icon={<FaTrash />}
+          colorScheme="error"
+        />
+      </Flex>
+    </IAIInformationalPopover>
   );
 };
 

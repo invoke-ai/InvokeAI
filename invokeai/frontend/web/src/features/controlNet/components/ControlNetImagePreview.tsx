@@ -13,6 +13,7 @@ import {
 import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
 import {
   useAddImageToBoardMutation,
@@ -26,7 +27,6 @@ import {
   ControlNetConfig,
   controlNetImageChanged,
 } from '../store/controlNetSlice';
-import { useTranslation } from 'react-i18next';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -52,7 +52,6 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
     controlImage: controlImageName,
     processedControlImage: processedControlImageName,
     processorType,
-    isEnabled,
     controlNetId,
   } = controlNet;
 
@@ -172,15 +171,13 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         h: isSmall ? 28 : 366, // magic no touch
         alignItems: 'center',
         justifyContent: 'center',
-        pointerEvents: isEnabled ? 'auto' : 'none',
-        opacity: isEnabled ? 1 : 0.5,
       }}
     >
       <IAIDndImage
         draggableData={draggableData}
         droppableData={droppableData}
         imageDTO={controlImage}
-        isDropDisabled={shouldShowProcessedImage || !isEnabled}
+        isDropDisabled={shouldShowProcessedImage}
         postUploadAction={postUploadAction}
       />
 
@@ -202,7 +199,6 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
           droppableData={droppableData}
           imageDTO={processedControlImage}
           isUploadDisabled={true}
-          isDropDisabled={!isEnabled}
         />
       </Box>
 

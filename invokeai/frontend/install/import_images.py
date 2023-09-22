@@ -14,7 +14,6 @@ import os
 import re
 import shutil
 import sqlite3
-import uuid
 from pathlib import Path
 
 import PIL
@@ -27,6 +26,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.shortcuts import message_dialog
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.util.misc import uuid_string
 
 app_config = InvokeAIAppConfig.get_config()
 
@@ -421,7 +421,7 @@ VALUES ('{filename}', 'internal', 'general', {width}, {height}, null, null, '{me
             return rows[0][0]
         else:
             board_date_string = datetime.datetime.utcnow().date().isoformat()
-            new_board_id = str(uuid.uuid4())
+            new_board_id = uuid_string()
             sql_insert_board = f"INSERT INTO boards (board_id, board_name, created_at, updated_at) VALUES ('{new_board_id}', '{board_name}', '{board_date_string}', '{board_date_string}')"
             self.cursor.execute(sql_insert_board)
             self.connection.commit()

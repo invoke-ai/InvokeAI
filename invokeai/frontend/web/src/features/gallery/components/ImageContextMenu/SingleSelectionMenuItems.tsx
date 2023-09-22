@@ -16,6 +16,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   FaAsterisk,
@@ -28,7 +29,8 @@ import {
   FaShare,
   FaTrash,
 } from 'react-icons/fa';
-import { MdDeviceHub, MdStar, MdStarBorder } from 'react-icons/md';
+import { FaCircleNodes } from 'react-icons/fa6';
+import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
   useGetImageMetadataFromFileQuery,
   useStarImagesMutation,
@@ -37,7 +39,6 @@ import {
 import { ImageDTO } from 'services/api/types';
 import { configSelector } from '../../../system/store/configSelectors';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
-import { flushSync } from 'react-dom';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -180,7 +181,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('parameters.downloadImage')}
       </MenuItem>
       <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <MdDeviceHub />}
+        icon={isLoading ? <SpinnerIcon /> : <FaCircleNodes />}
         onClickCapture={handleLoadWorkflow}
         isDisabled={isLoading || !workflow}
       >

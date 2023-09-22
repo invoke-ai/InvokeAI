@@ -1,15 +1,20 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlNetImageChanged,
+  controlNetIsEnabledChanged,
+  ipAdapterImageChanged,
+  isIPAdapterEnabledChanged,
+} from 'features/controlNet/store/controlNetSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
-import { t } from 'i18next';
 
 const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
   title: t('toast.imageUploaded'),
@@ -85,6 +90,12 @@ export const addImageUploadedFulfilledListener = () => {
       if (postUploadAction?.type === 'SET_CONTROLNET_IMAGE') {
         const { controlNetId } = postUploadAction;
         dispatch(
+          controlNetIsEnabledChanged({
+            controlNetId,
+            isEnabled: true,
+          })
+        );
+        dispatch(
           controlNetImageChanged({
             controlNetId,
             controlImage: imageDTO.image_name,
@@ -94,6 +105,18 @@ export const addImageUploadedFulfilledListener = () => {
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
             description: t('toast.setControlImage'),
+          })
+        );
+        return;
+      }
+
+      if (postUploadAction?.type === 'SET_IP_ADAPTER_IMAGE') {
+        dispatch(ipAdapterImageChanged(imageDTO));
+        dispatch(isIPAdapterEnabledChanged(true));
+        dispatch(
+          addToast({
+            ...DEFAULT_UPLOADED_TOAST,
+            description: t('toast.setIPAdapterImage'),
           })
         );
         return;

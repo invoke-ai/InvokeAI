@@ -104,7 +104,7 @@ const ImageMetadataActions = (props: Props) => {
       )}
       {metadata.negative_prompt && (
         <ImageMetadataItem
-          label={t('metadata.NegativePrompt')}
+          label={t('metadata.negativePrompt')}
           labelPosition="top"
           value={metadata.negative_prompt}
           onClick={handleRecallNegativePrompt}

@@ -15,10 +15,11 @@ export const addCanvasDownloadedAsImageListener = () => {
         .child({ namespace: 'canvasSavedToGalleryListener' });
       const state = getState();
 
-      const blob = await getBaseLayerBlob(state);
-
-      if (!blob) {
-        moduleLog.error('Problem getting base layer blob');
+      let blob;
+      try {
+        blob = await getBaseLayerBlob(state);
+      } catch (err) {
+        moduleLog.error(String(err));
         dispatch(
           addToast({
             title: t('toast.problemDownloadingCanvas'),

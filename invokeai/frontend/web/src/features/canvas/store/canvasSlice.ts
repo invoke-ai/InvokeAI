@@ -85,6 +85,7 @@ export const initialCanvasState: CanvasState = {
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
   tool: 'brush',
+  batchIds: [],
 };
 
 export const canvasSlice = createSlice({
@@ -297,18 +298,22 @@ export const canvasSlice = createSlice({
     setIsMoveStageKeyHeld: (state, action: PayloadAction<boolean>) => {
       state.isMoveStageKeyHeld = action.payload;
     },
-    canvasSessionIdChanged: (state, action: PayloadAction<string>) => {
-      state.layerState.stagingArea.sessionId = action.payload;
+    canvasBatchIdAdded: (state, action: PayloadAction<string>) => {
+      state.batchIds.push(action.payload);
+    },
+    canvasBatchIdsReset: (state) => {
+      state.batchIds = [];
     },
     stagingAreaInitialized: (
       state,
-      action: PayloadAction<{ sessionId: string; boundingBox: IRect }>
+      action: PayloadAction<{
+        boundingBox: IRect;
+      }>
     ) => {
-      const { sessionId, boundingBox } = action.payload;
+      const { boundingBox } = action.payload;
 
       state.layerState.stagingArea = {
         boundingBox,
-        sessionId,
         images: [],
         selectedImageIndex: -1,
       };
@@ -632,10 +637,7 @@ export const canvasSlice = createSlice({
         0
       );
     },
-    commitStagingAreaImage: (
-      state,
-      _action: PayloadAction<string | undefined>
-    ) => {
+    commitStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
         return;
       }
@@ -869,9 +871,10 @@ export const {
   setScaledBoundingBoxDimensions,
   setShouldRestrictStrokesToBox,
   stagingAreaInitialized,
-  canvasSessionIdChanged,
   setShouldAntialias,
   canvasResized,
+  canvasBatchIdAdded,
+  canvasBatchIdsReset,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setCanvasCoherenceStrength } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
@@ -13,23 +14,25 @@ const ParamCanvasCoherenceStrength = () => {
   const { t } = useTranslation();
 
   return (
-    <IAISlider
-      label={t('parameters.coherenceStrength')}
-      min={0}
-      max={1}
-      step={0.01}
-      sliderNumberInputProps={{ max: 999 }}
-      value={canvasCoherenceStrength}
-      onChange={(v) => {
-        dispatch(setCanvasCoherenceStrength(v));
-      }}
-      withInput
-      withSliderMarks
-      withReset
-      handleReset={() => {
-        dispatch(setCanvasCoherenceStrength(0.3));
-      }}
-    />
+    <IAIInformationalPopover details="compositingStrength">
+      <IAISlider
+        label={t('parameters.coherenceStrength')}
+        min={0}
+        max={1}
+        step={0.01}
+        sliderNumberInputProps={{ max: 999 }}
+        value={canvasCoherenceStrength}
+        onChange={(v) => {
+          dispatch(setCanvasCoherenceStrength(v));
+        }}
+        withInput
+        withSliderMarks
+        withReset
+        handleReset={() => {
+          dispatch(setCanvasCoherenceStrength(0.3));
+        }}
+      />
+    </IAIInformationalPopover>
   );
 };
 

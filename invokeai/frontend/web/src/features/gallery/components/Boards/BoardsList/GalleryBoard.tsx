@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
+import { AddToBoardDropData } from 'features/dnd/types';
 import {
   autoAddBoardIdChanged,
   boardIdSelected,
@@ -31,7 +32,6 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-import { AddToBoardDropData } from 'features/dnd/types';
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -49,16 +49,14 @@ const GalleryBoard = ({
     () =>
       createSelector(
         stateSelector,
-        ({ gallery, system }) => {
+        ({ gallery }) => {
           const isSelectedForAutoAdd =
             board.board_id === gallery.autoAddBoardId;
           const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-          const isProcessing = system.isProcessing;
 
           return {
             isSelectedForAutoAdd,
             autoAssignBoardOnClick,
-            isProcessing,
           };
         },
         defaultSelectorOptions
@@ -66,7 +64,7 @@ const GalleryBoard = ({
     [board.board_id]
   );
 
-  const { isSelectedForAutoAdd, autoAssignBoardOnClick, isProcessing } =
+  const { isSelectedForAutoAdd, autoAssignBoardOnClick } =
     useAppSelector(selector);
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(() => {
@@ -96,10 +94,10 @@ const GalleryBoard = ({
 
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected(board_id));
-    if (autoAssignBoardOnClick && !isProcessing) {
+    if (autoAssignBoardOnClick) {
       dispatch(autoAddBoardIdChanged(board_id));
     }
-  }, [board_id, autoAssignBoardOnClick, isProcessing, dispatch]);
+  }, [board_id, autoAssignBoardOnClick, dispatch]);
 
   const [updateBoard, { isLoading: isUpdateBoardLoading }] =
     useUpdateBoardMutation();

@@ -2,6 +2,7 @@ import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setMaskBlurMethod } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
@@ -28,11 +29,13 @@ export default function ParamMaskBlurMethod() {
   };
 
   return (
-    <IAIMantineSelect
-      value={maskBlurMethod}
-      onChange={handleMaskBlurMethodChange}
-      label={t('parameters.maskBlurMethod')}
-      data={maskBlurMethods}
-    />
+    <IAIInformationalPopover details="compositingBlurMethod">
+      <IAIMantineSelect
+        value={maskBlurMethod}
+        onChange={handleMaskBlurMethodChange}
+        label={t('parameters.maskBlurMethod')}
+        data={maskBlurMethods}
+      />
+    </IAIInformationalPopover>
   );
 }

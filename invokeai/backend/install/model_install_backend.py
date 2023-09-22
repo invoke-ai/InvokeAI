@@ -326,6 +326,16 @@ class ModelInstall(object):
                     elif f"learned_embeds.{suffix}" in files:
                         location = self._download_hf_model(repo_id, [f"learned_embeds.{suffix}"], staging)
                         break
+                    elif "image_encoder.txt" in files and f"ip_adapter.{suffix}" in files:  # IP-Adapter
+                        files = ["image_encoder.txt", f"ip_adapter.{suffix}"]
+                        location = self._download_hf_model(repo_id, files, staging)
+                        break
+                    elif f"model.{suffix}" in files and "config.json" in files:
+                        # This elif-condition is pretty fragile, but it is intended to handle CLIP Vision models hosted
+                        # by InvokeAI for use with IP-Adapters.
+                        files = ["config.json", f"model.{suffix}"]
+                        location = self._download_hf_model(repo_id, files, staging)
+                        break
             if not location:
                 logger.warning(f"Could not determine type of repo {repo_id}. Skipping install.")
                 return {}
@@ -534,14 +544,17 @@ def hf_download_with_resume(
         logger.info(f"{model_name}: Downloading...")
 
     try:
-        with open(model_dest, open_mode) as file, tqdm(
-            desc=model_name,
-            initial=exist_size,
-            total=total + exist_size,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1000,
-        ) as bar:
+        with (
+            open(model_dest, open_mode) as file,
+            tqdm(
+                desc=model_name,
+                initial=exist_size,
+                total=total + exist_size,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
+            ) as bar,
+        ):
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)
                 bar.update(size)

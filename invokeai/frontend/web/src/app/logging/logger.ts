@@ -20,6 +20,7 @@ export type LoggerNamespace =
   | 'system'
   | 'socketio'
   | 'session'
+  | 'queue'
   | 'dnd';
 
 export const logger = (namespace: LoggerNamespace) =>

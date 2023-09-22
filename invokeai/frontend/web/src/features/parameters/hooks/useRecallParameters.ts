@@ -27,8 +27,11 @@ import {
   useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
-import { loraRecalled } from '../../lora/store/loraSlice';
-import { controlnetRecalled } from '../../controlNet/store/controlNetSlice';
+import {
+  controlnetRecalled,
+  controlNetReset,
+} from '../../controlNet/store/controlNetSlice';
+import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
@@ -587,6 +590,7 @@ export const useRecallParameters = () => {
         dispatch(setRefinerStart(refiner_start));
       }
 
+      dispatch(lorasCleared());
       loras?.forEach((lora) => {
         const result = prepareLoRAMetadataItem(lora);
         if (result.lora) {
