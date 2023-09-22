@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
 import { setCfgScale } from 'features/parameters/store/generationSlice';
@@ -54,7 +54,7 @@ const ParamCFGScale = () => {
   );
 
   return shouldUseSliders ? (
-    <IAIInformationalPopover details="paramCFGScale">
+    <IAIInformationalPopover feature="paramCFGScale">
       <IAISlider
         label={t('parameters.cfgScale')}
         step={shift ? 0.1 : 0.5}
@@ -71,7 +71,7 @@ const ParamCFGScale = () => {
       />
     </IAIInformationalPopover>
   ) : (
-    <IAIInformationalPopover details="paramCFGScale">
+    <IAIInformationalPopover feature="paramCFGScale">
       <IAINumberInput
         label={t('parameters.cfgScale')}
         step={0.5}

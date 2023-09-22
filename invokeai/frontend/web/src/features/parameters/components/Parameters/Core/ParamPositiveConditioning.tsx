@@ -2,6 +2,7 @@ import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAITextarea from 'common/components/IAITextarea';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
@@ -12,7 +13,6 @@ import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
-import IAIInformationalPopover from '../../../../../common/components/IAIInformationalPopover';
 
 const promptInputSelector = createSelector(
   [stateSelector],
@@ -104,15 +104,15 @@ const ParamPositiveConditioning = () => {
 
   return (
     <Box position="relative">
-      <IAIInformationalPopover
-        placement="right"
-        details="paramPositiveConditioning"
-      >
-        <FormControl>
-          <ParamEmbeddingPopover
-            isOpen={isOpen}
-            onClose={onClose}
-            onSelect={handleSelectEmbedding}
+      <FormControl>
+        <ParamEmbeddingPopover
+          isOpen={isOpen}
+          onClose={onClose}
+          onSelect={handleSelectEmbedding}
+        >
+          <IAIInformationalPopover
+            feature="paramPositiveConditioning"
+            placement="right"
           >
             <IAITextarea
               id="prompt"
@@ -125,9 +125,9 @@ const ParamPositiveConditioning = () => {
               resize="vertical"
               minH={32}
             />
-          </ParamEmbeddingPopover>
-        </FormControl>
-      </IAIInformationalPopover>
+          </IAIInformationalPopover>
+        </ParamEmbeddingPopover>
+      </FormControl>
       {!isOpen && isEmbeddingEnabled && (
         <Box
           sx={{

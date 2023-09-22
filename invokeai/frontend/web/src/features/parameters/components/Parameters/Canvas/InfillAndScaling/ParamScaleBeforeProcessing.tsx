@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
@@ -36,7 +36,7 @@ const ParamScaleBeforeProcessing = () => {
   };
 
   return (
-    <IAIInformationalPopover details="scaleBeforeProcessing">
+    <IAIInformationalPopover feature="scaleBeforeProcessing">
       <IAIMantineSearchableSelect
         label={t('parameters.scaleBeforeProcessing')}
         data={BOUNDING_BOX_SCALES_DICT}

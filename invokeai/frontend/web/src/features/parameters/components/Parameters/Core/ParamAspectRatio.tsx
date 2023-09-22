@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { ButtonGroup } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -29,25 +29,23 @@ export default function ParamAspectRatio() {
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   return (
-    <Flex gap={2} flexGrow={1}>
-      <ButtonGroup isAttached>
-        {aspectRatios.map((ratio) => (
-          <IAIButton
-            key={ratio.name}
-            size="sm"
-            isChecked={aspectRatio === ratio.value}
-            isDisabled={
-              activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
-            }
-            onClick={() => {
-              dispatch(setAspectRatio(ratio.value));
-              dispatch(setShouldLockAspectRatio(false));
-            }}
-          >
-            {ratio.name}
-          </IAIButton>
-        ))}
-      </ButtonGroup>
-    </Flex>
+    <ButtonGroup isAttached>
+      {aspectRatios.map((ratio) => (
+        <IAIButton
+          key={ratio.name}
+          size="sm"
+          isChecked={aspectRatio === ratio.value}
+          isDisabled={
+            activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+          }
+          onClick={() => {
+            dispatch(setAspectRatio(ratio.value));
+            dispatch(setShouldLockAspectRatio(false));
+          }}
+        >
+          {ratio.name}
+        </IAIButton>
+      ))}
+    </ButtonGroup>
   );
 }
