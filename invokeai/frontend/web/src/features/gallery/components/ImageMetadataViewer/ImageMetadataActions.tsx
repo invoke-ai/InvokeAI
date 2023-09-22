@@ -202,7 +202,7 @@ const ImageMetadataActions = (props: Props) => {
               <ImageMetadataItem
                 key={index}
                 label="ControlNet"
-                value={`${controlnet.model_name} - ${controlnet}`}
+                value={`${controlnet.control_model.model_name} - ${controlnet.control_weight}`}
                 onClick={() => handleRecallControlNet(controlnet)}
               />
             );

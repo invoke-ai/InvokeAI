@@ -68,7 +68,6 @@ import {
   isValidWidth,
 } from '../types/parameterSchemas';
 import { v4 as uuidv4 } from 'uuid';
-import { init } from 'i18next';
 
 const selector = createSelector(stateSelector, ({ generation }) => {
   const { model } = generation;
