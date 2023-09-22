@@ -19,7 +19,6 @@ import {
   RequiredCannyImageProcessorInvocation,
   RequiredControlNetProcessorNode,
 } from './types';
-import { ControlNetModelConfigEntity } from 'services/api/endpoints/models';
 
 export type ControlModes = NonNullable<
   components['schemas']['ControlNetInvocation']['control_mode']
@@ -100,6 +99,9 @@ export const controlNetSlice = createSlice({
     isControlNetEnabledToggled: (state) => {
       state.isEnabled = !state.isEnabled;
     },
+    controlNetEnabled: (state) => {
+      state.isEnabled = true;
+    },
     controlNetAdded: (
       state,
       action: PayloadAction<{
@@ -115,14 +117,15 @@ export const controlNetSlice = createSlice({
     },
     controlNetRecalled: (
       state,
-      action: PayloadAction<ControlNetModelConfigEntity & { weight: number }>
+      action: PayloadAction<{
+        controlNetId: string;
+        controlNet?: ControlNetConfig;
+      }>
     ) => {
-      const { model_name, id, base_model, weight } = action.payload;
+      const { controlNetId, controlNet } = action.payload;
       state.controlNets[controlNetId] = {
+        ...(controlNet ?? initialControlNet),
         controlNetId,
-        model_name,
-        base_model,
-        weight,
       };
     },
     controlNetDuplicated: (
@@ -457,7 +460,9 @@ export const controlNetSlice = createSlice({
 
 export const {
   isControlNetEnabledToggled,
+  controlNetEnabled,
   controlNetAdded,
+  controlNetRecalled,
   controlNetDuplicated,
   controlNetAddedFromImage,
   controlNetRemoved,

@@ -28,8 +28,11 @@ import {
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
 import {
-  controlnetRecalled,
+  ControlNetConfig,
+  controlNetEnabled,
+  controlNetRecalled,
   controlNetReset,
+  initialControlNet,
 } from '../../controlNet/store/controlNetSlice';
 import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
@@ -46,9 +49,9 @@ import {
 } from '../store/generationSlice';
 import {
   isValidCfgScale,
-  isValidControlNetModel,
   isValidHeight,
   isValidLoRAModel,
+  isValidControlNetModel,
   isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
@@ -64,6 +67,8 @@ import {
   isValidStrength,
   isValidWidth,
 } from '../types/parameterSchemas';
+import { v4 as uuidv4 } from 'uuid';
+import { init } from 'i18next';
 
 const selector = createSelector(stateSelector, ({ generation }) => {
   const { model } = generation;
@@ -415,22 +420,32 @@ export const useRecallParameters = () => {
 
   const prepareControlNetMetadataItem = useCallback(
     (controlnetMetadataItem: ControlNetMetadataItem) => {
-      if (!isValidControlNetModel(controlnetMetadataItem.controlnet)) {
+      if (!isValidControlNetModel(controlnetMetadataItem.control_model)) {
         return { controlnet: null, error: 'Invalid ControlNet model' };
       }
 
-      const { base_model, model_name } = controlnetMetadataItem.controlnet;
+      const {
+        image,
+        control_model,
+        control_weight,
+        begin_step_percent,
+        end_step_percent,
+        control_mode,
+        resize_mode,
+      } = controlnetMetadataItem;
 
-      const matchingControlNet = controlnets.find(
-        (l) => l.base_model === base_model && l.model_name === model_name
+      const matchingControlNetModel = controlnets.find(
+        (c) =>
+          c.base_model === control_model.base_model &&
+          c.model_name === control_model.model_name
       );
 
-      if (!matchingControlNet) {
+      if (!matchingControlNetModel) {
         return { controlnet: null, error: 'ControlNet model is not installed' };
       }
 
       const isCompatibleBaseModel =
-        matchingControlNet?.base_model === model?.base_model;
+        matchingControlNetModel?.base_model === model?.base_model;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -439,12 +454,37 @@ export const useRecallParameters = () => {
         };
       }
 
-      return { controlnet: matchingControlNet, error: null };
+      const controlNetId = uuidv4();
+
+      const controlnet: { controlNetId: string; controlNet: ControlNetConfig } =
+        {
+          controlNetId,
+          controlNet: {
+            isEnabled: true,
+            model: matchingControlNetModel,
+            weight:
+              typeof control_weight === 'number'
+                ? control_weight
+                : initialControlNet.weight,
+            beginStepPct: begin_step_percent || initialControlNet.beginStepPct,
+            endStepPct: end_step_percent || initialControlNet.endStepPct,
+            controlMode: control_mode || initialControlNet.controlMode,
+            resizeMode: resize_mode || initialControlNet.resizeMode,
+            controlImage: image?.image_name || null,
+            processedControlImage: initialControlNet.processedControlImage,
+            processorType: initialControlNet.processorType,
+            processorNode: initialControlNet.processorNode,
+            shouldAutoConfig: true,
+            controlNetId,
+          },
+        };
+
+      return { controlnet, error: null };
     },
     [controlnets, model?.base_model]
   );
 
-  const recallControlnet = useCallback(
+  const recallControlNet = useCallback(
     (controlnetMetadataItem: ControlNetMetadataItem) => {
       const result = prepareControlNetMetadataItem(controlnetMetadataItem);
 
@@ -454,9 +494,8 @@ export const useRecallParameters = () => {
       }
 
       dispatch(
-        controlnetRecalled({
+        controlNetRecalled({
           ...result.controlnet,
-          weight: controlnetMetadataItem.weight,
         })
       );
 
@@ -598,6 +637,15 @@ export const useRecallParameters = () => {
         }
       });
 
+      dispatch(controlNetReset());
+      dispatch(controlNetEnabled());
+      controlnets?.forEach((controlnet) => {
+        const result = prepareControlNetMetadataItem(controlnet);
+        if (result.controlnet) {
+          dispatch(controlNetRecalled({ ...result.controlnet }));
+        }
+      });
+
       allParameterSetToast();
     },
     [
@@ -605,6 +653,7 @@ export const useRecallParameters = () => {
       allParameterSetToast,
       dispatch,
       prepareLoRAMetadataItem,
+      prepareControlNetMetadataItem,
     ]
   );
 
@@ -623,7 +672,7 @@ export const useRecallParameters = () => {
     recallHeight,
     recallStrength,
     recallLoRA,
-    recallControlnet,
+    recallControlNet,
     recallAllParameters,
     sendToImageToImage,
   };

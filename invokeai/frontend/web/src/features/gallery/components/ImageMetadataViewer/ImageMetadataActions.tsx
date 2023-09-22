@@ -1,8 +1,15 @@
-import { CoreMetadata, LoRAMetadataItem } from 'features/nodes/types/types';
+import {
+  ControlNetMetadataItem,
+  CoreMetadata,
+  LoRAMetadataItem,
+} from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isValidLoRAModel } from '../../../parameters/types/parameterSchemas';
+import {
+  isValidControlNetModel,
+  isValidLoRAModel,
+} from '../../../parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
@@ -26,7 +33,7 @@ const ImageMetadataActions = (props: Props) => {
     recallHeight,
     recallStrength,
     recallLoRA,
-    recallControlnet,
+    recallControlNet,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {
@@ -74,6 +81,13 @@ const ImageMetadataActions = (props: Props) => {
       recallLoRA(lora);
     },
     [recallLoRA]
+  );
+
+  const handleRecallControlNet = useCallback(
+    (controlnet: ControlNetMetadataItem) => {
+      recallControlNet(controlnet);
+    },
+    [recallControlNet]
   );
 
   if (!metadata || Object.keys(metadata).length === 0) {
@@ -177,6 +191,19 @@ const ImageMetadataActions = (props: Props) => {
                 label="LoRA"
                 value={`${lora.lora.model_name} - ${lora.weight}`}
                 onClick={() => handleRecallLoRA(lora)}
+              />
+            );
+          }
+        })}
+      {metadata.controlnets &&
+        metadata.controlnets.map((controlnet, index) => {
+          if (isValidControlNetModel(controlnet.control_model)) {
+            return (
+              <ImageMetadataItem
+                key={index}
+                label="ControlNet"
+                value={`${controlnet.model_name} - ${controlnet}`}
+                onClick={() => handleRecallControlNet(controlnet)}
               />
             );
           }

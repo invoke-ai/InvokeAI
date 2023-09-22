@@ -1,0 +1,43 @@
+  controlNet: {
+    controlNets: {
+      '6e323989-f949-424c-a592-dad885560638': {
+        isEnabled: true,
+        model: {
+          model_name: 'lineart',
+          base_model: 'sd-1'
+        },
+        weight: 1,
+        beginStepPct: 0,
+        endStepPct: 1,
+        controlMode: 'balanced',
+        resizeMode: 'just_resize',
+        controlImage: 'cc9e4c45-89d9-4857-b748-69b269c356a9.png',
+        processedControlImage: '20c89af5-1d8e-4b3e-9d4b-b4f4445fda6d.png',
+        processorType: 'lineart_image_processor',
+        processorNode: {
+          id: 'lineart_image_processor',
+          type: 'lineart_image_processor',
+          detect_resolution: 512,
+          image_resolution: 512,
+          coarse: false
+        },
+        shouldAutoConfig: true,
+        controlNetId: '6e323989-f949-424c-a592-dad885560638'
+      }
+    },
+
+    {
+    "image": {
+        "image_name": "efc13796-a355-4e74-8d78-5256bc668c5f.png"
+    },
+    "control_model": {
+        "model_name": "lineart",
+        "base_model": "sd-1"
+    },
+    "control_weight": 1,
+    "begin_step_percent": 0,
+    "end_step_percent": 0.5,
+    "control_mode": "balanced",
+    "resize_mode": "just_resize"
+}
+
