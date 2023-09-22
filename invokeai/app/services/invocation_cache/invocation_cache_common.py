@@ -54,7 +54,7 @@ class ThreadLock:
                     self._read_lock.acquire()
                 return fn(*args, **kwargs)
             finally:
-                self._readers = -1
+                self._readers -= 1
                 if self._readers == 0:
                     self._read_lock.release()
 
