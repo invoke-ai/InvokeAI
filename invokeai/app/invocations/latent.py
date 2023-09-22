@@ -77,6 +77,25 @@ DEFAULT_PRECISION = choose_precision(choose_torch_device())
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
 
 
+def fit_latents(latents: torch.Tensor, max_latents_size: int, device: torch.device) -> torch.Tensor:
+    if max_latents_size == 0:
+        return latents
+
+    latents_area = latents.shape[2] * latents.shape[3]
+    if latents_area <= max_latents_size:
+        return latents
+
+    scale_factor = np.sqrt(max_latents_size / latents_area)
+    scaled_latents = torch.nn.functional.interpolate(
+        latents.to(device),
+        scale_factor=scale_factor,
+        mode="bilinear",
+        antialias=True,
+    )
+
+    return scaled_latents
+
+
 @invocation_output("scheduler_output")
 class SchedulerOutput(BaseInvocationOutput):
     scheduler: SAMPLER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
@@ -500,14 +519,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
         with SilenceWarnings():  # this quenches NSFW nag from diffusers
             seed = None
             noise = None
+            max_image_size = context.services.configuration.max_image_size
+
             if self.noise is not None:
                 noise = context.services.latents.get(self.noise.latents_name)
                 seed = self.noise.seed
+                noise = fit_latents(latents=noise, max_latents_size=max_image_size // 64, device=choose_torch_device())
 
             if self.latents is not None:
                 latents = context.services.latents.get(self.latents.latents_name)
                 if seed is None:
                     seed = self.latents.seed
+                latents = fit_latents(
+                    latents=latents, max_latents_size=max_image_size // 64, device=choose_torch_device()
+                )
 
                 if noise is not None and noise.shape[1:] != latents.shape[1:]:
                     raise Exception(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
@@ -532,8 +557,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             def _lora_loader():
                 for lora in self.unet.loras:
                     lora_info = context.services.model_manager.get_model(
-                        **lora.dict(exclude={"weight"}),
-                        context=context,
+                        **lora.dict(exclude={"weight"}), context=context
                     )
                     yield (lora_info.context.model, lora.weight)
                     del lora_info

@@ -645,13 +645,19 @@ class ColorCorrectInvocation(BaseInvocation):
     mask_blur_radius: float = InputField(default=8, description="Mask blur radius")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        result = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
+
+        init_image = context.services.images.get_pil_image(self.reference.image_name)
+        # fit reference image to the input image
+        if init_image.size != result.size:
+            init_image = init_image.resize((result.width, result.height), Image.BILINEAR)
+
         pil_init_mask = None
         if self.mask is not None:
             pil_init_mask = context.services.images.get_pil_image(self.mask.image_name).convert("L")
-
-        init_image = context.services.images.get_pil_image(self.reference.image_name)
-
-        result = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
+            # fit mask to the input image
+            if pil_init_mask.size != result.size:
+                pil_init_mask = pil_init_mask.resize((result.width, result.height), Image.BILINEAR)
 
         # if init_image is None or init_mask is None:
         #    return result
