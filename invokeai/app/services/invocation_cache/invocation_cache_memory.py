@@ -56,14 +56,14 @@ class MemoryInvocationCache(InvocationCacheBase):
                     pass
 
     def delete(self, key: Union[int, str]) -> None:
-        if self.__max_cache_size == 0 or self.__disabled:
+        if self.__max_cache_size == 0:
             return
 
         if key in self.__cache:
             del self.__cache[key]
 
     def clear(self, *args, **kwargs) -> None:
-        if self.__max_cache_size == 0 or self.__disabled:
+        if self.__max_cache_size == 0:
             return
 
         self.__cache.clear()
@@ -94,7 +94,7 @@ class MemoryInvocationCache(InvocationCacheBase):
         )
 
     def _delete_by_match(self, to_match: str) -> None:
-        if self.__max_cache_size == 0 or self.__disabled:
+        if self.__max_cache_size == 0:
             return
 
         keys_to_delete = set()
