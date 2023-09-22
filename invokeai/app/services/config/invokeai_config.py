@@ -277,6 +277,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     class Config:
         validate_assignment = True
+        env_prefix = "INVOKEAI"
 
     def parse_args(self, argv: Optional[list[str]] = None, conf: Optional[DictConfig] = None, clobber=False):
         """
