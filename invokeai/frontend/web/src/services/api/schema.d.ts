@@ -1540,6 +1540,51 @@ export type components = {
       type: 'color';
     };
     /**
+     * Color Map Processor
+     * @description Generates a color map from the provided image
+     */
+    ColorMapImageProcessorInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components['schemas']['ImageField'];
+      /**
+       * Type
+       * @default color_map_image_processor
+       * @enum {string}
+       */
+      type: 'color_map_image_processor';
+      /**
+       * Color Map Tile Size
+       * @description Tile size
+       * @default 64
+       */
+      color_map_tile_size?: number;
+    };
+    /**
      * ColorOutput
      * @description Base class for nodes that output a single color
      */
