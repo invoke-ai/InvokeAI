@@ -388,6 +388,11 @@ class ModelInstall(ModelInstallBase):
 
     def _register(self, model_path: Path, info: ModelProbeInfo) -> str:
         key: str = FastModelHash.hash(model_path)
+
+        model_path = model_path.absolute()
+        if model_path.is_relative_to(self._app_config.models_path):
+            model_path = model_path.relative_to(self._app_config.models_path)
+
         registration_data = dict(
             path=model_path.as_posix(),
             name=model_path.name if model_path.is_dir() else model_path.stem,

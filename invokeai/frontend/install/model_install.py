@@ -537,7 +537,7 @@ def list_models(installer: ModelInstall, model_type: ModelType):
     print(f"Installed models of type `{model_type}`:")
     for model in models:
         path = (config.models_path / model.path).resolve()
-        print(f"{model.name:40}{model.base_model:10}{path}")
+        print(f"{model.name:40}{model.base_model.value:14}{path}")
 
 
 class TqdmProgress(object):
