@@ -17,7 +17,8 @@ import {
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const nodeDenylist = ['load_image'];
+// These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
+const nodeDenylist = ['load_image', 'image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
