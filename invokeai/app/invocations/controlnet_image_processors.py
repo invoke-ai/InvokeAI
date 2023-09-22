@@ -559,3 +559,32 @@ class SamDetectorReproducibleColors(SamDetector):
             img[:, :] = ann_color
             final_img.paste(Image.fromarray(img, mode="RGB"), (0, 0), Image.fromarray(np.uint8(m * 255)))
         return np.array(final_img, dtype=np.uint8)
+
+
+@invocation(
+    "color_map_image_processor",
+    title="Color Map Processor",
+    tags=["controlnet"],
+    category="controlnet",
+    version="1.0.0",
+)
+class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
+    """Generates a color map from the provided image"""
+
+    map_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
+
+    def run_processor(self, image: Image.Image):
+        image = image.convert("RGB")
+        image = np.array(image, dtype=np.uint8)
+        height, width = image.shape[:2]
+
+        rescaled_width = int(round(width / height * self.map_resolution)) if height < width else self.map_resolution
+        rescaled_height = self.map_resolution if height < width else int(round(height / width * self.map_resolution))
+        rescaled_image = cv2.resize(image, (rescaled_width, rescaled_height), interpolation=cv2.INTER_AREA)
+
+        color_map = cv2.resize(
+            rescaled_image, (rescaled_width // 64, rescaled_height // 64), interpolation=cv2.INTER_CUBIC
+        )
+        color_map = cv2.resize(color_map, (rescaled_width, rescaled_height), interpolation=cv2.INTER_NEAREST)
+        color_map = Image.fromarray(color_map)
+        return color_map
