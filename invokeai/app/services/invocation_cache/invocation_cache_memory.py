@@ -42,13 +42,14 @@ class MemoryInvocationCache(InvocationCacheBase):
     @thread_lock.write  # because of priority update
     def get(self, key: Union[int, str]) -> Optional[BaseInvocationOutput]:
         if self._max_cache_size == 0 or self._disabled:
-            return
+            return None
         item = self._cache.get(key, None)
         if item is not None:
             self._hits += 1
             item.priority = time()
             return item.invocation_output
         self._misses += 1
+        return None
 
     @thread_lock.write
     def save(self, key: Union[int, str], invocation_output: BaseInvocationOutput) -> None:
@@ -56,7 +57,7 @@ class MemoryInvocationCache(InvocationCacheBase):
             return
         # If the cache is full, we need to remove the least used
         number_to_delete = len(self._cache) + 1 - self._max_cache_size
-        self._delete_least_accessed(number_to_delete)
+        self._delete_oldest_access(number_to_delete)
         self._cache[key] = CachedItem(time(), invocation_output, invocation_output.json())
 
     def _delete_oldest_access(self, number_to_delete: int) -> None:
