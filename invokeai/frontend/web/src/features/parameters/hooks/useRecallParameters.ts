@@ -455,28 +455,24 @@ export const useRecallParameters = () => {
 
       const controlNetId = uuidv4();
 
-      const controlnet: { controlNetId: string; controlNet: ControlNetConfig } =
-        {
-          controlNetId,
-          controlNet: {
-            isEnabled: true,
-            model: matchingControlNetModel,
-            weight:
-              typeof control_weight === 'number'
-                ? control_weight
-                : initialControlNet.weight,
-            beginStepPct: begin_step_percent || initialControlNet.beginStepPct,
-            endStepPct: end_step_percent || initialControlNet.endStepPct,
-            controlMode: control_mode || initialControlNet.controlMode,
-            resizeMode: resize_mode || initialControlNet.resizeMode,
-            controlImage: image?.image_name || null,
-            processedControlImage: initialControlNet.processedControlImage,
-            processorType: initialControlNet.processorType,
-            processorNode: initialControlNet.processorNode,
-            shouldAutoConfig: true,
-            controlNetId,
-          },
-        };
+      const controlnet: ControlNetConfig = {
+        isEnabled: true,
+        model: matchingControlNetModel,
+        weight:
+          typeof control_weight === 'number'
+            ? control_weight
+            : initialControlNet.weight,
+        beginStepPct: begin_step_percent || initialControlNet.beginStepPct,
+        endStepPct: end_step_percent || initialControlNet.endStepPct,
+        controlMode: control_mode || initialControlNet.controlMode,
+        resizeMode: resize_mode || initialControlNet.resizeMode,
+        controlImage: image?.image_name || null,
+        processedControlImage: initialControlNet.processedControlImage,
+        processorType: initialControlNet.processorType,
+        processorNode: initialControlNet.processorNode,
+        shouldAutoConfig: true,
+        controlNetId,
+      };
 
       return { controlnet, error: null };
     },
@@ -641,7 +637,7 @@ export const useRecallParameters = () => {
       controlnets?.forEach((controlnet) => {
         const result = prepareControlNetMetadataItem(controlnet);
         if (result.controlnet) {
-          dispatch(controlNetRecalled({ ...result.controlnet }));
+          dispatch(controlNetRecalled(result.controlnet));
         }
       });
 

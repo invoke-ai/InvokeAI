@@ -115,17 +115,10 @@ export const controlNetSlice = createSlice({
         controlNetId,
       };
     },
-    controlNetRecalled: (
-      state,
-      action: PayloadAction<{
-        controlNetId: string;
-        controlNet?: ControlNetConfig;
-      }>
-    ) => {
-      const { controlNetId, controlNet } = action.payload;
-      state.controlNets[controlNetId] = {
-        ...(controlNet ?? initialControlNet),
-        controlNetId,
+    controlNetRecalled: (state, action: PayloadAction<ControlNetConfig>) => {
+      const controlNet = action.payload;
+      state.controlNets[controlNet.controlNetId] = {
+        ...controlNet,
       };
     },
     controlNetDuplicated: (
