@@ -804,6 +804,17 @@ export type components = {
        */
       image_count: number;
     };
+    /**
+     * BoardField
+     * @description A board primitive field
+     */
+    BoardField: {
+      /**
+       * Board Id
+       * @description The id of the board
+       */
+      board_id: string;
+    };
     /** Body_add_image_to_board */
     Body_add_image_to_board: {
       /**
@@ -1288,6 +1299,11 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
+      /**
        * Skipped Layers
        * @description Number of layers to skip in text encoder
        * @default 0
@@ -1299,11 +1315,6 @@ export type components = {
        * @enum {string}
        */
       type: "clip_skip";
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
     };
     /**
      * ClipSkipInvocationOutput
@@ -7551,6 +7562,16 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Board
+       * @description The board to save the image to
+       */
+      board?: components["schemas"]["BoardField"];
+      /**
        * Metadata
        * @description Optional core metadata to be written to image
        */
@@ -7561,11 +7582,6 @@ export type components = {
        * @enum {string}
        */
       type: "save_image";
-      /**
-       * Image
-       * @description The image to load
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
      * Scale Latents
@@ -7863,16 +7879,6 @@ export type components = {
        */
       session_id: string;
       /**
-       * Field Values
-       * @description The field values that were used for this queue item
-       */
-      field_values?: components["schemas"]["NodeFieldValue"][];
-      /**
-       * Queue Id
-       * @description The id of the queue with which this item is associated
-       */
-      queue_id: string;
-      /**
        * Error
        * @description The error message if this queue item errored
        */
@@ -7897,6 +7903,16 @@ export type components = {
        * @description When this queue item was completed
        */
       completed_at?: string;
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
+      /**
+       * Field Values
+       * @description The field values that were used for this queue item
+       */
+      field_values?: components["schemas"]["NodeFieldValue"][];
       /**
        * Session
        * @description The fully-populated session to be executed
@@ -7937,16 +7953,6 @@ export type components = {
        */
       session_id: string;
       /**
-       * Field Values
-       * @description The field values that were used for this queue item
-       */
-      field_values?: components["schemas"]["NodeFieldValue"][];
-      /**
-       * Queue Id
-       * @description The id of the queue with which this item is associated
-       */
-      queue_id: string;
-      /**
        * Error
        * @description The error message if this queue item errored
        */
@@ -7971,6 +7977,16 @@ export type components = {
        * @description When this queue item was completed
        */
       completed_at?: string;
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
+      /**
+       * Field Values
+       * @description The field values that were used for this queue item
+       */
+      field_values?: components["schemas"]["NodeFieldValue"][];
     };
     /** SessionQueueStatus */
     SessionQueueStatus: {
@@ -9052,7 +9068,7 @@ export type components = {
      * If a field should be provided a data type that does not exactly match the python type of the field,     use this to provide the type that should be used instead. See the node development docs for detail     on adding a new field type, which involves client-side changes.
      * @enum {string}
      */
-    UIType: "boolean" | "ColorField" | "ConditioningField" | "ControlField" | "float" | "ImageField" | "integer" | "LatentsField" | "string" | "BooleanCollection" | "ColorCollection" | "ConditioningCollection" | "ControlCollection" | "FloatCollection" | "ImageCollection" | "IntegerCollection" | "LatentsCollection" | "StringCollection" | "BooleanPolymorphic" | "ColorPolymorphic" | "ConditioningPolymorphic" | "ControlPolymorphic" | "FloatPolymorphic" | "ImagePolymorphic" | "IntegerPolymorphic" | "LatentsPolymorphic" | "StringPolymorphic" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "enum" | "Scheduler" | "WorkflowField" | "IsIntermediate" | "MetadataField";
+    UIType: "boolean" | "ColorField" | "ConditioningField" | "ControlField" | "float" | "ImageField" | "integer" | "LatentsField" | "string" | "BooleanCollection" | "ColorCollection" | "ConditioningCollection" | "ControlCollection" | "FloatCollection" | "ImageCollection" | "IntegerCollection" | "LatentsCollection" | "StringCollection" | "BooleanPolymorphic" | "ColorPolymorphic" | "ConditioningPolymorphic" | "ControlPolymorphic" | "FloatPolymorphic" | "ImagePolymorphic" | "IntegerPolymorphic" | "LatentsPolymorphic" | "StringPolymorphic" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "enum" | "Scheduler" | "WorkflowField" | "IsIntermediate" | "MetadataField" | "BoardField";
     /**
      * UIComponent
      * @description The type of UI component to use for a field, used to override the default components, which are     inferred from the field type.
@@ -9096,29 +9112,11 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * CLIPVisionModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     CLIPVisionModelFormat: "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
@@ -9131,6 +9129,24 @@ export type components = {
      * @enum {string}
      */
     IPAdapterModelFormat: "invokeai";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * ControlNetModelFormat
      * @description An enumeration.
