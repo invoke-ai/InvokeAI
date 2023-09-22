@@ -993,18 +993,13 @@ class SaveImageInvocation(BaseInvocation):
             image=image,
             image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
+            board_id=self.board.board_id if self.board else None,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata.dict() if self.metadata else None,
             workflow=self.workflow,
         )
-
-        if self.board:
-            context.services.board_images.add_image_to_board(
-                board_id=self.board.board_id,
-                image_name=image_dto.image_name,
-            )
 
         return ImageOutput(
             image=ImageField(image_name=image_dto.image_name),
