@@ -143,7 +143,7 @@ export const useBuildNodeData = () => {
           notes: '',
           isOpen: true,
           embedWorkflow: false,
-          isIntermediate: true,
+          isIntermediate: type === 'save_image' ? false : true,
           inputs,
           outputs,
           useCache: template.useCache,

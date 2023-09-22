@@ -6,15 +6,18 @@ import {
   SaveImageInvocation,
 } from 'services/api/types';
 import { REALESRGAN as ESRGAN, SAVE_IMAGE } from './constants';
+import { BoardId } from 'features/gallery/store/types';
 
 type Arg = {
   image_name: string;
   esrganModelName: ESRGANModelName;
+  autoAddBoardId: BoardId;
 };
 
 export const buildAdHocUpscaleGraph = ({
   image_name,
   esrganModelName,
+  autoAddBoardId,
 }: Arg): Graph => {
   const realesrganNode: ESRGANInvocation = {
     id: ESRGAN,
@@ -28,6 +31,8 @@ export const buildAdHocUpscaleGraph = ({
     id: SAVE_IMAGE,
     type: 'save_image',
     use_cache: false,
+    is_intermediate: false,
+    board: autoAddBoardId === 'none' ? undefined : { board_id: autoAddBoardId },
   };
 
   const graph: NonNullableGraph = {
