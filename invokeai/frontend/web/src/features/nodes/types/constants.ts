@@ -1,4 +1,9 @@
-import { FieldType, FieldUIConfig } from './types';
+import {
+  FieldType,
+  FieldTypeMap,
+  FieldTypeMapWithNumber,
+  FieldUIConfig,
+} from './types';
 import { t } from 'i18next';
 
 export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
@@ -28,7 +33,7 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ColorCollection',
 ];
 
-export const POLYMORPHIC_TYPES = [
+export const POLYMORPHIC_TYPES: FieldType[] = [
   'IntegerPolymorphic',
   'BooleanPolymorphic',
   'FloatPolymorphic',
@@ -40,7 +45,7 @@ export const POLYMORPHIC_TYPES = [
   'ColorPolymorphic',
 ];
 
-export const MODEL_TYPES = [
+export const MODEL_TYPES: FieldType[] = [
   'IPAdapterModelField',
   'ControlNetModelField',
   'LoRAModelField',
@@ -54,7 +59,7 @@ export const MODEL_TYPES = [
   'ClipField',
 ];
 
-export const COLLECTION_MAP = {
+export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   integer: 'IntegerCollection',
   boolean: 'BooleanCollection',
   number: 'FloatCollection',
@@ -71,7 +76,7 @@ export const isCollectionItemType = (
 ): itemType is keyof typeof COLLECTION_MAP =>
   Boolean(itemType && itemType in COLLECTION_MAP);
 
-export const SINGLE_TO_POLYMORPHIC_MAP = {
+export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
   integer: 'IntegerPolymorphic',
   boolean: 'BooleanPolymorphic',
   number: 'FloatPolymorphic',
@@ -84,7 +89,7 @@ export const SINGLE_TO_POLYMORPHIC_MAP = {
   ColorField: 'ColorPolymorphic',
 };
 
-export const POLYMORPHIC_TO_SINGLE_MAP = {
+export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
   IntegerPolymorphic: 'integer',
   BooleanPolymorphic: 'boolean',
   FloatPolymorphic: 'float',
@@ -96,7 +101,7 @@ export const POLYMORPHIC_TO_SINGLE_MAP = {
   ColorPolymorphic: 'ColorField',
 };
 
-export const TYPES_WITH_INPUT_COMPONENTS = [
+export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
   'string',
   'StringPolymorphic',
   'boolean',
@@ -117,6 +122,7 @@ export const TYPES_WITH_INPUT_COMPONENTS = [
   'SDXLMainModelField',
   'Scheduler',
   'IPAdapterModelField',
+  'BoardField',
 ];
 
 export const isPolymorphicItemType = (
@@ -236,6 +242,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: t('nodes.imageCollection'),
   },
   ImageField: {
+    color: 'purple.500',
+    description: t('nodes.imageFieldDescription'),
+    title: t('nodes.imageField'),
+  },
+  BoardField: {
     color: 'purple.500',
     description: t('nodes.imageFieldDescription'),
     title: t('nodes.imageField'),

@@ -72,6 +72,7 @@ export type FieldUIConfig = {
 
 // TODO: Get this from the OpenAPI schema? may be tricky...
 export const zFieldType = z.enum([
+  'BoardField',
   'boolean',
   'BooleanCollection',
   'BooleanPolymorphic',
@@ -119,6 +120,10 @@ export const zFieldType = z.enum([
 ]);
 
 export type FieldType = z.infer<typeof zFieldType>;
+export type FieldTypeMap = { [key in FieldType]?: FieldType };
+export type FieldTypeMapWithNumber = {
+  [key in FieldType | 'number']?: FieldType;
+};
 
 export const zReservedFieldType = z.enum([
   'WorkflowField',
@@ -186,6 +191,11 @@ export const zImageField = z.object({
   image_name: z.string().trim().min(1),
 });
 export type ImageField = z.infer<typeof zImageField>;
+
+export const zBoardField = z.object({
+  board_id: z.string().trim().min(1),
+});
+export type BoardField = z.infer<typeof zBoardField>;
 
 export const zLatentsField = z.object({
   latents_name: z.string().trim().min(1),
@@ -494,6 +504,12 @@ export const zImageInputFieldValue = zInputFieldValueBase.extend({
 });
 export type ImageInputFieldValue = z.infer<typeof zImageInputFieldValue>;
 
+export const zBoardInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('BoardField'),
+  value: zBoardField.optional(),
+});
+export type BoardInputFieldValue = z.infer<typeof zBoardInputFieldValue>;
+
 export const zImagePolymorphicInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ImagePolymorphic'),
   value: zImageField.optional(),
@@ -630,6 +646,7 @@ export type SchedulerInputFieldValue = z.infer<
 >;
 
 export const zInputFieldValue = z.discriminatedUnion('type', [
+  zBoardInputFieldValue,
   zBooleanCollectionInputFieldValue,
   zBooleanInputFieldValue,
   zBooleanPolymorphicInputFieldValue,
@@ -768,6 +785,11 @@ export type BooleanPolymorphicInputFieldTemplate = Omit<
   'type'
 > & {
   type: 'BooleanPolymorphic';
+};
+
+export type BoardInputFieldTemplate = InputFieldTemplateBase & {
+  default: BoardField;
+  type: 'BoardField';
 };
 
 export type ImageInputFieldTemplate = InputFieldTemplateBase & {
@@ -952,6 +974,7 @@ export type WorkflowInputFieldTemplate = InputFieldTemplateBase & {
  * maximum length, pattern to match, etc).
  */
 export type InputFieldTemplate =
+  | BoardInputFieldTemplate
   | BooleanCollectionInputFieldTemplate
   | BooleanPolymorphicInputFieldTemplate
   | BooleanInputFieldTemplate

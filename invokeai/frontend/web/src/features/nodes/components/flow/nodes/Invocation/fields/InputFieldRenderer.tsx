@@ -16,6 +16,7 @@ import SchedulerInputField from './inputs/SchedulerInputField';
 import StringInputField from './inputs/StringInputField';
 import VaeModelInputField from './inputs/VaeModelInputField';
 import IPAdapterModelInputField from './inputs/IPAdapterModelInputField';
+import BoardInputField from './inputs/BoardInputField';
 
 type InputFieldProps = {
   nodeId: string;
@@ -92,6 +93,16 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   ) {
     return (
       <ImageInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (field?.type === 'BoardField' && fieldTemplate?.type === 'BoardField') {
+    return (
+      <BoardInputField
         nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
