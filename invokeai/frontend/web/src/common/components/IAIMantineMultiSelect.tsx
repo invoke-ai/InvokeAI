@@ -44,23 +44,19 @@ const IAIMantineMultiSelect = forwardRef((props: IAIMultiSelectProps, ref) => {
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow isOpen={true}>
-      <MultiSelect
-        label={
-          label ? (
-            <FormControl ref={ref} isDisabled={disabled}>
-              <FormLabel>{label}</FormLabel>
-            </FormControl>
-          ) : undefined
-        }
-        ref={inputRef}
-        disabled={disabled}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleKeyUp}
-        searchable={searchable}
-        maxDropdownHeight={300}
-        styles={styles}
-        {...rest}
-      />
+      <FormControl ref={ref} isDisabled={disabled}>
+        {label && <FormLabel>{label}</FormLabel>}
+        <MultiSelect
+          ref={inputRef}
+          disabled={disabled}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
+          searchable={searchable}
+          maxDropdownHeight={300}
+          styles={styles}
+          {...rest}
+        />
+      </FormControl>
     </Tooltip>
   );
 });
