@@ -701,6 +701,8 @@
         "addNodeToolTip": "Add Node (Shift+A, Space)",
         "animatedEdges": "Animated Edges",
         "animatedEdgesHelp": "Animate selected edges and edges connected to selected nodes",
+        "boardField": "Board",
+        "boardFieldDescription": "A gallery board",
         "boolean": "Booleans",
         "booleanCollection": "Boolean Collection",
         "booleanCollectionDescription": "A collection of booleans.",

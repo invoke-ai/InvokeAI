@@ -8,12 +8,12 @@ import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.metadata import CoreMetadata
-from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
+from invokeai.app.invocations.primitives import BoardField, ColorField, ImageField, ImageOutput
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
 from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, FieldDescriptions, Input, InputField, InvocationContext, invocation
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.0")
@@ -972,13 +972,14 @@ class ImageChannelMultiplyInvocation(BaseInvocation):
     title="Save Image",
     tags=["primitives", "image"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
     use_cache=False,
 )
 class SaveImageInvocation(BaseInvocation):
     """Saves an image. Unlike an image primitive, this invocation stores a copy of the image."""
 
-    image: ImageField = InputField(description="The image to load")
+    image: ImageField = InputField(description=FieldDescriptions.image)
+    board: Optional[BoardField] = InputField(default=None, description=FieldDescriptions.board, input=Input.Direct)
     metadata: CoreMetadata = InputField(
         default=None,
         description=FieldDescriptions.core_metadata,
@@ -998,6 +999,12 @@ class SaveImageInvocation(BaseInvocation):
             metadata=self.metadata.dict() if self.metadata else None,
             workflow=self.workflow,
         )
+
+        if self.board:
+            context.services.board_images.add_image_to_board(
+                board_id=self.board.board_id,
+                image_name=image_dto.image_name,
+            )
 
         return ImageOutput(
             image=ImageField(image_name=image_dto.image_name),

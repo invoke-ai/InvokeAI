@@ -62,6 +62,8 @@ import {
   ConditioningField,
   IPAdapterInputFieldTemplate,
   IPAdapterModelInputFieldTemplate,
+  BoardInputFieldTemplate,
+  InputFieldTemplate,
 } from '../types/types';
 import { ControlField } from 'services/api/types';
 
@@ -444,6 +446,19 @@ const buildIPAdapterModelInputFieldTemplate = ({
   const template: IPAdapterModelInputFieldTemplate = {
     ...baseField,
     type: 'IPAdapterModelField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildBoardInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): BoardInputFieldTemplate => {
+  const template: BoardInputFieldTemplate = {
+    ...baseField,
+    type: 'BoardField',
     default: schemaObject.default ?? undefined,
   };
 
@@ -851,7 +866,10 @@ export const getFieldType = (
   return;
 };
 
-const TEMPLATE_BUILDER_MAP = {
+const TEMPLATE_BUILDER_MAP: {
+  [key in FieldType]?: (arg: BuildInputFieldArg) => InputFieldTemplate;
+} = {
+  BoardField: buildBoardInputFieldTemplate,
   boolean: buildBooleanInputFieldTemplate,
   BooleanCollection: buildBooleanCollectionInputFieldTemplate,
   BooleanPolymorphic: buildBooleanPolymorphicInputFieldTemplate,
@@ -937,7 +955,13 @@ export const buildInputFieldTemplate = (
     return;
   }
 
-  return TEMPLATE_BUILDER_MAP[fieldType]({
+  const builder = TEMPLATE_BUILDER_MAP[fieldType];
+
+  if (!builder) {
+    return;
+  }
+
+  return builder({
     schemaObject: fieldSchema,
     baseField,
   });
