@@ -1,7 +1,6 @@
 import { isObject } from 'lodash-es';
 import {
   CannyImageProcessorInvocation,
-  ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
   HedImageProcessorInvocation,
   LineartAnimeImageProcessorInvocation,
@@ -21,7 +20,6 @@ import { O } from 'ts-toolbelt';
  */
 export type ControlNetProcessorNode =
   | CannyImageProcessorInvocation
-  | ColorMapImageProcessorInvocation
   | ContentShuffleImageProcessorInvocation
   | HedImageProcessorInvocation
   | LineartAnimeImageProcessorInvocation
@@ -47,14 +45,6 @@ export type ControlNetProcessorType = NonNullable<
 export type RequiredCannyImageProcessorInvocation = O.Required<
   CannyImageProcessorInvocation,
   'type' | 'low_threshold' | 'high_threshold'
->;
-
-/**
- * The Color Map processor node, with parameters flagged as required
- */
-export type RequiredColorMapImageProcessorInvocation = O.Required<
-  ColorMapImageProcessorInvocation,
-  'type' | 'map_resolution'
 >;
 
 /**
@@ -150,7 +140,6 @@ export type RequiredZoeDepthImageProcessorInvocation = O.Required<
  */
 export type RequiredControlNetProcessorNode = O.Required<
   | RequiredCannyImageProcessorInvocation
-  | RequiredColorMapImageProcessorInvocation
   | RequiredContentShuffleImageProcessorInvocation
   | RequiredHedImageProcessorInvocation
   | RequiredLineartAnimeImageProcessorInvocation
@@ -172,22 +161,6 @@ export const isCannyImageProcessorInvocation = (
   obj: unknown
 ): obj is CannyImageProcessorInvocation => {
   if (isObject(obj) && 'type' in obj && obj.type === 'canny_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for ColorMapImageProcessorInvocation
- */
-export const isColorMapImageProcessorInvocation = (
-  obj: unknown
-): obj is ColorMapImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'color_map_image_processor'
-  ) {
     return true;
   }
   return false;

@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { ControlNetConfig } from '../store/controlNetSlice';
 import CannyProcessor from './processors/CannyProcessor';
-import ColorProcessor from './processors/ColorProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
 import HedProcessor from './processors/HedProcessor';
 import LineartAnimeProcessor from './processors/LineartAnimeProcessor';
@@ -24,16 +23,6 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'canny_image_processor') {
     return (
       <CannyProcessor
-        controlNetId={controlNetId}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
-  }
-
-  if (processorNode.type === 'color_map_image_processor') {
-    return (
-      <ColorProcessor
         controlNetId={controlNetId}
         processorNode={processorNode}
         isEnabled={isEnabled}
