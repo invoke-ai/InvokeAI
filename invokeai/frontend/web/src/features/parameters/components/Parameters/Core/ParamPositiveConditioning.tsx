@@ -107,6 +107,8 @@ const ParamPositiveConditioning = () => {
       <IAIInformationalPopover
         placement="right"
         details="paramPositiveConditioning"
+        buttonLabel="Learn More"
+        buttonHref="https://support.invoke.ai/support/solutions/articles/151000096606-tips-on-crafting-prompts"
       >
         <FormControl>
           <ParamEmbeddingPopover

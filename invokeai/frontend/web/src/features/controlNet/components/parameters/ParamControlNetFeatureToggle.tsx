@@ -28,7 +28,11 @@ const ParamControlNetFeatureToggle = () => {
 
   return (
     <Box width="100%">
-      <IAIInformationalPopover details="controlNetToggle">
+      <IAIInformationalPopover
+        details="controlNetToggle"
+        buttonLabel="Learn More"
+        buttonHref="https://support.invoke.ai/a/solutions/articles/151000105880?portalId=151000075831"
+      >
         <IAISwitch
           label="Enable ControlNet"
           isChecked={isEnabled}

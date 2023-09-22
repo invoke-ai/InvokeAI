@@ -40,7 +40,11 @@ const ParamInfillMethod = () => {
   );
 
   return (
-    <IAIInformationalPopover details="infillMethod">
+    <IAIInformationalPopover
+      details="infillMethod"
+      buttonLabel="Learn More"
+      buttonHref="https://support.invoke.ai/support/solutions/articles/151000158841"
+    >
       <IAIMantineSelect
         disabled={infill_methods?.length === 0}
         placeholder={isLoading ? 'Loading...' : undefined}

@@ -36,7 +36,11 @@ const ParamScaleBeforeProcessing = () => {
   };
 
   return (
-    <IAIInformationalPopover details="scaleBeforeProcessing">
+    <IAIInformationalPopover
+      details="scaleBeforeProcessing"
+      buttonLabel="Learn More"
+      buttonHref="https://support.invoke.ai/support/solutions/articles/151000158841"
+    >
       <IAIMantineSearchableSelect
         label={t('parameters.scaleBeforeProcessing')}
         data={BOUNDING_BOX_SCALES_DICT}

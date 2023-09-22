@@ -36,7 +36,11 @@ const ParamLora = (props: Props) => {
   }, [dispatch, lora.id]);
 
   return (
-    <IAIInformationalPopover details="lora">
+    <IAIInformationalPopover
+      details="lora"
+      buttonLabel="Learn More"
+      buttonHref="https://support.invoke.ai/a/solutions/articles/151000159072?portalId=151000075831"
+    >
       <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>
         <IAISlider
           label={lora.model_name}

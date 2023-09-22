@@ -120,7 +120,12 @@ const ParamMainModelSelect = () => {
     />
   ) : (
     <Flex w="100%" alignItems="center" gap={3}>
-      <IAIInformationalPopover details="paramModel" placement="bottom">
+      <IAIInformationalPopover
+        details="paramModel"
+        buttonLabel="Learn More"
+        buttonHref="https://support.invoke.ai/support/solutions/articles/151000096601-what-is-a-model-which-should-i-use-"
+        placement="bottom"
+      >
         <IAIMantineSearchableSelect
           tooltip={selectedModel?.description}
           label={t('modelManager.model')}

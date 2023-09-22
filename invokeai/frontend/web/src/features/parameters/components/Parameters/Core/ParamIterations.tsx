@@ -77,7 +77,11 @@ const ParamIterations = ({ asSlider }: Props) => {
       />
     </IAIInformationalPopover>
   ) : (
-    <IAIInformationalPopover details="paramIterations">
+    <IAIInformationalPopover
+      details="paramIterations"
+      buttonLabel="Learn More"
+      buttonHref="https://support.invoke.ai/a/solutions/articles/151000159073?portalId=151000075831"
+    >
       <IAINumberInput
         label={t('parameters.iterations')}
         step={step}
