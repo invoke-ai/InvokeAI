@@ -501,7 +501,8 @@ class ModelInstall(ModelInstallBase):
             else self._complete_installation_handler
         )
         job.probe_override = probe_override
-        job.metadata = metadata
+        if metadata:
+            job.metadata = metadata
         job.add_event_handler(handler)
 
         self._async_installs[source] = None
