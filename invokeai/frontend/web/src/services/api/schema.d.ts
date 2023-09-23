@@ -478,11 +478,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -662,11 +657,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -725,11 +715,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1018,11 +1003,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -1073,11 +1053,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1172,11 +1147,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -1221,11 +1191,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1307,11 +1272,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -1368,11 +1328,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1460,11 +1415,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -1541,11 +1491,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -1585,11 +1530,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1648,11 +1588,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -1692,11 +1627,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1760,11 +1690,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -1815,11 +1740,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1933,11 +1853,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2235,11 +2150,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -2317,11 +2227,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -2383,11 +2288,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2543,11 +2443,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -2588,11 +2483,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2656,11 +2546,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2789,11 +2674,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -2845,11 +2725,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -2884,11 +2759,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2936,11 +2806,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3015,11 +2880,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3295,11 +3155,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -3352,11 +3207,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3445,11 +3295,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3568,11 +3413,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -3642,11 +3482,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -3697,11 +3532,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3782,11 +3612,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -3850,11 +3675,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -3916,11 +3736,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -3980,11 +3795,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4140,11 +3950,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -4195,11 +4000,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -4246,11 +4046,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -4294,11 +4089,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4372,11 +4162,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -4426,21 +4211,11 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
        */
       use_cache?: boolean;
-      /**
-       * Metadata
-       * @description Optional core metadata to be written to image
-       */
-      metadata?: components['schemas']['CoreMetadata'];
       /**
        * Type
        * @default img_nsfw
@@ -4507,11 +4282,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -4573,11 +4343,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4652,11 +4417,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -4693,11 +4453,6 @@ export type components = {
         | 'bicubic'
         | 'lanczos';
       /**
-       * Metadata
-       * @description Optional core metadata to be written to image
-       */
-      metadata?: components['schemas']['CoreMetadata'];
-      /**
        * Type
        * @default img_resize
        * @enum {string}
@@ -4730,11 +4485,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4788,11 +4538,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4876,11 +4621,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -4897,11 +4637,6 @@ export type components = {
        * @default InvokeAI
        */
       text?: string;
-      /**
-       * Metadata
-       * @description Optional core metadata to be written to image
-       */
-      metadata?: components['schemas']['CoreMetadata'];
       /**
        * Type
        * @default img_watermark
@@ -4943,11 +4678,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5003,11 +4733,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5072,11 +4797,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -5121,11 +4841,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5178,11 +4893,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -5217,11 +4927,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5325,11 +5030,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -5397,11 +5097,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -5435,11 +5130,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5507,11 +5197,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5584,11 +5269,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -5606,11 +5286,6 @@ export type components = {
        * @default false
        */
       fp32?: boolean;
-      /**
-       * Metadata
-       * @description Optional core metadata to be written to image
-       */
-      metadata?: components['schemas']['CoreMetadata'];
       /**
        * Type
        * @default l2i
@@ -5644,11 +5319,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5714,11 +5384,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -5764,11 +5429,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5899,11 +5559,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -5991,11 +5646,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -6039,11 +5689,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6093,11 +5738,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6163,11 +5803,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -6207,11 +5842,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6253,6 +5883,40 @@ export type components = {
       | 'inv_sigmoid'
       | 'add_difference';
     /**
+     * Metadata Merge
+     * @description Takes a list of MetadataItems and outputs a MetadataDict.
+     */
+    MergeMetadataDictInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * Collection
+       * @description Collection of MetadataDicts
+       */
+      collection?: components['schemas']['MetadataDict'][];
+      /**
+       * Type
+       * @default merge_metadata_dict
+       * @enum {string}
+       */
+      type: 'merge_metadata_dict';
+    };
+    /**
      * Metadata Accumulator
      * @description Outputs a Core Metadata Object
      */
@@ -6268,11 +5932,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6450,11 +6109,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -6500,11 +6154,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6652,11 +6301,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -6715,11 +6359,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6800,11 +6439,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -6861,11 +6495,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -6881,11 +6510,6 @@ export type components = {
        * @description VAE
        */
       vae?: components['schemas']['VaeField'];
-      /**
-       * Metadata
-       * @description Optional core metadata to be written to image
-       */
-      metadata?: components['schemas']['CoreMetadata'];
       /**
        * Type
        * @default l2i_onnx
@@ -6944,11 +6568,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7036,11 +6655,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7225,11 +6839,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -7263,11 +6872,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7352,11 +6956,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -7414,11 +7013,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7487,11 +7081,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default false
@@ -7532,11 +7121,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7590,11 +7174,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -7641,11 +7220,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7701,11 +7275,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7781,11 +7350,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -7826,11 +7390,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7912,11 +7471,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8000,11 +7554,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -8070,11 +7619,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8142,11 +7686,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -8197,6 +7736,16 @@ export type components = {
      */
     SaveImageInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -8207,11 +7756,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8251,11 +7795,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8315,11 +7854,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8427,11 +7961,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -8504,11 +8033,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8761,11 +8285,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -8950,11 +8469,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -9096,11 +8610,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -9152,11 +8661,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -9191,11 +8695,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -9237,11 +8736,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -9329,11 +8823,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -9387,11 +8876,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -9432,11 +8916,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -9488,11 +8967,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -9552,11 +9026,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -9660,11 +9129,6 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
-      /**
        * Use Cache
        * @description Whether or not to use the cache
        * @default true
@@ -9747,11 +9211,6 @@ export type components = {
        * @default false
        */
       is_intermediate?: boolean;
-      /**
-       * Workflow
-       * @description The workflow to save with the image
-       */
-      workflow?: string;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -9857,8 +9316,12 @@ export type components = {
       | 'Scheduler'
       | 'WorkflowField'
       | 'IsIntermediate'
-      | 'MetadataField'
-      | 'BoardField';
+      | 'BoardField'
+      | 'Any'
+      | 'MetadataItem'
+      | 'MetadataItemCollection'
+      | 'MetadataItemPolymorphic'
+      | 'MetadataDict';
     /**
      * UIComponent
      * @description The type of UI component to use for a field, used to override the default components, which are     inferred from the field type.
