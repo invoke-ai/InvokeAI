@@ -1,19 +1,16 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   addEraseRect,
   addFillRect,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -26,15 +23,13 @@ import {
 } from 'react-icons/fa';
 
 export const selector = createSelector(
-  [canvasSelector, isStagingSelector, systemSelector],
-  (canvas, isStaging, system) => {
-    const { isProcessing } = system;
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     const { tool } = canvas;
 
     return {
       tool,
       isStaging,
-      isProcessing,
     };
   },
   {
@@ -107,11 +102,23 @@ const UnifiedCanvasToolSelect = () => {
     }
   );
 
-  const handleSelectBrushTool = () => dispatch(setTool('brush'));
-  const handleSelectEraserTool = () => dispatch(setTool('eraser'));
-  const handleSelectColorPickerTool = () => dispatch(setTool('colorPicker'));
-  const handleFillRect = () => dispatch(addFillRect());
-  const handleEraseBoundingBox = () => dispatch(addEraseRect());
+  const handleSelectBrushTool = useCallback(
+    () => dispatch(setTool('brush')),
+    [dispatch]
+  );
+  const handleSelectEraserTool = useCallback(
+    () => dispatch(setTool('eraser')),
+    [dispatch]
+  );
+  const handleSelectColorPickerTool = useCallback(
+    () => dispatch(setTool('colorPicker')),
+    [dispatch]
+  );
+  const handleFillRect = useCallback(() => dispatch(addFillRect()), [dispatch]);
+  const handleEraseBoundingBox = useCallback(
+    () => dispatch(addEraseRect()),
+    [dispatch]
+  );
 
   return (
     <Flex flexDirection="column" gap={2}>

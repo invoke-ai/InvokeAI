@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
-from packaging import version
 import platform
+from contextlib import nullcontext
+from typing import Union
 
 import torch
+from packaging import version
 from torch import autocast
-from typing import Union
+
 from invokeai.app.services.config import InvokeAIAppConfig
 
 CPU_DEVICE = torch.device("cpu")

@@ -14,6 +14,7 @@ import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import { MouseEvent, memo, useCallback, useEffect, useState } from 'react';
 import FieldTooltipContent from './FieldTooltipContent';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   nodeId: string;
@@ -33,10 +34,11 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   } = props;
   const label = useFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
+  const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
   const [localTitle, setLocalTitle] = useState(
-    label || fieldTemplateTitle || 'Unknown Field'
+    label || fieldTemplateTitle || t('nodes.unknownField')
   );
 
   const handleSubmit = useCallback(
@@ -44,10 +46,10 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
       if (newTitle && (newTitle === label || newTitle === fieldTemplateTitle)) {
         return;
       }
-      setLocalTitle(newTitle || fieldTemplateTitle || 'Unknown Field');
+      setLocalTitle(newTitle || fieldTemplateTitle || t('nodes.unknownField'));
       dispatch(fieldLabelChanged({ nodeId, fieldName, label: newTitle }));
     },
-    [label, fieldTemplateTitle, dispatch, nodeId, fieldName]
+    [label, fieldTemplateTitle, dispatch, nodeId, fieldName, t]
   );
 
   const handleChange = useCallback((newTitle: string) => {
@@ -56,8 +58,8 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
 
   useEffect(() => {
     // Another component may change the title; sync local title with global state
-    setLocalTitle(label || fieldTemplateTitle || 'Unknown Field');
-  }, [label, fieldTemplateTitle]);
+    setLocalTitle(label || fieldTemplateTitle || t('nodes.unknownField'));
+  }, [label, fieldTemplateTitle, t]);
 
   return (
     <Tooltip

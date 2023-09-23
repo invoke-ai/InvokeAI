@@ -4,9 +4,9 @@ These are nodes that have been developed by the community, for the community. If
 
 If you'd like to submit a node for the community, please refer to the [node creation overview](contributingNodes.md).
 
-To download a node, simply download the `.py` node file from the link and add it to the `invokeai/app/invocations` folder in your Invoke AI install location. Along with the node, an example node graph should be provided to help you get started with the node. 
+To download a node, simply download the `.py` node file from the link and add it to the `invokeai/app/invocations` folder in your Invoke AI install location. If you used the automated installation, this can be found inside the `.venv` folder. Along with the node, an example node graph should be provided to help you get started with the node. 
 
-To use a community node graph, download the the `.json` node graph file and load it into Invoke AI via the **Load Nodes** button on the Node Editor. 
+To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 ## Community Nodes
 
@@ -193,6 +193,40 @@ Results after using the depth controlnet
 ![9133eabb-bcda-4326-831e-1b641228b178](https://github.com/mickr777/InvokeAI/assets/115216705/915f1a53-968e-43eb-aa61-07cd8f1a733a)
 ![4f9a3fa8-9be9-4236-8a3e-fcec66decd2a](https://github.com/mickr777/InvokeAI/assets/115216705/821ef89e-8a60-44f5-b94e-471a9d8690cc)
 ![babd69c4-9d60-4a55-a834-5e8397f62610](https://github.com/mickr777/InvokeAI/assets/115216705/2befcb6d-49f4-4bfd-b5fc-1fee19274f89)
+
+--------------------------------
+
+### Prompt Tools 
+
+**Description:** A set of InvokeAI nodes that add general prompt manipulation tools.  These where written to accompany the PromptsFromFile node and other prompt generation nodes.
+
+1. PromptJoin - Joins to prompts into one.
+2. PromptReplace - performs a search and replace on a prompt. With the option of using regex.
+3. PromptSplitNeg - splits a prompt into positive and negative using the old V2 method of [] for negative.
+4. PromptToFile - saves a prompt or collection of prompts to a file. one per line. There is an append/overwrite option.
+5. PTFieldsCollect - Converts image generation fields into a Json format string that can be passed to Prompt to file. 
+6. PTFieldsExpand - Takes Json string and converts it to individual generation parameters This can be fed from the Prompts to file node.
+7. PromptJoinThree -  Joins 3 prompt together.
+8. PromptStrength - This take a string and float and outputs another string in the format of (string)strength like the weighted format of compel. 
+9. PromptStrengthCombine - This takes a collection of prompt strength strings and outputs a string in the .and() or .blend() format that can be fed into a proper prompt node.
+
+See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md
+
+**Node Link:** https://github.com/skunkworxdark/Prompt-tools-nodes
+
+--------------------------------
+
+### XY Image to Grid and Images to Grids nodes
+
+**Description:** Image to grid nodes and supporting tools.
+
+1. "Images To Grids" node - Takes a collection of images and creates a grid(s) of images. If there are more images than the size of a single grid then mutilple grids will be created until it runs out of images.
+2. "XYImage To Grid" node - Converts a collection of XYImages into a labeled Grid of images.  The XYImages collection has to be built using the supporoting nodes. See example node setups for more details.
+   
+
+See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/README.md
+
+**Node Link:** https://github.com/skunkworxdark/XYGrid_nodes
 
 --------------------------------
 

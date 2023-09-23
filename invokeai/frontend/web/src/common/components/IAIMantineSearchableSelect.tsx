@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
+import { FormControl, FormLabel, Tooltip, forwardRef } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
@@ -17,7 +17,7 @@ type IAISelectProps = Omit<SelectProps, 'label'> & {
   inputRef?: RefObject<HTMLInputElement>;
 };
 
-const IAIMantineSearchableSelect = (props: IAISelectProps) => {
+const IAIMantineSearchableSelect = forwardRef((props: IAISelectProps, ref) => {
   const {
     searchable = true,
     tooltip,
@@ -70,28 +70,27 @@ const IAIMantineSearchableSelect = (props: IAISelectProps) => {
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
-      <Select
-        ref={inputRef}
-        label={
-          label ? (
-            <FormControl isDisabled={disabled}>
-              <FormLabel>{label}</FormLabel>
-            </FormControl>
-          ) : undefined
-        }
-        disabled={disabled}
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleKeyUp}
-        searchable={searchable}
-        maxDropdownHeight={300}
-        styles={styles}
-        {...rest}
-      />
+      <FormControl ref={ref} isDisabled={disabled}>
+        {label && <FormLabel>{label}</FormLabel>}
+        <Select
+          ref={inputRef}
+          withinPortal
+          disabled={disabled}
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
+          searchable={searchable}
+          maxDropdownHeight={300}
+          styles={styles}
+          {...rest}
+        />
+      </FormControl>
     </Tooltip>
   );
-};
+});
+
+IAIMantineSearchableSelect.displayName = 'IAIMantineSearchableSelect';
 
 export default memo(IAIMantineSearchableSelect);

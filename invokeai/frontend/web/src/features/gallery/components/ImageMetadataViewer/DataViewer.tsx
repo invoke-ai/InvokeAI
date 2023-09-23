@@ -3,6 +3,7 @@ import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { FaCopy, FaDownload } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   label: string;
@@ -32,6 +33,8 @@ const DataViewer = (props: Props) => {
     a.click();
     a.remove();
   }, [dataString, label, fileName]);
+
+  const { t } = useTranslation();
 
   return (
     <Flex
@@ -73,9 +76,9 @@ const DataViewer = (props: Props) => {
       </Box>
       <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0, p: 2 }}>
         {withDownload && (
-          <Tooltip label={`Download ${label} JSON`}>
+          <Tooltip label={`${t('gallery.download')} ${label} JSON`}>
             <IconButton
-              aria-label={`Download ${label} JSON`}
+              aria-label={`${t('gallery.download')} ${label} JSON`}
               icon={<FaDownload />}
               variant="ghost"
               opacity={0.7}
@@ -84,9 +87,9 @@ const DataViewer = (props: Props) => {
           </Tooltip>
         )}
         {withCopy && (
-          <Tooltip label={`Copy ${label} JSON`}>
+          <Tooltip label={`${t('gallery.copy')} ${label} JSON`}>
             <IconButton
-              aria-label={`Copy ${label} JSON`}
+              aria-label={`${t('gallery.copy')} ${label} JSON`}
               icon={<FaCopy />}
               variant="ghost"
               opacity={0.7}

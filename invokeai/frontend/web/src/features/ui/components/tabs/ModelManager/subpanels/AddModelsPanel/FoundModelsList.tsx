@@ -77,7 +77,7 @@ export default function FoundModelsList() {
             dispatch(
               addToast(
                 makeToast({
-                  title: 'Failed To Add Model',
+                  title: t('toast.modelAddFailed'),
                   status: 'error',
                 })
               )
@@ -85,7 +85,7 @@ export default function FoundModelsList() {
           }
         });
     },
-    [dispatch, importMainModel]
+    [dispatch, importMainModel, t]
   );
 
   const handleSearchFilter = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -137,13 +137,13 @@ export default function FoundModelsList() {
                 onClick={quickAddHandler}
                 isLoading={isLoading}
               >
-                Quick Add
+                {t('modelManager.quickAdd')}
               </IAIButton>
               <IAIButton
                 onClick={() => dispatch(setAdvancedAddScanModel(model))}
                 isLoading={isLoading}
               >
-                Advanced
+                {t('modelManager.advanced')}
               </IAIButton>
             </Flex>
           ) : (
@@ -189,7 +189,7 @@ export default function FoundModelsList() {
             },
           }}
         >
-          <Text variant="subtext">No Models Found</Text>
+          <Text variant="subtext">{t('modelManager.noModels')}</Text>
         </Flex>
       );
     }

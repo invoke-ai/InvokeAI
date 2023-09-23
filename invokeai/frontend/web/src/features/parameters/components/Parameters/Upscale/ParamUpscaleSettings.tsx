@@ -1,13 +1,13 @@
 import { Flex, useDisclosure } from '@chakra-ui/react';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
+import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExpandArrowsAlt } from 'react-icons/fa';
+import { FaExpand } from 'react-icons/fa';
 import { ImageDTO } from 'services/api/types';
 import ParamESRGANModel from './ParamRealESRGANModel';
 
@@ -16,7 +16,7 @@ type Props = { imageDTO?: ImageDTO };
 const ParamUpscalePopover = (props: Props) => {
   const { imageDTO } = props;
   const dispatch = useAppDispatch();
-  const isBusy = useAppSelector(selectIsBusy);
+  const inProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
@@ -34,8 +34,9 @@ const ParamUpscalePopover = (props: Props) => {
       onClose={onClose}
       triggerComponent={
         <IAIIconButton
+          tooltip={t('parameters.upscale')}
           onClick={onOpen}
-          icon={<FaExpandArrowsAlt />}
+          icon={<FaExpand />}
           aria-label={t('parameters.upscale')}
         />
       }
@@ -49,7 +50,7 @@ const ParamUpscalePopover = (props: Props) => {
         <ParamESRGANModel />
         <IAIButton
           size="sm"
-          isDisabled={!imageDTO || isBusy}
+          isDisabled={!imageDTO || inProgress}
           onClick={handleClickUpscale}
         >
           {t('parameters.upscaleImage')}

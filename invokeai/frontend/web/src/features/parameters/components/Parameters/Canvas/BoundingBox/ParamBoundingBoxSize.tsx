@@ -1,7 +1,8 @@
-import { Flex, Spacer, Text } from '@chakra-ui/react';
+import { Flex, FormControl, FormLabel, Spacer } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { flipBoundingBoxAxes } from 'features/canvas/store/canvasSlice';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
@@ -92,38 +93,29 @@ export default function ParamBoundingBoxSize() {
         },
       }}
     >
-      <Flex alignItems="center" gap={2}>
-        <Text
-          sx={{
-            fontSize: 'sm',
-            width: 'full',
-            color: 'base.700',
-            _dark: {
-              color: 'base.300',
-            },
-          }}
-        >
-          {t('parameters.aspectRatio')}
-        </Text>
-        <Spacer />
-        <ParamAspectRatio />
-        <IAIIconButton
-          tooltip={t('ui.swapSizes')}
-          aria-label={t('ui.swapSizes')}
-          size="sm"
-          icon={<MdOutlineSwapVert />}
-          fontSize={20}
-          onClick={handleToggleSize}
-        />
-        <IAIIconButton
-          tooltip={t('ui.lockRatio')}
-          aria-label={t('ui.lockRatio')}
-          size="sm"
-          icon={<FaLock />}
-          isChecked={shouldLockAspectRatio}
-          onClick={handleLockRatio}
-        />
-      </Flex>
+      <IAIInformationalPopover feature="paramRatio">
+        <FormControl as={Flex} flexDir="row" alignItems="center" gap={2}>
+          <FormLabel>{t('parameters.aspectRatio')}</FormLabel>
+          <Spacer />
+          <ParamAspectRatio />
+          <IAIIconButton
+            tooltip={t('ui.swapSizes')}
+            aria-label={t('ui.swapSizes')}
+            size="sm"
+            icon={<MdOutlineSwapVert />}
+            fontSize={20}
+            onClick={handleToggleSize}
+          />
+          <IAIIconButton
+            tooltip={t('ui.lockRatio')}
+            aria-label={t('ui.lockRatio')}
+            size="sm"
+            icon={<FaLock />}
+            isChecked={shouldLockAspectRatio}
+            onClick={handleLockRatio}
+          />
+        </FormControl>
+      </IAIInformationalPopover>
       <ParamBoundingBoxWidth />
       <ParamBoundingBoxHeight />
     </Flex>

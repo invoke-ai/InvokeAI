@@ -5,6 +5,7 @@ InvokeAI Installer
 import argparse
 import os
 from pathlib import Path
+
 from installer import Installer
 
 if __name__ == "__main__":
