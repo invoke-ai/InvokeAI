@@ -17,7 +17,7 @@ from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
 from .download import DownloadEventHandler
 from .install import ModelInstall, ModelInstallBase
 from .models import MODEL_CLASSES, InvalidModelException, ModelBase
-from .storage import ModelConfigStore, get_config_store
+from .storage import ConfigFileVersionMismatchException, ModelConfigStore, get_config_store, migrate_models_store
 
 
 @dataclass
@@ -138,7 +138,12 @@ class ModelLoad(ModelLoadBase):
             models_file = config.model_conf_path
         else:
             models_file = config.root_path / "configs/models3.yaml"
-        store = get_config_store(models_file)
+        try:
+            store = get_config_store(models_file)
+        except ConfigFileVersionMismatchException:
+            migrate_models_store(config)
+            store = get_config_store(models_file)
+
         if not store:
             raise ValueError(f"Invalid model configuration file: {models_file}")
 

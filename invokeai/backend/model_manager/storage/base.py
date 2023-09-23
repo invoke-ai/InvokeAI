@@ -4,6 +4,7 @@ Abstract base class for storing and retrieving model configuration records.
 """
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import List, Optional, Set, Union
 
 from ..config import BaseModelType, ModelConfigBase, ModelType
@@ -22,6 +23,10 @@ class InvalidModelException(Exception):
 
 class UnknownModelException(Exception):
     """Raised on an attempt to fetch or delete a model with a nonexistent key."""
+
+
+class ConfigFileVersionMismatchException(Exception):
+    """Raised on an attempt to open a config with an incompatible version."""
 
 
 class ModelConfigStore(ABC):
@@ -96,6 +101,16 @@ class ModelConfigStore(ABC):
         Return models containing all of the listed tags.
 
         :param tags: Set of tags to search on.
+        """
+        pass
+
+    @abstractmethod
+    def search_by_path(
+        self,
+        path: Union[str, Path],
+    ) -> Optional[ModelConfigBase]:
+        """
+        Return the model having the indicated path.
         """
         pass
 

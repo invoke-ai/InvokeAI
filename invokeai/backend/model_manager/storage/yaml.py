@@ -50,7 +50,13 @@ from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 from ..config import BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
-from .base import CONFIG_FILE_VERSION, DuplicateModelException, ModelConfigStore, UnknownModelException
+from .base import (
+    CONFIG_FILE_VERSION,
+    ConfigFileVersionMismatchException,
+    DuplicateModelException,
+    ModelConfigStore,
+    UnknownModelException,
+)
 
 
 class ModelConfigStoreYAML(ModelConfigStore):
@@ -68,9 +74,8 @@ class ModelConfigStoreYAML(ModelConfigStore):
         if not self._filename.exists():
             self._initialize_yaml()
         self._config = OmegaConf.load(self._filename)
-        assert (
-            str(self.version) == CONFIG_FILE_VERSION
-        ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
+        if str(self.version) != CONFIG_FILE_VERSION:
+            raise ConfigFileVersionMismatchException
 
     def _initialize_yaml(self):
         try:
@@ -239,3 +244,67 @@ class ModelConfigStoreYAML(ModelConfigStore):
         finally:
             self._lock.release()
         return results
+
+    def search_by_path(self, path: Union[str, Path]) -> Optional[ModelConfigBase]:
+        """
+        Return the model with the indicated path, or None..
+        """
+        try:
+            self._lock.acquire()
+            for key, record in self._config.items():
+                if key == "__metadata__":
+                    continue
+                model = ModelConfigFactory.make_config(record, key)
+                if model.path == path:
+                    return model
+        finally:
+            self._lock.release()
+        return None
+
+    def _load_and_maybe_upgrade(self, config_path: Path) -> DictConfig:
+        config = OmegaConf.load(config_path)
+        version = config["__metadata__"].get("version")
+        if version == CONFIG_FILE_VERSION:
+            return config
+
+        # if we get here we need to upgrade
+        if version == "3.0.0":
+            return self._migrate_format_to_3_2(config, config_path)
+        else:
+            raise Exception(f"{config_path} has unknown version: {version}")
+
+    def _migrate_format_to_3_2(self, old_config: DictConfig, config_path: Path) -> DictConfig:
+        print(
+            f"** Doing one-time conversion of {config_path.as_posix()} to new format. Original will be named {config_path.as_posix() + '.orig'}"
+        )
+
+        # avoid circular dependencies
+        from shutil import move
+
+        from ..install import InvalidModelException, ModelInstall
+
+        move(config_path, config_path.as_posix() + ".orig")
+
+        new_store = self.__class__(config_path)
+        installer = ModelInstall(store=new_store)
+
+        for model_key, stanza in old_config.items():
+            if model_key == "__metadata__":
+                assert (
+                    stanza["version"] == "3.0.0"
+                ), f"This script works on version 3.0.0 yaml files, but your configuration points to a {stanza['version']} version"
+                continue
+
+            try:
+                path = stanza["path"]
+                new_key = installer.register_path(path)
+                model_info = new_store.get_model(new_key)
+                if vae := stanza.get("vae"):
+                    model_info.vae = vae
+                if model_config := stanza.get("config"):
+                    model_info.config = model_config.as_posix()
+                model_info.description = stanza.get("description")
+                new_store.update_model(new_key, model_info)
+                return OmegaConf.load(config_path)
+            except (DuplicateModelException, InvalidModelException) as e:
+                print(str(e))

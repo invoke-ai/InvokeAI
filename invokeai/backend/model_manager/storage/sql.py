@@ -477,3 +477,9 @@ class ModelConfigStoreSQL(ModelConfigStore):
         finally:
             self._lock.release()
         return results
+
+    def search_by_path(self, path: Union[str, Path]) -> Optional[ModelConfigBase]:
+        """
+        Return the model with the indicated path, or None..
+        """
+        raise NotImplementedError("search_by_path not implemented in storage.sql")

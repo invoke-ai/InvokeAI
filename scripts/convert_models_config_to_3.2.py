@@ -14,11 +14,8 @@ when new models are downloaded from HuggingFace or Civitae.
 import argparse
 from pathlib import Path
 
-from omegaconf import OmegaConf
-
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import DuplicateModelException, InvalidModelException, ModelInstall
-from invokeai.backend.model_manager.storage import get_config_store
+from invokeai.backend.model_manager.storage import migrate_models_store
 
 
 def main():
@@ -35,34 +32,7 @@ def main():
 
     config = InvokeAIAppConfig.get_config()
     config.parse_args(config_args)
-    old_yaml_file = OmegaConf.load(config.model_conf_path)
-
-    store = get_config_store(args.outfile)
-    installer = ModelInstall(store=store)
-
-    print(f"Writing 3.2 models configuration into {args.outfile}.")
-
-    for model_key, stanza in old_yaml_file.items():
-        if model_key == "__metadata__":
-            assert (
-                stanza["version"] == "3.0.0"
-            ), f"This script works on version 3.0.0 yaml files, but your configuration points to a {stanza['version']} version"
-            continue
-
-        try:
-            path = config.models_path / stanza["path"]
-            new_key = installer.register_path(path)
-            model_info = store.get_model(new_key)
-            if vae := stanza.get("vae"):
-                model_info.vae = (config.models_path / vae).as_posix()
-            if model_config := stanza.get("config"):
-                model_info.config = (config.root_path / model_config).as_posix()
-            model_info.description = stanza.get("description")
-            store.update_model(new_key, model_info)
-
-            print(f"{model_key} => {new_key}")
-        except (DuplicateModelException, InvalidModelException) as e:
-            print(str(e))
+    migrate_models_store(config)
 
 
 if __name__ == "__main__":

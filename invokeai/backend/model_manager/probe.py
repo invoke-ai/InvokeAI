@@ -7,6 +7,7 @@ its base type, model type, format and variant.
 """
 
 import json
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, Optional
@@ -493,20 +494,33 @@ class PipelineFolderProbe(FolderProbeBase):
 
 
 class VaeFolderProbe(FolderProbeBase):
-    """Probe a diffusers-style VAE model."""
-
     def get_base_type(self) -> BaseModelType:
-        """Return the BaseModelType for a diffusers-style VAE."""
+        if self._config_looks_like_sdxl():
+            return BaseModelType.StableDiffusionXL
+        elif self._name_looks_like_sdxl():
+            # but SD and SDXL VAE are the same shape (3-channel RGB to 4-channel float scaled down
+            # by a factor of 8), we can't necessarily tell them apart by config hyperparameters.
+            return BaseModelType.StableDiffusionXL
+        else:
+            return BaseModelType.StableDiffusion1
+
+    def _config_looks_like_sdxl(self) -> bool:
+        # config values that distinguish Stability's SD 1.x VAE from their SDXL VAE.
         config_file = self.folder_path / "config.json"
         if not config_file.exists():
             raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
         with open(config_file, "r") as file:
             config = json.load(file)
-        return (
-            BaseModelType.StableDiffusionXL
-            if config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
-            else BaseModelType.StableDiffusion1
-        )
+        return config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
+
+    def _name_looks_like_sdxl(self) -> bool:
+        return bool(re.search(r"xl\b", self._guess_name(), re.IGNORECASE))
+
+    def _guess_name(self) -> str:
+        name = self.folder_path.name
+        if name == "vae":
+            name = self.folder_path.parent.name
+        return name
 
 
 class TextualInversionFolderProbe(FolderProbeBase):
