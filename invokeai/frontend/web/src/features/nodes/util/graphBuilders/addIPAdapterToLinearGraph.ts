@@ -38,15 +38,7 @@ export const addIPAdapterToLinearGraph = (
 
     graph.nodes[ipAdapterNode.id] = ipAdapterNode as IPAdapterInvocation;
 
-    // if (metadataAccumulator?.ip_adapters) {
-    //   // metadata accumulator only needs the ip_adapter field - not the whole node
-    //   // extract what we need and add to the accumulator
-    //   const ipAdapterField = omit(ipAdapterNode, [
-    //     'id',
-    //     'type',
-    //   ]) as IPAdapterField;
-    //   metadataAccumulator.ip_adapters.push(ipAdapterField);
-    // }
+    // TODO: add metadata
 
     graph.edges.push({
       source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },

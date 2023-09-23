@@ -1,18 +1,16 @@
 import { RootState } from 'app/store/store';
 import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
-import { omit } from 'lodash-es';
 import {
   CollectInvocation,
   ControlField,
   ControlNetInvocation,
-  MetadataAccumulatorInvocation,
 } from 'services/api/types';
-import { NonNullableGraph } from '../../types/types';
+import { NonNullableGraph, zControlField } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CONTROL_NET_COLLECT,
-  METADATA_ACCUMULATOR,
 } from './constants';
+import { addMainMetadata } from './metadata';
 
 export const addControlNetToLinearGraph = (
   state: RootState,
@@ -23,12 +21,9 @@ export const addControlNetToLinearGraph = (
 
   const validControlNets = getValidControlNets(controlNets);
 
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
-
   if (isControlNetEnabled && Boolean(validControlNets.length)) {
     if (validControlNets.length) {
+      const controlnets: ControlField[] = [];
       // We have multiple controlnets, add ControlNet collector
       const controlNetIterateNode: CollectInvocation = {
         id: CONTROL_NET_COLLECT,
@@ -87,15 +82,7 @@ export const addControlNetToLinearGraph = (
 
         graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
 
-        if (metadataAccumulator?.controlnets) {
-          // metadata accumulator only needs a control field - not the whole node
-          // extract what we need and add to the accumulator
-          const controlField = omit(controlNetNode, [
-            'id',
-            'type',
-          ]) as ControlField;
-          metadataAccumulator.controlnets.push(controlField);
-        }
+        controlnets.push(zControlField.parse(controlNetNode));
 
         graph.edges.push({
           source: { node_id: controlNetNode.id, field: 'control' },
@@ -115,6 +102,8 @@ export const addControlNetToLinearGraph = (
           });
         }
       });
+
+      addMainMetadata(graph, { controlnets });
     }
   }
 };

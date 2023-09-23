@@ -1,21 +1,22 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
+import {
+  LoRAMetadataItem,
+  NonNullableGraph,
+  zLoRAMetadataItem,
+} from 'features/nodes/types/types';
 import { forEach, size } from 'lodash-es';
+import { LoraLoaderInvocation } from 'services/api/types';
 import {
-  LoraLoaderInvocation,
-  MetadataAccumulatorInvocation,
-} from 'services/api/types';
-import {
+  CANVAS_COHERENCE_DENOISE_LATENTS,
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPAINT_GRAPH,
-  CANVAS_COHERENCE_DENOISE_LATENTS,
   CLIP_SKIP,
   LORA_LOADER,
   MAIN_MODEL_LOADER,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
 } from './constants';
+import { addMainMetadata } from './metadata';
 
 export const addLoRAsToGraph = (
   state: RootState,
@@ -33,29 +34,29 @@ export const addLoRAsToGraph = (
 
   const { loras } = state.lora;
   const loraCount = size(loras);
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
 
-  if (loraCount > 0) {
-    // Remove modelLoaderNodeId unet connection to feed it to LoRAs
-    graph.edges = graph.edges.filter(
-      (e) =>
-        !(
-          e.source.node_id === modelLoaderNodeId &&
-          ['unet'].includes(e.source.field)
-        )
-    );
-    // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
-    graph.edges = graph.edges.filter(
-      (e) =>
-        !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
-    );
+  if (loraCount === 0) {
+    return;
   }
+
+  // Remove modelLoaderNodeId unet connection to feed it to LoRAs
+  graph.edges = graph.edges.filter(
+    (e) =>
+      !(
+        e.source.node_id === modelLoaderNodeId &&
+        ['unet'].includes(e.source.field)
+      )
+  );
+  // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
+  graph.edges = graph.edges.filter(
+    (e) =>
+      !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
+  );
 
   // we need to remember the last lora so we can chain from it
   let lastLoraNodeId = '';
   let currentLoraIndex = 0;
+  const loraMetadata: LoRAMetadataItem[] = [];
 
   forEach(loras, (lora) => {
     const { model_name, base_model, weight } = lora;
@@ -69,13 +70,12 @@ export const addLoRAsToGraph = (
       weight,
     };
 
-    // add the lora to the metadata accumulator
-    if (metadataAccumulator?.loras) {
-      metadataAccumulator.loras.push({
+    loraMetadata.push(
+      zLoRAMetadataItem.parse({
         lora: { model_name, base_model },
         weight,
-      });
-    }
+      })
+    );
 
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
@@ -182,4 +182,6 @@ export const addLoRAsToGraph = (
     lastLoraNodeId = currentLoraNodeId;
     currentLoraIndex += 1;
   });
+
+  addMainMetadata(graph, { loras: loraMetadata });
 };

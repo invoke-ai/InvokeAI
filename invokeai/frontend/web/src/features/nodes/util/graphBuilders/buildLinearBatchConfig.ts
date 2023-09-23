@@ -4,13 +4,20 @@ import { generateSeeds } from 'common/util/generateSeeds';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { range, unset } from 'lodash-es';
 import { components } from 'services/api/schema';
-import { Batch, BatchConfig } from 'services/api/types';
+import { Batch, BatchConfig, MetadataItemInvocation } from 'services/api/types';
 import {
+  BATCH_PROMPT,
+  BATCH_SEED,
+  BATCH_STYLE_PROMPT,
   CANVAS_COHERENCE_NOISE,
   METADATA_ACCUMULATOR,
   NOISE,
   POSITIVE_CONDITIONING,
 } from './constants';
+import {
+  addBatchMetadataNodeToGraph,
+  removeMetadataFromMainMetadataNode,
+} from './metadata';
 
 export const prepareLinearUIBatch = (
   state: RootState,
@@ -23,8 +30,27 @@ export const prepareLinearUIBatch = (
 
   const data: Batch['data'] = [];
 
+  const seedMetadataItemNode: MetadataItemInvocation = {
+    id: BATCH_SEED,
+    type: 'metadata_item',
+    label: 'seed',
+  };
+
+  const promptMetadataItemNode: MetadataItemInvocation = {
+    id: BATCH_PROMPT,
+    type: 'metadata_item',
+    label: 'positive_prompt',
+  };
+
+  const stylePromptMetadataItemNode: MetadataItemInvocation = {
+    id: BATCH_STYLE_PROMPT,
+    type: 'metadata_item',
+    label: 'positive_style_prompt',
+  };
+
+  const itemNodesIds: string[] = [];
+
   if (prompts.length === 1) {
-    unset(graph.nodes[METADATA_ACCUMULATOR], 'seed');
     const seeds = generateSeeds({
       count: iterations,
       start: shouldRandomizeSeed ? undefined : seed,
@@ -40,13 +66,15 @@ export const prepareLinearUIBatch = (
       });
     }
 
-    if (graph.nodes[METADATA_ACCUMULATOR]) {
-      zipped.push({
-        node_path: METADATA_ACCUMULATOR,
-        field_name: 'seed',
-        items: seeds,
-      });
-    }
+    // add to metadata
+    removeMetadataFromMainMetadataNode(graph, 'seed');
+    itemNodesIds.push(BATCH_SEED);
+    graph.nodes[BATCH_SEED] = seedMetadataItemNode;
+    zipped.push({
+      node_path: BATCH_SEED,
+      field_name: 'value',
+      items: seeds,
+    });
 
     if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
       zipped.push({
@@ -77,13 +105,15 @@ export const prepareLinearUIBatch = (
         });
       }
 
-      if (graph.nodes[METADATA_ACCUMULATOR]) {
-        firstBatchDatumList.push({
-          node_path: METADATA_ACCUMULATOR,
-          field_name: 'seed',
-          items: seeds,
-        });
-      }
+      // add to metadata
+      removeMetadataFromMainMetadataNode(graph, 'seed');
+      itemNodesIds.push(BATCH_SEED);
+      graph.nodes[BATCH_SEED] = seedMetadataItemNode;
+      firstBatchDatumList.push({
+        node_path: BATCH_SEED,
+        field_name: 'value',
+        items: seeds,
+      });
 
       if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
         firstBatchDatumList.push({
@@ -106,13 +136,17 @@ export const prepareLinearUIBatch = (
           items: seeds,
         });
       }
-      if (graph.nodes[METADATA_ACCUMULATOR]) {
-        secondBatchDatumList.push({
-          node_path: METADATA_ACCUMULATOR,
-          field_name: 'seed',
-          items: seeds,
-        });
-      }
+
+      // add to metadata
+      removeMetadataFromMainMetadataNode(graph, 'seed');
+      itemNodesIds.push(BATCH_SEED);
+      graph.nodes[BATCH_SEED] = seedMetadataItemNode;
+      secondBatchDatumList.push({
+        node_path: BATCH_SEED,
+        field_name: 'value',
+        items: seeds,
+      });
+
       if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
         secondBatchDatumList.push({
           node_path: CANVAS_COHERENCE_NOISE,
@@ -137,13 +171,15 @@ export const prepareLinearUIBatch = (
       });
     }
 
-    if (graph.nodes[METADATA_ACCUMULATOR]) {
-      firstBatchDatumList.push({
-        node_path: METADATA_ACCUMULATOR,
-        field_name: 'positive_prompt',
-        items: extendedPrompts,
-      });
-    }
+    // add to metadata
+    removeMetadataFromMainMetadataNode(graph, 'positive_prompt');
+    itemNodesIds.push(BATCH_PROMPT);
+    graph.nodes[BATCH_PROMPT] = promptMetadataItemNode;
+    firstBatchDatumList.push({
+      node_path: BATCH_PROMPT,
+      field_name: 'value',
+      items: extendedPrompts,
+    });
 
     if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
       unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
@@ -160,17 +196,21 @@ export const prepareLinearUIBatch = (
         });
       }
 
-      if (graph.nodes[METADATA_ACCUMULATOR]) {
-        firstBatchDatumList.push({
-          node_path: METADATA_ACCUMULATOR,
-          field_name: 'positive_style_prompt',
-          items: stylePrompts,
-        });
-      }
+      // add to metadata
+      removeMetadataFromMainMetadataNode(graph, 'positive_style_prompt');
+      itemNodesIds.push(BATCH_STYLE_PROMPT);
+      graph.nodes[BATCH_STYLE_PROMPT] = stylePromptMetadataItemNode;
+      firstBatchDatumList.push({
+        node_path: BATCH_STYLE_PROMPT,
+        field_name: 'value',
+        items: extendedPrompts,
+      });
     }
 
     data.push(firstBatchDatumList);
   }
+
+  addBatchMetadataNodeToGraph(graph, itemNodesIds);
 
   const enqueueBatchArg: BatchConfig = {
     prepend,

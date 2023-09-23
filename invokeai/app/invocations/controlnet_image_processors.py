@@ -25,6 +25,7 @@ from controlnet_aux import (
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, Field, validator
+from invokeai.app.invocations.metadata import WithMetadata
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
@@ -38,6 +39,7 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
+    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -127,7 +129,7 @@ class ControlNetInvocation(BaseInvocation):
 @invocation(
     "image_processor", title="Base Image Processor", tags=["controlnet"], category="controlnet", version="1.0.0"
 )
-class ImageProcessorInvocation(BaseInvocation):
+class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Base class for invocations that preprocess images for ControlNet"""
 
     image: ImageField = InputField(description="The image to process")
@@ -150,6 +152,7 @@ class ImageProcessorInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             node_id=self.id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata.data if self.metadata else None,
             workflow=self.workflow,
         )
 

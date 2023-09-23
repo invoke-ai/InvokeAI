@@ -17,7 +17,6 @@ import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   ONNX_MODEL_LOADER,
@@ -29,6 +28,7 @@ import {
   SEAMLESS,
 } from './constants';
 import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { addMainMetadataNodeToGraph } from './metadata';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -300,10 +300,7 @@ export const buildCanvasSDXLTextToImageGraph = (
     });
   }
 
-  // add metadata accumulator, which is only mostly populated - some fields are added later
-  graph.nodes[METADATA_ACCUMULATOR] = {
-    id: METADATA_ACCUMULATOR,
-    type: 'metadata_accumulator',
+  addMainMetadataNodeToGraph(graph, {
     generation_mode: 'txt2img',
     cfg_scale,
     width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
@@ -317,20 +314,6 @@ export const buildCanvasSDXLTextToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined, // option; set in addVAEToGraph
-    controlnets: [], // populated in addControlNetToLinearGraph
-    loras: [], // populated in addLoRAsToGraph
-  };
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: CANVAS_OUTPUT,
-      field: 'metadata',
-    },
   });
 
   // Add Seamless To Graph

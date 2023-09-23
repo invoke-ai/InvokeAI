@@ -19,10 +19,7 @@ const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
 const RESERVED_FIELD_TYPES = ['IsIntermediate', 'WorkflowField'];
 
-const invocationDenylist: AnyInvocationType[] = [
-  'graph',
-  'metadata_accumulator',
-];
+const invocationDenylist: AnyInvocationType[] = ['graph'];
 
 const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {

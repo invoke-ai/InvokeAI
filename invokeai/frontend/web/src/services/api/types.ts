@@ -147,6 +147,15 @@ export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
 export type SaveImageInvocation = s['SaveImageInvocation'];
+export type MetadataInvocation = s['MetadataInvocation'];
+export type MetadataInvocationAsCollection = Omit<
+  s['MetadataInvocation'],
+  'items'
+> & {
+  items: s['MetadataItem'][];
+};
+export type MetadataItemInvocation = s['MetadataItemInvocation'];
+export type MergeMetadataDictInvocation = s['MergeMetadataDictInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];

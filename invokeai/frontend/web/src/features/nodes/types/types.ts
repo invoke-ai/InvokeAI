@@ -1252,7 +1252,7 @@ export const isInvocationFieldSchema = (
 
 export type InvocationEdgeExtra = { type: 'default' | 'collapsed' };
 
-const zLoRAMetadataItem = z.object({
+export const zLoRAMetadataItem = z.object({
   lora: zLoRAModelField.deepPartial(),
   weight: z.number(),
 });
@@ -1279,15 +1279,7 @@ export const zCoreMetadata = z
       .nullish()
       .catch(null),
     controlnets: z.array(zControlField.deepPartial()).nullish().catch(null),
-    loras: z
-      .array(
-        z.object({
-          lora: zLoRAModelField.deepPartial(),
-          weight: z.number(),
-        })
-      )
-      .nullish()
-      .catch(null),
+    loras: z.array(zLoRAMetadataItem).nullish().catch(null),
     vae: zVaeModelField.nullish().catch(null),
     strength: z.number().nullish().catch(null),
     init_image: z.string().nullish().catch(null),
