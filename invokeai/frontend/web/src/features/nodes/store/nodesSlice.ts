@@ -30,6 +30,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
 import {
+  BoardInputFieldValue,
   BooleanInputFieldValue,
   ColorInputFieldValue,
   ControlNetModelInputFieldValue,
@@ -494,6 +495,12 @@ const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action);
     },
+    fieldBoardValueChanged: (
+      state,
+      action: FieldValueAction<BoardInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
     fieldImageValueChanged: (
       state,
       action: FieldValueAction<ImageInputFieldValue>
@@ -871,7 +878,7 @@ const nodesSlice = createSlice({
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
       if (['in_progress'].includes(action.payload.data.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
-          nes.status = NodeStatus.IN_PROGRESS;
+          nes.status = NodeStatus.PENDING;
           nes.error = null;
           nes.progress = null;
           nes.progressImage = null;
@@ -897,6 +904,7 @@ export const {
   imageCollectionFieldValueChanged,
   fieldStringValueChanged,
   fieldNumberValueChanged,
+  fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldImageValueChanged,
   fieldColorValueChanged,

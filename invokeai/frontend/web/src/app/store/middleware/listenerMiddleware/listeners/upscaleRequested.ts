@@ -18,11 +18,14 @@ export const addUpscaleRequestedListener = () => {
       const log = logger('session');
 
       const { image_name } = action.payload;
-      const { esrganModelName } = getState().postprocessing;
+      const state = getState();
+      const { esrganModelName } = state.postprocessing;
+      const { autoAddBoardId } = state.gallery;
 
       const graph = buildAdHocUpscaleGraph({
         image_name,
         esrganModelName,
+        autoAddBoardId,
       });
 
       try {

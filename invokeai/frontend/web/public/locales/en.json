@@ -81,6 +81,7 @@
         "load": "Load",
         "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
+        "learnMore": "Learn More",
         "modelManager": "Model Manager",
         "nodeEditor": "Node Editor",
         "nodes": "Workflow Editor",
@@ -135,6 +136,8 @@
         "bgth": "bg_th",
         "canny": "Canny",
         "cannyDescription": "Canny edge detection",
+        "colorMap": "Color",
+        "colorMapDescription": "Generates a color map from the image",
         "coarse": "Coarse",
         "contentShuffle": "Content Shuffle",
         "contentShuffleDescription": "Shuffles the content in an image",
@@ -158,6 +161,7 @@
         "hideAdvanced": "Hide Advanced",
         "highThreshold": "High Threshold",
         "imageResolution": "Image Resolution",
+        "colorMapTileSize": "Tile Size",
         "importImageFromCanvas": "Import Image From Canvas",
         "importMaskFromCanvas": "Import Mask From Canvas",
         "incompatibleBaseModel": "Incompatible base model:",
@@ -701,6 +705,8 @@
         "addNodeToolTip": "Add Node (Shift+A, Space)",
         "animatedEdges": "Animated Edges",
         "animatedEdgesHelp": "Animate selected edges and edges connected to selected nodes",
+        "boardField": "Board",
+        "boardFieldDescription": "A gallery board",
         "boolean": "Booleans",
         "booleanCollection": "Boolean Collection",
         "booleanCollectionDescription": "A collection of booleans.",
@@ -888,7 +894,7 @@
         "zoomOutNodes": "Zoom Out"
     },
     "parameters": {
-        "aspectRatio": "Ratio",
+        "aspectRatio": "Aspect Ratio",
         "boundingBoxHeader": "Bounding Box",
         "boundingBoxHeight": "Bounding Box Height",
         "boundingBoxWidth": "Bounding Box Width",
@@ -1020,8 +1026,8 @@
             "label": "Seed Behaviour",
             "perIterationLabel": "Seed per Iteration",
             "perIterationDesc": "Use a different seed for each iteration",
-            "perPromptLabel": "Seed per Prompt",
-            "perPromptDesc": "Use a different seed for each prompt"
+            "perPromptLabel": "Seed per Image",
+            "perPromptDesc": "Use a different seed for each image"
         }
     },
     "sdxl": {
@@ -1173,131 +1179,205 @@
     "popovers": {
         "clipSkip": {
             "heading": "CLIP Skip",
-            "paragraph": "Choose how many layers of the CLIP model to skip. Certain models are better suited to be used with CLIP Skip."
-        },
-        "compositingBlur": {
-            "heading": "Blur",
-            "paragraph": "The blur radius of the mask."
-        },
-        "compositingBlurMethod": {
-            "heading": "Blur Method",
-            "paragraph": "The method of blur applied to the masked area."
-        },
-        "compositingCoherencePass": {
-            "heading": "Coherence Pass",
-            "paragraph": "Composite the Inpainted/Outpainted images."
-        },
-        "compositingCoherenceMode": {
-            "heading": "Mode",
-            "paragraph": "The mode of the Coherence Pass."
-        },
-        "compositingCoherenceSteps": {
-            "heading": "Steps",
-            "paragraph": "Number of steps in the Coherence Pass. Similar to Denoising Steps."
-        },
-        "compositingStrength": {
-            "heading": "Strength",
-            "paragraph": "Amount of noise added for the Coherence Pass. Similar to Denoising Strength."
-        },
-        "compositingMaskAdjustments": {
-            "heading": "Mask Adjustments",
-            "paragraph": "Adjust the mask."
-        },
-        "controlNetBeginEnd": {
-            "heading": "Begin / End Step Percentage",
-            "paragraph": "Which parts of the denoising process will have the ControlNet applied. ControlNets applied at the start of the process guide composition, and ControlNets applied at the end guide details."
-        },
-        "controlNetControlMode": {
-            "heading": "Control Mode",
-            "paragraph": "Lends more weight to either the prompt or ControlNet."
-        },
-        "controlNetResizeMode": {
-            "heading": "Resize Mode",
-            "paragraph": "How the ControlNet image will be fit to the image generation Ratio"
-        },
-        "controlNetToggle": {
-            "heading": "Enable ControlNet",
-            "paragraph": "ControlNets provide guidance to the generation process, helping create images with controlled composition, structure, or style, depending on the model selected."
-        },
-        "controlNetWeight": {
-            "heading": "Weight",
-            "paragraph": "How strongly the ControlNet will impact the generated image."
-        },
-        "dynamicPromptsToggle": {
-            "heading": "Enable Dynamic Prompts",
-            "paragraph": "Dynamic prompts allow multiple options within a prompt. Dynamic prompts can be used by: {option1|option2|option3}. Combinations of prompts will be randomly generated until the “Images” number has been reached."
-        },
-        "dynamicPromptsCombinatorial": {
-            "heading": "Combinatorial Generation",
-            "paragraph": "Generate an image for every possible combination of Dynamic Prompts until the Max Prompts is reached."
-        },
-        "infillMethod": {
-            "heading": "Infill Method",
-            "paragraph": "Method to infill the selected area."
-        },
-        "lora": {
-            "heading": "LoRA Weight",
-            "paragraph": "Weight of the LoRA. Higher weight will lead to larger impacts on the final image."
-        },
-        "noiseEnable": {
-            "heading": "Enable Noise Settings",
-            "paragraph": "Advanced control over noise generation."
-        },
-        "noiseUseCPU": {
-            "heading": "Use CPU Noise",
-            "paragraph": "Uses the CPU to generate random noise."
-        },
-        "paramCFGScale": {
-            "heading": "CFG Scale",
-            "paragraph": "Controls how much your prompt influences the generation process."
-        },
-        "paramDenoisingStrength": {
-            "heading": "Denoising Strength",
-            "paragraph": "How much noise is added to the input image. 0 will result in an identical image, while 1 will result in a completely new image."
-        },
-        "paramIterations": {
-            "heading": "Iterations",
-            "paragraph": "The number of images to generate. If Dynamic Prompts is enabled, each of the prompts will be generated this many times."
-        },
-        "paramModel": {
-            "heading": "Model",
-            "paragraph": "Model used for the denoising steps. Different models are trained to specialize in producing different aesthetic results and content."
+            "paragraphs": [
+                "Choose how many layers of the CLIP model to skip.",
+                "Some models work better with certain CLIP Skip settings.",
+                "A higher value typically results in a less detailed image."
+            ]
         },
         "paramNegativeConditioning": {
             "heading": "Negative Prompt",
-            "paragraph": "The generation process avoids the concepts in the negative prompt. Use this to exclude qualities or objects from the output. Supports Compel syntax and embeddings."
+            "paragraphs": [
+                "The generation process avoids the concepts in the negative prompt. Use this to exclude qualities or objects from the output.",
+                "Supports Compel syntax and embeddings."
+            ]
         },
         "paramPositiveConditioning": {
             "heading": "Positive Prompt",
-            "paragraph": "Guides the generation process. You may use any words or phrases. Supports Compel and Dynamic Prompts syntaxes and embeddings."
-        },
-        "paramRatio": {
-            "heading": "Ratio",
-            "paragraph": "The ratio of the dimensions of the image generated. An image size (in number of pixels) equivalent to 512x512 is recommended for SD1.5 models and a size equivalent to 1024x1024 is recommended for SDXL models."
+            "paragraphs": [
+                "Guides the generation process. You may use any words or phrases.",
+                "Compel and Dynamic Prompts syntaxes and embeddings."
+            ]
         },
         "paramScheduler": {
             "heading": "Scheduler",
-            "paragraph": "Scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+            "paragraphs": [
+                "Scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+            ]
+        },
+        "compositingBlur": {
+            "heading": "Blur",
+            "paragraphs": ["The blur radius of the mask."]
+        },
+        "compositingBlurMethod": {
+            "heading": "Blur Method",
+            "paragraphs": ["The method of blur applied to the masked area."]
+        },
+        "compositingCoherencePass": {
+            "heading": "Coherence Pass",
+            "paragraphs": [
+                "A second round of denoising helps to composite the Inpainted/Outpainted image."
+            ]
+        },
+        "compositingCoherenceMode": {
+            "heading": "Mode",
+            "paragraphs": ["The mode of the Coherence Pass."]
+        },
+        "compositingCoherenceSteps": {
+            "heading": "Steps",
+            "paragraphs": [
+                "Number of denoising steps used in the Coherence Pass.",
+                "Same as the main Steps parameter."
+            ]
+        },
+        "compositingStrength": {
+            "heading": "Strength",
+            "paragraphs": [
+                "Denoising strength for the Coherence Pass.",
+                "Same as the Image to Image Denoising Strength parameter."
+            ]
+        },
+        "compositingMaskAdjustments": {
+            "heading": "Mask Adjustments",
+            "paragraphs": ["Adjust the mask."]
+        },
+        "controlNetBeginEnd": {
+            "heading": "Begin / End Step Percentage",
+            "paragraphs": [
+                "Which steps of the denoising process will have the ControlNet applied.",
+                "ControlNets applied at the beginning of the process guide composition, and ControlNets applied at the end guide details."
+            ]
+        },
+        "controlNetControlMode": {
+            "heading": "Control Mode",
+            "paragraphs": [
+                "Lends more weight to either the prompt or ControlNet."
+            ]
+        },
+        "controlNetResizeMode": {
+            "heading": "Resize Mode",
+            "paragraphs": [
+                "How the ControlNet image will be fit to the image output size."
+            ]
+        },
+        "controlNet": {
+            "heading": "ControlNet",
+            "paragraphs": [
+                "ControlNets provide guidance to the generation process, helping create images with controlled composition, structure, or style, depending on the model selected."
+            ]
+        },
+        "controlNetWeight": {
+            "heading": "Weight",
+            "paragraphs": [
+                "How strongly the ControlNet will impact the generated image."
+            ]
+        },
+        "dynamicPrompts": {
+            "heading": "Dynamic Prompts",
+            "paragraphs": [
+                "Dynamic Prompts parses a single prompt into many.",
+                "The basic syntax is \"a {red|green|blue} ball\". This will produce three prompts: \"a red ball\", \"a green ball\" and \"a blue ball\".",
+                "You can use the syntax as many times as you like in a single prompt, but be sure to keep the number of prompts generated in check with the Max Prompts setting."
+            ]
+        },
+        "dynamicPromptsMaxPrompts": {
+            "heading": "Max Prompts",
+            "paragraphs": [
+                "Limits the number of prompts that can be generated by Dynamic Prompts."
+            ]
+        },
+        "dynamicPromptsSeedBehaviour": {
+            "heading": "Seed Behaviour",
+            "paragraphs": [
+                "Controls how the seed is used when generating prompts.",
+                "Per Iteration will use a unique seed for each iteration. Use this to explore prompt variations on a single seed.",
+                "For example, if you have 5 prompts, each image will use the same seed.",
+                "Per Image will use a unique seed for each image. This provides more variation."
+            ]
+        },
+        "infillMethod": {
+            "heading": "Infill Method",
+            "paragraphs": ["Method to infill the selected area."]
+        },
+        "lora": {
+            "heading": "LoRA Weight",
+            "paragraphs": [
+                "Higher LoRA weight will lead to larger impacts on the final image."
+            ]
+        },
+        "noiseUseCPU": {
+            "heading": "Use CPU Noise",
+            "paragraphs": [
+                "Controls whether noise is generated on the CPU or GPU.",
+                "With CPU Noise enabled, a particular seed will produce the same image on any machine.",
+                "There is no performance impact to enabling CPU Noise."
+            ]
+        },
+        "paramCFGScale": {
+            "heading": "CFG Scale",
+            "paragraphs": [
+                "Controls how much your prompt influences the generation process."
+            ]
+        },
+        "paramDenoisingStrength": {
+            "heading": "Denoising Strength",
+            "paragraphs": [
+                "How much noise is added to the input image.",
+                "0 will result in an identical image, while 1 will result in a completely new image."
+            ]
+        },
+        "paramIterations": {
+            "heading": "Iterations",
+            "paragraphs": [
+                "The number of images to generate.",
+                "If Dynamic Prompts is enabled, each of the prompts will be generated this many times."
+            ]
+        },
+        "paramModel": {
+            "heading": "Model",
+            "paragraphs": [
+                "Model used for the denoising steps.",
+                "Different models are typically trained to specialize in producing particular aesthetic results and content."
+            ]
+        },
+        "paramRatio": {
+            "heading": "Aspect Ratio",
+            "paragraphs": [
+                "The aspect ratio of the dimensions of the image generated.",
+                "An image size (in number of pixels) equivalent to 512x512 is recommended for SD1.5 models and a size equivalent to 1024x1024 is recommended for SDXL models."
+            ]
         },
         "paramSeed": {
             "heading": "Seed",
-            "paragraph": "Controls the starting noise used for generation. Disable “Random Seed” to produce identical results with the same generation settings."
+            "paragraphs": [
+                "Controls the starting noise used for generation.",
+                "Disable “Random Seed” to produce identical results with the same generation settings."
+            ]
         },
         "paramSteps": {
             "heading": "Steps",
-            "paragraph": "Number of steps that will be performed in each generation. Higher step counts will typically create better images but will require more generation time."
+            "paragraphs": [
+                "Number of steps that will be performed in each generation.",
+                "Higher step counts will typically create better images but will require more generation time."
+            ]
         },
         "paramVAE": {
             "heading": "VAE",
-            "paragraph": "Model used for translating AI output into the final image."
+            "paragraphs": [
+                "Model used for translating AI output into the final image."
+            ]
         },
         "paramVAEPrecision": {
             "heading": "VAE Precision",
-            "paragraph": "The precision used during VAE encoding and decoding. Fp16/Half precision is more efficient, at the expense of minor image variations."
+            "paragraphs": [
+                "The precision used during VAE encoding and decoding. FP16/half precision is more efficient, at the expense of minor image variations."
+            ]
         },
         "scaleBeforeProcessing": {
             "heading": "Scale Before Processing",
-            "paragraph": "Scales the selected area to the size best suited for the model before the image generation process."
+            "paragraphs": [
+                "Scales the selected area to the size best suited for the model before the image generation process."
+            ]
         }
     },
     "ui": {
