@@ -1,4 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   ControlModes,
@@ -34,12 +35,14 @@ export default function ParamControlNetControlMode(
   );
 
   return (
-    <IAIMantineSelect
-      disabled={!isEnabled}
-      label={t('controlnet.controlMode')}
-      data={CONTROL_MODE_DATA}
-      value={String(controlMode)}
-      onChange={handleControlModeChange}
-    />
+    <IAIInformationalPopover feature="controlNetControlMode">
+      <IAIMantineSelect
+        disabled={!isEnabled}
+        label={t('controlnet.controlMode')}
+        data={CONTROL_MODE_DATA}
+        value={String(controlMode)}
+        onChange={handleControlModeChange}
+      />
+    </IAIInformationalPopover>
   );
 }

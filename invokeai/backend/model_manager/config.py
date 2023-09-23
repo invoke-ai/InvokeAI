@@ -40,6 +40,7 @@ class InvalidModelConfigException(Exception):
 class BaseModelType(str, Enum):
     """Base model type."""
 
+    Any = "any"
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
     StableDiffusionXL = "sdxl"
@@ -56,6 +57,8 @@ class ModelType(str, Enum):
     Lora = "lora"
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
+    IPAdapter = "ip_adapter"
+    CLIPVision = "clip_vision"
 
 
 class SubModelType(str, Enum):
@@ -91,6 +94,7 @@ class ModelFormat(str, Enum):
     Olive = "olive"
     EmbeddingFile = "embedding_file"
     EmbeddingFolder = "embedding_folder"
+    InvokeAI = "invokeai"
 
 
 class SchedulerPredictionType(str, Enum):
@@ -223,6 +227,12 @@ class ONNXSD2Config(MainConfig):
     upcast_attention: bool
 
 
+class IPAdapterConfig(ModelConfigBase):
+    """Model config for IP Adaptor format models."""
+
+    model_format: Literal[ModelFormat.InvokeAI]
+
+
 class ModelConfigFactory(object):
     """Class for parsing config dicts into StableDiffusion Config obects."""
 
@@ -257,6 +267,9 @@ class ModelConfigFactory(object):
         },
         ModelFormat.EmbeddingFolder: {
             ModelType.TextualInversion: TextualInversionConfig,
+        },
+        ModelFormat.InvokeAI: {
+            ModelType.IPAdapter: IPAdapterConfig,
         },
     }
 

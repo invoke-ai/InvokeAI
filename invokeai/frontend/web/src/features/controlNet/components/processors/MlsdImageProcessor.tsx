@@ -1,12 +1,10 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredMlsdImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor
   .default as RequiredMlsdImageProcessorInvocation;
@@ -21,7 +19,6 @@ const MlsdImageProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, thr_d, thr_v } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
   const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
@@ -84,7 +81,7 @@ const MlsdImageProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
         label={t('controlnet.imageResolution')}
@@ -96,7 +93,7 @@ const MlsdImageProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
         label={t('controlnet.w')}
@@ -109,7 +106,7 @@ const MlsdImageProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
         label={t('controlnet.h')}
@@ -122,7 +119,7 @@ const MlsdImageProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

@@ -3,15 +3,11 @@ import { generateColorPalette } from 'theme/util/generateColorPalette';
 
 const BASE = { H: 220, S: 16 };
 const ACCENT = { H: 250, S: 42 };
-// const ACCENT = { H: 250, S: 52 };
 const WORKING = { H: 47, S: 42 };
-// const WORKING = { H: 47, S: 50 };
+const GOLD = { H: 40, S: 70 };
 const WARNING = { H: 28, S: 42 };
-// const WARNING = { H: 28, S: 50 };
 const OK = { H: 113, S: 42 };
-// const OK = { H: 113, S: 50 };
 const ERROR = { H: 0, S: 42 };
-// const ERROR = { H: 0, S: 50 };
 
 export const InvokeAIColors: InvokeAIThemeColors = {
   base: generateColorPalette(BASE.H, BASE.S),
@@ -20,6 +16,8 @@ export const InvokeAIColors: InvokeAIThemeColors = {
   accentAlpha: generateColorPalette(ACCENT.H, ACCENT.S, true),
   working: generateColorPalette(WORKING.H, WORKING.S),
   workingAlpha: generateColorPalette(WORKING.H, WORKING.S, true),
+  gold: generateColorPalette(GOLD.H, GOLD.S),
+  goldAlpha: generateColorPalette(GOLD.H, GOLD.S, true),
   warning: generateColorPalette(WARNING.H, WARNING.S),
   warningAlpha: generateColorPalette(WARNING.H, WARNING.S, true),
   ok: generateColorPalette(OK.H, OK.S),

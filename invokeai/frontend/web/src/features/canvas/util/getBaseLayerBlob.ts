@@ -9,7 +9,7 @@ export const getBaseLayerBlob = async (state: RootState) => {
   const canvasBaseLayer = getCanvasBaseLayer();
 
   if (!canvasBaseLayer) {
-    return;
+    throw new Error('Problem getting base layer blob');
   }
 
   const {

@@ -337,61 +337,61 @@ class DownloadQueue(DownloadQueueBase):
         metadata = job.metadata
         url = job.source
         metadata_url = url
-        try:
-            # a Civitai download URL
-            if match := re.match(CIVITAI_MODEL_DOWNLOAD, metadata_url):
-                version = match.group(1)
-                resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
-                metadata.thumbnail_url = metadata.thumbnail_url or resp["images"][0]["url"]
-                metadata.description = metadata.description or (
-                    f"Trigger terms: {(', ').join(resp['trainedWords'])}"
-                    if resp["trainedWords"]
-                    else resp["description"]
-                )
-                metadata_url = CIVITAI_MODEL_PAGE + str(resp["modelId"]) + f"?modelVersionId={version}"
+        model = None
 
-            # a Civitai model page with the version
-            if match := re.match(CIVITAI_MODEL_PAGE_WITH_VERSION, metadata_url):
-                model = match.group(1)
-                version = int(match.group(2))
-            # and without
-            elif match := re.match(CIVITAI_MODEL_PAGE + r"(\d+)", metadata_url):
-                model = match.group(1)
-                version = None
+        # a Civitai download URL
+        if match := re.match(CIVITAI_MODEL_DOWNLOAD, metadata_url):
+            version = match.group(1)
+            resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
+            metadata.thumbnail_url = metadata.thumbnail_url or resp["images"][0]["url"]
+            metadata.description = metadata.description or (
+                f"Trigger terms: {(', ').join(resp['trainedWords'])}" if resp["trainedWords"] else resp["description"]
+            )
+            metadata_url = CIVITAI_MODEL_PAGE + str(resp["modelId"]) + f"?modelVersionId={version}"
 
-            if model:
-                resp = self._requests.get(CIVITAI_MODELS_ENDPOINT + str(model)).json()
+        # a Civitai model page with the version
+        if match := re.match(CIVITAI_MODEL_PAGE_WITH_VERSION, metadata_url):
+            model = match.group(1)
+            version = int(match.group(2))
+        # and without
+        elif match := re.match(CIVITAI_MODEL_PAGE + r"(\d+)", metadata_url):
+            model = match.group(1)
+            version = None
 
-                metadata.author = metadata.author or resp["creator"]["username"]
-                metadata.tags = metadata.tags or resp["tags"]
-                metadata.license = (
-                    metadata.license
-                    or f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
-                )
+        if not model:
+            return url
 
-                if version:
-                    versions = [x for x in resp["modelVersions"] if int(x["id"]) == version]
-                    version_data = versions[0]
-                else:
-                    version_data = resp["modelVersions"][0]  # first one
+        if model:
+            resp = self._requests.get(CIVITAI_MODELS_ENDPOINT + str(model)).json()
 
-                metadata.thumbnail_url = version_data.get("url") or metadata.thumbnail_url
-                metadata.description = metadata.description or (
-                    f"Trigger terms: {(', ').join(version_data.get('trainedWords'))}"
-                    if version_data.get("trainedWords")
-                    else version_data.get("description")
-                )
+            metadata.author = metadata.author or resp["creator"]["username"]
+            metadata.tags = metadata.tags or resp["tags"]
+            metadata.license = (
+                metadata.license
+                or f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
+            )
 
-                download_url = version_data["downloadUrl"]
+            if version:
+                versions = [x for x in resp["modelVersions"] if int(x["id"]) == version]
+                version_data = versions[0]
+            else:
+                version_data = resp["modelVersions"][0]  # first one
 
-        except (HTTPError, KeyError, TypeError, JSONDecodeError) as excp:
-            self._logger.warn(excp)
+            metadata.thumbnail_url = version_data.get("url") or metadata.thumbnail_url
+            metadata.description = metadata.description or (
+                f"Trigger terms: {(', ').join(version_data.get('trainedWords'))}"
+                if version_data.get("trainedWords")
+                else version_data.get("description")
+            )
+
+            download_url = version_data["downloadUrl"]
 
         # return the download url
         return download_url
 
     def _download_with_resume(self, job: DownloadJobBase):
         """Do the actual download."""
+        dest = None
         try:
             url = self._get_metadata_and_url(job)
 
@@ -466,7 +466,7 @@ class DownloadQueue(DownloadQueueBase):
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
         except Exception as excp:
-            self._logger.error(f"An error occurred while downloading/installing {dest}: {str(excp)}")
+            self._logger.error(f"An error occurred while downloading/installing {job.source}: {str(excp)}")
             print(traceback.format_exc())
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
@@ -512,7 +512,8 @@ class DownloadQueue(DownloadQueueBase):
 
             if subjob.status == DownloadJobStatus.ERROR:
                 job.error = subjob.error
-                subjob.subqueue.cancel_all_jobs()
+                if subjob.subqueue:
+                    subjob.subqueue.cancel_all_jobs()
                 self._update_job_status(job, DownloadJobStatus.ERROR)
                 return
 

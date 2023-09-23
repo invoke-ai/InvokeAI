@@ -60,6 +60,10 @@ import {
   ImageField,
   LatentsField,
   ConditioningField,
+  IPAdapterInputFieldTemplate,
+  IPAdapterModelInputFieldTemplate,
+  BoardInputFieldTemplate,
+  InputFieldTemplate,
 } from '../types/types';
 import { ControlField } from 'services/api/types';
 
@@ -435,6 +439,32 @@ const buildControlNetModelInputFieldTemplate = ({
   return template;
 };
 
+const buildIPAdapterModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterModelInputFieldTemplate => {
+  const template: IPAdapterModelInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterModelField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildBoardInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): BoardInputFieldTemplate => {
+  const template: BoardInputFieldTemplate = {
+    ...baseField,
+    type: 'BoardField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildImageInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -648,6 +678,19 @@ const buildControlCollectionInputFieldTemplate = ({
   return template;
 };
 
+const buildIPAdapterInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterInputFieldTemplate => {
+  const template: IPAdapterInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -823,7 +866,10 @@ export const getFieldType = (
   return;
 };
 
-const TEMPLATE_BUILDER_MAP = {
+const TEMPLATE_BUILDER_MAP: {
+  [key in FieldType]?: (arg: BuildInputFieldArg) => InputFieldTemplate;
+} = {
+  BoardField: buildBoardInputFieldTemplate,
   boolean: buildBooleanInputFieldTemplate,
   BooleanCollection: buildBooleanCollectionInputFieldTemplate,
   BooleanPolymorphic: buildBooleanPolymorphicInputFieldTemplate,
@@ -851,6 +897,8 @@ const TEMPLATE_BUILDER_MAP = {
   integer: buildIntegerInputFieldTemplate,
   IntegerCollection: buildIntegerCollectionInputFieldTemplate,
   IntegerPolymorphic: buildIntegerPolymorphicInputFieldTemplate,
+  IPAdapterField: buildIPAdapterInputFieldTemplate,
+  IPAdapterModelField: buildIPAdapterModelInputFieldTemplate,
   LatentsCollection: buildLatentsCollectionInputFieldTemplate,
   LatentsField: buildLatentsInputFieldTemplate,
   LatentsPolymorphic: buildLatentsPolymorphicInputFieldTemplate,
@@ -907,7 +955,13 @@ export const buildInputFieldTemplate = (
     return;
   }
 
-  return TEMPLATE_BUILDER_MAP[fieldType]({
+  const builder = TEMPLATE_BUILDER_MAP[fieldType];
+
+  if (!builder) {
+    return;
+  }
+
+  return builder({
     schemaObject: fieldSchema,
     baseField,
   });

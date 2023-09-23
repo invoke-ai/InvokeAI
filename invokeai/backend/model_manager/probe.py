@@ -197,22 +197,24 @@ class ModelProbe(ModelProbeBase):
         raise InvalidModelException(f"Unable to determine model type for {model}")
 
     @classmethod
-    def get_model_type_from_folder(cls, model: Path) -> Optional[ModelType]:
+    def get_model_type_from_folder(cls, folder_path: Path) -> Optional[ModelType]:
         """
         Get the model type of a hugging-face style folder.
 
         :param model: Path to model folder.
         """
         class_name = None
-        if (model / "unet/model.onnx").exists():
+        if (folder_path / "unet/model.onnx").exists():
             return ModelType.ONNX
-        if (model / "learned_embeds.bin").exists():
+        if (folder_path / "learned_embeds.bin").exists():
             return ModelType.TextualInversion
-        if (model / "pytorch_lora_weights.bin").exists():
+        if (folder_path / "pytorch_lora_weights.bin").exists():
             return ModelType.Lora
+        if (folder_path / "image_encoder.txt").exists():
+            return ModelType.IPAdapter
 
-        i = model / "model_index.json"
-        c = model / "config.json"
+        i = folder_path / "model_index.json"
+        c = folder_path / "config.json"
         config_path = i if i.exists() else c if c.exists() else None
 
         if config_path:
@@ -409,20 +411,30 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
         raise InvalidModelException("Unable to determine base type for {self.checkpoint_path}")
 
 
+class IPAdapterCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
+class CLIPVisionCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ########################################################
 # classes for probing folders
 #######################################################
 class FolderProbeBase(ProbeBase):
     """Class for probing folder-based models."""
 
-    def __init__(self, model: Path, helper: Optional[Callable] = None):  # not used
+    def __init__(self, folder_path: Path, helper: Optional[Callable] = None):  # not used
         """
         Initialize the folder prober.
 
         :param model: Path to the model to be probed.
         :param helper: Callable for returning the SchedulerPredictionType (unused).
         """
-        self.model = model
+        self.folder_path = folder_path
 
     def get_variant_type(self) -> ModelVariantType:
         """Return the model's variant type."""
@@ -438,7 +450,7 @@ class PipelineFolderProbe(FolderProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         """Return the BaseModelType of a pipeline folder."""
-        with open(self.model / "unet" / "config.json", "r") as file:
+        with open(self.folder_path / "unet" / "config.json", "r") as file:
             unet_conf = json.load(file)
         if unet_conf["cross_attention_dim"] == 768:
             return BaseModelType.StableDiffusion1
@@ -453,7 +465,7 @@ class PipelineFolderProbe(FolderProbeBase):
 
     def get_scheduler_prediction_type(self) -> SchedulerPredictionType:
         """Return the SchedulerPredictionType of a diffusers-style sd-2 model."""
-        with open(self.model / "scheduler" / "scheduler_config.json", "r") as file:
+        with open(self.folder_path / "scheduler" / "scheduler_config.json", "r") as file:
             scheduler_conf = json.load(file)
         prediction_type = scheduler_conf.get("prediction_type", "epsilon")
         return SchedulerPredictionType(prediction_type)
@@ -464,7 +476,7 @@ class PipelineFolderProbe(FolderProbeBase):
         # exception results in our returning the
         # "normal" variant type
         try:
-            config_file = self.model / "unet" / "config.json"
+            config_file = self.folder_path / "unet" / "config.json"
             with open(config_file, "r") as file:
                 conf = json.load(file)
 
@@ -485,9 +497,9 @@ class VaeFolderProbe(FolderProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         """Return the BaseModelType for a diffusers-style VAE."""
-        config_file = self.model / "config.json"
+        config_file = self.folder_path / "config.json"
         if not config_file.exists():
-            raise InvalidModelException(f"Cannot determine base type for {self.model}")
+            raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
         with open(config_file, "r") as file:
             config = json.load(file)
         return (
@@ -506,7 +518,7 @@ class TextualInversionFolderProbe(FolderProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         """Return the ModelBaseType of the HuggingFace-style Textual Inversion Folder."""
-        path = self.model / "learned_embeds.bin"
+        path = self.folder_path / "learned_embeds.bin"
         if not path.exists():
             raise InvalidModelException("This textual inversion folder does not contain a learned_embeds.bin file.")
         return TextualInversionCheckpointProbe(path).get_base_type()
@@ -533,9 +545,9 @@ class ControlNetFolderProbe(FolderProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         """Return the BaseModelType of a ControlNet model folder."""
-        config_file = self.model / "config.json"
+        config_file = self.folder_path / "config.json"
         if not config_file.exists():
-            raise InvalidModelException(f"Cannot determine base type for {self.model}")
+            raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
         with open(config_file, "r") as file:
             config = json.load(file)
         # no obvious way to distinguish between sd2-base and sd2-768
@@ -550,7 +562,7 @@ class ControlNetFolderProbe(FolderProbeBase):
             else None
         )
         if not base_model:
-            raise InvalidModelException(f"Unable to determine model base for {self.model}")
+            raise InvalidModelException(f"Unable to determine model base for {self.folder_path}")
         return base_model
 
 
@@ -561,7 +573,7 @@ class LoRAFolderProbe(FolderProbeBase):
         """Get the ModelBaseType of a LoRA model folder."""
         model_file = None
         for suffix in ["safetensors", "bin"]:
-            base_file = self.model / f"pytorch_lora_weights.{suffix}"
+            base_file = self.folder_path / f"pytorch_lora_weights.{suffix}"
             if base_file.exists():
                 model_file = base_file
                 break
@@ -570,15 +582,47 @@ class LoRAFolderProbe(FolderProbeBase):
         return LoRACheckpointProbe(model_file).get_base_type()
 
 
+class IPAdapterFolderProbe(FolderProbeBase):
+    def get_format(self) -> str:
+        return ModelFormat.InvokeAI.value
+
+    def get_base_type(self) -> BaseModelType:
+        model_file = self.folder_path / "ip_adapter.bin"
+        if not model_file.exists():
+            raise InvalidModelException("Unknown IP-Adapter model format.")
+
+        state_dict = torch.load(model_file, map_location="cpu")
+        cross_attention_dim = state_dict["ip_adapter"]["1.to_k_ip.weight"].shape[-1]
+        if cross_attention_dim == 768:
+            return BaseModelType.StableDiffusion1
+        elif cross_attention_dim == 1024:
+            return BaseModelType.StableDiffusion2
+        elif cross_attention_dim == 2048:
+            return BaseModelType.StableDiffusionXL
+        else:
+            raise InvalidModelException(f"IP-Adapter had unexpected cross-attention dimension: {cross_attention_dim}.")
+
+
+class CLIPVisionFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Lora, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
+
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
+
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)

@@ -3,12 +3,15 @@ import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
 import EmbedWorkflowCheckbox from './EmbedWorkflowCheckbox';
 import SaveToGalleryCheckbox from './SaveToGalleryCheckbox';
+import UseCacheCheckbox from './UseCacheCheckbox';
+import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 
 type Props = {
   nodeId: string;
 };
 
 const InvocationNodeFooter = ({ nodeId }: Props) => {
+  const hasImageOutput = useHasImageOutput(nodeId);
   return (
     <Flex
       className={DRAG_HANDLE_CLASSNAME}
@@ -22,8 +25,9 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
         justifyContent: 'space-between',
       }}
     >
-      <EmbedWorkflowCheckbox nodeId={nodeId} />
-      <SaveToGalleryCheckbox nodeId={nodeId} />
+      <UseCacheCheckbox nodeId={nodeId} />
+      {hasImageOutput && <EmbedWorkflowCheckbox nodeId={nodeId} />}
+      {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
     </Flex>
   );
 };

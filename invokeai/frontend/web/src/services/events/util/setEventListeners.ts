@@ -1,6 +1,7 @@
 import { MiddlewareAPI } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { AppDispatch, RootState } from 'app/store/store';
+import { $queueId } from 'features/queue/store/nanoStores';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { Socket } from 'socket.io-client';
@@ -15,8 +16,8 @@ import {
   socketInvocationStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
+  socketQueueItemStatusChanged,
   socketSessionRetrievalError,
-  socketSubscribed,
 } from '../actions';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
 
@@ -27,7 +28,7 @@ type SetEventListenersArg = {
 
 export const setEventListeners = (arg: SetEventListenersArg) => {
   const { socket, storeApi } = arg;
-  const { dispatch, getState } = storeApi;
+  const { dispatch } = storeApi;
 
   /**
    * Connect
@@ -37,17 +38,8 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     log.debug('Connected');
 
     dispatch(socketConnected());
-
-    const { sessionId } = getState().system;
-
-    if (sessionId) {
-      socket.emit('subscribe', { session: sessionId });
-      dispatch(
-        socketSubscribed({
-          sessionId,
-        })
-      );
-    }
+    const queue_id = $queueId.get();
+    socket.emit('subscribe_queue', { queue_id });
   });
 
   socket.on('connect_error', (error) => {
@@ -161,5 +153,9 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         data,
       })
     );
+  });
+
+  socket.on('queue_item_status_changed', (data) => {
+    dispatch(socketQueueItemStatusChanged({ data }));
   });
 };

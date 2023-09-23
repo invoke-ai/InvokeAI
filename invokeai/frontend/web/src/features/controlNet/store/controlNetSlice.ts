@@ -1,9 +1,13 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { ControlNetModelParam } from 'features/parameters/types/parameterSchemas';
+import {
+  ControlNetModelParam,
+  IPAdapterModelParam,
+} from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, forEach } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import { components } from 'services/api/schema';
 import { isAnySessionRejected } from 'services/api/thunks/session';
+import { ImageDTO } from 'services/api/types';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
 import {
@@ -56,16 +60,36 @@ export type ControlNetConfig = {
   shouldAutoConfig: boolean;
 };
 
+export type IPAdapterConfig = {
+  adapterImage: ImageDTO | null;
+  model: IPAdapterModelParam | null;
+  weight: number;
+  beginStepPct: number;
+  endStepPct: number;
+};
+
 export type ControlNetState = {
   controlNets: Record<string, ControlNetConfig>;
   isEnabled: boolean;
   pendingControlImages: string[];
+  isIPAdapterEnabled: boolean;
+  ipAdapterInfo: IPAdapterConfig;
+};
+
+export const initialIPAdapterState: IPAdapterConfig = {
+  adapterImage: null,
+  model: null,
+  weight: 1,
+  beginStepPct: 0,
+  endStepPct: 1,
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
   pendingControlImages: [],
+  isIPAdapterEnabled: false,
+  ipAdapterInfo: { ...initialIPAdapterState },
 };
 
 export const controlNetSlice = createSlice({
@@ -122,16 +146,16 @@ export const controlNetSlice = createSlice({
       const { controlNetId } = action.payload;
       delete state.controlNets[controlNetId];
     },
-    controlNetToggled: (
+    controlNetIsEnabledChanged: (
       state,
-      action: PayloadAction<{ controlNetId: string }>
+      action: PayloadAction<{ controlNetId: string; isEnabled: boolean }>
     ) => {
-      const { controlNetId } = action.payload;
+      const { controlNetId, isEnabled } = action.payload;
       const cn = state.controlNets[controlNetId];
       if (!cn) {
         return;
       }
-      cn.isEnabled = !cn.isEnabled;
+      cn.isEnabled = isEnabled;
     },
     controlNetImageChanged: (
       state,
@@ -353,6 +377,31 @@ export const controlNetSlice = createSlice({
     controlNetReset: () => {
       return { ...initialControlNetState };
     },
+    isIPAdapterEnabledChanged: (state, action: PayloadAction<boolean>) => {
+      state.isIPAdapterEnabled = action.payload;
+    },
+    ipAdapterImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+      state.ipAdapterInfo.adapterImage = action.payload;
+    },
+    ipAdapterWeightChanged: (state, action: PayloadAction<number>) => {
+      state.ipAdapterInfo.weight = action.payload;
+    },
+    ipAdapterModelChanged: (
+      state,
+      action: PayloadAction<IPAdapterModelParam | null>
+    ) => {
+      state.ipAdapterInfo.model = action.payload;
+    },
+    ipAdapterBeginStepPctChanged: (state, action: PayloadAction<number>) => {
+      state.ipAdapterInfo.beginStepPct = action.payload;
+    },
+    ipAdapterEndStepPctChanged: (state, action: PayloadAction<number>) => {
+      state.ipAdapterInfo.endStepPct = action.payload;
+    },
+    ipAdapterStateReset: (state) => {
+      state.isIPAdapterEnabled = false;
+      state.ipAdapterInfo = { ...initialIPAdapterState };
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
@@ -401,7 +450,7 @@ export const {
   controlNetRemoved,
   controlNetImageChanged,
   controlNetProcessedImageChanged,
-  controlNetToggled,
+  controlNetIsEnabledChanged,
   controlNetModelChanged,
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
@@ -412,6 +461,13 @@ export const {
   controlNetProcessorTypeChanged,
   controlNetReset,
   controlNetAutoConfigToggled,
+  isIPAdapterEnabledChanged,
+  ipAdapterImageChanged,
+  ipAdapterWeightChanged,
+  ipAdapterModelChanged,
+  ipAdapterBeginStepPctChanged,
+  ipAdapterEndStepPctChanged,
+  ipAdapterStateReset,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;

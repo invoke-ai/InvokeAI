@@ -1,0 +1,31 @@
+{
+  "_class_name": "AutoencoderKL",
+  "_diffusers_version": "0.18.0.dev0",
+  "_name_or_path": ".",
+  "act_fn": "silu",
+  "block_out_channels": [
+    128,
+    256,
+    512,
+    512
+  ],
+  "down_block_types": [
+    "DownEncoderBlock2D",
+    "DownEncoderBlock2D",
+    "DownEncoderBlock2D",
+    "DownEncoderBlock2D"
+  ],
+  "in_channels": 3,
+  "latent_channels": 4,
+  "layers_per_block": 2,
+  "norm_num_groups": 32,
+  "out_channels": 3,
+  "sample_size": 1024,
+  "scaling_factor": 0.13025,
+  "up_block_types": [
+    "UpDecoderBlock2D",
+    "UpDecoderBlock2D",
+    "UpDecoderBlock2D",
+    "UpDecoderBlock2D"
+  ]
+}

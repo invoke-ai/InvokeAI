@@ -16,7 +16,7 @@ import {
 } from '../types/types';
 import { buildInputFieldTemplate, getFieldType } from './fieldTemplateBuilders';
 
-const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'metadata'];
+const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'metadata', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
 const RESERVED_FIELD_TYPES = [
   'WorkflowField',
@@ -235,6 +235,8 @@ export const parseSchema = (
       {} as Record<string, OutputFieldTemplate>
     );
 
+    const useCache = schema.properties.use_cache.default;
+
     const invocation: InvocationTemplate = {
       title,
       type,
@@ -244,6 +246,7 @@ export const parseSchema = (
       outputType,
       inputs,
       outputs,
+      useCache,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });

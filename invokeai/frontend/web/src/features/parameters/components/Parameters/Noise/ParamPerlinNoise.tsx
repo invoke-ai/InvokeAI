@@ -9,9 +9,8 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { shouldUseNoiseSettings, perlin } = state.generation;
+    const { perlin } = state.generation;
     return {
-      isDisabled: !shouldUseNoiseSettings,
       perlin,
     };
   },
@@ -20,12 +19,11 @@ const selector = createSelector(
 
 export default function ParamPerlinNoise() {
   const dispatch = useAppDispatch();
-  const { perlin, isDisabled } = useAppSelector(selector);
+  const { perlin } = useAppSelector(selector);
   const { t } = useTranslation();
 
   return (
     <IAISlider
-      isDisabled={isDisabled}
       label={t('parameters.perlinNoise')}
       min={0}
       max={1}

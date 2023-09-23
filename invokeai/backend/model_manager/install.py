@@ -82,7 +82,8 @@ from .download import (
 )
 from .download.queue import DownloadJobPath, DownloadJobRepoID, DownloadJobURL
 from .hash import FastModelHash
-from .probe import InvalidModelException, ModelProbe, ModelProbeInfo
+from .models import InvalidModelException
+from .probe import ModelProbe, ModelProbeInfo
 from .search import ModelSearch
 from .storage import DuplicateModelException, ModelConfigStore, get_config_store
 

@@ -96,7 +96,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
             {workflow ? (
               <DataViewer data={workflow} label={t('metadata.workflow')} />
             ) : (
-              <IAINoContentFallback label={t('metadata.noWorkFlow')} />
+              <IAINoContentFallback label={t('nodes.noWorkflow')} />
             )}
           </TabPanel>
         </TabPanels>

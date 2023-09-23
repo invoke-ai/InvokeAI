@@ -5,6 +5,7 @@ import {
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
+  IPAdapterModelConfig,
   DiffusersModelConfig,
   ImportModelConfig,
   LoRAModelConfig,
@@ -17,7 +18,7 @@ import {
 } from 'services/api/types';
 
 import queryString from 'query-string';
-import { ApiFullTagDescription, LIST_TAG, api } from '..';
+import { ApiTagDescription, LIST_TAG, api } from '..';
 import { operations, paths } from '../schema';
 
 export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
@@ -36,6 +37,10 @@ export type ControlNetModelConfigEntity = ControlNetModelConfig & {
   id: string;
 };
 
+export type IPAdapterModelConfigEntity = IPAdapterModelConfig & {
+  id: string;
+};
+
 export type TextualInversionModelConfigEntity = TextualInversionModelConfig & {
   id: string;
 };
@@ -47,6 +52,7 @@ type AnyModelConfigEntity =
   | OnnxModelConfigEntity
   | LoRAModelConfigEntity
   | ControlNetModelConfigEntity
+  | IPAdapterModelConfigEntity
   | TextualInversionModelConfigEntity
   | VaeModelConfigEntity;
 
@@ -135,6 +141,10 @@ export const controlNetModelsAdapter =
   createEntityAdapter<ControlNetModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
+export const ipAdapterModelsAdapter =
+  createEntityAdapter<IPAdapterModelConfigEntity>({
+    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+  });
 export const textualInversionModelsAdapter =
   createEntityAdapter<TextualInversionModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
@@ -179,9 +189,7 @@ export const modelsApi = api.injectEndpoints({
         return `models/?${query}`;
       },
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
-          { type: 'OnnxModel', id: LIST_TAG },
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'OnnxModel', id: LIST_TAG }];
 
         if (result) {
           tags.push(
@@ -218,9 +226,7 @@ export const modelsApi = api.injectEndpoints({
         return `models/?${query}`;
       },
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
-          { type: 'MainModel', id: LIST_TAG },
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'MainModel', id: LIST_TAG }];
         if (result) {
           tags.push(
             ...result.ids.map((id) => ({
@@ -353,9 +359,7 @@ export const modelsApi = api.injectEndpoints({
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
-          { type: 'LoRAModel', id: LIST_TAG },
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'LoRAModel', id: LIST_TAG }];
 
         if (result) {
           tags.push(
@@ -409,7 +413,7 @@ export const modelsApi = api.injectEndpoints({
     >({
       query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
+        const tags: ApiTagDescription[] = [
           { type: 'ControlNetModel', id: LIST_TAG },
         ];
 
@@ -434,12 +438,41 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    getIPAdapterModels: build.query<
+      EntityState<IPAdapterModelConfigEntity>,
+      void
+    >({
+      query: () => ({ url: 'models/', params: { model_type: 'ip_adapter' } }),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = [
+          { type: 'IPAdapterModel', id: LIST_TAG },
+        ];
+
+        if (result) {
+          tags.push(
+            ...result.ids.map((id) => ({
+              type: 'IPAdapterModel' as const,
+              id,
+            }))
+          );
+        }
+
+        return tags;
+      },
+      transformResponse: (response: { models: IPAdapterModelConfig[] }) => {
+        const entities = createModelEntities<IPAdapterModelConfigEntity>(
+          response.models
+        );
+        return ipAdapterModelsAdapter.setAll(
+          ipAdapterModelsAdapter.getInitialState(),
+          entities
+        );
+      },
+    }),
     getVaeModels: build.query<EntityState<VaeModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
-          { type: 'VaeModel', id: LIST_TAG },
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'VaeModel', id: LIST_TAG }];
 
         if (result) {
           tags.push(
@@ -468,7 +501,7 @@ export const modelsApi = api.injectEndpoints({
     >({
       query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
+        const tags: ApiTagDescription[] = [
           { type: 'TextualInversionModel', id: LIST_TAG },
         ];
 
@@ -503,7 +536,7 @@ export const modelsApi = api.injectEndpoints({
         };
       },
       providesTags: (result) => {
-        const tags: ApiFullTagDescription[] = [
+        const tags: ApiTagDescription[] = [
           { type: 'ScannedModels', id: LIST_TAG },
         ];
 
@@ -532,6 +565,7 @@ export const {
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
   useGetControlNetModelsQuery,
+  useGetIPAdapterModelsQuery,
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,

@@ -7,14 +7,14 @@ from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
-from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import (
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
+    ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
 
 from ...backend.model_manager import ModelType, UnknownModelException
 from ...backend.model_manager.lora import ModelPatcher
-from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
 from ...backend.util.devices import torch_dtype
 from .baseinvocation import (
     BaseInvocation,
@@ -99,14 +99,15 @@ class CompelInvocation(BaseInvocation):
                 # print(traceback.format_exc())
                 print(f'Warn: trigger: "{trigger}" not found')
 
-        with ModelPatcher.apply_lora_text_encoder(
-            text_encoder_info.context.model, _lora_loader()
-        ), ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
-            tokenizer,
-            ti_manager,
-        ), ModelPatcher.apply_clip_skip(
-            text_encoder_info.context.model, self.clip.skipped_layers
-        ), text_encoder_info as text_encoder:
+        with (
+            ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),
+            ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
+                tokenizer,
+                ti_manager,
+            ),
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),
+            text_encoder_info as text_encoder,
+        ):
             compel = Compel(
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
@@ -122,7 +123,7 @@ class CompelInvocation(BaseInvocation):
 
             c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
-            ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+            ec = ExtraConditioningInfo(
                 tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
                 cross_attention_control_args=options.get("cross_attention_control", None),
             )
@@ -213,14 +214,15 @@ class SDXLPromptInvocationBase:
                 # print(traceback.format_exc())
                 print(f'Warn: trigger: "{trigger}" not found')
 
-        with ModelPatcher.apply_lora(
-            text_encoder_info.context.model, _lora_loader(), lora_prefix
-        ), ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
-            tokenizer,
-            ti_manager,
-        ), ModelPatcher.apply_clip_skip(
-            text_encoder_info.context.model, clip_field.skipped_layers
-        ), text_encoder_info as text_encoder:
+        with (
+            ModelPatcher.apply_lora(text_encoder_info.context.model, _lora_loader(), lora_prefix),
+            ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
+                tokenizer,
+                ti_manager,
+            ),
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, clip_field.skipped_layers),
+            text_encoder_info as text_encoder,
+        ):
             compel = Compel(
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
@@ -244,7 +246,7 @@ class SDXLPromptInvocationBase:
             else:
                 c_pooled = None
 
-            ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+            ec = ExtraConditioningInfo(
                 tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
                 cross_attention_control_args=options.get("cross_attention_control", None),
             )
@@ -436,9 +438,11 @@ def get_tokens_for_prompt_object(tokenizer, parsed_prompt: FlattenedPrompt, trun
         raise ValueError("Blend is not supported here - you need to get tokens for each of its .children")
 
     text_fragments = [
-        x.text
-        if type(x) is Fragment
-        else (" ".join([f.text for f in x.original]) if type(x) is CrossAttentionControlSubstitute else str(x))
+        (
+            x.text
+            if type(x) is Fragment
+            else (" ".join([f.text for f in x.original]) if type(x) is CrossAttentionControlSubstitute else str(x))
+        )
         for x in parsed_prompt.children
     ]
     text = " ".join(text_fragments)

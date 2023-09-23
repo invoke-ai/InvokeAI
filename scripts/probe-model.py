@@ -25,7 +25,7 @@ args = parser.parse_args()
 
 for path in args.model_path:
     try:
-        info = ModelProbe().probe(path, helper)
+        info = ModelProbe.probe(path, helper)
         print(f"{path}:{json.dumps(info.dict(), sort_keys=True, indent=4)}")
     except InvalidModelException as exc:
         print(exc)

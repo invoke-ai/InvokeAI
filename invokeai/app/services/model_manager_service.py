@@ -553,7 +553,7 @@ class ModelManagerService(ModelManagerServiceBase):
 
     def _emit_load_event(
         self,
-        context,
+        context: InvocationContext,
         model_key: str,
         submodel: Optional[SubModelType] = None,
         model_info: Optional[ModelInfo] = None,
@@ -563,6 +563,9 @@ class ModelManagerService(ModelManagerServiceBase):
 
         if model_info:
             context.services.events.emit_model_load_completed(
+                queue_id=context.queue_id,
+                queue_item_id=context.queue_item_id,
+                queue_batch_id=context.queue_batch_id,
                 graph_execution_state_id=context.graph_execution_state_id,
                 model_key=model_key,
                 submodel=submodel,
@@ -570,6 +573,9 @@ class ModelManagerService(ModelManagerServiceBase):
             )
         else:
             context.services.events.emit_model_load_started(
+                queue_id=context.queue_id,
+                queue_item_id=context.queue_item_id,
+                queue_batch_id=context.queue_batch_id,
                 graph_execution_state_id=context.graph_execution_state_id,
                 model_key=model_key,
                 submodel=submodel,
