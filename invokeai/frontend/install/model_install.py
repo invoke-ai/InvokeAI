@@ -21,17 +21,13 @@ from typing import Dict, List, Optional, Tuple
 import npyscreen
 import omegaconf
 import torch
-from huggingface_hub import HfFolder
 from npyscreen import widget
 from pydantic import BaseModel
-from tqdm import tqdm
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
-
-# from invokeai.backend.install.model_install_backend import InstallSelections, ModelInstall, SchedulerPredictionType
+from invokeai.backend.install.install_helper import InstallHelper
 from invokeai.backend.model_manager import BaseModelType, ModelInstall, ModelInstallJob, ModelType
-from invokeai.backend.model_manager.install import ModelSourceMetadata
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.widgets import (
@@ -57,12 +53,6 @@ NOPRINT_TRANS_TABLE = {i: None for i in range(0, sys.maxunicode + 1) if not chr(
 
 # maximum number of installed models we can display before overflowing vertically
 MAX_OTHER_MODELS = 72
-
-# name of the starter models file
-INITIAL_MODELS = "INITIAL_MODELS.yaml"
-INITIAL_MODELS_CONFIG = omegaconf.OmegaConf.load(Path(configs.__path__[0]) / INITIAL_MODELS)
-
-ACCESS_TOKEN = HfFolder.get_token()
 
 
 class UnifiedModelInfo(BaseModel):
@@ -102,8 +92,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         super().__init__(parentApp=parentApp, name=name, *args, **keywords)
 
     def create(self):
-        self.installer = self.parentApp.installer
-        self.initialize_model_lists()
+        self.installer = self.parentApp.install_helper.installer
         self.model_labels = self._get_model_labels()
         self.keypress_timeout = 10
         self.counter = 0
@@ -374,52 +363,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.__class__.current_tab = selected_tab  # for persistence
         self.display()
 
-    def initialize_model_lists(self):
-        """
-        Initialize our model slots.
-
-        Set up the following:
-        self.installed_models  -- list of installed model keys
-        self.starter_models -- list of starter model keys from INITIAL_MODELS
-        self.all_models -- dict of key => UnifiedModelInfo
-
-        Each of these is a dict of key=>ModelConfigBase.
-        """
-        installed_models = list()
-        starter_models = list()
-        all_models = dict()
-
-        # previously-installed models
-        for model in self.installer.store.all_models():
-            info = UnifiedModelInfo.parse_obj(model.dict())
-            info.installed = True
-            key = f"{model.base_model.value}/{model.model_type.value}/{model.name}"
-            all_models[key] = info
-            installed_models.append(key)
-
-        for key in INITIAL_MODELS_CONFIG.keys():
-            if key in all_models:
-                # we want to preserve the description
-                description = all_models[key].description or INITIAL_MODELS_CONFIG[key].get("description")
-                all_models[key].description = description
-            else:
-                base_model, model_type, model_name = key.split("/")
-                info = UnifiedModelInfo(
-                    name=model_name,
-                    model_type=model_type,
-                    base_model=base_model,
-                    source=INITIAL_MODELS_CONFIG[key].source,
-                    description=INITIAL_MODELS_CONFIG[key].get("description"),
-                    recommended=INITIAL_MODELS_CONFIG[key].get("recommended", False),
-                    default=INITIAL_MODELS_CONFIG[key].get("default", False),
-                )
-                all_models[key] = info
-            starter_models.append(key)
-
-        self.installed_models = installed_models
-        self.starter_models = starter_models
-        self.all_models = all_models
-
     def _get_model_labels(self) -> dict[str, str]:
         """Return a list of trimmed labels for all models."""
         window_width, window_height = get_terminal_size()
@@ -458,6 +401,18 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             )
         else:
             return True
+
+    @property
+    def all_models(self) -> Dict[str, UnifiedModelInfo]:
+        return self.parentApp.install_helper.all_models
+
+    @property
+    def starter_models(self) -> List[str]:
+        return self.parentApp.install_helper._starter_models
+
+    @property
+    def installed_models(self) -> List[str]:
+        return self.parentApp.install_helper._installed_models
 
     def on_back(self):
         self.parentApp.switchFormPrevious()
@@ -514,12 +469,12 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
 
 class AddModelApplication(npyscreen.NPSAppManaged):
-    def __init__(self, opt: Namespace, installer: ModelInstall):
+    def __init__(self, opt: Namespace, install_helper: InstallHelper):
         super().__init__()
         self.program_opts = opt
         self.user_cancelled = False
         self.install_selections = InstallSelections()
-        self.installer = installer
+        self.install_helper = install_helper
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
@@ -540,66 +495,13 @@ def list_models(installer: ModelInstall, model_type: ModelType):
         print(f"{model.name:40}{model.base_model.value:14}{path}")
 
 
-class TqdmProgress(object):
-    _bars: Dict[int, tqdm]  # the tqdm object
-    _last: Dict[int, int]  # last bytes downloaded
-
-    def __init__(self):
-        self._bars = dict()
-        self._last = dict()
-
-    def job_update(self, job: ModelInstallJob):
-        job_id = job.id
-        if job.status == "running":
-            if job_id not in self._bars:
-                dest = Path(job.destination).name
-                self._bars[job_id] = tqdm(
-                    desc=dest,
-                    initial=0,
-                    total=job.total_bytes,
-                    unit="iB",
-                    unit_scale=True,
-                )
-                self._last[job_id] = 0
-            self._bars[job_id].update(job.bytes - self._last[job_id])
-            self._last[job_id] = job.bytes
-
-
-def add_or_delete(installer: ModelInstall, selections: InstallSelections):
-    for model in selections.install_models:
-        metadata = ModelSourceMetadata(description=model.description, name=model.name)
-        installer.install(
-            model.source,
-            variant="fp16" if config.precision == "float16" else None,
-            access_token=ACCESS_TOKEN,  # this is a global,
-            metadata=metadata,
-        )
-
-    for model in selections.remove_models:
-        parts = model.split("/")
-        if len(parts) == 1:
-            base_model, model_type, model_name = (None, None, model)
-        else:
-            base_model, model_type, model_name = parts
-        matches = installer.store.search_by_name(base_model=base_model, model_type=model_type, model_name=model_name)
-        if len(matches) > 1:
-            print(f"{model} is ambiguous. Please use model_type:model_name (e.g. main:my_model) to disambiguate.")
-        elif not matches:
-            print(f"{model}: unknown model")
-        else:
-            for m in matches:
-                print(f"Deleting {m.model_type}:{m.name}")
-                installer.conditionally_delete(m.key)
-
-    installer.wait_for_installs()
-
-
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
     """Prompt user for install/delete selections and execute."""
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     config.precision = precision
-    installer = ModelInstall(config=config, event_handlers=[TqdmProgress().job_update])
+    install_helper = InstallHelper(config)
+    installer = install_helper.installer
 
     if opt.list_models:
         list_models(installer, opt.list_models)
@@ -608,33 +510,31 @@ def select_and_download_models(opt: Namespace):
         selections = InstallSelections(
             install_models=[UnifiedModelInfo(source=x) for x in (opt.add or [])], remove_models=opt.delete or []
         )
-        add_or_delete(installer, selections)
+        install_helper.add_or_delete(selections)
 
     elif opt.default_only:
-        selections = InstallSelections(install_models=installer.default_model())
-        add_or_delete(installer, selections)
+        selections = InstallSelections(install_models=[initial_models.default_model()])
+        install_helper.add_or_delete(selections)
+
     elif opt.yes_to_all:
-        selections = InstallSelections(install_models=installer.recommended_models())
-        add_or_delete(installer, selections)
+        selections = InstallSelections(install_models=initial_models.recommended_models())
+        install_helper.add_or_delete(selections)
 
     # this is where the TUI is called
     else:
-        # needed to support the probe() method running under a subprocess
-        torch.multiprocessing.set_start_method("spawn")
-
         if not set_min_terminal_size(MIN_COLS, MIN_LINES):
             raise WindowTooSmallException(
                 "Could not increase terminal size. Try running again with a larger window or smaller font size."
             )
 
-        installApp = AddModelApplication(opt, installer)
+        installApp = AddModelApplication(opt, install_helper)
         try:
             installApp.run()
         except KeyboardInterrupt as e:
             print("Aborted...")
             sys.exit(-1)
 
-        add_or_delete(installer, installApp.install_selections)
+        install_helper.add_or_delete(installApp.install_selections)
 
 
 # -------------------------------------
@@ -674,14 +574,6 @@ def main():
         "--list-models",
         choices=[x.value for x in ModelType],
         help="list installed models",
-    )
-    parser.add_argument(
-        "--config_file",
-        "-c",
-        dest="config_file",
-        type=str,
-        default=None,
-        help="path to configuration file to create",
     )
     parser.add_argument(
         "--root_dir",

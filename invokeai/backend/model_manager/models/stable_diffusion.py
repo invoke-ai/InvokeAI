@@ -11,6 +11,7 @@ from pydantic import Field
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
+from ..cache import GIG
 from ..config import MainCheckpointConfig, MainDiffusersConfig, SilenceWarnings
 from .base import (
     BaseModelType,
@@ -22,6 +23,7 @@ from .base import (
     ModelVariantType,
     classproperty,
     read_checkpoint_meta,
+    trim_model_convert_cache,
 )
 
 
@@ -241,10 +243,15 @@ def _convert_ckpt_and_cache(
     output_path = Path(output_path)
     variant = model_config.variant
     pipeline_class = StableDiffusionInpaintPipeline if variant == "inpaint" else StableDiffusionPipeline
+    max_cache_size = app_config.conversion_cache_size * GIG
 
     # return cached version if it exists
     if output_path.exists():
         return output_path
+
+    # make sufficient size in the cache folder
+    size_needed = weights.stat().st_size
+    trim_model_convert_cache(output_path.parent, max_cache_size - size_needed)
 
     # to avoid circular import errors
     from ...util.devices import choose_torch_device, torch_dtype

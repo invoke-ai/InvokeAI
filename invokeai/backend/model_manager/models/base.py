@@ -1,6 +1,7 @@
 import inspect
 import json
 import os
+import shutil
 import sys
 import typing
 from abc import ABCMeta, abstractmethod
@@ -17,6 +18,9 @@ from diffusers import ConfigMixin, DiffusionPipeline
 from onnx import numpy_helper
 from onnxruntime import InferenceSession, SessionOptions, get_available_providers
 from picklescan.scanner import scan_file_path
+
+from invokeai.backend.util import GIG, directory_size
+from invokeai.backend.util.logging import InvokeAILogger
 
 from ..config import (  # noqa F401
     BaseModelType,
@@ -598,3 +602,34 @@ class IAIOnnxRuntimeModel:
 
         # TODO: session options
         return cls(model_path, provider=provider)
+
+
+def trim_model_convert_cache(cache_path: Path, max_cache_size: int):
+    current_size = directory_size(cache_path)
+    logger = InvokeAILogger.getLogger()
+
+    if current_size <= max_cache_size:
+        return
+
+    logger.debug(
+        "Convert cache has gotten too large {(current_size / GIG):4.2f} > {(max_cache_size / GIG):4.2f}G.. Trimming."
+    )
+
+    # For this to work, we make the assumption that the directory contains
+    # either a 'unet/config.json' file, or a 'config.json' file at top level
+    def by_atime(path: Path) -> float:
+        for config in ["unet/config.json", "config.json"]:
+            sentinel = path / config
+            if sentinel.exists():
+                return sentinel.stat().st_atime
+        return 0.0
+
+    # sort by last access time - least accessed files will be at the end
+    lru_models = sorted(cache_path.iterdir(), key=by_atime, reverse=True)
+    logger.debug(f"cached models in descending atime order: {lru_models}")
+    while current_size > max_cache_size and len(lru_models) > 0:
+        next_victim = lru_models.pop()
+        victim_size = directory_size(next_victim)
+        logger.debug(f"Removing cached converted model {next_victim} to free {victim_size / GIG} GB")
+        shutil.rmtree(next_victim)
+        current_size -= victim_size

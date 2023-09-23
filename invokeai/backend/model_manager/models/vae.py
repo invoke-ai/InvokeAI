@@ -11,6 +11,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 
 from ..config import VaeCheckpointConfig, VaeDiffusersConfig
 from .base import (
+    GIG,
     BaseModelType,
     EmptyConfigLoader,
     InvalidModelException,
@@ -23,6 +24,7 @@ from .base import (
     calc_model_size_by_data,
     calc_model_size_by_fs,
     classproperty,
+    trim_model_convert_cache,
 )
 
 
@@ -116,6 +118,7 @@ class VaeModel(ModelBase):
 def _convert_vae_ckpt_and_cache(
     model_config: ModelConfigBase,
     output_path: str,
+    max_cache_size: int,
 ) -> str:
     """
     Convert the VAE indicated in mconfig into a diffusers AutoencoderKL
@@ -144,6 +147,11 @@ def _convert_vae_ckpt_and_cache(
     # return cached version if it exists
     if output_path.exists():
         return output_path
+
+    # make sufficient size in the cache folder
+    size_needed = weights_path.stat().st_size
+    max_cache_size = (app_config.conversion_cache_size * GIG,)
+    trim_model_convert_cache(output_path.parent, max_cache_size - size_needed)
 
     base_model = model_config.base_model
     if base_model in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:

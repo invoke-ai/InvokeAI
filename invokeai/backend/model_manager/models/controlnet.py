@@ -10,6 +10,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 
 from ..config import ControlNetCheckpointConfig, ControlNetDiffusersConfig
 from .base import (
+    GIG,
     BaseModelType,
     EmptyConfigLoader,
     InvalidModelException,
@@ -127,6 +128,7 @@ class ControlNetModel(ModelBase):
 def _convert_controlnet_ckpt_and_cache(
     model_config: ControlNetCheckpointConfig,
     output_path: str,
+    max_cache_size: int,
 ) -> str:
     """
     Convert the controlnet from checkpoint format to diffusers format,
@@ -141,6 +143,11 @@ def _convert_controlnet_ckpt_and_cache(
     # return cached version if it exists
     if output_path.exists():
         return output_path
+
+    # make sufficient size in the cache folder
+    size_needed = weights.stat().st_size
+    max_cache_size = (app_config.conversion_cache_size * GIG,)
+    trim_model_convert_cache(output_path.parent, max_cache_size - size_needed)
 
     # to avoid circular import errors
     from ..convert_ckpt_to_diffusers import convert_controlnet_to_diffusers

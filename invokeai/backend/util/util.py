@@ -21,6 +21,9 @@ import invokeai.backend.util.logging as logger
 
 from .devices import torch_dtype
 
+# actual size of a gig
+GIG = 1073741824
+
 
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)

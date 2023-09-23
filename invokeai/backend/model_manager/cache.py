@@ -17,7 +17,6 @@ context. Use like this:
 """
 
 import gc
-import hashlib
 import os
 import sys
 from contextlib import suppress
@@ -29,6 +28,7 @@ import torch
 
 import invokeai.backend.util.logging as logger
 
+from ..util import GIG
 from ..util.devices import choose_torch_device
 from .models import BaseModelType, ModelBase, ModelType, SubModelType
 
@@ -41,9 +41,6 @@ DEFAULT_MAX_CACHE_SIZE = 6.0
 
 # amount of GPU memory to hold in reserve for use by generations (GB)
 DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
-
-# actual size of a gig
-GIG = 1073741824
 
 
 @dataclass

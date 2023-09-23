@@ -13,6 +13,7 @@ from .devices import (  # noqa: F401
 )
 from .logging import InvokeAILogger  # noqa: F401
 from .util import (  # noqa: F401
+    GIG,
     Chdir,
     ask_user,
     directory_size,

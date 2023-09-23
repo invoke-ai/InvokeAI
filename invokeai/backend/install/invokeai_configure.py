@@ -22,7 +22,6 @@ from typing import Any, get_args, get_type_hints
 from urllib import request
 
 import npyscreen
-import omegaconf
 import psutil
 import torch
 import transformers
@@ -39,10 +38,10 @@ from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextConfig
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
-from invokeai.backend.install.model_install_backend import InstallSelections, ModelInstall, hf_download_from_pretrained
-from invokeai.backend.model_management.model_probe import BaseModelType, ModelType
+from invokeai.backend.model_manager import BaseModelType, ModelType
+from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
+from invokeai.frontend.install.model_install import addModelsForm
 
 # TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
@@ -56,6 +55,8 @@ from invokeai.frontend.install.widgets import (
     WindowTooSmallException,
     set_min_terminal_size,
 )
+
+from .install_helper import InstallHelper, InstallSelections
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -82,7 +83,6 @@ GENERATION_OPT_CHOICES = ["sequential_guidance", "force_tiled_decode", "lazy_off
 GB = 1073741824  # GB in bytes
 HAS_CUDA = torch.cuda.is_available()
 _, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
-
 
 MAX_VRAM /= GB
 MAX_RAM = psutil.virtual_memory().total / GB
@@ -178,6 +178,20 @@ class ProgressBar:
                 total=total_size,
             )
         self.pbar.update(block_size)
+
+
+# ---------------------------------------------
+def hf_download_from_pretrained(model_class: object, model_name: str, destination: Path, **kwargs):
+    logger = InvokeAILogger.getLogger("InvokeAIConfigure")
+    logger.addFilter(lambda x: "fp16 is not a valid" not in x.getMessage())
+
+    model = model_class.from_pretrained(
+        model_name,
+        resume_download=True,
+        **kwargs,
+    )
+    model.save_pretrained(destination, safe_serialization=True)
+    return destination
 
 
 # ---------------------------------------------
@@ -458,6 +472,25 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
+            name="Model disk conversion cache size (GB). This is used to cache safetensors files that need to be converted to diffusers..",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True,
+        )
+        self.nextrely -= 1
+        self.disk = self.add_widget_intelligent(
+            npyscreen.Slider,
+            value=clip(old_opts.disk, range=(0, 100), step=0.5),
+            out_of=100,
+            lowest=0.0,
+            step=0.5,
+            relx=8,
+            scroll_exit=True,
+        )
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
             name="Model RAM cache size (GB). Make this at least large enough to hold a single full model.",
             begin_entry_at=0,
             editable=False,
@@ -591,6 +624,7 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
         for attr in [
             "ram",
             "vram",
+            "disk",
             "outdir",
         ]:
             if hasattr(self, attr):
@@ -616,13 +650,14 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
 
 
 class EditOptApplication(npyscreen.NPSAppManaged):
-    def __init__(self, program_opts: Namespace, invokeai_opts: Namespace):
+    def __init__(self, program_opts: Namespace, invokeai_opts: Namespace, install_helper: InstallHelper):
         super().__init__()
         self.program_opts = program_opts
         self.invokeai_opts = invokeai_opts
         self.user_cancelled = False
         self.autoload_pending = True
-        self.install_selections = default_user_selections(program_opts)
+        self.install_helper = install_helper
+        self.install_selections = default_user_selections(program_opts, install_helper)
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
@@ -645,32 +680,17 @@ class EditOptApplication(npyscreen.NPSAppManaged):
         return self.options.marshall_arguments()
 
 
-def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Namespace:
-    editApp = EditOptApplication(program_opts, invokeai_opts)
-    editApp.run()
-    return editApp.new_opts()
-
-
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
     return opts
 
 
-def default_user_selections(program_opts: Namespace) -> InstallSelections:
-    try:
-        installer = ModelInstall(config)
-    except omegaconf.errors.ConfigKeyError:
-        logger.warning("Your models.yaml file is corrupt or out of date. Reinitializing")
-        initialize_rootdir(config.root_path, True)
-        installer = ModelInstall(config)
-
-    models = installer.all_models()
+def default_user_selections(program_opts: Namespace, install_helper: InstallHelper) -> InstallSelections:
+    default_models = (
+        [install_helper.default_model()] if program_opts.default_only else install_helper.recommended_models()
+    )
     return InstallSelections(
-        install_models=[models[installer.default_model()].path or models[installer.default_model()].repo_id]
-        if program_opts.default_only
-        else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
-        if program_opts.yes_to_all
-        else list(),
+        install_models=default_models if program_opts.yes_to_all else list(),
     )
 
 
@@ -720,7 +740,7 @@ def maybe_create_models_yaml(root: Path):
 
 
 # -------------------------------------
-def run_console_ui(program_opts: Namespace, initfile: Path = None) -> (Namespace, Namespace):
+def run_console_ui(program_opts: Namespace, initfile: Path, install_helper: InstallHelper) -> (Namespace, Namespace):
     invokeai_opts = default_startup_options(initfile)
     invokeai_opts.root = program_opts.root
 
@@ -729,13 +749,7 @@ def run_console_ui(program_opts: Namespace, initfile: Path = None) -> (Namespace
             "Could not increase terminal size. Try running again with a larger window or smaller font size."
         )
 
-    # the install-models application spawns a subprocess to install
-    # models, and will crash unless this is set before running.
-    import torch
-
-    torch.multiprocessing.set_start_method("spawn")
-
-    editApp = EditOptApplication(program_opts, invokeai_opts)
+    editApp = EditOptApplication(program_opts, invokeai_opts, install_helper)
     editApp.run()
     if editApp.user_cancelled:
         return (None, None)
@@ -894,6 +908,7 @@ def main():
     if opt.full_precision:
         invoke_args.extend(["--precision", "float32"])
     config.parse_args(invoke_args)
+    config.precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     logger = InvokeAILogger().getLogger(config=config)
 
     errors = set()
@@ -907,14 +922,18 @@ def main():
         # run this unconditionally in case new directories need to be added
         initialize_rootdir(config.root_path, opt.yes_to_all)
 
-        models_to_download = default_user_selections(opt)
+        # this will initialize the models.yaml file if not present
+        install_helper = InstallHelper(config)
+
+        models_to_download = default_user_selections(opt, install_helper)
         new_init_file = config.root_path / "invokeai.yaml"
 
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
             init_options = Namespace(precision="float32" if opt.full_precision else "float16")
+
         else:
-            init_options, models_to_download = run_console_ui(opt, new_init_file)
+            init_options, models_to_download = run_console_ui(opt, new_init_file, install_helper)
             if init_options:
                 write_opts(init_options, new_init_file)
             else:
@@ -929,10 +948,12 @@ def main():
 
         if opt.skip_sd_weights:
             logger.warning("Skipping diffusion weights download per user request")
+
         elif models_to_download:
-            process_and_execute(opt, models_to_download)
+            install_helper.add_or_delete(models_to_download)
 
         postscript(errors=errors)
+
         if not opt.yes_to_all:
             input("Press any key to continue...")
     except WindowTooSmallException as e:

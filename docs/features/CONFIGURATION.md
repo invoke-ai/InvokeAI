@@ -234,6 +234,18 @@ Paths:
 #  controlnet_dir: null
 ```
 
+### Model Cache
+
+These options control the size of various caches that InvokeAI uses
+during the model loading and conversion process. All units are in GB
+
+| Setting  | Default Value  |  Description |
+|----------|----------------|--------------|
+| `disk` | `20.0` | Before loading a model into memory, InvokeAI converts .ckpt and .safetensors models into diffusers format and saves them to disk. This option controls the maximum size of the directory in which these converted models are stored. If set to zero, then only the most recently-used model will be cached. |
+| `ram` | `6.0` | After loading a model from disk, it is kept in system RAM until it is needed again. This option controls how much RAM is set aside for this purpose. Larger amounts allow more models to reside in RAM and for InvokeAI to quickly switch between them. |
+| `vram` | `0.25` | This allows smaller models to remain in VRAM, speeding up execution modestly. It should be a small number. |
+
+
 ### Logging
 
 These settings control the information, warning, and debugging

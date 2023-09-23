@@ -72,8 +72,8 @@ class ONNXStableDiffusion1Model(DiffusersModel):
         cls,
         model_path: str,
         output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
+        # config: ModelConfigBase,   # not used?
+        # base_model: BaseModelType, # not used?
     ) -> str:
         return model_path
 

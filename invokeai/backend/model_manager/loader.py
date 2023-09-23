@@ -2,7 +2,6 @@
 """Model loader for InvokeAI."""
 
 import hashlib
-import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,9 +10,9 @@ from typing import List, Optional, Union
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import InvokeAILogger, choose_precision, choose_torch_device, directory_size
+from invokeai.backend.util import InvokeAILogger, choose_precision, choose_torch_device
 
-from .cache import GIG, CacheStats, ModelCache, ModelLocker
+from .cache import CacheStats, ModelCache, ModelLocker
 from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
 from .download import DownloadEventHandler
 from .install import ModelInstall, ModelInstallBase
@@ -236,7 +235,6 @@ class ModelLoad(ModelLoadBase):
             model_config=model_config,
             output_path=dst_convert_path,
         )
-        self._trim_model_convert_cache()  # keeps cache size under control
 
         model_context = self._cache.get_model(
             model_path=model_path,
@@ -275,34 +273,6 @@ class ModelLoad(ModelLoadBase):
 
     def _get_model_convert_cache_path(self, model_path):
         return self.resolve_model_path(Path(".cache") / hashlib.md5(str(model_path).encode()).hexdigest())
-
-    def _trim_model_convert_cache(self):
-        max_cache_size = self._app_config.conversion_cache_size * GIG
-        cache_path = self.resolve_model_path(Path(".cache"))
-        current_size = directory_size(cache_path)
-
-        if current_size <= max_cache_size:
-            return
-
-        self.logger.debug("Convert cache has gotten too large. Trimming.")
-
-        # For this to work, we make the assumption that the directory contains
-        # either a 'unet/config.json' file, or a 'config.json' file at top level
-        def by_atime(path: Path) -> float:
-            for config in ["unet/config.json", "config.json"]:
-                sentinel = path / sentinel
-                if sentinel.exists():
-                    return sentinel.stat().m_atime
-            return 0.0
-
-        # sort by last access time - least accessed files will be at the end
-        lru_models = sorted(cache_dir.iterdir(), key=by_atime, reverse=True)
-        while current_size > max_cache_size:
-            next_victim = lru_models.pop()
-            victim_size = directory_size(next_victim)
-            self.logger.debug(f"Removing cached converted model {next_victim} to free {victim_size / GIG} GB")
-            shutil.rmtree(next_victim)
-            current_size -= victim_size
 
     def _get_model_path(
         self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None
