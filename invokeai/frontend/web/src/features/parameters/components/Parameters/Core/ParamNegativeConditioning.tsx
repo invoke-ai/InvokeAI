@@ -1,6 +1,7 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAITextarea from 'common/components/IAITextarea';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
@@ -81,18 +82,23 @@ const ParamNegativeConditioning = () => {
         onClose={onClose}
         onSelect={handleSelectEmbedding}
       >
-        <IAITextarea
-          id="negativePrompt"
-          name="negativePrompt"
-          ref={promptRef}
-          value={negativePrompt}
-          placeholder={t('parameters.negativePromptPlaceholder')}
-          onChange={handleChangePrompt}
-          resize="vertical"
-          fontSize="sm"
-          minH={16}
-          {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
-        />
+        <IAIInformationalPopover
+          feature="paramNegativeConditioning"
+          placement="right"
+        >
+          <IAITextarea
+            id="negativePrompt"
+            name="negativePrompt"
+            ref={promptRef}
+            value={negativePrompt}
+            placeholder={t('parameters.negativePromptPlaceholder')}
+            onChange={handleChangePrompt}
+            resize="vertical"
+            fontSize="sm"
+            minH={16}
+            {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
+          />
+        </IAIInformationalPopover>
       </ParamEmbeddingPopover>
       {!isOpen && isEmbeddingEnabled && (
         <Box

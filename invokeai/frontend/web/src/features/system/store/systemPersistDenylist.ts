@@ -1,21 +1,8 @@
-import { SystemState } from './systemSlice';
+import { SystemState } from './types';
 
-/**
- * System slice persist denylist
- */
 export const systemPersistDenylist: (keyof SystemState)[] = [
-  'currentIteration',
-  'currentStep',
-  'isCancelable',
+  'isInitialized',
   'isConnected',
-  'isESRGANAvailable',
-  'isGFPGANAvailable',
-  'isProcessing',
-  'totalIterations',
-  'totalSteps',
-  'isCancelScheduled',
-  'progressImage',
-  'wereModelsReceived',
-  'isPersisted',
-  'isUploading',
+  'denoiseProgress',
+  'status',
 ];

@@ -18,7 +18,11 @@ export type AppFeature =
   | 'dynamicPrompting'
   | 'batches'
   | 'syncModels'
-  | 'multiselect';
+  | 'multiselect'
+  | 'pauseQueue'
+  | 'resumeQueue'
+  | 'prependQueue'
+  | 'invocationCache';
 
 /**
  * A disable-able Stable Diffusion feature
@@ -45,10 +49,13 @@ export type AppConfig = {
    * Whether or not we should update image urls when image loading errors
    */
   shouldUpdateImagesOnConnect: boolean;
+  shouldFetchMetadataFromApi: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
+  nodesAllowlist: string[] | undefined;
+  nodesDenylist: string[] | undefined;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];

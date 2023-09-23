@@ -1,6 +1,7 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { copyBlobToClipboard } from 'features/system/util/copyBlobToClipboard';
 
 export const useCopyImageToClipboard = () => {
   const toaster = useAppToaster();
@@ -22,13 +23,13 @@ export const useCopyImageToClipboard = () => {
         });
       }
       try {
-        const response = await fetch(image_url);
-        const blob = await response.blob();
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            [blob.type]: blob,
-          }),
-        ]);
+        const getImageBlob = async () => {
+          const response = await fetch(image_url);
+          return await response.blob();
+        };
+
+        copyBlobToClipboard(getImageBlob());
+
         toaster({
           title: t('toast.imageCopied'),
           status: 'success',

@@ -1,16 +1,14 @@
 import { Flex } from '@chakra-ui/react';
-// import { addNewModel } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
 import { SelectItem } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'features/system/util/makeToast';
-import { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
 const predictionSelectData: SelectItem[] = [
@@ -28,10 +26,6 @@ type ExtendedImportModelConfig = {
 export default function SimpleAddModels() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const isProcessing = useAppSelector(
-    (state: RootState) => state.system.isProcessing
-  );
 
   const [importMainModel, { isLoading }] = useImportMainModelsMutation();
 
@@ -55,7 +49,7 @@ export default function SimpleAddModels() {
         dispatch(
           addToast(
             makeToast({
-              title: 'Model Added',
+              title: t('toast.modelAddedSimple'),
               status: 'success',
             })
           )
@@ -64,7 +58,6 @@ export default function SimpleAddModels() {
       })
       .catch((error) => {
         if (error) {
-          console.log(error);
           dispatch(
             addToast(
               makeToast({
@@ -84,22 +77,18 @@ export default function SimpleAddModels() {
     >
       <Flex flexDirection="column" width="100%" gap={4}>
         <IAIMantineTextInput
-          label="Model Location"
-          placeholder="Provide a path to a local Diffusers model, local checkpoint / safetensors model a HuggingFace Repo ID, or a checkpoint/diffusers model URL."
+          label={t('modelManager.modelLocation')}
+          placeholder={t('modelManager.simpleModelDesc')}
           w="100%"
           {...addModelForm.getInputProps('location')}
         />
         <IAIMantineSelect
-          label="Prediction Type (for Stable Diffusion 2.x Models only)"
+          label={t('modelManager.predictionType')}
           data={predictionSelectData}
           defaultValue="none"
           {...addModelForm.getInputProps('prediction_type')}
         />
-        <IAIButton
-          type="submit"
-          isLoading={isLoading}
-          isDisabled={isLoading || isProcessing}
-        >
+        <IAIButton type="submit" isLoading={isLoading}>
           {t('modelManager.addModel')}
         </IAIButton>
       </Flex>

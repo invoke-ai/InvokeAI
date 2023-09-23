@@ -1,9 +1,8 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredMediapipeFaceProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
 
@@ -20,7 +19,7 @@ const MediapipeFaceProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { max_faces, min_confidence } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
+  const { t } = useTranslation();
 
   const handleMaxFacesChanged = useCallback(
     (v: number) => {
@@ -47,7 +46,7 @@ const MediapipeFaceProcessor = (props: Props) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Max Faces"
+        label={t('controlnet.maxFaces')}
         value={max_faces}
         onChange={handleMaxFacesChanged}
         handleReset={handleMaxFacesReset}
@@ -56,10 +55,10 @@ const MediapipeFaceProcessor = (props: Props) => {
         max={20}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
-        label="Min Confidence"
+        label={t('controlnet.minConfidence')}
         value={min_confidence}
         onChange={handleMinConfidenceChanged}
         handleReset={handleMinConfidenceReset}
@@ -69,7 +68,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

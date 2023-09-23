@@ -1,10 +1,9 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredHedImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
 
@@ -23,8 +22,8 @@ const HedPreprocessor = (props: HedProcessorProps) => {
     processorNode: { detect_resolution, image_resolution, scribble },
     isEnabled,
   } = props;
-  const isBusy = useAppSelector(selectIsBusy);
   const processorChanged = useProcessorNodeChanged();
+  const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -62,7 +61,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Detect Resolution"
+        label={t('controlnet.detectResolution')}
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
         handleReset={handleDetectResolutionReset}
@@ -71,10 +70,10 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
-        label="Image Resolution"
+        label={t('controlnet.imageResolution')}
         value={image_resolution}
         onChange={handleImageResolutionChanged}
         handleReset={handleImageResolutionReset}
@@ -83,13 +82,13 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISwitch
-        label="Scribble"
+        label={t('controlnet.scribble')}
         isChecked={scribble}
         onChange={handleScribbleChanged}
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

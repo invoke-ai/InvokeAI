@@ -24,6 +24,7 @@ import { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
 import 'reactflow/dist/style.css';
 import { AnyInvocationType } from 'services/events/types';
 import { AddNodePopoverSelectItem } from './AddNodePopoverSelectItem';
+import { useTranslation } from 'react-i18next';
 
 type NodeTemplate = {
   label: string;
@@ -48,43 +49,45 @@ const filter = (value: string, item: NodeTemplate) => {
   );
 };
 
-const selector = createSelector(
-  [stateSelector],
-  ({ nodes }) => {
-    const data: NodeTemplate[] = map(nodes.nodeTemplates, (template) => {
-      return {
-        label: template.title,
-        value: template.type,
-        description: template.description,
-        tags: template.tags,
-      };
-    });
-
-    data.push({
-      label: 'Progress Image',
-      value: 'current_image',
-      description: 'Displays the current image in the Node Editor',
-      tags: ['progress'],
-    });
-
-    data.push({
-      label: 'Notes',
-      value: 'notes',
-      description: 'Add notes about your workflow',
-      tags: ['notes'],
-    });
-
-    data.sort((a, b) => a.label.localeCompare(b.label));
-
-    return { data };
-  },
-  defaultSelectorOptions
-);
-
 const AddNodePopover = () => {
   const dispatch = useAppDispatch();
   const buildInvocation = useBuildNodeData();
   const toaster = useAppToaster();
+  const { t } = useTranslation();
+
+  const selector = createSelector(
+    [stateSelector],
+    ({ nodes }) => {
+      const data: NodeTemplate[] = map(nodes.nodeTemplates, (template) => {
+        return {
+          label: template.title,
+          value: template.type,
+          description: template.description,
+          tags: template.tags,
+        };
+      });
+
+      data.push({
+        label: t('nodes.currentImage'),
+        value: 'current_image',
+        description: t('nodes.currentImageDescription'),
+        tags: ['progress'],
+      });
+
+      data.push({
+        label: t('nodes.notes'),
+        value: 'notes',
+        description: t('nodes.notesDescription'),
+        tags: ['notes'],
+      });
+
+      data.sort((a, b) => a.label.localeCompare(b.label));
+
+      return { data, t };
+    },
+    defaultSelectorOptions
+  );
+
   const { data } = useAppSelector(selector);
   const isOpen = useAppSelector((state) => state.nodes.isAddNodePopoverOpen);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -92,18 +95,20 @@ const AddNodePopover = () => {
   const addNode = useCallback(
     (nodeType: AnyInvocationType) => {
       const invocation = buildInvocation(nodeType);
-
       if (!invocation) {
+        const errorMessage = t('nodes.unknownNode', {
+          nodeType: nodeType,
+        });
         toaster({
           status: 'error',
-          title: `Unknown Invocation type ${nodeType}`,
+          title: errorMessage,
         });
         return;
       }
 
       dispatch(nodeAdded(invocation));
     },
-    [dispatch, buildInvocation, toaster]
+    [dispatch, buildInvocation, toaster, t]
   );
 
   const handleChange = useCallback(
@@ -179,11 +184,11 @@ const AddNodePopover = () => {
           <IAIMantineSearchableSelect
             inputRef={inputRef}
             selectOnBlur={false}
-            placeholder="Search for nodes"
+            placeholder={t('nodes.nodeSearch')}
             value={null}
             data={data}
             maxDropdownHeight={400}
-            nothingFound="No matching nodes"
+            nothingFound={t('nodes.noMatchingNodes')}
             itemComponent={AddNodePopoverSelectItem}
             filter={filter}
             onChange={handleChange}

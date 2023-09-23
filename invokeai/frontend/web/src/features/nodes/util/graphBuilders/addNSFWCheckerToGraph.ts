@@ -1,33 +1,18 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   ImageNSFWBlurInvocation,
   LatentsToImageInvocation,
-  MetadataAccumulatorInvocation,
 } from 'services/api/types';
-import {
-  LATENTS_TO_IMAGE,
-  METADATA_ACCUMULATOR,
-  NSFW_CHECKER,
-} from './constants';
+import { LATENTS_TO_IMAGE, NSFW_CHECKER } from './constants';
 
 export const addNSFWCheckerToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   nodeIdToAddTo = LATENTS_TO_IMAGE
 ): void => {
-  const activeTabName = activeTabNameSelector(state);
-
-  const is_intermediate =
-    activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
-
   const nodeToAddTo = graph.nodes[nodeIdToAddTo] as
     | LatentsToImageInvocation
-    | undefined;
-
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
     | undefined;
 
   if (!nodeToAddTo) {
@@ -36,11 +21,12 @@ export const addNSFWCheckerToGraph = (
   }
 
   nodeToAddTo.is_intermediate = true;
+  nodeToAddTo.use_cache = true;
 
   const nsfwCheckerNode: ImageNSFWBlurInvocation = {
     id: NSFW_CHECKER,
     type: 'img_nsfw',
-    is_intermediate,
+    is_intermediate: true,
   };
 
   graph.nodes[NSFW_CHECKER] = nsfwCheckerNode as ImageNSFWBlurInvocation;
@@ -54,17 +40,4 @@ export const addNSFWCheckerToGraph = (
       field: 'image',
     },
   });
-
-  if (metadataAccumulator) {
-    graph.edges.push({
-      source: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'metadata',
-      },
-      destination: {
-        node_id: NSFW_CHECKER,
-        field: 'metadata',
-      },
-    });
-  }
 };

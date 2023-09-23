@@ -51,6 +51,9 @@ Prevent InvokeAI from displaying unwanted racy images.
 ### * [Controlling Logging](LOGGING.md)
 Control how InvokeAI logs status messages.
 
+### * [Command-line Utilities](UTILITIES.md)
+A list of the command-line utilities available with InvokeAI.
+
 <!-- OUT OF DATE
 ### * [Miscellaneous](OTHER.md)
 Run InvokeAI on Google Colab, generate images with repeating patterns,

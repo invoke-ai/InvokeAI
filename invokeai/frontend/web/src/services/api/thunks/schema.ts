@@ -26,7 +26,8 @@ export const receivedOpenAPISchema = createAsyncThunk(
   'nodes/receivedOpenAPISchema',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch(`openapi.json`);
+      const url = [window.location.origin, 'openapi.json'].join('/');
+      const response = await fetch(url);
       const openAPISchema = await response.json();
 
       const schemaJSON = JSON.parse(

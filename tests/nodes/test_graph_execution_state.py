@@ -1,30 +1,31 @@
-from .test_invoker import create_edge
-from .test_nodes import (
+import logging
+import threading
+
+import pytest
+
+# This import must happen before other invoke imports or test in other files(!!) break
+from .test_nodes import (  # isort: split
+    PromptCollectionTestInvocation,
+    PromptTestInvocation,
     TestEventService,
     TextToImageTestInvocation,
-    PromptTestInvocation,
-    PromptCollectionTestInvocation,
 )
-from invokeai.app.services.invocation_queue import MemoryInvocationQueue
-from invokeai.app.services.processor import DefaultInvocationProcessor
-from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    InvocationContext,
-)
+import sqlite3
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
+from invokeai.app.services.graph import CollectInvocation, Graph, GraphExecutionState, IterateInvocation, LibraryGraph
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+from invokeai.app.services.invocation_queue import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats import InvocationStatsService
-from invokeai.app.services.graph import (
-    Graph,
-    CollectInvocation,
-    IterateInvocation,
-    GraphExecutionState,
-    LibraryGraph,
-)
-import pytest
+from invokeai.app.services.processor import DefaultInvocationProcessor
+from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
+from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
+
+from .test_invoker import create_edge
 
 
 @pytest.fixture
@@ -41,24 +42,29 @@ def simple_graph():
 # the test invocations.
 @pytest.fixture
 def mock_services() -> InvocationServices:
+    lock = threading.Lock()
     # NOTE: none of these are actually called by the test invocations
+    db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        filename=sqlite_memory, table_name="graph_executions"
+        conn=db_conn, table_name="graph_executions", lock=lock
     )
     return InvocationServices(
         model_manager=None,  # type: ignore
         events=TestEventService(),
-        logger=None,  # type: ignore
+        logger=logging,  # type: ignore
         images=None,  # type: ignore
         latents=None,  # type: ignore
         boards=None,  # type: ignore
         board_images=None,  # type: ignore
         queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),
+        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs", lock=lock),
         graph_execution_manager=graph_execution_manager,
         performance_statistics=InvocationStatsService(graph_execution_manager),
         processor=DefaultInvocationProcessor(),
-        configuration=None,  # type: ignore
+        configuration=InvokeAIAppConfig(node_cache_size=0),  # type: ignore
+        session_queue=None,  # type: ignore
+        session_processor=None,  # type: ignore
+        invocation_cache=MemoryInvocationCache(),  # type: ignore
     )
 
 
@@ -68,7 +74,15 @@ def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[B
         return (None, None)
 
     print(f"invoking {n.id}: {type(n)}")
-    o = n.invoke(InvocationContext(services, "1"))
+    o = n.invoke(
+        InvocationContext(
+            queue_batch_id="1",
+            queue_item_id=1,
+            queue_id=DEFAULT_QUEUE_ID,
+            services=services,
+            graph_execution_state_id="1",
+        )
+    )
     g.complete(n.id, o)
 
     return (n, o)

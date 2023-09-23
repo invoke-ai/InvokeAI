@@ -55,6 +55,9 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
         {} as Record<Exclude<string, 'id' | 'type'>, unknown>
       );
 
+      // add reserved use_cache
+      transformedInputs['use_cache'] = node.data.useCache;
+
       // Build this specific node
       const graphNode = {
         type,

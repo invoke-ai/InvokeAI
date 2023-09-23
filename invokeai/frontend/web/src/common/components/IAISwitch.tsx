@@ -72,4 +72,6 @@ const IAISwitch = (props: IAISwitchProps) => {
   );
 };
 
+IAISwitch.displayName = 'IAISwitch';
+
 export default memo(IAISwitch);

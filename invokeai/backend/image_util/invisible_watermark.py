@@ -3,12 +3,13 @@ This module defines a singleton object, "invisible_watermark" that
 wraps the invisible watermark model. It respects the global "invisible_watermark"
 configuration variable, that allows the watermarking to be supressed.
 """
-import numpy as np
 import cv2
-from PIL import Image
+import numpy as np
 from imwatermark import WatermarkEncoder
-from invokeai.app.services.config import InvokeAIAppConfig
+from PIL import Image
+
 import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import InvokeAIAppConfig
 
 config = InvokeAIAppConfig.get_config()
 

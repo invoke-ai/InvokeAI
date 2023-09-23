@@ -25,12 +25,7 @@ from typing import Optional, Union
 
 import requests
 import torch
-from diffusers.models import (
-    AutoencoderKL,
-    ControlNetModel,
-    PriorTransformer,
-    UNet2DConditionModel,
-)
+from diffusers.models import AutoencoderKL, ControlNetModel, PriorTransformer, UNet2DConditionModel
 from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
 from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
@@ -64,6 +59,7 @@ from transformers import (
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
+
 from .models import BaseModelType, ModelVariantType
 
 try:
@@ -1203,8 +1199,8 @@ def download_from_original_stable_diffusion_ckpt(
         StableDiffusionControlNetPipeline,
         StableDiffusionInpaintPipeline,
         StableDiffusionPipeline,
-        StableDiffusionXLPipeline,
         StableDiffusionXLImg2ImgPipeline,
+        StableDiffusionXLPipeline,
         StableUnCLIPImg2ImgPipeline,
         StableUnCLIPPipeline,
     )

@@ -1,11 +1,10 @@
 import { logger } from 'app/logging/logger';
-import { LIST_TAG } from 'services/api';
-import { appInfoApi } from 'services/api/endpoints/appInfo';
-import { modelsApi } from 'services/api/endpoints/models';
+import { size } from 'lodash-es';
+import { api } from 'services/api';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { startAppListening } from '../..';
-import { size } from 'lodash-es';
+import { isInitializedChanged } from 'features/system/store/systemSlice';
 
 export const addSocketConnectedEventListener = () => {
   startAppListening({
@@ -15,7 +14,7 @@ export const addSocketConnectedEventListener = () => {
 
       log.debug('Connected');
 
-      const { nodes, config } = getState();
+      const { nodes, config, system } = getState();
 
       const { disabledTabs } = config;
 
@@ -23,22 +22,15 @@ export const addSocketConnectedEventListener = () => {
         dispatch(receivedOpenAPISchema());
       }
 
+      if (system.isInitialized) {
+        // only reset the query caches if this connect event is a *reconnect* event
+        dispatch(api.util.resetApiState());
+      } else {
+        dispatch(isInitializedChanged(true));
+      }
+
       // pass along the socket event as an application action
       dispatch(appSocketConnected(action.payload));
-
-      // update all server state
-      dispatch(
-        modelsApi.util.invalidateTags([
-          { type: 'MainModel', id: LIST_TAG },
-          { type: 'SDXLRefinerModel', id: LIST_TAG },
-          { type: 'LoRAModel', id: LIST_TAG },
-          { type: 'ControlNetModel', id: LIST_TAG },
-          { type: 'VaeModel', id: LIST_TAG },
-          { type: 'TextualInversionModel', id: LIST_TAG },
-          { type: 'ScannedModels', id: LIST_TAG },
-        ])
-      );
-      dispatch(appInfoApi.util.invalidateTags(['AppConfig', 'AppVersion']));
     },
   });
 };

@@ -11,6 +11,7 @@ export const addSocketDisconnectedEventListener = () => {
     effect: (action, { dispatch }) => {
       const log = logger('socketio');
       log.debug('Disconnected');
+
       // pass along the socket event as an application action
       dispatch(appSocketDisconnected(action.payload));
     },

@@ -2,24 +2,25 @@
 
 import copy
 import itertools
-import uuid
-from typing import Annotated, Any, Optional, Union, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Optional, Union, cast, get_args, get_origin, get_type_hints
 
 import networkx as nx
 from pydantic import BaseModel, root_validator, validator
 from pydantic.fields import Field
+
+from invokeai.app.util.misc import uuid_string
 
 # Importing * is bad karma but needed here for node detection
 from ..invocations import *  # noqa: F401 F403
 from ..invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    invocation,
     Input,
     InputField,
     InvocationContext,
     OutputField,
     UIType,
+    invocation,
     invocation_output,
 )
 
@@ -116,6 +117,10 @@ def are_connection_types_compatible(from_type: Any, to_type: Any) -> bool:
         if from_type is int and to_type is float:
             return True
 
+        # allow int|float -> str, pydantic will cast for us
+        if (from_type is int or from_type is float) and to_type is str:
+            return True
+
         # if not issubclass(from_type, to_type):
         if not is_union_subtype(from_type, to_type):
             return False
@@ -137,19 +142,31 @@ def are_connections_compatible(
     return are_connection_types_compatible(from_node_field, to_node_field)
 
 
-class NodeAlreadyInGraphError(Exception):
+class NodeAlreadyInGraphError(ValueError):
     pass
 
 
-class InvalidEdgeError(Exception):
+class InvalidEdgeError(ValueError):
     pass
 
 
-class NodeNotFoundError(Exception):
+class NodeNotFoundError(ValueError):
     pass
 
 
-class NodeAlreadyExecutedError(Exception):
+class NodeAlreadyExecutedError(ValueError):
+    pass
+
+
+class DuplicateNodeIdError(ValueError):
+    pass
+
+
+class NodeFieldNotFoundError(ValueError):
+    pass
+
+
+class NodeIdMismatchError(ValueError):
     pass
 
 
@@ -227,7 +244,7 @@ InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()] 
 
 
 class Graph(BaseModel):
-    id: str = Field(description="The id of this graph", default_factory=lambda: uuid.uuid4().__str__())
+    id: str = Field(description="The id of this graph", default_factory=uuid_string)
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
     nodes: dict[str, Annotated[InvocationsUnion, Field(discriminator="type")]] = Field(
         description="The nodes in this graph", default_factory=dict
@@ -236,6 +253,59 @@ class Graph(BaseModel):
         description="The connections between nodes and their fields in this graph",
         default_factory=list,
     )
+
+    @root_validator
+    def validate_nodes_and_edges(cls, values):
+        """Validates that all edges match nodes in the graph"""
+        nodes = cast(Optional[dict[str, BaseInvocation]], values.get("nodes"))
+        edges = cast(Optional[list[Edge]], values.get("edges"))
+
+        if nodes is not None:
+            # Validate that all node ids are unique
+            node_ids = [n.id for n in nodes.values()]
+            duplicate_node_ids = set([node_id for node_id in node_ids if node_ids.count(node_id) >= 2])
+            if duplicate_node_ids:
+                raise DuplicateNodeIdError(f"Node ids must be unique, found duplicates {duplicate_node_ids}")
+
+            # Validate that all node ids match the keys in the nodes dict
+            for k, v in nodes.items():
+                if k != v.id:
+                    raise NodeIdMismatchError(f"Node ids must match, got {k} and {v.id}")
+
+        if edges is not None and nodes is not None:
+            # Validate that all edges match nodes in the graph
+            node_ids = set([e.source.node_id for e in edges] + [e.destination.node_id for e in edges])
+            missing_node_ids = [node_id for node_id in node_ids if node_id not in nodes]
+            if missing_node_ids:
+                raise NodeNotFoundError(
+                    f"All edges must reference nodes in the graph, missing nodes: {missing_node_ids}"
+                )
+
+            # Validate that all edge fields match node fields in the graph
+            for edge in edges:
+                source_node = nodes.get(edge.source.node_id, None)
+                if source_node is None:
+                    raise NodeFieldNotFoundError(f"Edge source node {edge.source.node_id} does not exist in the graph")
+
+                destination_node = nodes.get(edge.destination.node_id, None)
+                if destination_node is None:
+                    raise NodeFieldNotFoundError(
+                        f"Edge destination node {edge.destination.node_id} does not exist in the graph"
+                    )
+
+                # output fields are not on the node object directly, they are on the output type
+                if edge.source.field not in source_node.get_output_type().__fields__:
+                    raise NodeFieldNotFoundError(
+                        f"Edge source field {edge.source.field} does not exist in node {edge.source.node_id}"
+                    )
+
+                # input fields are on the node
+                if edge.destination.field not in destination_node.__fields__:
+                    raise NodeFieldNotFoundError(
+                        f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
+                    )
+
+        return values
 
     def add_node(self, node: BaseInvocation) -> None:
         """Adds a node to a graph
@@ -697,8 +767,7 @@ class Graph(BaseModel):
 class GraphExecutionState(BaseModel):
     """Tracks the state of a graph execution"""
 
-    id: str = Field(description="The id of the execution state", default_factory=lambda: uuid.uuid4().__str__())
-
+    id: str = Field(description="The id of the execution state", default_factory=uuid_string)
     # TODO: Store a reference to the graph instead of the actual graph?
     graph: Graph = Field(description="The graph being executed")
 
@@ -847,7 +916,7 @@ class GraphExecutionState(BaseModel):
             new_node = copy.deepcopy(node)
 
             # Create the node id (use a random uuid)
-            new_node.id = str(uuid.uuid4())
+            new_node.id = uuid_string()
 
             # Set the iteration index for iteration invocations
             if isinstance(new_node, IterateInvocation):
@@ -1082,7 +1151,7 @@ class ExposedNodeOutput(BaseModel):
 
 
 class LibraryGraph(BaseModel):
-    id: str = Field(description="The unique identifier for this library graph", default_factory=uuid.uuid4)
+    id: str = Field(description="The unique identifier for this library graph", default_factory=uuid_string)
     graph: Graph = Field(description="The graph")
     name: str = Field(description="The name of the graph")
     description: str = Field(description="The description of the graph")

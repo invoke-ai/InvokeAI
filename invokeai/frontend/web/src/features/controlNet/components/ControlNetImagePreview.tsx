@@ -13,6 +13,7 @@ import {
 import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
 import {
   useAddImageToBoardMutation,
@@ -51,11 +52,11 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
     controlImage: controlImageName,
     processedControlImage: processedControlImageName,
     processorType,
-    isEnabled,
     controlNetId,
   } = controlNet;
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const { pendingControlImages, autoAddBoardId } = useAppSelector(selector);
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -170,15 +171,13 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         h: isSmall ? 28 : 366, // magic no touch
         alignItems: 'center',
         justifyContent: 'center',
-        pointerEvents: isEnabled ? 'auto' : 'none',
-        opacity: isEnabled ? 1 : 0.5,
       }}
     >
       <IAIDndImage
         draggableData={draggableData}
         droppableData={droppableData}
         imageDTO={controlImage}
-        isDropDisabled={shouldShowProcessedImage || !isEnabled}
+        isDropDisabled={shouldShowProcessedImage}
         postUploadAction={postUploadAction}
       />
 
@@ -200,7 +199,6 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
           droppableData={droppableData}
           imageDTO={processedControlImage}
           isUploadDisabled={true}
-          isDropDisabled={!isEnabled}
         />
       </Box>
 
@@ -208,18 +206,18 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         <IAIDndImageIcon
           onClick={handleResetControlImage}
           icon={controlImage ? <FaUndo /> : undefined}
-          tooltip="Reset Control Image"
+          tooltip={t('controlnet.resetControlImage')}
         />
         <IAIDndImageIcon
           onClick={handleSaveControlImage}
           icon={controlImage ? <FaSave size={16} /> : undefined}
-          tooltip="Save Control Image"
+          tooltip={t('controlnet.saveControlImage')}
           styleOverrides={{ marginTop: 6 }}
         />
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
           icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
-          tooltip="Set Control Image Dimensions To W/H"
+          tooltip={t('controlnet.setControlImageDimensions')}
           styleOverrides={{ marginTop: 12 }}
         />
       </>

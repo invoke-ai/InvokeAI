@@ -22,6 +22,7 @@ import {
   SliderTrackProps,
   Tooltip,
   TooltipProps,
+  forwardRef,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
@@ -71,7 +72,7 @@ export type IAIFullSliderProps = {
   sliderIAIIconButtonProps?: IAIIconButtonProps;
 };
 
-const IAISlider = (props: IAIFullSliderProps) => {
+const IAISlider = forwardRef((props: IAIFullSliderProps, ref) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const {
     label,
@@ -187,6 +188,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
 
   return (
     <FormControl
+      ref={ref}
       onClick={forceInputBlur}
       sx={
         isCompact
@@ -354,6 +356,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
       </HStack>
     </FormControl>
   );
-};
+});
+
+IAISlider.displayName = 'IAISlider';
 
 export default memo(IAISlider);

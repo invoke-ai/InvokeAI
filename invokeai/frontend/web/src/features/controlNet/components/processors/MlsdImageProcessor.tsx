@@ -1,9 +1,8 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredMlsdImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
 
@@ -20,7 +19,7 @@ const MlsdImageProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, thr_d, thr_v } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
+  const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -73,7 +72,7 @@ const MlsdImageProcessor = (props: Props) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Detect Resolution"
+        label={t('controlnet.detectResolution')}
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
         handleReset={handleDetectResolutionReset}
@@ -82,10 +81,10 @@ const MlsdImageProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
-        label="Image Resolution"
+        label={t('controlnet.imageResolution')}
         value={image_resolution}
         onChange={handleImageResolutionChanged}
         handleReset={handleImageResolutionReset}
@@ -94,10 +93,10 @@ const MlsdImageProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
-        label="W"
+        label={t('controlnet.w')}
         value={thr_d}
         onChange={handleThrDChanged}
         handleReset={handleThrDReset}
@@ -107,10 +106,10 @@ const MlsdImageProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
-        label="H"
+        label={t('controlnet.h')}
         value={thr_v}
         onChange={handleThrVChanged}
         handleReset={handleThrVReset}
@@ -120,7 +119,7 @@ const MlsdImageProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

@@ -11,6 +11,7 @@ import { ImageOutput } from 'services/api/types';
 import { AnyResult } from 'services/events/types';
 import ScrollableContent from '../ScrollableContent';
 import ImageOutputPreview from './outputs/ImageOutputPreview';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -40,13 +41,18 @@ const selector = createSelector(
 
 const InspectorOutputsTab = () => {
   const { node, template, nes } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   if (!node || !nes || !isInvocationNode(node)) {
-    return <IAINoContentFallback label="No node selected" icon={null} />;
+    return (
+      <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
+    );
   }
 
   if (nes.outputs.length === 0) {
-    return <IAINoContentFallback label="No outputs recorded" icon={null} />;
+    return (
+      <IAINoContentFallback label={t('nodes.noOutputRecorded')} icon={null} />
+    );
   }
 
   return (
@@ -77,7 +83,7 @@ const InspectorOutputsTab = () => {
               />
             ))
           ) : (
-            <DataViewer data={nes.outputs} label="Node Outputs" />
+            <DataViewer data={nes.outputs} label={t('nodes.nodeOutputs')} />
           )}
         </Flex>
       </ScrollableContent>

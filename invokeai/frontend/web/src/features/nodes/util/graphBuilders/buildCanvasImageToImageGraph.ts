@@ -1,12 +1,12 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -40,12 +40,12 @@ export const buildCanvasImageToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     img2imgStrength: strength,
     vaePrecision,
     clipSkip,
     shouldUseCpuNoise,
-    shouldUseNoiseSettings,
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
@@ -53,14 +53,10 @@ export const buildCanvasImageToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const {
-    scaledBoundingBoxDimensions,
-    boundingBoxScaleMethod,
-    shouldAutoSave,
-  } = state.canvas;
+  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -72,9 +68,7 @@ export const buildCanvasImageToImageGraph = (
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
-  const use_cpu = shouldUseNoiseSettings
-    ? shouldUseCpuNoise
-    : initialGenerationState.shouldUseCpuNoise;
+  const use_cpu = shouldUseCpuNoise;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -92,32 +86,33 @@ export const buildCanvasImageToImageGraph = (
       [modelLoaderNodeId]: {
         type: 'main_model_loader',
         id: modelLoaderNodeId,
-        is_intermediate: true,
+        is_intermediate,
         model,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
-        is_intermediate: true,
+        is_intermediate,
         skipped_layers: clipSkip,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'compel',
         id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
+        is_intermediate,
         prompt: negativePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-        is_intermediate: true,
+        is_intermediate,
         use_cpu,
+        seed,
         width: !isUsingScaledDimensions
           ? width
           : scaledBoundingBoxDimensions.width,
@@ -128,12 +123,12 @@ export const buildCanvasImageToImageGraph = (
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
         id: IMAGE_TO_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: DENOISE_LATENTS,
-        is_intermediate: true,
+        is_intermediate,
         cfg_scale,
         scheduler,
         steps,
@@ -143,7 +138,7 @@ export const buildCanvasImageToImageGraph = (
       [CANVAS_OUTPUT]: {
         type: 'l2i',
         id: CANVAS_OUTPUT,
-        is_intermediate: !shouldAutoSave,
+        is_intermediate,
       },
     },
     edges: [
@@ -238,7 +233,7 @@ export const buildCanvasImageToImageGraph = (
     graph.nodes[IMG2IMG_RESIZE] = {
       id: IMG2IMG_RESIZE,
       type: 'img_resize',
-      is_intermediate: true,
+      is_intermediate,
       image: initialImage,
       width: scaledBoundingBoxDimensions.width,
       height: scaledBoundingBoxDimensions.height,
@@ -246,13 +241,13 @@ export const buildCanvasImageToImageGraph = (
     graph.nodes[LATENTS_TO_IMAGE] = {
       id: LATENTS_TO_IMAGE,
       type: 'l2i',
-      is_intermediate: true,
+      is_intermediate,
       fp32,
     };
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       width: width,
       height: height,
     };
@@ -293,7 +288,7 @@ export const buildCanvasImageToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       type: 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate: !shouldAutoSave,
+      is_intermediate,
       fp32,
     };
 
@@ -322,10 +317,10 @@ export const buildCanvasImageToImageGraph = (
     height: !isUsingScaledDimensions
       ? height
       : scaledBoundingBoxDimensions.height,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -336,17 +331,6 @@ export const buildCanvasImageToImageGraph = (
     strength,
     init_image: initialImage.image_name,
   };
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: CANVAS_OUTPUT,
-      field: 'metadata',
-    },
-  });
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -360,11 +344,11 @@ export const buildCanvasImageToImageGraph = (
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
 
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
-
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  // Add IP Adapter
+  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
@@ -376,6 +360,8 @@ export const buildCanvasImageToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
+
+  addSaveImageNode(state, graph);
 
   return graph;
 };
