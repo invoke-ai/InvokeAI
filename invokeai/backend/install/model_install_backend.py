@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore")
 
 # --------------------------globals-----------------------
 config = InvokeAIAppConfig.get_config()
-logger = InvokeAILogger.getLogger(name="InvokeAI")
+logger = InvokeAILogger.get_logger(name="InvokeAI")
 
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
 Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
@@ -492,7 +492,7 @@ def yes_or_no(prompt: str, default_yes=True):
 
 # ---------------------------------------------
 def hf_download_from_pretrained(model_class: object, model_name: str, destination: Path, **kwargs):
-    logger = InvokeAILogger.getLogger("InvokeAI")
+    logger = InvokeAILogger.get_logger("InvokeAI")
     logger.addFilter(lambda x: "fp16 is not a valid" not in x.getMessage())
 
     model = model_class.from_pretrained(
