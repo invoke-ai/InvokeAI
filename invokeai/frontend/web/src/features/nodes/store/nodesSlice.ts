@@ -91,6 +91,8 @@ export const initialNodesState: NodesState = {
   isReady: false,
   connectionStartParams: null,
   currentConnectionFieldType: null,
+  connectionMade: false,
+  nodePopoverCursorPosition: null,
   shouldShowFieldTypeLegend: false,
   shouldShowMinimapPanel: true,
   shouldValidateGraph: true,
@@ -178,12 +180,54 @@ const nodesSlice = createSlice({
         nodeId: node.id,
         ...initialNodeExecutionState,
       };
+
+      if (state.connectionStartParams) {
+        const handleType = state.connectionStartParams.handleType;
+        const currentFieldType = state.currentConnectionFieldType;
+        if (currentFieldType) {
+          const handles =
+            handleType == 'source' ? node.data.inputs : node.data.outputs;
+          const matchingInputField = Object.values(handles).find(
+            (input) => input.type === currentFieldType
+          );
+
+          if (matchingInputField) {
+            const newConnection: Connection = {
+              source:
+                handleType == 'source'
+                  ? state.connectionStartParams.nodeId
+                  : node.id,
+              target:
+                handleType == 'source'
+                  ? node.id
+                  : state.connectionStartParams.nodeId,
+              sourceHandle:
+                handleType == 'source'
+                  ? state.connectionStartParams.handleId
+                  : matchingInputField.name,
+              targetHandle:
+                handleType == 'source'
+                  ? matchingInputField.name
+                  : state.connectionStartParams.handleId,
+            };
+
+            state.edges = addEdge(
+              { ...newConnection, type: 'default' },
+              state.edges
+            );
+          }
+        }
+      }
+
+      state.connectionStartParams = null;
+      state.currentConnectionFieldType = null;
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
     },
     connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
       state.connectionStartParams = action.payload;
+      state.connectionMade = false;
       const { nodeId, handleId, handleType } = action.payload;
       if (!nodeId || !handleId) {
         return;
@@ -208,10 +252,15 @@ const nodesSlice = createSlice({
         { ...action.payload, type: 'default' },
         state.edges
       );
+      state.connectionMade = true;
     },
     connectionEnded: (state) => {
-      state.connectionStartParams = null;
-      state.currentConnectionFieldType = null;
+      if (!state.connectionMade) {
+        state.isAddNodePopoverOpen = true; //TODO: Set this to use the function, if I can figure out how
+      } else {
+        state.connectionStartParams = null;
+        state.currentConnectionFieldType = null;
+      }
     },
     workflowExposedFieldAdded: (
       state,
@@ -823,6 +872,10 @@ const nodesSlice = createSlice({
     },
     addNodePopoverClosed: (state) => {
       state.isAddNodePopoverOpen = false;
+
+      //Make sure these get reset if we close the popover and haven't selected a node
+      state.currentConnectionFieldType = null;
+      state.currentConnectionFieldType = null;
     },
     addNodePopoverToggled: (state) => {
       state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;

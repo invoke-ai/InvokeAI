@@ -55,10 +55,31 @@ const AddNodePopover = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
+  const fieldFilter = useAppSelector(
+    (state) => state.nodes.currentConnectionFieldType
+  );
+  const handleFilter = useAppSelector(
+    (state) => state.nodes.connectionStartParams?.handleType
+  );
+
   const selector = createSelector(
     [stateSelector],
     ({ nodes }) => {
-      const data: NodeTemplate[] = map(nodes.nodeTemplates, (template) => {
+      const filteredNodeTemplates = fieldFilter
+        ? Object.entries(nodes.nodeTemplates)
+            .filter(([_key, template]) => {
+              const handles =
+                handleFilter == 'source' ? template.inputs : template.outputs;
+              return Object.values(handles).some((input) => {
+                return input.type === fieldFilter;
+              });
+            })
+            .reduce((obj, [key, value]) => {
+              obj[key] = value;
+              return obj;
+            }, {})
+        : nodes.nodeTemplates;
+      const data: NodeTemplate[] = map(filteredNodeTemplates, (template) => {
         return {
           label: template.title,
           value: template.type,
