@@ -25,6 +25,7 @@ import 'reactflow/dist/style.css';
 import { AnyInvocationType } from 'services/events/types';
 import { AddNodePopoverSelectItem } from './AddNodePopoverSelectItem';
 import { useTranslation } from 'react-i18next';
+import { InvocationTemplate } from 'features/nodes/types/types';
 
 type NodeTemplate = {
   label: string;
@@ -74,7 +75,7 @@ const AddNodePopover = () => {
                 return input.type === fieldFilter;
               });
             })
-            .reduce((obj, [key, value]) => {
+            .reduce((obj: Record<string, InvocationTemplate>, [key, value]) => {
               obj[key] = value;
               return obj;
             }, {})
