@@ -74,7 +74,7 @@ if is_accelerate_available():
     from accelerate import init_empty_weights
     from accelerate.utils import set_module_tensor_to_device
 
-logger = InvokeAILogger.getLogger(__name__)
+logger = InvokeAILogger.get_logger(__name__)
 CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().models_path / "core/convert"
 
 
