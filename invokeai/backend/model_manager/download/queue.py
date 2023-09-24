@@ -105,7 +105,7 @@ class DownloadQueue(DownloadQueueBase):
         self._queue = PriorityQueue()
         self._worker_pool = set()
         self._lock = threading.RLock()
-        self._logger = InvokeAILogger.getLogger(config=config)
+        self._logger = InvokeAILogger.get_logger(config=config)
         self._event_handlers = event_handlers
         self._requests = requests_session or requests.Session()
         self._quiet = quiet

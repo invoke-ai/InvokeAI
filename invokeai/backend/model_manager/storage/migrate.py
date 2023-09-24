@@ -17,7 +17,7 @@ def migrate_models_store(config: InvokeAIAppConfig):
     from invokeai.backend.model_manager.storage import get_config_store
 
     app_config = InvokeAIAppConfig.get_config()
-    logger = InvokeAILogger.getLogger()
+    logger = InvokeAILogger.get_logger()
     old_file: Path = app_config.model_conf_path
     new_file: Path = old_file.with_name("models3_2.yaml")
 

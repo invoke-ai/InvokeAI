@@ -149,7 +149,7 @@ class ModelLoad(ModelLoadBase):
 
         self._app_config = config
         self._store = store
-        self._logger = InvokeAILogger.getLogger()
+        self._logger = InvokeAILogger.get_logger()
         self._installer = ModelInstall(
             store=self._store,
             logger=self._logger,

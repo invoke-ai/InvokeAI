@@ -293,7 +293,7 @@ class EventServiceBase:
 
     def emit_model_event(self, job: DownloadJobBase):
         """Emit event when the status of a download/install job changes."""
-        logger = InvokeAILogger.getLogger()
+        logger = InvokeAILogger.get_logger()
         progress = 100 * (job.bytes / job.total_bytes) if job.total_bytes > 0 else 0
         logger.info(f"Dispatch model_event for job {job.id}, status={job.status.value}, progress={progress:5.2f}%")
         self.dispatch(  # use dispatch() directly here because we are not a session event.

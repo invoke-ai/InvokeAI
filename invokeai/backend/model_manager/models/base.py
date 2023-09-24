@@ -606,7 +606,7 @@ class IAIOnnxRuntimeModel:
 
 def trim_model_convert_cache(cache_path: Path, max_cache_size: int):
     current_size = directory_size(cache_path)
-    logger = InvokeAILogger.getLogger()
+    logger = InvokeAILogger.get_logger()
 
     if current_size <= max_cache_size:
         return

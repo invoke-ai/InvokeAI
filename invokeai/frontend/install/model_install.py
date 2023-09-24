@@ -44,7 +44,7 @@ from invokeai.frontend.install.widgets import (
 )
 
 config = InvokeAIAppConfig.get_config()
-logger = InvokeAILogger.getLogger()
+logger = InvokeAILogger.get_logger()
 
 # build a table mapping all non-printable characters to None
 # for stripping control characters
@@ -590,7 +590,7 @@ def main():
     if opt.full_precision:
         invoke_args.extend(["--precision", "float32"])
     config.parse_args(invoke_args)
-    logger = InvokeAILogger().getLogger(config=config)
+    logger = InvokeAILogger().get_logger(config=config)
 
     if not config.model_conf_path.exists():
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")

@@ -93,10 +93,12 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # or renaming it and then running invokeai-configure again.
 """
 
-logger = InvokeAILogger.getLogger()
+logger = InvokeAILogger.get_logger()
 
 
 class DummyWidgetValue(Enum):
+    """Dummy widget values."""
+
     zero = 0
     true = True
     false = False
@@ -182,7 +184,6 @@ class ProgressBar:
 
 # ---------------------------------------------
 def hf_download_from_pretrained(model_class: object, model_name: str, destination: Path, **kwargs):
-    logger = InvokeAILogger.getLogger("InvokeAIConfigure")
     logger.addFilter(lambda x: "fp16 is not a valid" not in x.getMessage())
 
     model = model_class.from_pretrained(
@@ -909,7 +910,7 @@ def main():
         invoke_args.extend(["--precision", "float32"])
     config.parse_args(invoke_args)
     config.precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
-    logger = InvokeAILogger().getLogger(config=config)
+    logger = InvokeAILogger().get_logger(config=config)
 
     errors = set()
 

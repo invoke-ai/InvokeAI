@@ -360,7 +360,7 @@ class ModelInstall(ModelInstallBase):
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ):  # noqa D107 - use base class docstrings
         self._app_config = config or InvokeAIAppConfig.get_config()
-        self._logger = logger or InvokeAILogger.getLogger(config=self._app_config)
+        self._logger = logger or InvokeAILogger.get_logger(config=self._app_config)
         self._store = store or get_config_store(self._app_config.model_conf_path)
         self._download_queue = download or DownloadQueue(config=self._app_config, event_handlers=event_handlers)
         self._async_installs = dict()

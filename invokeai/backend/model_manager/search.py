@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.backend.util.logging import InvokeAILogger
 
-default_logger = InvokeAILogger.getLogger()
+default_logger = InvokeAILogger.get_logger()
 
 
 class SearchStats(BaseModel):
