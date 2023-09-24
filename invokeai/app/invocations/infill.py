@@ -7,12 +7,12 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
 from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
-from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 

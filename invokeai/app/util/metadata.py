@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import ValidationError
 
-from invokeai.app.services.graph import Edge
+from invokeai.app.services.shared.graph import Edge
 
 
 def get_metadata_graph_from_raw_session(session_raw: str) -> Optional[dict]:

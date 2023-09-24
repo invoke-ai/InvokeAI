@@ -5,8 +5,7 @@ from typing import Optional, Union, cast
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event as FastAPIEvent
 
-from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.graph import Graph
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -29,8 +28,9 @@ from invokeai.app.services.session_queue.session_queue_common import (
     calc_session_count,
     prepare_values_to_insert,
 )
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
+from invokeai.app.services.shared.sqlite import SqliteDatabase
 
 
 class SqliteSessionQueue(SessionQueueBase):

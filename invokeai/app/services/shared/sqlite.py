@@ -4,6 +4,8 @@ from logging import Logger
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
+sqlite_memory = ":memory:"
+
 
 class SqliteDatabase:
     conn: sqlite3.Connection
@@ -16,7 +18,7 @@ class SqliteDatabase:
         self._config = config
 
         if self._config.use_memory_db:
-            location = ":memory:"
+            location = sqlite_memory
             logger.info("Using in-memory database")
         else:
             db_path = self._config.db_path

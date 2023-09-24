@@ -18,9 +18,9 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemDTO,
     SessionQueueStatus,
 )
+from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
 
-from ...services.graph import Graph
 from ..dependencies import ApiDependencies
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
