@@ -563,23 +563,24 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             if downloads := section.get("download_ids"):
                 selections.install_models.extend(downloads.value.split())
 
-        # special case for the ipadapter_models. If any of the adapters are
-        # chosen, then we add the corresponding encoder(s) to the install list.
-        section = self.ipadapter_models
-        if section.get("models_selected"):
-            selected_adapters = [
-                self.all_models[section["models"][x]].name for x in section.get("models_selected").value
-            ]
-            encoders = []
-            if any(["sdxl" in x for x in selected_adapters]):
-                encoders.append("ip_adapter_sdxl_image_encoder")
-            if any(["sd15" in x for x in selected_adapters]):
-                encoders.append("ip_adapter_sd_image_encoder")
-            for encoder in encoders:
-                key = f"any/clip_vision/{encoder}"
-                repo_id = f"InvokeAI/{encoder}"
-                if key not in self.all_models:
-                    selections.install_models.append(repo_id)
+        # NOT NEEDED - DONE IN BACKEND NOW
+        # # special case for the ipadapter_models. If any of the adapters are
+        # # chosen, then we add the corresponding encoder(s) to the install list.
+        # section = self.ipadapter_models
+        # if section.get("models_selected"):
+        #     selected_adapters = [
+        #         self.all_models[section["models"][x]].name for x in section.get("models_selected").value
+        #     ]
+        #     encoders = []
+        #     if any(["sdxl" in x for x in selected_adapters]):
+        #         encoders.append("ip_adapter_sdxl_image_encoder")
+        #     if any(["sd15" in x for x in selected_adapters]):
+        #         encoders.append("ip_adapter_sd_image_encoder")
+        #     for encoder in encoders:
+        #         key = f"any/clip_vision/{encoder}"
+        #         repo_id = f"InvokeAI/{encoder}"
+        #         if key not in self.all_models:
+        #             selections.install_models.append(repo_id)
 
 
 class AddModelApplication(npyscreen.NPSAppManaged):
