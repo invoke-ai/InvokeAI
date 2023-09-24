@@ -89,7 +89,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     queue_item_id=queue_item.session_queue_item_id,
                     queue_id=queue_item.session_queue_id,
                     graph_execution_state_id=graph_execution_state.id,
-                    node=invocation.dict(),
+                    node=invocation.model_dump(),
                     source_node_id=source_node_id,
                 )
 
@@ -127,9 +127,9 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             queue_item_id=queue_item.session_queue_item_id,
                             queue_id=queue_item.session_queue_id,
                             graph_execution_state_id=graph_execution_state.id,
-                            node=invocation.dict(),
+                            node=invocation.model_dump(),
                             source_node_id=source_node_id,
-                            result=outputs.dict(),
+                            result=outputs.model_dump(),
                         )
                     self.__invoker.services.performance_statistics.log_stats()
 
@@ -157,7 +157,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         queue_item_id=queue_item.session_queue_item_id,
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=graph_execution_state.id,
-                        node=invocation.dict(),
+                        node=invocation.model_dump(),
                         source_node_id=source_node_id,
                         error_type=e.__class__.__name__,
                         error=error,
@@ -187,7 +187,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             queue_item_id=queue_item.session_queue_item_id,
                             queue_id=queue_item.session_queue_id,
                             graph_execution_state_id=graph_execution_state.id,
-                            node=invocation.dict(),
+                            node=invocation.model_dump(),
                             source_node_id=source_node_id,
                             error_type=e.__class__.__name__,
                             error=traceback.format_exc(),
