@@ -1,12 +1,9 @@
 from abc import ABC, abstractmethod
-from logging import Logger
 from typing import Optional
 
-from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
-from invokeai.app.services.board_record_storage import BoardRecord, BoardRecordStorageBase
-from invokeai.app.services.image_record_storage import ImageRecordStorageBase
+from invokeai.app.services.board_record_storage import BoardRecord
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.models.board_record import BoardDTO
-from invokeai.app.services.urls import UrlServiceBase
 
 
 class BoardImagesServiceABC(ABC):
@@ -46,60 +43,36 @@ class BoardImagesServiceABC(ABC):
         pass
 
 
-class BoardImagesServiceDependencies:
-    """Service dependencies for the BoardImagesService."""
-
-    board_image_records: BoardImageRecordStorageBase
-    board_records: BoardRecordStorageBase
-    image_records: ImageRecordStorageBase
-    urls: UrlServiceBase
-    logger: Logger
-
-    def __init__(
-        self,
-        board_image_record_storage: BoardImageRecordStorageBase,
-        image_record_storage: ImageRecordStorageBase,
-        board_record_storage: BoardRecordStorageBase,
-        url: UrlServiceBase,
-        logger: Logger,
-    ):
-        self.board_image_records = board_image_record_storage
-        self.image_records = image_record_storage
-        self.board_records = board_record_storage
-        self.urls = url
-        self.logger = logger
-
-
 class BoardImagesService(BoardImagesServiceABC):
-    _services: BoardImagesServiceDependencies
+    __invoker: Invoker
 
-    def __init__(self, services: BoardImagesServiceDependencies):
-        self._services = services
+    def start(self, invoker: Invoker) -> None:
+        self.__invoker = invoker
 
     def add_image_to_board(
         self,
         board_id: str,
         image_name: str,
     ) -> None:
-        self._services.board_image_records.add_image_to_board(board_id, image_name)
+        self.__invoker.services.board_image_records.add_image_to_board(board_id, image_name)
 
     def remove_image_from_board(
         self,
         image_name: str,
     ) -> None:
-        self._services.board_image_records.remove_image_from_board(image_name)
+        self.__invoker.services.board_image_records.remove_image_from_board(image_name)
 
     def get_all_board_image_names_for_board(
         self,
         board_id: str,
     ) -> list[str]:
-        return self._services.board_image_records.get_all_board_image_names_for_board(board_id)
+        return self.__invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
 
     def get_board_for_image(
         self,
         image_name: str,
     ) -> Optional[str]:
-        board_id = self._services.board_image_records.get_board_for_image(image_name)
+        board_id = self.__invoker.services.board_image_records.get_board_for_image(image_name)
         return board_id
 
 

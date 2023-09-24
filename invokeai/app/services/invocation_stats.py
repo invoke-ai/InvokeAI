@@ -38,12 +38,11 @@ import psutil
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_management.model_cache import CacheStats
 
 from ..invocations.baseinvocation import BaseInvocation
-from .graph import GraphExecutionState
-from .item_storage import ItemStorageABC
-from .model_manager_service import ModelManagerService
+from .model_manager_service import ModelManagerServiceBase
 
 # size of GIG in bytes
 GIG = 1073741824
@@ -72,7 +71,6 @@ class NodeLog:
 class InvocationStatsServiceBase(ABC):
     "Abstract base class for recording node memory/time performance statistics"
 
-    graph_execution_manager: ItemStorageABC["GraphExecutionState"]
     # {graph_id => NodeLog}
     _stats: Dict[str, NodeLog]
     _cache_stats: Dict[str, CacheStats]
@@ -80,10 +78,9 @@ class InvocationStatsServiceBase(ABC):
     ram_changed: float
 
     @abstractmethod
-    def __init__(self, graph_execution_manager: ItemStorageABC["GraphExecutionState"]):
+    def __init__(self):
         """
         Initialize the InvocationStatsService and reset counters to zero
-        :param graph_execution_manager: Graph execution manager for this session
         """
         pass
 
@@ -158,13 +155,17 @@ class InvocationStatsService(InvocationStatsServiceBase):
     """Accumulate performance information about a running graph. Collects time spent in each node,
     as well as the maximum and current VRAM utilisation for CUDA systems"""
 
-    def __init__(self, graph_execution_manager: ItemStorageABC["GraphExecutionState"]):
-        self.graph_execution_manager = graph_execution_manager
+    _invoker: Invoker
+
+    def __init__(self):
         # {graph_id => NodeLog}
         self._stats: Dict[str, NodeLog] = {}
         self._cache_stats: Dict[str, CacheStats] = {}
         self.ram_used: float = 0.0
         self.ram_changed: float = 0.0
+
+    def start(self, invoker: Invoker) -> None:
+        self._invoker = invoker
 
     class StatsContext:
         """Context manager for collecting statistics."""
@@ -174,13 +175,13 @@ class InvocationStatsService(InvocationStatsServiceBase):
         graph_id: str
         start_time: float
         ram_used: int
-        model_manager: ModelManagerService
+        model_manager: ModelManagerServiceBase
 
         def __init__(
             self,
             invocation: BaseInvocation,
             graph_id: str,
-            model_manager: ModelManagerService,
+            model_manager: ModelManagerServiceBase,
             collector: "InvocationStatsServiceBase",
         ):
             """Initialize statistics for this run."""
@@ -217,12 +218,11 @@ class InvocationStatsService(InvocationStatsServiceBase):
         self,
         invocation: BaseInvocation,
         graph_execution_state_id: str,
-        model_manager: ModelManagerService,
     ) -> StatsContext:
         if not self._stats.get(graph_execution_state_id):  # first time we're seeing this
             self._stats[graph_execution_state_id] = NodeLog()
             self._cache_stats[graph_execution_state_id] = CacheStats()
-        return self.StatsContext(invocation, graph_execution_state_id, model_manager, self)
+        return self.StatsContext(invocation, graph_execution_state_id, self._invoker.services.model_manager, self)
 
     def reset_all_stats(self):
         """Zero all statistics"""
@@ -261,7 +261,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         errored = set()
         for graph_id, node_log in self._stats.items():
             try:
-                current_graph_state = self.graph_execution_manager.get(graph_id)
+                current_graph_state = self._invoker.services.graph_execution_manager.get(graph_id)
             except Exception:
                 errored.add(graph_id)
                 continue
