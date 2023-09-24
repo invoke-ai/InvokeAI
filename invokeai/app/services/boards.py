@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 
 from invokeai.app.services.board_images import board_record_to_dto
 from invokeai.app.services.board_record_storage import BoardChanges
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.models.board_record import BoardDTO
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 
 class BoardServiceABC(ABC):

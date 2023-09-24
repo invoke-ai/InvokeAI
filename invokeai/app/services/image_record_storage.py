@@ -3,27 +3,12 @@ import sqlite3
 import threading
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Generic, Optional, TypeVar, cast
-
-from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
+from typing import Optional, cast
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.models.image_record import ImageRecord, ImageRecordChanges, deserialize_image_record
 from invokeai.app.services.shared.db import SqliteDatabase
-
-T = TypeVar("T", bound=BaseModel)
-
-
-class OffsetPaginatedResults(GenericModel, Generic[T]):
-    """Offset-paginated results"""
-
-    # fmt: off
-    items: list[T] = Field(description="Items")
-    offset: int = Field(description="Offset from which to retrieve items")
-    limit: int = Field(description="Limit of items to get")
-    total: int = Field(description="Total number of items in result")
-    # fmt: on
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 
 # TODO: Should these excpetions subclass existing python exceptions?
