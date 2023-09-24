@@ -1,22 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Generic, Optional, TypeVar
 
-from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
+from pydantic import BaseModel
+
+from invokeai.app.services.shared.pagination import PaginatedResults
 
 T = TypeVar("T", bound=BaseModel)
-
-
-class PaginatedResults(GenericModel, Generic[T]):
-    """Paginated results"""
-
-    # fmt: off
-    items: list[T] = Field(description="Items")
-    page: int = Field(description="Current Page")
-    pages: int = Field(description="Total number of pages")
-    per_page: int = Field(description="Number of items per page")
-    total: int = Field(description="Total number of items in result")
-    # fmt: on
 
 
 class ItemStorageABC(ABC, Generic[T]):

@@ -18,7 +18,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemDTO,
     SessionQueueStatus,
 )
-from invokeai.app.services.shared.models import CursorPaginatedResults
+from invokeai.app.services.shared.pagination import CursorPaginatedResults
 
 from ...services.graph import Graph
 from ..dependencies import ApiDependencies
