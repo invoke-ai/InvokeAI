@@ -27,9 +27,9 @@ from PIL import Image
 from pydantic import BaseModel, Field, validator
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
 from ...backend.model_management import BaseModelType
-from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,

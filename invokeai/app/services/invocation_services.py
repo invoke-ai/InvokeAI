@@ -6,27 +6,27 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from logging import Logger
 
-    from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
-    from invokeai.app.services.board_images import BoardImagesServiceABC
-    from invokeai.app.services.board_record_storage import BoardRecordStorageBase
-    from invokeai.app.services.boards import BoardServiceABC
-    from invokeai.app.services.config import InvokeAIAppConfig
-    from invokeai.app.services.events import EventServiceBase
-    from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
-    from invokeai.app.services.image_file_storage import ImageFileStorageBase
-    from invokeai.app.services.image_record_storage import ImageRecordStorageBase
-    from invokeai.app.services.images import ImageServiceABC
-    from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
-    from invokeai.app.services.invocation_queue import InvocationQueueABC
-    from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
-    from invokeai.app.services.invoker import InvocationProcessorABC
-    from invokeai.app.services.item_storage import ItemStorageABC
-    from invokeai.app.services.latent_storage import LatentsStorageBase
-    from invokeai.app.services.model_manager_service import ModelManagerServiceBase
-    from invokeai.app.services.resource_name import NameServiceBase
-    from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
-    from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
-    from invokeai.app.services.urls import UrlServiceBase
+    from .board_image_records.board_image_records_base import BoardImageRecordStorageBase
+    from .board_images.board_images_base import BoardImagesServiceABC
+    from .board_records.board_records_base import BoardRecordStorageBase
+    from .boards.boards_base import BoardServiceABC
+    from .config import InvokeAIAppConfig
+    from .events.events_base import EventServiceBase
+    from .image_files.image_files_base import ImageFileStorageBase
+    from .image_records.image_records_base import ImageRecordStorageBase
+    from .images.images_base import ImageServiceABC
+    from .invocation_cache.invocation_cache_base import InvocationCacheBase
+    from .invocation_processor.invocation_processor_base import InvocationProcessorABC
+    from .invocation_queue.invocation_queue_base import InvocationQueueABC
+    from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
+    from .item_storage.item_storage_base import ItemStorageABC
+    from .latents_storage.latents_storage_base import LatentsStorageBase
+    from .model_manager.model_manager_base import ModelManagerServiceBase
+    from .names.names_base import NameServiceBase
+    from .session_processor.session_processor_base import SessionProcessorBase
+    from .session_queue.session_queue_base import SessionQueueBase
+    from .shared.graph import GraphExecutionState, LibraryGraph
+    from .urls.urls_base import UrlServiceBase
 
 
 class InvocationServices:
