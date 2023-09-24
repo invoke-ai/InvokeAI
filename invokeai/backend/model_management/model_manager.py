@@ -236,13 +236,13 @@ import types
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Callable, Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import Callable, Dict, List, Literal, Optional, Set, Tuple, Union, cast
 
 import torch
 import yaml
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -293,6 +293,8 @@ class AddModelResult(BaseModel):
     model_type: ModelType = Field(description="The type of model")
     base_model: BaseModelType = Field(description="The base model")
     config: ModelConfigBase = Field(description="The configuration of the model")
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 MAX_CACHE_SIZE = 6.0  # GB
@@ -576,7 +578,7 @@ class ModelManager(object):
         """
         model_key = self.create_key(model_name, base_model, model_type)
         if model_key in self.models:
-            return self.models[model_key].dict(exclude_defaults=True)
+            return self.models[model_key].model_dump(exclude_defaults=True)
         else:
             return None  # TODO: None or empty dict on not found
 
@@ -632,7 +634,7 @@ class ModelManager(object):
                 continue
 
             model_dict = dict(
-                **model_config.dict(exclude_defaults=True),
+                **model_config.model_dump(exclude_defaults=True),
                 # OpenAPIModelInfoBase
                 model_name=cur_model_name,
                 base_model=cur_base_model,
@@ -900,14 +902,16 @@ class ModelManager(object):
         Write current configuration out to the indicated file.
         """
         data_to_save = dict()
-        data_to_save["__metadata__"] = self.config_meta.dict()
+        data_to_save["__metadata__"] = self.config_meta.model_dump()
 
         for model_key, model_config in self.models.items():
             model_name, base_model, model_type = self.parse_key(model_key)
             model_class = self._get_implementation(base_model, model_type)
             if model_class.save_to_config:
                 # TODO: or exclude_unset better fits here?
-                data_to_save[model_key] = model_config.dict(exclude_defaults=True, exclude={"error"})
+                data_to_save[model_key] = cast(BaseModel, model_config).model_dump(
+                    exclude_defaults=True, exclude={"error"}, mode="json"
+                )
                 # alias for config file
                 data_to_save[model_key]["format"] = data_to_save[model_key].pop("model_format")
 

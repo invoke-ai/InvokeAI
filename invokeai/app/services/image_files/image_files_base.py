@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Optional
 
 from PIL.Image import Image as PILImageType
@@ -13,7 +14,7 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_path(self, image_name: str, thumbnail: bool = False) -> str:
+    def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
         """Gets the internal path to an image or thumbnail."""
         pass
 

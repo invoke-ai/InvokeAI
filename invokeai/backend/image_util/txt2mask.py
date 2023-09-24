@@ -41,18 +41,18 @@ config = InvokeAIAppConfig.get_config()
 
 
 class SegmentedGrayscale(object):
-    def __init__(self, image: Image, heatmap: torch.Tensor):
+    def __init__(self, image: Image.Image, heatmap: torch.Tensor):
         self.heatmap = heatmap
         self.image = image
 
-    def to_grayscale(self, invert: bool = False) -> Image:
+    def to_grayscale(self, invert: bool = False) -> Image.Image:
         return self._rescale(Image.fromarray(np.uint8(255 - self.heatmap * 255 if invert else self.heatmap * 255)))
 
-    def to_mask(self, threshold: float = 0.5) -> Image:
+    def to_mask(self, threshold: float = 0.5) -> Image.Image:
         discrete_heatmap = self.heatmap.lt(threshold).int()
         return self._rescale(Image.fromarray(np.uint8(discrete_heatmap * 255), mode="L"))
 
-    def to_transparent(self, invert: bool = False) -> Image:
+    def to_transparent(self, invert: bool = False) -> Image.Image:
         transparent_image = self.image.copy()
         # For img2img, we want the selected regions to be transparent,
         # but to_grayscale() returns the opposite. Thus invert.
@@ -61,7 +61,7 @@ class SegmentedGrayscale(object):
         return transparent_image
 
     # unscales and uncrops the 352x352 heatmap so that it matches the image again
-    def _rescale(self, heatmap: Image) -> Image:
+    def _rescale(self, heatmap: Image.Image) -> Image.Image:
         size = self.image.width if (self.image.width > self.image.height) else self.image.height
         resized_image = heatmap.resize((size, size), resample=Image.Resampling.LANCZOS)
         return resized_image.crop((0, 0, self.image.width, self.image.height))
@@ -82,7 +82,7 @@ class Txt2Mask(object):
         self.model = CLIPSegForImageSegmentation.from_pretrained(CLIPSEG_MODEL, cache_dir=config.cache_dir)
 
     @torch.no_grad()
-    def segment(self, image, prompt: str) -> SegmentedGrayscale:
+    def segment(self, image: Image.Image, prompt: str) -> SegmentedGrayscale:
         """
         Given a prompt string such as "a bagel", tries to identify the object in the
         provided image and returns a SegmentedGrayscale object in which the brighter
@@ -99,7 +99,7 @@ class Txt2Mask(object):
         heatmap = torch.sigmoid(outputs.logits)
         return SegmentedGrayscale(image, heatmap)
 
-    def _scale_and_crop(self, image: Image) -> Image:
+    def _scale_and_crop(self, image: Image.Image) -> Image.Image:
         scaled_image = Image.new("RGB", (CLIPSEG_SIZE, CLIPSEG_SIZE))
         if image.width > image.height:  # width is constraint
             scale = CLIPSEG_SIZE / image.width

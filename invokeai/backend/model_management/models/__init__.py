@@ -2,7 +2,7 @@ import inspect
 from enum import Enum
 from typing import Literal, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, create_model
 
 from .base import (  # noqa: F401
     BaseModelType,
@@ -106,6 +106,8 @@ class OpenAPIModelInfoBase(BaseModel):
     base_model: BaseModelType
     model_type: ModelType
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 for base_model, models in MODEL_CLASSES.items():
     for model_type, model_class in models.items():
@@ -121,17 +123,11 @@ for base_model, models in MODEL_CLASSES.items():
             if openapi_cfg_name in vars():
                 continue
 
-            api_wrapper = type(
+            api_wrapper = create_model(
                 openapi_cfg_name,
-                (cfg, OpenAPIModelInfoBase),
-                dict(
-                    __annotations__=dict(
-                        model_type=Literal[model_type.value],
-                    ),
-                ),
+                __base__=(cfg, OpenAPIModelInfoBase),
+                model_type=(Literal[model_type], model_type),  # type: ignore
             )
-
-            # globals()[openapi_cfg_name] = api_wrapper
             vars()[openapi_cfg_name] = api_wrapper
             OPENAPI_MODEL_CONFIGS.append(api_wrapper)
 
