@@ -4,6 +4,8 @@ from typing import Generic, Optional, TypeVar, get_args
 
 from pydantic import BaseModel, parse_raw_as
 
+from invokeai.app.services.shared.db import SqliteDatabase
+
 from .item_storage import ItemStorageABC, PaginatedResults
 
 T = TypeVar("T", bound=BaseModel)
@@ -18,13 +20,13 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     _id_field: str
     _lock: threading.Lock
 
-    def __init__(self, conn: sqlite3.Connection, table_name: str, lock: threading.Lock, id_field: str = "id"):
+    def __init__(self, db: SqliteDatabase, table_name: str, id_field: str = "id"):
         super().__init__()
 
+        self._lock = db.lock
+        self._conn = db.conn
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
-        self._lock = lock
-        self._conn = conn
         self._cursor = self._conn.cursor()
 
         self._create_table()
