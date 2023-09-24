@@ -8,7 +8,6 @@ import invokeai.backend.util.logging as logger
 from ..invocations.baseinvocation import InvocationContext
 from ..models.exceptions import CanceledException
 from .invocation_queue import InvocationQueueItem
-from .invocation_stats import InvocationStatsServiceBase
 from .invoker import InvocationProcessorABC, Invoker
 
 
@@ -37,7 +36,6 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     def __process(self, stop_event: Event):
         try:
             self.__threadLimit.acquire()
-            statistics: InvocationStatsServiceBase = self.__invoker.services.performance_statistics
             queue_item: Optional[InvocationQueueItem] = None
 
             while not stop_event.is_set():
@@ -97,8 +95,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 # Invoke
                 try:
                     graph_id = graph_execution_state.id
-                    model_manager = self.__invoker.services.model_manager
-                    with statistics.collect_stats(invocation, graph_id, model_manager):
+                    with self.__invoker.services.performance_statistics.collect_stats(invocation, graph_id):
                         # use the internal invoke_internal(), which wraps the node's invoke() method,
                         # which handles a few things:
                         # - nodes that require a value, but get it only from a connection
@@ -133,13 +130,13 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             source_node_id=source_node_id,
                             result=outputs.dict(),
                         )
-                    statistics.log_stats()
+                    self.__invoker.services.performance_statistics.log_stats()
 
                 except KeyboardInterrupt:
                     pass
 
                 except CanceledException:
-                    statistics.reset_stats(graph_execution_state.id)
+                    self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 except Exception as e:
@@ -164,7 +161,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=error,
                     )
-                    statistics.reset_stats(graph_execution_state.id)
+                    self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 # Check queue to see if this is canceled, and skip if so
