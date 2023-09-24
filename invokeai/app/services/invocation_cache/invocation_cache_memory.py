@@ -9,8 +9,6 @@ from invokeai.app.services.invocation_cache.invocation_cache_base import Invocat
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.invoker import Invoker
 
-lock = Lock()
-
 
 @dataclass(order=True)
 class CachedItem:
@@ -26,6 +24,7 @@ class MemoryInvocationCache(InvocationCacheBase):
     _hits: int
     _misses: int
     _invoker: Invoker
+    _lock: Lock
 
     def __init__(self, max_cache_size: int = 0) -> None:
         self._cache = OrderedDict()
@@ -33,6 +32,7 @@ class MemoryInvocationCache(InvocationCacheBase):
         self._disabled = False
         self._hits = 0
         self._misses = 0
+        self._lock = Lock()
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
@@ -42,7 +42,7 @@ class MemoryInvocationCache(InvocationCacheBase):
         self._invoker.services.latents.on_deleted(self._delete_by_match)
 
     def get(self, key: Union[int, str]) -> Optional[BaseInvocationOutput]:
-        with lock:
+        with self._lock:
             if self._max_cache_size == 0 or self._disabled:
                 return None
             item = self._cache.get(key, None)
@@ -54,7 +54,7 @@ class MemoryInvocationCache(InvocationCacheBase):
             return None
 
     def save(self, key: Union[int, str], invocation_output: BaseInvocationOutput) -> None:
-        with lock:
+        with self._lock:
             if self._max_cache_size == 0 or self._disabled or key in self._cache:
                 return
             # If the cache is full, we need to remove the least used
@@ -76,11 +76,11 @@ class MemoryInvocationCache(InvocationCacheBase):
             del self._cache[key]
 
     def delete(self, key: Union[int, str]) -> None:
-        with lock:
+        with self._lock:
             return self._delete(key)
 
     def clear(self, *args, **kwargs) -> None:
-        with lock:
+        with self._lock:
             if self._max_cache_size == 0:
                 return
             self._cache.clear()
@@ -92,19 +92,19 @@ class MemoryInvocationCache(InvocationCacheBase):
         return hash(invocation.json(exclude={"id"}))
 
     def disable(self) -> None:
-        with lock:
+        with self._lock:
             if self._max_cache_size == 0:
                 return
             self._disabled = True
 
     def enable(self) -> None:
-        with lock:
+        with self._lock:
             if self._max_cache_size == 0:
                 return
             self._disabled = False
 
     def get_status(self) -> InvocationCacheStatus:
-        with lock:
+        with self._lock:
             return InvocationCacheStatus(
                 hits=self._hits,
                 misses=self._misses,
@@ -114,7 +114,7 @@ class MemoryInvocationCache(InvocationCacheBase):
             )
 
     def _delete_by_match(self, to_match: str) -> None:
-        with lock:
+        with self._lock:
             if self._max_cache_size == 0:
                 return
             keys_to_delete = set()
