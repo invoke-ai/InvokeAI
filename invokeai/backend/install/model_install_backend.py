@@ -88,6 +88,7 @@ class ModelLoadInfo:
     default: bool = False
     requires: Optional[List[str]] = field(default_factory=list)
 
+
 class ModelInstall(object):
     def __init__(
         self,
@@ -261,7 +262,7 @@ class ModelInstall(object):
     def _remove_installed(self, model_list: List[str]):
         all_models = self.all_models()
         for path in model_list:
-            key = self.reverse_paths.get(path) 
+            key = self.reverse_paths.get(path)
             if key and all_models[key].installed:
                 logger.warning(f"{path} already installed. Skipping.")
                 model_list.remove(path)
@@ -270,7 +271,7 @@ class ModelInstall(object):
         additional_models = []
         all_models = self.all_models()
         for path in model_list:
-            if not(key := self.reverse_paths.get(path)):
+            if not (key := self.reverse_paths.get(path)):
                 continue
             for requirement in all_models[key].requires:
                 requirement_key = self.reverse_paths.get(requirement)
