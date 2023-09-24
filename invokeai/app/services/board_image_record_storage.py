@@ -3,9 +3,9 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Optional, cast
 
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.image_record import ImageRecord, deserialize_image_record
 from invokeai.app.services.shared.db import SqliteDatabase
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 
 class BoardImageRecordStorageBase(ABC):
