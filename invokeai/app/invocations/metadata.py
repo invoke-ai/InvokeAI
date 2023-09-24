@@ -223,4 +223,4 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> MetadataAccumulatorOutput:
         """Collects and outputs a CoreMetadata object"""
 
-        return MetadataAccumulatorOutput(metadata=CoreMetadata(**self.dict()))
+        return MetadataAccumulatorOutput(metadata=CoreMetadata(**self.model_dump()))

@@ -6,7 +6,7 @@ import { useMantineMultiSelectStyles } from 'mantine-theme/hooks/useMantineMulti
 import { KeyboardEvent, RefObject, memo, useCallback } from 'react';
 
 type IAIMultiSelectProps = Omit<MultiSelectProps, 'label'> & {
-  tooltip?: string;
+  tooltip?: string | null;
   inputRef?: RefObject<HTMLInputElement>;
   label?: string;
 };
