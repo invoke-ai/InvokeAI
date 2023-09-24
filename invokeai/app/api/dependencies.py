@@ -2,33 +2,34 @@
 
 from logging import Logger
 
-from invokeai.app.services.board_image_record_storage import SqliteBoardImageRecordStorage
-from invokeai.app.services.board_images import BoardImagesService
-from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
-from invokeai.app.services.boards import BoardService
-from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
-from invokeai.app.services.images import ImageService
-from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
-from invokeai.app.services.resource_name import SimpleNameService
-from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from invokeai.app.services.shared.sqlite import SqliteDatabase
-from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
-from ..services.default_graphs import create_system_graphs
-from ..services.graph import GraphExecutionState, LibraryGraph
-from ..services.image_file_storage import DiskImageFileStorage
-from ..services.invocation_queue import MemoryInvocationQueue
+from ..services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from ..services.board_images.board_images_default import BoardImagesService
+from ..services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from ..services.boards.boards_default import BoardService
+from ..services.config import InvokeAIAppConfig
+from ..services.image_files.image_files_disk import DiskImageFileStorage
+from ..services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from ..services.images.images_default import ImageService
+from ..services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+from ..services.invocation_processor.invocation_processor_default import DefaultInvocationProcessor
+from ..services.invocation_queue.invocation_queue_memory import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
-from ..services.invocation_stats import InvocationStatsService
+from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
-from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ..services.model_manager_service import ModelManagerService
-from ..services.processor import DefaultInvocationProcessor
-from ..services.sqlite import SqliteItemStorage
+from ..services.item_storage.item_storage_sqlite import SqliteItemStorage
+from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
+from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
+from ..services.model_manager.model_manager_default import ModelManagerService
+from ..services.names.names_default import SimpleNameService
+from ..services.session_processor.session_processor_default import DefaultSessionProcessor
+from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from ..services.shared.default_graphs import create_system_graphs
+from ..services.shared.graph import GraphExecutionState, LibraryGraph
+from ..services.shared.sqlite import SqliteDatabase
+from ..services.urls.urls_default import LocalUrlService
 from .events import FastAPIEventService
 
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi_events.dispatcher import dispatch
 
-from ..services.events import EventServiceBase
+from ..services.events.events_base import EventServiceBase
 
 
 class FastAPIEventService(EventServiceBase):

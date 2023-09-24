@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field, validator
 from pydantic.fields import ModelField, Undefined
 from pydantic.typing import NoArgAnyCallable
 
-from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
