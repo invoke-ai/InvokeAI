@@ -24,6 +24,8 @@ export const isValidDrop = (
       return payloadType === 'IMAGE_DTO';
     case 'SET_CONTROLNET_IMAGE':
       return payloadType === 'IMAGE_DTO';
+    case 'SET_IP_ADAPTER_IMAGE':
+      return payloadType === 'IMAGE_DTO';
     case 'SET_CANVAS_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_NODES_IMAGE':

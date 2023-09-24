@@ -22,6 +22,12 @@ export type UpdateBoardArg =
     changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
   };
 
+export type BatchConfig =
+  paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
+
+export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
+export type EnqueueGraphResult = components['schemas']['EnqueueGraphResult'];
+
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
  */
@@ -60,8 +66,10 @@ export type OnnxModelField = s['OnnxModelField'];
 export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
 export type ControlNetModelField = s['ControlNetModelField'];
+export type IPAdapterModelField = s['IPAdapterModelField'];
 export type ModelsList = s['ModelsList'];
 export type ControlField = s['ControlField'];
+export type IPAdapterField = s['IPAdapterField'];
 
 // Model Configs
 export type LoRAModelConfig = s['LoRAModelConfig'];
@@ -73,6 +81,8 @@ export type ControlNetModelDiffusersConfig =
 export type ControlNetModelConfig =
   | ControlNetModelCheckpointConfig
   | ControlNetModelDiffusersConfig;
+export type IPAdapterModelInvokeAIConfig = s['IPAdapterModelInvokeAIConfig'];
+export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
 export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | s['StableDiffusion1ModelDiffusersConfig']
@@ -88,6 +98,7 @@ export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
   | ControlNetModelConfig
+  | IPAdapterModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
   | OnnxModelConfig;
@@ -99,6 +110,9 @@ export type ImportModelConfig = s['Body_import_model'];
 export type Graph = s['Graph'];
 export type Edge = s['Edge'];
 export type GraphExecutionState = s['GraphExecutionState'];
+export type Batch = s['Batch'];
+export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
+export type SessionQueueItem = s['SessionQueueItem'];
 
 // General nodes
 export type CollectInvocation = s['CollectInvocation'];
@@ -132,10 +146,14 @@ export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
+export type SaveImageInvocation = s['SaveImageInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];
+export type IPAdapterInvocation = s['IPAdapterInvocation'];
 export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
+export type ColorMapImageProcessorInvocation =
+  s['ColorMapImageProcessorInvocation'];
 export type ContentShuffleImageProcessorInvocation =
   s['ContentShuffleImageProcessorInvocation'];
 export type HedImageProcessorInvocation = s['HedImageProcessorInvocation'];
@@ -173,6 +191,10 @@ export type ControlNetAction = {
   controlNetId: string;
 };
 
+export type IPAdapterAction = {
+  type: 'SET_IP_ADAPTER_IMAGE';
+};
+
 export type InitialImageAction = {
   type: 'SET_INITIAL_IMAGE';
 };
@@ -198,6 +220,7 @@ export type AddToBatchAction = {
 
 export type PostUploadAction =
   | ControlNetAction
+  | IPAdapterAction
   | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction

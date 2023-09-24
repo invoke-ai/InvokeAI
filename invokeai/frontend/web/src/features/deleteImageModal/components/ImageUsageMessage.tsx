@@ -1,8 +1,8 @@
 import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { some } from 'lodash-es';
 import { memo } from 'react';
-import { ImageUsage } from '../store/types';
 import { useTranslation } from 'react-i18next';
+import { ImageUsage } from '../store/types';
 
 type Props = {
   imageUsage?: ImageUsage;
@@ -37,6 +37,9 @@ const ImageUsageMessage = (props: Props) => {
         )}
         {imageUsage.isControlNetImage && (
           <ListItem>{t('common.controlNet')}</ListItem>
+        )}
+        {imageUsage.isIPAdapterImage && (
+          <ListItem>{t('common.ipAdapter')}</ListItem>
         )}
         {imageUsage.isNodesImage && (
           <ListItem>{t('common.nodeEditor')}</ListItem>

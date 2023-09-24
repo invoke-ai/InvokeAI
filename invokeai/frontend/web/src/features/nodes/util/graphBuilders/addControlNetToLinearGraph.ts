@@ -8,7 +8,11 @@ import {
   MetadataAccumulatorInvocation,
 } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
-import { CONTROL_NET_COLLECT, METADATA_ACCUMULATOR } from './constants';
+import {
+  CANVAS_COHERENCE_DENOISE_LATENTS,
+  CONTROL_NET_COLLECT,
+  METADATA_ACCUMULATOR,
+} from './constants';
 
 export const addControlNetToLinearGraph = (
   state: RootState,
@@ -100,6 +104,16 @@ export const addControlNetToLinearGraph = (
             field: 'item',
           },
         });
+
+        if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+          graph.edges.push({
+            source: { node_id: controlNetNode.id, field: 'control' },
+            destination: {
+              node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+              field: 'control',
+            },
+          });
+        }
       });
     }
   }

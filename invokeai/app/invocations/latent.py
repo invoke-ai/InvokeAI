@@ -1,13 +1,16 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
 from contextlib import ExitStack
+from functools import singledispatchmethod
 from typing import List, Literal, Optional, Union
 
 import einops
 import numpy as np
 import torch
 import torchvision.transforms as T
+from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
+from diffusers.models import UNet2DConditionModel
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -19,6 +22,7 @@ from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import validator
 from torchvision.transforms.functional import resize as tv_resize
 
+from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.invocations.primitives import (
     DenoiseMaskField,
@@ -31,15 +35,17 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import BaseModelType
 from ...backend.model_management.seamless import set_seamless
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
-    ConditioningData,
     ControlNetData,
+    IPAdapterData,
     StableDiffusionGeneratorPipeline,
     image_resized_to_grid_as_tensor,
 )
@@ -67,7 +73,6 @@ if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
-
 
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
 
@@ -191,7 +196,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -205,7 +210,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     noise: Optional[LatentsField] = InputField(description=FieldDescriptions.noise, input=Input.Connection, ui_order=3)
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     cfg_scale: Union[float, List[float]] = InputField(
-        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type=UIType.Float, title="CFG Scale"
+        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, title="CFG Scale"
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
@@ -215,13 +220,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
     unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet", ui_order=2)
     control: Union[ControlField, list[ControlField]] = InputField(
         default=None,
-        description=FieldDescriptions.control,
         input=Input.Connection,
         ui_order=5,
     )
+    ip_adapter: Optional[IPAdapterField] = InputField(
+        description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection, ui_order=6
+    )
     latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     denoise_mask: Optional[DenoiseMaskField] = InputField(
-        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=6
+        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=7
     )
 
     @validator("cfg_scale")
@@ -323,8 +330,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
     def prep_control_data(
         self,
         context: InvocationContext,
-        # really only need model for dtype and device
-        model: StableDiffusionGeneratorPipeline,
         control_input: Union[ControlField, List[ControlField]],
         latents_shape: List[int],
         exit_stack: ExitStack,
@@ -344,57 +349,107 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             control_list = None
         if control_list is None:
-            control_data = None
-            # from above handling, any control that is not None should now be of type list[ControlField]
-        else:
-            # FIXME: add checks to skip entry if model or image is None
-            #        and if weight is None, populate with default 1.0?
-            control_data = []
-            control_models = []
-            for control_info in control_list:
-                control_model = exit_stack.enter_context(
-                    context.services.model_manager.get_model(
-                        model_name=control_info.control_model.model_name,
-                        model_type=ModelType.ControlNet,
-                        base_model=control_info.control_model.base_model,
-                        context=context,
-                    )
-                )
+            return None
+        # After above handling, any control that is not None should now be of type list[ControlField].
 
-                control_models.append(control_model)
-                control_image_field = control_info.image
-                input_image = context.services.images.get_pil_image(control_image_field.image_name)
-                # self.image.image_type, self.image.image_name
-                # FIXME: still need to test with different widths, heights, devices, dtypes
-                #        and add in batch_size, num_images_per_prompt?
-                #        and do real check for classifier_free_guidance?
-                # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
-                control_image = prepare_control_image(
-                    image=input_image,
-                    do_classifier_free_guidance=do_classifier_free_guidance,
-                    width=control_width_resize,
-                    height=control_height_resize,
-                    # batch_size=batch_size * num_images_per_prompt,
-                    # num_images_per_prompt=num_images_per_prompt,
-                    device=control_model.device,
-                    dtype=control_model.dtype,
-                    control_mode=control_info.control_mode,
-                    resize_mode=control_info.resize_mode,
+        # FIXME: add checks to skip entry if model or image is None
+        #        and if weight is None, populate with default 1.0?
+        controlnet_data = []
+        for control_info in control_list:
+            control_model = exit_stack.enter_context(
+                context.services.model_manager.get_model(
+                    model_name=control_info.control_model.model_name,
+                    model_type=ModelType.ControlNet,
+                    base_model=control_info.control_model.base_model,
+                    context=context,
                 )
-                control_item = ControlNetData(
-                    model=control_model,
-                    image_tensor=control_image,
-                    weight=control_info.control_weight,
-                    begin_step_percent=control_info.begin_step_percent,
-                    end_step_percent=control_info.end_step_percent,
-                    control_mode=control_info.control_mode,
-                    # any resizing needed should currently be happening in prepare_control_image(),
-                    #    but adding resize_mode to ControlNetData in case needed in the future
-                    resize_mode=control_info.resize_mode,
-                )
-                control_data.append(control_item)
-                # MultiControlNetModel has been refactored out, just need list[ControlNetData]
-        return control_data
+            )
+
+            # control_models.append(control_model)
+            control_image_field = control_info.image
+            input_image = context.services.images.get_pil_image(control_image_field.image_name)
+            # self.image.image_type, self.image.image_name
+            # FIXME: still need to test with different widths, heights, devices, dtypes
+            #        and add in batch_size, num_images_per_prompt?
+            #        and do real check for classifier_free_guidance?
+            # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
+            control_image = prepare_control_image(
+                image=input_image,
+                do_classifier_free_guidance=do_classifier_free_guidance,
+                width=control_width_resize,
+                height=control_height_resize,
+                # batch_size=batch_size * num_images_per_prompt,
+                # num_images_per_prompt=num_images_per_prompt,
+                device=control_model.device,
+                dtype=control_model.dtype,
+                control_mode=control_info.control_mode,
+                resize_mode=control_info.resize_mode,
+            )
+            control_item = ControlNetData(
+                model=control_model,  # model object
+                image_tensor=control_image,
+                weight=control_info.control_weight,
+                begin_step_percent=control_info.begin_step_percent,
+                end_step_percent=control_info.end_step_percent,
+                control_mode=control_info.control_mode,
+                # any resizing needed should currently be happening in prepare_control_image(),
+                #    but adding resize_mode to ControlNetData in case needed in the future
+                resize_mode=control_info.resize_mode,
+            )
+            controlnet_data.append(control_item)
+            # MultiControlNetModel has been refactored out, just need list[ControlNetData]
+
+        return controlnet_data
+
+    def prep_ip_adapter_data(
+        self,
+        context: InvocationContext,
+        ip_adapter: Optional[IPAdapterField],
+        conditioning_data: ConditioningData,
+        unet: UNet2DConditionModel,
+        exit_stack: ExitStack,
+    ) -> Optional[IPAdapterData]:
+        """If IP-Adapter is enabled, then this function loads the requisite models, and adds the image prompt embeddings
+        to the `conditioning_data` (in-place).
+        """
+        if ip_adapter is None:
+            return None
+
+        image_encoder_model_info = context.services.model_manager.get_model(
+            model_name=ip_adapter.image_encoder_model.model_name,
+            model_type=ModelType.CLIPVision,
+            base_model=ip_adapter.image_encoder_model.base_model,
+            context=context,
+        )
+
+        ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
+            context.services.model_manager.get_model(
+                model_name=ip_adapter.ip_adapter_model.model_name,
+                model_type=ModelType.IPAdapter,
+                base_model=ip_adapter.ip_adapter_model.base_model,
+                context=context,
+            )
+        )
+
+        input_image = context.services.images.get_pil_image(ip_adapter.image.image_name)
+
+        # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
+        # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
+        with image_encoder_model_info as image_encoder_model:
+            # Get image embeddings from CLIP and ImageProjModel.
+            image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
+                input_image, image_encoder_model
+            )
+            conditioning_data.ip_adapter_conditioning = IPAdapterConditioningInfo(
+                image_prompt_embeds, uncond_image_prompt_embeds
+            )
+
+        return IPAdapterData(
+            ip_adapter_model=ip_adapter_model,
+            weight=ip_adapter.weight,
+            begin_step_percent=ip_adapter.begin_step_percent,
+            end_step_percent=ip_adapter.end_step_percent,
+        )
 
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
@@ -488,9 +543,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 **self.unet.unet.dict(),
                 context=context,
             )
-            with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
-                unet_info.context.model, _lora_loader()
-            ), set_seamless(unet_info.context.model, self.unet.seamless_axes), unet_info as unet:
+            with (
+                ExitStack() as exit_stack,
+                ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),
+                set_seamless(unet_info.context.model, self.unet.seamless_axes),
+                unet_info as unet,
+            ):
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
@@ -509,13 +567,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 pipeline = self.create_pipeline(unet, scheduler)
                 conditioning_data = self.get_conditioning_data(context, scheduler, unet, seed)
 
-                control_data = self.prep_control_data(
-                    model=pipeline,
+                controlnet_data = self.prep_control_data(
                     context=context,
                     control_input=self.control,
                     latents_shape=latents.shape,
                     # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
                     do_classifier_free_guidance=True,
+                    exit_stack=exit_stack,
+                )
+
+                ip_adapter_data = self.prep_ip_adapter_data(
+                    context=context,
+                    ip_adapter=self.ip_adapter,
+                    conditioning_data=conditioning_data,
+                    unet=unet,
                     exit_stack=exit_stack,
                 )
 
@@ -537,7 +602,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     masked_latents=masked_latents,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
-                    control_data=control_data,  # list[ControlNetData]
+                    control_data=controlnet_data,  # list[ControlNetData],
+                    ip_adapter_data=ip_adapter_data,  # IPAdapterData,
                     callback=step_callback,
                 )
 
@@ -792,8 +858,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             # non_noised_latents_from_image
             image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
             with torch.inference_mode():
-                image_tensor_dist = vae.encode(image_tensor).latent_dist
-                latents = image_tensor_dist.sample().to(dtype=vae.dtype)  # FIXME: uses torch.randn. make reproducible!
+                latents = ImageToLatentsInvocation._encode_to_tensor(vae, image_tensor)
 
             latents = vae.config.scaling_factor * latents
             latents = latents.to(dtype=orig_dtype)
@@ -819,6 +884,18 @@ class ImageToLatentsInvocation(BaseInvocation):
         latents = latents.to("cpu")
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents, seed=None)
+
+    @singledispatchmethod
+    @staticmethod
+    def _encode_to_tensor(vae: AutoencoderKL, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
+        image_tensor_dist = vae.encode(image_tensor).latent_dist
+        latents = image_tensor_dist.sample().to(dtype=vae.dtype)  # FIXME: uses torch.randn. make reproducible!
+        return latents
+
+    @_encode_to_tensor.register
+    @staticmethod
+    def _(vae: AutoencoderTiny, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
+        return vae.encode(image_tensor).latents
 
 
 @invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents", version="1.0.0")

@@ -1,16 +1,14 @@
 import { Flex } from '@chakra-ui/react';
-// import { addNewModel } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
 import { SelectItem } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'features/system/util/makeToast';
-import { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
 const predictionSelectData: SelectItem[] = [
@@ -28,10 +26,6 @@ type ExtendedImportModelConfig = {
 export default function SimpleAddModels() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const isProcessing = useAppSelector(
-    (state: RootState) => state.system.isProcessing
-  );
 
   const [importMainModel, { isLoading }] = useImportMainModelsMutation();
 
@@ -55,7 +49,7 @@ export default function SimpleAddModels() {
         dispatch(
           addToast(
             makeToast({
-              title: t('toast.modelAddSimple'),
+              title: t('toast.modelAddedSimple'),
               status: 'success',
             })
           )
@@ -64,7 +58,6 @@ export default function SimpleAddModels() {
       })
       .catch((error) => {
         if (error) {
-          console.log(error);
           dispatch(
             addToast(
               makeToast({
@@ -95,11 +88,7 @@ export default function SimpleAddModels() {
           defaultValue="none"
           {...addModelForm.getInputProps('prediction_type')}
         />
-        <IAIButton
-          type="submit"
-          isLoading={isLoading}
-          isDisabled={isLoading || isProcessing}
-        >
+        <IAIButton type="submit" isLoading={isLoading}>
           {t('modelManager.addModel')}
         </IAIButton>
       </Flex>

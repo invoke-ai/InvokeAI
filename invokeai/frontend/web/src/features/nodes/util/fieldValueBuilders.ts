@@ -1,7 +1,10 @@
-import { InputFieldTemplate, InputFieldValue } from '../types/types';
+import { FieldType, InputFieldTemplate, InputFieldValue } from '../types/types';
 
-const FIELD_VALUE_FALLBACK_MAP = {
+const FIELD_VALUE_FALLBACK_MAP: {
+  [key in FieldType]: InputFieldValue['value'];
+} = {
   enum: '',
+  BoardField: undefined,
   boolean: false,
   BooleanCollection: [],
   BooleanPolymorphic: false,
@@ -28,6 +31,8 @@ const FIELD_VALUE_FALLBACK_MAP = {
   integer: 0,
   IntegerCollection: [],
   IntegerPolymorphic: 0,
+  IPAdapterField: undefined,
+  IPAdapterModelField: undefined,
   LatentsCollection: [],
   LatentsField: undefined,
   LatentsPolymorphic: undefined,

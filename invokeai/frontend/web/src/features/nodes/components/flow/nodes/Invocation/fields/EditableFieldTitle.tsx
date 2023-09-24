@@ -38,7 +38,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
 
   const dispatch = useAppDispatch();
   const [localTitle, setLocalTitle] = useState(
-    label || fieldTemplateTitle || t('nodes.unknownFeild')
+    label || fieldTemplateTitle || t('nodes.unknownField')
   );
 
   const handleSubmit = useCallback(

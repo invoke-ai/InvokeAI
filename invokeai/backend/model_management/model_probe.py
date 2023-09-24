@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, Literal, Optional, Union
@@ -7,6 +8,8 @@ import safetensors.torch
 import torch
 from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
+
+from invokeai.backend.model_management.models.ip_adapter import IPAdapterModelFormat
 
 from .models import (
     BaseModelType,
@@ -51,7 +54,9 @@ class ModelProbe(object):
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
+        "AutoencoderTiny": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
+        "CLIPVisionModelWithProjection": ModelType.CLIPVision,
     }
 
     @classmethod
@@ -85,8 +90,7 @@ class ModelProbe(object):
         to place it somewhere in the models directory hierarchy. If the model is
         already loaded into memory, you may provide it as model in order to avoid
         opening it a second time. The prediction_type_helper callable is a function that receives
-        the path to the model and returns the BaseModelType. It is called to distinguish
-        between V2-Base and V2-768 SD models.
+        the path to the model and returns the SchedulerPredictionType.
         """
         if model_path:
             format_type = "diffusers" if model_path.is_dir() else "checkpoint"
@@ -118,14 +122,18 @@ class ModelProbe(object):
                     and prediction_type == SchedulerPredictionType.VPrediction
                 ),
                 format=format,
-                image_size=1024
-                if (base_type in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner})
-                else 768
-                if (
-                    base_type == BaseModelType.StableDiffusion2
-                    and prediction_type == SchedulerPredictionType.VPrediction
-                )
-                else 512,
+                image_size=(
+                    1024
+                    if (base_type in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner})
+                    else (
+                        768
+                        if (
+                            base_type == BaseModelType.StableDiffusion2
+                            and prediction_type == SchedulerPredictionType.VPrediction
+                        )
+                        else 512
+                    )
+                ),
             )
         except Exception:
             raise
@@ -170,6 +178,7 @@ class ModelProbe(object):
         Get the model type of a hugging-face style folder.
         """
         class_name = None
+        error_hint = None
         if model:
             class_name = model.__class__.__name__
         else:
@@ -177,9 +186,10 @@ class ModelProbe(object):
                 return ModelType.ONNX
             if (folder_path / "learned_embeds.bin").exists():
                 return ModelType.TextualInversion
-
             if (folder_path / "pytorch_lora_weights.bin").exists():
                 return ModelType.Lora
+            if (folder_path / "image_encoder.txt").exists():
+                return ModelType.IPAdapter
 
             i = folder_path / "model_index.json"
             c = folder_path / "config.json"
@@ -188,13 +198,24 @@ class ModelProbe(object):
             if config_path:
                 with open(config_path, "r") as file:
                     conf = json.load(file)
-                class_name = conf["_class_name"]
+                if "_class_name" in conf:
+                    class_name = conf["_class_name"]
+                elif "architectures" in conf:
+                    class_name = conf["architectures"][0]
+                else:
+                    class_name = None
+            else:
+                error_hint = f"No model_index.json or config.json found in {folder_path}."
 
         if class_name and (type := cls.CLASS2TYPE.get(class_name)):
             return type
+        else:
+            error_hint = f"class {class_name} is not one of the supported classes [{', '.join(cls.CLASS2TYPE.keys())}]"
 
         # give up
-        raise InvalidModelException(f"Unable to determine model type for {folder_path}")
+        raise InvalidModelException(
+            f"Unable to determine model type for {folder_path}" + (f"; {error_hint}" if error_hint else "")
+        )
 
     @classmethod
     def _scan_and_load_checkpoint(cls, model_path: Path) -> dict:
@@ -283,25 +304,36 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
         else:
             raise InvalidModelException("Cannot determine base type")
 
-    def get_scheduler_prediction_type(self) -> SchedulerPredictionType:
+    def get_scheduler_prediction_type(self) -> Optional[SchedulerPredictionType]:
+        """Return model prediction type."""
+        # if there is a .yaml associated with this checkpoint, then we do not need
+        # to probe for the prediction type as it will be ignored.
+        if self.checkpoint_path and self.checkpoint_path.with_suffix(".yaml").exists():
+            return None
+
         type = self.get_base_type()
-        if type == BaseModelType.StableDiffusion1:
-            return SchedulerPredictionType.Epsilon
-        checkpoint = self.checkpoint
-        state_dict = self.checkpoint.get("state_dict") or checkpoint
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
-            if "global_step" in checkpoint:
-                if checkpoint["global_step"] == 220000:
-                    return SchedulerPredictionType.Epsilon
-                elif checkpoint["global_step"] == 110000:
-                    return SchedulerPredictionType.VPrediction
-            if (
-                self.checkpoint_path and self.helper and not self.checkpoint_path.with_suffix(".yaml").exists()
-            ):  # if a .yaml config file exists, then this step not needed
-                return self.helper(self.checkpoint_path)
-            else:
-                return None
+        if type == BaseModelType.StableDiffusion2:
+            checkpoint = self.checkpoint
+            state_dict = self.checkpoint.get("state_dict") or checkpoint
+            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+            if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
+                if "global_step" in checkpoint:
+                    if checkpoint["global_step"] == 220000:
+                        return SchedulerPredictionType.Epsilon
+                    elif checkpoint["global_step"] == 110000:
+                        return SchedulerPredictionType.VPrediction
+            if self.helper and self.checkpoint_path:
+                if helper_guess := self.helper(self.checkpoint_path):
+                    return helper_guess
+            return SchedulerPredictionType.VPrediction  # a guess for sd2 ckpts
+
+        elif type == BaseModelType.StableDiffusion1:
+            if self.helper and self.checkpoint_path:
+                if helper_guess := self.helper(self.checkpoint_path):
+                    return helper_guess
+            return SchedulerPredictionType.Epsilon  # a reasonable guess for sd1 ckpts
+        else:
+            return None
 
 
 class VaeCheckpointProbe(CheckpointProbeBase):
@@ -364,6 +396,16 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
             elif self.checkpoint_path and self.helper:
                 return self.helper(self.checkpoint_path)
         raise InvalidModelException("Unable to determine base type for {self.checkpoint_path}")
+
+
+class IPAdapterCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
+class CLIPVisionCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
 
 
 ########################################################
@@ -438,16 +480,32 @@ class PipelineFolderProbe(FolderProbeBase):
 
 class VaeFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
+        if self._config_looks_like_sdxl():
+            return BaseModelType.StableDiffusionXL
+        elif self._name_looks_like_sdxl():
+            # but SD and SDXL VAE are the same shape (3-channel RGB to 4-channel float scaled down
+            # by a factor of 8), we can't necessarily tell them apart by config hyperparameters.
+            return BaseModelType.StableDiffusionXL
+        else:
+            return BaseModelType.StableDiffusion1
+
+    def _config_looks_like_sdxl(self) -> bool:
+        # config values that distinguish Stability's SD 1.x VAE from their SDXL VAE.
         config_file = self.folder_path / "config.json"
         if not config_file.exists():
             raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
         with open(config_file, "r") as file:
             config = json.load(file)
-        return (
-            BaseModelType.StableDiffusionXL
-            if config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
-            else BaseModelType.StableDiffusion1
-        )
+        return config.get("scaling_factor", 0) == 0.13025 and config.get("sample_size") in [512, 1024]
+
+    def _name_looks_like_sdxl(self) -> bool:
+        return bool(re.search(r"xl\b", self._guess_name(), re.IGNORECASE))
+
+    def _guess_name(self) -> str:
+        name = self.folder_path.name
+        if name == "vae":
+            name = self.folder_path.parent.name
+        return name
 
 
 class TextualInversionFolderProbe(FolderProbeBase):
@@ -485,11 +543,13 @@ class ControlNetFolderProbe(FolderProbeBase):
         base_model = (
             BaseModelType.StableDiffusion1
             if dimension == 768
-            else BaseModelType.StableDiffusion2
-            if dimension == 1024
-            else BaseModelType.StableDiffusionXL
-            if dimension == 2048
-            else None
+            else (
+                BaseModelType.StableDiffusion2
+                if dimension == 1024
+                else BaseModelType.StableDiffusionXL
+                if dimension == 2048
+                else None
+            )
         )
         if not base_model:
             raise InvalidModelException(f"Unable to determine model base for {self.folder_path}")
@@ -509,15 +569,47 @@ class LoRAFolderProbe(FolderProbeBase):
         return LoRACheckpointProbe(model_file, None).get_base_type()
 
 
+class IPAdapterFolderProbe(FolderProbeBase):
+    def get_format(self) -> str:
+        return IPAdapterModelFormat.InvokeAI.value
+
+    def get_base_type(self) -> BaseModelType:
+        model_file = self.folder_path / "ip_adapter.bin"
+        if not model_file.exists():
+            raise InvalidModelException("Unknown IP-Adapter model format.")
+
+        state_dict = torch.load(model_file, map_location="cpu")
+        cross_attention_dim = state_dict["ip_adapter"]["1.to_k_ip.weight"].shape[-1]
+        if cross_attention_dim == 768:
+            return BaseModelType.StableDiffusion1
+        elif cross_attention_dim == 1024:
+            return BaseModelType.StableDiffusion2
+        elif cross_attention_dim == 2048:
+            return BaseModelType.StableDiffusionXL
+        else:
+            raise InvalidModelException(f"IP-Adapter had unexpected cross-attention dimension: {cross_attention_dim}.")
+
+
+class CLIPVisionFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Lora, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
+
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
+
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)

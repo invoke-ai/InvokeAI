@@ -6,7 +6,6 @@ import IAIMantineSearchableSelect, {
   IAISelectDataType,
 } from 'common/components/IAIMantineSearchableSelect';
 import { configSelector } from 'features/system/store/configSelectors';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
@@ -56,7 +55,6 @@ const ParamControlNetProcessorSelect = (
 ) => {
   const dispatch = useAppDispatch();
   const { controlNetId, isEnabled, processorNode } = props.controlNet;
-  const isBusy = useAppSelector(selectIsBusy);
   const controlNetProcessors = useAppSelector(selector);
   const { t } = useTranslation();
 
@@ -78,7 +76,7 @@ const ParamControlNetProcessorSelect = (
       value={processorNode.type ?? 'canny_image_processor'}
       data={controlNetProcessors}
       onChange={handleProcessorTypeChanged}
-      disabled={isBusy || !isEnabled}
+      disabled={!isEnabled}
     />
   );
 };

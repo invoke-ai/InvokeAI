@@ -1,4 +1,3 @@
-# Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from .services.config import InvokeAIAppConfig
 
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
@@ -9,7 +8,6 @@ app_config.parse_args()
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import asyncio
-    import logging
     import mimetypes
     import socket
     from inspect import signature
@@ -33,7 +31,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
-    from .api.routers import app_info, board_images, boards, images, models, sessions
+    from .api.routers import app_info, board_images, boards, images, models, session_queue, sessions, utilities
     from .api.sockets import SocketIO
     from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
 
@@ -42,7 +40,9 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
 
 
-logger = InvokeAILogger.getLogger(config=app_config)
+app_config = InvokeAIAppConfig.get_config()
+app_config.parse_args()
+logger = InvokeAILogger.get_logger(config=app_config)
 
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
@@ -92,6 +92,8 @@ async def shutdown_event():
 
 app.include_router(sessions.session_router, prefix="/api")
 
+app.include_router(utilities.utilities_router, prefix="/api")
+
 app.include_router(models.models_router, prefix="/api")
 
 app.include_router(images.images_router, prefix="/api")
@@ -101,6 +103,8 @@ app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 
 app.include_router(app_info.app_router, prefix="/api")
+
+app.include_router(session_queue.session_queue_router, prefix="/api")
 
 
 # Build a custom OpenAPI to include all outputs
@@ -220,7 +224,7 @@ def invoke_api():
                 exc_info=e,
             )
         else:
-            jurigged.watch(logger=InvokeAILogger.getLogger(name="jurigged").info)
+            jurigged.watch(logger=InvokeAILogger.get_logger(name="jurigged").info)
 
     port = find_port(app_config.port)
     if port != app_config.port:
@@ -239,7 +243,7 @@ def invoke_api():
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
     for logname in ["uvicorn.access", "uvicorn"]:
-        log = logging.getLogger(logname)
+        log = InvokeAILogger.get_logger(logname)
         log.handlers.clear()
         for ch in logger.handlers:
             log.addHandler(ch)

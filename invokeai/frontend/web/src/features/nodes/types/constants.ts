@@ -1,4 +1,9 @@
-import { FieldType, FieldUIConfig } from './types';
+import {
+  FieldType,
+  FieldTypeMap,
+  FieldTypeMapWithNumber,
+  FieldUIConfig,
+} from './types';
 import { t } from 'i18next';
 
 export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
@@ -28,7 +33,7 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ColorCollection',
 ];
 
-export const POLYMORPHIC_TYPES = [
+export const POLYMORPHIC_TYPES: FieldType[] = [
   'IntegerPolymorphic',
   'BooleanPolymorphic',
   'FloatPolymorphic',
@@ -40,7 +45,8 @@ export const POLYMORPHIC_TYPES = [
   'ColorPolymorphic',
 ];
 
-export const MODEL_TYPES = [
+export const MODEL_TYPES: FieldType[] = [
+  'IPAdapterModelField',
   'ControlNetModelField',
   'LoRAModelField',
   'MainModelField',
@@ -53,7 +59,7 @@ export const MODEL_TYPES = [
   'ClipField',
 ];
 
-export const COLLECTION_MAP = {
+export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   integer: 'IntegerCollection',
   boolean: 'BooleanCollection',
   number: 'FloatCollection',
@@ -70,7 +76,7 @@ export const isCollectionItemType = (
 ): itemType is keyof typeof COLLECTION_MAP =>
   Boolean(itemType && itemType in COLLECTION_MAP);
 
-export const SINGLE_TO_POLYMORPHIC_MAP = {
+export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
   integer: 'IntegerPolymorphic',
   boolean: 'BooleanPolymorphic',
   number: 'FloatPolymorphic',
@@ -83,7 +89,7 @@ export const SINGLE_TO_POLYMORPHIC_MAP = {
   ColorField: 'ColorPolymorphic',
 };
 
-export const POLYMORPHIC_TO_SINGLE_MAP = {
+export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
   IntegerPolymorphic: 'integer',
   BooleanPolymorphic: 'boolean',
   FloatPolymorphic: 'float',
@@ -94,6 +100,30 @@ export const POLYMORPHIC_TO_SINGLE_MAP = {
   ControlPolymorphic: 'ControlField',
   ColorPolymorphic: 'ColorField',
 };
+
+export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
+  'string',
+  'StringPolymorphic',
+  'boolean',
+  'BooleanPolymorphic',
+  'integer',
+  'float',
+  'FloatPolymorphic',
+  'IntegerPolymorphic',
+  'enum',
+  'ImageField',
+  'ImagePolymorphic',
+  'MainModelField',
+  'SDXLRefinerModelField',
+  'VaeModelField',
+  'LoRAModelField',
+  'ControlNetModelField',
+  'ColorField',
+  'SDXLMainModelField',
+  'Scheduler',
+  'IPAdapterModelField',
+  'BoardField',
+];
 
 export const isPolymorphicItemType = (
   itemType: string | undefined
@@ -216,6 +246,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: t('nodes.imageFieldDescription'),
     title: t('nodes.imageField'),
   },
+  BoardField: {
+    color: 'purple.500',
+    description: t('nodes.imageFieldDescription'),
+    title: t('nodes.imageField'),
+  },
   ImagePolymorphic: {
     color: 'purple.500',
     description: t('nodes.imagePolymorphicDescription'),
@@ -235,6 +270,16 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'red.500',
     description: t('nodes.integerPolymorphicDescription'),
     title: t('nodes.integerPolymorphic'),
+  },
+  IPAdapterField: {
+    color: 'green.300',
+    description: 'IP-Adapter info passed between nodes.',
+    title: 'IP-Adapter',
+  },
+  IPAdapterModelField: {
+    color: 'teal.500',
+    description: 'IP-Adapter model',
+    title: 'IP-Adapter Model',
   },
   LatentsCollection: {
     color: 'pink.500',
