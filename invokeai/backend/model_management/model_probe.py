@@ -90,8 +90,7 @@ class ModelProbe(object):
         to place it somewhere in the models directory hierarchy. If the model is
         already loaded into memory, you may provide it as model in order to avoid
         opening it a second time. The prediction_type_helper callable is a function that receives
-        the path to the model and returns the BaseModelType. It is called to distinguish
-        between V2-Base and V2-768 SD models.
+        the path to the model and returns the SchedulerPredictionType.
         """
         if model_path:
             format_type = "diffusers" if model_path.is_dir() else "checkpoint"
@@ -305,25 +304,36 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
         else:
             raise InvalidModelException("Cannot determine base type")
 
-    def get_scheduler_prediction_type(self) -> SchedulerPredictionType:
+    def get_scheduler_prediction_type(self) -> Optional[SchedulerPredictionType]:
+        """Return model prediction type."""
+        # if there is a .yaml associated with this checkpoint, then we do not need
+        # to probe for the prediction type as it will be ignored.
+        if self.checkpoint_path and self.checkpoint_path.with_suffix(".yaml").exists():
+            return None
+
         type = self.get_base_type()
-        if type == BaseModelType.StableDiffusion1:
-            return SchedulerPredictionType.Epsilon
-        checkpoint = self.checkpoint
-        state_dict = self.checkpoint.get("state_dict") or checkpoint
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
-            if "global_step" in checkpoint:
-                if checkpoint["global_step"] == 220000:
-                    return SchedulerPredictionType.Epsilon
-                elif checkpoint["global_step"] == 110000:
-                    return SchedulerPredictionType.VPrediction
-            if (
-                self.checkpoint_path and self.helper and not self.checkpoint_path.with_suffix(".yaml").exists()
-            ):  # if a .yaml config file exists, then this step not needed
-                return self.helper(self.checkpoint_path)
-            else:
-                return None
+        if type == BaseModelType.StableDiffusion2:
+            checkpoint = self.checkpoint
+            state_dict = self.checkpoint.get("state_dict") or checkpoint
+            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+            if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
+                if "global_step" in checkpoint:
+                    if checkpoint["global_step"] == 220000:
+                        return SchedulerPredictionType.Epsilon
+                    elif checkpoint["global_step"] == 110000:
+                        return SchedulerPredictionType.VPrediction
+            if self.helper and self.checkpoint_path:
+                if helper_guess := self.helper(self.checkpoint_path):
+                    return helper_guess
+            return SchedulerPredictionType.VPrediction  # a guess for sd2 ckpts
+
+        elif type == BaseModelType.StableDiffusion1:
+            if self.helper and self.checkpoint_path:
+                if helper_guess := self.helper(self.checkpoint_path):
+                    return helper_guess
+            return SchedulerPredictionType.Epsilon  # a reasonable guess for sd1 ckpts
+        else:
+            return None
 
 
 class VaeCheckpointProbe(CheckpointProbeBase):
