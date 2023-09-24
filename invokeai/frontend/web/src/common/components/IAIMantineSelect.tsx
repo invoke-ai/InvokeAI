@@ -22,7 +22,12 @@ const IAIMantineSelect = forwardRef((props: IAISelectProps, ref) => {
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
-      <FormControl ref={ref} isRequired={required} isDisabled={disabled}>
+      <FormControl
+        ref={ref}
+        isRequired={required}
+        isDisabled={disabled}
+        position="static"
+      >
         <FormLabel>{label}</FormLabel>
         <Select disabled={disabled} ref={inputRef} styles={styles} {...rest} />
       </FormControl>
