@@ -135,8 +135,9 @@ class DownloadQueueBase(ABC):
         self,
         source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
-        filename: Optional[Path] = None,
         start: bool = True,
+        priority: int = 10,
+        filename: Optional[Path] = None,
         variant: Optional[str] = None,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
@@ -146,6 +147,7 @@ class DownloadQueueBase(ABC):
 
         :param source: Source of the download - URL, repo_id or Path
         :param destdir: Directory to download into.
+        :param priority: Initial priority for this job [10]
         :param filename: Optional name of file, if not provided
         will use the content-disposition field to assign the name.
         :param start: Immediately start job [True]

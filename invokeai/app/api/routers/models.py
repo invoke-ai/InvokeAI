@@ -134,6 +134,10 @@ async def import_model(
     prediction_type: Optional[Literal["v_prediction", "epsilon", "sample"]] = Body(
         description="Prediction type for SDv2 checkpoint files", default="v_prediction"
     ),
+    priority: Optional[int] = Body(
+        description="Which import jobs run first. Lower values run before higher ones.",
+        default=10,
+    ),
 ) -> ModelImportStatus:
     """
     Add a model using its local path, repo_id, or remote URL.
@@ -142,6 +146,13 @@ async def import_model(
     series of background threads. The return object has a `job_id` property
     that can be used to control the download job.
 
+    The priority controls which import jobs run first. Lower values run before
+    higher ones.
+
+    The prediction_type applies to SDv2 models only and can be one of
+    "v_prediction", "epsilon", or "sample". Default if not provided is
+    "v_prediction".
+
     Listen on the event bus for a series of `model_event` events with an `id`
     matching the returned job id to get the progress, completion status, errors,
     and information on the model that was installed.
@@ -149,7 +160,9 @@ async def import_model(
     logger = ApiDependencies.invoker.services.logger
     try:
         result = ApiDependencies.invoker.services.model_manager.install_model(
-            location, model_attributes={"prediction_type": SchedulerPredictionType(prediction_type)}
+            location,
+            model_attributes={"prediction_type": SchedulerPredictionType(prediction_type)},
+            priority=priority,
         )
         return ModelImportStatus(
             job_id=result.id,

@@ -116,15 +116,14 @@ class DownloadQueue(DownloadQueueBase):
         self,
         source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
-        filename: Optional[Path] = None,
         start: bool = True,
+        priority: int = 10,
+        filename: Optional[Path] = None,
         variant: Optional[str] = None,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> DownloadJobBase:
-        """
-        Create a download job and return its ID.
-        """
+        """Create a download job and return its ID."""
         kwargs = dict()
 
         if Path(source).exists():
@@ -142,6 +141,7 @@ class DownloadQueue(DownloadQueueBase):
             destination=Path(destdir) / (filename or "."),
             access_token=access_token,
             event_handlers=(event_handlers or self._event_handlers),
+            priority=priority,
             **kwargs,
         )
 

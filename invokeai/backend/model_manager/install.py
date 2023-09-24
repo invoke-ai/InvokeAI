@@ -492,10 +492,11 @@ class ModelInstall(ModelInstallBase):
         probe_override: Optional[Dict[str, Any]] = None,
         metadata: Optional[ModelSourceMetadata] = None,
         access_token: Optional[str] = None,
+        priority: Optional[int] = 10,
     ) -> DownloadJobBase:  # noqa D102
         queue = self._download_queue
 
-        job = self._make_download_job(source, variant, access_token)
+        job = self._make_download_job(source, variant=variant, access_token=access_token, priority=priority)
         handler = (
             self._complete_registration_handler
             if inplace and Path(source).exists()
@@ -581,6 +582,7 @@ class ModelInstall(ModelInstallBase):
         source: Union[str, Path, AnyHttpUrl],
         variant: Optional[str] = None,
         access_token: Optional[str] = None,
+        priority: Optional[int] = 10,
     ) -> DownloadJobBase:
         # Clean up a common source of error. Doesn't work with Paths.
         if isinstance(source, str):
@@ -606,7 +608,9 @@ class ModelInstall(ModelInstallBase):
             kwargs = {}
         else:
             raise ValueError(f"'{source}' is not recognized as a local file, directory, repo_id or URL")
-        return cls(source=source, destination=Path(self._tmpdir.name), access_token=access_token, **kwargs)
+        return cls(
+            source=source, destination=Path(self._tmpdir.name), access_token=access_token, priority=priority, **kwargs
+        )
 
     def wait_for_installs(self) -> Dict[str, str]:  # noqa D102
         self._download_queue.join()

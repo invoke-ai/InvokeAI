@@ -198,11 +198,13 @@ class ModelManagerServiceBase(ABC):
         self,
         source: Union[str, Path, AnyHttpUrl],
         model_attributes: Optional[Dict[str, Any]] = None,
+        priority: Optional[int] = 10,
     ) -> ModelInstallJob:
         """Import a path, repo_id or URL. Returns an ModelInstallJob.
 
         :param model_attributes: Additional attributes to supplement/override
         the model information gained from automated probing.
+        :param priority: Queue priority. Lower values have higher priority.
 
         Typical usage:
         job = model_manager.install(
@@ -413,6 +415,7 @@ class ModelManagerService(ModelManagerServiceBase):
         self,
         source: Union[str, Path, AnyHttpUrl],
         model_attributes: Optional[Dict[str, Any]] = None,
+        priority: Optional[int] = 10,
     ) -> ModelInstallJob:
         """
         Add a model using a path, repo_id or URL.
@@ -420,6 +423,8 @@ class ModelManagerService(ModelManagerServiceBase):
         :param model_attributes: Dictionary of ModelConfigBase fields to
         attach to the model. When installing a URL or repo_id, some metadata
         values, such as `tags` will be automagically added.
+        :param priority: Queue priority for this install job. Lower value jobs
+        will run before higher value ones.
         """
         self.logger.debug(f"add model {source}")
         variant = "fp16" if self._loader.precision == "float16" else None
@@ -427,6 +432,7 @@ class ModelManagerService(ModelManagerServiceBase):
             source,
             probe_override=model_attributes,
             variant=variant,
+            priority=priority,
         )
 
     def list_install_jobs(self) -> List[ModelInstallJob]:
