@@ -47,8 +47,14 @@ Config_preamble = """
 
 LEGACY_CONFIGS = {
     BaseModelType.StableDiffusion1: {
-        ModelVariantType.Normal: "v1-inference.yaml",
-        ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
+        ModelVariantType.Normal: {
+            SchedulerPredictionType.Epsilon: "v1-inference.yaml",
+            SchedulerPredictionType.VPrediction: "v1-inference-v.yaml",
+        },
+        ModelVariantType.Inpaint: {
+            SchedulerPredictionType.Epsilon: "v1-inpainting-inference.yaml",
+            SchedulerPredictionType.VPrediction: "v1-inpainting-inference-v.yaml",
+        },
     },
     BaseModelType.StableDiffusion2: {
         ModelVariantType.Normal: {
@@ -286,7 +292,7 @@ class ModelInstall(object):
             location = download_with_resume(url, Path(staging))
             if not location:
                 logger.error(f"Unable to download {url}. Skipping.")
-            info = ModelProbe().heuristic_probe(location)
+            info = ModelProbe().heuristic_probe(location, self.prediction_helper)
             dest = self.config.models_path / info.base_type.value / info.model_type.value / location.name
             dest.parent.mkdir(parents=True, exist_ok=True)
             models_path = shutil.move(location, dest)
@@ -393,7 +399,7 @@ class ModelInstall(object):
                     possible_conf = path.with_suffix(".yaml")
                     if possible_conf.exists():
                         legacy_conf = str(self.relative_to_root(possible_conf))
-                    elif info.base_type == BaseModelType.StableDiffusion2:
+                    elif info.base_type in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
                         legacy_conf = Path(
                             self.config.legacy_conf_dir,
                             LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type],
