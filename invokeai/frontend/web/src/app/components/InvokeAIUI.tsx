@@ -17,7 +17,10 @@ import '../../i18n';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
 import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
-import { $queueId, DEFAULT_QUEUE_ID } from 'features/queue/store/nanoStores';
+import {
+  $queueId,
+  DEFAULT_QUEUE_ID,
+} from 'features/queue/store/queueNanoStore';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
