@@ -34,6 +34,9 @@ class TextualInversionModel(ModelBase):
             raise Exception("There is no child models in textual inversion")
         return self.model_size
 
+    def calc_size(self, model):
+        return model.embedding.nelement() * model.embedding.element_size()
+
     def get_model(
         self,
         torch_dtype: Optional[torch.dtype],
@@ -54,7 +57,7 @@ class TextualInversionModel(ModelBase):
             dtype=torch_dtype,
         )
 
-        self.model_size = model.embedding.nelement() * model.embedding.element_size()
+        self.model_size = self.calc_size(model)
         return model
 
     @classproperty

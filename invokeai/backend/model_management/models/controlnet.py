@@ -17,7 +17,6 @@ from .base import (
     ModelNotFoundException,
     ModelType,
     SubModelType,
-    calc_model_size_by_data,
     calc_model_size_by_fs,
     classproperty,
 )
@@ -87,7 +86,7 @@ class ControlNetModel(ModelBase):
             raise ModelNotFoundException()
 
         # calc more accurate size
-        self.model_size = calc_model_size_by_data(model)
+        self.model_size = self.calc_size(model)
         return model
 
     @classproperty

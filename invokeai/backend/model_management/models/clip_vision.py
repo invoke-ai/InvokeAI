@@ -12,7 +12,6 @@ from invokeai.backend.model_management.models.base import (
     ModelConfigBase,
     ModelType,
     SubModelType,
-    calc_model_size_by_data,
     calc_model_size_by_fs,
     classproperty,
 )
@@ -63,7 +62,7 @@ class CLIPVisionModel(ModelBase):
         model = CLIPVisionModelWithProjection.from_pretrained(self.model_path, torch_dtype=torch_dtype)
 
         # Calculate a more accurate model size.
-        self.model_size = calc_model_size_by_data(model)
+        self.model_size = self.calc_size(model)
 
         return model
 

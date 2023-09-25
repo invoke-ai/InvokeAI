@@ -220,7 +220,19 @@ class ModelBase(metaclass=ABCMeta):
 
     @abstractmethod
     def get_size(self, child_type: Optional[SubModelType] = None) -> int:
+        """Get a cached estimate of this model's memory footprint, in bytes.
+
+        If called before loading the model, the size is estimated from the on-disk file sizes.
+
+        After loading the model, the initial memory footprint size is cached.
+
+        See `calc_size()` to re-calculate.
+        """
         raise NotImplementedError()
+
+    def calc_size(self, model):
+        """Calculate the current total size of `model` in memory (in bytes)."""
+        return calc_model_size_by_data(model)
 
     @abstractmethod
     def get_model(
@@ -300,7 +312,7 @@ class DiffusersModel(ModelBase):
             raise Exception(f"Failed to load {self.base_model}:{self.model_type}:{child_type} model")
 
         # calc more accurate size
-        self.child_sizes[child_type] = calc_model_size_by_data(model)
+        self.child_sizes[child_type] = self.calc_size(model)
         return model
 
     # def convert_if_required(model_path: str, cache_path: str, config: Optional[dict]) -> str:

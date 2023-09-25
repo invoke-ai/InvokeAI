@@ -55,8 +55,11 @@ class LoRAModel(ModelBase):
             base_model=self.base_model,
         )
 
-        self.model_size = model.calc_size()
+        self.model_size = self.calc_size(model)
         return model
+
+    def calc_size(self, model):
+        return model.calc_size()
 
     @classproperty
     def save_to_config(cls) -> bool:

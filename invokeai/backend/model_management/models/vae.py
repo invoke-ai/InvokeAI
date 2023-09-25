@@ -19,7 +19,6 @@ from .base import (
     ModelType,
     ModelVariantType,
     SubModelType,
-    calc_model_size_by_data,
     calc_model_size_by_fs,
     classproperty,
 )
@@ -72,7 +71,7 @@ class VaeModel(ModelBase):
             torch_dtype=torch_dtype,
         )
         # calc more accurate size
-        self.model_size = calc_model_size_by_data(model)
+        self.model_size = self.calc_size(model)
         return model
 
     @classproperty

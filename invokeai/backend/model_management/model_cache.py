@@ -44,6 +44,7 @@ DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
 
 # actual size of a gig
 GIG = 1073741824
+MB = 2**20
 
 
 @dataclass
@@ -211,17 +212,26 @@ class ModelCache(object):
             if self.stats:
                 self.stats.misses += 1
 
-            # this will remove older cached models until
-            # there is sufficient room to load the requested model
-            self._make_cache_room(model_info.get_size(submodel))
+            # Get the estimated model size before loading.
+            predicted_model_size = model_info.get_size(submodel)
+            # Make room in the cache to load this model.
+            self._make_cache_room(predicted_model_size)
 
             # clean memory to make MemoryUsage() more accurate
             gc.collect()
             model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
-            if mem_used := model_info.get_size(submodel):
-                self.logger.debug(f"CPU RAM used for load: {(mem_used/GIG):.2f} GB")
 
-            cache_entry = _CacheRecord(self, model, mem_used)
+            # Re-calculate model size after loading.
+            actual_model_size = model_info.calc_size(model)
+            if actual_model_size > 0:
+                self.logger.debug(f"CPU RAM used for load: {(actual_model_size/GIG):.2f} GB")
+            if abs(actual_model_size - predicted_model_size) > 10 * MB:
+                self.logger.info(
+                    f"Predicted model size before load was off by > 10 MB for '{key}'. Predicted:"
+                    f" {(predicted_model_size/GIG):.2f} GB, Actual: {(actual_model_size/GIG):.2f} GB."
+                )
+
+            cache_entry = _CacheRecord(self, model, actual_model_size)
             self._cached_models[key] = cache_entry
         else:
             if self.stats:
@@ -231,9 +241,21 @@ class ModelCache(object):
             self.stats.cache_size = self.max_cache_size * GIG
             self.stats.high_watermark = max(self.stats.high_watermark, self._cache_size())
             self.stats.in_cache = len(self._cached_models)
-            self.stats.loaded_model_sizes[key] = max(
-                self.stats.loaded_model_sizes.get(key, 0), model_info.get_size(submodel)
+            self.stats.loaded_model_sizes[key] = max(self.stats.loaded_model_sizes.get(key, 0), cache_entry.size)
+
+        # Check if the model's self-reported memory usage has changed.
+        # TODO(ryand): This logic is a temporary band-aid for the problem of model memory sizes changing in the cache.
+        # The main purpose of the current implementation is simply to increase visibility into the problem. The biggest
+        # problem with the current implementation is that model memory is only re-calculated on model load (not unload).
+        # This means that frequent model switching to could allow many models with under-reported memory sizes to
+        # accumulate in the cache.
+        cur_model_size = model_info.calc_size(cache_entry.model)
+        if cur_model_size != cache_entry.size:
+            self.logger.warning(
+                f"Detected a change in the size of '{key}' while accessing it from the cache. Cache entry size:"
+                f" {(cache_entry.size/GIG):.2f} GB, updated size: {(cur_model_size/GIG):.2f} GB."
             )
+            cache_entry.size = cur_model_size
 
         with suppress(Exception):
             self._cache_stack.remove(key)
