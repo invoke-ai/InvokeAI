@@ -3,7 +3,7 @@ import { Node, Edge } from 'reactflow';
 import { FieldType } from 'features/nodes/types/types';
 
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
-import { getIsGraphAcyclic } from 'features/nodes/hooks/useIsValidConnection';
+import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 
 export const findConnectionToValidHandle = (
   node: Node,
