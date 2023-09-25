@@ -1,4 +1,4 @@
-import { Flex, Heading, Skeleton, Text } from '@chakra-ui/react';
+import { Flex, Heading } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
