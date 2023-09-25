@@ -11,6 +11,7 @@ The work is actually done in backend code in model_install_backend.py.
 
 import argparse
 import curses
+import logging
 import sys
 import textwrap
 import traceback
@@ -20,37 +21,31 @@ from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
 from shutil import get_terminal_size
 
-import logging
 import npyscreen
 import torch
 from npyscreen import widget
 
-from invokeai.backend.util.logging import InvokeAILogger
-
-from invokeai.backend.install.model_install_backend import (
-    InstallSelections,
-    ModelInstall,
-    SchedulerPredictionType,
-)
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.install.model_install_backend import InstallSelections, ModelInstall, SchedulerPredictionType
 from invokeai.backend.model_management import ModelManager, ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.widgets import (
+    MIN_COLS,
+    MIN_LINES,
+    BufferBox,
     CenteredTitleText,
+    CyclingForm,
     MultiSelectColumns,
     SingleSelectColumns,
     TextBox,
-    BufferBox,
-    set_min_terminal_size,
-    select_stable_diffusion_config_file,
-    CyclingForm,
-    MIN_COLS,
-    MIN_LINES,
     WindowTooSmallException,
+    select_stable_diffusion_config_file,
+    set_min_terminal_size,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
 
 config = InvokeAIAppConfig.get_config()
-logger = InvokeAILogger.getLogger()
+logger = InvokeAILogger.get_logger()
 
 # build a table mapping all non-printable characters to None
 # for stripping control characters
@@ -106,11 +101,12 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 "STARTER MODELS",
                 "MAIN MODELS",
                 "CONTROLNETS",
+                "IP-ADAPTERS",
                 "LORA/LYCORIS",
                 "TEXTUAL INVERSION",
             ],
             value=[self.current_tab],
-            columns=5,
+            columns=6,
             max_height=2,
             relx=8,
             scroll_exit=True,
@@ -131,6 +127,13 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.nextrely = top_of_table
         self.controlnet_models = self.add_model_widgets(
             model_type=ModelType.ControlNet,
+            window_width=window_width,
+        )
+        bottom_of_table = max(bottom_of_table, self.nextrely)
+
+        self.nextrely = top_of_table
+        self.ipadapter_models = self.add_model_widgets(
+            model_type=ModelType.IPAdapter,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table, self.nextrely)
@@ -348,6 +351,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.starter_pipelines,
             self.pipeline_models,
             self.controlnet_models,
+            self.ipadapter_models,
             self.lora_models,
             self.ti_models,
         ]
@@ -537,6 +541,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.starter_pipelines,
             self.pipeline_models,
             self.controlnet_models,
+            self.ipadapter_models,
             self.lora_models,
             self.ti_models,
         ]
@@ -557,6 +562,25 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         for section in ui_sections:
             if downloads := section.get("download_ids"):
                 selections.install_models.extend(downloads.value.split())
+
+        # NOT NEEDED - DONE IN BACKEND NOW
+        # # special case for the ipadapter_models. If any of the adapters are
+        # # chosen, then we add the corresponding encoder(s) to the install list.
+        # section = self.ipadapter_models
+        # if section.get("models_selected"):
+        #     selected_adapters = [
+        #         self.all_models[section["models"][x]].name for x in section.get("models_selected").value
+        #     ]
+        #     encoders = []
+        #     if any(["sdxl" in x for x in selected_adapters]):
+        #         encoders.append("ip_adapter_sdxl_image_encoder")
+        #     if any(["sd15" in x for x in selected_adapters]):
+        #         encoders.append("ip_adapter_sd_image_encoder")
+        #     for encoder in encoders:
+        #         key = f"any/clip_vision/{encoder}"
+        #         repo_id = f"InvokeAI/{encoder}"
+        #         if key not in self.all_models:
+        #             selections.install_models.append(repo_id)
 
 
 class AddModelApplication(npyscreen.NPSAppManaged):
@@ -657,7 +681,7 @@ def process_and_execute(
         translator = StderrToMessage(conn_out)
         sys.stderr = translator
         sys.stdout = translator
-        logger = InvokeAILogger.getLogger()
+        logger = InvokeAILogger.get_logger()
         logger.handlers.clear()
         logger.addHandler(logging.StreamHandler(translator))
 
@@ -770,7 +794,7 @@ def main():
     if opt.full_precision:
         invoke_args.extend(["--precision", "float32"])
     config.parse_args(invoke_args)
-    logger = InvokeAILogger().getLogger(config=config)
+    logger = InvokeAILogger().get_logger(config=config)
 
     if not config.model_conf_path.exists():
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")

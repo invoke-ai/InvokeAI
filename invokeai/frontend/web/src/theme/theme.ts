@@ -76,6 +76,7 @@ export const theme: ThemeOverride = {
   direction: 'ltr',
   fonts: {
     body: `'Inter Variable', sans-serif`,
+    heading: `'Inter Variable', sans-serif`,
   },
   shadows: {
     light: {

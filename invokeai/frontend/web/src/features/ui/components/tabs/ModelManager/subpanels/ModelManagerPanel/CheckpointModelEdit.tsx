@@ -1,11 +1,10 @@
 import { Badge, Divider, Flex, Text } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { useCallback, useEffect, useState } from 'react';
@@ -26,8 +25,6 @@ type CheckpointModelEditProps = {
 };
 
 export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
-  const isBusy = useAppSelector(selectIsBusy);
-
   const { model } = props;
 
   const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
@@ -189,11 +186,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               />
             </Flex>
 
-            <IAIButton
-              type="submit"
-              isDisabled={isBusy || isLoading}
-              isLoading={isLoading}
-            >
+            <IAIButton type="submit" isLoading={isLoading}>
               {t('modelManager.updateModel')}
             </IAIButton>
           </Flex>

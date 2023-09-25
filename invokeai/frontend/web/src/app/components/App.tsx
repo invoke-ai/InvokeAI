@@ -12,34 +12,32 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
-import { ReactNode, memo, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
+import { useStore } from '@nanostores/react';
+import { $headerComponent } from 'app/store/nanostores/headerComponent';
 
 const DEFAULT_CONFIG = {};
 
 interface Props {
   config?: PartialAppConfig;
-  headerComponent?: ReactNode;
   selectedImage?: {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
 }
 
-const App = ({
-  config = DEFAULT_CONFIG,
-  headerComponent,
-  selectedImage,
-}: Props) => {
+const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   const language = useAppSelector(languageSelector);
 
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
-  const { handlePreselectedImage } = usePreselectedImage();
+  const { handleSendToCanvas, handleSendToImg2Img, handleUseAllMetadata } =
+    usePreselectedImage(selectedImage?.imageName);
   const handleReset = useCallback(() => {
     localStorage.clear();
     location.reload();
@@ -62,8 +60,24 @@ const App = ({
   }, [dispatch]);
 
   useEffect(() => {
-    handlePreselectedImage(selectedImage);
-  }, [handlePreselectedImage, selectedImage]);
+    if (selectedImage && selectedImage.action === 'sendToCanvas') {
+      handleSendToCanvas();
+    }
+  }, [selectedImage, handleSendToCanvas]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'sendToImg2Img') {
+      handleSendToImg2Img();
+    }
+  }, [selectedImage, handleSendToImg2Img]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'useAllParameters') {
+      handleUseAllMetadata();
+    }
+  }, [selectedImage, handleUseAllMetadata]);
+
+  const headerComponent = useStore($headerComponent);
 
   return (
     <ErrorBoundary

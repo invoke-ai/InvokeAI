@@ -1,68 +1,67 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
+# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
-import argparse
-import re
-import shlex
-import sys
-import time
-from typing import Union, get_type_hints, Optional
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 
-from pydantic import BaseModel, ValidationError
-from pydantic.fields import Field
-
-# This should come early so that the logger can pick up its configuration options
 from .services.config import InvokeAIAppConfig
-from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.version.invokeai_version import __version__
 
+# parse_args() must be called before any other imports. if it is not called first, consumers of the config
+# which are imported/used before parse_args() is called will get the default config values instead of the
+# values from the command line or config file.
 
-from invokeai.app.services.board_image_record_storage import (
-    SqliteBoardImageRecordStorage,
-)
-from invokeai.app.services.board_images import (
-    BoardImagesService,
-    BoardImagesServiceDependencies,
-)
-from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
-from invokeai.app.services.boards import BoardService, BoardServiceDependencies
-from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
-from invokeai.app.services.images import ImageService, ImageServiceDependencies
-from invokeai.app.services.resource_name import SimpleNameService
-from invokeai.app.services.urls import LocalUrlService
-from invokeai.app.services.invocation_stats import InvocationStatsService
-from .services.default_graphs import default_text_to_image_graph_id, create_system_graphs
-from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
+if True:  # hack to make flake8 happy with imports coming after setting up the config
+    import argparse
+    import re
+    import shlex
+    import sqlite3
+    import sys
+    import time
+    from typing import Optional, Union, get_type_hints
 
-from .cli.commands import BaseCommand, CliContext, ExitCli, SortedHelpFormatter, add_graph_parsers, add_parsers
-from .cli.completer import set_autocompleter
-from .invocations.baseinvocation import BaseInvocation
-from .services.events import EventServiceBase
-from .services.graph import (
-    Edge,
-    EdgeConnection,
-    GraphExecutionState,
-    GraphInvocation,
-    LibraryGraph,
-    are_connection_types_compatible,
-)
-from .services.image_file_storage import DiskImageFileStorage
-from .services.invocation_queue import MemoryInvocationQueue
-from .services.invocation_services import InvocationServices
-from .services.invoker import Invoker
-from .services.model_manager_service import ModelManagerService
-from .services.processor import DefaultInvocationProcessor
-from .services.sqlite import SqliteItemStorage
+    import torch
+    from pydantic import BaseModel, ValidationError
+    from pydantic.fields import Field
 
-import torch
-import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+    import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+    from invokeai.app.services.board_image_record_storage import SqliteBoardImageRecordStorage
+    from invokeai.app.services.board_images import BoardImagesService, BoardImagesServiceDependencies
+    from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
+    from invokeai.app.services.boards import BoardService, BoardServiceDependencies
+    from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
+    from invokeai.app.services.images import ImageService, ImageServiceDependencies
+    from invokeai.app.services.invocation_stats import InvocationStatsService
+    from invokeai.app.services.resource_name import SimpleNameService
+    from invokeai.app.services.urls import LocalUrlService
+    from invokeai.backend.util.logging import InvokeAILogger
+    from invokeai.version.invokeai_version import __version__
 
-if torch.backends.mps.is_available():
-    import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+    from .cli.commands import BaseCommand, CliContext, ExitCli, SortedHelpFormatter, add_graph_parsers, add_parsers
+    from .cli.completer import set_autocompleter
+    from .invocations.baseinvocation import BaseInvocation
+    from .services.default_graphs import create_system_graphs, default_text_to_image_graph_id
+    from .services.events import EventServiceBase
+    from .services.graph import (
+        Edge,
+        EdgeConnection,
+        GraphExecutionState,
+        GraphInvocation,
+        LibraryGraph,
+        are_connection_types_compatible,
+    )
+    from .services.image_file_storage import DiskImageFileStorage
+    from .services.invocation_queue import MemoryInvocationQueue
+    from .services.invocation_services import InvocationServices
+    from .services.invoker import Invoker
+    from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
+    from .services.model_manager_service import ModelManagerService
+    from .services.processor import DefaultInvocationProcessor
+    from .services.sqlite import SqliteItemStorage
 
+    if torch.backends.mps.is_available():
+        import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
 
 config = InvokeAIAppConfig.get_config()
 config.parse_args()
-logger = InvokeAILogger().getLogger(config=config)
+logger = InvokeAILogger().get_logger(config=config)
 
 
 class CliCommand(BaseModel):
@@ -252,19 +251,18 @@ def invoke_cli():
         db_location = config.db_path
         db_location.parent.mkdir(parents=True, exist_ok=True)
 
+    db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
     logger.info(f'InvokeAI database location is "{db_location}"')
 
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        filename=db_location, table_name="graph_executions"
-    )
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions")
 
     urls = LocalUrlService()
-    image_record_storage = SqliteImageRecordStorage(db_location)
+    image_record_storage = SqliteImageRecordStorage(conn=db_conn)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
     names = SimpleNameService()
 
-    board_record_storage = SqliteBoardRecordStorage(db_location)
-    board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+    board_record_storage = SqliteBoardRecordStorage(conn=db_conn)
+    board_image_record_storage = SqliteBoardImageRecordStorage(conn=db_conn)
 
     boards = BoardService(
         services=BoardServiceDependencies(
@@ -306,12 +304,13 @@ def invoke_cli():
         boards=boards,
         board_images=board_images,
         queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
+        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs"),
         graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
         performance_statistics=InvocationStatsService(graph_execution_manager),
         logger=logger,
         configuration=config,
+        invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),
     )
 
     system_graphs = create_system_graphs(services.graph_library)

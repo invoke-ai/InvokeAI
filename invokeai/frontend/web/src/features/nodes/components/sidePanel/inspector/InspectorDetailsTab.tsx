@@ -9,6 +9,7 @@ import { memo } from 'react';
 import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
 import NodeTitle from '../../flow/nodes/common/NodeTitle';
 import ScrollableContent from '../ScrollableContent';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -34,9 +35,12 @@ const selector = createSelector(
 
 const InspectorDetailsTab = () => {
   const { data, template } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   if (!template || !data) {
-    return <IAINoContentFallback label="No node selected" icon={null} />;
+    return (
+      <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
+    );
   }
 
   return <Content data={data} template={template} />;

@@ -11,9 +11,9 @@ import {
 } from 'features/controlNet/store/controlNetSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
 type ParamControlNetModelProps = {
@@ -32,9 +32,9 @@ const selector = createSelector(
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const { controlNetId, model: controlNetModel, isEnabled } = props.controlNet;
   const dispatch = useAppDispatch();
-  const isBusy = useAppSelector(selectIsBusy);
 
   const { mainModel } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const { data: controlNetModels } = useGetControlNetModelsQuery();
 
@@ -58,13 +58,13 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
         group: MODEL_TYPE_MAP[model.base_model],
         disabled,
         tooltip: disabled
-          ? `Incompatible base model: ${model.base_model}`
+          ? `${t('controlnet.incompatibleBaseModel')} ${model.base_model}`
           : undefined,
       });
     });
 
     return data;
-  }, [controlNetModels, mainModel?.base_model]);
+  }, [controlNetModels, mainModel?.base_model, t]);
 
   // grab the full model entity from the RTK Query cache
   const selectedModel = useMemo(
@@ -105,10 +105,10 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       error={
         !selectedModel || mainModel?.base_model !== selectedModel.base_model
       }
-      placeholder="Select a model"
+      placeholder={t('controlnet.selectModel')}
       value={selectedModel?.id ?? null}
       onChange={handleModelChanged}
-      disabled={isBusy || !isEnabled}
+      disabled={!isEnabled}
       tooltip={selectedModel?.description}
     />
   );

@@ -42,7 +42,8 @@ class CoreMetadata(BaseModelExcludeNull):
     cfg_scale: float = Field(description="The classifier-free guidance scale parameter")
     steps: int = Field(description="The number of steps used for inference")
     scheduler: str = Field(description="The scheduler used for inference")
-    clip_skip: int = Field(
+    clip_skip: Optional[int] = Field(
+        default=None,
         description="The number of skipped CLIP layers",
     )
     model: MainModelField = Field(description="The main model used for inference")
@@ -116,7 +117,8 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     cfg_scale: float = InputField(description="The classifier-free guidance scale parameter")
     steps: int = InputField(description="The number of steps used for inference")
     scheduler: str = InputField(description="The scheduler used for inference")
-    clip_skip: int = InputField(
+    clip_skip: Optional[int] = Field(
+        default=None,
         description="The number of skipped CLIP layers",
     )
     model: MainModelField = InputField(description="The main model used for inference")

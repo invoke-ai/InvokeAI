@@ -17,6 +17,7 @@ import {
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { FaMinus, FaPlus } from 'react-icons/fa';
 import { menuListMotionProps } from 'theme/components/menu';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   nodeId: string;
@@ -30,6 +31,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   const label = useFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
   const input = useFieldInputKind(nodeId, fieldName);
+  const { t } = useTranslation();
 
   const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -119,7 +121,9 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
             motionProps={menuListMotionProps}
             onContextMenu={skipEvent}
           >
-            <MenuGroup title={label || fieldTemplateTitle || 'Unknown Field'}>
+            <MenuGroup
+              title={label || fieldTemplateTitle || t('nodes.unknownField')}
+            >
               {menuItems}
             </MenuGroup>
           </MenuList>

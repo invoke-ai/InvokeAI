@@ -4,7 +4,7 @@ export const tabMap = [
   'unifiedCanvas',
   'nodes',
   'modelManager',
-  'batch',
+  'queue',
 ] as const;
 
 export type InvokeTabName = (typeof tabMap)[number];

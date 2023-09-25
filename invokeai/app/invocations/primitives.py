@@ -226,6 +226,12 @@ class ImageField(BaseModel):
     image_name: str = Field(description="The name of the image")
 
 
+class BoardField(BaseModel):
+    """A board primitive field"""
+
+    board_id: str = Field(description="The id of the board")
+
+
 @invocation_output("image_output")
 class ImageOutput(BaseInvocationOutput):
     """Base class for nodes that output a single image"""

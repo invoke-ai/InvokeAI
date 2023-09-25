@@ -1,10 +1,9 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredOpenposeImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
 
@@ -21,7 +20,7 @@ const OpenposeProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, hand_and_face } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
+  const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -59,7 +58,7 @@ const OpenposeProcessor = (props: Props) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Detect Resolution"
+        label={t('controlnet.detectResolution')}
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
         handleReset={handleDetectResolutionReset}
@@ -68,10 +67,10 @@ const OpenposeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
-        label="Image Resolution"
+        label={t('controlnet.imageResolution')}
         value={image_resolution}
         onChange={handleImageResolutionChanged}
         handleReset={handleImageResolutionReset}
@@ -80,13 +79,13 @@ const OpenposeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISwitch
-        label="Hand and Face"
+        label={t('controlnet.handAndFace')}
         isChecked={hand_and_face}
         onChange={handleHandAndFaceChanged}
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

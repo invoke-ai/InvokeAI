@@ -65,11 +65,6 @@ const SchedulerInputField = (
   return (
     <IAIMantineSearchableSelect
       className="nowheel nodrag"
-      sx={{
-        '.mantine-Select-dropdown': {
-          width: '14rem !important',
-        },
-      }}
       value={field.value}
       data={data}
       onChange={handleChange}

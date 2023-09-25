@@ -5,7 +5,6 @@ import ParamCompositingSettingsCollapse from 'features/parameters/components/Par
 import ParamInfillAndScalingCollapse from 'features/parameters/components/Parameters/Canvas/InfillAndScaling/ParamInfillAndScalingCollapse';
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 import ParamPromptArea from 'features/parameters/components/Parameters/Prompt/ParamPromptArea';
-import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 import { memo } from 'react';
 import UnifiedCanvasCoreParameters from './UnifiedCanvasCoreParameters';
@@ -21,7 +20,6 @@ const UnifiedCanvasParameters = () => {
       <ParamSymmetryCollapse />
       <ParamInfillAndScalingCollapse />
       <ParamCompositingSettingsCollapse />
-      <ParamSeamlessCollapse />
       <ParamAdvancedCollapse />
     </>
   );

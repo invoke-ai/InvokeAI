@@ -19,16 +19,17 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { setShouldShowAdvancedOptions } from 'features/parameters/store/generationSlice';
 import {
   consoleLogLevelChanged,
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
+  setShouldEnableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
+import { LANGUAGES } from 'features/system/store/types';
 import {
   setShouldAutoChangeDimensions,
   setShouldShowProgressInViewer,
@@ -48,7 +49,6 @@ import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 import { useFeatureStatus } from '../../hooks/useFeatureStatus';
-import { LANGUAGES } from '../../store/constants';
 import { languageSelector } from '../../store/systemSelectors';
 import { languageChanged } from '../../store/systemSlice';
 import SettingSwitch from './SettingSwitch';
@@ -58,7 +58,7 @@ import StyledFlex from './StyledFlex';
 
 const selector = createSelector(
   [stateSelector],
-  ({ system, ui, generation }) => {
+  ({ system, ui }) => {
     const {
       shouldConfirmOnDelete,
       enableImageDebugging,
@@ -67,6 +67,7 @@ const selector = createSelector(
       shouldAntialiasProgressImage,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
+      shouldEnableInformationalPopovers,
     } = system;
 
     const {
@@ -74,8 +75,6 @@ const selector = createSelector(
       shouldShowProgressInViewer,
       shouldAutoChangeDimensions,
     } = ui;
-
-    const { shouldShowAdvancedOptions } = generation;
 
     return {
       shouldConfirmOnDelete,
@@ -85,10 +84,10 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
-      shouldShowAdvancedOptions,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
       shouldAutoChangeDimensions,
+      shouldEnableInformationalPopovers,
     };
   },
   {
@@ -118,8 +117,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
-  const shouldShowAdvancedOptionsSettings =
-    config?.shouldShowAdvancedOptionsSettings ?? true;
   const shouldShowClearIntermediates =
     config?.shouldShowClearIntermediates ?? true;
   const shouldShowLocalizationToggle =
@@ -161,10 +158,10 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     consoleLogLevel,
     shouldLogToConsole,
     shouldAntialiasProgressImage,
-    shouldShowAdvancedOptions,
     shouldUseNSFWChecker,
     shouldUseWatermarker,
     shouldAutoChangeDimensions,
+    shouldEnableInformationalPopovers,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -242,15 +239,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
-                {shouldShowAdvancedOptionsSettings && (
-                  <SettingSwitch
-                    label={t('settings.showAdvancedOptions')}
-                    isChecked={shouldShowAdvancedOptions}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setShouldShowAdvancedOptions(e.target.checked))
-                    }
-                  />
-                )}
               </StyledFlex>
 
               <StyledFlex>
@@ -323,6 +311,15 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     onChange={handleLanguageChanged}
                   />
                 )}
+                <SettingSwitch
+                  label="Enable informational popovers"
+                  isChecked={shouldEnableInformationalPopovers}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(
+                      setShouldEnableInformationalPopovers(e.target.checked)
+                    )
+                  }
+                />
               </StyledFlex>
 
               {shouldShowDeveloperSettings && (

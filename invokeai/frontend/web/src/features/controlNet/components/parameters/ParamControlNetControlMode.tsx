@@ -1,4 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   ControlModes,
@@ -6,23 +7,25 @@ import {
   controlNetControlModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type ParamControlNetControlModeProps = {
   controlNet: ControlNetConfig;
 };
-
-const CONTROL_MODE_DATA = [
-  { label: 'Balanced', value: 'balanced' },
-  { label: 'Prompt', value: 'more_prompt' },
-  { label: 'Control', value: 'more_control' },
-  { label: 'Mega Control', value: 'unbalanced' },
-];
 
 export default function ParamControlNetControlMode(
   props: ParamControlNetControlModeProps
 ) {
   const { controlMode, isEnabled, controlNetId } = props.controlNet;
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
+  const CONTROL_MODE_DATA = [
+    { label: t('controlnet.balanced'), value: 'balanced' },
+    { label: t('controlnet.prompt'), value: 'more_prompt' },
+    { label: t('controlnet.control'), value: 'more_control' },
+    { label: t('controlnet.megaControl'), value: 'unbalanced' },
+  ];
 
   const handleControlModeChange = useCallback(
     (controlMode: ControlModes) => {
@@ -32,12 +35,14 @@ export default function ParamControlNetControlMode(
   );
 
   return (
-    <IAIMantineSelect
-      disabled={!isEnabled}
-      label="Control Mode"
-      data={CONTROL_MODE_DATA}
-      value={String(controlMode)}
-      onChange={handleControlModeChange}
-    />
+    <IAIInformationalPopover feature="controlNetControlMode">
+      <IAIMantineSelect
+        disabled={!isEnabled}
+        label={t('controlnet.controlMode')}
+        data={CONTROL_MODE_DATA}
+        value={String(controlMode)}
+        onChange={handleControlModeChange}
+      />
+    </IAIInformationalPopover>
   );
 }

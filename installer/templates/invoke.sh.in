@@ -97,13 +97,13 @@ do_choice() {
         ;;
     10)
         clear
-        printf "Command-line help\n"
-        invokeai --help
+        printf "Running the db maintenance script\n"
+        invokeai-db-maintenance --root ${INVOKEAI_ROOT}
         ;;
-    "HELP 1")
+    11)
         clear
         printf "Command-line help\n"
-        invokeai --help
+        invokeai-web --help
         ;;
     *)
         clear
@@ -125,7 +125,10 @@ do_dialog() {
         6 "Change InvokeAI startup options"
         7 "Re-run the configure script to fix a broken install or to complete a major upgrade"
         8 "Open the developer console"
-        9 "Update InvokeAI")
+        9 "Update InvokeAI"
+	10 "Run the InvokeAI image database maintenance script"
+	11 "Command-line help"
+    )
 
     choice=$(dialog --clear \
         --backtitle "\Zb\Zu\Z3InvokeAI" \
@@ -157,9 +160,10 @@ do_line_input() {
     printf "7: Re-run the configure script to fix a broken install\n"
     printf "8: Open the developer console\n"
     printf "9: Update InvokeAI\n"
-    printf "10: Command-line help\n"
+    printf "10: Run the InvokeAI image database maintenance script\n"
+    printf "11: Command-line help\n"
     printf "Q: Quit\n\n"
-    read -p "Please enter 1-10, Q: [1] " yn
+    read -p "Please enter 1-11, Q: [1] " yn
     choice=${yn:='1'}
     do_choice $choice
     clear

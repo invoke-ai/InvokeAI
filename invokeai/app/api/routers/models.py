@@ -2,7 +2,7 @@
 
 
 import pathlib
-from typing import Literal, List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
@@ -10,13 +10,13 @@ from pydantic import BaseModel, parse_obj_as
 from starlette.exceptions import HTTPException
 
 from invokeai.backend import BaseModelType, ModelType
+from invokeai.backend.model_management import MergeInterpolationMethod
 from invokeai.backend.model_management.models import (
     OPENAPI_MODEL_CONFIGS,
-    SchedulerPredictionType,
-    ModelNotFoundException,
     InvalidModelException,
+    ModelNotFoundException,
+    SchedulerPredictionType,
 )
-from invokeai.backend.model_management import MergeInterpolationMethod
 
 from ..dependencies import ApiDependencies
 
@@ -146,7 +146,8 @@ async def update_model(
 async def import_model(
     location: str = Body(description="A model path, repo_id or URL to import"),
     prediction_type: Optional[Literal["v_prediction", "epsilon", "sample"]] = Body(
-        description="Prediction type for SDv2 checkpoint files", default="v_prediction"
+        description="Prediction type for SDv2 checkpoints and rare SDv1 checkpoints",
+        default=None,
     ),
 ) -> ImportModelResponse:
     """Add a model using its local path, repo_id, or remote URL. Model characteristics will be probed and configured automatically"""
@@ -154,6 +155,8 @@ async def import_model(
     items_to_import = {location}
     prediction_types = {x.value: x for x in SchedulerPredictionType}
     logger = ApiDependencies.invoker.services.logger
+
+    print(f"DEBUG: prediction_type = {prediction_type}")
 
     try:
         installed_models = ApiDependencies.invoker.services.model_manager.heuristic_import(

@@ -6,68 +6,56 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
-import sys
 import argparse
 import io
 import os
-import psutil
 import shutil
+import sys
 import textwrap
-import torch
 import traceback
-import yaml
 import warnings
 from argparse import Namespace
 from enum import Enum
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import get_type_hints, get_args, Any
+from typing import Any, get_args, get_type_hints
 from urllib import request
 
 import npyscreen
-import transformers
 import omegaconf
+import psutil
+import torch
+import transformers
+import yaml
 from diffusers import AutoencoderKL
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
+from pydantic.error_wrappers import ValidationError
 from tqdm import tqdm
-from transformers import (
-    CLIPTextModel,
-    CLIPTextConfig,
-    CLIPTokenizer,
-    AutoFeatureExtractor,
-    BertTokenizerFast,
-)
-import invokeai.configs as configs
+from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 
-from invokeai.app.services.config import (
-    InvokeAIAppConfig,
-)
+import invokeai.configs as configs
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.install.legacy_arg_parsing import legacy_parser
+from invokeai.backend.install.model_install_backend import InstallSelections, ModelInstall, hf_download_from_pretrained
+from invokeai.backend.model_management.model_probe import BaseModelType, ModelType
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 
 # TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
-    SingleSelectColumnsSimple,
-    MultiSelectColumns,
-    CenteredButtonPress,
-    FileBox,
-    set_min_terminal_size,
-    CyclingForm,
     MIN_COLS,
     MIN_LINES,
+    CenteredButtonPress,
+    CyclingForm,
+    FileBox,
+    MultiSelectColumns,
+    SingleSelectColumnsSimple,
     WindowTooSmallException,
+    set_min_terminal_size,
 )
-from invokeai.backend.install.legacy_arg_parsing import legacy_parser
-from invokeai.backend.install.model_install_backend import (
-    hf_download_from_pretrained,
-    InstallSelections,
-    ModelInstall,
-)
-from invokeai.backend.model_management.model_probe import ModelType, BaseModelType
-from pydantic.error_wrappers import ValidationError
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -105,7 +93,7 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # or renaming it and then running invokeai-configure again.
 """
 
-logger = InvokeAILogger.getLogger()
+logger = InvokeAILogger.get_logger()
 
 
 class DummyWidgetValue(Enum):
@@ -906,7 +894,7 @@ def main():
     if opt.full_precision:
         invoke_args.extend(["--precision", "float32"])
     config.parse_args(invoke_args)
-    logger = InvokeAILogger().getLogger(config=config)
+    logger = InvokeAILogger().get_logger(config=config)
 
     errors = set()
 

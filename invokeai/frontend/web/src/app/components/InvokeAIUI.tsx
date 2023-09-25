@@ -15,6 +15,9 @@ import { socketMiddleware } from 'services/events/middleware';
 import Loading from '../../common/components/Loading/Loading';
 import '../../i18n';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
+import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
+import { $headerComponent } from 'app/store/nanostores/headerComponent';
+import { $queueId, DEFAULT_QUEUE_ID } from 'features/queue/store/nanoStores';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -26,10 +29,12 @@ interface Props extends PropsWithChildren {
   headerComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
+  queueId?: string;
   selectedImage?: {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  customStarUi?: CustomStarUi;
 }
 
 const InvokeAIUI = ({
@@ -39,7 +44,9 @@ const InvokeAIUI = ({
   headerComponent,
   middleware,
   projectId,
+  queueId,
   selectedImage,
+  customStarUi,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -55,6 +62,11 @@ const InvokeAIUI = ({
     // configure API client project header
     if (projectId) {
       $projectId.set(projectId);
+    }
+
+    // configure API client project header
+    if (queueId) {
+      $queueId.set(queueId);
     }
 
     // reset dynamically added middlewares
@@ -77,8 +89,29 @@ const InvokeAIUI = ({
       $baseUrl.set(undefined);
       $authToken.set(undefined);
       $projectId.set(undefined);
+      $queueId.set(DEFAULT_QUEUE_ID);
     };
-  }, [apiUrl, token, middleware, projectId]);
+  }, [apiUrl, token, middleware, projectId, queueId]);
+
+  useEffect(() => {
+    if (customStarUi) {
+      $customStarUI.set(customStarUi);
+    }
+
+    return () => {
+      $customStarUI.set(undefined);
+    };
+  }, [customStarUi]);
+
+  useEffect(() => {
+    if (headerComponent) {
+      $headerComponent.set(headerComponent);
+    }
+
+    return () => {
+      $headerComponent.set(undefined);
+    };
+  }, [headerComponent]);
 
   return (
     <React.StrictMode>
@@ -86,11 +119,7 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App
-                config={config}
-                headerComponent={headerComponent}
-                selectedImage={selectedImage}
-              />
+              <App config={config} selectedImage={selectedImage} />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>

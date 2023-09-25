@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-import re
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -23,10 +23,12 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field, validator
-from pydantic.fields import Undefined, ModelField
-from pydantic.typing import NoArgAnyCallable
 import semver
+from pydantic import BaseModel, Field, validator
+from pydantic.fields import ModelField, Undefined
+from pydantic.typing import NoArgAnyCallable
+
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
@@ -65,6 +67,7 @@ class FieldDescriptions:
     width = "Width of output (px)"
     height = "Height of output (px)"
     control = "ControlNet(s) to apply"
+    ip_adapter = "IP-Adapter to apply"
     denoised_latents = "Denoised latents tensor"
     latents = "Latents tensor"
     strength = "Strength of denoising (proportional to steps)"
@@ -85,6 +88,9 @@ class FieldDescriptions:
     num_1 = "The first number"
     num_2 = "The second number"
     mask = "The mask to use for the operation"
+    board = "The board to save the image to"
+    image = "The image to process"
+    tile_size = "Tile size"
 
 
 class Input(str, Enum):
@@ -153,6 +159,7 @@ class UIType(str, Enum):
     VaeModel = "VaeModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
+    IPAdapterModel = "IPAdapterModelField"
     UNet = "UNetField"
     Vae = "VaeField"
     CLIP = "ClipField"
@@ -169,6 +176,7 @@ class UIType(str, Enum):
     WorkflowField = "WorkflowField"
     IsIntermediate = "IsIntermediate"
     MetadataField = "MetadataField"
+    BoardField = "BoardField"
     # endregion
 
 
@@ -196,6 +204,7 @@ class _InputField(BaseModel):
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
     ui_order: Optional[int]
+    ui_choice_labels: Optional[dict[str, str]]
     item_default: Optional[Any]
 
 
@@ -244,6 +253,7 @@ def InputField(
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
     ui_order: Optional[int] = None,
+    ui_choice_labels: Optional[dict[str, str]] = None,
     item_default: Optional[Any] = None,
     **kwargs: Any,
 ) -> Any:
@@ -310,6 +320,7 @@ def InputField(
         ui_hidden=ui_hidden,
         ui_order=ui_order,
         item_default=item_default,
+        ui_choice_labels=ui_choice_labels,
         **kwargs,
     )
 
@@ -412,12 +423,27 @@ class UIConfigBase(BaseModel):
 
 
 class InvocationContext:
+    """Initialized and provided to on execution of invocations."""
+
     services: InvocationServices
     graph_execution_state_id: str
+    queue_id: str
+    queue_item_id: int
+    queue_batch_id: str
 
-    def __init__(self, services: InvocationServices, graph_execution_state_id: str):
+    def __init__(
+        self,
+        services: InvocationServices,
+        queue_id: str,
+        queue_item_id: int,
+        queue_batch_id: str,
+        graph_execution_state_id: str,
+    ):
         self.services = services
         self.graph_execution_state_id = graph_execution_state_id
+        self.queue_id = queue_id
+        self.queue_item_id = queue_item_id
+        self.queue_batch_id = queue_batch_id
 
 
 class BaseInvocationOutput(BaseModel):
@@ -470,6 +496,7 @@ class BaseInvocation(ABC, BaseModel):
 
     @classmethod
     def get_all_subclasses(cls):
+        app_config = InvokeAIAppConfig.get_config()
         subclasses = []
         toprocess = [cls]
         while len(toprocess) > 0:
@@ -477,7 +504,23 @@ class BaseInvocation(ABC, BaseModel):
             next_subclasses = next.__subclasses__()
             subclasses.extend(next_subclasses)
             toprocess.extend(next_subclasses)
-        return subclasses
+        allowed_invocations = []
+        for sc in subclasses:
+            is_in_allowlist = (
+                sc.__fields__.get("type").default in app_config.allow_nodes
+                if isinstance(app_config.allow_nodes, list)
+                else True
+            )
+
+            is_in_denylist = (
+                sc.__fields__.get("type").default in app_config.deny_nodes
+                if isinstance(app_config.deny_nodes, list)
+                else False
+            )
+
+            if is_in_allowlist and not is_in_denylist:
+                allowed_invocations.append(sc)
+        return allowed_invocations
 
     @classmethod
     def get_invocations(cls):
@@ -498,6 +541,9 @@ class BaseInvocation(ABC, BaseModel):
         return signature(cls.invoke).return_annotation
 
     class Config:
+        validate_assignment = True
+        validate_all = True
+
         @staticmethod
         def schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
             uiconfig = getattr(model_class, "UIConfig", None)
@@ -546,7 +592,29 @@ class BaseInvocation(ABC, BaseModel):
                     raise RequiredConnectionException(self.__fields__["type"].default, field_name)
                 elif _input == Input.Any:
                     raise MissingInputException(self.__fields__["type"].default, field_name)
-        return self.invoke(context)
+
+        # skip node cache codepath if it's disabled
+        if context.services.configuration.node_cache_size == 0:
+            return self.invoke(context)
+
+        output: BaseInvocationOutput
+        if self.use_cache:
+            key = context.services.invocation_cache.create_key(self)
+            cached_value = context.services.invocation_cache.get(key)
+            if cached_value is None:
+                context.services.logger.debug(f'Invocation cache miss for type "{self.get_type()}": {self.id}')
+                output = self.invoke(context)
+                context.services.invocation_cache.save(key, output)
+                return output
+            else:
+                context.services.logger.debug(f'Invocation cache hit for type "{self.get_type()}": {self.id}')
+                return cached_value
+        else:
+            context.services.logger.debug(f'Skipping invocation cache for "{self.get_type()}": {self.id}')
+            return self.invoke(context)
+
+    def get_type(self) -> str:
+        return self.__fields__["type"].default
 
     id: str = Field(
         description="The id of this instance of an invocation. Must be unique among all instances of invocations."
@@ -559,6 +627,7 @@ class BaseInvocation(ABC, BaseModel):
         description="The workflow to save with the image",
         ui_type=UIType.WorkflowField,
     )
+    use_cache: bool = InputField(default=True, description="Whether or not to use the cache")
 
     @validator("workflow", pre=True)
     def validate_workflow_is_json(cls, v):
@@ -582,6 +651,7 @@ def invocation(
     tags: Optional[list[str]] = None,
     category: Optional[str] = None,
     version: Optional[str] = None,
+    use_cache: Optional[bool] = True,
 ) -> Callable[[Type[GenericBaseInvocation]], Type[GenericBaseInvocation]]:
     """
     Adds metadata to an invocation.
@@ -590,6 +660,8 @@ def invocation(
     :param Optional[str] title: Adds a title to the invocation. Use if the auto-generated title isn't quite right. Defaults to None.
     :param Optional[list[str]] tags: Adds tags to the invocation. Invocations may be searched for by their tags. Defaults to None.
     :param Optional[str] category: Adds a category to the invocation. Used to group the invocations in the UI. Defaults to None.
+    :param Optional[str] version: Adds a version to the invocation. Must be a valid semver string. Defaults to None.
+    :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
     """
 
     def wrapper(cls: Type[GenericBaseInvocation]) -> Type[GenericBaseInvocation]:
@@ -614,6 +686,8 @@ def invocation(
             except ValueError as e:
                 raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
             cls.UIConfig.version = version
+        if use_cache is not None:
+            cls.__fields__["use_cache"].default = use_cache
 
         # Add the invocation type to the pydantic model of the invocation
         invocation_type_annotation = Literal[invocation_type]  # type: ignore

@@ -21,8 +21,8 @@ TI files that you'll encounter are `.pt` and `.bin` files, which are produced by
 different TI training packages. InvokeAI supports both formats, but its
 [built-in TI training system](TRAINING.md) produces `.pt`.
 
-The [Hugging Face company](https://huggingface.co/sd-concepts-library) has
-amassed a large ligrary of &gt;800 community-contributed TI files covering a
+[Hugging Face](https://huggingface.co/sd-concepts-library) has
+amassed a large library of &gt;800 community-contributed TI files covering a
 broad range of subjects and styles. You can also install your own or others' TI files 
 by placing them in the designated directory for the compatible model type
 

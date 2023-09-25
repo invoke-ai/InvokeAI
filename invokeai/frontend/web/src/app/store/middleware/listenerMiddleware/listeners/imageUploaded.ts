@@ -1,17 +1,23 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlNetImageChanged,
+  controlNetIsEnabledChanged,
+  ipAdapterImageChanged,
+  isIPAdapterEnabledChanged,
+} from 'features/controlNet/store/controlNetSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
 
 const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
-  title: 'Image Uploaded',
+  title: t('toast.imageUploaded'),
   status: 'success',
 };
 
@@ -57,8 +63,8 @@ export const addImageUploadedFulfilledListener = () => {
           // Fall back to just the board id if we can't find the board for some reason
           const board = data?.find((b) => b.board_id === autoAddBoardId);
           const description = board
-            ? `Added to board ${board.board_name}`
-            : `Added to board ${autoAddBoardId}`;
+            ? `${t('toast.addedToBoard')} ${board.board_name}`
+            : `${t('toast.addedToBoard')} ${autoAddBoardId}`;
 
           dispatch(
             addToast({
@@ -75,7 +81,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as canvas initial image',
+            description: t('toast.setCanvasInitialImage'),
           })
         );
         return;
@@ -83,6 +89,12 @@ export const addImageUploadedFulfilledListener = () => {
 
       if (postUploadAction?.type === 'SET_CONTROLNET_IMAGE') {
         const { controlNetId } = postUploadAction;
+        dispatch(
+          controlNetIsEnabledChanged({
+            controlNetId,
+            isEnabled: true,
+          })
+        );
         dispatch(
           controlNetImageChanged({
             controlNetId,
@@ -92,7 +104,19 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as control image',
+            description: t('toast.setControlImage'),
+          })
+        );
+        return;
+      }
+
+      if (postUploadAction?.type === 'SET_IP_ADAPTER_IMAGE') {
+        dispatch(ipAdapterImageChanged(imageDTO));
+        dispatch(isIPAdapterEnabledChanged(true));
+        dispatch(
+          addToast({
+            ...DEFAULT_UPLOADED_TOAST,
+            description: t('toast.setIPAdapterImage'),
           })
         );
         return;
@@ -103,7 +127,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as initial image',
+            description: t('toast.setInitialImage'),
           })
         );
         return;
@@ -117,7 +141,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: `Set as node field ${fieldName}`,
+            description: `${t('toast.setNodeField')} ${fieldName}`,
           })
         );
         return;
@@ -140,7 +164,7 @@ export const addImageUploadedRejectedListener = () => {
       log.error({ ...sanitizedData }, 'Image upload failed');
       dispatch(
         addToast({
-          title: 'Image Upload Failed',
+          title: t('toast.imageUploadFailed'),
           description: action.error.message,
           status: 'error',
         })

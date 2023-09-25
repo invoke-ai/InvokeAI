@@ -1,19 +1,21 @@
-import os
 import json
+import os
 from enum import Enum
-from pydantic import Field
 from typing import Literal, Optional
+
+from omegaconf import OmegaConf
+from pydantic import Field
+
 from .base import (
-    ModelConfigBase,
     BaseModelType,
+    DiffusersModel,
+    InvalidModelException,
+    ModelConfigBase,
     ModelType,
     ModelVariantType,
-    DiffusersModel,
-    read_checkpoint_meta,
     classproperty,
-    InvalidModelException,
+    read_checkpoint_meta,
 )
-from omegaconf import OmegaConf
 
 
 class StableDiffusionXLModelFormat(str, Enum):

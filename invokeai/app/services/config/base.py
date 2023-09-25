@@ -9,15 +9,17 @@ the command line.
 """
 
 from __future__ import annotations
+
 import argparse
 import os
 import pydoc
 import sys
 from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig, ListConfig
 from pathlib import Path
+from typing import ClassVar, Dict, List, Literal, Optional, Union, get_args, get_origin, get_type_hints
+
+from omegaconf import DictConfig, ListConfig, OmegaConf
 from pydantic import BaseSettings
-from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
 
 class PagingArgumentParser(argparse.ArgumentParser):
@@ -37,12 +39,14 @@ class InvokeAISettings(BaseSettings):
     read from an omegaconf .yaml file.
     """
 
-    initconf: ClassVar[DictConfig] = None
+    initconf: ClassVar[Optional[DictConfig]] = None
     argparse_groups: ClassVar[Dict] = {}
 
-    def parse_args(self, argv: list = sys.argv[1:]):
+    def parse_args(self, argv: Optional[list] = sys.argv[1:]):
         parser = self.get_parser()
-        opt = parser.parse_args(argv)
+        opt, unknown_opts = parser.parse_known_args(argv)
+        if len(unknown_opts) > 0:
+            print("Unknown args:", unknown_opts)
         for name in self.__fields__:
             if name not in self._excluded():
                 value = getattr(opt, name)
@@ -79,7 +83,8 @@ class InvokeAISettings(BaseSettings):
         else:
             settings_stanza = "Uncategorized"
 
-        env_prefix = cls.Config.env_prefix if hasattr(cls.Config, "env_prefix") else settings_stanza.upper()
+        env_prefix = getattr(cls.Config, "env_prefix", None)
+        env_prefix = env_prefix if env_prefix is not None else settings_stanza.upper()
 
         initconf = (
             cls.initconf.get(settings_stanza)
@@ -112,8 +117,8 @@ class InvokeAISettings(BaseSettings):
                 field.default = current_default
 
     @classmethod
-    def cmd_name(self, command_field: str = "type") -> str:
-        hints = get_type_hints(self)
+    def cmd_name(cls, command_field: str = "type") -> str:
+        hints = get_type_hints(cls)
         if command_field in hints:
             return get_args(hints[command_field])[0]
         else:
@@ -129,16 +134,12 @@ class InvokeAISettings(BaseSettings):
         return parser
 
     @classmethod
-    def add_subparser(cls, parser: argparse.ArgumentParser):
-        parser.add_parser(cls.cmd_name(), help=cls.__doc__)
-
-    @classmethod
-    def _excluded(self) -> List[str]:
+    def _excluded(cls) -> List[str]:
         # internal fields that shouldn't be exposed as command line options
         return ["type", "initconf"]
 
     @classmethod
-    def _excluded_from_yaml(self) -> List[str]:
+    def _excluded_from_yaml(cls) -> List[str]:
         # combination of deprecated parameters and internal ones that shouldn't be exposed as invokeai.yaml options
         return [
             "type",
