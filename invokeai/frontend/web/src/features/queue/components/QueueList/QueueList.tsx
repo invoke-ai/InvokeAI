@@ -1,4 +1,4 @@
-import { Flex, Heading, Skeleton, Text } from '@chakra-ui/react';
+import { Flex, Heading } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -23,7 +23,6 @@ import QueueItemComponent from './QueueItemComponent';
 import QueueListComponent from './QueueListComponent';
 import QueueListHeader from './QueueListHeader';
 import { ListContext } from './types';
-import QueueItemSkeleton from './QueueItemSkeleton';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TableVirtuosoScrollerRef = (ref: HTMLElement | Window | null) => any;
@@ -86,7 +85,7 @@ const QueueList = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  const { data: listQueueItemsData, isLoading } = useListQueueItemsQuery({
+  const { data: listQueueItemsData } = useListQueueItemsQuery({
     cursor: listCursor,
     priority: listPriority,
   });
@@ -128,51 +127,33 @@ const QueueList = () => {
 
   return (
     <Flex w="full" h="full" flexDir="column">
-      {isLoading ? (
+      {queueItems.length ? (
         <>
           <QueueListHeader />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
-          <QueueItemSkeleton />
+          <Flex
+            ref={rootRef}
+            w="full"
+            h="full"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Virtuoso<SessionQueueItemDTO, ListContext>
+              data={queueItems}
+              endReached={handleLoadMore}
+              scrollerRef={setScroller as TableVirtuosoScrollerRef}
+              itemContent={itemContent}
+              computeItemKey={computeItemKey}
+              components={components}
+              context={context}
+            />
+          </Flex>
         </>
       ) : (
-        <>
-          {queueItems.length ? (
-            <>
-              <QueueListHeader />
-              <Flex
-                ref={rootRef}
-                w="full"
-                h="full"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Virtuoso<SessionQueueItemDTO, ListContext>
-                  data={queueItems}
-                  endReached={handleLoadMore}
-                  scrollerRef={setScroller as TableVirtuosoScrollerRef}
-                  itemContent={itemContent}
-                  computeItemKey={computeItemKey}
-                  components={components}
-                  context={context}
-                />
-              </Flex>
-            </>
-          ) : (
-            <Flex w="full" h="full" alignItems="center" justifyContent="center">
-              <Heading color="base.400" _dark={{ color: 'base.500' }}>
-                {t('queue.queueEmpty')}
-              </Heading>
-            </Flex>
-          )}
-        </>
+        <Flex w="full" h="full" alignItems="center" justifyContent="center">
+          <Heading color="base.400" _dark={{ color: 'base.500' }}>
+            {t('queue.queueEmpty')}
+          </Heading>
+        </Flex>
       )}
     </Flex>
   );
