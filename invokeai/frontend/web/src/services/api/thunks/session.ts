@@ -1,5 +1,5 @@
 import { createAsyncThunk, isAnyOf } from '@reduxjs/toolkit';
-import { $queueId } from 'features/queue/store/nanoStores';
+import { $queueId } from 'features/queue/store/queueNanoStore';
 import { isObject } from 'lodash-es';
 import { $client } from 'services/api/client';
 import { paths } from 'services/api/schema';
