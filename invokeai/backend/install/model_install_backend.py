@@ -76,14 +76,6 @@ LEGACY_CONFIGS = {
 
 
 @dataclass
-class ModelInstallList:
-    """Class for listing models to be installed/removed"""
-
-    install_models: List[str] = field(default_factory=list)
-    remove_models: List[str] = field(default_factory=list)
-
-
-@dataclass
 class InstallSelections:
     install_models: List[str] = field(default_factory=list)
     remove_models: List[str] = field(default_factory=list)
@@ -100,6 +92,7 @@ class ModelLoadInfo:
     installed: bool = False
     recommended: bool = False
     default: bool = False
+    requires: Optional[List[str]] = field(default_factory=list)
 
 
 class ModelInstall(object):
@@ -137,8 +130,6 @@ class ModelInstall(object):
 
         # supplement with entries in models.yaml
         installed_models = [x for x in self.mgr.list_models()]
-        # suppresses autoloaded models
-        # installed_models = [x for x in self.mgr.list_models() if not self._is_autoloaded(x)]
 
         for md in installed_models:
             base = md["base_model"]
@@ -170,9 +161,12 @@ class ModelInstall(object):
 
     def list_models(self, model_type):
         installed = self.mgr.list_models(model_type=model_type)
+        print()
         print(f"Installed models of type `{model_type}`:")
+        print(f"{'Model Key':50} Model Path")
         for i in installed:
-            print(f"{i['model_name']}\t{i['base_model']}\t{i['path']}")
+            print(f"{'/'.join([i['base_model'],i['model_type'],i['model_name']]):50} {i['path']}")
+        print()
 
     # logic here a little reversed to maintain backward compatibility
     def starter_models(self, all_models: bool = False) -> Set[str]:
@@ -210,6 +204,8 @@ class ModelInstall(object):
             job += 1
 
         # add requested models
+        self._remove_installed(selections.install_models)
+        self._add_required_models(selections.install_models)
         for path in selections.install_models:
             logger.info(f"Installing {path} [{job}/{jobs}]")
             try:
@@ -268,6 +264,26 @@ class ModelInstall(object):
             raise KeyError(f"{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping")
 
         return models_installed
+
+    def _remove_installed(self, model_list: List[str]):
+        all_models = self.all_models()
+        for path in model_list:
+            key = self.reverse_paths.get(path)
+            if key and all_models[key].installed:
+                logger.warning(f"{path} already installed. Skipping.")
+                model_list.remove(path)
+
+    def _add_required_models(self, model_list: List[str]):
+        additional_models = []
+        all_models = self.all_models()
+        for path in model_list:
+            if not (key := self.reverse_paths.get(path)):
+                continue
+            for requirement in all_models[key].requires:
+                requirement_key = self.reverse_paths.get(requirement)
+                if not all_models[requirement_key].installed:
+                    additional_models.append(requirement)
+        model_list.extend(additional_models)
 
     # install a model from a local path. The optional info parameter is there to prevent
     # the model from being probed twice in the event that it has already been probed.
