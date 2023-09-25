@@ -12,7 +12,6 @@ from invokeai.app.services.invoker import Invoker
 
 @dataclass(order=True)
 class CachedItem:
-    priority: float
     invocation_output: BaseInvocationOutput = field(compare=False)
     invocation_output_json: str = field(compare=False)
 
@@ -64,8 +63,6 @@ class MemoryInvocationCache(InvocationCacheBase):
 
     def _delete_oldest_access(self, number_to_delete: int) -> None:
         number_to_delete = min(number_to_delete, len(self._cache))
-        if self._max_cache_size == 0 or number_to_delete < 1:
-            return
         for _ in range(number_to_delete):
             self._cache.popitem(last=False)
 
