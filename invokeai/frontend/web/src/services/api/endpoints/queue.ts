@@ -4,7 +4,7 @@ import {
   ThunkDispatch,
   createEntityAdapter,
 } from '@reduxjs/toolkit';
-import { $queueId } from 'features/queue/store/nanoStores';
+import { $queueId } from 'features/queue/store/queueNanoStore';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
 import { ApiTagDescription, api } from '..';
