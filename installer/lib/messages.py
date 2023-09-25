@@ -7,7 +7,7 @@ import os
 import platform
 from pathlib import Path
 
-from prompt_toolkit import prompt, HTML
+from prompt_toolkit import HTML, prompt
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.validation import Validator
 from rich import box, print
@@ -97,13 +97,17 @@ def user_wants_auto_configuration() -> bool:
             padding=(1, 1),
         )
     )
-    choice = prompt(HTML("Choose <b>&lt;a&gt;</b>utomatic or <b>&lt;m&gt;</b>anual configuration [a/m] (a): "),
-                    validator=Validator.from_callable(
-                        lambda n: n=='' or n.startswith(('a', 'A', 'm', 'M')),
-                        error_message="Please select 'a' or 'm'"
-                    ),
-                ) or 'a'
-    return choice.lower().startswith('a')
+    choice = (
+        prompt(
+            HTML("Choose <b>&lt;a&gt;</b>utomatic or <b>&lt;m&gt;</b>anual configuration [a/m] (a): "),
+            validator=Validator.from_callable(
+                lambda n: n == "" or n.startswith(("a", "A", "m", "M")), error_message="Please select 'a' or 'm'"
+            ),
+        )
+        or "a"
+    )
+    return choice.lower().startswith("a")
+
 
 def dest_path(dest=None) -> Path:
     """
@@ -209,7 +213,7 @@ def graphical_accelerator():
         "cpu",
     )
     idk = (
-         "I'm not sure what to choose",
+        "I'm not sure what to choose",
         "idk",
     )
 

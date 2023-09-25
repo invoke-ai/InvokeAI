@@ -344,12 +344,12 @@ class InvokeAiInstance:
                 auto_install = True
         sys.argv = new_argv
 
-        import requests  # to catch download exceptions
         import messages
+        import requests  # to catch download exceptions
 
         auto_install = auto_install or messages.user_wants_auto_configuration()
         if auto_install:
-            sys.argv.append('--yes')
+            sys.argv.append("--yes")
         else:
             messages.introduction()
 
