@@ -74,7 +74,7 @@ if is_accelerate_available():
     from accelerate import init_empty_weights
     from accelerate.utils import set_module_tensor_to_device
 
-logger = InvokeAILogger.getLogger(__name__)
+logger = InvokeAILogger.get_logger(__name__)
 CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().models_path / "core/convert"
 
 
@@ -1279,12 +1279,12 @@ def download_from_original_stable_diffusion_ckpt(
         extract_ema = original_config["model"]["params"]["use_ema"]
 
     if (
-        model_version == BaseModelType.StableDiffusion2
+        model_version in [BaseModelType.StableDiffusion2, BaseModelType.StableDiffusion1]
         and original_config["model"]["params"].get("parameterization") == "v"
     ):
         prediction_type = "v_prediction"
         upcast_attention = True
-        image_size = 768
+        image_size = 768 if model_version == BaseModelType.StableDiffusion2 else 512
     else:
         prediction_type = "epsilon"
         upcast_attention = False
