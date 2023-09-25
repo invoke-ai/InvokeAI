@@ -260,6 +260,16 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def cancel_all_jobs(self):
+        """Cancel all active jobs."""
+        pass
+
+    @abstractmethod
+    def prune_jobs(self):
+        """Remove completed or errored install jobs."""
+        pass
+
+    @abstractmethod
     def change_job_priority(self, job_id: int, delta: int):
         """
         Change an install job's priority.
@@ -473,6 +483,16 @@ class ModelManagerService(ModelManagerServiceBase):
         """Cancel the given install job."""
         queue = self._loader.queue
         queue.cancel_job(queue.id_to_job(job_id))
+
+    def cancel_all_jobs(self):
+        """Cancel all active install job."""
+        queue = self._loader.queue
+        queue.cancel_all_jobs()
+
+    def prune_jobs(self):
+        """Cancel all active install job."""
+        queue = self._loader.queue
+        queue.prune_jobs()
 
     def change_job_priority(self, job_id: int, delta: int):
         """

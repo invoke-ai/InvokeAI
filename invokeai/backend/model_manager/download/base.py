@@ -225,6 +225,13 @@ class DownloadQueueBase(ABC):
         pass
 
     @abstractmethod
+    def prune_jobs(self):
+        """
+        Prune completed and errored queue items from the job list.
+        """
+        pass
+
+    @abstractmethod
     def cancel_all_jobs(self, preserve_partial: bool = False):
         """
         Cancel all active and enquedjobs.

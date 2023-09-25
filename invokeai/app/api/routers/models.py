@@ -414,7 +414,7 @@ async def list_install_jobs() -> List[ModelImportStatus]:
 
 
 @models_router.patch(
-    "/jobs/{job_id}",
+    "/jobs/control/{operation}/{job_id}",
     operation_id="control_install_jobs",
     responses={
         200: {"description": "The control job was updated successfully"},
@@ -426,7 +426,7 @@ async def list_install_jobs() -> List[ModelImportStatus]:
 )
 async def control_install_jobs(
     job_id: int = Path(description="Install job_id for start, pause and cancel operations"),
-    operation: JobControlOperation = Body(description="The operation to perform on the job."),
+    operation: JobControlOperation = Path(description="The operation to perform on the job."),
     priority_delta: Optional[int] = Body(
         description="Change in job priority for priority operations only. Negative numbers increase priority.",
         default=None,
@@ -449,6 +449,7 @@ async def control_install_jobs(
 
         elif operation == JobControlOperation.CHANGE_PRIORITY:
             mgr.change_job_priority(job_id, priority_delta)
+
         else:
             raise ValueError(f"Unknown operation {JobControlOperation.value}")
 
@@ -465,6 +466,51 @@ async def control_install_jobs(
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@models_router.patch(
+    "/jobs/cancel_all",
+    operation_id="cancel_all_jobs",
+    responses={
+        204: {"description": "All jobs cancelled successfully"},
+        400: {"description": "Bad request"},
+    },
+    status_code=200,
+    response_model=ModelImportStatus,
+)
+async def cancel_install_jobs():
+    """Cancel all pending install jobs."""
+    logger = ApiDependencies.invoker.services.logger
+    try:
+        mgr = ApiDependencies.invoker.services.model_manager
+        logger.info("Cancelling all running model installation jobs.")
+        mgr.cancel_all_jobs()
+        return Response(status_code=204)
+    except Exception as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@models_router.patch(
+    "/jobs/prune",
+    operation_id="prune_jobs",
+    responses={
+        204: {"description": "All jobs cancelled successfully"},
+        400: {"description": "Bad request"},
+    },
+    status_code=200,
+    response_model=ModelImportStatus,
+)
+async def prune_jobs():
+    """Prune all completed and errored jobs."""
+    logger = ApiDependencies.invoker.services.logger
+    try:
+        mgr = ApiDependencies.invoker.services.model_manager
+        mgr.prune_jobs()
+        return Response(status_code=204)
     except Exception as e:
         logger.error(str(e))
         raise HTTPException(status_code=400, detail=str(e))

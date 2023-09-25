@@ -192,6 +192,21 @@ class DownloadQueue(DownloadQueueBase):
         finally:
             self._lock.release()
 
+    def prune_jobs(self):
+        """
+        Prune completed and errored queue items from the job list.
+        """
+        try:
+            self._lock.acquire()
+            to_delete = set()
+            for job in self._jobs:
+                if self._in_terminal_state(job):
+                    self._job.remove(job)
+        except KeyError as excp:
+            raise UnknownJobIDException("Unrecognized job") from excp
+        finally:
+            self._lock.release()
+
     def cancel_job(self, job: DownloadJobBase, preserve_partial: bool = False):
         """
         Cancel the indicated job.
@@ -321,9 +336,6 @@ class DownloadQueue(DownloadQueueBase):
 
             if job.status == DownloadJobStatus.CANCELLED:
                 self._cleanup_cancelled_job(job)
-
-            if self._in_terminal_state(job):
-                del self._jobs[job.id]
 
             self._queue.task_done()
 
