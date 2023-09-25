@@ -112,28 +112,32 @@ class ModelProbe(ModelProbeBase):
     @classmethod
     def probe(
         cls,
-        model: Path,
+        model_path: Path,
         prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
     ) -> Optional[ModelProbeInfo]:
         """Probe model."""
         try:
             model_type = (
-                cls.get_model_type_from_folder(model) if model.is_dir() else cls.get_model_type_from_checkpoint(model)
+                cls.get_model_type_from_folder(model_path)
+                if model_path.is_dir()
+                else cls.get_model_type_from_checkpoint(model_path)
             )
-            format_type = "onnx" if model_type == ModelType.ONNX else "diffusers" if model.is_dir() else "checkpoint"
+            format_type = (
+                "onnx" if model_type == ModelType.ONNX else "diffusers" if model_path.is_dir() else "checkpoint"
+            )
 
             probe_class = cls.PROBES[format_type].get(model_type)
 
             if not probe_class:
                 return None
 
-            probe = probe_class(model, prediction_type_helper)
+            probe = probe_class(model_path, prediction_type_helper)
 
             base_type = probe.get_base_type()
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
             format = probe.get_format()
-            hash = FastModelHash.hash(model)
+            hash = FastModelHash.hash(model_path)
 
             model_info = ModelProbeInfo(
                 model_type=model_type,
@@ -161,19 +165,19 @@ class ModelProbe(ModelProbeBase):
         return model_info
 
     @classmethod
-    def get_model_type_from_checkpoint(cls, model: Path) -> Optional[ModelType]:
+    def get_model_type_from_checkpoint(cls, model_path: Path) -> Optional[ModelType]:
         """
         Scan a checkpoint model and return its ModelType.
 
-        :param model: path to the model checkpoint/safetensors file
+        :param model_path: path to the model checkpoint/safetensors file
         """
-        if model.suffix not in (".bin", ".pt", ".ckpt", ".safetensors", ".pth"):
+        if model_path.suffix not in (".bin", ".pt", ".ckpt", ".safetensors", ".pth"):
             return None
 
-        if model.name == "learned_embeds.bin":
+        if model_path.name == "learned_embeds.bin":
             return ModelType.TextualInversion
 
-        ckpt = read_checkpoint_meta(model, scan=True)
+        ckpt = read_checkpoint_meta(model_path, scan=True)
         ckpt = ckpt.get("state_dict", ckpt)
 
         for key in ckpt.keys():
@@ -195,14 +199,14 @@ class ModelProbe(ModelProbeBase):
             if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
                 return ModelType.TextualInversion
 
-        raise InvalidModelException(f"Unable to determine model type for {model}")
+        raise InvalidModelException(f"Unable to determine model type for {model_path}")
 
     @classmethod
     def get_model_type_from_folder(cls, folder_path: Path) -> Optional[ModelType]:
         """
         Get the model type of a hugging-face style folder.
 
-        :param model: Path to model folder.
+        :param folder_path: Path to model folder.
         """
         class_name = None
         if (folder_path / "unet/model.onnx").exists():
@@ -227,7 +231,7 @@ class ModelProbe(ModelProbeBase):
             return type
 
         # give up
-        raise InvalidModelException(f"Unable to determine model type for {model}")
+        raise InvalidModelException(f"Unable to determine model type for {folder_path}")
 
     @classmethod
     def _scan_and_load_checkpoint(cls, model: Path) -> dict:
@@ -314,26 +318,36 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
         else:
             raise InvalidModelException("Cannot determine base type")
 
-    def get_scheduler_prediction_type(self) -> SchedulerPredictionType:
-        """Return the SchedulerPredictionType for the checkpoint-style main model."""
+    def get_scheduler_prediction_type(self) -> Optional[SchedulerPredictionType]:
+        """Return model prediction type."""
+        # if there is a .yaml associated with this checkpoint, then we do not need
+        # to probe for the prediction type as it will be ignored.
+        if self.checkpoint_path and self.checkpoint_path.with_suffix(".yaml").exists():
+            return None
+
         type = self.get_base_type()
-        if type == BaseModelType.StableDiffusion1:
-            return SchedulerPredictionType.Epsilon
-        checkpoint = self.checkpoint
-        state_dict = self.checkpoint.get("state_dict") or checkpoint
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
-            if "global_step" in checkpoint:
-                if checkpoint["global_step"] == 220000:
-                    return SchedulerPredictionType.Epsilon
-                elif checkpoint["global_step"] == 110000:
-                    return SchedulerPredictionType.VPrediction
-            if (
-                self.model and self.helper and not self.model.with_suffix(".yaml").exists()
-            ):  # if a .yaml config file exists, then this step not needed
-                return self.helper(self.model)
-            else:
-                return None
+        if type == BaseModelType.StableDiffusion2:
+            checkpoint = self.checkpoint
+            state_dict = self.checkpoint.get("state_dict") or checkpoint
+            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
+            if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
+                if "global_step" in checkpoint:
+                    if checkpoint["global_step"] == 220000:
+                        return SchedulerPredictionType.Epsilon
+                    elif checkpoint["global_step"] == 110000:
+                        return SchedulerPredictionType.VPrediction
+            if self.helper and self.checkpoint_path:
+                if helper_guess := self.helper(self.checkpoint_path):
+                    return helper_guess
+            return SchedulerPredictionType.VPrediction  # a guess for sd2 ckpts
+
+        elif type == BaseModelType.StableDiffusion1:
+            if self.helper and self.checkpoint_path:
+                if helper_guess := self.helper(self.checkpoint_path):
+                    return helper_guess
+            return SchedulerPredictionType.Epsilon  # a reasonable guess for sd1 ckpts
+        else:
+            return None
 
 
 class VaeCheckpointProbe(CheckpointProbeBase):
@@ -494,6 +508,8 @@ class PipelineFolderProbe(FolderProbeBase):
 
 
 class VaeFolderProbe(FolderProbeBase):
+    """Class for probing folder-style models."""
+
     def get_base_type(self) -> BaseModelType:
         if self._config_looks_like_sdxl():
             return BaseModelType.StableDiffusionXL
@@ -597,6 +613,8 @@ class LoRAFolderProbe(FolderProbeBase):
 
 
 class IPAdapterFolderProbe(FolderProbeBase):
+    """Class for probing IP-Adapter models."""
+
     def get_format(self) -> str:
         return ModelFormat.InvokeAI.value
 

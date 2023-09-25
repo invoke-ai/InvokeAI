@@ -103,3 +103,35 @@ sd-1/lora/LowRA:
    recommended: True
 sd-1/lora/Ink scenery:
    source: https://civitai.com/api/download/models/83390
+sd-1/ip_adapter/ip_adapter_sd15:
+   source: InvokeAI/ip_adapter_sd15
+   recommended: True
+   requires:
+      - InvokeAI/ip_adapter_sd_image_encoder
+   description: IP-Adapter for SD 1.5 models
+sd-1/ip_adapter/ip_adapter_plus_sd15:
+   source: InvokeAI/ip_adapter_plus_sd15
+   recommended: False
+   requires:
+      - InvokeAI/ip_adapter_sd_image_encoder
+   description: Refined IP-Adapter for SD 1.5 models
+sd-1/ip_adapter/ip_adapter_plus_face_sd15:
+   source: InvokeAI/ip_adapter_plus_face_sd15
+   recommended: False
+   requires:
+      - InvokeAI/ip_adapter_sd_image_encoder
+   description: Refined IP-Adapter for SD 1.5 models, adapted for faces
+sdxl/ip_adapter/ip_adapter_sdxl:
+   source: InvokeAI/ip_adapter_sdxl
+   recommended: False
+   requires:
+      - InvokeAI/ip_adapter_sdxl_image_encoder
+   description: IP-Adapter for SDXL models
+any/clip_vision/ip_adapter_sd_image_encoder:
+   source: InvokeAI/ip_adapter_sd_image_encoder
+   recommended: False
+   description: Required model for using IP-Adapters with SD-1/2 models
+any/clip_vision/ip_adapter_sdxl_image_encoder:
+   source: InvokeAI/ip_adapter_sdxl_image_encoder
+   recommended: False
+   description: Required model for using IP-Adapters with SDXL models

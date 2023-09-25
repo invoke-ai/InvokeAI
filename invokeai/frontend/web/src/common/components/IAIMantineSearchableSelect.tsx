@@ -70,11 +70,10 @@ const IAIMantineSearchableSelect = forwardRef((props: IAISelectProps, ref) => {
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
-      <FormControl ref={ref} isDisabled={disabled}>
+      <FormControl ref={ref} isDisabled={disabled} position="static">
         {label && <FormLabel>{label}</FormLabel>}
         <Select
           ref={inputRef}
-          withinPortal
           disabled={disabled}
           searchValue={searchValue}
           onSearchChange={setSearchValue}

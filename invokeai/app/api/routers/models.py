@@ -132,7 +132,8 @@ async def update_model(
 async def import_model(
     location: str = Body(description="A model path, repo_id or URL to import"),
     prediction_type: Optional[Literal["v_prediction", "epsilon", "sample"]] = Body(
-        description="Prediction type for SDv2 checkpoint files", default="v_prediction"
+        description="Prediction type for SDv2 checkpoints and rare SDv1 checkpoints",
+        default=None,
     ),
     priority: Optional[int] = Body(
         description="Which import jobs run first. Lower values run before higher ones.",

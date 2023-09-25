@@ -47,20 +47,27 @@ class DefaultSessionProcessor(SessionProcessorBase):
     async def _on_queue_event(self, event: FastAPIEvent) -> None:
         event_name = event[1]["event"]
 
-        match event_name:
-            case "graph_execution_state_complete" | "invocation_error" | "session_retrieval_error" | "invocation_retrieval_error":
-                self.__queue_item = None
-                self._poll_now()
-            case "session_canceled" if self.__queue_item is not None and self.__queue_item.session_id == event[1][
-                "data"
-            ]["graph_execution_state_id"]:
-                self.__queue_item = None
-                self._poll_now()
-            case "batch_enqueued":
-                self._poll_now()
-            case "queue_cleared":
-                self.__queue_item = None
-                self._poll_now()
+        # This was a match statement, but match is not supported on python 3.9
+        if event_name in [
+            "graph_execution_state_complete",
+            "invocation_error",
+            "session_retrieval_error",
+            "invocation_retrieval_error",
+        ]:
+            self.__queue_item = None
+            self._poll_now()
+        elif (
+            event_name == "session_canceled"
+            and self.__queue_item is not None
+            and self.__queue_item.session_id == event[1]["data"]["graph_execution_state_id"]
+        ):
+            self.__queue_item = None
+            self._poll_now()
+        elif event_name == "batch_enqueued":
+            self._poll_now()
+        elif event_name == "queue_cleared":
+            self.__queue_item = None
+            self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
         if not self.__resume_event.is_set():
