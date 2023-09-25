@@ -59,6 +59,7 @@ import {
 } from '../types/types';
 import { NodesState } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
+import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 
 export const WORKFLOW_FORMAT_VERSION = '1.0.0';
 
@@ -182,35 +183,22 @@ const nodesSlice = createSlice({
       };
 
       if (state.connectionStartParams) {
-        const handleType = state.connectionStartParams.handleType;
-        const currentFieldType = state.currentConnectionFieldType;
-        if (currentFieldType) {
-          const handles =
-            handleType == 'source' ? node.data.inputs : node.data.outputs;
-          const matchingInputField = Object.values(handles).find(
-            (input) => input.type === currentFieldType
+        const { nodeId, handleId, handleType } = state.connectionStartParams;
+        if (
+          nodeId &&
+          handleId &&
+          handleType &&
+          state.currentConnectionFieldType
+        ) {
+          const newConnection = findConnectionToValidHandle(
+            node,
+            nodeId,
+            handleId,
+            handleType,
+            state.currentConnectionFieldType
           );
-
-          if (matchingInputField) {
-            const newConnection: Connection = {
-              source:
-                handleType == 'source'
-                  ? state.connectionStartParams.nodeId
-                  : node.id,
-              target:
-                handleType == 'source'
-                  ? node.id
-                  : state.connectionStartParams.nodeId,
-              sourceHandle:
-                handleType == 'source'
-                  ? state.connectionStartParams.handleId
-                  : matchingInputField.name,
-              targetHandle:
-                handleType == 'source'
-                  ? matchingInputField.name
-                  : state.connectionStartParams.handleId,
-            };
-
+          console.log('newConnection', newConnection);
+          if (newConnection) {
             state.edges = addEdge(
               { ...newConnection, type: 'default' },
               state.edges
@@ -256,7 +244,41 @@ const nodesSlice = createSlice({
     },
     connectionEnded: (state) => {
       if (!state.connectionMade) {
-        state.isAddNodePopoverOpen = true; //TODO: Set this to use the function, if I can figure out how
+        if (state.mouseOverNode) {
+          const nodeIndex = state.nodes.findIndex(
+            (n) => n.id === state.mouseOverNode
+          );
+          const mouseOverNode = state.nodes?.[nodeIndex];
+          if (mouseOverNode && state.connectionStartParams) {
+            const { nodeId, handleId, handleType } =
+              state.connectionStartParams;
+            if (
+              nodeId &&
+              handleId &&
+              handleType &&
+              state.currentConnectionFieldType
+            ) {
+              const newConnection = findConnectionToValidHandle(
+                mouseOverNode,
+                nodeId,
+                handleId,
+                handleType,
+                state.currentConnectionFieldType
+              );
+              console.log('newConnection', newConnection);
+              if (newConnection) {
+                state.edges = addEdge(
+                  { ...newConnection, type: 'default' },
+                  state.edges
+                );
+              }
+            }
+          }
+          state.connectionStartParams = null;
+          state.currentConnectionFieldType = null;
+        } else {
+          state.isAddNodePopoverOpen = true;
+        }
       } else {
         state.connectionStartParams = null;
         state.currentConnectionFieldType = null;
