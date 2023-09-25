@@ -8,7 +8,6 @@ app_config.parse_args()
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import asyncio
-    import logging
     import mimetypes
     import socket
     from inspect import signature
