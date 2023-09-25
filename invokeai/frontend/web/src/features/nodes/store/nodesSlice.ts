@@ -192,6 +192,8 @@ const nodesSlice = createSlice({
         ) {
           const newConnection = findConnectionToValidHandle(
             node,
+            state.nodes,
+            state.edges,
             nodeId,
             handleId,
             handleType,
@@ -240,6 +242,7 @@ const nodesSlice = createSlice({
         { ...action.payload, type: 'default' },
         state.edges
       );
+
       state.connectionMade = true;
     },
     connectionEnded: (state) => {
@@ -260,12 +263,13 @@ const nodesSlice = createSlice({
             ) {
               const newConnection = findConnectionToValidHandle(
                 mouseOverNode,
+                state.nodes,
+                state.edges,
                 nodeId,
                 handleId,
                 handleType,
                 state.currentConnectionFieldType
               );
-              console.log('newConnection', newConnection);
               if (newConnection) {
                 state.edges = addEdge(
                   { ...newConnection, type: 'default' },
