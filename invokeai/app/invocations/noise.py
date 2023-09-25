@@ -129,7 +129,7 @@ class NoiseInvocation(BaseInvocation):
     "blend_noise", title="Blend Noise", tags=["latents", "noise", "variations"], category="latents", version="1.0.0"
 )
 class BlendNoiseInvocation(BaseInvocation):
-    """Blend two noise tensors according to a proportion. Useful for generating variations."""
+    """Blend two noise tensors proportionately. Useful for generating variations."""
 
     noise_A: LatentsField = InputField(description=FieldDescriptions.noise, input=Input.Connection, ui_order=0)
     noise_B: LatentsField = InputField(description=FieldDescriptions.noise, input=Input.Connection, ui_order=1)
