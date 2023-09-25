@@ -254,4 +254,5 @@ export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
   mediapipe: 'mediapipe_face_processor',
   pidi: 'pidi_image_processor',
   zoe: 'zoe_depth_image_processor',
+  color: 'color_map_image_processor',
 };
