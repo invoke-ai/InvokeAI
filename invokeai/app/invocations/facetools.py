@@ -1,6 +1,3 @@
-## FaceTools 3.9
-## Nodes for InvokeAI, written by YMGenesis/Matthew Janik & JPPhoto/Jonathan S. Pollack
-
 import math
 from typing import TypedDict
 
