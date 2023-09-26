@@ -15,6 +15,7 @@ import {
   NodeChange,
   OnConnectStartParams,
   SelectionMode,
+  updateEdge,
   Viewport,
   XYPosition,
 } from 'reactflow';
@@ -181,6 +182,16 @@ const nodesSlice = createSlice({
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
+    },
+    edgeAdded: (state, action: PayloadAction<Edge>) => {
+      state.edges = addEdge(action.payload, state.edges);
+    },
+    edgeUpdated: (
+      state,
+      action: PayloadAction<{ oldEdge: Edge; newConnection: Connection }>
+    ) => {
+      const { oldEdge, newConnection } = action.payload;
+      state.edges = updateEdge(oldEdge, newConnection, state.edges);
     },
     connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
       state.connectionStartParams = action.payload;
@@ -366,6 +377,7 @@ const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
+                updatable: false,
               });
             }
           }
@@ -388,6 +400,7 @@ const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
+                updatable: false,
               });
             }
           }
@@ -399,6 +412,9 @@ const nodesSlice = createSlice({
           );
         }
       }
+    },
+    edgeDeleted: (state, action: PayloadAction<string>) => {
+      state.edges = state.edges.filter((e) => e.id !== action.payload);
     },
     edgesDeleted: (state, action: PayloadAction<Edge[]>) => {
       const edges = action.payload;
@@ -890,69 +906,72 @@ const nodesSlice = createSlice({
 });
 
 export const {
-  nodesChanged,
-  edgesChanged,
-  nodeAdded,
-  nodesDeleted,
+  addNodePopoverClosed,
+  addNodePopoverOpened,
+  addNodePopoverToggled,
+  connectionEnded,
   connectionMade,
   connectionStarted,
-  connectionEnded,
-  shouldShowFieldTypeLegendChanged,
-  shouldShowMinimapPanelChanged,
-  nodeTemplatesBuilt,
-  nodeEditorReset,
-  imageCollectionFieldValueChanged,
-  fieldStringValueChanged,
-  fieldNumberValueChanged,
+  edgeDeleted,
+  edgesChanged,
+  edgesDeleted,
+  edgeUpdated,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
-  fieldImageValueChanged,
   fieldColorValueChanged,
-  fieldMainModelValueChanged,
-  fieldVaeModelValueChanged,
-  fieldLoRAModelValueChanged,
-  fieldEnumModelValueChanged,
   fieldControlNetModelValueChanged,
+  fieldEnumModelValueChanged,
+  fieldImageValueChanged,
   fieldIPAdapterModelValueChanged,
+  fieldLabelChanged,
+  fieldLoRAModelValueChanged,
+  fieldMainModelValueChanged,
+  fieldNumberValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
+  fieldStringValueChanged,
+  fieldVaeModelValueChanged,
+  imageCollectionFieldValueChanged,
+  mouseOverFieldChanged,
+  mouseOverNodeChanged,
+  nodeAdded,
+  nodeEditorReset,
+  nodeEmbedWorkflowChanged,
+  nodeExclusivelySelected,
+  nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,
-  edgesDeleted,
-  shouldValidateGraphChanged,
-  shouldAnimateEdgesChanged,
   nodeOpacityChanged,
-  shouldSnapToGridChanged,
-  shouldColorEdgesChanged,
-  selectedNodesChanged,
-  selectedEdgesChanged,
-  workflowNameChanged,
-  workflowDescriptionChanged,
-  workflowTagsChanged,
-  workflowAuthorChanged,
-  workflowNotesChanged,
-  workflowVersionChanged,
-  workflowContactChanged,
-  workflowLoaded,
+  nodesChanged,
+  nodesDeleted,
+  nodeTemplatesBuilt,
+  nodeUseCacheChanged,
   notesNodeValueChanged,
+  selectedAll,
+  selectedEdgesChanged,
+  selectedNodesChanged,
+  selectionCopied,
+  selectionModeChanged,
+  selectionPasted,
+  shouldAnimateEdgesChanged,
+  shouldColorEdgesChanged,
+  shouldShowFieldTypeLegendChanged,
+  shouldShowMinimapPanelChanged,
+  shouldSnapToGridChanged,
+  shouldValidateGraphChanged,
+  viewportChanged,
+  workflowAuthorChanged,
+  workflowContactChanged,
+  workflowDescriptionChanged,
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
-  fieldLabelChanged,
-  viewportChanged,
-  mouseOverFieldChanged,
-  selectionCopied,
-  selectionPasted,
-  selectedAll,
-  addNodePopoverOpened,
-  addNodePopoverClosed,
-  addNodePopoverToggled,
-  selectionModeChanged,
-  nodeEmbedWorkflowChanged,
-  nodeIsIntermediateChanged,
-  mouseOverNodeChanged,
-  nodeExclusivelySelected,
-  nodeUseCacheChanged,
+  workflowLoaded,
+  workflowNameChanged,
+  workflowNotesChanged,
+  workflowTagsChanged,
+  workflowVersionChanged,
+  edgeAdded,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
