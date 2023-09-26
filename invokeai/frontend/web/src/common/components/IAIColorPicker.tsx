@@ -1,18 +1,9 @@
-import { chakra, ChakraProps } from '@chakra-ui/react';
+import { Box, ChakraProps } from '@chakra-ui/react';
 import { memo } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
 
-type IAIColorPickerProps = Omit<ColorPickerBaseProps<RgbaColor>, 'color'> &
-  ChakraProps & {
-    pickerColor: RgbaColor;
-    styleClass?: string;
-  };
-
-const ChakraRgbaColorPicker = chakra(RgbaColorPicker, {
-  baseStyle: { paddingInline: 4 },
-  shouldForwardProp: (prop) => !['pickerColor'].includes(prop),
-});
+type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor>;
 
 const colorPickerStyles: NonNullable<ChakraProps['sx']> = {
   width: 6,
@@ -20,19 +11,17 @@ const colorPickerStyles: NonNullable<ChakraProps['sx']> = {
   borderColor: 'base.100',
 };
 
-const IAIColorPicker = (props: IAIColorPickerProps) => {
-  const { styleClass = '', ...rest } = props;
+const sx = {
+  '.react-colorful__hue-pointer': colorPickerStyles,
+  '.react-colorful__saturation-pointer': colorPickerStyles,
+  '.react-colorful__alpha-pointer': colorPickerStyles,
+};
 
+const IAIColorPicker = (props: IAIColorPickerProps) => {
   return (
-    <ChakraRgbaColorPicker
-      sx={{
-        '.react-colorful__hue-pointer': colorPickerStyles,
-        '.react-colorful__saturation-pointer': colorPickerStyles,
-        '.react-colorful__alpha-pointer': colorPickerStyles,
-      }}
-      className={styleClass}
-      {...rest}
-    />
+    <Box sx={sx}>
+      <RgbaColorPicker {...props} />
+    </Box>
   );
 };
 

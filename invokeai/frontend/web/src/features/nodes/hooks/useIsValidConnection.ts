@@ -3,12 +3,7 @@ import graphlib from '@dagrejs/graphlib';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { Connection, Edge, Node, useReactFlow } from 'reactflow';
-import {
-  COLLECTION_MAP,
-  COLLECTION_TYPES,
-  POLYMORPHIC_TO_SINGLE_MAP,
-  POLYMORPHIC_TYPES,
-} from '../types/constants';
+import { validateSourceAndTargetTypes } from '../store/util/validateSourceAndTargetTypes';
 import { InvocationNodeData } from '../types/types';
 
 /**
@@ -23,11 +18,6 @@ export const useIsValidConnection = () => {
   );
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
-      if (!shouldValidateGraph) {
-        // manual override!
-        return true;
-      }
-
       const edges = flow.getEdges();
       const nodes = flow.getNodes();
       // Connection must have valid targets
@@ -50,6 +40,16 @@ export const useIsValidConnection = () => {
       if (!sourceType || !targetType) {
         // something has gone terribly awry
         return false;
+      }
+
+      if (source === target) {
+        // Don't allow nodes to connect to themselves, even if validation is disabled
+        return false;
+      }
+
+      if (!shouldValidateGraph) {
+        // manual override!
+        return true;
       }
 
       if (
@@ -76,60 +76,8 @@ export const useIsValidConnection = () => {
         return false;
       }
 
-      /**
-       * Connection types must be the same for a connection, with exceptions:
-       * - CollectionItem can connect to any non-Collection
-       * - Non-Collections can connect to CollectionItem
-       * - Anything (non-Collections, Collections, Polymorphics) can connect to Polymorphics of the same base type
-       * - Generic Collection can connect to any other Collection or Polymorphic
-       * - Any Collection can connect to a Generic Collection
-       */
-
-      if (sourceType !== targetType) {
-        const isCollectionItemToNonCollection =
-          sourceType === 'CollectionItem' &&
-          !COLLECTION_TYPES.includes(targetType);
-
-        const isNonCollectionToCollectionItem =
-          targetType === 'CollectionItem' &&
-          !COLLECTION_TYPES.includes(sourceType) &&
-          !POLYMORPHIC_TYPES.includes(sourceType);
-
-        const isAnythingToPolymorphicOfSameBaseType =
-          POLYMORPHIC_TYPES.includes(targetType) &&
-          (() => {
-            if (!POLYMORPHIC_TYPES.includes(targetType)) {
-              return false;
-            }
-            const baseType =
-              POLYMORPHIC_TO_SINGLE_MAP[
-                targetType as keyof typeof POLYMORPHIC_TO_SINGLE_MAP
-              ];
-
-            const collectionType =
-              COLLECTION_MAP[baseType as keyof typeof COLLECTION_MAP];
-
-            return sourceType === baseType || sourceType === collectionType;
-          })();
-
-        const isGenericCollectionToAnyCollectionOrPolymorphic =
-          sourceType === 'Collection' &&
-          (COLLECTION_TYPES.includes(targetType) ||
-            POLYMORPHIC_TYPES.includes(targetType));
-
-        const isCollectionToGenericCollection =
-          targetType === 'Collection' && COLLECTION_TYPES.includes(sourceType);
-
-        const isIntToFloat = sourceType === 'integer' && targetType === 'float';
-
-        return (
-          isCollectionItemToNonCollection ||
-          isNonCollectionToCollectionItem ||
-          isAnythingToPolymorphicOfSameBaseType ||
-          isGenericCollectionToAnyCollectionOrPolymorphic ||
-          isCollectionToGenericCollection ||
-          isIntToFloat
-        );
+      if (!validateSourceAndTargetTypes(sourceType, targetType)) {
+        return false;
       }
 
       // Graphs much be acyclic (no loops!)

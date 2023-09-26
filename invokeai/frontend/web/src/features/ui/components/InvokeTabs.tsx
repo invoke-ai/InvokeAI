@@ -14,7 +14,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
-import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -110,7 +110,7 @@ export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 
 const InvokeTabs = () => {
-  const activeTab = useAppSelector(activeTabIndexSelector);
+  const activeTabIndex = useAppSelector(activeTabIndexSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const { t } = useTranslation();
@@ -150,13 +150,13 @@ const InvokeTabs = () => {
 
   const handleTabChange = useCallback(
     (index: number) => {
-      const activeTabName = tabMap[index];
-      if (!activeTabName) {
+      const tab = enabledTabs[index];
+      if (!tab) {
         return;
       }
-      dispatch(setActiveTab(activeTabName));
+      dispatch(setActiveTab(tab.id));
     },
-    [dispatch]
+    [dispatch, enabledTabs]
   );
 
   const {
@@ -216,8 +216,8 @@ const InvokeTabs = () => {
   return (
     <Tabs
       variant="appTabs"
-      defaultIndex={activeTab}
-      index={activeTab}
+      defaultIndex={activeTabIndex}
+      index={activeTabIndex}
       onChange={handleTabChange}
       sx={{
         flexGrow: 1,
