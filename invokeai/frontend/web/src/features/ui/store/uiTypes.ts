@@ -1,4 +1,5 @@
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
+import { InvokeTabName } from './tabMap';
 
 export type Coordinates = {
   x: number;
@@ -13,7 +14,7 @@ export type Dimensions = {
 export type Rect = Coordinates & Dimensions;
 
 export interface UIState {
-  activeTab: number;
+  activeTab: InvokeTabName;
   shouldShowImageDetails: boolean;
   shouldUseCanvasBetaLayout: boolean;
   shouldShowExistingModelsInSearch: boolean;
