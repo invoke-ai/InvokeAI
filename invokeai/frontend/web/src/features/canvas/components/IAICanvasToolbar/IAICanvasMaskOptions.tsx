@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -135,11 +135,12 @@ const IAICanvasMaskOptions = () => {
             dispatch(setShouldPreserveMaskedArea(e.target.checked))
           }
         />
-        <IAIColorPicker
-          sx={{ paddingTop: 2, paddingBottom: 2 }}
-          pickerColor={maskColor}
-          onChange={(newColor) => dispatch(setMaskColor(newColor))}
-        />
+        <Box sx={{ paddingTop: 2, paddingBottom: 2 }}>
+          <IAIColorPicker
+            color={maskColor}
+            onChange={(newColor) => dispatch(setMaskColor(newColor))}
+          />
+        </Box>
         <IAIButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
           Save Mask
         </IAIButton>

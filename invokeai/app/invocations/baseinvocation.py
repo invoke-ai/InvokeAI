@@ -91,6 +91,9 @@ class FieldDescriptions:
     board = "The board to save the image to"
     image = "The image to process"
     tile_size = "Tile size"
+    inclusive_low = "The inclusive low value"
+    exclusive_high = "The exclusive high value"
+    decimal_places = "The number of decimal places to round to"
 
 
 class Input(str, Enum):
