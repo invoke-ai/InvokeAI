@@ -1210,22 +1210,21 @@ export const zParsedSemver = zSemVer.transform((val) => {
 
 export type SemVer = z.infer<typeof zSemVer>;
 
-export const zInvocationNodeData = z
-  .object({
-    id: z.string().trim().min(1),
-    // no easy way to build this dynamically, and we don't want to anyways, because this will be used
-    // to validate incoming workflows, and we want to allow community nodes.
-    type: z.string().trim().min(1),
-    inputs: z.record(zInputFieldValue),
-    outputs: z.record(zOutputFieldValue),
-    label: z.string(),
-    isOpen: z.boolean(),
-    notes: z.string(),
-    embedWorkflow: z.boolean(),
-    isIntermediate: z.boolean(),
-    version: zSemVer.optional(),
-  })
-  .passthrough();
+export const zInvocationNodeData = z.object({
+  id: z.string().trim().min(1),
+  // no easy way to build this dynamically, and we don't want to anyways, because this will be used
+  // to validate incoming workflows, and we want to allow community nodes.
+  type: z.string().trim().min(1),
+  inputs: z.record(zInputFieldValue),
+  outputs: z.record(zOutputFieldValue),
+  label: z.string(),
+  isOpen: z.boolean(),
+  notes: z.string(),
+  embedWorkflow: z.boolean(),
+  isIntermediate: z.boolean(),
+  useCache: z.boolean().optional(),
+  version: zSemVer.optional(),
+});
 
 export const zInvocationNodeDataV2 = z.preprocess(
   (arg) => {
