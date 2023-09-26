@@ -65,23 +65,23 @@ class DivideInvocation(BaseInvocation):
 class RandomIntInvocation(BaseInvocation):
     """Outputs a single random integer."""
 
-    low: int = InputField(default=0, description="The inclusive low value")
-    high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
+    low: int = InputField(default=0, description=FieldDescriptions.inclusive_low)
+    high: int = InputField(default=np.iinfo(np.int32).max, description=FieldDescriptions.exclusive_high)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=np.random.randint(self.low, self.high))
 
 
-@invocation("rand_float",title="Random Float",tags=["math","float","random"],category="math",version="1.0.0")
+@invocation("rand_float", title="Random Float", tags=["math", "float", "random"], category="math", version="1.0.0")
 class RandomFloatInvocation(BaseInvocation):
-    """Output a random value between min and max"""
-    
-    min: float = InputField(default=0.0, description="The mimimum returned value")
-    max: float = InputField(default=1.0, description="The maximum returned value")
-    decimals: int = InputField(default=2, description="The number of decimal places in the generated float")
+    """Outputs a single random float"""
 
-    def invoke(self, context:InvocationContext) -> FloatOutput:
-        random_float = np.random.uniform(self.min, self.max)
+    low: float = InputField(default=0.0, description=FieldDescriptions.inclusive_low)
+    high: float = InputField(default=1.0, description=FieldDescriptions.exclusive_high)
+    decimals: int = InputField(default=2, description=FieldDescriptions.decimal_places)
+
+    def invoke(self, context: InvocationContext) -> FloatOutput:
+        random_float = np.random.uniform(self.low, self.high)
         rounded_float = round(random_float, self.decimals)
         return FloatOutput(value=rounded_float)
 
