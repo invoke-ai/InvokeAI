@@ -156,8 +156,6 @@ async def import_model(
     prediction_types = {x.value: x for x in SchedulerPredictionType}
     logger = ApiDependencies.invoker.services.logger
 
-    print(f"DEBUG: prediction_type = {prediction_type}")
-
     try:
         installed_models = ApiDependencies.invoker.services.model_manager.heuristic_import(
             items_to_import=items_to_import, prediction_type_helper=lambda x: prediction_types.get(prediction_type)
