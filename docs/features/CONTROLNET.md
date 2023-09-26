@@ -139,7 +139,7 @@ Additionally, each ControlNet section can be expanded in order to manipulate set
 [IP-Adapter](https://ip-adapter.github.io) is a tooling that allows for image prompt capabilities with text-to-image diffusion models. IP-Adapter works by analyzing the given image prompt to extract features, then passing those features to the UNet along with any other conditioning provided. 
 
 ![IP-Adapter + T2I](https://github.com/tencent-ailab/IP-Adapter/raw/main/assets/demo/ip_adpter_plus_multi.jpg)
-![IP-Adapter + T2I](https://github.com/tencent-ailab/IP-Adapter/blob/main/assets/demo/image-to-image.jpg)
+![IP-Adapter + IMG2IMG](https://github.com/tencent-ailab/IP-Adapter/blob/main/assets/demo/image-to-image.jpg)
 
 #### Installation
 There are several ways to install IP-Adapter models with an existing InvokeAI installation:
