@@ -717,6 +717,7 @@
         "cannotConnectInputToInput": "Cannot connect input to input",
         "cannotConnectOutputToOutput": "Cannot connect output to output",
         "cannotConnectToSelf": "Cannot connect to self",
+        "cannotDuplicateConnection": "Cannot create duplicate connections",
         "clipField": "Clip",
         "clipFieldDescription": "Tokenizer and text_encoder submodels.",
         "collection": "Collection",
