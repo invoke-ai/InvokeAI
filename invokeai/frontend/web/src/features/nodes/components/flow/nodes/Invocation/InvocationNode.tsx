@@ -8,6 +8,7 @@ import InvocationNodeFooter from './InvocationNodeFooter';
 import InvocationNodeHeader from './InvocationNodeHeader';
 import InputField from './fields/InputField';
 import OutputField from './fields/OutputField';
+import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 
 type Props = {
   nodeId: string;
@@ -20,6 +21,7 @@ type Props = {
 const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
   const inputConnectionFieldNames = useConnectionInputFieldNames(nodeId);
   const inputAnyOrDirectFieldNames = useAnyOrDirectInputFieldNames(nodeId);
+  const withFooter = useWithFooter(nodeId);
   const outputFieldNames = useOutputFieldNames(nodeId);
 
   return (
@@ -41,7 +43,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
               h: 'full',
               py: 2,
               gap: 1,
-              borderBottomRadius: 0,
+              borderBottomRadius: withFooter ? 0 : 'base',
             }}
           >
             <Flex sx={{ flexDir: 'column', px: 2, w: 'full', h: 'full' }}>
@@ -74,7 +76,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
               ))}
             </Flex>
           </Flex>
-          <InvocationNodeFooter nodeId={nodeId} />
+          {withFooter && <InvocationNodeFooter nodeId={nodeId} />}
         </>
       )}
     </NodeWrapper>

@@ -159,6 +159,7 @@ async def import_model(
     and information on the model that was installed.
     """
     logger = ApiDependencies.invoker.services.logger
+
     try:
         result = ApiDependencies.invoker.services.model_manager.install_model(
             location,
