@@ -13,5 +13,5 @@ export const nodesPersistDenylist: (keyof NodesState)[] = [
   'nodesToCopy',
   'edgesToCopy',
   'connectionMade',
-  'nodePopoverCursorPosition',
+  'addNewNodePosition',
 ];

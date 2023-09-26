@@ -41,6 +41,6 @@ export type NodesState = {
   nodesToCopy: Node<NodeData>[];
   edgesToCopy: Edge<InvocationEdgeExtra>[];
   isAddNodePopoverOpen: boolean;
-  nodePopoverCursorPosition: XYPosition | null;
+  addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
 };

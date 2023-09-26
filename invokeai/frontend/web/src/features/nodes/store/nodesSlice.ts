@@ -93,7 +93,7 @@ export const initialNodesState: NodesState = {
   connectionStartParams: null,
   currentConnectionFieldType: null,
   connectionMade: false,
-  nodePopoverCursorPosition: null,
+  addNewNodePosition: null,
   shouldShowFieldTypeLegend: false,
   shouldShowMinimapPanel: true,
   shouldValidateGraph: true,
@@ -155,8 +155,8 @@ const nodesSlice = createSlice({
       const node = action.payload;
       const position = findUnoccupiedPosition(
         state.nodes,
-        node.position.x,
-        node.position.y
+        state.addNewNodePosition?.x ?? node.position.x,
+        state.addNewNodePosition?.y ?? node.position.y
       );
       node.position = position;
       node.selected = true;
@@ -199,7 +199,6 @@ const nodesSlice = createSlice({
             handleType,
             state.currentConnectionFieldType
           );
-          console.log('newConnection', newConnection);
           if (newConnection) {
             state.edges = addEdge(
               { ...newConnection, type: 'default' },
@@ -245,7 +244,7 @@ const nodesSlice = createSlice({
 
       state.connectionMade = true;
     },
-    connectionEnded: (state) => {
+    connectionEnded: (state, action) => {
       if (!state.connectionMade) {
         if (state.mouseOverNode) {
           const nodeIndex = state.nodes.findIndex(
@@ -281,6 +280,7 @@ const nodesSlice = createSlice({
           state.connectionStartParams = null;
           state.currentConnectionFieldType = null;
         } else {
+          state.addNewNodePosition = action.payload.cursorPosition;
           state.isAddNodePopoverOpen = true;
         }
       } else {
@@ -894,6 +894,7 @@ const nodesSlice = createSlice({
       });
     },
     addNodePopoverOpened: (state) => {
+      state.addNewNodePosition = null; //Create the node in viewport center by default
       state.isAddNodePopoverOpen = true;
     },
     addNodePopoverClosed: (state) => {

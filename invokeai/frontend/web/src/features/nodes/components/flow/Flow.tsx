@@ -115,7 +115,7 @@ export const Flow = () => {
   );
 
   const onConnectEnd: OnConnectEnd = useCallback(() => {
-    dispatch(connectionEnded());
+    dispatch(connectionEnded({ cursorPosition: cursorPosition.current }));
   }, [dispatch]);
 
   const onEdgesDelete: OnEdgesDelete = useCallback(
