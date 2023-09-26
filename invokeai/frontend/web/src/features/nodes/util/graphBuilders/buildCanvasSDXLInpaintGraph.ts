@@ -663,7 +663,8 @@ export const buildCanvasSDXLInpaintGraph = (
       graph,
       CANVAS_COHERENCE_DENOISE_LATENTS,
       modelLoaderNodeId,
-      canvasInitImage
+      canvasInitImage,
+      canvasMaskImage
     );
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
