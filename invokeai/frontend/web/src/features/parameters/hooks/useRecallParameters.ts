@@ -72,7 +72,6 @@ import {
   CONTROLNET_PROCESSORS,
   CONTROLNET_MODEL_DEFAULT_PROCESSORS,
 } from 'features/controlNet/store/constants';
-import { ControlNetProcessorType } from 'features/controlNet/store/types';
 
 const selector = createSelector(stateSelector, ({ generation }) => {
   const { model } = generation;
@@ -459,10 +458,16 @@ export const useRecallParameters = () => {
       }
 
       const controlNetId = uuidv4();
-      const processorType: ControlNetProcessorType =
-        CONTROLNET_MODEL_DEFAULT_PROCESSORS[
-          matchingControlNetModel.model_name
-        ] || initialControlNet.processorType;
+
+      let processorType = initialControlNet.processorType;
+      for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
+        if (matchingControlNetModel.model_name.includes(modelSubstring)) {
+          processorType =
+            CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring] ||
+            initialControlNet.processorType;
+          break;
+        }
+      }
       const processorNode = CONTROLNET_PROCESSORS[processorType].default;
 
       const controlnet: ControlNetConfig = {
