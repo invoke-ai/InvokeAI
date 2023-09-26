@@ -7,7 +7,7 @@ import os
 import platform
 from pathlib import Path
 
-from prompt_toolkit import prompt
+from prompt_toolkit import HTML, prompt
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.validation import Validator
 from rich import box, print
@@ -65,15 +65,48 @@ def confirm_install(dest: Path) -> bool:
     if dest.exists():
         print(f":exclamation: Directory {dest} already exists :exclamation:")
         dest_confirmed = Confirm.ask(
-            ":stop_sign: Are you sure you want to (re)install in this location?",
+            ":stop_sign: (re)install in this location?",
             default=False,
         )
     else:
         print(f"InvokeAI will be installed in {dest}")
-        dest_confirmed = not Confirm.ask("Would you like to pick a different location?", default=False)
+        dest_confirmed = Confirm.ask("Use this location?", default=True)
     console.line()
 
     return dest_confirmed
+
+
+def user_wants_auto_configuration() -> bool:
+    """Prompt the user to choose between manual and auto configuration."""
+    console.rule("InvokeAI Configuration Section")
+    console.print(
+        Panel(
+            Group(
+                "\n".join(
+                    [
+                        "Libraries are installed and InvokeAI will now set up its root directory and configuration. Choose between:",
+                        "",
+                        "  * AUTOMATIC configuration:  install reasonable defaults and a minimal set of starter models.",
+                        "  * MANUAL configuration: manually inspect and adjust configuration options and pick from a larger set of starter models.",
+                        "",
+                        "Later you can fine tune your configuration by selecting option [6] 'Change InvokeAI startup options' from the invoke.bat/invoke.sh launcher script.",
+                    ]
+                ),
+            ),
+            box=box.MINIMAL,
+            padding=(1, 1),
+        )
+    )
+    choice = (
+        prompt(
+            HTML("Choose <b>&lt;a&gt;</b>utomatic or <b>&lt;m&gt;</b>anual configuration [a/m] (a): "),
+            validator=Validator.from_callable(
+                lambda n: n == "" or n.startswith(("a", "A", "m", "M")), error_message="Please select 'a' or 'm'"
+            ),
+        )
+        or "a"
+    )
+    return choice.lower().startswith("a")
 
 
 def dest_path(dest=None) -> Path:
