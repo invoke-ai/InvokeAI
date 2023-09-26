@@ -68,6 +68,11 @@ import {
   isValidWidth,
 } from '../types/parameterSchemas';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  CONTROLNET_PROCESSORS,
+  CONTROLNET_MODEL_DEFAULT_PROCESSORS,
+} from 'features/controlNet/store/constants';
+import { ControlNetProcessorType } from 'features/controlNet/store/types';
 
 const selector = createSelector(stateSelector, ({ generation }) => {
   const { model } = generation;
@@ -454,6 +459,15 @@ export const useRecallParameters = () => {
       }
 
       const controlNetId = uuidv4();
+      const processorType: ControlNetProcessorType =
+        CONTROLNET_MODEL_DEFAULT_PROCESSORS[
+          matchingControlNetModel.model_name
+        ] || initialControlNet.processorType;
+      const processorNode = CONTROLNET_PROCESSORS[processorType].default;
+
+      console.log('processorNode', processorNode);
+
+      console.log(matchingControlNetModel, 'matchingControlNetModel');
 
       const controlnet: ControlNetConfig = {
         isEnabled: true,
@@ -467,9 +481,12 @@ export const useRecallParameters = () => {
         controlMode: control_mode || initialControlNet.controlMode,
         resizeMode: resize_mode || initialControlNet.resizeMode,
         controlImage: image?.image_name || null,
-        processedControlImage: initialControlNet.processedControlImage,
-        processorType: initialControlNet.processorType,
-        processorNode: initialControlNet.processorNode,
+        processedControlImage: image?.image_name || null,
+        processorType,
+        processorNode:
+          processorNode.type !== 'none'
+            ? processorNode
+            : initialControlNet.processorNode,
         shouldAutoConfig: true,
         controlNetId,
       };
