@@ -465,10 +465,6 @@ export const useRecallParameters = () => {
         ] || initialControlNet.processorType;
       const processorNode = CONTROLNET_PROCESSORS[processorType].default;
 
-      console.log('processorNode', processorNode);
-
-      console.log(matchingControlNetModel, 'matchingControlNetModel');
-
       const controlnet: ControlNetConfig = {
         isEnabled: true,
         model: matchingControlNetModel,
