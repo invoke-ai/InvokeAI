@@ -197,11 +197,13 @@ class DownloadQueue(DownloadQueueBase):
         Prune completed and errored queue items from the job list.
         """
         try:
-            self._lock.acquire()
             to_delete = set()
-            for job in self._jobs:
+            self._lock.acquire()
+            for job_id, job in self._jobs.items():
                 if self._in_terminal_state(job):
-                    self._job.remove(job)
+                    to_delete.add(job_id)
+            for job_id in to_delete:
+                del self._jobs[job_id]
         except KeyError as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
         finally:
@@ -661,8 +663,11 @@ class DownloadQueue(DownloadQueueBase):
         source = Path(job.source).resolve()
         destination = Path(job.destination).resolve()
         try:
+            job.total_bytes = source.stat().st_size
+            self._update_job_status(job, DownloadJobStatus.RUNNING)
             if source != destination:
                 shutil.move(source, destination)
+            job.bytes = destination.stat().st_size
             self._update_job_status(job, DownloadJobStatus.COMPLETED)
         except OSError as excp:
             job.error = excp

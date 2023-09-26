@@ -236,9 +236,11 @@ class ModelLoad(ModelLoadBase):
             raise InvalidModelException(f"Files for model '{key}' not found at {model_path}")
 
         dst_convert_path = self._get_model_convert_cache_path(model_path)
-        model_path = model_class.convert_if_required(
-            model_config=model_config,
-            output_path=dst_convert_path,
+        model_path = self.resolve_model_path(
+            model_class.convert_if_required(
+                model_config=model_config,
+                output_path=dst_convert_path,
+            )
         )
 
         model_context = self._cache.get_model(

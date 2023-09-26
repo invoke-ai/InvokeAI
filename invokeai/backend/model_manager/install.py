@@ -525,7 +525,7 @@ class ModelInstall(ModelInstallBase):
             info.license = metadata.license
             info.thumbnail_url = metadata.thumbnail_url
             self._store.update_model(model_id, info)
-            self._async_installs[info.source] = model_id
+            self._async_installs[job.source] = model_id
             job.model_key = model_id
         elif job.status == "error":
             self._logger.warning(f"{job.source}: Model installation error: {job.error}")
@@ -544,7 +544,7 @@ class ModelInstall(ModelInstallBase):
             info.source = str(job.source)
             info.description = f"Imported model {info.name}"
             self._store.update_model(model_id, info)
-            self._async_installs[info.source] = model_id
+            self._async_installs[job.source] = model_id
             job.model_key = model_id
         elif job.status == "error":
             self._logger.warning(f"{job.source}: Model installation error: {job.error}")

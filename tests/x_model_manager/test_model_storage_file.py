@@ -2,20 +2,19 @@
 Test the refactored model config classes.
 """
 
-import sys
 from hashlib import sha256
 
 import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.config import DiffusersConfig, ModelType, TextualInversionConfig, VaeDiffusersConfig
-from invokeai.backend.model_manager.storage import ModelConfigStore, ModelConfigStoreSQL, UnknownModelException
+from invokeai.backend.model_manager.storage import ModelConfigStore, ModelConfigStoreYAML, UnknownModelException
 
 
 @pytest.fixture
 def store(datadir) -> ModelConfigStore:
-    InvokeAIAppConfig.get_config(root=datadir)
-    return ModelConfigStoreSQL(datadir / "databases" / "models.db")
+    InvokeAIAppConfig(root=datadir)
+    return ModelConfigStoreYAML(datadir / "configs" / "models.yaml")
 
 
 def example_config() -> TextualInversionConfig:
@@ -83,14 +82,11 @@ def test_delete(store: ModelConfigStore):
     except UnknownModelException:
         assert True
 
-    # a bug in sqlite3 in python 3.9 prevents DEL from returning number of
-    # deleted rows!
-    if sys.version_info.major == 3 and sys.version_info.minor > 9:
-        try:
-            store.del_model("unknown")
-            assert False, "expected delete of unknown model to raise exception"
-        except UnknownModelException:
-            assert True
+    try:
+        store.del_model("unknown")
+        assert False, "expected delete of unknown model to raise exception"
+    except UnknownModelException:
+        assert True
 
 
 def test_exists(store: ModelConfigStore):

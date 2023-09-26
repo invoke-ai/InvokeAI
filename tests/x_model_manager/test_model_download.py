@@ -310,6 +310,8 @@ def test_pause_cancel_url():  # this one is tricky because of potential race con
         assert Path(tmpdir, "mock9999.safetensors").exists() is False, "cancelled file should be deleted"
         assert Path(tmpdir, "mock54321.safetensors").exists()
 
+        assert len(queue.list_jobs()) == 3
+        queue.prune_jobs()
         assert len(queue.list_jobs()) == 0
 
     def test_pause_cancel_repo_id():  # this one is tricky because of potential race conditions
