@@ -1,11 +1,14 @@
-import { getCanvasBaseLayer } from './konvaInstanceProvider';
 import { RootState } from 'app/store/store';
+import { getCanvasBaseLayer } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';
 
 /**
  * Get the canvas base layer blob, with or without bounding box according to `shouldCropToBoundingBoxOnSave`
  */
-export const getBaseLayerBlob = async (state: RootState) => {
+export const getBaseLayerBlob = async (
+  state: RootState,
+  alwaysUseBoundingBox: boolean = false
+) => {
   const canvasBaseLayer = getCanvasBaseLayer();
 
   if (!canvasBaseLayer) {
@@ -24,14 +27,15 @@ export const getBaseLayerBlob = async (state: RootState) => {
 
   const absPos = clonedBaseLayer.getAbsolutePosition();
 
-  const boundingBox = shouldCropToBoundingBoxOnSave
-    ? {
-        x: boundingBoxCoordinates.x + absPos.x,
-        y: boundingBoxCoordinates.y + absPos.y,
-        width: boundingBoxDimensions.width,
-        height: boundingBoxDimensions.height,
-      }
-    : clonedBaseLayer.getClientRect();
+  const boundingBox =
+    shouldCropToBoundingBoxOnSave || alwaysUseBoundingBox
+      ? {
+          x: boundingBoxCoordinates.x + absPos.x,
+          y: boundingBoxCoordinates.y + absPos.y,
+          width: boundingBoxDimensions.width,
+          height: boundingBoxDimensions.height,
+        }
+      : clonedBaseLayer.getClientRect();
 
   return konvaNodeToBlob(clonedBaseLayer, boundingBox);
 };
