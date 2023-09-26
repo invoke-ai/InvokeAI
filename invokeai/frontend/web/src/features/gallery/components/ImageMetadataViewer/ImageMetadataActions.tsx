@@ -4,7 +4,7 @@ import {
   LoRAMetadataItem,
 } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { memo, useCallback } from 'react';
+import { memo, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   isValidControlNetModel,
@@ -89,6 +89,14 @@ const ImageMetadataActions = (props: Props) => {
     },
     [recallControlNet]
   );
+
+  const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
+    return metadata?.controlnets
+      ? metadata.controlnets.filter((controlnet) =>
+          isValidControlNetModel(controlnet.control_model)
+        )
+      : [];
+  }, [metadata?.controlnets]);
 
   if (!metadata || Object.keys(metadata).length === 0) {
     return null;
@@ -195,19 +203,14 @@ const ImageMetadataActions = (props: Props) => {
             );
           }
         })}
-      {metadata.controlnets &&
-        metadata.controlnets.map((controlnet, index) => {
-          if (isValidControlNetModel(controlnet.control_model)) {
-            return (
-              <ImageMetadataItem
-                key={index}
-                label="ControlNet"
-                value={`${controlnet.control_model.model_name} - ${controlnet.control_weight}`}
-                onClick={() => handleRecallControlNet(controlnet)}
-              />
-            );
-          }
-        })}
+      {validControlNets.map((controlnet, index) => (
+        <ImageMetadataItem
+          key={index}
+          label="ControlNet"
+          value={`${controlnet.control_model?.model_name} - ${controlnet.control_weight}`}
+          onClick={() => handleRecallControlNet(controlnet)}
+        />
+      ))}
     </>
   );
 };
