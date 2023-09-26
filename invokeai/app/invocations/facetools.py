@@ -1,13 +1,17 @@
+## FaceTools 3.9
+## Nodes for InvokeAI, written by YMGenesis/Matthew Janik & JPPhoto/Jonathan S. Pollack
+
 import math
+from typing import TypedDict
 
 import cv2
 import mediapipe as mp
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL.Image import Image as ImageType
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
-    BaseInvocationOutput,
     InputField,
     InvocationContext,
     OutputField,
@@ -19,28 +23,43 @@ from invokeai.app.models.image import ImageCategory, ResourceOrigin
 
 
 @invocation_output("face_mask_output")
-class FaceMaskOutput(BaseInvocationOutput):
+class FaceMaskOutput(ImageOutput):
     """Base class for FaceMask output"""
 
-    image: ImageField = OutputField(description="The output image")
-    width: int = OutputField(description="The width of the image in pixels")
-    height: int = OutputField(description="The height of the image in pixels")
     mask: ImageField = OutputField(description="The output mask")
 
 
 @invocation_output("face_off_output")
-class FaceOffOutput(BaseInvocationOutput):
+class FaceOffOutput(ImageOutput):
     """Base class for FaceOff Output"""
 
-    bounded_image: ImageField = OutputField(default=None, description="Original image bound, cropped, and resized")
-    width: int = OutputField(description="The width of the bounded image in pixels")
-    height: int = OutputField(description="The height of the bounded image in pixels")
-    mask: ImageField = OutputField(default=None, description="The output mask")
+    mask: ImageField = OutputField(description="The output mask")
     x: int = OutputField(description="The x coordinate of the bounding box's left side")
     y: int = OutputField(description="The y coordinate of the bounding box's top side")
 
 
-def cleanup_faces_list(orig):
+class FaceResultsData(TypedDict):
+    pil_image: ImageType
+    mask_pil: ImageType
+    x_center: float
+    y_center: float
+    mesh_width: int
+    mesh_height: int
+    face_id: int
+
+
+class ExtractFaceData(TypedDict):
+    bounded_image: ImageType
+    mask_pil: ImageType
+    x_min: int
+    y_min: int
+    x_max: int
+    y_max: int
+
+
+def cleanup_faces_list(
+    orig: list[FaceResultsData],
+) -> list[FaceResultsData]:
     newlist = []
 
     if len(orig) == 0:
@@ -84,14 +103,14 @@ def cleanup_faces_list(orig):
 
 def generate_face_box_mask(
     context: InvocationContext,
-    minimum_confidence,
-    x_offset,
-    y_offset,
-    pil_image,
-    chunk_x_offset=0,
-    chunk_y_offset=0,
-    draw_mesh=True,
-):
+    minimum_confidence: float,
+    x_offset: float,
+    y_offset: float,
+    pil_image: ImageType,
+    chunk_x_offset: int = 0,
+    chunk_y_offset: int = 0,
+    draw_mesh: bool = True,
+) -> list[FaceResultsData]:
     result = []
 
     # Convert the PIL image to a NumPy array.
@@ -175,7 +194,7 @@ def generate_face_box_mask(
                 and (top_side >= -over_h)
                 and (bottom_side < im_height + over_h)
             ):
-                this_face = dict()
+                this_face: FaceResultsData = FaceResultsData()
                 if draw_mesh:
                     this_face["pil_image"] = pil_image
                     this_face["mask_pil"] = mask_pil
@@ -190,7 +209,13 @@ def generate_face_box_mask(
     return result
 
 
-def extract_face(context: InvocationContext, image, all_faces, face_id, padding):
+def extract_face(
+    context: InvocationContext,
+    image: ImageType,
+    all_faces: list[FaceResultsData],
+    face_id: int,
+    padding: int,
+) -> ExtractFaceData:
     mask_pil = all_faces[face_id]["mask_pil"]
     center_x = all_faces[face_id]["x_center"]
     center_y = all_faces[face_id]["y_center"]
@@ -256,12 +281,25 @@ def extract_face(context: InvocationContext, image, all_faces, face_id, padding)
     # blur mask edge by small radius
     mask_pil = mask_pil.filter(ImageFilter.GaussianBlur(radius=2))
 
-    return bounded_image, mask_pil, x_min, y_min, x_max, y_max
+    return ExtractFaceData(
+        bounded_image=bounded_image,
+        mask_pil=mask_pil,
+        x_min=x_min,
+        y_min=y_min,
+        x_max=x_max,
+        y_max=y_max,
+    )
 
 
 def get_faces_list(
-    context: InvocationContext, image, should_chunk, minimum_confidence, x_offset, y_offset, draw_mesh=True
-):
+    context: InvocationContext,
+    image: ImageType,
+    should_chunk: bool,
+    minimum_confidence: float,
+    x_offset: float,
+    y_offset: float,
+    draw_mesh: bool = True,
+) -> list[FaceResultsData]:
     result = []
 
     # Generate the face box mask and get the center of the face.
@@ -335,7 +373,7 @@ def get_faces_list(
 
 @invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.0")
 class FaceOffInvocation(BaseInvocation):
-    """bound, extract, and mask a face from an image using MediaPipe detection"""
+    """Bound, extract, and mask a face from an image using MediaPipe detection"""
 
     image: ImageField = InputField(description="Image for face detection")
     face_id: int = InputField(
@@ -373,15 +411,17 @@ class FaceOffInvocation(BaseInvocation):
             )
             return None
 
-        bounded_image, mask_pil, x_min, y_min, x_max, y_max = extract_face(
-            context, image, all_faces, face_id, self.padding
-        )
+        face_data = extract_face(context, image, all_faces, face_id, self.padding)
+        bounded_image = face_data["bounded_image"]
+        mask_pil = face_data["mask_pil"]
+        x_min = face_data["x_min"]
+        y_min = face_data["y_min"]
 
         # Convert the input image to RGBA mode to ensure it has an alpha channel.
-        bounded_image = bounded_image.convert("RGBA")
+        image = bounded_image.convert("RGBA")
 
-        bounded_image_dto = context.services.images.create(
-            image=bounded_image,
+        image_dto = context.services.images.create(
+            image=image,
             image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
@@ -400,9 +440,9 @@ class FaceOffInvocation(BaseInvocation):
         )
 
         return FaceOffOutput(
-            bounded_image=ImageField(image_name=bounded_image_dto.image_name),
-            width=bounded_image_dto.width,
-            height=bounded_image_dto.height,
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
             mask=ImageField(image_name=mask_dto.image_name),
             x=x_min,
             y=y_min,
@@ -436,7 +476,7 @@ class FaceOffInvocation(BaseInvocation):
             )
 
             result = FaceOffOutput(
-                bounded_image=ImageField(image_name=image_dto.image_name),
+                image=ImageField(image_name=image_dto.image_name),
                 width=image_dto.width,
                 height=image_dto.height,
                 mask=ImageField(image_name=mask_dto.image_name),
@@ -492,9 +532,13 @@ class FaceMaskInvocation(BaseInvocation):
 
         for face_id in id_range:
             if face_id >= 0 and face_id < len(all_faces):
-                bounded_image, face_mask_pil, x_min, y_min, x_max, y_max = extract_face(
-                    context, image, all_faces, face_id, 0
-                )
+                face_data = extract_face(context, image, all_faces, face_id, 0)
+                face_mask_pil = face_data["mask_pil"]
+                x_min = face_data["x_min"]
+                y_min = face_data["y_min"]
+                x_max = face_data["x_max"]
+                y_max = face_data["y_max"]
+
                 mask_pil.paste(
                     Image.new(mode="L", size=((x_max - x_min, y_max - y_min)), color=0),
                     box=(x_min, y_min),
