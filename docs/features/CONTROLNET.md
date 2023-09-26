@@ -138,18 +138,21 @@ Additionally, each ControlNet section can be expanded in order to manipulate set
 
 [IP-Adapter](https://ip-adapter.github.io) is a tooling that allows for image prompt capabilities with text-to-image diffusion models. IP-Adapter works by analyzing the given image prompt to extract features, then passing those features to the UNet along with any other conditioning provided. 
 
+![IP-Adapter + T2I](https://github.com/tencent-ailab/IP-Adapter/raw/main/assets/demo/ip_adpter_plus_multi.jpg)
+![IP-Adapter + T2I](https://github.com/tencent-ailab/IP-Adapter/blob/main/assets/demo/image-to-image.jpg)
+
 #### Installation
-There are several ways to instal IP-Adapter models with an existing InvokeAI installation:
+There are several ways to install IP-Adapter models with an existing InvokeAI installation:
 
 1. Through the command line interface launched from the invoke.sh / invoke.bat scripts, option [5] to download models
-2. Install IP-Adapter models through the Model Manager UI with models from the *Tools* section of [www.models.invoke.ai](www.models.invoke.ai). To do this, copy the repo ID from the desired model page, and paste it in the Add Model field of the model manager. 
-3. Manually downloading the models files and placed in the `models/ip-adapter` folder of the Invoke root directory. *Note:* The image_encoder folder is necessary for IP-Adapter to function. 
+2. Through the Model Manager UI with models from the *Tools* section of [www.models.invoke.ai](www.models.invoke.ai). To do this, copy the repo ID from the desired model page, and paste it in the Add Model field of the model manager. 
+3. Manually downloading the models files and placed in the `models/ip-adapter` folder of the Invoke root directory. **Note:** The image_encoder folder is necessary for IP-Adapter to function. 
 
 #### Using IP-Adapter
 
 IP-Adapter can be used by navigating to the *Control Adapters* options and enabling IP-Adapter. 
 
-IP-Adapter requires an image to be used as the Image Prompt. It can also be used in conjunction with text prompts, Image-to-Image, ControlNets and LoRAs.
+IP-Adapter requires an image to be used as the Image Prompt. It can also be used in conjunction with text prompts, Image-to-Image, Inpainting, Outpainting, ControlNets and LoRAs.
 
 
 Each IP-Adapter has two settings that are applied to the IP-Adapter:
