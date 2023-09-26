@@ -81,3 +81,38 @@ export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
     </Flex>
   );
 };
+
+type IAINoImageFallbackWithSpinnerProps = FlexProps & {
+  label?: string;
+};
+
+export const IAINoContentFallbackWithSpinner = (
+  props: IAINoImageFallbackWithSpinnerProps
+) => {
+  const { sx, ...rest } = props;
+
+  return (
+    <Flex
+      sx={{
+        w: 'full',
+        h: 'full',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 'base',
+        flexDir: 'column',
+        gap: 2,
+        userSelect: 'none',
+        opacity: 0.7,
+        color: 'base.700',
+        _dark: {
+          color: 'base.500',
+        },
+        ...sx,
+      }}
+      {...rest}
+    >
+      <Spinner size="xl" />
+      {props.label && <Text textAlign="center">{props.label}</Text>}
+    </Flex>
+  );
+};

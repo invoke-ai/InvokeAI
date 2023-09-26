@@ -12,6 +12,7 @@ import {
   OnConnect,
   OnConnectEnd,
   OnConnectStart,
+  OnEdgeUpdateFunc,
   OnEdgesChange,
   OnEdgesDelete,
   OnInit,
@@ -21,6 +22,7 @@ import {
   OnSelectionChangeFunc,
   ProOptions,
   ReactFlow,
+  ReactFlowProps,
   XYPosition,
 } from 'reactflow';
 import { useIsValidConnection } from '../../hooks/useIsValidConnection';
@@ -28,6 +30,8 @@ import {
   connectionEnded,
   connectionMade,
   connectionStarted,
+  edgeAdded,
+  edgeDeleted,
   edgesChanged,
   edgesDeleted,
   nodesChanged,
@@ -167,6 +171,63 @@ export const Flow = () => {
     }
   }, []);
 
+  // #region Updatable Edges
+
+  /**
+   * Adapted from https://reactflow.dev/docs/examples/edges/updatable-edge/
+   * and https://reactflow.dev/docs/examples/edges/delete-edge-on-drop/
+   *
+   * - Edges can be dragged from one handle to another.
+   * - If the user drags the edge away from the node and drops it, delete the edge.
+   * - Do not delete the edge if the cursor didn't move (resolves annoying behaviour
+   *   where the edge is deleted if you click it accidentally).
+   */
+
+  // We have a ref for cursor position, but it is the *projected* cursor position.
+  // Easiest to just keep track of the last mouse event for this particular feature
+  const edgeUpdateMouseEvent = useRef<MouseEvent>();
+
+  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> =
+    useCallback(
+      (e, edge, _handleType) => {
+        // update mouse event
+        edgeUpdateMouseEvent.current = e;
+        // always delete the edge when starting an updated
+        dispatch(edgeDeleted(edge.id));
+      },
+      [dispatch]
+    );
+
+  const onEdgeUpdate: OnEdgeUpdateFunc = useCallback(
+    (_oldEdge, newConnection) => {
+      // instead of updating the edge (we deleted it earlier), we instead create
+      // a new one.
+      dispatch(connectionMade(newConnection));
+    },
+    [dispatch]
+  );
+
+  const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> =
+    useCallback(
+      (e, edge, _handleType) => {
+        // Handle the case where user begins a drag but didn't move the cursor -
+        // bc we deleted the edge, we need to add it back
+        if (
+          // ignore touch events
+          !('touches' in e) &&
+          edgeUpdateMouseEvent.current?.clientX === e.clientX &&
+          edgeUpdateMouseEvent.current?.clientY === e.clientY
+        ) {
+          dispatch(edgeAdded(edge));
+        }
+        // reset mouse event
+        edgeUpdateMouseEvent.current = undefined;
+      },
+      [dispatch]
+    );
+
+  // #endregion
+
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
     e.preventDefault();
     dispatch(selectionCopied());
@@ -196,6 +257,9 @@ export const Flow = () => {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onEdgesDelete={onEdgesDelete}
+      onEdgeUpdate={onEdgeUpdate}
+      onEdgeUpdateStart={onEdgeUpdateStart}
+      onEdgeUpdateEnd={onEdgeUpdateEnd}
       onNodesDelete={onNodesDelete}
       onConnectStart={onConnectStart}
       onConnect={onConnect}

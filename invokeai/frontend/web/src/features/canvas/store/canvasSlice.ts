@@ -8,7 +8,6 @@ import { setAspectRatio } from 'features/parameters/store/generationSlice';
 import { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
-import { sessionCanceled } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import calculateCoordinates from '../util/calculateCoordinates';
 import calculateScale from '../util/calculateScale';
@@ -786,11 +785,6 @@ export const canvasSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(sessionCanceled.pending, (state) => {
-      if (!state.layerState.stagingArea.images.length) {
-        state.layerState.stagingArea = initialLayerState.stagingArea;
-      }
-    });
     builder.addCase(setAspectRatio, (state, action) => {
       const ratio = action.payload;
       if (ratio) {
