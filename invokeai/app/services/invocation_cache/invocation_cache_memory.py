@@ -59,7 +59,7 @@ class MemoryInvocationCache(InvocationCacheBase):
             # If the cache is full, we need to remove the least used
             number_to_delete = len(self._cache) + 1 - self._max_cache_size
             self._delete_oldest_access(number_to_delete)
-            self._cache[key] = CachedItem(time(), invocation_output, invocation_output.json())
+            self._cache[key] = CachedItem(invocation_output, invocation_output.json())
 
     def _delete_oldest_access(self, number_to_delete: int) -> None:
         number_to_delete = min(number_to_delete, len(self._cache))
