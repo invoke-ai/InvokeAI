@@ -94,6 +94,18 @@ async def Pause(
 
 
 @session_queue_router.put(
+    "/{queue_id}/processor/take_one",
+    operation_id="take_one",
+    responses={200: {"model": SessionProcessorStatus}},
+)
+async def take_one(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+) -> SessionProcessorStatus:
+    """Executes the next-in-line queue item, pausing the processor afterwards. Has no effect if the queue is resumed."""
+    return ApiDependencies.invoker.services.session_processor.take_one()
+
+
+@session_queue_router.put(
     "/{queue_id}/cancel_by_batch_ids",
     operation_id="cancel_by_batch_ids",
     responses={200: {"model": CancelByBatchIDsResult}},

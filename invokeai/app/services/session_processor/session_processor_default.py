@@ -25,6 +25,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self.__resume_event = ThreadEvent()
         self.__stop_event = ThreadEvent()
         self.__poll_now_event = ThreadEvent()
+        self.__take_one_event = ThreadEvent()
 
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_queue_event)
 
@@ -36,6 +37,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 "stop_event": self.__stop_event,
                 "poll_now_event": self.__poll_now_event,
                 "resume_event": self.__resume_event,
+                "take_one_event": self.__take_one_event,
             },
         )
         self.__thread.start()
@@ -81,6 +83,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self.__resume_event.clear()
         return self.get_status()
 
+    def take_one(self) -> SessionProcessorStatus:
+        if self.__queue_item is None and not self.__resume_event.is_set():
+            self.__resume_event.set()
+            self.__take_one_event.set()
+            self._poll_now()
+        return self.get_status()
+
     def get_status(self) -> SessionProcessorStatus:
         return SessionProcessorStatus(
             is_started=self.__resume_event.is_set(),
@@ -92,9 +101,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
         stop_event: ThreadEvent,
         poll_now_event: ThreadEvent,
         resume_event: ThreadEvent,
+        take_one_event: ThreadEvent,
     ):
         try:
             stop_event.clear()
+            take_one_event.clear()
             resume_event.set()
             self.__threadLimit.acquire()
             queue_item: Optional[SessionQueueItem] = None
@@ -117,6 +128,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 invoke_all=True,
                             )
                             queue_item = None
+
+                    if take_one_event.is_set():
+                        resume_event.clear()
+                        take_one_event.clear()
 
                     if queue_item is None:
                         self.__invoker.services.logger.debug("Waiting for next polling interval or event")

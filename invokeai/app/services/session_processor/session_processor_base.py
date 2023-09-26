@@ -23,6 +23,11 @@ class SessionProcessorBase(ABC):
         pass
 
     @abstractmethod
+    def take_one(self) -> SessionProcessorStatus:
+        """Takes one session from the queue and executes it"""
+        pass
+
+    @abstractmethod
     def get_status(self) -> SessionProcessorStatus:
         """Gets the status of the session processor"""
         pass
