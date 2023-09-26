@@ -76,16 +76,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
             )
 
-        if "workflow" not in columns:
-            self._cursor.execute(
-                """--sql
-                ALTER TABLE images
-                ADD COLUMN workflow_id TEXT;
-                -- TODO: This requires a migration:
-                -- FOREIGN KEY (workflow_id) REFERENCES workflows (workflow_id) ON DELETE SET NULL;
-                """
-            )
-
         # Create the `images` table indices.
         self._cursor.execute(
             """--sql
