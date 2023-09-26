@@ -8,10 +8,13 @@ import ClearInvocationCacheButton from './ClearInvocationCacheButton';
 import ToggleInvocationCacheButton from './ToggleInvocationCacheButton';
 import StatusStatGroup from './common/StatusStatGroup';
 import StatusStatItem from './common/StatusStatItem';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const InvocationCacheStatus = () => {
   const { t } = useTranslation();
   const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isInvocationCacheEnabled =
+    useFeatureStatus('invocationCache').isFeatureEnabled;
   const { data: queueStatus } = useGetQueueStatusQuery(undefined);
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery(undefined, {
     pollingInterval:

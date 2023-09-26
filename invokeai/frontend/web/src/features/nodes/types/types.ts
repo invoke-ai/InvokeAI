@@ -409,11 +409,22 @@ export type ControlCollectionInputFieldValue = z.infer<
 export const zIPAdapterModel = zModelIdentifier;
 export type IPAdapterModel = z.infer<typeof zIPAdapterModel>;
 
+export const zIPAdapterImageField = z.object({
+  image_name: z.string().trim().min(1),
+  thumbnail_name: z.string().trim().min(1),
+  image_encoder_model: zIPAdapterModel,
+  weight: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
 export const zIPAdapterField = z.object({
-  image: zImageField,
+  adapter_image: zIPAdapterImageField,
   ip_adapter_model: zIPAdapterModel,
   image_encoder_model: z.string().trim().min(1),
   weight: z.number(),
+  begin_step_percent: z.number().optional(),
+  end_step_percent: z.number().optional(),
 });
 export type IPAdapterField = z.infer<typeof zIPAdapterField>;
 
@@ -1145,6 +1156,10 @@ const zControlNetMetadataItem = zControlField.deepPartial();
 
 export type ControlNetMetadataItem = z.infer<typeof zControlNetMetadataItem>;
 
+const zIPAdapterMetadataItem = zIPAdapterField.deepPartial();
+
+export type IPAdapterMetadataItem = z.infer<typeof zIPAdapterMetadataItem>;
+
 export const zCoreMetadata = z
   .object({
     app_version: z.string().nullish().catch(null),
@@ -1165,6 +1180,7 @@ export const zCoreMetadata = z
       .nullish()
       .catch(null),
     controlnets: z.array(zControlField.deepPartial()).nullish().catch(null),
+    ipAdapters: z.array(zIPAdapterField.deepPartial()).nullish().catch(null),
     loras: z
       .array(
         z.object({

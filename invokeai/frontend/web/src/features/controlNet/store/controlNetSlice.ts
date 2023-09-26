@@ -389,6 +389,9 @@ export const controlNetSlice = createSlice({
     isIPAdapterEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isIPAdapterEnabled = action.payload;
     },
+    ipAdapterRecalled: (state, action: PayloadAction<IPAdapterConfig>) => {
+      state.ipAdapterInfo = action.payload;
+    },
     ipAdapterImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.ipAdapterInfo.adapterImage = action.payload;
     },
@@ -473,6 +476,7 @@ export const {
   controlNetReset,
   controlNetAutoConfigToggled,
   isIPAdapterEnabledChanged,
+  ipAdapterRecalled,
   ipAdapterImageChanged,
   ipAdapterWeightChanged,
   ipAdapterModelChanged,

@@ -1,7 +1,14 @@
 import { RootState } from 'app/store/store';
-import { IPAdapterInvocation } from 'services/api/types';
-import { NonNullableGraph } from '../../types/types';
-import { CANVAS_COHERENCE_DENOISE_LATENTS, IP_ADAPTER } from './constants';
+import {
+  IPAdapterInvocation,
+  MetadataAccumulatorInvocation,
+} from 'services/api/types';
+import { IPAdapterMetadataItem, NonNullableGraph } from '../../types/types';
+import {
+  CANVAS_COHERENCE_DENOISE_LATENTS,
+  IP_ADAPTER,
+  METADATA_ACCUMULATOR,
+} from './constants';
 
 export const addIPAdapterToLinearGraph = (
   state: RootState,
@@ -10,9 +17,9 @@ export const addIPAdapterToLinearGraph = (
 ): void => {
   const { isIPAdapterEnabled, ipAdapterInfo } = state.controlNet;
 
-  // const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-  //   | MetadataAccumulatorInvocation
-  //   | undefined;
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
 
   if (isIPAdapterEnabled && ipAdapterInfo.model) {
     const ipAdapterNode: IPAdapterInvocation = {
@@ -37,16 +44,22 @@ export const addIPAdapterToLinearGraph = (
     }
 
     graph.nodes[ipAdapterNode.id] = ipAdapterNode as IPAdapterInvocation;
+    console.log(metadataAccumulator, 'rawr');
+    if (metadataAccumulator?.ipAdapters) {
+      const ipAdapterField = {
+        image: ipAdapterInfo.adapterImage,
+        ip_adapter_model: {
+          base_model: ipAdapterInfo.model?.base_model,
+          model_name: ipAdapterInfo.model?.model_name,
+        },
+        weight: ipAdapterInfo.weight,
+        begin_step_percent: ipAdapterInfo.beginStepPct,
+        end_step_percent: ipAdapterInfo.endStepPct,
+      };
 
-    // if (metadataAccumulator?.ip_adapters) {
-    //   // metadata accumulator only needs the ip_adapter field - not the whole node
-    //   // extract what we need and add to the accumulator
-    //   const ipAdapterField = omit(ipAdapterNode, [
-    //     'id',
-    //     'type',
-    //   ]) as IPAdapterField;
-    //   metadataAccumulator.ip_adapters.push(ipAdapterField);
-    // }
+      metadataAccumulator.ipAdapters.push(ipAdapterField);
+      console.log('metadataAccumulator', metadataAccumulator);
+    }
 
     graph.edges.push({
       source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },

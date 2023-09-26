@@ -2,6 +2,7 @@ import {
   ControlNetMetadataItem,
   CoreMetadata,
   LoRAMetadataItem,
+  IPAdapterMetadataItem,
 } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useMemo, useCallback } from 'react';
@@ -11,7 +12,7 @@ import {
   isValidLoRAModel,
 } from '../../../parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
-
+1;
 type Props = {
   metadata?: CoreMetadata;
 };
@@ -34,6 +35,7 @@ const ImageMetadataActions = (props: Props) => {
     recallStrength,
     recallLoRA,
     recallControlNet,
+    recallIPAdapter,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {
@@ -90,6 +92,13 @@ const ImageMetadataActions = (props: Props) => {
     [recallControlNet]
   );
 
+  const handleRecallIPAdapter = useCallback(
+    (ipAdapter: IPAdapterMetadataItem) => {
+      recallIPAdapter(ipAdapter);
+    },
+    [recallIPAdapter]
+  );
+
   const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
     return metadata?.controlnets
       ? metadata.controlnets.filter((controlnet) =>
@@ -97,6 +106,14 @@ const ImageMetadataActions = (props: Props) => {
         )
       : [];
   }, [metadata?.controlnets]);
+
+  const validIPAdapters: IPAdapterMetadataItem[] = useMemo(() => {
+    return metadata?.ipAdapters
+      ? metadata.ipAdapters.filter((ipAdapter) =>
+          isValidControlNetModel(ipAdapter.ip_adapter_model)
+        )
+      : [];
+  }, [metadata?.ipAdapters]);
 
   if (!metadata || Object.keys(metadata).length === 0) {
     return null;
@@ -209,6 +226,14 @@ const ImageMetadataActions = (props: Props) => {
           label="ControlNet"
           value={`${controlnet.control_model?.model_name} - ${controlnet.control_weight}`}
           onClick={() => handleRecallControlNet(controlnet)}
+        />
+      ))}
+      {validIPAdapters.map((ipAdapter, index) => (
+        <ImageMetadataItem
+          key={index}
+          label="IP Adapter"
+          value={`${ipAdapter.ip_adapter_model?.model_name} - ${ipAdapter.weight}`}
+          onClick={() => handleRecallIPAdapter(ipAdapter)}
         />
       ))}
     </>

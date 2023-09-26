@@ -3133,7 +3133,7 @@ export type components = {
        * Image Encoder Model
        * @description The name of the CLIP image encoder model.
        */
-      image_encoder_model: components["schemas"]["CLIPVisionModelField"];
+      image_encoder_model?: components["schemas"]["CLIPVisionModelField"];
       /**
        * Weight
        * @description The weight given to the ControlNet
@@ -5769,6 +5769,11 @@ export type components = {
        * @description The LoRAs used for inference
        */
       loras?: components["schemas"]["LoRAMetadataField"][];
+      /**
+       * Strength
+       * @description The strength used for latents-to-latents
+       */
+      ipAdapters?: components["schemas"]["IPAdapterField"][];
       /**
        * Strength
        * @description The strength used for latents-to-latents
