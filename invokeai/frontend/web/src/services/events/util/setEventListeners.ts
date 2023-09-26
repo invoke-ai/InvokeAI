@@ -1,7 +1,7 @@
 import { MiddlewareAPI } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { AppDispatch, RootState } from 'app/store/store';
-import { $queueId } from 'features/queue/store/nanoStores';
+import { $queueId } from 'features/queue/store/queueNanoStore';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { Socket } from 'socket.io-client';

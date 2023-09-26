@@ -1,15 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { getIsGraphAcyclic } from 'features/nodes/hooks/useIsValidConnection';
-import {
-  COLLECTION_MAP,
-  COLLECTION_TYPES,
-  POLYMORPHIC_TO_SINGLE_MAP,
-  POLYMORPHIC_TYPES,
-} from 'features/nodes/types/constants';
 import { FieldType } from 'features/nodes/types/types';
-import { HandleType } from 'reactflow';
 import i18n from 'i18next';
+import { HandleType } from 'reactflow';
+import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/hooks/useIsValidConnection.ts`
@@ -70,64 +65,8 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.inputMayOnlyHaveOneConnection');
     }
 
-    /**
-     * Connection types must be the same for a connection, with exceptions:
-     * - CollectionItem can connect to any non-Collection
-     * - Non-Collections can connect to CollectionItem
-     * - Anything (non-Collections, Collections, Polymorphics) can connect to Polymorphics of the same base type
-     * - Generic Collection can connect to any other Collection or Polymorphic
-     * - Any Collection can connect to a Generic Collection
-     */
-
-    if (sourceType !== targetType) {
-      const isCollectionItemToNonCollection =
-        sourceType === 'CollectionItem' &&
-        !COLLECTION_TYPES.includes(targetType);
-
-      const isNonCollectionToCollectionItem =
-        targetType === 'CollectionItem' &&
-        !COLLECTION_TYPES.includes(sourceType) &&
-        !POLYMORPHIC_TYPES.includes(sourceType);
-
-      const isAnythingToPolymorphicOfSameBaseType =
-        POLYMORPHIC_TYPES.includes(targetType) &&
-        (() => {
-          if (!POLYMORPHIC_TYPES.includes(targetType)) {
-            return false;
-          }
-          const baseType =
-            POLYMORPHIC_TO_SINGLE_MAP[
-              targetType as keyof typeof POLYMORPHIC_TO_SINGLE_MAP
-            ];
-
-          const collectionType =
-            COLLECTION_MAP[baseType as keyof typeof COLLECTION_MAP];
-
-          return sourceType === baseType || sourceType === collectionType;
-        })();
-
-      const isGenericCollectionToAnyCollectionOrPolymorphic =
-        sourceType === 'Collection' &&
-        (COLLECTION_TYPES.includes(targetType) ||
-          POLYMORPHIC_TYPES.includes(targetType));
-
-      const isCollectionToGenericCollection =
-        targetType === 'Collection' && COLLECTION_TYPES.includes(sourceType);
-
-      const isIntToFloat = sourceType === 'integer' && targetType === 'float';
-
-      if (
-        !(
-          isCollectionItemToNonCollection ||
-          isNonCollectionToCollectionItem ||
-          isAnythingToPolymorphicOfSameBaseType ||
-          isGenericCollectionToAnyCollectionOrPolymorphic ||
-          isCollectionToGenericCollection ||
-          isIntToFloat
-        )
-      ) {
-        return i18n.t('nodes.fieldTypesMustMatch');
-      }
+    if (!validateSourceAndTargetTypes(sourceType, targetType)) {
+      return i18n.t('nodes.fieldTypesMustMatch');
     }
 
     const isGraphAcyclic = getIsGraphAcyclic(

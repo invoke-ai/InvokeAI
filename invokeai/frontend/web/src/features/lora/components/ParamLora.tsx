@@ -10,7 +10,7 @@ import {
   loraWeightChanged,
   loraWeightReset,
 } from '../store/loraSlice';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 type Props = {
   lora: LoRA;
@@ -36,7 +36,7 @@ const ParamLora = (props: Props) => {
   }, [dispatch, lora.id]);
 
   return (
-    <IAIInformationalPopover details="lora">
+    <IAIInformationalPopover feature="lora">
       <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>
         <IAISlider
           label={lora.model_name}

@@ -21,7 +21,7 @@ import {
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -119,8 +119,8 @@ const ParamMainModelSelect = () => {
       data={[]}
     />
   ) : (
-    <IAIInformationalPopover details="paramModel" placement="bottom">
-      <Flex w="100%" alignItems="center" gap={3}>
+    <Flex w="100%" alignItems="center" gap={3}>
+      <IAIInformationalPopover feature="paramModel">
         <IAIMantineSearchableSelect
           tooltip={selectedModel?.description}
           label={t('modelManager.model')}
@@ -134,13 +134,13 @@ const ParamMainModelSelect = () => {
           onChange={handleChangeModel}
           w="100%"
         />
-        {isSyncModelEnabled && (
-          <Box mt={7}>
-            <SyncModelsButton iconMode />
-          </Box>
-        )}
-      </Flex>
-    </IAIInformationalPopover>
+      </IAIInformationalPopover>
+      {isSyncModelEnabled && (
+        <Box mt={6}>
+          <SyncModelsButton iconMode />
+        </Box>
+      )}
+    </Flex>
   );
 };
 

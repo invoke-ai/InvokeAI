@@ -43,8 +43,8 @@ const ParamDynamicPromptsCollapse = () => {
       activeLabel={activeLabel}
     >
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
-        <ParamDynamicPromptsSeedBehaviour />
         <ParamDynamicPromptsPreview />
+        <ParamDynamicPromptsSeedBehaviour />
         <ParamDynamicPromptsMaxPrompts />
       </Flex>
     </IAICollapse>

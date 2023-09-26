@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { cloneDeep, forEach, isEqual, map, uniqBy } from 'lodash-es';
+import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
 import {
   addEdge,
   applyEdgeChanges,
@@ -19,7 +19,6 @@ import {
   XYPosition,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import { sessionCanceled, sessionInvoked } from 'services/api/thunks/session';
 import { ImageField } from 'services/api/types';
 import {
   appSocketGeneratorProgress,
@@ -31,6 +30,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
 import {
+  BoardInputFieldValue,
   BooleanInputFieldValue,
   ColorInputFieldValue,
   ControlNetModelInputFieldValue,
@@ -495,6 +495,12 @@ const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action);
     },
+    fieldBoardValueChanged: (
+      state,
+      action: FieldValueAction<BoardInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
     fieldImageValueChanged: (
       state,
       action: FieldValueAction<ImageInputFieldValue>
@@ -869,26 +875,8 @@ const nodesSlice = createSlice({
         node.progressImage = progress_image ?? null;
       }
     });
-    builder.addCase(sessionInvoked.fulfilled, (state) => {
-      forEach(state.nodeExecutionStates, (nes) => {
-        nes.status = NodeStatus.PENDING;
-        nes.error = null;
-        nes.progress = null;
-        nes.progressImage = null;
-        nes.outputs = [];
-      });
-    });
-    builder.addCase(sessionCanceled.fulfilled, (state) => {
-      map(state.nodeExecutionStates, (nes) => {
-        if (nes.status === NodeStatus.IN_PROGRESS) {
-          nes.status = NodeStatus.PENDING;
-        }
-      });
-    });
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
-      if (
-        ['completed', 'canceled', 'failed'].includes(action.payload.data.status)
-      ) {
+      if (['in_progress'].includes(action.payload.data.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
           nes.status = NodeStatus.PENDING;
           nes.error = null;
@@ -916,6 +904,7 @@ export const {
   imageCollectionFieldValueChanged,
   fieldStringValueChanged,
   fieldNumberValueChanged,
+  fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldImageValueChanged,
   fieldColorValueChanged,
