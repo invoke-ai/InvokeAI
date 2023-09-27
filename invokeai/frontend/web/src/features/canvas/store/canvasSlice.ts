@@ -186,7 +186,7 @@ export const canvasSlice = createSlice({
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
       state.layerState = {
-        ...initialLayerState,
+        ...cloneDeep(initialLayerState),
         objects: [
           {
             kind: 'image',
@@ -200,6 +200,7 @@ export const canvasSlice = createSlice({
         ],
       };
       state.futureLayerStates = [];
+      state.batchIds = [];
 
       const newScale = calculateScale(
         stageDimensions.width,
@@ -349,11 +350,14 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.stagingArea = { ...initialLayerState.stagingArea };
+      state.layerState.stagingArea = cloneDeep(
+        cloneDeep(initialLayerState)
+      ).stagingArea;
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
-      state.shouldShowStagingOutline = true;
+      state.shouldShowStagingImage = true;
+      state.batchIds = [];
     },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } =
@@ -490,8 +494,9 @@ export const canvasSlice = createSlice({
     resetCanvas: (state) => {
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      state.layerState = initialLayerState;
+      state.layerState = cloneDeep(initialLayerState);
       state.futureLayerStates = [];
+      state.batchIds = [];
     },
     canvasResized: (
       state,
@@ -656,13 +661,12 @@ export const canvasSlice = createSlice({
           ...imageToCommit,
         });
       }
-      state.layerState.stagingArea = {
-        ...initialLayerState.stagingArea,
-      };
+      state.layerState.stagingArea = cloneDeep(initialLayerState).stagingArea;
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
       state.shouldShowStagingImage = true;
+      state.batchIds = [];
     },
     fitBoundingBoxToStage: (state) => {
       const {
