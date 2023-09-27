@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Lincoln D. Stein and The InvokeAI Development Team
 
-"""
-invokeai.backend.util.logging
+"""invokeai.backend.util.logging
 
 Logging class for InvokeAI that produces console messages
 
@@ -9,9 +8,9 @@ Usage:
 
 from invokeai.backend.util.logging import InvokeAILogger
 
-logger = InvokeAILogger.getLogger(name='InvokeAI') // Initialization
+logger = InvokeAILogger.get_logger(name='InvokeAI') // Initialization
 (or)
-logger = InvokeAILogger.getLogger(__name__) // To use the filename
+logger = InvokeAILogger.get_logger(__name__) // To use the filename
 logger.configure()
 
 logger.critical('this is critical') // Critical Message
@@ -34,13 +33,13 @@ IAILogger.debug('this is a debugging message')
 ## Configuration
 
 The default configuration will print to stderr on the console. To add
-additional logging handlers, call getLogger with an initialized InvokeAIAppConfig
+additional logging handlers, call get_logger with an initialized InvokeAIAppConfig
 object:
 
 
  config = InvokeAIAppConfig.get_config()
  config.parse_args()
- logger = InvokeAILogger.getLogger(config=config)
+ logger = InvokeAILogger.get_logger(config=config)
 
 ### Three command-line options control logging:
 
@@ -173,6 +172,7 @@ InvokeAI:
     log_level: info
     log_format: color
 ```
+
 """
 
 import logging.handlers
@@ -193,39 +193,35 @@ except ImportError:
 
 # module level functions
 def debug(msg, *args, **kwargs):
-    InvokeAILogger.getLogger().debug(msg, *args, **kwargs)
+    InvokeAILogger.get_logger().debug(msg, *args, **kwargs)
 
 
 def info(msg, *args, **kwargs):
-    InvokeAILogger.getLogger().info(msg, *args, **kwargs)
+    InvokeAILogger.get_logger().info(msg, *args, **kwargs)
 
 
 def warning(msg, *args, **kwargs):
-    InvokeAILogger.getLogger().warning(msg, *args, **kwargs)
+    InvokeAILogger.get_logger().warning(msg, *args, **kwargs)
 
 
 def error(msg, *args, **kwargs):
-    InvokeAILogger.getLogger().error(msg, *args, **kwargs)
+    InvokeAILogger.get_logger().error(msg, *args, **kwargs)
 
 
 def critical(msg, *args, **kwargs):
-    InvokeAILogger.getLogger().critical(msg, *args, **kwargs)
+    InvokeAILogger.get_logger().critical(msg, *args, **kwargs)
 
 
 def log(level, msg, *args, **kwargs):
-    InvokeAILogger.getLogger().log(level, msg, *args, **kwargs)
+    InvokeAILogger.get_logger().log(level, msg, *args, **kwargs)
 
 
 def disable(level=logging.CRITICAL):
-    InvokeAILogger.getLogger().disable(level)
+    InvokeAILogger.get_logger().disable(level)
 
 
 def basicConfig(**kwargs):
-    InvokeAILogger.getLogger().basicConfig(**kwargs)
-
-
-def getLogger(name: str = None) -> logging.Logger:
-    return InvokeAILogger.getLogger(name)
+    InvokeAILogger.get_logger().basicConfig(**kwargs)
 
 
 _FACILITY_MAP = (
@@ -351,7 +347,7 @@ class InvokeAILogger(object):
     loggers = dict()
 
     @classmethod
-    def getLogger(
+    def get_logger(
         cls, name: str = "InvokeAI", config: InvokeAIAppConfig = InvokeAIAppConfig.get_config()
     ) -> logging.Logger:
         if name in cls.loggers:
@@ -360,13 +356,13 @@ class InvokeAILogger(object):
         else:
             logger = logging.getLogger(name)
         logger.setLevel(config.log_level.upper())  # yes, strings work here
-        for ch in cls.getLoggers(config):
+        for ch in cls.get_loggers(config):
             logger.addHandler(ch)
             cls.loggers[name] = logger
         return cls.loggers[name]
 
     @classmethod
-    def getLoggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
+    def get_loggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
         handler_strs = config.log_handlers
         handlers = list()
         for handler in handler_strs:

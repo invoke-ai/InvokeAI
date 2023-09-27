@@ -152,6 +152,8 @@ export type SaveImageInvocation = s['SaveImageInvocation'];
 export type ControlNetInvocation = s['ControlNetInvocation'];
 export type IPAdapterInvocation = s['IPAdapterInvocation'];
 export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
+export type ColorMapImageProcessorInvocation =
+  s['ColorMapImageProcessorInvocation'];
 export type ContentShuffleImageProcessorInvocation =
   s['ContentShuffleImageProcessorInvocation'];
 export type HedImageProcessorInvocation = s['HedImageProcessorInvocation'];

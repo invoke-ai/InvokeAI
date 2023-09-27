@@ -7,8 +7,6 @@ from .services.config import InvokeAIAppConfig
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
-config = InvokeAIAppConfig.get_config()
-config.parse_args()
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import argparse
@@ -61,8 +59,9 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     if torch.backends.mps.is_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
 
-
-logger = InvokeAILogger().getLogger(config=config)
+config = InvokeAIAppConfig.get_config()
+config.parse_args()
+logger = InvokeAILogger().get_logger(config=config)
 
 
 class CliCommand(BaseModel):

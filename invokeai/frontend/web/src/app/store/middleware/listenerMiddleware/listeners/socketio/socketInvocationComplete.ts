@@ -17,7 +17,8 @@ import {
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const nodeDenylist = ['load_image'];
+// These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
+const nodeDenylist = ['load_image', 'image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
@@ -80,9 +81,32 @@ export const addInvocationCompleteEventListener = () => {
 
           // If auto-switch is enabled, select the new image
           if (shouldAutoSwitch) {
-            // if auto-add is enabled, switch the board as the image comes in
-            dispatch(galleryViewChanged('images'));
-            dispatch(boardIdSelected(imageDTO.board_id ?? 'none'));
+            // if auto-add is enabled, switch the gallery view and board if needed as the image comes in
+            if (gallery.galleryView !== 'images') {
+              dispatch(galleryViewChanged('images'));
+            }
+
+            if (
+              imageDTO.board_id &&
+              imageDTO.board_id !== gallery.selectedBoardId
+            ) {
+              dispatch(
+                boardIdSelected({
+                  boardId: imageDTO.board_id,
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
+            if (!imageDTO.board_id && gallery.selectedBoardId !== 'none') {
+              dispatch(
+                boardIdSelected({
+                  boardId: 'none',
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
             dispatch(imageSelected(imageDTO));
           }
         }

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const zPydanticValidationError = z.object({
   status: z.literal(422),
-  error: z.object({
+  data: z.object({
     detail: z.array(
       z.object({
         loc: z.array(z.string()),

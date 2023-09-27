@@ -6,7 +6,7 @@ import {
   CoreMetadata,
   LoRAMetadataItem,
   ControlNetMetadataItem,
-  IPAdapterMetadataItem,
+  IPAdapterMetadataItem
 } from 'features/nodes/types/types';
 import {
   refinerModelChanged,
@@ -28,6 +28,8 @@ import {
   loraModelsAdapter,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
+  loraModelsAdapter,
+  useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
 import {
@@ -38,7 +40,7 @@ import {
   controlNetReset,
   initialControlNet,
   initialIPAdapterState,
-  ipAdapterRecalled,
+  ipAdapterRecalled
 } from '../../controlNet/store/controlNetSlice';
 import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
@@ -75,6 +77,10 @@ import {
   isValidWidth,
 } from '../types/parameterSchemas';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  CONTROLNET_PROCESSORS,
+  CONTROLNET_MODEL_DEFAULT_PROCESSORS,
+} from 'features/controlNet/store/constants';
 
 const selector = createSelector(stateSelector, ({ generation }) => {
   const { model } = generation;
@@ -462,6 +468,17 @@ export const useRecallParameters = () => {
 
       const controlNetId = uuidv4();
 
+      let processorType = initialControlNet.processorType;
+      for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
+        if (matchingControlNetModel.model_name.includes(modelSubstring)) {
+          processorType =
+            CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring] ||
+            initialControlNet.processorType;
+          break;
+        }
+      }
+      const processorNode = CONTROLNET_PROCESSORS[processorType].default;
+
       const controlnet: ControlNetConfig = {
         isEnabled: true,
         model: matchingControlNetModel,
@@ -474,9 +491,12 @@ export const useRecallParameters = () => {
         controlMode: control_mode || initialControlNet.controlMode,
         resizeMode: resize_mode || initialControlNet.resizeMode,
         controlImage: image?.image_name || null,
-        processedControlImage: initialControlNet.processedControlImage,
-        processorType: initialControlNet.processorType,
-        processorNode: initialControlNet.processorNode,
+        processedControlImage: image?.image_name || null,
+        processorType,
+        processorNode:
+          processorNode.type !== 'none'
+            ? processorNode
+            : initialControlNet.processorNode,
         shouldAutoConfig: true,
         controlNetId,
       };
@@ -588,11 +608,14 @@ export const useRecallParameters = () => {
           ...result.ipAdapter,
         })
       );
+      
+      dispatch(controlNetEnabled());
 
       parameterSetToast();
     },
     [
       prepareIPAdapterMetadataItem,
+      prepareControlNetMetadataItem,
       dispatch,
       parameterSetToast,
       parameterNotSetToast,
@@ -638,7 +661,7 @@ export const useRecallParameters = () => {
         refiner_start,
         loras,
         controlnets,
-        ipAdapters,
+        ipAdapters
       } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
@@ -757,7 +780,7 @@ export const useRecallParameters = () => {
       dispatch,
       prepareLoRAMetadataItem,
       prepareControlNetMetadataItem,
-      prepareIPAdapterMetadataItem,
+      prepareIPAdapterMetadataItem
     ]
   );
 

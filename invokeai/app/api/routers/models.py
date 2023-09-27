@@ -146,7 +146,8 @@ async def update_model(
 async def import_model(
     location: str = Body(description="A model path, repo_id or URL to import"),
     prediction_type: Optional[Literal["v_prediction", "epsilon", "sample"]] = Body(
-        description="Prediction type for SDv2 checkpoint files", default="v_prediction"
+        description="Prediction type for SDv2 checkpoints and rare SDv1 checkpoints",
+        default=None,
     ),
 ) -> ImportModelResponse:
     """Add a model using its local path, repo_id, or remote URL. Model characteristics will be probed and configured automatically"""
