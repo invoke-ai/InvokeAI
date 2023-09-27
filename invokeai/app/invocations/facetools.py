@@ -1,5 +1,5 @@
 import math
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 import cv2
 import mediapipe as mp
@@ -36,18 +36,18 @@ class FaceOffOutput(ImageOutput):
 
 
 class FaceResultsData(TypedDict):
-    pil_image: ImageType
-    mask_pil: ImageType
+    pil_image: Optional[ImageType]
+    mask_pil: Optional[ImageType]
     x_center: float
     y_center: float
     mesh_width: int
     mesh_height: int
-    face_id: int
+    face_id: Optional[int]
 
 
 class ExtractFaceData(TypedDict):
     bounded_image: ImageType
-    mask_pil: ImageType
+    mask_pil: Optional[ImageType]
     x_min: int
     y_min: int
     x_max: int
@@ -109,6 +109,7 @@ def generate_face_box_mask(
     draw_mesh: bool = True,
 ) -> list[FaceResultsData]:
     result = []
+    mask_pil = None
 
     # Convert the PIL image to a NumPy array.
     np_image = np.array(pil_image, dtype=np.uint8)
@@ -191,15 +192,19 @@ def generate_face_box_mask(
                 and (top_side >= -over_h)
                 and (bottom_side < im_height + over_h)
             ):
-                this_face: FaceResultsData = FaceResultsData()
-                if draw_mesh:
-                    this_face["pil_image"] = pil_image
-                    this_face["mask_pil"] = mask_pil
-                this_face["x_center"] = x_center + chunk_x_offset
-                this_face["y_center"] = y_center + chunk_y_offset
-                this_face["mesh_width"] = mesh_width
-                this_face["mesh_height"] = mesh_height
-                result.append(this_face)
+                x_center = float(x_center)
+                y_center = float(y_center)
+                face = FaceResultsData(
+                    pil_image=pil_image if draw_mesh else None,
+                    mask_pil=mask_pil,
+                    x_center=x_center + chunk_x_offset,
+                    y_center=y_center + chunk_y_offset,
+                    mesh_width=mesh_width,
+                    mesh_height=mesh_height,
+                    face_id=None,
+                )
+
+                result.append(face)
             else:
                 context.services.logger.info("FaceTools --> Face out of bounds, ignoring.")
 
@@ -388,9 +393,7 @@ class FaceOffInvocation(BaseInvocation):
         description="Whether to bypass full image face detection and default to image chunking. Chunking will occur if no faces are found in the full image.",
     )
 
-    def faceoff(self, context: InvocationContext) -> FaceOffOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
-
+    def faceoff(self, context: InvocationContext, image) -> Optional[FaceOffOutput]:
         all_faces = get_faces_list(
             context,
             image,
@@ -446,10 +449,10 @@ class FaceOffInvocation(BaseInvocation):
         )
 
     def invoke(self, context: InvocationContext) -> FaceOffOutput:
-        result = self.faceoff(context)
+        image = context.services.images.get_pil_image(self.image.image_name)
+        result = self.faceoff(context, image)
 
         if result is None:
-            image = context.services.images.get_pil_image(self.image.image_name)
             whitemask = Image.new("L", image.size, color=255)
             context.services.logger.info("FaceOff --> No face detected. Passing through original image.")
 
@@ -504,9 +507,7 @@ class FaceMaskInvocation(BaseInvocation):
     )
     invert_mask: bool = InputField(default=False, description="Toggle to invert the mask")
 
-    def facemask(self, context: InvocationContext) -> FaceMaskOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
-
+    def facemask(self, context: InvocationContext, image) -> Optional[FaceMaskOutput]:
         all_faces = get_faces_list(
             context,
             image,
@@ -575,10 +576,10 @@ class FaceMaskInvocation(BaseInvocation):
         )
 
     def invoke(self, context: InvocationContext) -> FaceMaskOutput:
-        result = self.facemask(context)
+        image = context.services.images.get_pil_image(self.image.image_name)
+        result = self.facemask(context, image)
 
         if result is None:
-            image = context.services.images.get_pil_image(self.image.image_name)
             whitemask = Image.new("L", image.size, color=255)
             context.services.logger.warning("FaceMask --> No face detected. Passing through original image.")
 
@@ -626,8 +627,7 @@ class FaceIdentifierInvocation(BaseInvocation):
         description="Whether to bypass full image face detection and default to image chunking. Chunking will occur if no faces are found in the full image.",
     )
 
-    def faceidentifier(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+    def faceidentifier(self, context: InvocationContext, image) -> Optional[ImageOutput]:
         image = image.copy()
 
         all_faces = get_faces_list(
@@ -668,7 +668,8 @@ class FaceIdentifierInvocation(BaseInvocation):
         )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        result = self.faceidentifier(context)
+        image = context.services.images.get_pil_image(self.image.image_name)
+        result = self.faceidentifier(context, image)
 
         if result is None:
             image = context.services.images.get_pil_image(self.image.image_name)
