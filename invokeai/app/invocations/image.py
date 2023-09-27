@@ -993,7 +993,6 @@ class SaveImageInvocation(BaseInvocation):
         logger.debug(f"self.metadata {self.metadata}")
         logger.debug(f"potatos {self.metadata.dict()}")
 
-
         image_dto = context.services.images.create(
             image=image,
             image_origin=ResourceOrigin.INTERNAL,

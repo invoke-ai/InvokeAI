@@ -29,9 +29,11 @@ class LoRAMetadataField(BaseModelExcludeNull):
 
 class IPAdapterField(BaseModelExcludeNull):
     """IP Adapter metadata for an image generated in InvokeAI."""
+
     image: ImageField = Field(description="The IP Adapter image")
     ip_adapter_model: str = Field(description="The IP Adapter model")
     weight: float = Field(description="The weight of the IP Adapter model")
+
 
 class IPAdapterMetadataField(BaseModelExcludeNull):
     image: ImageField = Field(description="The IP-Adapter image prompt.")
@@ -43,7 +45,6 @@ class IPAdapterMetadataField(BaseModelExcludeNull):
     end_step_percent: float = Field(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
     )
-    
 
 
 class CoreMetadata(BaseModelExcludeNull):
@@ -201,6 +202,6 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> MetadataAccumulatorOutput:
-        """Collects and outputs a CoreMetadata object"""        
+        """Collects and outputs a CoreMetadata object"""
 
         return MetadataAccumulatorOutput(metadata=CoreMetadata(**self.dict()))
