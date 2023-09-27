@@ -6,7 +6,6 @@ import ClearInvocationCacheButton from './ClearInvocationCacheButton';
 import ToggleInvocationCacheButton from './ToggleInvocationCacheButton';
 import StatusStatGroup from './common/StatusStatGroup';
 import StatusStatItem from './common/StatusStatItem';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const InvocationCacheStatus = () => {
   const { t } = useTranslation();

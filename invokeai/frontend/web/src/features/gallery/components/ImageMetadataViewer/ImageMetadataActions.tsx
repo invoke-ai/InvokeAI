@@ -2,7 +2,7 @@ import {
   ControlNetMetadataItem,
   CoreMetadata,
   LoRAMetadataItem,
-  IPAdapterMetadataItem
+  IPAdapterMetadataItem,
 } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useMemo, useCallback } from 'react';

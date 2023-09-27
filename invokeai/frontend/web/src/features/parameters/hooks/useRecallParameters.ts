@@ -32,6 +32,7 @@ import {
 } from '../../../services/api/endpoints/models';
 import {
   ControlNetConfig,
+  IPAdapterConfig,
   controlNetEnabled,
   controlNetRecalled,
   controlNetReset,
@@ -576,9 +577,20 @@ export const useRecallParameters = () => {
         };
       }
 
-      const ipAdapter = {
+      const ipAdapter: IPAdapterConfig = {
         adapterImage: {
-          image_name: image?.image_name || null,
+          image_name: image?.image_name || '',
+          image_url: '',
+          thumbnail_url: '',
+          image_origin: 'internal',
+          image_category: 'mask',
+          width: 0,
+          height: 0,
+          board_id: '',
+          created_at: '',
+          updated_at: '',
+          is_intermediate: false,
+          starred: false,
         },
         model: matchingIPAdapterModel,
         weight: weight || initialIPAdapterState.weight,

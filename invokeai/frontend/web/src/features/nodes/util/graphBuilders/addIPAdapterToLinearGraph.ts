@@ -3,17 +3,12 @@ import {
   IPAdapterInvocation,
   MetadataAccumulatorInvocation,
 } from 'services/api/types';
-import {
-  IPAdapterField,
-  IPAdapterMetadataItem,
-  NonNullableGraph,
-} from '../../types/types';
+import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   IP_ADAPTER,
   METADATA_ACCUMULATOR,
 } from './constants';
-import { omit } from 'lodash-es';
 
 export const addIPAdapterToLinearGraph = (
   state: RootState,
@@ -42,8 +37,6 @@ export const addIPAdapterToLinearGraph = (
       end_step_percent: ipAdapterInfo.endStepPct,
     };
 
-    console.log(ipAdapterNode, 'what the actual fuck 1');
-
     if (ipAdapterInfo.adapterImage) {
       ipAdapterNode.image = {
         image_name: ipAdapterInfo.adapterImage.image_name,
@@ -52,10 +45,7 @@ export const addIPAdapterToLinearGraph = (
       return;
     }
 
-    console.log(ipAdapterNode, 'what the actual fuck 2');
-
     graph.nodes[ipAdapterNode.id] = ipAdapterNode as IPAdapterInvocation;
-    console.log(ipAdapterInfo, 'ip adapter info');
     if (metadataAccumulator?.ipAdapters) {
       const ipAdapterField = {
         image: {
@@ -68,7 +58,6 @@ export const addIPAdapterToLinearGraph = (
         weight: ipAdapterInfo.weight,
         begin_step_percent: ipAdapterInfo.beginStepPct,
         end_step_percent: ipAdapterInfo.endStepPct,
-        some_random_shit: 'test',
       };
 
       metadataAccumulator.ipAdapters.push(ipAdapterField);
