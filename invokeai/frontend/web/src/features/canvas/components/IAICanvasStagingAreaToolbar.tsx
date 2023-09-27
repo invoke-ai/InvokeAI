@@ -134,6 +134,7 @@ const IAICanvasStagingAreaToolbar = () => {
     <Flex
       pos="absolute"
       bottom={4}
+      gap={2}
       w="100%"
       align="center"
       justify="center"
@@ -153,6 +154,12 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="accent"
           pointerEvents="none"
           isDisabled={!shouldShowStagingImage}
+          sx={{
+            background: 'base.600',
+            _dark: {
+              background: 'base.800',
+            },
+          }}
         >{`${currentIndex + 1}/${total}`}</IAIButton>
         <IAIIconButton
           tooltip={`${t('unifiedCanvas.next')} (Right)`}
@@ -162,6 +169,8 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="accent"
           isDisabled={!shouldShowStagingImage}
         />
+      </ButtonGroup>
+      <ButtonGroup isAttached borderRadius="base" shadow="dark-lg">
         <IAIIconButton
           tooltip={`${t('unifiedCanvas.accept')} (Enter)`}
           aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
