@@ -1141,6 +1141,10 @@ const zLoRAMetadataItem = z.object({
 
 export type LoRAMetadataItem = z.infer<typeof zLoRAMetadataItem>;
 
+const zControlNetMetadataItem = zControlField.deepPartial();
+
+export type ControlNetMetadataItem = z.infer<typeof zControlNetMetadataItem>;
+
 export const zCoreMetadata = z
   .object({
     app_version: z.string().nullish().catch(null),
