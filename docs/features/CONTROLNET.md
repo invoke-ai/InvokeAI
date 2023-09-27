@@ -139,14 +139,15 @@ Additionally, each ControlNet section can be expanded in order to manipulate set
 [IP-Adapter](https://ip-adapter.github.io) is a tooling that allows for image prompt capabilities with text-to-image diffusion models. IP-Adapter works by analyzing the given image prompt to extract features, then passing those features to the UNet along with any other conditioning provided. 
 
 ![IP-Adapter + T2I](https://github.com/tencent-ailab/IP-Adapter/raw/main/assets/demo/ip_adpter_plus_multi.jpg)
+
 ![IP-Adapter + IMG2IMG](https://github.com/tencent-ailab/IP-Adapter/blob/main/assets/demo/image-to-image.jpg)
 
 #### Installation
 There are several ways to install IP-Adapter models with an existing InvokeAI installation:
 
-1. Through the command line interface launched from the invoke.sh / invoke.bat scripts, option [5] to download models
-2. Through the Model Manager UI with models from the *Tools* section of [www.models.invoke.ai](www.models.invoke.ai). To do this, copy the repo ID from the desired model page, and paste it in the Add Model field of the model manager. 
-3. Manually downloading the models files and placed in the `models/ip-adapter` folder of the Invoke root directory. **Note:** The image_encoder folder is necessary for IP-Adapter to function. 
+1. Through the command line interface launched from the invoke.sh / invoke.bat scripts, option [5] to download models.
+2. Through the Model Manager UI with models from the *Tools* section of [www.models.invoke.ai](www.models.invoke.ai). To do this, copy the repo ID from the desired model page, and paste it in the Add Model field of the model manager. **Note** Both the IP-Adapter and the Image Encoder must be installed for IP-Adapter to work. For example, the [SD 1.5 IP-Adapter](https://models.invoke.ai/InvokeAI/ip_adapter_plus_sd15) and [SD1.5 Image Encoder](https://models.invoke.ai/InvokeAI/ip_adapter_sd_image_encoder) must be installed to use IP-Adapter with SD1.5 based models.  
+3. Manually downloading the IP-Adapter and Image Encoder files and placing them in the `ip-adapter` folder of relevant base model folder of Invoke root directory. For example, for the SDXL IP-Adapter, files should be added to the `model/sdxl/ip_adapter/` folder. 
 
 #### Using IP-Adapter
 
