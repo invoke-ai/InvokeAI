@@ -13,6 +13,7 @@ from invokeai.backend.model_management.models.base import (
     ModelConfigBase,
     ModelType,
     SubModelType,
+    calc_model_size_by_fs,
     classproperty,
 )
 
@@ -30,7 +31,7 @@ class IPAdapterModel(ModelBase):
         assert model_type == ModelType.IPAdapter
         super().__init__(model_path, base_model, model_type)
 
-        self.model_size = os.path.getsize(self.model_path)
+        self.model_size = calc_model_size_by_fs(self.model_path)
 
     @classmethod
     def detect_format(cls, path: str) -> str:
@@ -63,9 +64,12 @@ class IPAdapterModel(ModelBase):
         if child_type is not None:
             raise ValueError("There are no child models in an IP-Adapter model.")
 
-        return build_ip_adapter(
+        model = build_ip_adapter(
             ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"), device="cpu", dtype=torch_dtype
         )
+
+        self.model_size = model.calc_size()
+        return model
 
     @classmethod
     def convert_if_required(
