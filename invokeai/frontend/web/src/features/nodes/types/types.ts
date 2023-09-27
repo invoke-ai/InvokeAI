@@ -1222,6 +1222,7 @@ export const zInvocationNodeData = z.object({
   notes: z.string(),
   embedWorkflow: z.boolean(),
   isIntermediate: z.boolean(),
+  useCache: z.boolean().optional(),
   version: zSemVer.optional(),
 });
 
