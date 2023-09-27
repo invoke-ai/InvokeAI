@@ -98,6 +98,9 @@ export const controlNetSlice = createSlice({
     isControlNetEnabledToggled: (state) => {
       state.isEnabled = !state.isEnabled;
     },
+    controlNetEnabled: (state) => {
+      state.isEnabled = true;
+    },
     controlNetAdded: (
       state,
       action: PayloadAction<{
@@ -109,6 +112,12 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId] = {
         ...(controlNet ?? initialControlNet),
         controlNetId,
+      };
+    },
+    controlNetRecalled: (state, action: PayloadAction<ControlNetConfig>) => {
+      const controlNet = action.payload;
+      state.controlNets[controlNet.controlNetId] = {
+        ...controlNet,
       };
     },
     controlNetDuplicated: (
@@ -439,7 +448,9 @@ export const controlNetSlice = createSlice({
 
 export const {
   isControlNetEnabledToggled,
+  controlNetEnabled,
   controlNetAdded,
+  controlNetRecalled,
   controlNetDuplicated,
   controlNetAddedFromImage,
   controlNetRemoved,

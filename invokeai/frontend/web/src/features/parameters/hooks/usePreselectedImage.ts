@@ -1,7 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { CoreMetadata } from 'features/nodes/types/types';
 import { t } from 'i18next';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAppToaster } from '../../../app/components/Toaster';
 import { useAppDispatch } from '../../../app/store/storeHooks';
 import {
@@ -13,18 +13,21 @@ import { setActiveTab } from '../../ui/store/uiSlice';
 import { initialImageSelected } from '../store/actions';
 import { useRecallParameters } from './useRecallParameters';
 
-export const usePreselectedImage = (imageName?: string) => {
+export const usePreselectedImage = (selectedImage?: {
+  imageName: string;
+  action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
+}) => {
   const dispatch = useAppDispatch();
 
   const { recallAllParameters } = useRecallParameters();
   const toaster = useAppToaster();
 
   const { currentData: selectedImageDto } = useGetImageDTOQuery(
-    imageName ?? skipToken
+    selectedImage?.imageName ?? skipToken
   );
 
   const { currentData: selectedImageMetadata } = useGetImageMetadataQuery(
-    imageName ?? skipToken
+    selectedImage?.imageName ?? skipToken
   );
 
   const handleSendToCanvas = useCallback(() => {
@@ -53,6 +56,24 @@ export const usePreselectedImage = (imageName?: string) => {
     // disabled because `recallAllParameters` changes the model, but its dep to prepare LoRAs has model as a dep. this introduces circular logic that causes infinite re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImageMetadata]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'sendToCanvas') {
+      handleSendToCanvas();
+    }
+  }, [selectedImage, handleSendToCanvas]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'sendToImg2Img') {
+      handleSendToImg2Img();
+    }
+  }, [selectedImage, handleSendToImg2Img]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'useAllParameters') {
+      handleUseAllMetadata();
+    }
+  }, [selectedImage, handleUseAllMetadata]);
 
   return { handleSendToCanvas, handleSendToImg2Img, handleUseAllMetadata };
 };
