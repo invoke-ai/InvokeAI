@@ -621,25 +621,22 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      const currentIndex = state.layerState.stagingArea.selectedImageIndex;
-      const length = state.layerState.stagingArea.images.length;
+      const nextIndex = state.layerState.stagingArea.selectedImageIndex + 1;
+      const lastIndex = state.layerState.stagingArea.images.length - 1;
 
-      state.layerState.stagingArea.selectedImageIndex = Math.min(
-        currentIndex + 1,
-        length - 1
-      );
+      state.layerState.stagingArea.selectedImageIndex =
+        nextIndex > lastIndex ? 0 : nextIndex;
     },
     prevStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
         return;
       }
 
-      const currentIndex = state.layerState.stagingArea.selectedImageIndex;
+      const prevIndex = state.layerState.stagingArea.selectedImageIndex - 1;
+      const lastIndex = state.layerState.stagingArea.images.length - 1;
 
-      state.layerState.stagingArea.selectedImageIndex = Math.max(
-        currentIndex - 1,
-        0
-      );
+      state.layerState.stagingArea.selectedImageIndex =
+        prevIndex < 0 ? lastIndex : prevIndex;
     },
     commitStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {

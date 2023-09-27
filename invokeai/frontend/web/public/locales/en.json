@@ -1444,6 +1444,8 @@
         "showCanvasDebugInfo": "Show Additional Canvas Info",
         "showGrid": "Show Grid",
         "showHide": "Show/Hide",
+        "showResultsOn": "Show Results (On)",
+        "showResultsOff": "Show Results (Off)",
         "showIntermediates": "Show Intermediates",
         "snapToGrid": "Snap to Grid",
         "undo": "Undo"
