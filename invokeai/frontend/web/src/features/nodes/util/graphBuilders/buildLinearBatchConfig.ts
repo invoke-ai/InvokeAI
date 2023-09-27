@@ -41,13 +41,6 @@ export const prepareLinearUIBatch = (
     }
 
     if (graph.nodes[METADATA_ACCUMULATOR]) {
-      console.log(
-        'adding seed to metadata accumulator',
-        METADATA_ACCUMULATOR,
-        seeds,
-        '--',
-        graph.nodes[METADATA_ACCUMULATOR]
-      );
       zipped.push({
         node_path: METADATA_ACCUMULATOR,
         field_name: 'seed',
@@ -145,10 +138,6 @@ export const prepareLinearUIBatch = (
     }
 
     if (graph.nodes[METADATA_ACCUMULATOR]) {
-      console.log(
-        'adding prompt to metadata accumulator',
-        METADATA_ACCUMULATOR
-      );
       firstBatchDatumList.push({
         node_path: METADATA_ACCUMULATOR,
         field_name: 'positive_prompt',
@@ -172,10 +161,6 @@ export const prepareLinearUIBatch = (
       }
 
       if (graph.nodes[METADATA_ACCUMULATOR]) {
-        console.log(
-          'adding style prompt to metadata accumulator',
-          METADATA_ACCUMULATOR
-        );
         firstBatchDatumList.push({
           node_path: METADATA_ACCUMULATOR,
           field_name: 'positive_style_prompt',

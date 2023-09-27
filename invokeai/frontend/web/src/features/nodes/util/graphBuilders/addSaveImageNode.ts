@@ -41,7 +41,6 @@ export const addSaveImageNode = (
     | undefined;
 
   if (metadataAccumulator) {
-    console.log('idk where we are', metadataAccumulator);
     graph.edges.push({
       source: {
         node_id: METADATA_ACCUMULATOR,

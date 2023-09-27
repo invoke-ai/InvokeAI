@@ -544,7 +544,6 @@ export const useRecallParameters = () => {
 
   const prepareIPAdapterMetadataItem = useCallback(
     (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
-      console.log(ipAdapterMetadataItem, 'ipAdapterMetadataItem');
       if (!isValidIPAdapterModel(ipAdapterMetadataItem?.ip_adapter_model)) {
         return { ipAdapter: null, error: 'Invalid IP Adapter model' };
       }

@@ -17,8 +17,6 @@ export const addIPAdapterToLinearGraph = (
 ): void => {
   const { isIPAdapterEnabled, ipAdapterInfo } = state.controlNet;
 
-  console.log('ipAdapterInfo', ipAdapterInfo);
-
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation
     | undefined;
@@ -61,7 +59,6 @@ export const addIPAdapterToLinearGraph = (
       };
 
       metadataAccumulator.ipAdapters.push(ipAdapterField);
-      console.log('metadataAccumulator', metadataAccumulator);
     }
 
     graph.edges.push({
