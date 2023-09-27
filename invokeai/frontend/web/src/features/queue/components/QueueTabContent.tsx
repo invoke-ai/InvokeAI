@@ -19,7 +19,6 @@ const QueueTabContent = () => {
       p={2}
       flexDir="column"
       gap={2}
-      border="8px thistle solid"
     >
       <Flex gap={2} w="full">
         <QueueTabQueueControls />

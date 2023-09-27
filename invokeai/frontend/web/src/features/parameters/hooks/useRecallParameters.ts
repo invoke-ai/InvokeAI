@@ -6,7 +6,7 @@ import {
   CoreMetadata,
   LoRAMetadataItem,
   ControlNetMetadataItem,
-  IPAdapterMetadataItem
+  IPAdapterMetadataItem,
 } from 'features/nodes/types/types';
 import {
   refinerModelChanged,
@@ -25,8 +25,6 @@ import { ImageDTO } from 'services/api/types';
 import {
   controlNetModelsAdapter,
   ipAdapterModelsAdapter,
-  loraModelsAdapter,
-  useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
   loraModelsAdapter,
   useGetControlNetModelsQuery,
@@ -34,13 +32,13 @@ import {
 } from '../../../services/api/endpoints/models';
 import {
   ControlNetConfig,
-  IPAdapterConfig,
   controlNetEnabled,
   controlNetRecalled,
   controlNetReset,
   initialControlNet,
   initialIPAdapterState,
-  ipAdapterRecalled
+  ipAdapterRecalled,
+  isIPAdapterEnabledChanged,
 } from '../../controlNet/store/controlNetSlice';
 import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
@@ -545,16 +543,13 @@ export const useRecallParameters = () => {
 
   const prepareIPAdapterMetadataItem = useCallback(
     (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
-      if (
-        !isValidIPAdapterModel(
-          ipAdapterMetadataItem?.ip_adapter_model?.model_name
-        )
-      ) {
+      console.log(ipAdapterMetadataItem, 'ipAdapterMetadataItem');
+      if (!isValidIPAdapterModel(ipAdapterMetadataItem?.ip_adapter_model)) {
         return { ipAdapter: null, error: 'Invalid IP Adapter model' };
       }
 
       const {
-        adapter_image,
+        image,
         ip_adapter_model,
         weight,
         begin_step_percent,
@@ -581,8 +576,10 @@ export const useRecallParameters = () => {
         };
       }
 
-      const ipAdapter: IPAdapterMetadataItem = {
-        image_name: adapter_image,
+      const ipAdapter = {
+        adapterImage: {
+          image_name: image?.image_name || null,
+        },
         model: matchingIPAdapterModel,
         weight: weight || initialIPAdapterState.weight,
         beginStepPct: begin_step_percent || 0,
@@ -608,14 +605,13 @@ export const useRecallParameters = () => {
           ...result.ipAdapter,
         })
       );
-      
-      dispatch(controlNetEnabled());
+
+      dispatch(isIPAdapterEnabledChanged(true));
 
       parameterSetToast();
     },
     [
       prepareIPAdapterMetadataItem,
-      prepareControlNetMetadataItem,
       dispatch,
       parameterSetToast,
       parameterNotSetToast,
@@ -661,7 +657,7 @@ export const useRecallParameters = () => {
         refiner_start,
         loras,
         controlnets,
-        ipAdapters
+        ipAdapters,
       } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
@@ -762,9 +758,9 @@ export const useRecallParameters = () => {
         }
       });
 
-      // if (ipAdapters.length) {
-      //   // TODO: dispatch ipAdapterEnabled
-      // }
+      if (ipAdapters?.length) {
+        dispatch(isIPAdapterEnabledChanged(true));
+      }
       ipAdapters?.forEach((ipAdapter) => {
         const result = prepareIPAdapterMetadataItem(ipAdapter);
         if (result.ipAdapter) {
@@ -780,7 +776,7 @@ export const useRecallParameters = () => {
       dispatch,
       prepareLoRAMetadataItem,
       prepareControlNetMetadataItem,
-      prepareIPAdapterMetadataItem
+      prepareIPAdapterMetadataItem,
     ]
   );
 

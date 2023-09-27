@@ -2119,6 +2119,11 @@ export type components = {
        * Loras
        * @description The LoRAs used for inference
        */
+      ipAdapters: components["schemas"]["IPAdapterField"][];
+      /**
+       * Loras
+       * @description The LoRAs used for inference
+       */
       loras: components["schemas"]["LoRAMetadataField"][];
       /**
        * Vae

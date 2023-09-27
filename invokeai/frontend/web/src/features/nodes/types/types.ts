@@ -420,6 +420,7 @@ export const zIPAdapterImageField = z.object({
 
 export const zIPAdapterField = z.object({
   adapter_image: zIPAdapterImageField,
+  image: zImageField,
   ip_adapter_model: zIPAdapterModel,
   image_encoder_model: z.string().trim().min(1),
   weight: z.number(),
