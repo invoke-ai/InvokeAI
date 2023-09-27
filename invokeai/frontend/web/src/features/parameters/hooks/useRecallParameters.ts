@@ -512,6 +512,8 @@ export const useRecallParameters = () => {
         })
       );
 
+      dispatch(controlNetEnabled());
+
       parameterSetToast();
     },
     [
