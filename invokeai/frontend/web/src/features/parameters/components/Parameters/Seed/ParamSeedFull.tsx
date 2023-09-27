@@ -3,11 +3,11 @@ import { memo } from 'react';
 import ParamSeed from './ParamSeed';
 import ParamSeedShuffle from './ParamSeedShuffle';
 import ParamSeedRandomize from './ParamSeedRandomize';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 const ParamSeedFull = () => {
   return (
-    <IAIInformationalPopover details="paramSeed">
+    <IAIInformationalPopover feature="paramSeed">
       <Flex sx={{ gap: 3, alignItems: 'flex-end' }}>
         <ParamSeed />
         <ParamSeedShuffle />

@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
 import { setIterations } from 'features/parameters/store/generationSlice';
@@ -61,7 +61,7 @@ const ParamIterations = ({ asSlider }: Props) => {
   }, [dispatch, initial]);
 
   return asSlider || shouldUseSliders ? (
-    <IAIInformationalPopover details="paramImages">
+    <IAIInformationalPopover feature="paramIterations">
       <IAISlider
         label={t('parameters.iterations')}
         step={step}
@@ -77,7 +77,7 @@ const ParamIterations = ({ asSlider }: Props) => {
       />
     </IAIInformationalPopover>
   ) : (
-    <IAIInformationalPopover details="paramImages">
+    <IAIInformationalPopover feature="paramIterations">
       <IAINumberInput
         label={t('parameters.iterations')}
         step={step}

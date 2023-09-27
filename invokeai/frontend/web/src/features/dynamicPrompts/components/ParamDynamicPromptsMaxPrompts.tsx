@@ -9,6 +9,7 @@ import {
   maxPromptsReset,
 } from '../store/dynamicPromptsSlice';
 import { useTranslation } from 'react-i18next';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -46,19 +47,21 @@ const ParamDynamicPromptsMaxPrompts = () => {
   }, [dispatch]);
 
   return (
-    <IAISlider
-      label={t('dynamicPrompts.maxPrompts')}
-      isDisabled={isDisabled}
-      min={min}
-      max={sliderMax}
-      value={maxPrompts}
-      onChange={handleChange}
-      sliderNumberInputProps={{ max: inputMax }}
-      withSliderMarks
-      withInput
-      withReset
-      handleReset={handleReset}
-    />
+    <IAIInformationalPopover feature="dynamicPromptsMaxPrompts">
+      <IAISlider
+        label={t('dynamicPrompts.maxPrompts')}
+        isDisabled={isDisabled}
+        min={min}
+        max={sliderMax}
+        value={maxPrompts}
+        onChange={handleChange}
+        sliderNumberInputProps={{ max: inputMax }}
+        withSliderMarks
+        withInput
+        withReset
+        handleReset={handleReset}
+      />
+    </IAIInformationalPopover>
   );
 };
 

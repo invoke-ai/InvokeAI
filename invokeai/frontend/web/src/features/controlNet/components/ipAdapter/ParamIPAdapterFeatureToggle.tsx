@@ -3,8 +3,8 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
-import { isIPAdapterEnableToggled } from 'features/controlNet/store/controlNetSlice';
-import { memo, useCallback } from 'react';
+import { isIPAdapterEnabledChanged } from 'features/controlNet/store/controlNetSlice';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -22,9 +22,12 @@ const ParamIPAdapterFeatureToggle = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleChange = useCallback(() => {
-    dispatch(isIPAdapterEnableToggled());
-  }, [dispatch]);
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(isIPAdapterEnabledChanged(e.target.checked));
+    },
+    [dispatch]
+  );
 
   return (
     <IAISwitch

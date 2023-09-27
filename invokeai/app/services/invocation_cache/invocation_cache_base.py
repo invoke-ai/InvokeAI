@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Union
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
+from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 
 
 class InvocationCacheBase(ABC):
@@ -32,7 +33,7 @@ class InvocationCacheBase(ABC):
 
     @abstractmethod
     def delete(self, key: Union[int, str]) -> None:
-        """Deleteds an invocation output from the cache"""
+        """Deletes an invocation output from the cache"""
         pass
 
     @abstractmethod
@@ -43,4 +44,19 @@ class InvocationCacheBase(ABC):
     @abstractmethod
     def create_key(self, invocation: BaseInvocation) -> int:
         """Gets the key for the invocation's cache item"""
+        pass
+
+    @abstractmethod
+    def disable(self) -> None:
+        """Disables the cache, overriding the max cache size"""
+        pass
+
+    @abstractmethod
+    def enable(self) -> None:
+        """Enables the cache, letting the the max cache size take effect"""
+        pass
+
+    @abstractmethod
+    def get_status(self) -> InvocationCacheStatus:
+        """Returns the status of the cache"""
         pass

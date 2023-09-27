@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
 import { clipSkipMap } from 'features/parameters/types/constants';
@@ -42,8 +42,12 @@ export default function ParamClipSkip() {
     return clipSkipMap[model.base_model].markers;
   }, [model]);
 
+  if (model?.base_model === 'sdxl') {
+    return null;
+  }
+
   return (
-    <IAIInformationalPopover details="clipSkip">
+    <IAIInformationalPopover feature="clipSkip" placement="top">
       <IAISlider
         label={t('parameters.clipSkip')}
         aria-label={t('parameters.clipSkip')}

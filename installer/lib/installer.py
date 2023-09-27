@@ -332,6 +332,7 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
+        auto_install = False
         # set sys.argv to a consistent state
         new_argv = [sys.argv[0]]
         for i in range(1, len(sys.argv)):
@@ -340,13 +341,17 @@ class InvokeAiInstance:
                 new_argv.append(el)
                 new_argv.append(sys.argv[i + 1])
             elif el in ["-y", "--yes", "--yes-to-all"]:
-                new_argv.append(el)
+                auto_install = True
         sys.argv = new_argv
 
+        import messages
         import requests  # to catch download exceptions
-        from messages import introduction
 
-        introduction()
+        auto_install = auto_install or messages.user_wants_auto_configuration()
+        if auto_install:
+            sys.argv.append("--yes")
+        else:
+            messages.introduction()
 
         from invokeai.frontend.install.invokeai_configure import invokeai_configure
 

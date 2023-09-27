@@ -6,7 +6,6 @@ import {
 import { cloneDeep, forEach } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import { components } from 'services/api/schema';
-import { isAnySessionRejected } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
@@ -99,6 +98,9 @@ export const controlNetSlice = createSlice({
     isControlNetEnabledToggled: (state) => {
       state.isEnabled = !state.isEnabled;
     },
+    controlNetEnabled: (state) => {
+      state.isEnabled = true;
+    },
     controlNetAdded: (
       state,
       action: PayloadAction<{
@@ -110,6 +112,12 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId] = {
         ...(controlNet ?? initialControlNet),
         controlNetId,
+      };
+    },
+    controlNetRecalled: (state, action: PayloadAction<ControlNetConfig>) => {
+      const controlNet = action.payload;
+      state.controlNets[controlNet.controlNetId] = {
+        ...controlNet,
       };
     },
     controlNetDuplicated: (
@@ -146,16 +154,16 @@ export const controlNetSlice = createSlice({
       const { controlNetId } = action.payload;
       delete state.controlNets[controlNetId];
     },
-    controlNetToggled: (
+    controlNetIsEnabledChanged: (
       state,
-      action: PayloadAction<{ controlNetId: string }>
+      action: PayloadAction<{ controlNetId: string; isEnabled: boolean }>
     ) => {
-      const { controlNetId } = action.payload;
+      const { controlNetId, isEnabled } = action.payload;
       const cn = state.controlNets[controlNetId];
       if (!cn) {
         return;
       }
-      cn.isEnabled = !cn.isEnabled;
+      cn.isEnabled = isEnabled;
     },
     controlNetImageChanged: (
       state,
@@ -377,8 +385,8 @@ export const controlNetSlice = createSlice({
     controlNetReset: () => {
       return { ...initialControlNetState };
     },
-    isIPAdapterEnableToggled: (state) => {
-      state.isIPAdapterEnabled = !state.isIPAdapterEnabled;
+    isIPAdapterEnabledChanged: (state, action: PayloadAction<boolean>) => {
+      state.isIPAdapterEnabled = action.payload;
     },
     ipAdapterImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.ipAdapterInfo.adapterImage = action.payload;
@@ -418,10 +426,6 @@ export const controlNetSlice = createSlice({
       state.pendingControlImages = [];
     });
 
-    builder.addMatcher(isAnySessionRejected, (state) => {
-      state.pendingControlImages = [];
-    });
-
     builder.addMatcher(
       imagesApi.endpoints.deleteImage.matchFulfilled,
       (state, action) => {
@@ -444,13 +448,15 @@ export const controlNetSlice = createSlice({
 
 export const {
   isControlNetEnabledToggled,
+  controlNetEnabled,
   controlNetAdded,
+  controlNetRecalled,
   controlNetDuplicated,
   controlNetAddedFromImage,
   controlNetRemoved,
   controlNetImageChanged,
   controlNetProcessedImageChanged,
-  controlNetToggled,
+  controlNetIsEnabledChanged,
   controlNetModelChanged,
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
@@ -461,7 +467,7 @@ export const {
   controlNetProcessorTypeChanged,
   controlNetReset,
   controlNetAutoConfigToggled,
-  isIPAdapterEnableToggled,
+  isIPAdapterEnabledChanged,
   ipAdapterImageChanged,
   ipAdapterWeightChanged,
   ipAdapterModelChanged,

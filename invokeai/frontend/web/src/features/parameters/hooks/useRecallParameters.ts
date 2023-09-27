@@ -2,7 +2,11 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { CoreMetadata, LoRAMetadataItem } from 'features/nodes/types/types';
+import {
+  CoreMetadata,
+  LoRAMetadataItem,
+  ControlNetMetadataItem,
+} from 'features/nodes/types/types';
 import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
@@ -18,10 +22,19 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageDTO } from 'services/api/types';
 import {
+  controlNetModelsAdapter,
   loraModelsAdapter,
+  useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
-import { loraRecalled } from '../../lora/store/loraSlice';
+import {
+  ControlNetConfig,
+  controlNetEnabled,
+  controlNetRecalled,
+  controlNetReset,
+  initialControlNet,
+} from '../../controlNet/store/controlNetSlice';
+import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
@@ -38,6 +51,7 @@ import {
   isValidCfgScale,
   isValidHeight,
   isValidLoRAModel,
+  isValidControlNetModel,
   isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
@@ -53,6 +67,11 @@ import {
   isValidStrength,
   isValidWidth,
 } from '../types/parameterSchemas';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  CONTROLNET_PROCESSORS,
+  CONTROLNET_MODEL_DEFAULT_PROCESSORS,
+} from 'features/controlNet/store/constants';
 
 const selector = createSelector(stateSelector, ({ generation }) => {
   const { model } = generation;
@@ -390,6 +409,121 @@ export const useRecallParameters = () => {
     [prepareLoRAMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
+  /**
+   * Recall ControlNet with toast
+   */
+
+  const { controlnets } = useGetControlNetModelsQuery(undefined, {
+    selectFromResult: (result) => ({
+      controlnets: result.data
+        ? controlNetModelsAdapter.getSelectors().selectAll(result.data)
+        : [],
+    }),
+  });
+
+  const prepareControlNetMetadataItem = useCallback(
+    (controlnetMetadataItem: ControlNetMetadataItem) => {
+      if (!isValidControlNetModel(controlnetMetadataItem.control_model)) {
+        return { controlnet: null, error: 'Invalid ControlNet model' };
+      }
+
+      const {
+        image,
+        control_model,
+        control_weight,
+        begin_step_percent,
+        end_step_percent,
+        control_mode,
+        resize_mode,
+      } = controlnetMetadataItem;
+
+      const matchingControlNetModel = controlnets.find(
+        (c) =>
+          c.base_model === control_model.base_model &&
+          c.model_name === control_model.model_name
+      );
+
+      if (!matchingControlNetModel) {
+        return { controlnet: null, error: 'ControlNet model is not installed' };
+      }
+
+      const isCompatibleBaseModel =
+        matchingControlNetModel?.base_model === model?.base_model;
+
+      if (!isCompatibleBaseModel) {
+        return {
+          controlnet: null,
+          error: 'ControlNet incompatible with currently-selected model',
+        };
+      }
+
+      const controlNetId = uuidv4();
+
+      let processorType = initialControlNet.processorType;
+      for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
+        if (matchingControlNetModel.model_name.includes(modelSubstring)) {
+          processorType =
+            CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring] ||
+            initialControlNet.processorType;
+          break;
+        }
+      }
+      const processorNode = CONTROLNET_PROCESSORS[processorType].default;
+
+      const controlnet: ControlNetConfig = {
+        isEnabled: true,
+        model: matchingControlNetModel,
+        weight:
+          typeof control_weight === 'number'
+            ? control_weight
+            : initialControlNet.weight,
+        beginStepPct: begin_step_percent || initialControlNet.beginStepPct,
+        endStepPct: end_step_percent || initialControlNet.endStepPct,
+        controlMode: control_mode || initialControlNet.controlMode,
+        resizeMode: resize_mode || initialControlNet.resizeMode,
+        controlImage: image?.image_name || null,
+        processedControlImage: image?.image_name || null,
+        processorType,
+        processorNode:
+          processorNode.type !== 'none'
+            ? processorNode
+            : initialControlNet.processorNode,
+        shouldAutoConfig: true,
+        controlNetId,
+      };
+
+      return { controlnet, error: null };
+    },
+    [controlnets, model?.base_model]
+  );
+
+  const recallControlNet = useCallback(
+    (controlnetMetadataItem: ControlNetMetadataItem) => {
+      const result = prepareControlNetMetadataItem(controlnetMetadataItem);
+
+      if (!result.controlnet) {
+        parameterNotSetToast(result.error);
+        return;
+      }
+
+      dispatch(
+        controlNetRecalled({
+          ...result.controlnet,
+        })
+      );
+
+      dispatch(controlNetEnabled());
+
+      parameterSetToast();
+    },
+    [
+      prepareControlNetMetadataItem,
+      dispatch,
+      parameterSetToast,
+      parameterNotSetToast,
+    ]
+  );
+
   /*
    * Sets image as initial image with toast
    */
@@ -428,6 +562,7 @@ export const useRecallParameters = () => {
         refiner_negative_aesthetic_score,
         refiner_start,
         loras,
+        controlnets,
       } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
@@ -509,10 +644,20 @@ export const useRecallParameters = () => {
         dispatch(setRefinerStart(refiner_start));
       }
 
+      dispatch(lorasCleared());
       loras?.forEach((lora) => {
         const result = prepareLoRAMetadataItem(lora);
         if (result.lora) {
           dispatch(loraRecalled({ ...result.lora, weight: lora.weight }));
+        }
+      });
+
+      dispatch(controlNetReset());
+      dispatch(controlNetEnabled());
+      controlnets?.forEach((controlnet) => {
+        const result = prepareControlNetMetadataItem(controlnet);
+        if (result.controlnet) {
+          dispatch(controlNetRecalled(result.controlnet));
         }
       });
 
@@ -523,6 +668,7 @@ export const useRecallParameters = () => {
       allParameterSetToast,
       dispatch,
       prepareLoRAMetadataItem,
+      prepareControlNetMetadataItem,
     ]
   );
 
@@ -541,6 +687,7 @@ export const useRecallParameters = () => {
     recallHeight,
     recallStrength,
     recallLoRA,
+    recallControlNet,
     recallAllParameters,
     sendToImageToImage,
   };

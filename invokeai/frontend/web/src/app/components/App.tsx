@@ -36,7 +36,8 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
 
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
-  const { handlePreselectedImage } = usePreselectedImage();
+  const { handleSendToCanvas, handleSendToImg2Img, handleUseAllMetadata } =
+    usePreselectedImage(selectedImage?.imageName);
   const handleReset = useCallback(() => {
     localStorage.clear();
     location.reload();
@@ -59,8 +60,22 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   }, [dispatch]);
 
   useEffect(() => {
-    handlePreselectedImage(selectedImage);
-  }, [handlePreselectedImage, selectedImage]);
+    if (selectedImage && selectedImage.action === 'sendToCanvas') {
+      handleSendToCanvas();
+    }
+  }, [selectedImage, handleSendToCanvas]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'sendToImg2Img') {
+      handleSendToImg2Img();
+    }
+  }, [selectedImage, handleSendToImg2Img]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'useAllParameters') {
+      handleUseAllMetadata();
+    }
+  }, [selectedImage, handleUseAllMetadata]);
 
   const headerComponent = useStore($headerComponent);
 

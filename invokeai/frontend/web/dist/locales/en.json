@@ -635,7 +635,7 @@
         "onnxModels": "Onnx",
         "pathToCustomConfig": "Path To Custom Config",
         "pickModelType": "Pick Model Type",
-        "predictionType": "Prediction Type (for Stable Diffusion 2.x Models only)",
+        "predictionType": "Prediction Type (for Stable Diffusion 2.x Models and occasional Stable Diffusion 1.x Models)",
         "quickAdd": "Quick Add",
         "repo_id": "Repo ID",
         "repoIDValidationMsg": "Online repository of your model",

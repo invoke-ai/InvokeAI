@@ -17,7 +17,8 @@ import {
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const nodeDenylist = ['load_image'];
+// These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
+const nodeDenylist = ['load_image', 'image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
@@ -37,6 +38,7 @@ export const addInvocationCompleteEventListener = () => {
         const { image_name } = result.image;
         const { canvas, gallery } = getState();
 
+        // This populates the `getImageDTO` cache
         const imageDTO = await dispatch(
           imagesApi.endpoints.getImageDTO.initiate(image_name)
         ).unwrap();
@@ -52,54 +54,59 @@ export const addInvocationCompleteEventListener = () => {
         if (!imageDTO.is_intermediate) {
           /**
            * Cache updates for when an image result is received
-           * - *add* to getImageDTO
-           * - IF `autoAddBoardId` is set:
-           *    - THEN add it to the board_id/images
-           * - ELSE (`autoAddBoardId` is not set):
-           *    - THEN add it to the no_board/images
+           * - add it to the no_board/images
            */
 
-          const { autoAddBoardId } = gallery;
-          if (autoAddBoardId && autoAddBoardId !== 'none') {
-            dispatch(
-              imagesApi.endpoints.addImageToBoard.initiate({
-                board_id: autoAddBoardId,
-                imageDTO,
-              })
-            );
-          } else {
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                {
-                  board_id: 'none',
-                  categories: IMAGE_CATEGORIES,
-                },
-                (draft) => {
-                  imagesAdapter.addOne(draft, imageDTO);
-                }
-              )
-            );
-          }
+          dispatch(
+            imagesApi.util.updateQueryData(
+              'listImages',
+              {
+                board_id: imageDTO.board_id ?? 'none',
+                categories: IMAGE_CATEGORIES,
+              },
+              (draft) => {
+                imagesAdapter.addOne(draft, imageDTO);
+              }
+            )
+          );
 
           dispatch(
             imagesApi.util.invalidateTags([
-              { type: 'BoardImagesTotal', id: autoAddBoardId },
-              { type: 'BoardAssetsTotal', id: autoAddBoardId },
+              { type: 'BoardImagesTotal', id: imageDTO.board_id },
+              { type: 'BoardAssetsTotal', id: imageDTO.board_id },
             ])
           );
 
-          const { selectedBoardId, shouldAutoSwitch } = gallery;
+          const { shouldAutoSwitch } = gallery;
 
           // If auto-switch is enabled, select the new image
           if (shouldAutoSwitch) {
-            // if auto-add is enabled, switch the board as the image comes in
-            if (autoAddBoardId && autoAddBoardId !== selectedBoardId) {
-              dispatch(boardIdSelected(autoAddBoardId));
-              dispatch(galleryViewChanged('images'));
-            } else if (!autoAddBoardId) {
+            // if auto-add is enabled, switch the gallery view and board if needed as the image comes in
+            if (gallery.galleryView !== 'images') {
               dispatch(galleryViewChanged('images'));
             }
+
+            if (
+              imageDTO.board_id &&
+              imageDTO.board_id !== gallery.selectedBoardId
+            ) {
+              dispatch(
+                boardIdSelected({
+                  boardId: imageDTO.board_id,
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
+            if (!imageDTO.board_id && gallery.selectedBoardId !== 'none') {
+              dispatch(
+                boardIdSelected({
+                  boardId: 'none',
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
             dispatch(imageSelected(imageDTO));
           }
         }

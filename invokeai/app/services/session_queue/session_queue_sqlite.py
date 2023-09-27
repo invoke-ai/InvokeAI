@@ -59,13 +59,14 @@ class SqliteSessionQueue(SessionQueueBase):
 
     async def _on_session_event(self, event: FastAPIEvent) -> FastAPIEvent:
         event_name = event[1]["event"]
-        match event_name:
-            case "graph_execution_state_complete":
-                await self._handle_complete_event(event)
-            case "invocation_error" | "session_retrieval_error" | "invocation_retrieval_error":
-                await self._handle_error_event(event)
-            case "session_canceled":
-                await self._handle_cancel_event(event)
+
+        # This was a match statement, but match is not supported on python 3.9
+        if event_name == "graph_execution_state_complete":
+            await self._handle_complete_event(event)
+        elif event_name in ["invocation_error", "session_retrieval_error", "invocation_retrieval_error"]:
+            await self._handle_error_event(event)
+        elif event_name == "session_canceled":
+            await self._handle_cancel_event(event)
         return event
 
     async def _handle_complete_event(self, event: FastAPIEvent) -> None:
