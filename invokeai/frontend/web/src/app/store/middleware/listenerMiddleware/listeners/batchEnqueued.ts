@@ -47,8 +47,6 @@ export const addBatchEnqueuedListener = () => {
       const response = action.payload;
       const arg = action.meta.arg.originalArgs;
 
-      console.log({ response });
-
       if (!response) {
         toast({
           title: t('queue.batchFailedToQueue'),
@@ -63,7 +61,6 @@ export const addBatchEnqueuedListener = () => {
       }
 
       const result = zPydanticValidationError.safeParse(response);
-      console.log({ result });
       if (result.success) {
         result.data.data.detail.map((e) => {
           toast({
