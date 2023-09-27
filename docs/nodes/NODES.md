@@ -9,7 +9,7 @@ If you're not familiar with Diffusion, take a look at our [Diffusion Overview.](
 ### Linear View
 The Workflow Editor allows you to create a UI for your workflow, to make it easier to iterate on your generations. 
 
-To add an input to the Linear UI, right click on the input and select "Add to Linear View".
+To add an input to the Linear UI, right click on the input label and select "Add to Linear View".
 
 The Linear UI View will also be part of the saved workflow, allowing you share workflows and enable other to use them, regardless of complexity. 
 
