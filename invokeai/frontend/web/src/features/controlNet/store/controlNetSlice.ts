@@ -6,7 +6,6 @@ import {
 import { cloneDeep, forEach } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import { components } from 'services/api/schema';
-import { isAnySessionRejected } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
@@ -415,10 +414,6 @@ export const controlNetSlice = createSlice({
     });
 
     builder.addCase(appSocketInvocationError, (state) => {
-      state.pendingControlImages = [];
-    });
-
-    builder.addMatcher(isAnySessionRejected, (state) => {
       state.pendingControlImages = [];
     });
 
