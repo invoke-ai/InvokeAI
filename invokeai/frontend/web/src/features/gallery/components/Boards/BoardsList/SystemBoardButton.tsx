@@ -32,7 +32,7 @@ const SystemBoardButton = ({ board_id }: Props) => {
   const boardName = useBoardName(board_id);
 
   const handleClick = useCallback(() => {
-    dispatch(boardIdSelected(board_id));
+    dispatch(boardIdSelected({ boardId: board_id }));
   }, [board_id, dispatch]);
 
   return (
