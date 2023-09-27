@@ -36,10 +36,10 @@ export const addCanvasImageToControlNetListener = () => {
           file: new File([blob], 'savedCanvas.png', {
             type: 'image/png',
           }),
-          image_category: 'mask',
+          image_category: 'control',
           is_intermediate: false,
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          crop_visible: true,
+          crop_visible: false,
           postUploadAction: {
             type: 'TOAST',
             toastOptions: { title: t('toast.canvasSentControlnetAssets') },
