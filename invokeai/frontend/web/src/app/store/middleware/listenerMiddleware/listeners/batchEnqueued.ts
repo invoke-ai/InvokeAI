@@ -47,6 +47,8 @@ export const addBatchEnqueuedListener = () => {
       const response = action.payload;
       const arg = action.meta.arg.originalArgs;
 
+      console.log({ response });
+
       if (!response) {
         toast({
           title: t('queue.batchFailedToQueue'),
@@ -61,6 +63,7 @@ export const addBatchEnqueuedListener = () => {
       }
 
       const result = zPydanticValidationError.safeParse(response);
+      console.log({ result });
       if (result.success) {
         result.data.data.detail.map((e) => {
           toast({
@@ -76,15 +79,20 @@ export const addBatchEnqueuedListener = () => {
         });
       } else {
         let detail = 'Unknown Error';
+        let duration = undefined;
         if (response.status === 403 && 'body' in response) {
           detail = get(response, 'body.detail', 'Unknown Error');
         } else if (response.status === 403 && 'error' in response) {
           detail = get(response, 'error.detail', 'Unknown Error');
+        } else if (response.status === 403 && 'data' in response) {
+          detail = get(response, 'data.detail', 'Unknown Error');
+          duration = 15000;
         }
         toast({
           title: t('queue.batchFailedToQueue'),
           status: 'error',
           description: detail,
+          ...(duration ? { duration } : {}),
         });
       }
       logger('queue').error(
