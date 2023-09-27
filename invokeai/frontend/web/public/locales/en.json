@@ -80,7 +80,7 @@
         "lightMode": "Light Mode",
         "linear": "Linear",
         "load": "Load",
-        "loading": "Loading $t({{noun}})...",
+        "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
