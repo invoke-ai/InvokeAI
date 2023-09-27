@@ -44,8 +44,27 @@ export const addUpscaleRequestedListener = () => {
           { enqueueResult: parseify(enqueueResult) },
           t('queue.graphQueued')
         );
-      } catch {
+      } catch (error) {
         log.error({ graph: parseify(graph) }, t('queue.graphFailedToQueue'));
+
+        // handle usage-related errors
+        if (error instanceof Object) {
+          if ('data' in error && 'status' in error) {
+            if (error.status === 403) {
+              const detail = (error.data as any)?.detail || 'Unknown Error';
+              dispatch(
+                addToast({
+                  title: t('queue.graphFailedToQueue'),
+                  status: 'error',
+                  description: detail,
+                  duration: 15000,
+                })
+              );
+              return;
+            }
+          }
+        }
+
         dispatch(
           addToast({
             title: t('queue.graphFailedToQueue'),
