@@ -223,7 +223,11 @@ const IAICanvas = () => {
           >
             <IAICanvasObjectRenderer />
           </Layer>
-          <Layer id="mask" visible={isMaskEnabled} listening={false}>
+          <Layer
+            id="mask"
+            visible={isMaskEnabled && !isStaging}
+            listening={false}
+          >
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
