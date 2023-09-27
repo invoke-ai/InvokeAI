@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { ButtonGroup, Flex, Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -237,15 +237,18 @@ const IAICanvasToolChooserOptions = () => {
               sliderNumberInputProps={{ max: 500 }}
             />
           </Flex>
-          <IAIColorPicker
+          <Box
             sx={{
               width: '100%',
               paddingTop: 2,
               paddingBottom: 2,
             }}
-            pickerColor={brushColor}
-            onChange={(newColor) => dispatch(setBrushColor(newColor))}
-          />
+          >
+            <IAIColorPicker
+              color={brushColor}
+              onChange={(newColor) => dispatch(setBrushColor(newColor))}
+            />
+          </Box>
         </Flex>
       </IAIPopover>
     </ButtonGroup>

@@ -55,9 +55,29 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.cannotConnectInputToInput');
     }
 
+    // we have to figure out which is the target and which is the source
+    const target = handleType === 'target' ? nodeId : connectionNodeId;
+    const targetHandle =
+      handleType === 'target' ? fieldName : connectionFieldName;
+    const source = handleType === 'source' ? nodeId : connectionNodeId;
+    const sourceHandle =
+      handleType === 'source' ? fieldName : connectionFieldName;
+
     if (
       edges.find((edge) => {
-        return edge.target === nodeId && edge.targetHandle === fieldName;
+        edge.target === target &&
+          edge.targetHandle === targetHandle &&
+          edge.source === source &&
+          edge.sourceHandle === sourceHandle;
+      })
+    ) {
+      // We already have a connection from this source to this target
+      return i18n.t('nodes.cannotDuplicateConnection');
+    }
+
+    if (
+      edges.find((edge) => {
+        return edge.target === target && edge.targetHandle === targetHandle;
       }) &&
       // except CollectionItem inputs can have multiples
       targetType !== 'CollectionItem'
