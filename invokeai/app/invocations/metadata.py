@@ -27,14 +27,6 @@ class LoRAMetadataField(BaseModelExcludeNull):
     weight: float = Field(description="The weight of the LoRA model")
 
 
-class IPAdapterField(BaseModelExcludeNull):
-    """IP Adapter metadata for an image generated in InvokeAI."""
-
-    image: ImageField = Field(description="The IP Adapter image")
-    ip_adapter_model: str = Field(description="The IP Adapter model")
-    weight: float = Field(description="The weight of the IP Adapter model")
-
-
 class IPAdapterMetadataField(BaseModelExcludeNull):
     image: ImageField = Field(description="The IP-Adapter image prompt.")
     ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")

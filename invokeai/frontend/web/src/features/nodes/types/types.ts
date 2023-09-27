@@ -411,18 +411,11 @@ export type IPAdapterModel = z.infer<typeof zIPAdapterModel>;
 
 export const zIPAdapterImageField = z.object({
   image_name: z.string().trim().min(1),
-  thumbnail_name: z.string().trim().min(1),
-  image_encoder_model: zIPAdapterModel,
-  weight: z.number(),
-  width: z.number(),
-  height: z.number(),
 });
 
 export const zIPAdapterField = z.object({
-  adapter_image: zIPAdapterImageField,
   image: zImageField,
   ip_adapter_model: zIPAdapterModel,
-  image_encoder_model: z.string().trim().min(1),
   weight: z.number(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),

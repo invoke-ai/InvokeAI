@@ -988,10 +988,6 @@ class SaveImageInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
-        logger = context.services.logger
-        logger.debug("invoking")
-        logger.debug(f"self.metadata {self.metadata}")
-        logger.debug(f"potatos {self.metadata.dict()}")
 
         image_dto = context.services.images.create(
             image=image,

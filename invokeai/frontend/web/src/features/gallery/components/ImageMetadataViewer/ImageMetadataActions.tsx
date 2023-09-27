@@ -12,7 +12,7 @@ import {
   isValidLoRAModel,
 } from '../../../parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
-1;
+
 type Props = {
   metadata?: CoreMetadata;
 };
