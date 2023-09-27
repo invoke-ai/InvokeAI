@@ -739,9 +739,9 @@ export const useRecallParameters = () => {
         }
       });
 
-      if (ipAdapters.length) {
-        // TODO: dispatch ipAdapterEnabled
-      }
+      // if (ipAdapters.length) {
+      //   // TODO: dispatch ipAdapterEnabled
+      // }
       ipAdapters?.forEach((ipAdapter) => {
         const result = prepareIPAdapterMetadataItem(ipAdapter);
         if (result.ipAdapter) {
