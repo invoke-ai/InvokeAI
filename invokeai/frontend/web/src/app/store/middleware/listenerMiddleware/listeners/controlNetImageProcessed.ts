@@ -15,7 +15,6 @@ import { isImageOutput } from 'services/api/guards';
 import { Graph, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
-import { FetchBaseQueryError } from '@reduxjs/toolkit/dist/query';
 
 export const addControlNetImageProcessedListener = () => {
   startAppListening({
