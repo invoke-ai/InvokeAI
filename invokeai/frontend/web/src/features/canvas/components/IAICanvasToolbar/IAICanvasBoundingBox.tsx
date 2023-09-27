@@ -213,45 +213,45 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     [scaledStep]
   );
 
-  const handleStartedTransforming = () => {
+  const handleStartedTransforming = useCallback(() => {
     dispatch(setIsTransformingBoundingBox(true));
-  };
+  }, [dispatch]);
 
-  const handleEndedTransforming = () => {
+  const handleEndedTransforming = useCallback(() => {
     dispatch(setIsTransformingBoundingBox(false));
     dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
     setIsMouseOverBoundingBoxOutline(false);
-  };
+  }, [dispatch]);
 
-  const handleStartedMoving = () => {
+  const handleStartedMoving = useCallback(() => {
     dispatch(setIsMovingBoundingBox(true));
-  };
+  }, [dispatch]);
 
-  const handleEndedModifying = () => {
+  const handleEndedModifying = useCallback(() => {
     dispatch(setIsTransformingBoundingBox(false));
     dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
     setIsMouseOverBoundingBoxOutline(false);
-  };
+  }, [dispatch]);
 
-  const handleMouseOver = () => {
+  const handleMouseOver = useCallback(() => {
     setIsMouseOverBoundingBoxOutline(true);
-  };
+  }, []);
 
-  const handleMouseOut = () => {
+  const handleMouseOut = useCallback(() => {
     !isTransformingBoundingBox &&
       !isMovingBoundingBox &&
       setIsMouseOverBoundingBoxOutline(false);
-  };
+  }, [isMovingBoundingBox, isTransformingBoundingBox]);
 
-  const handleMouseEnterBoundingBox = () => {
+  const handleMouseEnterBoundingBox = useCallback(() => {
     dispatch(setIsMouseOverBoundingBox(true));
-  };
+  }, [dispatch]);
 
-  const handleMouseLeaveBoundingBox = () => {
+  const handleMouseLeaveBoundingBox = useCallback(() => {
     dispatch(setIsMouseOverBoundingBox(false));
-  };
+  }, [dispatch]);
 
   return (
     <Group {...rest}>
