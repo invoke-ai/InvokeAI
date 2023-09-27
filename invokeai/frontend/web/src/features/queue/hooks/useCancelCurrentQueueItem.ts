@@ -1,5 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
+import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -40,7 +41,7 @@ export const useCancelCurrentQueueItem = () => {
   }, [currentQueueItemId, dispatch, t, trigger]);
 
   const isDisabled = useMemo(
-    () => !isConnected || !currentQueueItemId,
+    () => !isConnected || isNil(currentQueueItemId),
     [isConnected, currentQueueItemId]
   );
 
