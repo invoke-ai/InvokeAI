@@ -89,19 +89,22 @@ const AddNodePopover = () => {
         };
       });
 
-      data.push({
-        label: t('nodes.currentImage'),
-        value: 'current_image',
-        description: t('nodes.currentImageDescription'),
-        tags: ['progress'],
-      });
+      //We only want these nodes if we're not filtered
+      if (fieldFilter === null) {
+        data.push({
+          label: t('nodes.currentImage'),
+          value: 'current_image',
+          description: t('nodes.currentImageDescription'),
+          tags: ['progress'],
+        });
 
-      data.push({
-        label: t('nodes.notes'),
-        value: 'notes',
-        description: t('nodes.notesDescription'),
-        tags: ['notes'],
-      });
+        data.push({
+          label: t('nodes.notes'),
+          value: 'notes',
+          description: t('nodes.notesDescription'),
+          tags: ['notes'],
+        });
+      }
 
       data.sort((a, b) => a.label.localeCompare(b.label));
 
