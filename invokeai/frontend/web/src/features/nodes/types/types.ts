@@ -1169,17 +1169,9 @@ export const zCoreMetadata = z
       .union([zMainModel.deepPartial(), zOnnxModel.deepPartial()])
       .nullish()
       .catch(null),
-    controlnets: z.array(zControlField.deepPartial()).nullish().catch(null),
-    ipAdapters: z.array(zIPAdapterField.deepPartial()).nullish().catch(null),
-    loras: z
-      .array(
-        z.object({
-          lora: zLoRAModelField.deepPartial(),
-          weight: z.number(),
-        })
-      )
-      .nullish()
-      .catch(null),
+    controlnets: z.array(zControlNetMetadataItem).nullish().catch(null),
+    ipAdapters: z.array(zIPAdapterMetadataItem).nullish().catch(null),
+    loras: z.array(zLoRAMetadataItem).nullish().catch(null),
     vae: zVaeModelField.nullish().catch(null),
     strength: z.number().nullish().catch(null),
     init_image: z.string().nullish().catch(null),
