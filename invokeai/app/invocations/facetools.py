@@ -536,8 +536,12 @@ class FaceMaskInvocation(BaseInvocation):
 
             if len(intersection) == 0:
                 id_range_str = ",".join([str(id) for id in id_range])
-                raise ValueError(
-                    f"Face IDs must be in range of detected faces - requested {self.face_ids}, detected {id_range_str}"
+                context.services.logger.warning(
+                    f"Face IDs must be in range of detected faces - requested {self.face_ids}, detected {id_range_str}. Passing through original image."
+                )
+                return FaceMaskResult(
+                    image=image,  # original image
+                    mask=mask_pil,  # white mask
                 )
 
             ids_to_extract = list(intersection)
