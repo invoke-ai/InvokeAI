@@ -205,7 +205,8 @@ class ModelCache(object):
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
             self.logger.info(
-                f"Loading model {model_path}, type {base_model.value}:{model_type.value}{':'+submodel.value if submodel else ''}"
+                f"Loading model {model_path}, type"
+                f" {base_model.value}:{model_type.value}{':'+submodel.value if submodel else ''}"
             )
             if self.stats:
                 self.stats.misses += 1
@@ -339,7 +340,8 @@ class ModelCache(object):
                 locked_models += 1
 
         self.logger.debug(
-            f"Current VRAM/RAM usage: {vram}/{ram}; cached_models/loaded_models/locked_models/ = {cached_models}/{loaded_models}/{locked_models}"
+            f"Current VRAM/RAM usage: {vram}/{ram}; cached_models/loaded_models/locked_models/ ="
+            f" {cached_models}/{loaded_models}/{locked_models}"
         )
 
     def _cache_size(self) -> int:
@@ -354,7 +356,8 @@ class ModelCache(object):
 
         if current_size + bytes_needed > maximum_size:
             self.logger.debug(
-                f"Max cache size exceeded: {(current_size/GIG):.2f}/{self.max_cache_size:.2f} GB, need an additional {(bytes_needed/GIG):.2f} GB"
+                f"Max cache size exceeded: {(current_size/GIG):.2f}/{self.max_cache_size:.2f} GB, need an additional"
+                f" {(bytes_needed/GIG):.2f} GB"
             )
 
         self.logger.debug(f"Before unloading: cached_models={len(self._cached_models)}")
@@ -387,7 +390,8 @@ class ModelCache(object):
 
             device = cache_entry.model.device if hasattr(cache_entry.model, "device") else None
             self.logger.debug(
-                f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded}, refs: {refs}"
+                f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded},"
+                f" refs: {refs}"
             )
 
             # 2 refs:
