@@ -32,7 +32,7 @@ gaming):
 
 * **Python**
 
-    version 3.9 through 3.11
+    version 3.10 through 3.11
 
 * **CUDA Tools**
 
@@ -65,7 +65,7 @@ gaming):
 To install InvokeAI with virtual environments and the PIP package
 manager, please follow these steps:
 
-1.  Please make sure you are using Python 3.9 through 3.11. The rest of the install
+1.  Please make sure you are using Python 3.10 through 3.11. The rest of the install
     procedure depends on this and will not work with other versions:
 
     ```bash
