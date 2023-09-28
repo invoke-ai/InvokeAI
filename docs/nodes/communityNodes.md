@@ -8,7 +8,7 @@ To download a node, simply download the `.py` node file from the link and add it
 
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
-## Community Nodes
+--------------------------------
 
 ### FaceTools
 
@@ -54,7 +54,7 @@ To use a community workflow, download the the `.json` node graph file and load i
 
 Input:
 
-![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/c88ada13-fb3d-484c-a4fe-947b44712632)
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/c88ada13-fb3d-484c-a4fe-947b44712632){: style="height:512px;width:512px"}
 
 Highlights/Midtones/Shadows:
 
@@ -79,15 +79,15 @@ Highlights/Midtones/Shadows (with LUT blur enabled):
 
 Input:
 
-![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/fd5efb9f-4355-4409-a1c2-c1ca99e0cab4)
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/fd5efb9f-4355-4409-a1c2-c1ca99e0cab4){: style="height:512px;width:512px"}
 
 Halftone Output:
 
-![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/7e606f29-e68f-4d46-b3d5-97f799a4ec2f)
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/7e606f29-e68f-4d46-b3d5-97f799a4ec2f){: style="height:512px;width:512px"}
 
 CMYK Halftone Output:
 
-![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/c59c578f-db8e-4d66-8c66-2851752d75ea)
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/c59c578f-db8e-4d66-8c66-2851752d75ea){: style="height:512px;width:512px"}
 
 --------------------------------
 ### Retroize
@@ -123,7 +123,7 @@ Generated Prompt: An enchanted weapon will be usable by any character regardless
 **Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
 
 **Output Example:** 
-=======
+
 ![Example animation](https://github.com/helix4u/load_video_frame/blob/main/testmp4_embed_converted.gif)
 [Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
 
@@ -188,6 +188,7 @@ This includes 3 Nodes:
 **Description:** This is a pack of nodes for composing masks and images, including a simple text mask creator and both image and latent offset nodes. The offsets wrap around, so these can be used in conjunction with the Seamless node to progressively generate centered on different parts of the seamless tiling.
 
 This includes 14 Nodes:
+
 - *Adjust Image Hue Plus* - Rotate the hue of an image in one of several different color spaces.
 - *Blend Latents/Noise (Masked)* - Use a mask to blend part of one latents tensor [including Noise outputs] into another. Can be used to "renoise" sections during a multi-stage [masked] denoising process.
 - *Enhance Image* - Boost or reduce color saturation, contrast, brightness, sharpness, or invert colors of any image at any stage with this simple wrapper for pillow [PIL]'s ImageEnhance module.
