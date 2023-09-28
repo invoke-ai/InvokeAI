@@ -22,6 +22,7 @@ import Loading from '../../common/components/Loading/Loading';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
 import '../../i18n';
 import { $socketOptions } from '../hooks/useSocketIO';
+import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -75,6 +76,19 @@ const InvokeAIUI = ({
     // configure API client project header
     if (queueId) {
       $queueId.set(queueId);
+    }
+
+    // reset dynamically added middlewares
+    resetMiddlewares();
+
+    // TODO: at this point, after resetting the middleware, we really ought to clean up the socket
+    // stuff by calling `dispatch(socketReset())`. but we cannot dispatch from here as we are
+    // outside the provider. it's not needed until there is the possibility that we will change
+    // the `apiUrl`/`token` dynamically.
+
+    // rebuild socket middleware with token and apiUrl
+    if (middleware && middleware.length > 0) {
+      addMiddleware(...middleware);
     }
 
     return () => {
