@@ -3,9 +3,9 @@ import { canvasMaskToControlNet } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
-import { t } from 'i18next';
 
 export const addCanvasMaskToControlNetListener = () => {
   startAppListening({
@@ -50,7 +50,7 @@ export const addCanvasMaskToControlNetListener = () => {
           image_category: 'mask',
           is_intermediate: false,
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          crop_visible: true,
+          crop_visible: false,
           postUploadAction: {
             type: 'TOAST',
             toastOptions: { title: t('toast.maskSentControlnetAssets') },

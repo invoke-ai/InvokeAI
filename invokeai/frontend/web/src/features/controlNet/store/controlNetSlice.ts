@@ -6,7 +6,6 @@ import {
 import { cloneDeep, forEach } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import { components } from 'services/api/schema';
-import { isAnySessionRejected } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
@@ -99,6 +98,9 @@ export const controlNetSlice = createSlice({
     isControlNetEnabledToggled: (state) => {
       state.isEnabled = !state.isEnabled;
     },
+    controlNetEnabled: (state) => {
+      state.isEnabled = true;
+    },
     controlNetAdded: (
       state,
       action: PayloadAction<{
@@ -110,6 +112,12 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId] = {
         ...(controlNet ?? initialControlNet),
         controlNetId,
+      };
+    },
+    controlNetRecalled: (state, action: PayloadAction<ControlNetConfig>) => {
+      const controlNet = action.payload;
+      state.controlNets[controlNet.controlNetId] = {
+        ...controlNet,
       };
     },
     controlNetDuplicated: (
@@ -402,6 +410,9 @@ export const controlNetSlice = createSlice({
       state.isIPAdapterEnabled = false;
       state.ipAdapterInfo = { ...initialIPAdapterState };
     },
+    clearPendingControlImages: (state) => {
+      state.pendingControlImages = [];
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
@@ -415,10 +426,6 @@ export const controlNetSlice = createSlice({
     });
 
     builder.addCase(appSocketInvocationError, (state) => {
-      state.pendingControlImages = [];
-    });
-
-    builder.addMatcher(isAnySessionRejected, (state) => {
       state.pendingControlImages = [];
     });
 
@@ -444,7 +451,9 @@ export const controlNetSlice = createSlice({
 
 export const {
   isControlNetEnabledToggled,
+  controlNetEnabled,
   controlNetAdded,
+  controlNetRecalled,
   controlNetDuplicated,
   controlNetAddedFromImage,
   controlNetRemoved,
@@ -468,6 +477,7 @@ export const {
   ipAdapterBeginStepPctChanged,
   ipAdapterEndStepPctChanged,
   ipAdapterStateReset,
+  clearPendingControlImages,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;

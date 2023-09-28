@@ -34,7 +34,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected('none'));
+    dispatch(boardIdSelected({ boardId: 'none' }));
     if (autoAssignBoardOnClick) {
       dispatch(autoAddBoardIdChanged('none'));
     }
