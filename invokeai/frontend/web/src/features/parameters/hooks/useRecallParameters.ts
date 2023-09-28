@@ -579,9 +579,9 @@ export const useRecallParameters = () => {
       const ipAdapter: IPAdapterConfig = {
         adapterImage: image?.image_name ?? null,
         model: matchingIPAdapterModel,
-        weight: weight || initialIPAdapterState.weight,
-        beginStepPct: begin_step_percent || 0,
-        endStepPct: end_step_percent || 0,
+        weight: weight ?? initialIPAdapterState.weight,
+        beginStepPct: begin_step_percent ?? 0,
+        endStepPct: end_step_percent ?? 0,
       };
 
       return { ipAdapter, error: null };
