@@ -1,12 +1,10 @@
 ---
-title: ControlNet
+title: Control Adapters
 ---
 
-# :material-loupe: ControlNet
+# :material-loupe: Control Adapters
 
 ## ControlNet
-
-ControlNet
 
 ControlNet is a powerful set of features developed by the open-source
 community (notably, Stanford researcher
@@ -20,7 +18,7 @@ towards generating images that better fit your desired style or
 outcome.
 
 
-### How it works
+#### How it works
 
 ControlNet works by analyzing an input image, pre-processing that
 image to identify relevant information that can be interpreted by each
@@ -30,7 +28,7 @@ composition, or other aspects of the image to better achieve a
 specific result.
 
 
-### Models
+#### Models
 
 InvokeAI provides access to a series of ControlNet models that provide
 different effects or styles in your generated images.  Currently
@@ -96,6 +94,8 @@ A model that generates normal maps from input images, allowing for more realisti
 **Image Segmentation**: 
 A model that divides input images into segments or regions, each of which corresponds to a different object or part of the image. (More details coming soon)
 
+**QR Code Monster**:
+A model that helps generate creative QR codes that still scan. Can also be used to create images with text, logos or shapes within them. 
 
 **Openpose**: 
 The OpenPose control model allows for the identification of the general pose of a character by pre-processing an existing image with a clear human structure. With advanced options, Openpose can also detect the face or hands in the image. 
@@ -120,7 +120,7 @@ With Pix2Pix, you can input an image into the controlnet, and then "instruct" th
 Each of these models can be adjusted and combined with other ControlNet models to achieve different results, giving you even more control over your image generation process.
 
 
-## Using ControlNet
+### Using ControlNet
 
 To use ControlNet, you can simply select the desired model and adjust both the ControlNet and Pre-processor settings to achieve the desired result. You can also use multiple ControlNet models at the same time, allowing you to achieve even more complex effects or styles in your generated images.
 
@@ -132,3 +132,31 @@ Weight - Strength of the Controlnet model applied to the generation for the sect
 Start/End  - 0 represents the start of the generation, 1 represents the end. The Start/end setting controls what steps during the generation process have the ControlNet applied.
 
 Additionally, each ControlNet section can be expanded in order to manipulate settings for the image pre-processor that adjusts your uploaded image before using it in when you Invoke.
+
+
+## IP-Adapter
+
+[IP-Adapter](https://ip-adapter.github.io) is a tooling that allows for image prompt capabilities with text-to-image diffusion models. IP-Adapter works by analyzing the given image prompt to extract features, then passing those features to the UNet along with any other conditioning provided. 
+
+![IP-Adapter + T2I](https://github.com/tencent-ailab/IP-Adapter/raw/main/assets/demo/ip_adpter_plus_multi.jpg)
+
+![IP-Adapter + IMG2IMG](https://github.com/tencent-ailab/IP-Adapter/blob/main/assets/demo/image-to-image.jpg)
+
+#### Installation
+There are several ways to install IP-Adapter models with an existing InvokeAI installation:
+
+1. Through the command line interface launched from the invoke.sh / invoke.bat scripts, option [5] to download models.
+2. Through the Model Manager UI with models from the *Tools* section of [www.models.invoke.ai](www.models.invoke.ai). To do this, copy the repo ID from the desired model page, and paste it in the Add Model field of the model manager. **Note** Both the IP-Adapter and the Image Encoder must be installed for IP-Adapter to work. For example, the [SD 1.5 IP-Adapter](https://models.invoke.ai/InvokeAI/ip_adapter_plus_sd15) and [SD1.5 Image Encoder](https://models.invoke.ai/InvokeAI/ip_adapter_sd_image_encoder) must be installed to use IP-Adapter with SD1.5 based models.  
+3. **Advanced -- Not recommended ** Manually downloading the IP-Adapter and Image Encoder files - Image Encoder folders shouid be placed in the `models\any\clip_vision` folders. IP Adapter Model folders should be placed in the relevant `ip-adapter` folder of relevant base model folder of Invoke root directory. For example, for the SDXL IP-Adapter, files should be added to the `model/sdxl/ip_adapter/` folder. 
+
+#### Using IP-Adapter
+
+IP-Adapter can be used by navigating to the *Control Adapters* options and enabling IP-Adapter. 
+
+IP-Adapter requires an image to be used as the Image Prompt. It can also be used in conjunction with text prompts, Image-to-Image, Inpainting, Outpainting, ControlNets and LoRAs.
+
+
+Each IP-Adapter has two settings that are applied to the IP-Adapter:
+
+* Weight - Strength of the IP-Adapter model applied to the generation for the section, defined by start/end
+* Start/End  - 0 represents the start of the generation, 1 represents the end. The Start/end setting controls what steps during the generation process have the IP-Adapter applied.

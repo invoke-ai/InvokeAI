@@ -127,12 +127,12 @@ nav:
         - Manual Installation on Windows: 'installation/deprecated_documentation/INSTALL_WINDOWS.md'
         - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
         - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
-    - Nodes:
+    - Workflows & Nodes:
       - Community Nodes: 'nodes/communityNodes.md'
       - Example Workflows: 'nodes/exampleWorkflows.md'
       - Nodes Overview: 'nodes/overview.md'
       - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Node Editor Usage: 'nodes/NODES.md'
+      - Workflow Editor Usage: 'nodes/NODES.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
     - Features:
@@ -140,7 +140,7 @@ nav:
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Concepts: 'features/CONCEPTS.md'
       - Configuration: 'features/CONFIGURATION.md'
-      - ControlNet: 'features/CONTROLNET.md'
+      - Control Adapters: 'features/CONTROLNET.md'
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
       - Model Merging: 'features/MODEL_MERGING.md'
