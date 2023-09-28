@@ -1,26 +1,27 @@
 import { Middleware } from '@reduxjs/toolkit';
-import { store } from 'app/store/store';
-import { PartialAppConfig } from 'app/types/invokeai';
-import React, {
-  lazy,
-  memo,
-  PropsWithChildren,
-  ReactNode,
-  useEffect,
-} from 'react';
-import { Provider } from 'react-redux';
-import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { $authToken, $baseUrl, $projectId } from 'services/api/client';
-import { socketMiddleware } from 'services/events/middleware';
-import Loading from '../../common/components/Loading/Loading';
-import '../../i18n';
-import AppDndContext from '../../features/dnd/components/AppDndContext';
 import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
+import { $isDebugging } from 'app/store/nanostores/isDebugging';
+import { store } from 'app/store/store';
+import { PartialAppConfig } from 'app/types/invokeai';
 import {
   $queueId,
   DEFAULT_QUEUE_ID,
 } from 'features/queue/store/queueNanoStore';
+import React, {
+  PropsWithChildren,
+  ReactNode,
+  lazy,
+  memo,
+  useEffect,
+} from 'react';
+import { Provider } from 'react-redux';
+import { $authToken, $baseUrl, $projectId } from 'services/api/client';
+import { ManagerOptions, SocketOptions } from 'socket.io-client';
+import Loading from '../../common/components/Loading/Loading';
+import AppDndContext from '../../features/dnd/components/AppDndContext';
+import '../../i18n';
+import { $socketOptions } from '../hooks/useSocketIO';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -38,6 +39,8 @@ interface Props extends PropsWithChildren {
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
   customStarUi?: CustomStarUi;
+  socketOptions?: Partial<ManagerOptions & SocketOptions>;
+  isDebugging?: boolean;
 }
 
 const InvokeAIUI = ({
@@ -50,6 +53,8 @@ const InvokeAIUI = ({
   queueId,
   selectedImage,
   customStarUi,
+  socketOptions,
+  isDebugging = false,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -70,21 +75,6 @@ const InvokeAIUI = ({
     // configure API client project header
     if (queueId) {
       $queueId.set(queueId);
-    }
-
-    // reset dynamically added middlewares
-    resetMiddlewares();
-
-    // TODO: at this point, after resetting the middleware, we really ought to clean up the socket
-    // stuff by calling `dispatch(socketReset())`. but we cannot dispatch from here as we are
-    // outside the provider. it's not needed until there is the possibility that we will change
-    // the `apiUrl`/`token` dynamically.
-
-    // rebuild socket middleware with token and apiUrl
-    if (middleware && middleware.length > 0) {
-      addMiddleware(socketMiddleware(), ...middleware);
-    } else {
-      addMiddleware(socketMiddleware());
     }
 
     return () => {
@@ -115,6 +105,24 @@ const InvokeAIUI = ({
       $headerComponent.set(undefined);
     };
   }, [headerComponent]);
+
+  useEffect(() => {
+    if (socketOptions) {
+      $socketOptions.set(socketOptions);
+    }
+    return () => {
+      $socketOptions.set({});
+    };
+  }, [socketOptions]);
+
+  useEffect(() => {
+    if (isDebugging) {
+      $isDebugging.set(isDebugging);
+    }
+    return () => {
+      $isDebugging.set(false);
+    };
+  }, [isDebugging]);
 
   return (
     <React.StrictMode>
