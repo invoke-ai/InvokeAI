@@ -11,7 +11,7 @@ const IAICanvasImageErrorFallback = ({
   canvasImage,
 }: IAICanvasImageErrorFallbackProps) => {
   const [errorColorLight, errorColorDark, fontColorLight, fontColorDark] =
-    useToken('colors', ['gray.400', 'gray.500', 'base.700', 'base.900']);
+    useToken('colors', ['base.400', 'base.500', 'base.700', 'base.900']);
   const errorColor = useColorModeValue(errorColorLight, errorColorDark);
   const fontColor = useColorModeValue(fontColorLight, fontColorDark);
   const { t } = useTranslation();
