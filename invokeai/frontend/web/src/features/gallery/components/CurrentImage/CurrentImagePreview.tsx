@@ -149,6 +149,7 @@ const CurrentImagePreview = () => {
           width={denoiseProgress.progress_image.width}
           height={denoiseProgress.progress_image.height}
           draggable={false}
+          data-testid="progress-image"
           sx={{
             objectFit: 'contain',
             maxWidth: 'full',
@@ -171,6 +172,7 @@ const CurrentImagePreview = () => {
           noContentFallback={
             <IAINoContentFallback icon={FaImage} label="No image selected" />
           }
+          dataTestId="image-preview"
         />
       )}
       {shouldShowImageDetails && imageDTO && (

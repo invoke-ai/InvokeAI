@@ -72,6 +72,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
       borderRadius="base"
       justifyContent="center"
       sx={sx}
+      data-testid="queue-item"
     >
       <Flex
         minH={9}
