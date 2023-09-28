@@ -409,10 +409,6 @@ export type ControlCollectionInputFieldValue = z.infer<
 export const zIPAdapterModel = zModelIdentifier;
 export type IPAdapterModel = z.infer<typeof zIPAdapterModel>;
 
-export const zIPAdapterImageField = z.object({
-  image_name: z.string().trim().min(1),
-});
-
 export const zIPAdapterField = z.object({
   image: zImageField,
   ip_adapter_model: zIPAdapterModel,
