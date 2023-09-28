@@ -403,7 +403,7 @@ class FaceOffInvocation(BaseInvocation):
     face_id: int = InputField(
         default=0,
         ge=0,
-        description="0 for first detected face, single digit for one specific. Multiple faces not supported. Find a face's ID with FaceIdentifier node.",
+        description="The face ID to process, numbered from 0. Multiple faces not supported. Find a face's ID with FaceIdentifier node.",
     )
     minimum_confidence: float = InputField(
         default=0.5, description="Minimum confidence for face detection (lower if detection is failing)"
@@ -495,7 +495,7 @@ class FaceMaskInvocation(BaseInvocation):
     image: ImageField = InputField(description="Image to face detect")
     face_ids: str = InputField(
         default="",
-        description="0 for all faces, single digit for one, comma-separated list for multiple specific (1, 2, 4). Find face IDs with FaceIdentifier node.",
+        description="Comma-separated list of face ids to mask eg '0,2,7'. Numbered from 0. Leave empty to mask all. Find face IDs with FaceIdentifier node.",
     )
     minimum_confidence: float = InputField(
         default=0.5, description="Minimum confidence for face detection (lower if detection is failing)"
