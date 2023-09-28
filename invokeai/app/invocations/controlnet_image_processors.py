@@ -127,7 +127,7 @@ class ControlNetInvocation(BaseInvocation):
 
 
 @invocation(
-    "image_processor", title="Base Image Processor", tags=["controlnet"], category="controlnet", version="1.0.0"
+    "image_processor", title="Base Image Processorwp", tags=["controlnet"], category="controlnet", version="1.0.0"
 )
 class ImageProcessorInvocation(BaseInvocation):
     """Base class for invocations that preprocess images for ControlNet"""
@@ -607,7 +607,9 @@ class DWPoseImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
     def run_processor(self, image):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # for now, executing DWPose processing on CPU only
+        device = "cpu"
         dwpose_processor = DWposeDetector(device=device)
         processed_image = dwpose_processor(
             image,
