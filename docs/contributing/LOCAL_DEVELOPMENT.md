@@ -167,6 +167,23 @@ and so you'll have access to the same python environment as the InvokeAI app.
 
 This is _super_ handy.
 
+#### Enabling Type-Checking with Pylance
+
+We use python's typing system in InvokeAI. PR reviews will include checking that types are present and correct. We don't enforce types with `mypy` at this time, but that is on the horizon.
+
+Using a code analysis tool to automatically type check your code (and types) is very important when writing with types. These tools provide immediate feedback in your editor when types are incorrect, and following their suggestions lead to fewer runtime bugs.
+
+Pylance, installed at the beginning of this guide, is the de-facto python LSP (language server protocol). It provides type checking in the editor (among many other features). Once installed, you do need to enable type checking manually:
+
+- Open a python file
+- Look along the status bar in VSCode for `{ } Python`
+- Click the `{ }`
+- Turn type checking on - basic is fine
+
+You'll now see red squiggly lines where type issues are detected. Hover your cursor over the indicated symbols to see what's wrong.
+
+In 99% of cases when the type checker says there is a problem, there really is a problem, and you should take some time to understand and resolve what it is pointing out.
+
 #### Debugging configs with `launch.json`
 
 Debugging configs are managed in a `launch.json` file. Like most VSCode configs,
