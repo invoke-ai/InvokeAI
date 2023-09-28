@@ -51,6 +51,7 @@ export const addUpscaleRequestedListener = () => {
         if (error instanceof Object) {
           if ('data' in error && 'status' in error) {
             if (error.status === 403) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const detail = (error.data as any)?.detail || 'Unknown Error';
               dispatch(
                 addToast({
