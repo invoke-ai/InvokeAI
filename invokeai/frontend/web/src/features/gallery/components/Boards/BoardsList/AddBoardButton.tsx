@@ -20,6 +20,7 @@ const AddBoardButton = () => {
       aria-label={t('boards.addBoard')}
       onClick={handleCreateBoard}
       size="sm"
+      data-testid="add-board-button"
     />
   );
 };
