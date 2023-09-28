@@ -94,6 +94,7 @@ export const initialNodesState: NodesState = {
   connectionStartParams: null,
   currentConnectionFieldType: null,
   connectionMade: false,
+  modifyingEdge: false,
   addNewNodePosition: null,
   shouldShowFieldTypeLegend: false,
   shouldShowMinimapPanel: true,
@@ -212,6 +213,9 @@ const nodesSlice = createSlice({
       state.connectionStartParams = null;
       state.currentConnectionFieldType = null;
     },
+    edgeChangeStarted: (state) => {
+      state.modifyingEdge = true;
+    },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
     },
@@ -227,7 +231,7 @@ const nodesSlice = createSlice({
     },
     connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
       state.connectionStartParams = action.payload;
-      state.connectionMade = false;
+      state.connectionMade = state.modifyingEdge;
       const { nodeId, handleId, handleType } = action.payload;
       if (!nodeId || !handleId) {
         return;
@@ -298,6 +302,7 @@ const nodesSlice = createSlice({
         state.connectionStartParams = null;
         state.currentConnectionFieldType = null;
       }
+      state.modifyingEdge = false;
     },
     workflowExposedFieldAdded: (
       state,
@@ -993,6 +998,7 @@ export const {
   connectionMade,
   connectionStarted,
   edgeDeleted,
+  edgeChangeStarted,
   edgesChanged,
   edgesDeleted,
   edgeUpdated,

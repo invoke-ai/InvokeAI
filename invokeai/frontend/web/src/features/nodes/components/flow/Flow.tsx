@@ -30,6 +30,7 @@ import {
   connectionEnded,
   connectionMade,
   connectionStarted,
+  edgeChangeStarted,
   edgeAdded,
   edgeDeleted,
   edgesChanged,
@@ -194,6 +195,7 @@ export const Flow = () => {
         edgeUpdateMouseEvent.current = e;
         // always delete the edge when starting an updated
         dispatch(edgeDeleted(edge.id));
+        dispatch(edgeChangeStarted());
       },
       [dispatch]
     );

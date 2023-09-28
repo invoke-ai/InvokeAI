@@ -23,6 +23,7 @@ export type NodesState = {
   connectionStartParams: OnConnectStartParams | null;
   currentConnectionFieldType: FieldType | null;
   connectionMade: boolean;
+  modifyingEdge: boolean;
   shouldShowFieldTypeLegend: boolean;
   shouldShowMinimapPanel: boolean;
   shouldValidateGraph: boolean;
