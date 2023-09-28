@@ -37,7 +37,7 @@ export const addIPAdapterToLinearGraph = (
 
     if (ipAdapterInfo.adapterImage) {
       ipAdapterNode.image = {
-        image_name: ipAdapterInfo.adapterImage.image_name,
+        image_name: ipAdapterInfo.adapterImage,
       };
     } else {
       return;
@@ -47,7 +47,7 @@ export const addIPAdapterToLinearGraph = (
     if (metadataAccumulator?.ipAdapters) {
       const ipAdapterField = {
         image: {
-          image_name: ipAdapterInfo.adapterImage.image_name,
+          image_name: ipAdapterInfo.adapterImage,
         },
         ip_adapter_model: {
           base_model: ipAdapterInfo.model?.base_model,

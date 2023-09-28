@@ -577,20 +577,7 @@ export const useRecallParameters = () => {
       }
 
       const ipAdapter: IPAdapterConfig = {
-        adapterImage: {
-          image_name: image?.image_name || '',
-          image_url: '',
-          thumbnail_url: '',
-          image_origin: 'internal',
-          image_category: 'mask',
-          width: 0,
-          height: 0,
-          board_id: '',
-          created_at: '',
-          updated_at: '',
-          is_intermediate: false,
-          starred: false,
-        },
+        adapterImage: image?.image_name ?? null,
         model: matchingIPAdapterModel,
         weight: weight || initialIPAdapterState.weight,
         beginStepPct: begin_step_percent || 0,
