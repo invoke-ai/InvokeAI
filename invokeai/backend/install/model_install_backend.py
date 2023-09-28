@@ -350,17 +350,17 @@ class ModelInstall(object):
                 for suffix in ["safetensors", "bin"]:
                     if f"{prefix}pytorch_lora_weights.{suffix}" in files:
                         location = self._download_hf_model(
-                            repo_id, [f"pytorch_lora_weights.bin"], staging, subfolder=subfolder
+                            repo_id, ["pytorch_lora_weights.bin"], staging, subfolder=subfolder
                         )  # LoRA
                         break
                     elif (
                         self.config.precision == "float16" and f"{prefix}diffusion_pytorch_model.fp16.{suffix}" in files
                     ):  # vae, controlnet or some other standalone
-                        files = [f"config.json", f"diffusion_pytorch_model.fp16.{suffix}"]
+                        files = ["config.json", f"diffusion_pytorch_model.fp16.{suffix}"]
                         location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
                     elif f"{prefix}diffusion_pytorch_model.{suffix}" in files:
-                        files = [f"config.json", f"diffusion_pytorch_model.{suffix}"]
+                        files = ["config.json", f"diffusion_pytorch_model.{suffix}"]
                         location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
                     elif f"{prefix}learned_embeds.{suffix}" in files:
@@ -371,13 +371,13 @@ class ModelInstall(object):
                     elif (
                         f"{prefix}image_encoder.txt" in files and f"{prefix}ip_adapter.{suffix}" in files
                     ):  # IP-Adapter
-                        files = [f"image_encoder.txt", f"ip_adapter.{suffix}"]
+                        files = ["image_encoder.txt", f"ip_adapter.{suffix}"]
                         location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
                     elif f"{prefix}model.{suffix}" in files and f"{prefix}config.json" in files:
                         # This elif-condition is pretty fragile, but it is intended to handle CLIP Vision models hosted
                         # by InvokeAI for use with IP-Adapters.
-                        files = [f"config.json", f"model.{suffix}"]
+                        files = ["config.json", f"model.{suffix}"]
                         location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
             if not location:
