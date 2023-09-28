@@ -328,6 +328,7 @@ export const buildLinearImageToImageGraph = (
     vae: undefined, // option; set in addVAEToGraph
     controlnets: [], // populated in addControlNetToLinearGraph
     loras: [], // populated in addLoRAsToGraph
+    ipAdapters: [], // populated in addIPAdapterToLinearGraph
     clip_skip: clipSkip,
     strength,
     init_image: initialImage.imageName,

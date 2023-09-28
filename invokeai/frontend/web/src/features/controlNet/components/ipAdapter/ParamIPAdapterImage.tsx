@@ -33,7 +33,7 @@ const ParamIPAdapterImage = () => {
   const { t } = useTranslation();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(
-    ipAdapterInfo.adapterImage?.image_name ?? skipToken
+    ipAdapterInfo.adapterImage ?? skipToken
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {

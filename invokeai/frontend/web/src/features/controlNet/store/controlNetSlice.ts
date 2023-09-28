@@ -6,7 +6,6 @@ import {
 import { cloneDeep, forEach } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import { components } from 'services/api/schema';
-import { ImageDTO } from 'services/api/types';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
 import {
@@ -60,7 +59,7 @@ export type ControlNetConfig = {
 };
 
 export type IPAdapterConfig = {
-  adapterImage: ImageDTO | null;
+  adapterImage: string | null;
   model: IPAdapterModelParam | null;
   weight: number;
   beginStepPct: number;
@@ -388,7 +387,10 @@ export const controlNetSlice = createSlice({
     isIPAdapterEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isIPAdapterEnabled = action.payload;
     },
-    ipAdapterImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+    ipAdapterRecalled: (state, action: PayloadAction<IPAdapterConfig>) => {
+      state.ipAdapterInfo = action.payload;
+    },
+    ipAdapterImageChanged: (state, action: PayloadAction<string | null>) => {
       state.ipAdapterInfo.adapterImage = action.payload;
     },
     ipAdapterWeightChanged: (state, action: PayloadAction<number>) => {
@@ -471,6 +473,7 @@ export const {
   controlNetReset,
   controlNetAutoConfigToggled,
   isIPAdapterEnabledChanged,
+  ipAdapterRecalled,
   ipAdapterImageChanged,
   ipAdapterWeightChanged,
   ipAdapterModelChanged,
