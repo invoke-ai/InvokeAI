@@ -336,7 +336,6 @@ class ModelInstall(object):
         files = [x.rfilename for x in hinfo.siblings]
         if subfolder:
             files = [x for x in files if x.startswith("v2/")]
-        print(f"DEBUG: files={files}")
         prefix = f"{subfolder}/" if subfolder else ""
 
         location = None
