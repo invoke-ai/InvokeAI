@@ -580,8 +580,8 @@ export const useRecallParameters = () => {
         adapterImage: image?.image_name ?? null,
         model: matchingIPAdapterModel,
         weight: weight ?? initialIPAdapterState.weight,
-        beginStepPct: begin_step_percent ?? 0,
-        endStepPct: end_step_percent ?? 0,
+        beginStepPct: begin_step_percent ?? initialIPAdapterState.beginStepPct,
+        endStepPct: end_step_percent ?? initialIPAdapterState.endStepPct,
       };
 
       return { ipAdapter, error: null };
