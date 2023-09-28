@@ -474,8 +474,6 @@ class ModelInstall(object):
         precision = torch_dtype(choose_torch_device())
         variants = ["fp16", None] if precision == torch.float16 else [None, "fp16"]
 
-        print(f"DEBUG: subfolder = {subfolder}")
-
         model = None
         for variant in variants:
             try:
