@@ -413,6 +413,9 @@ export const controlNetSlice = createSlice({
       state.isIPAdapterEnabled = false;
       state.ipAdapterInfo = { ...initialIPAdapterState };
     },
+    clearPendingControlImages: (state) => {
+      state.pendingControlImages = [];
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
@@ -478,6 +481,7 @@ export const {
   ipAdapterBeginStepPctChanged,
   ipAdapterEndStepPctChanged,
   ipAdapterStateReset,
+  clearPendingControlImages,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;
