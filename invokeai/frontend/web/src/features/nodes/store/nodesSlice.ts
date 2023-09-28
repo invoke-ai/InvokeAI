@@ -922,7 +922,7 @@ const nodesSlice = createSlice({
       state.isAddNodePopoverOpen = false;
 
       //Make sure these get reset if we close the popover and haven't selected a node
-      state.currentConnectionFieldType = null;
+      state.connectionStartParams = null;
       state.currentConnectionFieldType = null;
     },
     addNodePopoverToggled: (state) => {
