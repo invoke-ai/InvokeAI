@@ -98,6 +98,7 @@ const ParamLoRASelect = () => {
         item.value.toLowerCase().includes(value.toLowerCase().trim())
       }
       onChange={handleChange}
+      data-testid="add-lora"
     />
   );
 };
