@@ -54,21 +54,6 @@ import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addDynamicPromptsListener } from './listeners/promptChanged';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
-import {
-  addSessionCanceledFulfilledListener,
-  addSessionCanceledPendingListener,
-  addSessionCanceledRejectedListener,
-} from './listeners/sessionCanceled';
-import {
-  addSessionCreatedFulfilledListener,
-  addSessionCreatedPendingListener,
-  addSessionCreatedRejectedListener,
-} from './listeners/sessionCreated';
-import {
-  addSessionInvokedFulfilledListener,
-  addSessionInvokedPendingListener,
-  addSessionInvokedRejectedListener,
-} from './listeners/sessionInvoked';
 import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
@@ -86,6 +71,7 @@ import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSa
 import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
+import { addBatchEnqueuedListener } from './listeners/batchEnqueued';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -136,6 +122,7 @@ addEnqueueRequestedCanvasListener();
 addEnqueueRequestedNodes();
 addEnqueueRequestedLinear();
 addAnyEnqueuedListener();
+addBatchEnqueuedListener();
 
 // Canvas actions
 addCanvasSavedToGalleryListener();
@@ -174,21 +161,6 @@ addModelLoadEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
 addSocketQueueItemStatusChangedEventListener();
-
-// Session Created
-addSessionCreatedPendingListener();
-addSessionCreatedFulfilledListener();
-addSessionCreatedRejectedListener();
-
-// Session Invoked
-addSessionInvokedPendingListener();
-addSessionInvokedFulfilledListener();
-addSessionInvokedRejectedListener();
-
-// Session Canceled
-addSessionCanceledPendingListener();
-addSessionCanceledFulfilledListener();
-addSessionCanceledRejectedListener();
 
 // ControlNet
 addControlNetImageProcessedListener();

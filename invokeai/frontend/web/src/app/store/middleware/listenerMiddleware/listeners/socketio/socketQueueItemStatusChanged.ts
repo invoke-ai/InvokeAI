@@ -35,6 +35,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         queueApi.util.invalidateTags([
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
+          'InvocationCacheStatus',
           { type: 'SessionQueueItem', id: item_id },
           { type: 'SessionQueueItemDTO', id: item_id },
           { type: 'BatchStatus', id: queue_batch_id },

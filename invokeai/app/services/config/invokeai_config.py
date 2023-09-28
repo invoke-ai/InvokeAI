@@ -183,7 +183,7 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_MAX_DISK_CACHE = 20  # gigs, enough for three sdxl models, or 6 sd-1 models
-DEFAULT_RAM_CACHE = 6.0
+DEFAULT_RAM_CACHE = 7.5
 DEFAULT_VRAM_CACHE = 0.25
 
 

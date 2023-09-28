@@ -93,7 +93,7 @@ const GalleryBoard = ({
   const [localBoardName, setLocalBoardName] = useState(board_name);
 
   const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected(board_id));
+    dispatch(boardIdSelected({ boardId: board_id }));
     if (autoAssignBoardOnClick) {
       dispatch(autoAddBoardIdChanged(board_id));
     }

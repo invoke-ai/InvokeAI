@@ -53,13 +53,12 @@ export const useIsValidConnection = () => {
       }
 
       if (
-        edges
-          .filter((edge) => {
-            return edge.target === target && edge.targetHandle === targetHandle;
-          })
-          .find((edge) => {
-            edge.source === source && edge.sourceHandle === sourceHandle;
-          })
+        edges.find((edge) => {
+          edge.target === target &&
+            edge.targetHandle === targetHandle &&
+            edge.source === source &&
+            edge.sourceHandle === sourceHandle;
+        })
       ) {
         // We already have a connection from this source to this target
         return false;
