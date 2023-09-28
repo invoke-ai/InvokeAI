@@ -12,7 +12,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     populate_graph,
     prepare_values_to_insert,
 )
-from tests.nodes.test_nodes import PromptTestInvocation
+from .test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
