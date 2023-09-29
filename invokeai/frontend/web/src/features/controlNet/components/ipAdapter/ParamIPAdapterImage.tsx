@@ -63,11 +63,14 @@ const ParamIPAdapterImage = () => {
 
   return (
     <Flex
+      layerStyle="second"
       sx={{
         position: 'relative',
         w: 'full',
         alignItems: 'center',
         justifyContent: 'center',
+        aspectRatio: '1/1',
+        borderRadius: 'base',
       }}
     >
       <IAIDndImage
