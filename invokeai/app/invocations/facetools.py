@@ -4,8 +4,8 @@ from typing import Optional, TypedDict
 
 import cv2
 import numpy as np
-from mediapipe.python.solutions.face_mesh import FaceMesh
-from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageFont
+from mediapipe.python.solutions.face_mesh import FaceMesh  # type: ignore[import]
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from PIL.Image import Image as ImageType
 from pydantic import validator
 
@@ -484,7 +484,7 @@ class FaceOffInvocation(BaseInvocation):
             is_intermediate=self.is_intermediate,
         )
 
-        result = FaceOffOutput(
+        output = FaceOffOutput(
             image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
@@ -493,7 +493,7 @@ class FaceOffInvocation(BaseInvocation):
             y=y,
         )
 
-        return result
+        return output
 
 
 @invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.0")
@@ -603,14 +603,14 @@ class FaceMaskInvocation(BaseInvocation):
             is_intermediate=self.is_intermediate,
         )
 
-        result = FaceMaskOutput(
+        output = FaceMaskOutput(
             image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
             mask=ImageField(image_name=mask_dto.image_name),
         )
 
-        return result
+        return output
 
 
 @invocation(
