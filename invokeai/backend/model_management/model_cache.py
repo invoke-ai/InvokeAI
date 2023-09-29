@@ -18,6 +18,7 @@ context. Use like this:
 
 import gc
 import hashlib
+import math
 import os
 import sys
 import time
@@ -46,6 +47,8 @@ DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
 
 # actual size of a gig
 GIG = 1073741824
+# Size of a MB in bytes.
+MB = 2**20
 
 
 @dataclass
@@ -232,6 +235,15 @@ class ModelCache(object):
                 f" {(self_reported_model_size_after_load/GIG):.2f}GB."
                 f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
             )
+
+            if not math.isclose(
+                self_reported_model_size_before_load, self_reported_model_size_after_load, abs_tol=10 * MB
+            ):
+                self.logger.warning(
+                    f"Model '{key}' mis-reported its size before load. Self-reported size before/after load:"
+                    f" {(self_reported_model_size_before_load/GIG):.2f}GB /"
+                    f" {(self_reported_model_size_after_load/GIG):.2f}GB."
+                )
 
             cache_entry = _CacheRecord(self, model, self_reported_model_size_after_load)
             self._cached_models[key] = cache_entry
