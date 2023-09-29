@@ -10,4 +10,4 @@ When updating or creating documentation, please keep in mind InvokeAI is a tool 
 
 ## Help & Questions
 
-Please ping @imic1 or @hipsterusername in the [Discord](https://discord.com/channels/1020123559063990373/1049495067846524939) if you have any questions.
+Please ping @imic or @hipsterusername in the [Discord](https://discord.com/channels/1020123559063990373/1049495067846524939) if you have any questions.

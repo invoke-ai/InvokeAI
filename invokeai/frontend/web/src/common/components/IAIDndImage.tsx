@@ -185,7 +185,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   borderRadius: 'base',
                   ...imageSx,
                 }}
-                data-testId={dataTestId}
+                data-testid={dataTestId}
               />
               {withMetadataOverlay && (
                 <ImageMetadataOverlay imageDTO={imageDTO} />
