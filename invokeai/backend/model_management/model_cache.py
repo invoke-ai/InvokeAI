@@ -236,9 +236,10 @@ class ModelCache(object):
                 f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
             )
 
-            if not math.isclose(
-                self_reported_model_size_before_load, self_reported_model_size_after_load, abs_tol=10 * MB
-            ):
+            # We only log a warning for over-reported (not under-reported) model sizes before load. There is a known
+            # issue where models report their fp32 size before load, and are then loaded as fp16. Once this issue is
+            # addressed, it would make sense to log a warning for both over-reported and under-reported model sizes.
+            if (self_reported_model_size_after_load - self_reported_model_size_before_load) > 10 * MB:
                 self.logger.warning(
                     f"Model '{key}' mis-reported its size before load. Self-reported size before/after load:"
                     f" {(self_reported_model_size_before_load/GIG):.2f}GB /"
@@ -286,24 +287,42 @@ class ModelCache(object):
             f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
         )
 
-        # If the estimated model size does not match the change in VRAM, log a warning.
-        if (
-            snapshot_before.vram is not None
-            and snapshot_after.vram is not None
-            and not math.isclose(
-                abs(snapshot_before.vram - snapshot_after.vram),
+        if snapshot_before.vram is not None and snapshot_after.vram is not None:
+            vram_change = abs(snapshot_before.vram - snapshot_after.vram)
+
+            # If the estimated model size does not match the change in VRAM, log a warning.
+            if not math.isclose(
+                vram_change,
                 cache_entry.size,
                 rel_tol=0.1,
                 abs_tol=10 * MB,
-            )
-        ):
-            self.logger.warning(
-                f"Moving model '{key}' from {source_device} to"
-                f" {target_device} caused an unexpected change in VRAM usage. The model's"
-                " estimated size may be incorrect. Estimated model size:"
-                f" {(cache_entry.size/GIG):.2f} GB."
-                f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
-            )
+            ):
+                self.logger.warning(
+                    f"Moving model '{key}' from {source_device} to"
+                    f" {target_device} caused an unexpected change in VRAM usage. The model's"
+                    " estimated size may be incorrect. Estimated model size:"
+                    f" {(cache_entry.size/GIG):.2f} GB."
+                    f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
+                )
+
+                # Now, we will update our size estimate for `cache_entry` based on the change in VRAM usage. We only use the
+                # change in VRAM usage, not the change in RAM usage, because it is a more accurate measurement. The VRAM
+                # usage measurement only includes the memory used by PyTorch tensors, whereas the RAM usage measurement is
+                # of total process memory and is influenced by other factors.
+
+                # We want to err on the side of over-estimating the model's size, so we only update our estimate if the new
+                # information suggests that the model is larger than we previously thought.
+                if vram_change > cache_entry.size:
+                    self.logger.info(
+                        f"Updating the cache size estimate for model '{key}'. {(cache_entry.size/GIG):.2f}GB ->"
+                        f" {(vram_change/GIG):.2f}GB."
+                    )
+                    cache_entry.size = vram_change
+
+                    self.logger.info(
+                        "Clearing models from cache, if necessary, after updating a model's size estimate."
+                    )
+                    self._make_cache_room(0)
 
     class ModelLocker(object):
         def __init__(self, cache, key, model, gpu_load, size_needed):
