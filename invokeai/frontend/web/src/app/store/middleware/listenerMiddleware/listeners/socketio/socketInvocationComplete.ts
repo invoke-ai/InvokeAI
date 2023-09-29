@@ -74,6 +74,7 @@ export const addInvocationCompleteEventListener = () => {
             imagesApi.util.invalidateTags([
               { type: 'BoardImagesTotal', id: imageDTO.board_id },
               { type: 'BoardAssetsTotal', id: imageDTO.board_id },
+              { type: 'Board', id: imageDTO.board_id },
             ])
           );
 
