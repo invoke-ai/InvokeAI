@@ -484,6 +484,20 @@ class ModelCache(object):
                     f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
                 )
 
+                if not math.isclose(
+                    abs((snapshot_before.vram or 0) - (snapshot_after.vram or 0)),
+                    cache_entry.size,
+                    rel_tol=0.1,
+                    abs_tol=10 * MB,
+                ):
+                    self.logger.warning(
+                        f"Moving '{model_key}' from {self.execution_device} to"
+                        f" {self.storage_device} caused an unexpected change in VRAM usage. The model's"
+                        " estimated size may be incorrect. Estimated model size:"
+                        f" {(cache_entry.size/GIG):.2f} GB."
+                        f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
+                    )
+
                 vram_in_use = snapshot_after.vram or 0
                 self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB")
 
