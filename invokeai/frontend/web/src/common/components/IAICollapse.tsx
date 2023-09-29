@@ -46,6 +46,7 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
           transitionDuration: 'normal',
           userSelect: 'none',
         }}
+        data-testid={`${label} collapsible`}
       >
         {label}
         <AnimatePresence>

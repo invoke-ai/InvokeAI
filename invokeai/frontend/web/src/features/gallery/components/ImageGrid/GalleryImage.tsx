@@ -117,7 +117,10 @@ const GalleryImage = (props: HoverableImageProps) => {
   }
 
   return (
-    <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
+    <Box
+      sx={{ w: 'full', h: 'full', touchAction: 'none' }}
+      data-testid={`image-${imageDTO.image_name}`}
+    >
       <Flex
         userSelect="none"
         sx={{

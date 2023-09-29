@@ -6,6 +6,7 @@ import {
   CoreMetadata,
   LoRAMetadataItem,
   ControlNetMetadataItem,
+  IPAdapterMetadataItem,
 } from 'features/nodes/types/types';
 import {
   refinerModelChanged,
@@ -23,16 +24,22 @@ import { useTranslation } from 'react-i18next';
 import { ImageDTO } from 'services/api/types';
 import {
   controlNetModelsAdapter,
+  ipAdapterModelsAdapter,
+  useGetIPAdapterModelsQuery,
   loraModelsAdapter,
   useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
 import {
   ControlNetConfig,
+  IPAdapterConfig,
   controlNetEnabled,
   controlNetRecalled,
   controlNetReset,
   initialControlNet,
+  initialIPAdapterState,
+  ipAdapterRecalled,
+  isIPAdapterEnabledChanged,
 } from '../../controlNet/store/controlNetSlice';
 import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
@@ -52,6 +59,7 @@ import {
   isValidHeight,
   isValidLoRAModel,
   isValidControlNetModel,
+  isValidIPAdapterModel,
   isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
@@ -512,12 +520,96 @@ export const useRecallParameters = () => {
         })
       );
 
-      dispatch(controlNetEnabled());
-
       parameterSetToast();
     },
     [
       prepareControlNetMetadataItem,
+      dispatch,
+      parameterSetToast,
+      parameterNotSetToast,
+    ]
+  );
+
+  /**
+   * Recall IP Adapter with toast
+   */
+
+  const { ipAdapters } = useGetIPAdapterModelsQuery(undefined, {
+    selectFromResult: (result) => ({
+      ipAdapters: result.data
+        ? ipAdapterModelsAdapter.getSelectors().selectAll(result.data)
+        : [],
+    }),
+  });
+
+  const prepareIPAdapterMetadataItem = useCallback(
+    (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
+      if (!isValidIPAdapterModel(ipAdapterMetadataItem?.ip_adapter_model)) {
+        return { ipAdapter: null, error: 'Invalid IP Adapter model' };
+      }
+
+      const {
+        image,
+        ip_adapter_model,
+        weight,
+        begin_step_percent,
+        end_step_percent,
+      } = ipAdapterMetadataItem;
+
+      const matchingIPAdapterModel = ipAdapters.find(
+        (c) =>
+          c.base_model === ip_adapter_model?.base_model &&
+          c.model_name === ip_adapter_model?.model_name
+      );
+
+      if (!matchingIPAdapterModel) {
+        return { ipAdapter: null, error: 'IP Adapter model is not installed' };
+      }
+
+      const isCompatibleBaseModel =
+        matchingIPAdapterModel?.base_model === model?.base_model;
+
+      if (!isCompatibleBaseModel) {
+        return {
+          ipAdapter: null,
+          error: 'IP Adapter incompatible with currently-selected model',
+        };
+      }
+
+      const ipAdapter: IPAdapterConfig = {
+        adapterImage: image?.image_name ?? null,
+        model: matchingIPAdapterModel,
+        weight: weight ?? initialIPAdapterState.weight,
+        beginStepPct: begin_step_percent ?? initialIPAdapterState.beginStepPct,
+        endStepPct: end_step_percent ?? initialIPAdapterState.endStepPct,
+      };
+
+      return { ipAdapter, error: null };
+    },
+    [ipAdapters, model?.base_model]
+  );
+
+  const recallIPAdapter = useCallback(
+    (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
+      const result = prepareIPAdapterMetadataItem(ipAdapterMetadataItem);
+
+      if (!result.ipAdapter) {
+        parameterNotSetToast(result.error);
+        return;
+      }
+
+      dispatch(
+        ipAdapterRecalled({
+          ...result.ipAdapter,
+        })
+      );
+
+      dispatch(isIPAdapterEnabledChanged(true));
+
+      parameterSetToast();
+    },
+    [
+      prepareIPAdapterMetadataItem,
       dispatch,
       parameterSetToast,
       parameterNotSetToast,
@@ -563,6 +655,7 @@ export const useRecallParameters = () => {
         refiner_start,
         loras,
         controlnets,
+        ipAdapters,
       } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
@@ -653,11 +746,23 @@ export const useRecallParameters = () => {
       });
 
       dispatch(controlNetReset());
-      dispatch(controlNetEnabled());
+      if (controlnets?.length) {
+        dispatch(controlNetEnabled());
+      }
       controlnets?.forEach((controlnet) => {
         const result = prepareControlNetMetadataItem(controlnet);
         if (result.controlnet) {
           dispatch(controlNetRecalled(result.controlnet));
+        }
+      });
+
+      if (ipAdapters?.length) {
+        dispatch(isIPAdapterEnabledChanged(true));
+      }
+      ipAdapters?.forEach((ipAdapter) => {
+        const result = prepareIPAdapterMetadataItem(ipAdapter);
+        if (result.ipAdapter) {
+          dispatch(ipAdapterRecalled(result.ipAdapter));
         }
       });
 
@@ -669,6 +774,7 @@ export const useRecallParameters = () => {
       dispatch,
       prepareLoRAMetadataItem,
       prepareControlNetMetadataItem,
+      prepareIPAdapterMetadataItem,
     ]
   );
 
@@ -688,6 +794,7 @@ export const useRecallParameters = () => {
     recallStrength,
     recallLoRA,
     recallControlNet,
+    recallIPAdapter,
     recallAllParameters,
     sendToImageToImage,
   };

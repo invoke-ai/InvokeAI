@@ -242,6 +242,7 @@ export const buildLinearSDXLTextToImageGraph = (
     vae: undefined,
     controlnets: [],
     loras: [],
+    ipAdapters: [],
     positive_style_prompt: positiveStylePrompt,
     negative_style_prompt: negativeStylePrompt,
   };

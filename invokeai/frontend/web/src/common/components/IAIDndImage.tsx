@@ -67,6 +67,7 @@ type IAIDndImageProps = FlexProps & {
   withHoverOverlay?: boolean;
   children?: JSX.Element;
   uploadElement?: ReactNode;
+  dataTestId?: string;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -94,6 +95,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     children,
     onMouseOver,
     onMouseOut,
+    dataTestId,
   } = props;
 
   const { colorMode } = useColorMode();
@@ -183,6 +185,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   borderRadius: 'base',
                   ...imageSx,
                 }}
+                data-testId={dataTestId}
               />
               {withMetadataOverlay && (
                 <ImageMetadataOverlay imageDTO={imageDTO} />

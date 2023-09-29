@@ -39,6 +39,7 @@ const IAIDndImageIcon = (props: Props) => {
         },
         ...styleOverrides,
       }}
+      data-testid={tooltip}
     />
   );
 };

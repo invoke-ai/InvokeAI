@@ -77,7 +77,12 @@ const QueueCounts = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex justifyContent="space-between" alignItems="center" pe={1}>
+    <Flex
+      justifyContent="space-between"
+      alignItems="center"
+      pe={1}
+      data-testid="queue-count"
+    >
       <Spacer />
       <Button
         onClick={handleClick}

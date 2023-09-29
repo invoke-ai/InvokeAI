@@ -8,7 +8,7 @@ const QueueStatus = () => {
   const { data: queueStatus } = useGetQueueStatusQuery();
   const { t } = useTranslation();
   return (
-    <StatusStatGroup>
+    <StatusStatGroup data-testid="queue-status">
       <StatusStatItem
         label={t('queue.in_progress')}
         value={queueStatus?.queue.in_progress ?? 0}
