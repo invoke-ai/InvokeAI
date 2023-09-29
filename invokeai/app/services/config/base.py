@@ -25,6 +25,7 @@ from pydantic import BaseSettings
 class PagingArgumentParser(argparse.ArgumentParser):
     """
     A custom ArgumentParser that uses pydoc to page its output.
+
     It also supports reading defaults from an init file.
     """
 
@@ -226,9 +227,7 @@ class InvokeAISettings(BaseSettings):
 
 
 def int_or_float_or_str(value: str) -> Union[int, float, str]:
-    """
-    Workaround for argparse type checking.
-    """
+    """Workaround for argparse type checking."""
     try:
         return int(value)
     except Exception as e:  # noqa F841

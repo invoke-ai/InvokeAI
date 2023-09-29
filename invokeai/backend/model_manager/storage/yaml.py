@@ -49,7 +49,7 @@ import yaml
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
-from ..config import BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
+from ..config import AnyModelConfig, BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
 from .base import (
     CONFIG_FILE_VERSION,
     ConfigFileVersionMismatchException,
@@ -170,7 +170,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
             self._lock.release()
         return self.get_model(key)
 
-    def get_model(self, key: str) -> ModelConfigBase:
+    def get_model(self, key: str) -> AnyModelConfig:
         """
         Retrieve the ModelConfigBase instance for the indicated model.
 

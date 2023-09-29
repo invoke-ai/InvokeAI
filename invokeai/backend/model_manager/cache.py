@@ -55,20 +55,10 @@ class CacheStats(object):
     loaded_model_sizes: Dict[str, int] = field(default_factory=dict)
 
 
-class ModelLocker(object):
-    "Forward declaration"
-    pass
-
-
-class ModelCache(object):
-    "Forward declaration"
-    pass
-
-
 class _CacheRecord:
     size: int
     model: Any
-    cache: ModelCache
+    cache: "ModelCache"
     _locks: int
 
     def __init__(self, cache, model: Any, size: int):
@@ -130,7 +120,7 @@ class ModelCache(object):
         self.logger = logger
 
         # used for stats collection
-        self.stats = None
+        self.stats: Optional[CacheStats] = None
 
         self._cached_models = dict()
         self._cache_stack = list()
@@ -160,7 +150,7 @@ class ModelCache(object):
 
         if model_info_key not in self.model_infos:
             self.model_infos[model_info_key] = model_class(
-                model_path,
+                model_path.as_posix(),
                 base_model,
                 model_type,
             )

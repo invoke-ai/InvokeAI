@@ -10,7 +10,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
 
 import safetensors.torch
 import torch
@@ -33,8 +33,8 @@ class ModelProbeInfo(BaseModel):
     base_type: BaseModelType
     format: ModelFormat
     hash: str
-    variant_type: Optional[ModelVariantType] = "normal"
-    prediction_type: Optional[SchedulerPredictionType] = "v_prediction"
+    variant_type: Optional[ModelVariantType] = ModelVariantType("normal")
+    prediction_type: Optional[SchedulerPredictionType] = SchedulerPredictionType("v_prediction")
     upcast_attention: Optional[bool] = False
     image_size: Optional[int] = None
 
@@ -63,7 +63,7 @@ class ProbeBase(ABC):
     """Base model for probing checkpoint and diffusers-style models."""
 
     @abstractmethod
-    def get_base_type(self) -> BaseModelType:
+    def get_base_type(self) -> Optional[BaseModelType]:
         """Return the BaseModelType for the model."""
         pass
 
@@ -71,7 +71,7 @@ class ProbeBase(ABC):
         """Return the ModelVariantType for the model."""
         pass
 
-    def get_scheduler_prediction_type(self) -> SchedulerPredictionType:
+    def get_scheduler_prediction_type(self) -> Optional[SchedulerPredictionType]:
         """Return the SchedulerPredictionType for the model."""
         pass
 
@@ -83,7 +83,7 @@ class ProbeBase(ABC):
 class ModelProbe(ModelProbeBase):
     """Class to probe a checkpoint, safetensors or diffusers folder."""
 
-    PROBES = {
+    PROBES: Dict[str, dict] = {
         "diffusers": {},
         "checkpoint": {},
         "onnx": {},
@@ -252,7 +252,7 @@ class ModelProbe(ModelProbeBase):
         # scan model
         scan_result = scan_file_path(model)
         if scan_result.infected_files != 0:
-            raise "The model {model_name} is potentially infected by malware. Aborting import."
+            raise InvalidModelException("The model {model_name} is potentially infected by malware. Aborting import.")
 
 
 # ##################################################3
@@ -263,15 +263,13 @@ class ModelProbe(ModelProbeBase):
 class CheckpointProbeBase(ProbeBase):
     """Base class for probing checkpoint-style models."""
 
-    def __init__(
-        self, model: Path, helper: Optional[Callable[[Path], SchedulerPredictionType]] = None
-    ) -> BaseModelType:
+    def __init__(self, checkpoint_path: Path, helper: Optional[Callable[[Path], SchedulerPredictionType]] = None):
         """Initialize the CheckpointProbeBase object."""
-        self.checkpoint = ModelProbe._scan_and_load_checkpoint(model)
-        self.model = model
+        self.checkpoint_path = checkpoint_path
+        self.checkpoint = ModelProbe._scan_and_load_checkpoint(checkpoint_path)
         self.helper = helper
 
-    def get_base_type(self) -> BaseModelType:
+    def get_base_type(self) -> Optional[BaseModelType]:
         """Return the BaseModelType of a checkpoint-style model."""
         pass
 
@@ -281,7 +279,7 @@ class CheckpointProbeBase(ProbeBase):
 
     def get_variant_type(self) -> ModelVariantType:
         """Return the ModelVariantType of a checkpoint-style model."""
-        model_type = ModelProbe.get_model_type_from_checkpoint(self.model)
+        model_type = ModelProbe.get_model_type_from_checkpoint(self.checkpoint_path)
         if model_type != ModelType.Main:
             return ModelVariantType.Normal
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
@@ -378,13 +376,13 @@ class LoRACheckpointProbe(CheckpointProbeBase):
         elif token_vector_length == 2048:
             return BaseModelType.StableDiffusionXL
         else:
-            raise InvalidModelException(f"Unsupported LoRA type: {self.model}")
+            raise InvalidModelException(f"Unsupported LoRA type: {self.checkpoint_path}")
 
 
 class TextualInversionCheckpointProbe(CheckpointProbeBase):
     """TextualInversion checkpoint prober."""
 
-    def get_format(self) -> Optional[str]:
+    def get_format(self) -> str:
         """Return the format of a TextualInversion emedding."""
         return ModelFormat.EmbeddingFile
 
@@ -401,8 +399,7 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
             return BaseModelType.StableDiffusion1
         elif token_dim == 1024:
             return BaseModelType.StableDiffusion2
-        else:
-            return None
+        raise InvalidModelException("Unknown base model for {self.checkpoint_path}")
 
 
 class ControlNetCheckpointProbe(CheckpointProbeBase):
@@ -421,18 +418,22 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
                 return BaseModelType.StableDiffusion1
             elif checkpoint[key_name].shape[-1] == 1024:
                 return BaseModelType.StableDiffusion2
-            elif self.checkpoint_path and self.helper:
-                return self.helper(self.checkpoint_path)
         raise InvalidModelException("Unable to determine base type for {self.checkpoint_path}")
 
 
 class IPAdapterCheckpointProbe(CheckpointProbeBase):
+    """Probe IP adapter models."""
+
     def get_base_type(self) -> BaseModelType:
+        """Probe base type."""
         raise NotImplementedError()
 
 
 class CLIPVisionCheckpointProbe(CheckpointProbeBase):
+    """Probe ClipVision adapter models."""
+
     def get_base_type(self) -> BaseModelType:
+        """Probe base type."""
         raise NotImplementedError()
 
 
@@ -511,6 +512,7 @@ class VaeFolderProbe(FolderProbeBase):
     """Class for probing folder-style models."""
 
     def get_base_type(self) -> BaseModelType:
+        """Get base type of model."""
         if self._config_looks_like_sdxl():
             return BaseModelType.StableDiffusionXL
         elif self._name_looks_like_sdxl():
@@ -542,7 +544,7 @@ class VaeFolderProbe(FolderProbeBase):
 class TextualInversionFolderProbe(FolderProbeBase):
     """Probe a HuggingFace-style TextualInversion folder."""
 
-    def get_format(self) -> Optional[str]:
+    def get_format(self) -> str:
         """Return the format of the TextualInversion."""
         return ModelFormat.EmbeddingFolder
 
@@ -616,9 +618,11 @@ class IPAdapterFolderProbe(FolderProbeBase):
     """Class for probing IP-Adapter models."""
 
     def get_format(self) -> str:
+        """Get format of ip adapter."""
         return ModelFormat.InvokeAI.value
 
     def get_base_type(self) -> BaseModelType:
+        """Get base type of ip adapter."""
         model_file = self.folder_path / "ip_adapter.bin"
         if not model_file.exists():
             raise InvalidModelException("Unknown IP-Adapter model format.")
@@ -636,7 +640,10 @@ class IPAdapterFolderProbe(FolderProbeBase):
 
 
 class CLIPVisionFolderProbe(FolderProbeBase):
+    """Probe for folder-based CLIPVision models."""
+
     def get_base_type(self) -> BaseModelType:
+        """Get base type."""
         return BaseModelType.Any
 
 

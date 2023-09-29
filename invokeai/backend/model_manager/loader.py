@@ -5,16 +5,16 @@ import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import InvokeAILogger, choose_precision, choose_torch_device
+from invokeai.backend.util import InvokeAILogger, Logger, choose_precision, choose_torch_device
 
-from .cache import CacheStats, ModelCache, ModelLocker
+from .cache import CacheStats, ModelCache
 from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
-from .download import DownloadEventHandler
+from .download import DownloadEventHandler, DownloadQueueBase
 from .install import ModelInstall, ModelInstallBase
 from .models import MODEL_CLASSES, InvalidModelException, ModelBase
 from .storage import ConfigFileVersionMismatchException, ModelConfigStore, get_config_store, migrate_models_store
@@ -24,10 +24,10 @@ from .storage import ConfigFileVersionMismatchException, ModelConfigStore, get_c
 class ModelInfo:
     """This is a context manager object that is used to intermediate access to a model."""
 
-    context: ModelLocker
+    context: ModelCache.ModelLocker
     name: str
     base_model: BaseModelType
-    type: ModelType
+    type: Union[ModelType, SubModelType]
     key: str
     location: Union[Path, str]
     precision: torch.dtype
@@ -73,7 +73,7 @@ class ModelLoadBase(ABC):
 
     @property
     @abstractmethod
-    def logger(self) -> InvokeAILogger:
+    def logger(self) -> Logger:
         """Return the current logger."""
         pass
 
@@ -84,7 +84,7 @@ class ModelLoadBase(ABC):
 
     @property
     @abstractmethod
-    def queue(self) -> str:
+    def queue(self) -> DownloadQueueBase:
         """Return the download queue object used by this object."""
         pass
 
@@ -106,10 +106,7 @@ class ModelLoadBase(ABC):
 
     @abstractmethod
     def sync_to_config(self):
-        """
-        Reinitialize the store to sync in-memory and in-disk
-        versions.
-        """
+        """Reinitialize the store to sync in-memory and in-disk versions."""
         pass
 
 
@@ -120,7 +117,7 @@ class ModelLoad(ModelLoadBase):
     _store: ModelConfigStore
     _installer: ModelInstallBase
     _cache: ModelCache
-    _logger: InvokeAILogger
+    _logger: Logger
     _cache_keys: dict
     _models_file: Path
 
@@ -195,7 +192,7 @@ class ModelLoad(ModelLoadBase):
         return self._installer
 
     @property
-    def logger(self) -> InvokeAILogger:
+    def logger(self) -> Logger:
         """Return the current logger."""
         return self._logger
 
@@ -205,7 +202,7 @@ class ModelLoad(ModelLoadBase):
         return self._app_config
 
     @property
-    def queue(self) -> str:
+    def queue(self) -> DownloadQueueBase:
         """Return the download queue object used by this object."""
         return self._installer.queue
 
@@ -267,6 +264,7 @@ class ModelLoad(ModelLoadBase):
         )
 
     def collect_cache_stats(self, cache_stats: CacheStats):
+        """Save CacheStats object for stats collecting."""
         self._cache.stats = cache_stats
 
     def resolve_model_path(self, path: Union[Path, str]) -> Path:
@@ -283,12 +281,12 @@ class ModelLoad(ModelLoadBase):
 
     def _get_model_path(
         self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None
-    ) -> (Path, bool):
+    ) -> Tuple[Path, bool]:
         """Extract a model's filesystem path from its config.
 
         :return: The fully qualified Path of the module (or submodule).
         """
-        model_path = model_config.path
+        model_path = Path(model_config.path)
         is_submodel_override = False
 
         # Does the config explicitly override the submodel?
@@ -302,5 +300,6 @@ class ModelLoad(ModelLoadBase):
         return model_path, is_submodel_override
 
     def sync_to_config(self):
+        """Synchronize models on disk to those in memory."""
         self._store = get_config_store(self._models_file)
         self.installer.scan_models_directory()

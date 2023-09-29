@@ -60,7 +60,7 @@ from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import Chdir, InvokeAILogger
+from invokeai.backend.util import Chdir, InvokeAILogger, Logger
 
 from .config import (
     BaseModelType,
@@ -321,7 +321,7 @@ class ModelInstall(ModelInstallBase):
     """Model installer class handles installation from a local path."""
 
     _app_config: InvokeAIAppConfig
-    _logger: InvokeAILogger
+    _logger: Logger
     _store: ModelConfigStore
     _download_queue: DownloadQueueBase
     _async_installs: Dict[str, str]
@@ -355,7 +355,7 @@ class ModelInstall(ModelInstallBase):
         self,
         store: Optional[ModelConfigStore] = None,
         config: Optional[InvokeAIAppConfig] = None,
-        logger: Optional[InvokeAILogger] = None,
+        logger: Optional[Logger] = None,
         download: Optional[DownloadQueueBase] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ):  # noqa D107 - use base class docstrings

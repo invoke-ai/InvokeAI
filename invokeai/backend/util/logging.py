@@ -180,7 +180,7 @@ import socket
 import urllib.parse
 from abc import abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import Dict
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
@@ -345,7 +345,7 @@ LOG_FORMATTERS = {
 
 
 class InvokeAILogger(object):
-    loggers = dict()
+    loggers: Dict[str, logging.Logger] = dict()
 
     @classmethod
     def get_logger(

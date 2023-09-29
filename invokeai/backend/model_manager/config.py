@@ -118,7 +118,7 @@ class ModelConfigBase(BaseModel):
     base_model: BaseModelType
     model_type: ModelType
     model_format: ModelFormat
-    key: Optional[str] = Field(None)  # this will get added by the store
+    key: str = Field(description="hash key for model", default="<NOKEY>")  # this will get added by the store
     description: Optional[str] = Field(None)
     author: Optional[str] = Field(description="Model author")
     license: Optional[str] = Field(description="License string")
@@ -233,6 +233,16 @@ class IPAdapterConfig(ModelConfigBase):
     model_format: Literal[ModelFormat.InvokeAI]
 
 
+AnyModelConfig = Union[
+    MainCheckpointConfig,
+    MainDiffusersConfig,
+    LoRAConfig,
+    TextualInversionConfig,
+    ONNXSD1Config,
+    ONNXSD2Config,
+]
+
+
 class ModelConfigFactory(object):
     """Class for parsing config dicts into StableDiffusion Config obects."""
 
@@ -279,14 +289,7 @@ class ModelConfigFactory(object):
         model_data: Union[dict, ModelConfigBase],
         key: Optional[str] = None,
         dest_class: Optional[Type] = None,
-    ) -> Union[
-        MainCheckpointConfig,
-        MainDiffusersConfig,
-        LoRAConfig,
-        TextualInversionConfig,
-        ONNXSD1Config,
-        ONNXSD2Config,
-    ]:
+    ) -> AnyModelConfig:
         """
         Return the appropriate config object from raw dict values.
 

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Set, Union
 
-from ..config import BaseModelType, ModelConfigBase, ModelType
+from ..config import AnyModelConfig, BaseModelType, ModelConfigBase, ModelType
 
 # should match the InvokeAI version when this is first released.
 CONFIG_FILE_VERSION = "3.2"
@@ -76,9 +76,9 @@ class ModelConfigStore(ABC):
         pass
 
     @abstractmethod
-    def get_model(self, key: str) -> ModelConfigBase:
+    def get_model(self, key: str) -> AnyModelConfig:
         """
-        Retrieve the ModelConfigBase instance for the indicated model.
+        Retrieve the configuration for the indicated model.
 
         :param key: Key of model config to be fetched.
 

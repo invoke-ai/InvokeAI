@@ -1,6 +1,8 @@
 """
 Initialization file for invokeai.backend.util
 """
+from logging import Logger  # noqa: F401
+
 from .attention import auto_detect_slice_size  # noqa: F401
 from .devices import (  # noqa: F401
     CPU_DEVICE,

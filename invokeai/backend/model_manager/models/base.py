@@ -177,6 +177,15 @@ class ModelBase(metaclass=ABCMeta):
     ) -> Any:
         raise NotImplementedError()
 
+    @classmethod
+    @abstractmethod
+    def convert_if_required(
+        cls,
+        model_config: ModelConfigBase,
+        output_path: str,
+    ) -> str:
+        raise NotImplementedError()
+
 
 class DiffusersModel(ModelBase):
     # child_types: Dict[str, Type]

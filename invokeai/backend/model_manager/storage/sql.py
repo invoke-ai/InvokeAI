@@ -46,7 +46,7 @@ import threading
 from pathlib import Path
 from typing import List, Optional, Set, Union
 
-from ..config import BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
+from ..config import AnyModelConfig, BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
 from .base import CONFIG_FILE_VERSION, DuplicateModelException, ModelConfigStore, UnknownModelException
 
 
@@ -350,7 +350,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._lock.release()
         return self.get_model(key)
 
-    def get_model(self, key: str) -> ModelConfigBase:
+    def get_model(self, key: str) -> AnyModelConfig:
         """
         Retrieve the ModelConfigBase instance for the indicated model.
 

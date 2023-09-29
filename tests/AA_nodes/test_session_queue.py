@@ -12,6 +12,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     populate_graph,
     prepare_values_to_insert,
 )
+
 from .test_nodes import PromptTestInvocation
 
 
