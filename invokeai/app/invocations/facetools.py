@@ -38,8 +38,8 @@ class FaceOffOutput(ImageOutput):
 
 
 class FaceResultData(TypedDict):
-    pil_image: ImageType
-    mask_pil: ImageType
+    image: ImageType
+    mask: ImageType
     x_center: float
     y_center: float
     mesh_width: int
@@ -52,7 +52,7 @@ class FaceResultDataWithId(FaceResultData):
 
 class ExtractFaceData(TypedDict):
     bounded_image: ImageType
-    mask_pil: ImageType
+    bounded_mask: ImageType
     x_min: int
     y_min: int
     x_max: int
@@ -72,29 +72,30 @@ def create_black_image(w: int, h: int) -> ImageType:
     return Image.new("L", (w, h), color=0)
 
 
-def cleanup_faces_list(
+def prepare_faces_list(
     face_result_list: list[FaceResultData],
 ) -> list[FaceResultDataWithId]:
-    pruned_faces: list[FaceResultData] = []
+    """Deduplicates a list of faces, adding IDs to them."""
+    deduped_faces: list[FaceResultData] = []
 
     if len(face_result_list) == 0:
         return list()
 
-    for face_result in face_result_list:
+    for candidate in face_result_list:
         should_add = True
-        i_x_center = face_result["x_center"]
-        i_y_center = face_result["y_center"]
-        for j in pruned_faces:
-            face_center_x = j["x_center"]
-            face_center_y = j["y_center"]
-            face_radius_w = j["mesh_width"] / 2
-            face_radius_h = j["mesh_height"] / 2
-            # Determine if the center of the candidate i is inside the ellipse of the added face
+        candidate_x_center = candidate["x_center"]
+        candidate_y_center = candidate["y_center"]
+        for face in deduped_faces:
+            face_center_x = face["x_center"]
+            face_center_y = face["y_center"]
+            face_radius_w = face["mesh_width"] / 2
+            face_radius_h = face["mesh_height"] / 2
+            # Determine if the center of the candidate_face is inside the ellipse of the added face
             # p < 1 -> Inside
             # p = 1 -> Exactly on the ellipse
             # p > 1 -> Outside
-            p = (math.pow((i_x_center - face_center_x), 2) / math.pow(face_radius_w, 2)) + (
-                math.pow((i_y_center - face_center_y), 2) / math.pow(face_radius_h, 2)
+            p = (math.pow((candidate_x_center - face_center_x), 2) / math.pow(face_radius_w, 2)) + (
+                math.pow((candidate_y_center - face_center_y), 2) / math.pow(face_radius_h, 2)
             )
 
             if p < 1:  # Inside of the already-added face's radius
@@ -102,16 +103,16 @@ def cleanup_faces_list(
                 break
 
         if should_add is True:
-            pruned_faces.append(face_result)
+            deduped_faces.append(candidate)
 
-    pruned_faces = sorted(pruned_faces, key=lambda x: x["y_center"])
-    pruned_faces = sorted(pruned_faces, key=lambda x: x["x_center"])
+    sorted_faces = sorted(deduped_faces, key=lambda x: x["y_center"])
+    sorted_faces = sorted(sorted_faces, key=lambda x: x["x_center"])
 
     # add face_id for reference
-    pruned_faces_with_ids: list[FaceResultDataWithId] = []
+    sorted_faces_with_ids: list[FaceResultDataWithId] = []
     face_id_counter = 0
-    for face in pruned_faces:
-        pruned_faces_with_ids.append(
+    for face in sorted_faces:
+        sorted_faces_with_ids.append(
             FaceResultDataWithId(
                 **face,
                 face_id=face_id_counter,
@@ -119,7 +120,7 @@ def cleanup_faces_list(
         )
         face_id_counter += 1
 
-    return pruned_faces_with_ids
+    return sorted_faces_with_ids
 
 
 def generate_face_box_mask(
@@ -219,8 +220,8 @@ def generate_face_box_mask(
                 x_center = float(x_center)
                 y_center = float(y_center)
                 face = FaceResultData(
-                    pil_image=pil_image,
-                    mask_pil=mask_pil or create_white_image(*pil_image.size),
+                    image=pil_image,
+                    mask=mask_pil or create_white_image(*pil_image.size),
                     x_center=x_center + chunk_x_offset,
                     y_center=y_center + chunk_y_offset,
                     mesh_width=mesh_width,
@@ -240,14 +241,14 @@ def extract_face(
     face: FaceResultData,
     padding: int,
 ) -> ExtractFaceData:
-    mask_pil = face["mask_pil"]
+    mask = face["mask"]
     center_x = face["x_center"]
     center_y = face["y_center"]
     mesh_width = face["mesh_width"]
     mesh_height = face["mesh_height"]
 
     # Determine the minimum size of the square crop
-    min_size = min(mask_pil.width, mask_pil.height)
+    min_size = min(mask.width, mask.height)
 
     # Calculate the crop boundaries for the output image and mask.
     mesh_width += 128 + padding  # add pixels to account for mask variance
@@ -269,19 +270,19 @@ def extract_face(
         context.services.logger.warning("FaceTools --> -X-axis padding reached image edge.")
         x_max -= x_min
         x_min = 0
-    elif x_max > mask_pil.width:
+    elif x_max > mask.width:
         context.services.logger.warning("FaceTools --> +X-axis padding reached image edge.")
-        x_min -= x_max - mask_pil.width
-        x_max = mask_pil.width
+        x_min -= x_max - mask.width
+        x_max = mask.width
 
     if y_min < 0:
         context.services.logger.warning("FaceTools --> +Y-axis padding reached image edge.")
         y_max -= y_min
         y_min = 0
-    elif y_max > mask_pil.height:
+    elif y_max > mask.height:
         context.services.logger.warning("FaceTools --> -Y-axis padding reached image edge.")
-        y_min -= y_max - mask_pil.height
-        y_max = mask_pil.height
+        y_min -= y_max - mask.height
+        y_max = mask.height
 
     # Ensure the crop is square and adjust the boundaries if needed
     if x_max - x_min != crop_size:
@@ -299,15 +300,15 @@ def extract_face(
     context.services.logger.info(f"FaceTools --> Calculated bounding box (8 multiple): {crop_size}")
 
     # Crop the output image to the specified size with the center of the face mesh as the center.
-    mask_pil = mask_pil.crop((x_min, y_min, x_max, y_max))
+    mask = mask.crop((x_min, y_min, x_max, y_max))
     bounded_image = image.crop((x_min, y_min, x_max, y_max))
 
     # blur mask edge by small radius
-    mask_pil = mask_pil.filter(ImageFilter.GaussianBlur(radius=2))
+    mask = mask.filter(ImageFilter.GaussianBlur(radius=2))
 
     return ExtractFaceData(
         bounded_image=bounded_image,
-        mask_pil=mask_pil,
+        bounded_mask=mask,
         x_min=x_min,
         y_min=y_min,
         x_max=x_max,
@@ -330,14 +331,14 @@ def get_faces_list(
     if not should_chunk:
         context.services.logger.info("FaceTools --> Attempting full image face detection.")
         result = generate_face_box_mask(
-            context,
-            minimum_confidence,
-            x_offset,
-            y_offset,
-            image,
-            0,
-            0,
-            draw_mesh,
+            context=context,
+            minimum_confidence=minimum_confidence,
+            x_offset=x_offset,
+            y_offset=y_offset,
+            pil_image=image,
+            chunk_x_offset=0,
+            chunk_y_offset=0,
+            draw_mesh=draw_mesh,
         )
     if should_chunk or len(result) == 0:
         context.services.logger.info("FaceTools --> Chunking image (chunk toggled on, or no face found in full image).")
@@ -374,14 +375,14 @@ def get_faces_list(
         for idx in range(len(image_chunks)):
             context.services.logger.info(f"FaceTools --> Evaluating faces in chunk {idx}")
             result = result + generate_face_box_mask(
-                context,
-                minimum_confidence,
-                x_offset,
-                y_offset,
-                image_chunks[idx],
-                x_offsets[idx],
-                y_offsets[idx],
-                draw_mesh,
+                context=context,
+                minimum_confidence=minimum_confidence,
+                x_offset=x_offset,
+                y_offset=y_offset,
+                pil_image=image_chunks[idx],
+                chunk_x_offset=x_offsets[idx],
+                chunk_y_offset=y_offsets[idx],
+                draw_mesh=draw_mesh,
             )
 
         if len(result) == 0:
@@ -390,7 +391,7 @@ def get_faces_list(
                 "FaceTools --> No face detected in chunked input image. Passing through original image."
             )
 
-    all_faces = cleanup_faces_list(result)
+    all_faces = prepare_faces_list(result)
 
     return all_faces
 
@@ -418,12 +419,13 @@ class FaceOffInvocation(BaseInvocation):
 
     def faceoff(self, context: InvocationContext, image: ImageType) -> Optional[ExtractFaceData]:
         all_faces = get_faces_list(
-            context,
-            image,
-            self.chunk,
-            self.minimum_confidence,
-            self.x_offset,
-            self.y_offset,
+            context=context,
+            image=image,
+            should_chunk=self.chunk,
+            minimum_confidence=self.minimum_confidence,
+            x_offset=self.x_offset,
+            y_offset=self.y_offset,
+            draw_mesh=True,
         )
 
         if len(all_faces) == 0:
@@ -436,7 +438,7 @@ class FaceOffInvocation(BaseInvocation):
             )
             return None
 
-        face_data = extract_face(context, image, all_faces[self.face_id], self.padding)
+        face_data = extract_face(context=context, image=image, face=all_faces[self.face_id], padding=self.padding)
         # Convert the input image to RGBA mode to ensure it has an alpha channel.
         face_data["bounded_image"] = face_data["bounded_image"].convert("RGBA")
 
@@ -444,7 +446,7 @@ class FaceOffInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> FaceOffOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
-        result = self.faceoff(context, image)
+        result = self.faceoff(context=context, image=image)
 
         if result is None:
             result_image = image
@@ -453,7 +455,7 @@ class FaceOffInvocation(BaseInvocation):
             y = 0
         else:
             result_image = result["bounded_image"]
-            result_mask = result["mask_pil"]
+            result_mask = result["bounded_mask"]
             x = result["x_min"]
             y = result["y_min"]
 
@@ -509,7 +511,7 @@ class FaceMaskInvocation(BaseInvocation):
     invert_mask: bool = InputField(default=False, description="Toggle to invert the mask")
 
     @validator("face_ids")
-    def validate_comma_separated_list(cls, v) -> str:
+    def validate_comma_separated_ints(cls, v) -> str:
         comma_separated_ints_regex = re.compile(r"^\d*(,\d+)*$")
         if comma_separated_ints_regex.match(v) is None:
             raise ValueError('Face IDs must be a comma-separated list of integers (e.g. "1,2,3")')
@@ -517,12 +519,13 @@ class FaceMaskInvocation(BaseInvocation):
 
     def facemask(self, context: InvocationContext, image: ImageType) -> FaceMaskResult:
         all_faces = get_faces_list(
-            context,
-            image,
-            self.chunk,
-            self.minimum_confidence,
-            self.x_offset,
-            self.y_offset,
+            context=context,
+            image=image,
+            should_chunk=self.chunk,
+            minimum_confidence=self.minimum_confidence,
+            x_offset=self.x_offset,
+            y_offset=self.y_offset,
+            draw_mesh=True,
         )
 
         mask_pil = create_white_image(*image.size)
@@ -532,9 +535,9 @@ class FaceMaskInvocation(BaseInvocation):
         if self.face_ids != "":
             parsed_face_ids = [int(id) for id in self.face_ids.split(",")]
             # get requested face_ids that are in range
-            intersection = set(parsed_face_ids) & set(id_range)
+            intersected_face_ids = set(parsed_face_ids) & set(id_range)
 
-            if len(intersection) == 0:
+            if len(intersected_face_ids) == 0:
                 id_range_str = ",".join([str(id) for id in id_range])
                 context.services.logger.warning(
                     f"Face IDs must be in range of detected faces - requested {self.face_ids}, detected {id_range_str}. Passing through original image."
@@ -544,11 +547,11 @@ class FaceMaskInvocation(BaseInvocation):
                     mask=mask_pil,  # white mask
                 )
 
-            ids_to_extract = list(intersection)
+            ids_to_extract = list(intersected_face_ids)
 
         for face_id in ids_to_extract:
-            face_data = extract_face(context, image, all_faces[face_id], 0)
-            face_mask_pil = face_data["mask_pil"]
+            face_data = extract_face(context=context, image=image, face=all_faces[face_id], padding=0)
+            face_mask_pil = face_data["bounded_mask"]
             x_min = face_data["x_min"]
             y_min = face_data["y_min"]
             x_max = face_data["x_max"]
@@ -573,7 +576,7 @@ class FaceMaskInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> FaceMaskOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
-        result = self.facemask(context, image)
+        result = self.facemask(context=context, image=image)
 
         image_dto = context.services.images.create(
             image=result["image"],
@@ -623,13 +626,13 @@ class FaceIdentifierInvocation(BaseInvocation):
         image = image.copy()
 
         all_faces = get_faces_list(
-            context,
-            image,
-            self.chunk,
-            self.minimum_confidence,
-            0,
-            0,
-            False,
+            context=context,
+            image=image,
+            should_chunk=self.chunk,
+            minimum_confidence=self.minimum_confidence,
+            x_offset=0,
+            y_offset=0,
+            draw_mesh=False,
         )
 
         # Paste face IDs on the output image
@@ -647,7 +650,7 @@ class FaceIdentifierInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
-        result_image = self.faceidentifier(context, image)
+        result_image = self.faceidentifier(context=context, image=image)
 
         image_dto = context.services.images.create(
             image=result_image,
