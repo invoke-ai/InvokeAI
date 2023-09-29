@@ -307,6 +307,20 @@ class ModelCache(object):
                             f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
                         )
 
+                        if not math.isclose(
+                            abs((snapshot_before.vram or 0) - (snapshot_after.vram or 0)),
+                            self.cache_entry.size,
+                            rel_tol=0.1,
+                            abs_tol=10 * MB,
+                        ):
+                            self.cache.logger.warning(
+                                f"Moving '{self.key}' from {self.cache.storage_device} to"
+                                f" {self.cache.execution_device} caused an unexpected change in VRAM usage. The model's"
+                                " estimated size may be incorrect. Estimated model size:"
+                                f" {(self.cache_entry.size/GIG):.2f} GB."
+                                f" {get_pretty_snapshot_diff(snapshot_before, snapshot_after)}."
+                            )
+
                     self.cache.logger.debug(f"Locking {self.key} in {self.cache.execution_device}")
                     self.cache._print_cuda_stats()
 
