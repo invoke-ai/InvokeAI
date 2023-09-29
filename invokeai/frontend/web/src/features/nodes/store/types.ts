@@ -4,6 +4,7 @@ import {
   OnConnectStartParams,
   SelectionMode,
   Viewport,
+  XYPosition,
 } from 'reactflow';
 import {
   FieldIdentifier,
@@ -21,6 +22,8 @@ export type NodesState = {
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   currentConnectionFieldType: FieldType | null;
+  connectionMade: boolean;
+  modifyingEdge: boolean;
   shouldShowFieldTypeLegend: boolean;
   shouldShowMinimapPanel: boolean;
   shouldValidateGraph: boolean;
@@ -39,5 +42,6 @@ export type NodesState = {
   nodesToCopy: Node<NodeData>[];
   edgesToCopy: Edge<InvocationEdgeExtra>[];
   isAddNodePopoverOpen: boolean;
+  addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
 };
