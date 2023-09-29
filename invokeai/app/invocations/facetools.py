@@ -5,7 +5,7 @@ from typing import Optional, TypedDict
 import cv2
 import numpy as np
 from mediapipe.python.solutions.face_mesh import FaceMesh
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageFont
 from PIL.Image import Image as ImageType
 from pydantic import validator
 
@@ -70,6 +70,12 @@ def create_white_image(w: int, h: int) -> ImageType:
 
 def create_black_image(w: int, h: int) -> ImageType:
     return Image.new("L", (w, h), color=0)
+
+
+FONT_SIZE = 32
+FONT_STROKE_WIDTH = 4
+
+font = ImageFont.truetype("invokeai/assets/fonts/inter/Inter-Regular.ttf", FONT_SIZE)
 
 
 def prepare_faces_list(
@@ -640,8 +646,19 @@ class FaceIdentifierInvocation(BaseInvocation):
         for face in all_faces:
             x_coord = face["x_center"]
             y_coord = face["y_center"]
-            face_id = face["face_id"]
-            draw.text((x_coord, y_coord), str(face_id), fill=(255, 255, 255, 255))
+            text = str(face["face_id"])
+            # get bbox of the text so we can center the id on the face
+            _, _, bbox_w, bbox_h = draw.textbbox(xy=(0, 0), text=text, font=font, stroke_width=FONT_STROKE_WIDTH)
+            x = x_coord - bbox_w / 2
+            y = y_coord - bbox_h / 2
+            draw.text(
+                xy=(x, y),
+                text=str(text),
+                fill=(255, 255, 255, 255),
+                font=font,
+                stroke_width=FONT_STROKE_WIDTH,
+                stroke_fill=(0, 0, 0, 255),
+            )
 
         # Create an RGBA image with transparency
         image = image.convert("RGBA")
