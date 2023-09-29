@@ -1,5 +1,6 @@
 """
 Manage a RAM cache of diffusion/transformer models for fast switching.
+
 They are moved between GPU VRAM and CPU RAM as necessary. If the cache
 grows larger than a preset maximum, then the least recently used
 model will be cleared and (re)loaded from disk when next needed.
@@ -22,11 +23,11 @@ import sys
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, Union, types
+from typing import Any, Dict, List, Optional, Type, Union
 
 import torch
 
-import invokeai.backend.util.logging as logger
+from invokeai.backend.util import InvokeAILogger, Logger
 
 from ..util import GIG
 from ..util.devices import choose_torch_device
@@ -97,7 +98,7 @@ class ModelCache(object):
         sequential_offload: bool = False,
         lazy_offloading: bool = True,
         sha_chunksize: int = 16777216,
-        logger: types.ModuleType = logger,
+        logger: Logger = InvokeAILogger.get_logger(),
     ):
         """
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
@@ -122,8 +123,8 @@ class ModelCache(object):
         # used for stats collection
         self.stats: Optional[CacheStats] = None
 
-        self._cached_models = dict()
-        self._cache_stack = list()
+        self._cached_models: Dict[str, _CacheRecord] = dict()
+        self._cache_stack: List[str] = list()
 
     # Note that the combination of model_path and submodel_type
     # are sufficient to generate a unique cache key. This key
@@ -221,8 +222,12 @@ class ModelCache(object):
         return self.ModelLocker(self, key, cache_entry.model, gpu_load, cache_entry.size)
 
     class ModelLocker(object):
+        """Context manager that locks models into VRAM."""
+
         def __init__(self, cache, key, model, gpu_load, size_needed):
             """
+            Initialize a context manager object that locks models into VRAM.
+
             :param cache: The model_cache object
             :param key: The key of the model to lock in GPU
             :param model: The model to lock

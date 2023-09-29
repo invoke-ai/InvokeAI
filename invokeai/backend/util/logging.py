@@ -294,7 +294,7 @@ class InvokeAILegacyLogFormatter(InvokeAIFormatter):
     }
 
     def log_fmt(self, levelno: int) -> str:
-        return self.FORMATS.get(levelno)
+        return self.FORMATS[levelno]
 
 
 class InvokeAIPlainLogFormatter(InvokeAIFormatter):
@@ -333,7 +333,7 @@ class InvokeAIColorLogFormatter(InvokeAIFormatter):
     }
 
     def log_fmt(self, levelno: int) -> str:
-        return self.FORMATS.get(levelno)
+        return self.FORMATS[levelno]
 
 
 LOG_FORMATTERS = {

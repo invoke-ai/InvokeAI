@@ -149,7 +149,7 @@ def _fast_safetensors_reader(path: str):
 def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
     if str(path).endswith(".safetensors"):
         try:
-            checkpoint = _fast_safetensors_reader(path)
+            checkpoint = _fast_safetensors_reader(str(path))
         except Exception:
             # TODO: create issue for support "meta"?
             checkpoint = safetensors.torch.load_file(path, device="cpu")

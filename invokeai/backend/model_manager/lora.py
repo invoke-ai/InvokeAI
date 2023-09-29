@@ -12,7 +12,7 @@ from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from .models.lora import LoRAModel
+from .models.lora import LoRALayerBase, LoRAModel, LoRAModelRaw
 
 """
 loras = [
@@ -87,7 +87,7 @@ class ModelPatcher:
     def apply_lora_text_encoder(
         cls,
         text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
     ):
         with cls.apply_lora(text_encoder, loras, "lora_te_"):
             yield
@@ -97,7 +97,7 @@ class ModelPatcher:
     def apply_sdxl_lora_text_encoder(
         cls,
         text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
     ):
         with cls.apply_lora(text_encoder, loras, "lora_te1_"):
             yield
@@ -107,7 +107,7 @@ class ModelPatcher:
     def apply_sdxl_lora_text_encoder2(
         cls,
         text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
     ):
         with cls.apply_lora(text_encoder, loras, "lora_te2_"):
             yield
@@ -117,7 +117,7 @@ class ModelPatcher:
     def apply_lora(
         cls,
         model: torch.nn.Module,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
         prefix: str,
     ):
         original_weights = dict()
@@ -337,7 +337,7 @@ class ONNXModelPatcher:
     def apply_lora(
         cls,
         model: IAIOnnxRuntimeModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, torch.Tensor]],
         prefix: str,
     ):
         from .models.base import IAIOnnxRuntimeModel
@@ -348,7 +348,7 @@ class ONNXModelPatcher:
         orig_weights = dict()
 
         try:
-            blended_loras = dict()
+            blended_loras: Dict[str, torch.Tensor] = dict()
 
             for lora, lora_weight in loras:
                 for layer_key, layer in lora.layers.items():

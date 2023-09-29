@@ -1,6 +1,4 @@
-"""
-Initialization file for invokeai.backend.model_manager.config
-"""
+"""Initialization file for invokeai.backend.model_manager.config."""
 from .config import (  # noqa F401
     BaseModelType,
     InvalidModelConfigException,

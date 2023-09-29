@@ -54,7 +54,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 
 from pydantic import Field
 from pydantic.networks import AnyHttpUrl
@@ -166,7 +166,7 @@ class ModelInstallBase(ABC):
         pass
 
     @abstractmethod
-    def install_path(self, model_path: Union[Path, str], info: Optional[ModelProbeInfo] = None) -> str:
+    def install_path(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> str:
         """
         Probe, register and install the model in the models directory.
 
@@ -174,7 +174,7 @@ class ModelInstallBase(ABC):
         the models directory handled by InvokeAI.
 
         :param model_path: Filesystem Path to the model.
-        :param info: Optional ModelProbeInfo object. If not provided, model will be probed.
+        :param overrides: Dictionary of model probe info fields that, if present, override probed values.
         :returns id: The string ID of the installed model.
         """
         pass
@@ -184,6 +184,7 @@ class ModelInstallBase(ABC):
         self,
         source: Union[str, Path, AnyHttpUrl],
         inplace: bool = True,
+        priority: int = 10,
         variant: Optional[str] = None,
         probe_override: Optional[Dict[str, Any]] = None,
         metadata: Optional[ModelSourceMetadata] = None,
@@ -225,7 +226,7 @@ class ModelInstallBase(ABC):
         pass
 
     @abstractmethod
-    def wait_for_installs(self) -> Dict[str, str]:
+    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
         """
         Wait for all pending installs to complete.
 
@@ -293,7 +294,7 @@ class ModelInstallBase(ABC):
         pass
 
     @abstractmethod
-    def sync_model_path(self, key) -> Path:
+    def sync_model_path(self, key) -> ModelConfigBase:
         """
         Move model into the location indicated by its basetype, type and name.
 
@@ -324,11 +325,11 @@ class ModelInstall(ModelInstallBase):
     _logger: Logger
     _store: ModelConfigStore
     _download_queue: DownloadQueueBase
-    _async_installs: Dict[str, str]
-    _installed: Set[Path] = Field(default=set)
+    _async_installs: Dict[Union[str, Path, AnyHttpUrl], Optional[str]]
+    _installed: Set[str] = Field(default=set)
     _tmpdir: Optional[tempfile.TemporaryDirectory]  # used for downloads
 
-    _legacy_configs = {
+    _legacy_configs: Dict[BaseModelType, Dict[ModelVariantType, Union[str, dict]]] = {
         BaseModelType.StableDiffusion1: {
             ModelVariantType.Normal: "v1-inference.yaml",
             ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
@@ -357,13 +358,13 @@ class ModelInstall(ModelInstallBase):
         config: Optional[InvokeAIAppConfig] = None,
         logger: Optional[Logger] = None,
         download: Optional[DownloadQueueBase] = None,
-        event_handlers: Optional[List[DownloadEventHandler]] = None,
+        event_handlers: List[DownloadEventHandler] = [],
     ):  # noqa D107 - use base class docstrings
         self._app_config = config or InvokeAIAppConfig.get_config()
         self._logger = logger or InvokeAILogger.get_logger(config=self._app_config)
         self._store = store or get_config_store(self._app_config.model_conf_path)
         self._download_queue = download or DownloadQueue(config=self._app_config, event_handlers=event_handlers)
-        self._async_installs = dict()
+        self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
         self._installed = set()
         self._tmpdir = None
 
@@ -403,7 +404,8 @@ class ModelInstall(ModelInstallBase):
         )
         # add 'main' specific fields
         if info.model_type == ModelType.Main:
-            registration_data.update(variant=info.variant_type)
+            if info.variant_type:
+                registration_data.update(variant=info.variant_type)
             if info.format == ModelFormat.Checkpoint:
                 try:
                     config_file = self._legacy_configs[info.base_type][info.variant_type]
@@ -416,7 +418,7 @@ class ModelInstall(ModelInstallBase):
                             )
                             config_file = config_file[SchedulerPredictionType.VPrediction]
                     registration_data.update(
-                        config=Path(self._app_config.legacy_conf_dir, config_file).as_posix(),
+                        config=Path(self._app_config.legacy_conf_dir, str(config_file)).as_posix(),
                     )
                 except KeyError as exc:
                     raise InvalidModelException(
@@ -453,12 +455,12 @@ class ModelInstall(ModelInstallBase):
         return old_path.replace(new_path)
 
     def _probe_model(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> ModelProbeInfo:
-        info: ModelProbeInfo = ModelProbe.probe(model_path)
+        info: ModelProbeInfo = ModelProbe.probe(Path(model_path))
         if overrides:  # used to override probe fields
             for key, value in overrides.items():
                 try:
                     setattr(info, key, value)  # skip validation errors
-                except:
+                except Exception:
                     pass
         return info
 
@@ -488,11 +490,11 @@ class ModelInstall(ModelInstallBase):
         self,
         source: Union[str, Path, AnyHttpUrl],
         inplace: bool = True,
+        priority: int = 10,
         variant: Optional[str] = None,
         probe_override: Optional[Dict[str, Any]] = None,
         metadata: Optional[ModelSourceMetadata] = None,
         access_token: Optional[str] = None,
-        priority: Optional[int] = 10,
     ) -> DownloadJobBase:  # noqa D102
         queue = self._download_queue
 
@@ -502,7 +504,8 @@ class ModelInstall(ModelInstallBase):
             if inplace and Path(source).exists()
             else self._complete_installation_handler
         )
-        job.probe_override = probe_override
+        if isinstance(job, ModelInstallJob):
+            job.probe_override = probe_override
         if metadata:
             job.metadata = metadata
         job.add_event_handler(handler)
@@ -512,6 +515,7 @@ class ModelInstall(ModelInstallBase):
         return job
 
     def _complete_installation_handler(self, job: DownloadJobBase):
+        job = ModelInstallJob.parse_obj(job)  # this upcast should succeed
         if job.status == "completed":
             self._logger.info(f"{job.source}: Download finished with status {job.status}. Installing.")
             model_id = self.install_path(job.destination, job.probe_override)
@@ -537,6 +541,7 @@ class ModelInstall(ModelInstallBase):
             self._tmpdir = None
 
     def _complete_registration_handler(self, job: DownloadJobBase):
+        job = ModelInstallJob.parse_obj(job)  # upcast should succeed
         if job.status == "completed":
             self._logger.info(f"{job.source}: Installing in place.")
             model_id = self.register_path(job.destination, job.probe_override)
@@ -567,7 +572,7 @@ class ModelInstall(ModelInstallBase):
         models_dir = self._app_config.models_path
 
         if not old_path.is_relative_to(models_dir):
-            return old_path
+            return model
 
         new_path = models_dir / model.base_model.value / model.model_type.value / model.name
         self._logger.info(
@@ -592,7 +597,6 @@ class ModelInstall(ModelInstallBase):
         # we simply probe and register/install it. The job does not actually do anything, but we
         # create one anyway in order to have similar behavior for local files, URLs and repo_ids.
         if Path(source).exists():  # a path that is already on disk
-            source = Path(source)
             destdir = source
             return ModelInstallPathJob(source=source, destination=Path(destdir))
 
@@ -600,6 +604,7 @@ class ModelInstall(ModelInstallBase):
         models_dir = self._app_config.models_path
         self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
 
+        cls = ModelInstallJob
         if re.match(REPO_ID_RE, str(source)):
             cls = ModelInstallRepoIDJob
             kwargs = dict(variant=variant)
@@ -609,10 +614,15 @@ class ModelInstall(ModelInstallBase):
         else:
             raise ValueError(f"'{source}' is not recognized as a local file, directory, repo_id or URL")
         return cls(
-            source=source, destination=Path(self._tmpdir.name), access_token=access_token, priority=priority, **kwargs
+            source=str(source),
+            destination=Path(self._tmpdir.name),
+            access_token=access_token,
+            priority=priority,
+            **kwargs,
         )
 
-    def wait_for_installs(self) -> Dict[str, str]:  # noqa D102
+    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
+        """Pause until all installation jobs have completed."""
         self._download_queue.join()
         id_map = self._async_installs
         self._async_installs = dict()
@@ -634,9 +644,10 @@ class ModelInstall(ModelInstallBase):
         dest_directory: Optional[Path] = None,
     ) -> ModelConfigBase:
         """
-        Convert a checkpoint file into a diffusers folder, deleting the cached
-        version and deleting the original checkpoint file if it is in the models
-        directory.
+        Convert a checkpoint file into a diffusers folder.
+
+        It will delete the cached version ans well as the
+        original checkpoint file if it is in the models directory.
         :param key: Unique key of model.
         :dest_directory: Optional place to put converted file. If not specified,
         will be stored in the `models_dir`.
@@ -668,7 +679,7 @@ class ModelInstall(ModelInstallBase):
             update = info.dict()
             update.pop("config")
             update["model_format"] = "diffusers"
-            update["path"] = converted_model.location.as_posix()
+            update["path"] = converted_model.location
 
             if dest_directory:
                 new_diffusers_path = Path(dest_directory) / info.name

@@ -9,7 +9,7 @@ Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
@@ -17,7 +17,8 @@ from diffusers import logging as dlogging
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
-from . import ModelConfigBase, ModelConfigStore, ModelInstall, ModelType
+from . import BaseModelType, ModelConfigBase, ModelConfigStore, ModelInstall, ModelType
+from .config import MainConfig
 
 
 class MergeInterpolationMethod(str, Enum):
@@ -102,11 +103,11 @@ class ModelMerger(object):
         **kwargs - the default DiffusionPipeline.get_config_dict kwargs:
              cache_dir, resume_download, force_download, proxies, local_files_only, use_auth_token, revision, torch_dtype, device_map
         """
-        model_paths = list()
+        model_paths: List[Path] = list()
         model_names = list()
         config = self._config
         store = self._store
-        base_models = set()
+        base_models: Set[BaseModelType] = set()
         vae = None
 
         assert (
@@ -115,6 +116,7 @@ class ModelMerger(object):
 
         for key in model_keys:
             info = store.get_model(key)
+            assert isinstance(info, MainConfig)
             model_names.append(info.name)
             assert (
                 info.model_format == "diffusers"

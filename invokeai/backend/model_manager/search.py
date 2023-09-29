@@ -27,7 +27,7 @@ from typing import Callable, Optional, Set, Union
 
 from pydantic import BaseModel, Field
 
-from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util import InvokeAILogger, Logger
 
 default_logger = InvokeAILogger.get_logger()
 
@@ -56,7 +56,7 @@ class ModelSearchBase(ABC, BaseModel):
     on_model_found      : Optional[Callable[[Path], bool]]      = Field(default=None, description="Called when a model is found.")          # noqa E221
     on_search_completed : Optional[Callable[[Set[Path]], None]] = Field(default=None, description="Called when search is complete.")        # noqa E221
     stats               : SearchStats                           = Field(default_factory=SearchStats, description="Summary statistics after search")  # noqa E221
-    logger              : InvokeAILogger                        = Field(default=default_logger, description="InvokeAILogger instance.")     # noqa E221
+    logger              : Logger                                = Field(default=default_logger, description="Logger instance.")     # noqa E221
     # fmt: on
 
     class Config:
@@ -143,7 +143,7 @@ class ModelSearch(ModelSearchBase):
             self.on_search_completed(self._models_found)
 
     def search(self, directory: Union[Path, str]) -> Set[Path]:
-        self._directory = directory
+        self._directory = Path(directory)
         self.stats = SearchStats()  # zero out
         self.search_started()  # This will initialize _models_found to empty
         self._walk_directory(directory)
@@ -155,7 +155,7 @@ class ModelSearch(ModelSearchBase):
             # don't descend into directories that start with a "."
             # to avoid the Mac .DS_STORE issue.
             if str(Path(root).name).startswith("."):
-                self._pruned_paths.add(root)
+                self._pruned_paths.add(Path(root))
             if any([Path(root).is_relative_to(x) for x in self._pruned_paths]):
                 continue
 

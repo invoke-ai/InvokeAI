@@ -7,19 +7,18 @@ import shutil
 import threading
 import time
 import traceback
-from json import JSONDecodeError
 from pathlib import Path
 from queue import PriorityQueue
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 import requests
 from huggingface_hub import HfApi, hf_hub_url
-from pydantic import Field, ValidationError, validator
+from pydantic import Field, ValidationError, parse_obj_as, validator
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util import InvokeAILogger, Logger
 
 from ..storage import DuplicateModelException
 from . import HTTP_RE, REPO_ID_RE
@@ -56,19 +55,20 @@ class DownloadJobRepoID(DownloadJobBase):
     """Download repo ids."""
 
     variant: Optional[str] = Field(description="Variant, such as 'fp16', to download")
+    source: str = Field(description="URL or repo_id to download")
 
     @validator("source")
     @classmethod
     def _validate_source(cls, v: str) -> str:
         if not re.match(REPO_ID_RE, v):
-            raise ValidationError(f"{v} invalid repo_id")
+            raise ValidationError(f"{v} invalid repo_id", cls)
         return v
 
 
 class DownloadJobPath(DownloadJobBase):
     """Handle file paths."""
 
-    source: Path = Field(description="Path to a file or directory to install")
+    source: Union[str, Path] = Field(description="Path to a file or directory to install")
 
 
 class DownloadQueue(DownloadQueueBase):
@@ -77,8 +77,8 @@ class DownloadQueue(DownloadQueueBase):
     _jobs: Dict[int, DownloadJobBase]
     _worker_pool: Set[threading.Thread]
     _queue: PriorityQueue
-    _lock: threading.Lock
-    _logger: InvokeAILogger
+    _lock: threading.RLock
+    _logger: Logger
     _event_handlers: List[DownloadEventHandler] = Field(default_factory=list)
     _next_job_id: int = 0
     _sequence: int = 0  # This is for debugging and used to tag jobs in dequeueing order
@@ -126,6 +126,7 @@ class DownloadQueue(DownloadQueueBase):
         """Create a download job and return its ID."""
         kwargs = dict()
 
+        cls = DownloadJobBase
         if Path(source).exists():
             cls = DownloadJobPath
         elif re.match(REPO_ID_RE, str(source)):
@@ -137,7 +138,7 @@ class DownloadQueue(DownloadQueueBase):
             raise NotImplementedError(f"Don't know what to do with this type of source: {source}")
 
         job = cls(
-            source=source,
+            source=str(source),
             destination=Path(destdir) / (filename or "."),
             access_token=access_token,
             event_handlers=(event_handlers or self._event_handlers),
@@ -179,7 +180,7 @@ class DownloadQueue(DownloadQueueBase):
 
     def list_jobs(self) -> List[DownloadJobBase]:
         """List all the jobs."""
-        return self._jobs.values()
+        return list(self._jobs.values())
 
     def change_priority(self, job: DownloadJobBase, delta: int):
         """Change the priority of a job. Smaller priorities run first."""
@@ -193,9 +194,7 @@ class DownloadQueue(DownloadQueueBase):
             self._lock.release()
 
     def prune_jobs(self):
-        """
-        Prune completed and errored queue items from the job list.
-        """
+        """Prune completed and errored queue items from the job list."""
         try:
             to_delete = set()
             self._lock.acquire()
@@ -334,7 +333,7 @@ class DownloadQueue(DownloadQueueBase):
                 elif isinstance(job, DownloadJobPath):
                     self._download_path(job)
                 else:
-                    raise NotImplementedError(f"Don't know what to do with this job: {job}")
+                    raise NotImplementedError(f"Don't know what to do with this job: {job}, type={type(job)}")
 
             if job.status == DownloadJobStatus.CANCELLED:
                 self._cleanup_cancelled_job(job)
@@ -354,7 +353,7 @@ class DownloadQueue(DownloadQueueBase):
         model = None
 
         # a Civitai download URL
-        if match := re.match(CIVITAI_MODEL_DOWNLOAD, metadata_url):
+        if match := re.match(CIVITAI_MODEL_DOWNLOAD, str(metadata_url)):
             version = match.group(1)
             resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
             metadata.thumbnail_url = metadata.thumbnail_url or resp["images"][0]["url"]
@@ -364,16 +363,16 @@ class DownloadQueue(DownloadQueueBase):
             metadata_url = CIVITAI_MODEL_PAGE + str(resp["modelId"]) + f"?modelVersionId={version}"
 
         # a Civitai model page with the version
-        if match := re.match(CIVITAI_MODEL_PAGE_WITH_VERSION, metadata_url):
+        if match := re.match(CIVITAI_MODEL_PAGE_WITH_VERSION, str(metadata_url)):
             model = match.group(1)
             version = int(match.group(2))
         # and without
-        elif match := re.match(CIVITAI_MODEL_PAGE + r"(\d+)", metadata_url):
+        elif match := re.match(CIVITAI_MODEL_PAGE + r"(\d+)", str(metadata_url)):
             model = match.group(1)
             version = None
 
         if not model:
-            return url
+            return parse_obj_as(AnyHttpUrl, url)
 
         if model:
             resp = self._requests.get(CIVITAI_MODELS_ENDPOINT + str(model)).json()
@@ -419,16 +418,19 @@ class DownloadQueue(DownloadQueueBase):
 
             if job.destination.is_dir():
                 try:
-                    file_name = re.search('filename="(.+)"', resp.headers["Content-Disposition"]).group(1)
+                    file_name = ""
+                    if match := re.search('filename="(.+)"', resp.headers["Content-Disposition"]):
+                        file_name = match.group(1)
+                    assert file_name != ""
                     self._validate_filename(
-                        job.destination, file_name
+                        job.destination.as_posix(), file_name
                     )  # will raise a ValueError exception if file_name is suspicious
                 except ValueError:
                     self._logger.warning(
                         f"Invalid filename '{file_name}' returned by source {url}, using last component of URL instead"
                     )
                     file_name = os.path.basename(url)
-                except KeyError:
+                except (KeyError, AssertionError):
                     file_name = os.path.basename(url)
                 job.destination = job.destination / file_name
                 dest = job.destination
@@ -537,12 +539,13 @@ class DownloadQueue(DownloadQueueBase):
                 self._update_job_status(job, DownloadJobStatus.RUNNING)
                 return
 
-        job.subqueue = self.__class__(
+        subqueue = self.__class__(
             event_handlers=[subdownload_event],
             requests_session=self._requests,
             quiet=True,
         )
         try:
+            job = DownloadJobRepoID.parse_obj(job)
             repo_id = job.source
             variant = job.variant
             if not job.metadata:
@@ -550,12 +553,12 @@ class DownloadQueue(DownloadQueueBase):
             urls_to_download = self._get_repo_info(repo_id, variant=variant, metadata=job.metadata)
             if job.destination.name != Path(repo_id).name:
                 job.destination = job.destination / Path(repo_id).name
-            bytes_downloaded = dict()
+            bytes_downloaded: Dict[int, int] = dict()
             job.total_bytes = 0
 
             for url, subdir, file, size in urls_to_download:
                 job.total_bytes += size
-                job.subqueue.create_download_job(
+                subqueue.create_download_job(
                     source=url,
                     destdir=job.destination / subdir,
                     filename=file,
@@ -569,6 +572,7 @@ class DownloadQueue(DownloadQueueBase):
             self._update_job_status(job, DownloadJobStatus.ERROR)
             self._logger.error(job.error)
         finally:
+            job.subqueue = subqueue
             job.subqueue.join()
             if job.status == DownloadJobStatus.RUNNING:
                 self._update_job_status(job, DownloadJobStatus.COMPLETED)
@@ -579,7 +583,7 @@ class DownloadQueue(DownloadQueueBase):
         repo_id: str,
         metadata: ModelSourceMetadata,
         variant: Optional[str] = None,
-    ) -> Tuple[List[Tuple[AnyHttpUrl, Path, Path]], ModelSourceMetadata]:
+    ) -> List[Tuple[AnyHttpUrl, Path, Path, int]]:
         """
         Given a repo_id and an optional variant, return list of URLs to download to get the model.
         The metadata field will be updated with model metadata from HuggingFace.
@@ -602,7 +606,7 @@ class DownloadQueue(DownloadQueueBase):
             paths = [x for x in paths if Path(x).parent.as_posix() in submodels]
             paths.insert(0, "model_index.json")
         urls = [
-            (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name, sizes[x.as_posix()])
+            (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), Path(x.name), sizes[x.as_posix()])
             for x in self._select_variants(paths, variant)
         ]
         if hasattr(model_info, "cardData"):
@@ -614,7 +618,7 @@ class DownloadQueue(DownloadQueueBase):
     def _select_variants(self, paths: List[str], variant: Optional[str] = None) -> Set[Path]:
         """Select the proper variant files from a list of HuggingFace repo_id paths."""
         result = set()
-        basenames = dict()
+        basenames: Dict[Path, Path] = dict()
         for p in paths:
             path = Path(p)
 

@@ -33,7 +33,7 @@ class ModelProbeInfo(BaseModel):
     base_type: BaseModelType
     format: ModelFormat
     hash: str
-    variant_type: Optional[ModelVariantType] = ModelVariantType("normal")
+    variant_type: ModelVariantType = ModelVariantType("normal")
     prediction_type: Optional[SchedulerPredictionType] = SchedulerPredictionType("v_prediction")
     upcast_attention: Optional[bool] = False
     image_size: Optional[int] = None
@@ -114,7 +114,7 @@ class ModelProbe(ModelProbeBase):
         cls,
         model_path: Path,
         prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
-    ) -> Optional[ModelProbeInfo]:
+    ) -> ModelProbeInfo:
         """Probe model."""
         try:
             model_type = (
@@ -129,7 +129,7 @@ class ModelProbe(ModelProbeBase):
             probe_class = cls.PROBES[format_type].get(model_type)
 
             if not probe_class:
-                return None
+                raise InvalidModelException(f"Unable to determine model type for {model_path}")
 
             probe = probe_class(model_path, prediction_type_helper)
 
@@ -160,7 +160,7 @@ class ModelProbe(ModelProbeBase):
                 else 512,
             )
         except Exception:
-            raise
+            raise InvalidModelException(f"Unable to determine model type for {model_path}")
 
         return model_info
 

@@ -52,14 +52,14 @@ def migrate_models_store(config: InvokeAIAppConfig):
         except Exception as excp:
             print(str(excp))
 
-        model_info = store.get_model(new_key)
-        if vae := stanza.get("vae") and isinstance(model_info, MainConfig):
-            model_info.vae = (app_config.models_path / vae).as_posix()
-        if model_config := stanza.get("config") and isinstance(model_info, MainCheckpointConfig):
-            model_info.config = (app_config.root_path / model_config).as_posix()
-        model_info.description = stanza.get("description")
-        store.update_model(new_key, model_info)
-        store.update_model(new_key, model_info)
+        if new_key != "<NOKEY>":
+            model_info = store.get_model(new_key)
+            if (vae := stanza.get("vae")) and isinstance(model_info, MainConfig):
+                model_info.vae = (app_config.models_path / vae).as_posix()
+            if (model_config := stanza.get("config")) and isinstance(model_info, MainCheckpointConfig):
+                model_info.config = (app_config.root_path / model_config).as_posix()
+            model_info.description = stanza.get("description")
+            store.update_model(new_key, model_info)
 
     logger.info(f"Original version of models config file saved as {str(old_file) + '.orig'}")
     shutil.move(old_file, str(old_file) + ".orig")

@@ -48,7 +48,6 @@ from typing import List, Optional, Set, Union
 import yaml
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
-from omegaconf.listconfig import ListConfig
 
 from ..config import AnyModelConfig, BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
 from .base import (
@@ -64,7 +63,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
     """Implementation of the ModelConfigStore ABC using a YAML file."""
 
     _filename: Path
-    _config: Union[DictConfig, ListConfig]
+    _config: DictConfig
     _lock: threading.RLock
 
     def __init__(self, config_file: Path):
@@ -74,7 +73,9 @@ class ModelConfigStoreYAML(ModelConfigStore):
         self._lock = threading.RLock()
         if not self._filename.exists():
             self._initialize_yaml()
-        self._config = OmegaConf.load(self._filename)
+        config = OmegaConf.load(self._filename)
+        assert isinstance(config, DictConfig)
+        self._config = config
         if str(self.version) != CONFIG_FILE_VERSION:
             raise ConfigFileVersionMismatchException
 
@@ -101,7 +102,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
     @property
     def version(self) -> str:
         """Return version of this config file/database."""
-        return self._config["__metadata__"].get("version")
+        return self._config.__metadata__.get("version")
 
     def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
         """

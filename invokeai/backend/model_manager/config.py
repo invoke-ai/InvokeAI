@@ -240,6 +240,7 @@ AnyModelConfig = Union[
     TextualInversionConfig,
     ONNXSD1Config,
     ONNXSD2Config,
+    ModelConfigBase,
 ]
 
 
@@ -324,6 +325,8 @@ class ModelConfigFactory(object):
 
 # TO DO: Move this somewhere else
 class SilenceWarnings(object):
+    """Context manager to temporarily lower verbosity of diffusers & transformers warning messages."""
+
     def __init__(self):
         self.transformers_verbosity = transformers_logging.get_verbosity()
         self.diffusers_verbosity = diffusers_logging.get_verbosity()

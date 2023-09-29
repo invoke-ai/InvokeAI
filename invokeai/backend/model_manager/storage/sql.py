@@ -398,14 +398,14 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._lock.release()
         return count > 0
 
-    def search_by_tag(self, tags: Set[str]) -> List[ModelConfigBase]:
+    def search_by_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
         """Return models containing all of the listed tags."""
         # rather than create a hairy SQL cross-product, we intersect
         # tag results in a stepwise fashion at the python level.
         results = []
         try:
             self._lock.acquire()
-            matches = set()
+            matches: Set[str] = set()
             for tag in tags:
                 self._cursor.execute(
                     """--sql
@@ -438,7 +438,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
-    ) -> List[ModelConfigBase]:
+    ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
 
@@ -479,7 +479,5 @@ class ModelConfigStoreSQL(ModelConfigStore):
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> Optional[ModelConfigBase]:
-        """
-        Return the model with the indicated path, or None..
-        """
+        """Return the model with the indicated path, or None."""
         raise NotImplementedError("search_by_path not implemented in storage.sql")

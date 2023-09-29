@@ -1,6 +1,4 @@
-"""
-Initialization file for invokeai.backend.model_manager.storage
-"""
+"""Initialization file for invokeai.backend.model_manager.storage."""
 import pathlib
 
 from .base import (  # noqa F401

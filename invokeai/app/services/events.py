@@ -3,9 +3,9 @@
 from typing import Any, Optional
 
 from invokeai.app.models.image import ProgressImage
-from invokeai.app.services.model_manager_service import ModelInfo, SubModelType
 from invokeai.app.services.session_queue.session_queue_common import EnqueueBatchResult, SessionQueueItem
 from invokeai.app.util.misc import get_timestamp
+from invokeai.backend.model_manager import ModelInfo, SubModelType
 from invokeai.backend.model_manager.download import DownloadJobBase
 from invokeai.backend.util.logging import InvokeAILogger
 

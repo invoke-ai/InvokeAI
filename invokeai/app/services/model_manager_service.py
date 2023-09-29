@@ -26,16 +26,12 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.cache import CacheStats
 from invokeai.backend.model_manager.download import DownloadJobBase
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
+from .events import EventServiceBase
 
 from .config import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..invocations.baseinvocation import InvocationContext
-
-
-# "forward declaration" because of circular import issues
-class EventServiceBase:
-    pass
 
 
 class ModelManagerServiceBase(ABC):
@@ -197,8 +193,8 @@ class ModelManagerServiceBase(ABC):
     def install_model(
         self,
         source: Union[str, Path, AnyHttpUrl],
+        priority: int = 10,
         model_attributes: Optional[Dict[str, Any]] = None,
-        priority: Optional[int] = 10,
     ) -> ModelInstallJob:
         """Import a path, repo_id or URL. Returns an ModelInstallJob.
 
@@ -230,7 +226,7 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def wait_for_installs(self) -> Dict[str, str]:
+    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
         """
         Wait for all pending installs to complete.
 
@@ -334,7 +330,7 @@ class ModelManagerService(ModelManagerServiceBase):
     """Responsible for managing models on disk and in memory."""
 
     _loader: ModelLoad = Field(description="InvokeAIAppConfig object for the current process")
-    _event_bus: "EventServiceBase" = Field(description="an event bus to send install events to", default=None)
+    _event_bus: Optional[EventServiceBase] = Field(description="an event bus to send install events to", default=None)
 
     def __init__(self, config: InvokeAIAppConfig, event_bus: Optional["EventServiceBase"] = None):
         """
@@ -345,8 +341,10 @@ class ModelManagerService(ModelManagerServiceBase):
         installation and download events will be sent to the event bus.
         """
         self._event_bus = event_bus
-        handlers = [self._event_bus.emit_model_event] if self._event_bus else None
-        self._loader = ModelLoad(config, event_handlers=handlers)
+        kwargs: Dict[str, Any] = {}
+        if self._event_bus:
+            kwargs.update(event_handlers=[self._event_bus.emit_model_event])
+        self._loader = ModelLoad(config, **kwargs)
 
     def get_model(
         self,
@@ -365,8 +363,8 @@ class ModelManagerService(ModelManagerServiceBase):
         if context:
             self._emit_load_event(
                 context=context,
-                key=key,
-                submodel_type=submodel_type,
+                model_key=key,
+                submodel=submodel_type,
                 model_info=model_info,
             )
 
@@ -416,16 +414,18 @@ class ModelManagerService(ModelManagerServiceBase):
         assertion error if the name already exists.
         """
         self.logger.debug(f"add/update model {model_path}")
-        return self._loader.installer.install(
-            model_path,
-            probe_override=model_attributes,
+        return ModelInstallJob.parse_obj(
+            self._loader.installer.install(
+                model_path,
+                probe_override=model_attributes,
+            )
         )
 
     def install_model(
         self,
         source: Union[str, Path, AnyHttpUrl],
+        priority: int = 10,
         model_attributes: Optional[Dict[str, Any]] = None,
-        priority: Optional[int] = 10,
     ) -> ModelInstallJob:
         """
         Add a model using a path, repo_id or URL.
@@ -438,11 +438,13 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         self.logger.debug(f"add model {source}")
         variant = "fp16" if self._loader.precision == "float16" else None
-        return self._loader.installer.install(
-            source,
-            probe_override=model_attributes,
-            variant=variant,
-            priority=priority,
+        return ModelInstallJob.parse_obj(
+            self._loader.installer.install(
+                source,
+                probe_override=model_attributes,
+                variant=variant,
+                priority=priority,
+            )
         )
 
     def list_install_jobs(self) -> List[ModelInstallJob]:
@@ -453,9 +455,9 @@ class ModelManagerService(ModelManagerServiceBase):
 
     def id_to_job(self, id: int) -> ModelInstallJob:
         """Return the ModelInstallJob instance corresponding to the given job ID."""
-        return self._loader.queue.id_to_job(id)
+        return ModelInstallJob.parse_obj(self._loader.queue.id_to_job(id))
 
-    def wait_for_installs(self) -> Dict[str, str]:
+    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
         """
         Wait for all pending installs to complete.
 

@@ -121,11 +121,7 @@ class ModelLoad(ModelLoadBase):
     _cache_keys: dict
     _models_file: Path
 
-    def __init__(
-        self,
-        config: InvokeAIAppConfig,
-        event_handlers: Optional[List[DownloadEventHandler]] = None,
-    ):
+    def __init__(self, config: InvokeAIAppConfig, event_handlers: List[DownloadEventHandler] = []):
         """
         Initialize ModelLoad object.
 

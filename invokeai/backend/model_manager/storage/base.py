@@ -35,13 +35,11 @@ class ModelConfigStore(ABC):
     @property
     @abstractmethod
     def version(self) -> str:
-        """
-        Return the config file/database schema version.
-        """
+        """Return the config file/database schema version."""
         pass
 
     @abstractmethod
-    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
+    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> None:
         """
         Add a model to the database.
 
@@ -65,7 +63,7 @@ class ModelConfigStore(ABC):
         pass
 
     @abstractmethod
-    def update_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
+    def update_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
@@ -96,7 +94,7 @@ class ModelConfigStore(ABC):
         pass
 
     @abstractmethod
-    def search_by_tag(self, tags: Set[str]) -> List[ModelConfigBase]:
+    def search_by_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
         """
         Return models containing all of the listed tags.
 
@@ -108,10 +106,8 @@ class ModelConfigStore(ABC):
     def search_by_path(
         self,
         path: Union[str, Path],
-    ) -> Optional[ModelConfigBase]:
-        """
-        Return the model having the indicated path.
-        """
+    ) -> Optional[AnyModelConfig]:
+        """Return the model having the indicated path."""
         pass
 
     @abstractmethod
@@ -120,7 +116,7 @@ class ModelConfigStore(ABC):
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
-    ) -> List[ModelConfigBase]:
+    ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
 
@@ -133,8 +129,6 @@ class ModelConfigStore(ABC):
         """
         pass
 
-    def all_models(self) -> List[ModelConfigBase]:
-        """
-        Return all the model configs in the database.
-        """
+    def all_models(self) -> List[AnyModelConfig]:
+        """Return all the model configs in the database."""
         return self.search_by_name()

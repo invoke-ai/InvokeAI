@@ -57,9 +57,9 @@ class FastModelHash(object):
                 # only tally tensor files
                 if not file.endswith((".ckpt", ".safetensors", ".bin", ".pt", ".pth")):
                     continue
-                path = Path(root) / file
+                path = (Path(root) / file).as_posix()
                 fast_hash = cls._hash_file(path)
-                components.update({str(path): fast_hash})
+                components.update({path: fast_hash})
 
         # hash all the model hashes together, using alphabetic file order
         md5 = hashlib.md5()

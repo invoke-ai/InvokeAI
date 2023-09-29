@@ -1,7 +1,5 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-"""
-Abstract base class for a multithreaded model download queue.
-"""
+"""Abstract base class for a multithreaded model download queue."""
 
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -56,7 +54,7 @@ class DownloadJobBase(BaseModel):
 
     priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
     id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a placeholder
-    source: str = Field(description="URL or repo_id to download")
+    source: Union[str, Path] = Field(description="URL or repo_id to download")
     destination: Path = Field(description="Destination of URL on local disk")
     metadata: ModelSourceMetadata = Field(
         description="Model metadata (source-specific)", default_factory=ModelSourceMetadata
@@ -84,7 +82,8 @@ class DownloadJobBase(BaseModel):
 
     def add_event_handler(self, handler: DownloadEventHandler):
         """Add an event handler to the end of the handlers list."""
-        self.event_handlers.append(handler)
+        if self.event_handlers is not None:
+            self.event_handlers.append(handler)
 
     def clear_event_handlers(self):
         """Clear all event handlers."""
@@ -226,9 +225,7 @@ class DownloadQueueBase(ABC):
 
     @abstractmethod
     def prune_jobs(self):
-        """
-        Prune completed and errored queue items from the job list.
-        """
+        """Prune completed and errored queue items from the job list."""
         pass
 
     @abstractmethod

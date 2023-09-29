@@ -3,7 +3,7 @@
 
 import pathlib
 from enum import Enum
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional, Union, Tuple
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
@@ -22,14 +22,17 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.download import DownloadJobStatus, UnknownJobIDException
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod
 
-from ..dependencies import ApiDependencies
+from invokeai.app.api.dependencies import ApiDependencies
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
 # NOTE: The generic configuration classes defined in invokeai.backend.model_manager.config
-# such as "MainCheckpointConfig" are repackaged by code original written by Stalker
+# such as "MainCheckpointConfig" are repackaged by code originally written by Stalker
 # into base-specific classes such as `abc.StableDiffusion1ModelCheckpointConfig`
 # This is the reason for the calls to dict() followed by pydantic.parse_obj_as()
+
+# There are still numerous mypy errors here because it does not seem to like this
+# way of dynamically generating the typing hints below.
 UpdateModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ImportModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ConvertModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
@@ -38,7 +41,7 @@ ImportModelAttributes = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
 
 class ModelsList(BaseModel):
-    models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
+    models: List[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
 
 
 class ModelImportStatus(BaseModel):

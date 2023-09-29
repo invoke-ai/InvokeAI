@@ -19,9 +19,8 @@
 
 import re
 from contextlib import nullcontext
-from io import BytesIO
 from pathlib import Path
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 import requests
 import torch
@@ -1223,7 +1222,7 @@ def download_from_original_stable_diffusion_ckpt(
             # scan model
             scan_result = scan_file_path(checkpoint_path)
             if scan_result.infected_files != 0:
-                raise "The model {checkpoint_path} is potentially infected by malware. Aborting import."
+                raise Exception("The model {checkpoint_path} is potentially infected by malware. Aborting import.")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -1272,15 +1271,15 @@ def download_from_original_stable_diffusion_ckpt(
             # only refiner xl has embedder and one text embedders
             config_url = "https://raw.githubusercontent.com/Stability-AI/generative-models/main/configs/inference/sd_xl_refiner.yaml"
 
-        original_config_file = BytesIO(requests.get(config_url).content)
+        original_config_file = requests.get(config_url).text
 
     original_config = OmegaConf.load(original_config_file)
-    if original_config["model"]["params"].get("use_ema") is not None:
-        extract_ema = original_config["model"]["params"]["use_ema"]
+    if original_config.model["params"].get("use_ema") is not None:
+        extract_ema = original_config.model["params"]["use_ema"]
 
     if (
         model_version in [BaseModelType.StableDiffusion2, BaseModelType.StableDiffusion1]
-        and original_config["model"]["params"].get("parameterization") == "v"
+        and original_config.model["params"].get("parameterization") == "v"
     ):
         prediction_type = "v_prediction"
         upcast_attention = True
@@ -1312,11 +1311,11 @@ def download_from_original_stable_diffusion_ckpt(
         num_in_channels = 4
 
     if "unet_config" in original_config.model.params:
-        original_config["model"]["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
+        original_config.model["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
 
     if (
-        "parameterization" in original_config["model"]["params"]
-        and original_config["model"]["params"]["parameterization"] == "v"
+        "parameterization" in original_config.model["params"]
+        and original_config.model["params"]["parameterization"] == "v"
     ):
         if prediction_type is None:
             # NOTE: For stable diffusion 2 base it is recommended to pass `prediction_type=="epsilon"`
@@ -1437,7 +1436,7 @@ def download_from_original_stable_diffusion_ckpt(
 
     if model_type == "FrozenOpenCLIPEmbedder":
         config_name = "stabilityai/stable-diffusion-2"
-        config_kwargs = {"subfolder": "text_encoder"}
+        config_kwargs: Dict[str, Union[str, int]] = {"subfolder": "text_encoder"}
 
         text_model = convert_open_clip_checkpoint(checkpoint, config_name, **config_kwargs)
         tokenizer = CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / "stable-diffusion-2-clip", subfolder="tokenizer")
@@ -1664,7 +1663,7 @@ def download_controlnet_from_original_ckpt(
             # scan model
             scan_result = scan_file_path(checkpoint_path)
             if scan_result.infected_files != 0:
-                raise "The model {checkpoint_path} is potentially infected by malware. Aborting import."
+                raise Exception("The model {checkpoint_path} is potentially infected by malware. Aborting import.")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -1685,7 +1684,7 @@ def download_controlnet_from_original_ckpt(
     original_config = OmegaConf.load(original_config_file)
 
     if num_in_channels is not None:
-        original_config["model"]["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
+        original_config.model["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
 
     if "control_stage_config" not in original_config.model.params:
         raise ValueError("`control_stage_config` not present in original config")
@@ -1725,7 +1724,7 @@ def convert_ckpt_to_diffusers(
     and in addition a path-like object indicating the location of the desired diffusers
     model to be written.
     """
-    pipe = download_from_original_stable_diffusion_ckpt(checkpoint_path, **kwargs)
+    pipe = download_from_original_stable_diffusion_ckpt(str(checkpoint_path), **kwargs)
 
     pipe.save_pretrained(
         dump_path,
@@ -1743,6 +1742,6 @@ def convert_controlnet_to_diffusers(
     and in addition a path-like object indicating the location of the desired diffusers
     model to be written.
     """
-    pipe = download_controlnet_from_original_ckpt(checkpoint_path, **kwargs)
+    pipe = download_controlnet_from_original_ckpt(str(checkpoint_path), **kwargs)
 
     pipe.save_pretrained(dump_path, safe_serialization=True)
