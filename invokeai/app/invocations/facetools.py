@@ -1,5 +1,7 @@
 import math
+import os
 import re
+from pathlib import Path
 from typing import Optional, TypedDict
 
 import cv2
@@ -74,8 +76,6 @@ def create_black_image(w: int, h: int) -> ImageType:
 
 FONT_SIZE = 32
 FONT_STROKE_WIDTH = 4
-
-font = ImageFont.truetype("invokeai/assets/fonts/inter/Inter-Regular.ttf", FONT_SIZE)
 
 
 def prepare_faces_list(
@@ -640,6 +640,10 @@ class FaceIdentifierInvocation(BaseInvocation):
             y_offset=0,
             draw_mesh=False,
         )
+
+        path = Path(__file__).resolve().parent.parent.parent
+        font_path = os.path.abspath(path / "assets/fonts/inter/Inter-Regular.ttf")
+        font = ImageFont.truetype(font_path, FONT_SIZE)
 
         # Paste face IDs on the output image
         draw = ImageDraw.Draw(image)
