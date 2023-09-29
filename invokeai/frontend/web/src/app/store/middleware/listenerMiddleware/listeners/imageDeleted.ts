@@ -113,7 +113,7 @@ export const addRequestedSingleImageDeletionListener = () => {
 
         // Remove IP Adapter Set Image if image is deleted.
         if (
-          getState().controlNet.ipAdapterInfo.adapterImage?.image_name ===
+          getState().controlNet.ipAdapterInfo.adapterImage ===
           imageDTO.image_name
         ) {
           dispatch(ipAdapterImageChanged(null));
@@ -238,7 +238,7 @@ export const addRequestedMultipleImageDeletionListener = () => {
 
           // Remove IP Adapter Set Image if image is deleted.
           if (
-            getState().controlNet.ipAdapterInfo.adapterImage?.image_name ===
+            getState().controlNet.ipAdapterInfo.adapterImage ===
             imageDTO.image_name
           ) {
             dispatch(ipAdapterImageChanged(null));

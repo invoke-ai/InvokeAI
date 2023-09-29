@@ -118,7 +118,7 @@ export const addImageDroppedListener = () => {
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(ipAdapterImageChanged(activeData.payload.imageDTO));
+        dispatch(ipAdapterImageChanged(activeData.payload.imageDTO.image_name));
         dispatch(isIPAdapterEnabledChanged(true));
         return;
       }

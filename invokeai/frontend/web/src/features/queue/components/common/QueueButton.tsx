@@ -39,6 +39,7 @@ const QueueButton = ({
         colorScheme={colorScheme}
         isLoading={isLoading}
         sx={sx}
+        data-testid={label}
       />
     );
   }
@@ -55,6 +56,7 @@ const QueueButton = ({
       loadingText={loadingText ?? label}
       flexGrow={1}
       sx={sx}
+      data-testid={label}
     >
       {label}
     </IAIButton>
