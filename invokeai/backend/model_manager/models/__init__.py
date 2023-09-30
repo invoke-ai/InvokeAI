@@ -1,6 +1,6 @@
 import inspect
 from enum import Enum
-from typing import Literal, get_origin
+from typing import Any, Literal, get_origin
 
 from pydantic import BaseModel
 
@@ -89,8 +89,8 @@ MODEL_CLASSES = {
     # },
 }
 
-MODEL_CONFIGS = list()
-OPENAPI_MODEL_CONFIGS = list()
+MODEL_CONFIGS: Any = list()
+OPENAPI_MODEL_CONFIGS: Any = list()
 
 
 class OpenAPIModelInfoBase(BaseModel):

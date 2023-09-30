@@ -2,14 +2,11 @@ import base64
 import importlib
 import io
 import math
-import multiprocessing as mp
 import os
 import re
-from collections import abc
 from inspect import isfunction
 from pathlib import Path
-from queue import Queue
-from threading import Thread
+from typing import Optional
 
 import numpy as np
 import requests
@@ -166,7 +163,7 @@ def ask_user(question: str, answers: list):
 
 
 # -------------------------------------
-def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path:
+def download_with_resume(url: str, dest: Path, access_token: str = None) -> Optional[Path]:
     """
     Download a model file.
     :param url:  https, http or ftp URL
@@ -183,10 +180,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     content_length = int(resp.headers.get("content-length", 0))
 
     if dest.is_dir():
-        try:
-            file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition")).group(1)
-        except AttributeError:
-            file_name = os.path.basename(url)
+        file_name = response_attachment(resp) or os.path.basename(url)
         dest = dest / file_name
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -235,12 +229,21 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     return dest
 
 
-def url_attachment_name(url: str) -> dict:
+def response_attachment(response: requests.Response) -> Optional[str]:
     try:
-        resp = requests.get(url, stream=True)
-        match = re.search('filename="(.+)"', resp.headers.get("Content-Disposition"))
-        return match.group(1)
+        if disposition := response.headers.get("Content-Disposition"):
+            if match := re.search('filename="(.+)"', disposition):
+                return match.group(1)
+        return None
     except Exception:
+        return None
+
+
+def url_attachment_name(url: str) -> Optional[str]:
+    resp = requests.get(url)
+    if resp.ok:
+        return response_attachment(resp)
+    else:
         return None
 
 

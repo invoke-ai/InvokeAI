@@ -208,7 +208,7 @@ class ModelCache(object):
                 self.stats.hits += 1
 
         if self.stats:
-            self.stats.cache_size = self.max_cache_size * GIG
+            self.stats.cache_size = int(self.max_cache_size * GIG)
             self.stats.high_watermark = max(self.stats.high_watermark, self._cache_size())
             self.stats.in_cache = len(self._cached_models)
             self.stats.loaded_model_sizes[key] = max(
