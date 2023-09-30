@@ -328,6 +328,7 @@ class ModelInstall(ModelInstallBase):
     _async_installs: Dict[Union[str, Path, AnyHttpUrl], Optional[str]]
     _installed: Set[str] = Field(default=set)
     _tmpdir: Optional[tempfile.TemporaryDirectory]  # used for downloads
+    _cached_model_paths: Set[Path] = Field(default=set)  # used to speed up directory scanning
 
     _legacy_configs: Dict[BaseModelType, Dict[ModelVariantType, Union[str, dict]]] = {
         BaseModelType.StableDiffusion1: {
@@ -451,7 +452,9 @@ class ModelInstall(ModelInstallBase):
         # if path already exists then we jigger the name to make it unique
         counter: int = 1
         while new_path.exists():
-            new_path = new_path.with_stem(new_path.stem + f"_{counter:02d}")
+            path = new_path.with_stem(new_path.stem + f"_{counter:02d}")
+            if not path.exists():
+                new_path = path
             counter += 1
         return old_path.replace(new_path)
 
@@ -630,6 +633,7 @@ class ModelInstall(ModelInstallBase):
         return id_map
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
+        self._cached_model_paths = set([Path(x.path) for x in self._store.all_models()])
         callback = self._scan_install if install else self._scan_register
         search = ModelSearch(on_model_found=callback)
         self._installed = set()
@@ -704,6 +708,8 @@ class ModelInstall(ModelInstallBase):
 
     # the following two methods are callbacks to the ModelSearch object
     def _scan_register(self, model: Path) -> bool:
+        if model in self._cached_model_paths:
+            return True
         try:
             id = self.register_path(model)
             self.sync_model_path(id)  # possibly move it to right place in `models`
@@ -714,6 +720,8 @@ class ModelInstall(ModelInstallBase):
         return True
 
     def _scan_install(self, model: Path) -> bool:
+        if model in self._cached_model_paths:
+            return True
         try:
             id = self.install_path(model)
             self._logger.info(f"Installed {model} with id {id}")
