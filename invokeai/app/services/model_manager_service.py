@@ -345,6 +345,7 @@ class ModelManagerService(ModelManagerServiceBase):
         if self._event_bus:
             kwargs.update(event_handlers=[self._event_bus.emit_model_event])
         self._loader = ModelLoad(config, **kwargs)
+        self._loader.installer.scan_models_directory()  # synchronize new/deleted models found in models directory
 
     def get_model(
         self,

@@ -369,7 +369,8 @@ class ModelInstall(ModelInstallBase):
         self._tmpdir = None
 
         # this step synchronizes the `models` directory with the models db
-        self.scan_models_directory()
+        # do NOT do this automatically, but only on app startup
+        # self.scan_models_directory()
 
     @property
     def queue(self) -> DownloadQueueBase:
