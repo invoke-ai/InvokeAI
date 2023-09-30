@@ -180,6 +180,8 @@ class ModelSearch(ModelSearchBase):
                     self._scanned_dirs.add(path)
                     try:
                         self.model_found(path)
+                    except KeyboardInterrupt:
+                        raise
                     except Exception as e:
                         self.logger.warning(str(e))
 
@@ -190,5 +192,7 @@ class ModelSearch(ModelSearchBase):
                 if path.suffix in {".ckpt", ".bin", ".pth", ".safetensors", ".pt"}:
                     try:
                         self.model_found(path)
+                    except KeyboardInterrupt:
+                        raise
                     except Exception as e:
                         self.logger.warning(str(e))
