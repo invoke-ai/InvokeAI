@@ -1,8 +1,16 @@
-import { CoreMetadata, LoRAMetadataItem } from 'features/nodes/types/types';
+import {
+  ControlNetMetadataItem,
+  CoreMetadata,
+  LoRAMetadataItem,
+  IPAdapterMetadataItem,
+} from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { memo, useCallback } from 'react';
+import { memo, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isValidLoRAModel } from '../../../parameters/types/parameterSchemas';
+import {
+  isValidControlNetModel,
+  isValidLoRAModel,
+} from '../../../parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
@@ -26,6 +34,8 @@ const ImageMetadataActions = (props: Props) => {
     recallHeight,
     recallStrength,
     recallLoRA,
+    recallControlNet,
+    recallIPAdapter,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {
@@ -74,6 +84,36 @@ const ImageMetadataActions = (props: Props) => {
     },
     [recallLoRA]
   );
+
+  const handleRecallControlNet = useCallback(
+    (controlnet: ControlNetMetadataItem) => {
+      recallControlNet(controlnet);
+    },
+    [recallControlNet]
+  );
+
+  const handleRecallIPAdapter = useCallback(
+    (ipAdapter: IPAdapterMetadataItem) => {
+      recallIPAdapter(ipAdapter);
+    },
+    [recallIPAdapter]
+  );
+
+  const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
+    return metadata?.controlnets
+      ? metadata.controlnets.filter((controlnet) =>
+          isValidControlNetModel(controlnet.control_model)
+        )
+      : [];
+  }, [metadata?.controlnets]);
+
+  const validIPAdapters: IPAdapterMetadataItem[] = useMemo(() => {
+    return metadata?.ipAdapters
+      ? metadata.ipAdapters.filter((ipAdapter) =>
+          isValidControlNetModel(ipAdapter.ip_adapter_model)
+        )
+      : [];
+  }, [metadata?.ipAdapters]);
 
   if (!metadata || Object.keys(metadata).length === 0) {
     return null;
@@ -180,6 +220,22 @@ const ImageMetadataActions = (props: Props) => {
             );
           }
         })}
+      {validControlNets.map((controlnet, index) => (
+        <ImageMetadataItem
+          key={index}
+          label="ControlNet"
+          value={`${controlnet.control_model?.model_name} - ${controlnet.control_weight}`}
+          onClick={() => handleRecallControlNet(controlnet)}
+        />
+      ))}
+      {validIPAdapters.map((ipAdapter, index) => (
+        <ImageMetadataItem
+          key={index}
+          label="IP Adapter"
+          value={`${ipAdapter.ip_adapter_model?.model_name} - ${ipAdapter.weight}`}
+          onClick={() => handleRecallIPAdapter(ipAdapter)}
+        />
+      ))}
     </>
   );
 };

@@ -60,6 +60,7 @@ const InitialImage = () => {
       noContentFallback={
         <IAINoContentFallback label="No initial image selected" />
       }
+      dataTestId="initial-image"
     />
   );
 };

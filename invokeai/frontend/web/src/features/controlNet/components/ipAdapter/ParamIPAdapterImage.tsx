@@ -33,7 +33,7 @@ const ParamIPAdapterImage = () => {
   const { t } = useTranslation();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(
-    ipAdapterInfo.adapterImage?.image_name ?? skipToken
+    ipAdapterInfo.adapterImage ?? skipToken
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
@@ -63,11 +63,14 @@ const ParamIPAdapterImage = () => {
 
   return (
     <Flex
+      layerStyle="second"
       sx={{
         position: 'relative',
         w: 'full',
         alignItems: 'center',
         justifyContent: 'center',
+        aspectRatio: '1/1',
+        borderRadius: 'base',
       }}
     >
       <IAIDndImage

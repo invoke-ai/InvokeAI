@@ -8,19 +8,7 @@ To download a node, simply download the `.py` node file from the link and add it
 
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
-## Community Nodes
-
-### FaceTools
-
-**Description:** FaceTools is a collection of nodes created to manipulate faces as you would in Unified Canvas. It includes FaceMask, FaceOff, and FacePlace. FaceMask autodetects a face in the image using MediaPipe and creates a mask from it. FaceOff similarly detects a face, then takes the face off of the image by adding a square bounding box around it and cropping/scaling it. FacePlace puts the bounded face image from FaceOff back onto the original image. Using these nodes with other inpainting node(s), you can put new faces on existing things, put new things around existing faces, and work closer with a face as a bounded image. Additionally, you can supply X and Y offset values to scale/change the shape of the mask for finer control on FaceMask and FaceOff. See GitHub repository below for usage examples.
-
-**Node Link:** https://github.com/ymgenesis/FaceTools/
-
-**FaceMask Output Examples** 
-
-![5cc8abce-53b0-487a-b891-3bf94dcc8960](https://github.com/invoke-ai/InvokeAI/assets/25252829/43f36d24-1429-4ab1-bd06-a4bedfe0955e)
-![b920b710-1882-49a0-8d02-82dff2cca907](https://github.com/invoke-ai/InvokeAI/assets/25252829/7660c1ed-bf7d-4d0a-947f-1fc1679557ba)
-![71a91805-fda5-481c-b380-264665703133](https://github.com/invoke-ai/InvokeAI/assets/25252829/f8f6a2ee-2b68-4482-87da-b90221d5c3e2)
+--------------------------------
 
 --------------------------------
 ### Ideal Size
@@ -42,6 +30,52 @@ To use a community workflow, download the the `.json` node graph file and load i
 **Description:** This InvokeAI node takes in a collection of images and randomly chooses one. This can be useful when you have a number of poses to choose from for a ControlNet node, or a number of input images for another purpose.
 
 **Node Link:** https://github.com/JPPhoto/image-picker-node
+
+--------------------------------
+### Thresholding
+
+**Description:** This node generates masks for highlights, midtones, and shadows given an input image. You can optionally specify a blur for the lookup table used in making those masks from the source image.
+
+**Node Link:** https://github.com/JPPhoto/thresholding-node
+
+**Examples**
+
+Input:
+
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/c88ada13-fb3d-484c-a4fe-947b44712632){: style="height:512px;width:512px"}
+
+Highlights/Midtones/Shadows:
+
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/727021c1-36ff-4ec8-90c8-105e00de986d" style="width: 30%" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0b721bfc-f051-404e-b905-2f16b824ddfe" style="width: 30%" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/04c1297f-1c88-42b6-a7df-dd090b976286" style="width: 30%" />
+
+Highlights/Midtones/Shadows (with LUT blur enabled):
+
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/19aa718a-70c1-4668-8169-d68f4bd13771" style="width: 30%" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0a440e43-697f-4d17-82ee-f287467df0a5" style="width: 30%" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0701fd0f-2ca7-4fe2-8613-2b52547bafce" style="width: 30%" />
+
+--------------------------------
+### Halftone
+
+**Description**: Halftone converts the source image to grayscale and then performs halftoning. CMYK Halftone converts the image to CMYK and applies a per-channel halftoning to make the source image look like a magazine or newspaper. For both nodes, you can specify angles and halftone dot spacing.
+
+**Node Link:** https://github.com/JPPhoto/halftone-node
+
+**Example**
+
+Input:
+
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/fd5efb9f-4355-4409-a1c2-c1ca99e0cab4){: style="height:512px;width:512px"}
+
+Halftone Output:
+
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/7e606f29-e68f-4d46-b3d5-97f799a4ec2f){: style="height:512px;width:512px"}
+
+CMYK Halftone Output:
+
+![image](https://github.com/invoke-ai/InvokeAI/assets/34005131/c59c578f-db8e-4d66-8c66-2851752d75ea){: style="height:512px;width:512px"}
 
 --------------------------------
 ### Retroize
@@ -77,7 +111,7 @@ Generated Prompt: An enchanted weapon will be usable by any character regardless
 **Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
 
 **Output Example:** 
-=======
+
 ![Example animation](https://github.com/helix4u/load_video_frame/blob/main/testmp4_embed_converted.gif)
 [Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
 
@@ -141,7 +175,8 @@ This includes 3 Nodes:
 
 **Description:** This is a pack of nodes for composing masks and images, including a simple text mask creator and both image and latent offset nodes. The offsets wrap around, so these can be used in conjunction with the Seamless node to progressively generate centered on different parts of the seamless tiling.
 
-This includes 14 Nodes:
+This includes 15 Nodes:
+
 - *Adjust Image Hue Plus* - Rotate the hue of an image in one of several different color spaces.
 - *Blend Latents/Noise (Masked)* - Use a mask to blend part of one latents tensor [including Noise outputs] into another. Can be used to "renoise" sections during a multi-stage [masked] denoising process.
 - *Enhance Image* - Boost or reduce color saturation, contrast, brightness, sharpness, or invert colors of any image at any stage with this simple wrapper for pillow [PIL]'s ImageEnhance module.
@@ -154,6 +189,7 @@ This includes 14 Nodes:
 - *Image Value Thresholds* - Clip an image to pure black/white beyond specified thresholds.
 - *Offset Latents* - Offset a latents tensor in the vertical and/or horizontal dimensions, wrapping it around.
 - *Offset Image* - Offset an image in the vertical and/or horizontal dimensions, wrapping it around.
+- *Rotate/Flip Image* - Rotate an image in degrees clockwise/counterclockwise about its center, optionally resizing the image boundaries to fit, or flipping it about the vertical and/or horizontal axes.
 - *Shadows/Highlights/Midtones* - Extract three masks (with adjustable hard or soft thresholds) representing shadows, midtones, and highlights regions of an image.
 - *Text Mask (simple 2D)* - create and position a white on black (or black on white) line of text using any font locally available to Invoke.
 
@@ -225,6 +261,21 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/README.md
 
 **Node Link:** https://github.com/skunkworxdark/XYGrid_nodes
+
+--------------------------------
+
+### Image to Character Art Image Node's
+
+**Description:** Group of nodes to convert an input image into ascii/unicode art Image
+
+**Node Link:** https://github.com/mickr777/imagetoasciiimage
+
+**Output Examples**
+
+<img src="https://github.com/invoke-ai/InvokeAI/assets/115216705/8e061fcc-9a2c-4fa9-bcc7-c0f7b01e9056" width="300" />
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/3c4990eb-2f42-46b9-90f9-0088b939dc6a" width="300" /></br>
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/fee7f800-a4a8-41e2-a66b-c66e4343307e" width="300" />
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/1d9c1003-a45f-45c2-aac7-46470bb89330" width="300" />
 
 --------------------------------
 

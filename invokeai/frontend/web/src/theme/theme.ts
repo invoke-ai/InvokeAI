@@ -1,5 +1,4 @@
-import { ThemeOverride } from '@chakra-ui/react';
-
+import { ThemeOverride, ToastProviderProps } from '@chakra-ui/react';
 import { InvokeAIColors } from './colors/colors';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
@@ -148,4 +147,8 @@ export const theme: ThemeOverride = {
     Text: textTheme,
     Tooltip: tooltipTheme,
   },
+};
+
+export const TOAST_OPTIONS: ToastProviderProps = {
+  defaultOptions: { isClosable: true },
 };

@@ -269,7 +269,7 @@ class LaMaInfillInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint")
+@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
 class CV2InfillInvocation(BaseInvocation):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 

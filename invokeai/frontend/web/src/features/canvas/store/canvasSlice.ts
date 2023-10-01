@@ -8,7 +8,6 @@ import { setAspectRatio } from 'features/parameters/store/generationSlice';
 import { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
-import { sessionCanceled } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import calculateCoordinates from '../util/calculateCoordinates';
 import calculateScale from '../util/calculateScale';
@@ -187,7 +186,7 @@ export const canvasSlice = createSlice({
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
       state.layerState = {
-        ...initialLayerState,
+        ...cloneDeep(initialLayerState),
         objects: [
           {
             kind: 'image',
@@ -201,6 +200,7 @@ export const canvasSlice = createSlice({
         ],
       };
       state.futureLayerStates = [];
+      state.batchIds = [];
 
       const newScale = calculateScale(
         stageDimensions.width,
@@ -350,11 +350,14 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.stagingArea = { ...initialLayerState.stagingArea };
+      state.layerState.stagingArea = cloneDeep(
+        cloneDeep(initialLayerState)
+      ).stagingArea;
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
-      state.shouldShowStagingOutline = true;
+      state.shouldShowStagingImage = true;
+      state.batchIds = [];
     },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } =
@@ -491,8 +494,9 @@ export const canvasSlice = createSlice({
     resetCanvas: (state) => {
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      state.layerState = initialLayerState;
+      state.layerState = cloneDeep(initialLayerState);
       state.futureLayerStates = [];
+      state.batchIds = [];
     },
     canvasResized: (
       state,
@@ -617,25 +621,22 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      const currentIndex = state.layerState.stagingArea.selectedImageIndex;
-      const length = state.layerState.stagingArea.images.length;
+      const nextIndex = state.layerState.stagingArea.selectedImageIndex + 1;
+      const lastIndex = state.layerState.stagingArea.images.length - 1;
 
-      state.layerState.stagingArea.selectedImageIndex = Math.min(
-        currentIndex + 1,
-        length - 1
-      );
+      state.layerState.stagingArea.selectedImageIndex =
+        nextIndex > lastIndex ? 0 : nextIndex;
     },
     prevStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
         return;
       }
 
-      const currentIndex = state.layerState.stagingArea.selectedImageIndex;
+      const prevIndex = state.layerState.stagingArea.selectedImageIndex - 1;
+      const lastIndex = state.layerState.stagingArea.images.length - 1;
 
-      state.layerState.stagingArea.selectedImageIndex = Math.max(
-        currentIndex - 1,
-        0
-      );
+      state.layerState.stagingArea.selectedImageIndex =
+        prevIndex < 0 ? lastIndex : prevIndex;
     },
     commitStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
@@ -657,13 +658,12 @@ export const canvasSlice = createSlice({
           ...imageToCommit,
         });
       }
-      state.layerState.stagingArea = {
-        ...initialLayerState.stagingArea,
-      };
+      state.layerState.stagingArea = cloneDeep(initialLayerState).stagingArea;
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
       state.shouldShowStagingImage = true;
+      state.batchIds = [];
     },
     fitBoundingBoxToStage: (state) => {
       const {
@@ -786,11 +786,6 @@ export const canvasSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(sessionCanceled.pending, (state) => {
-      if (!state.layerState.stagingArea.images.length) {
-        state.layerState.stagingArea = initialLayerState.stagingArea;
-      }
-    });
     builder.addCase(setAspectRatio, (state, action) => {
       const ratio = action.payload;
       if (ratio) {
