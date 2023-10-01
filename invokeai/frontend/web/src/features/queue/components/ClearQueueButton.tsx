@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTrash } from 'react-icons/fa';
+import { FaBan } from 'react-icons/fa';
 import { useClearQueue } from '../hooks/useClearQueue';
 import QueueButton from './common/QueueButton';
 import { ChakraProps, Text } from '@chakra-ui/react';
@@ -27,7 +27,7 @@ const ClearQueueButton = ({ asIconButton, sx }: Props) => {
           asIconButton={asIconButton}
           label={t('queue.clear')}
           tooltip={t('queue.clearTooltip')}
-          icon={<FaTrash />}
+          icon={<FaBan />}
           colorScheme="error"
           sx={sx}
         />
