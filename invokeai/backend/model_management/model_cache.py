@@ -132,6 +132,7 @@ class _CacheRecord:
 class ModelCache(object):
     def __init__(
         self,
+        models_path: Path,
         max_cache_size: float = DEFAULT_MAX_CACHE_SIZE,
         max_vram_cache_size: float = DEFAULT_MAX_VRAM_CACHE_SIZE,
         execution_device: torch.device = torch.device("cuda"),
@@ -141,7 +142,6 @@ class ModelCache(object):
         lazy_offloading: bool = True,
         sha_chunksize: int = 16777216,
         logger: types.ModuleType = logger,
-        model_size_stash: Optional[ModelSizeStash] = None,
     ):
         """
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
@@ -162,7 +162,7 @@ class ModelCache(object):
         self.storage_device: torch.device = storage_device
         self.sha_chunksize = sha_chunksize
         self.logger = logger
-        self.model_size_stash = model_size_stash
+        self.model_size_stash = ModelSizeStash(models_path / '.model_info')
 
         # used for stats collection
         self.stats = None
@@ -235,6 +235,7 @@ class ModelCache(object):
         )
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
+        full_model_path = model_path / (submodel or '.')
         if cache_entry is None:
             self.logger.info(
                 f"Loading model {model_path}, type"
@@ -244,10 +245,7 @@ class ModelCache(object):
                 self.stats.misses += 1
 
             # Get the estimated model size before loading.
-            predicted_model_size = None
-            if self.model_size_stash:
-                predicted_model_size = self.model_size_stash.get_size(model_path / (submodel or '.'))
-            predicted_model_size = predicted_model_size or model_info.get_size(submodel)
+            predicted_model_size = self.model_size_stash.get_size(full_model_path) or model_info.get_size(submodel)
 
             # Make room in the cache to load this model.
             self._make_cache_room(predicted_model_size)
@@ -258,8 +256,7 @@ class ModelCache(object):
 
             # Re-calculate model size after loading.
             actual_model_size = model_info.calc_size(model)
-            if self.model_size_stash:
-                self.model_size_stash.stash_size(model_path / (submodel or '.'), actual_model_size)
+            self.model_size_stash.stash_size(full_model_path, actual_model_size)
 
             if actual_model_size > 0:
                 self.logger.debug(f"CPU RAM used for load: {(actual_model_size/GIG):.2f} GB")
@@ -294,6 +291,7 @@ class ModelCache(object):
                 f" {(cache_entry.size/GIG):.2f} GB, updated size: {(cur_model_size/GIG):.2f} GB."
             )
             cache_entry.size = cur_model_size
+            self.model_size_stash.stash_size(full_model_path, cur_model_size)
 
         with suppress(Exception):
             self._cache_stack.remove(key)

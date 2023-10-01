@@ -349,7 +349,7 @@ class ModelManager(object):
             precision=precision,
             sequential_offload=sequential_offload,
             logger=logger,
-            model_size_stash=ModelSizeStash(self.app_config.models_path / '.model_info'),
+            models_path=self.app_config.models_path,
         )
 
         self._read_models(config)
