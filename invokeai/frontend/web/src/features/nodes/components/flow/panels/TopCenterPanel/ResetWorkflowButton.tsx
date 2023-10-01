@@ -18,7 +18,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTrash } from 'react-icons/fa';
+import { FaUndo } from 'react-icons/fa';
 
 const ResetWorkflowButton = () => {
   const { t } = useTranslation();
@@ -48,7 +48,7 @@ const ResetWorkflowButton = () => {
   return (
     <>
       <IAIIconButton
-        icon={<FaTrash />}
+        icon={<FaUndo />}
         tooltip={t('nodes.resetWorkflow')}
         aria-label={t('nodes.resetWorkflow')}
         onClick={onOpen}
