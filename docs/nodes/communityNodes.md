@@ -279,6 +279,21 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 
 --------------------------------
 
+### Grid to Gif
+
+**Description:** One node that turns a grid image into an image colletion, one node that turns an image collection into a gif
+
+**Node Link:** https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/GridToGif.py
+
+**Example Node Graph:**  https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/Grid%20to%20Gif%20Example%20Workflow.json
+
+**Output Examples** 
+
+<img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/input.png" width="300" />
+<img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/output.gif" width="300" />
+
+--------------------------------
+
 ### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
