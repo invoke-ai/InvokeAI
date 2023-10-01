@@ -320,6 +320,7 @@ class DiffusersModel(ModelBase):
 
     # def convert_if_required(model_path: str, cache_path: str, config: Optional[dict]) -> str:
 
+
 def calc_model_size_by_fs(model_path: str, subfolder: Optional[str] = None, variant: Optional[str] = None):
     if subfolder is not None:
         model_path = os.path.join(model_path, subfolder)

@@ -84,7 +84,7 @@ class ModelSizeStash(object):
     def stash_size(self, model_path: Path, size: int):
         stash_filename = self._get_stash_path(model_path)
         stash_filename.parent.mkdir(parents=True, exist_ok=True)
-        with open(stash_filename, 'w') as f:
+        with open(stash_filename, "w") as f:
             json.dump({"file_size": size}, f)
 
     def get_size(self, model_path: Path) -> Optional[int]:
@@ -92,11 +92,12 @@ class ModelSizeStash(object):
         if not stash_filename.exists():
             return None
         try:
-            with open(stash_filename, 'r') as f:
+            with open(stash_filename, "r") as f:
                 obj = json.load(f)
-                return obj['file_size']
+                return obj["file_size"]
         except (OSError, json.JSONDecodeError):
             return None
+
 
 class _CacheRecord:
     size: int
@@ -162,7 +163,7 @@ class ModelCache(object):
         self.storage_device: torch.device = storage_device
         self.sha_chunksize = sha_chunksize
         self.logger = logger
-        self.model_size_stash = ModelSizeStash(models_path / '.model_info')
+        self.model_size_stash = ModelSizeStash(models_path / ".model_info")
 
         # used for stats collection
         self.stats = None
@@ -235,7 +236,7 @@ class ModelCache(object):
         )
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
-        full_model_path = model_path / (submodel or '.')
+        full_model_path = model_path / (submodel or ".")
         if cache_entry is None:
             self.logger.info(
                 f"Loading model {model_path}, type"
@@ -529,4 +530,3 @@ class VRAMUsage(object):
 
     def __exit__(self, *args):
         self.vram_used = torch.cuda.memory_allocated() - self.vram
-
