@@ -111,7 +111,7 @@ export const addImageUploadedFulfilledListener = () => {
       }
 
       if (postUploadAction?.type === 'SET_IP_ADAPTER_IMAGE') {
-        dispatch(ipAdapterImageChanged(imageDTO));
+        dispatch(ipAdapterImageChanged(imageDTO.image_name));
         dispatch(isIPAdapterEnabledChanged(true));
         dispatch(
           addToast({

@@ -10,6 +10,13 @@ export const validateSourceAndTargetTypes = (
   sourceType: FieldType,
   targetType: FieldType
 ) => {
+  // TODO: There's a bug with Collect -> Iterate nodes:
+  // https://github.com/invoke-ai/InvokeAI/issues/3956
+  // Once this is resolved, we can remove this check.
+  if (sourceType === 'Collection' && targetType === 'Collection') {
+    return false;
+  }
+
   if (sourceType === targetType) {
     return true;
   }

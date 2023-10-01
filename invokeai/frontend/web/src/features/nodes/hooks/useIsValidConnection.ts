@@ -1,9 +1,9 @@
 // TODO: enable this at some point
-import graphlib from '@dagrejs/graphlib';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
-import { Connection, Edge, Node, useReactFlow } from 'reactflow';
+import { Connection, Node, useReactFlow } from 'reactflow';
 import { validateSourceAndTargetTypes } from '../store/util/validateSourceAndTargetTypes';
+import { getIsGraphAcyclic } from '../store/util/getIsGraphAcyclic';
 import { InvocationNodeData } from '../types/types';
 
 /**
@@ -53,13 +53,12 @@ export const useIsValidConnection = () => {
       }
 
       if (
-        edges
-          .filter((edge) => {
-            return edge.target === target && edge.targetHandle === targetHandle;
-          })
-          .find((edge) => {
-            edge.source === source && edge.sourceHandle === sourceHandle;
-          })
+        edges.find((edge) => {
+          edge.target === target &&
+            edge.targetHandle === targetHandle &&
+            edge.source === source &&
+            edge.sourceHandle === sourceHandle;
+        })
       ) {
         // We already have a connection from this source to this target
         return false;
@@ -87,28 +86,4 @@ export const useIsValidConnection = () => {
   );
 
   return isValidConnection;
-};
-
-export const getIsGraphAcyclic = (
-  source: string,
-  target: string,
-  nodes: Node[],
-  edges: Edge[]
-) => {
-  // construct graphlib graph from editor state
-  const g = new graphlib.Graph();
-
-  nodes.forEach((n) => {
-    g.setNode(n.id);
-  });
-
-  edges.forEach((e) => {
-    g.setEdge(e.source, e.target);
-  });
-
-  // add the candidate edge
-  g.setEdge(source, target);
-
-  // check if the graph is acyclic
-  return graphlib.alg.isAcyclic(g);
 };

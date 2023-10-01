@@ -27,6 +27,7 @@ const IAIMantineSelect = forwardRef((props: IAISelectProps, ref) => {
         isRequired={required}
         isDisabled={disabled}
         position="static"
+        data-testid={`select-${label || props.placeholder}`}
       >
         <FormLabel>{label}</FormLabel>
         <Select disabled={disabled} ref={inputRef} styles={styles} {...rest} />
