@@ -94,6 +94,7 @@ class FieldDescriptions:
     inclusive_low = "The inclusive low value"
     exclusive_high = "The exclusive high value"
     decimal_places = "The number of decimal places to round to"
+    seed_random_generation = "The seed value for RNG"
 
 
 class Input(str, Enum):

@@ -9,6 +9,8 @@ from invokeai.app.invocations.primitives import FloatOutput, IntegerOutput
 
 from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
 
+from invokeai.app.util.misc import SEED_MAX
+
 
 @invocation("add", title="Add Integers", tags=["math", "add"], category="math", version="1.0.0")
 class AddInvocation(BaseInvocation):
@@ -63,13 +65,15 @@ class DivideInvocation(BaseInvocation):
     use_cache=False,
 )
 class RandomIntInvocation(BaseInvocation):
-    """Outputs a single random integer."""
+    """Outputs a single random integer (with possibility to set seed)."""
 
     low: int = InputField(default=0, description=FieldDescriptions.inclusive_low)
     high: int = InputField(default=np.iinfo(np.int32).max, description=FieldDescriptions.exclusive_high)
+    seed: int = InputField(default=None, ge=0, le=SEED_MAX, description=FieldDescriptions.seed_random_generation)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(value=np.random.randint(self.low, self.high))
+        rng = np.random.default_rng(seed=self.seed)
+        return IntegerOutput(value=rng.integers(self.low, self.high, 1))
 
 
 @invocation("rand_float", title="Random Float", tags=["math", "float", "random"], category="math", version="1.0.0")
@@ -79,9 +83,11 @@ class RandomFloatInvocation(BaseInvocation):
     low: float = InputField(default=0.0, description=FieldDescriptions.inclusive_low)
     high: float = InputField(default=1.0, description=FieldDescriptions.exclusive_high)
     decimals: int = InputField(default=2, description=FieldDescriptions.decimal_places)
+    seed: int = InputField(default=None, ge=0, le=SEED_MAX, description=FieldDescriptions.seed_random_generation)
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
-        random_float = np.random.uniform(self.low, self.high)
+        rng = np.random.default_rng(seed=self.seed)
+        random_float = rng.uniform(self.low, self.high, 1)
         rounded_float = round(random_float, self.decimals)
         return FloatOutput(value=rounded_float)
 
