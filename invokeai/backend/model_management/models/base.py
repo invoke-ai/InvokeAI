@@ -321,6 +321,37 @@ class DiffusersModel(ModelBase):
     # def convert_if_required(model_path: str, cache_path: str, config: Optional[dict]) -> str:
 
 
+def estimate_model_size(model_path: str) -> int:
+    """Estimate model size from disk image, taking our precision into account."""
+    # Encapsulation-breaking way of getting precision, but it isn't too much overhead.
+    config = InvokeAIAppConfig.get_config()
+    precision = config.precision
+    if precision == "auto":
+        precision = choose_precision(torch.device(choose_torch_device()))
+    invoke_precision = torch.float32 if precision == "float32" else torch.float16
+
+    size_on_disk = os.stat(model_path).st_size
+    metadata = read_checkpoint_meta(model_path)
+    model_precision = None
+    for key, value in metadata.items():  # find a tensor to get the size from
+        if isinstance(value, torch.Tensor):
+            model_precision = value.dtype
+            break
+
+    if model_precision == torch.float32:
+        if invoke_precision == torch.float16:
+            return size_on_disk // 2
+        else:
+            return size_on_disk
+    elif model_precision == torch.float16:
+        if invoke_precision == torch.float32:
+            return size_on_disk * 2
+        else:
+            return size_on_disk
+    else:
+        return size_on_disk
+
+
 def calc_model_size_by_fs(model_path: str, subfolder: Optional[str] = None, variant: Optional[str] = None):
     if subfolder is not None:
         model_path = os.path.join(model_path, subfolder)
@@ -378,8 +409,7 @@ def calc_model_size_by_fs(model_path: str, subfolder: Optional[str] = None, vari
 
         model_size = 0
         for model_file in model_files:
-            file_stats = os.stat(os.path.join(model_path, model_file))
-            model_size += file_stats.st_size
+            model_size += estimate_model_size(os.path.join(model_path, model_file))
         return model_size
 
     # raise NotImplementedError(f"Unknown model structure! Files: {all_files}")
