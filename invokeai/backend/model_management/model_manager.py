@@ -248,7 +248,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, Chdir
 
-from .model_cache import ModelCache, ModelLocker
+from .model_cache import ModelCache, ModelLocker, ModelSizeStash
 from .model_search import ModelSearch
 from .models import (
     MODEL_CLASSES,
@@ -349,6 +349,7 @@ class ModelManager(object):
             precision=precision,
             sequential_offload=sequential_offload,
             logger=logger,
+            model_size_stash=ModelSizeStash(self.app_config.models_path / '.model_info'),
         )
 
         self._read_models(config)

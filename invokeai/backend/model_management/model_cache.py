@@ -18,6 +18,7 @@ context. Use like this:
 
 import gc
 import hashlib
+import json
 import os
 import sys
 from contextlib import suppress
@@ -69,6 +70,34 @@ class ModelCache(object):
     pass
 
 
+class ModelSizeStash(object):
+    """Simple disk-based stash for model sizes."""
+
+    # cache_path: Path -- directory of the cache
+
+    def __init__(self, cache_path: Path):
+        self.cache_path = cache_path
+
+    def _get_stash_path(self, model_path: Path) -> Path:
+        return self.cache_path / hashlib.md5(str(model_path).encode()).hexdigest()
+
+    def stash_size(self, model_path: Path, size: int):
+        stash_filename = self._get_stash_path(model_path)
+        stash_filename.parent.mkdir(parents=True, exist_ok=True)
+        with open(stash_filename, 'w') as f:
+            json.dump({"file_size": size}, f)
+
+    def get_size(self, model_path: Path) -> Optional[int]:
+        stash_filename = self._get_stash_path(model_path)
+        if not stash_filename.exists():
+            return None
+        try:
+            with open(stash_filename, 'r') as f:
+                obj = json.load(f)
+                return obj['file_size']
+        except (OSError, json.JSONDecodeError):
+            return None
+
 class _CacheRecord:
     size: int
     model: Any
@@ -112,6 +141,7 @@ class ModelCache(object):
         lazy_offloading: bool = True,
         sha_chunksize: int = 16777216,
         logger: types.ModuleType = logger,
+        model_size_stash: Optional[ModelSizeStash] = None,
     ):
         """
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
@@ -132,6 +162,7 @@ class ModelCache(object):
         self.storage_device: torch.device = storage_device
         self.sha_chunksize = sha_chunksize
         self.logger = logger
+        self.model_size_stash = model_size_stash
 
         # used for stats collection
         self.stats = None
@@ -213,7 +244,11 @@ class ModelCache(object):
                 self.stats.misses += 1
 
             # Get the estimated model size before loading.
-            predicted_model_size = model_info.get_size(submodel)
+            predicted_model_size = None
+            if self.model_size_stash:
+                predicted_model_size = self.model_size_stash.get_size(model_path / (submodel or '.'))
+            predicted_model_size = predicted_model_size or model_info.get_size(submodel)
+
             # Make room in the cache to load this model.
             self._make_cache_room(predicted_model_size)
 
@@ -223,6 +258,9 @@ class ModelCache(object):
 
             # Re-calculate model size after loading.
             actual_model_size = model_info.calc_size(model)
+            if self.model_size_stash:
+                self.model_size_stash.stash_size(model_path / (submodel or '.'), actual_model_size)
+
             if actual_model_size > 0:
                 self.logger.debug(f"CPU RAM used for load: {(actual_model_size/GIG):.2f} GB")
             if abs(actual_model_size - predicted_model_size) > 10 * MB:
@@ -493,3 +531,4 @@ class VRAMUsage(object):
 
     def __exit__(self, *args):
         self.vram_used = torch.cuda.memory_allocated() - self.vram
+

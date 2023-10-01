@@ -22,6 +22,9 @@ from picklescan.scanner import scan_file_path
 from pydantic import BaseModel, Field
 from transformers import logging as transformers_logging
 
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.util.devices import choose_precision, choose_torch_device
+
 
 class DuplicateModelException(Exception):
     pass
@@ -316,7 +319,6 @@ class DiffusersModel(ModelBase):
         return model
 
     # def convert_if_required(model_path: str, cache_path: str, config: Optional[dict]) -> str:
-
 
 def calc_model_size_by_fs(model_path: str, subfolder: Optional[str] = None, variant: Optional[str] = None):
     if subfolder is not None:
