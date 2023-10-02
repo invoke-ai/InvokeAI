@@ -16,11 +16,6 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
 
-const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
-  title: t('toast.imageUploaded'),
-  status: 'success',
-};
-
 export const addImageUploadedFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
@@ -42,6 +37,11 @@ export const addImageUploadedFulfilledListener = () => {
       ) {
         return;
       }
+
+      const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
+        title: t('toast.imageUploaded'),
+        status: 'success',
+      };
 
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
