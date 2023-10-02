@@ -88,7 +88,7 @@ class RandomFloatInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> FloatOutput:
         rng = np.random.default_rng(seed=self.seed)
         random_float = rng.uniform(self.low, self.high, 1)
-        rounded_float = round(random_float, self.decimals)
+        rounded_float = np.round(random_float, self.decimals)
         return FloatOutput(value=rounded_float)
 
 
