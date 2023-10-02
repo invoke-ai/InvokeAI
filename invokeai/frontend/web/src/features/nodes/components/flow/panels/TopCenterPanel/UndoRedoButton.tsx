@@ -9,14 +9,18 @@ const UndoRedoButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  // Assuming you have selectors to check if undo or redo is available
-  const canUndo = useAppSelector((state) => state.nodes.past.length > 0);
-  const canRedo = useAppSelector((state) => state.nodes.future.length > 0);
+  const canUndo = useAppSelector((state) => {
+    return state.nodes.past.length > 0;
+  });
+
+  const canRedo = useAppSelector((state) => {
+    return state.nodes.future.length > 0;
+  });
 
   const handleUndo = () => {
     dispatch(undoAction());
   };
-  
+
   const handleRedo = () => {
     dispatch(redoAction());
   };
