@@ -181,7 +181,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     if (!imageDTO) {
       return;
     }
-    dispatch(upscaleRequested({ image_name: imageDTO.image_name }));
+    dispatch(upscaleRequested({ imageDTO }));
   }, [dispatch, imageDTO]);
 
   const handleDelete = useCallback(() => {
