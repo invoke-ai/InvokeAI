@@ -264,6 +264,36 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 
 --------------------------------
 
+### Image to Character Art Image Node's
+
+**Description:** Group of nodes to convert an input image into ascii/unicode art Image
+
+**Node Link:** https://github.com/mickr777/imagetoasciiimage
+
+**Output Examples**
+
+<img src="https://github.com/invoke-ai/InvokeAI/assets/115216705/8e061fcc-9a2c-4fa9-bcc7-c0f7b01e9056" width="300" />
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/3c4990eb-2f42-46b9-90f9-0088b939dc6a" width="300" /></br>
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/fee7f800-a4a8-41e2-a66b-c66e4343307e" width="300" />
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/1d9c1003-a45f-45c2-aac7-46470bb89330" width="300" />
+
+--------------------------------
+
+### Grid to Gif
+
+**Description:** One node that turns a grid image into an image colletion, one node that turns an image collection into a gif
+
+**Node Link:** https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/GridToGif.py
+
+**Example Node Graph:**  https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/Grid%20to%20Gif%20Example%20Workflow.json
+
+**Output Examples** 
+
+<img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/input.png" width="300" />
+<img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/output.gif" width="300" />
+
+--------------------------------
+
 ### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
