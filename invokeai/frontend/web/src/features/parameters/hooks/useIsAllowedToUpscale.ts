@@ -19,48 +19,48 @@ const getUpscaledPixels = (imageDTO?: ImageDTO, maxUpscalePixels?: number) => {
   return { x4, x2 };
 };
 
-const getMayUpscale = (
+const getIsAllowedToUpscale = (
   upscaledPixels?: ReturnType<typeof getUpscaledPixels>,
   maxUpscalePixels?: number
 ) => {
   if (!upscaledPixels || !maxUpscalePixels) {
     return { x4: true, x2: true };
   }
-  const mayUpscale = { x4: false, x2: false };
+  const isAllowedToUpscale = { x4: false, x2: false };
   if (upscaledPixels.x4 <= maxUpscalePixels) {
-    mayUpscale.x4 = true;
+    isAllowedToUpscale.x4 = true;
   }
   if (upscaledPixels.x2 <= maxUpscalePixels) {
-    mayUpscale.x2 = true;
+    isAllowedToUpscale.x2 = true;
   }
 
-  return mayUpscale;
+  return isAllowedToUpscale;
 };
 
 const getDetailTKey = (
-  mayUpscale?: ReturnType<typeof getMayUpscale>,
+  isAllowedToUpscale?: ReturnType<typeof getIsAllowedToUpscale>,
   scaleFactor?: number
 ) => {
-  if (!mayUpscale || !scaleFactor) {
+  if (!isAllowedToUpscale || !scaleFactor) {
     return;
   }
 
-  if (mayUpscale.x4 && mayUpscale.x2) {
+  if (isAllowedToUpscale.x4 && isAllowedToUpscale.x2) {
     return;
   }
 
-  if (!mayUpscale.x2 && !mayUpscale.x4) {
-    return 'parameters.mayUpscale.tooLarge';
+  if (!isAllowedToUpscale.x2 && !isAllowedToUpscale.x4) {
+    return 'parameters.isAllowedToUpscale.tooLarge';
   }
 
-  if (!mayUpscale.x4 && mayUpscale.x2 && scaleFactor === 4) {
-    return 'parameters.mayUpscale.useX2Model';
+  if (!isAllowedToUpscale.x4 && isAllowedToUpscale.x2 && scaleFactor === 4) {
+    return 'parameters.isAllowedToUpscale.useX2Model';
   }
 
   return;
 };
 
-export const createMayUpscaleSelector = (imageDTO?: ImageDTO) =>
+export const createIsAllowedToUpscaleSelector = (imageDTO?: ImageDTO) =>
   createSelector(
     stateSelector,
     ({ postprocessing, config }) => {
@@ -68,27 +68,33 @@ export const createMayUpscaleSelector = (imageDTO?: ImageDTO) =>
       const { maxUpscalePixels } = config;
 
       const upscaledPixels = getUpscaledPixels(imageDTO, maxUpscalePixels);
-      const mayUpscale = getMayUpscale(upscaledPixels, maxUpscalePixels);
+      const isAllowedToUpscale = getIsAllowedToUpscale(
+        upscaledPixels,
+        maxUpscalePixels
+      );
       const scaleFactor = esrganModelName.includes('x2') ? 2 : 4;
-      const detailTKey = getDetailTKey(mayUpscale, scaleFactor);
+      const detailTKey = getDetailTKey(isAllowedToUpscale, scaleFactor);
       return {
-        mayUpscale: scaleFactor === 2 ? mayUpscale.x2 : mayUpscale.x4,
+        isAllowedToUpscale:
+          scaleFactor === 2 ? isAllowedToUpscale.x2 : isAllowedToUpscale.x4,
         detailTKey,
       };
     },
     defaultSelectorOptions
   );
 
-export const useMayUpscale = (imageDTO?: ImageDTO) => {
+export const useIsAllowedToUpscale = (imageDTO?: ImageDTO) => {
   const { t } = useTranslation();
-  const selectMayUpscale = useMemo(
-    () => createMayUpscaleSelector(imageDTO),
+  const selectIsAllowedToUpscale = useMemo(
+    () => createIsAllowedToUpscaleSelector(imageDTO),
     [imageDTO]
   );
-  const { mayUpscale, detailTKey } = useAppSelector(selectMayUpscale);
+  const { isAllowedToUpscale, detailTKey } = useAppSelector(
+    selectIsAllowedToUpscale
+  );
 
   return {
-    mayUpscale,
+    isAllowedToUpscale,
     detail: detailTKey ? t(detailTKey) : undefined,
   };
 };

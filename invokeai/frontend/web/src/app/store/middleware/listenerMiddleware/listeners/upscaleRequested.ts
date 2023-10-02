@@ -7,7 +7,7 @@ import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import { startAppListening } from '..';
 import { ImageDTO } from 'services/api/types';
-import { createMayUpscaleSelector } from 'features/parameters/hooks/useMayUpscale';
+import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
 
 export const upscaleRequested = createAction<{ imageDTO: ImageDTO }>(
   `upscale/upscaleRequested`
@@ -23,18 +23,18 @@ export const addUpscaleRequestedListener = () => {
       const { image_name } = imageDTO;
       const state = getState();
 
-      const { mayUpscale, detailTKey } =
-        createMayUpscaleSelector(imageDTO)(state);
+      const { isAllowedToUpscale, detailTKey } =
+        createIsAllowedToUpscaleSelector(imageDTO)(state);
 
       // if we can't upscale, show a toast and return
-      if (!mayUpscale) {
+      if (!isAllowedToUpscale) {
         log.error(
           { imageDTO },
-          t(detailTKey ?? 'parameters.mayUpscale.tooLarge') // should never coalesce
+          t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge') // should never coalesce
         );
         dispatch(
           addToast({
-            title: t(detailTKey ?? 'parameters.mayUpscale.tooLarge'), // should never coalesce
+            title: t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge'), // should never coalesce
             status: 'error',
           })
         );
