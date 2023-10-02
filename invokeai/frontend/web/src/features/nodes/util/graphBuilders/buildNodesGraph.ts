@@ -32,7 +32,7 @@ export const parseFieldValue = (field: InputFieldValue) => {
  * Builds a graph from the node editor state.
  */
 export const buildNodesGraph = (nodesState: NodesState): Graph => {
-  const { nodes, edges } = nodesState;
+  const { nodes, edges } = nodesState.present;
 
   const filteredNodes = nodes.filter(isInvocationNode);
   const workflowJSON = JSON.stringify(buildWorkflow(nodesState));

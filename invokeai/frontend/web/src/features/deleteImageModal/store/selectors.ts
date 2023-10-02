@@ -13,13 +13,15 @@ export const getImageUsage = (state: RootState, image_name: string) => {
     (obj) => obj.kind === 'image' && obj.imageName === image_name
   );
 
-  const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) => {
-    return some(
-      node.data.inputs,
-      (input) =>
-        input.type === 'ImageField' && input.value?.image_name === image_name
-    );
-  });
+  const isNodesImage = nodes.present.nodes
+    .filter(isInvocationNode)
+    .some((node) => {
+      return some(
+        node.data.inputs,
+        (input) =>
+          input.type === 'ImageField' && input.value?.image_name === image_name
+      );
+    });
 
   const isControlNetImage = some(
     controlNet.controlNets,

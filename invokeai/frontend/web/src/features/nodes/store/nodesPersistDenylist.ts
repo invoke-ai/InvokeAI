@@ -3,7 +3,7 @@ import { NodesState } from './types';
 /**
  * Nodes slice persist denylist
  */
-export const nodesPersistDenylist: (keyof NodesState)[] = [
+export const nodesPersistDenylist: (keyof NodesState['present'])[] = [
   'nodeTemplates',
   'connectionStartParams',
   'currentConnectionFieldType',

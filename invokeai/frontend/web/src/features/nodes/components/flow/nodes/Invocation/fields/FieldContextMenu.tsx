@@ -43,7 +43,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
         stateSelector,
         ({ nodes }) => {
           const isExposed = Boolean(
-            nodes.workflow.exposedFields.find(
+            nodes.present.workflow.exposedFields.find(
               (f) => f.nodeId === nodeId && f.fieldName === fieldName
             )
           );

@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 export default function NodeOpacitySlider() {
   const dispatch = useAppDispatch();
-  const nodeOpacity = useAppSelector((state) => state.nodes.nodeOpacity);
+  const nodeOpacity = useAppSelector((state) => state.nodes.present.nodeOpacity);
   const { t } = useTranslation();
 
   const handleChange = useCallback(

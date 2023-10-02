@@ -21,3 +21,7 @@ export const isAnyGraphBuilt = isAnyOf(
 export const workflowLoadRequested = createAction<Workflow>(
   'nodes/workflowLoadRequested'
 );
+
+export const undoAction = createAction('nodes/undo');
+export const redoAction = createAction('nodes/redo');
+

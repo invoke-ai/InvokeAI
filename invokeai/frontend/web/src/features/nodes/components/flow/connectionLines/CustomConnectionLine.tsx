@@ -8,7 +8,7 @@ import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
 
 const selector = createSelector(stateSelector, ({ nodes }) => {
   const { shouldAnimateEdges, currentConnectionFieldType, shouldColorEdges } =
-    nodes;
+    nodes.present;
 
   const stroke =
     currentConnectionFieldType && shouldColorEdges

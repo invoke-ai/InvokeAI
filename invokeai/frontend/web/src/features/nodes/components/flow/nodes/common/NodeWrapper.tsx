@@ -40,7 +40,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       createSelector(
         stateSelector,
         ({ nodes }) =>
-          nodes.nodeExecutionStates[nodeId]?.status === NodeStatus.IN_PROGRESS
+          nodes.present.nodeExecutionStates[nodeId]?.status === NodeStatus.IN_PROGRESS
       ),
     [nodeId]
   );
@@ -62,7 +62,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
     nodeInProgressDark
   );
 
-  const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
+  const opacity = useAppSelector((state) => state.nodes.present.nodeOpacity);
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {

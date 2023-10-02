@@ -11,11 +11,11 @@ export const useFieldInputKind = (nodeId: string, fieldName: string) => {
       createSelector(
         stateSelector,
         ({ nodes }) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
+          const node = nodes.present.nodes.find((node) => node.id === nodeId);
           if (!isInvocationNode(node)) {
             return;
           }
-          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodes.present.nodeTemplates[node?.data.type ?? ''];
           const fieldTemplate = nodeTemplate?.inputs[fieldName];
           return fieldTemplate?.input;
         },

@@ -14,7 +14,7 @@ const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
   const hasTemplateSelector = useMemo(
     () =>
       createSelector(stateSelector, ({ nodes }) =>
-        Boolean(nodes.nodeTemplates[type])
+        Boolean(nodes.present.nodeTemplates[type])
       ),
     [type]
   );

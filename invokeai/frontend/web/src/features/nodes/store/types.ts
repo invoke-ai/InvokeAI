@@ -16,7 +16,7 @@ import {
   Workflow,
 } from '../types/types';
 
-export type NodesState = {
+export type CurrentNodesState = {
   nodes: Node<NodeData>[];
   edges: Edge<InvocationEdgeExtra>[];
   nodeTemplates: Record<string, InvocationTemplate>;
@@ -44,4 +44,10 @@ export type NodesState = {
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
+};
+
+export type NodesState = {
+  past: CurrentNodesState[];
+  present: CurrentNodesState;
+  future: CurrentNodesState[];
 };

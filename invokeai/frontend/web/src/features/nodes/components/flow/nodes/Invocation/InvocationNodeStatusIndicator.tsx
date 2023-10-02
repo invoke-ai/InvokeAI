@@ -34,7 +34,7 @@ const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
     () =>
       createSelector(
         stateSelector,
-        ({ nodes }) => nodes.nodeExecutionStates[nodeId]
+        ({ nodes }) => nodes.present.nodeExecutionStates[nodeId]
       ),
     [nodeId]
   );

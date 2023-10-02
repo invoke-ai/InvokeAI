@@ -23,7 +23,7 @@ export const makeConnectionErrorSelector = (
     }
 
     const { currentConnectionFieldType, connectionStartParams, nodes, edges } =
-      state.nodes;
+      state.nodes.present;
 
     if (!connectionStartParams || !currentConnectionFieldType) {
       return i18n.t('nodes.noConnectionInProgress');

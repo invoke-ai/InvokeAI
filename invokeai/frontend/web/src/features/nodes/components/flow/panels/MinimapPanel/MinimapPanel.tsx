@@ -8,7 +8,7 @@ const ChakraMiniMap = chakra(MiniMap);
 
 const MinimapPanel = () => {
   const shouldShowMinimapPanel = useAppSelector(
-    (state: RootState) => state.nodes.shouldShowMinimapPanel
+    (state: RootState) => state.nodes.present.shouldShowMinimapPanel
   );
 
   const nodeColor = useColorModeValue(

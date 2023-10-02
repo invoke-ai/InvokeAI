@@ -7,7 +7,7 @@ import { workflowNotesChanged } from 'features/nodes/store/nodesSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
 
 const selector = createSelector(stateSelector, ({ nodes }) => {
-  const { notes } = nodes.workflow;
+  const { notes } = nodes.present.workflow;
 
   return {
     notes,

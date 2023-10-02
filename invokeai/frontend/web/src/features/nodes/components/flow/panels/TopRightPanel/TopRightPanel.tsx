@@ -6,7 +6,7 @@ import WorkflowEditorSettings from './WorkflowEditorSettings';
 
 const TopRightPanel = () => {
   const shouldShowFieldTypeLegend = useAppSelector(
-    (state) => state.nodes.shouldShowFieldTypeLegend
+    (state) => state.nodes.present.shouldShowFieldTypeLegend
   );
 
   return (

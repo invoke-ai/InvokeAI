@@ -8,8 +8,8 @@ import { useFieldType } from './useFieldType.ts';
 const selectIsConnectionInProgress = createSelector(
   stateSelector,
   ({ nodes }) =>
-    nodes.currentConnectionFieldType !== null &&
-    nodes.connectionStartParams !== null
+    nodes.present.currentConnectionFieldType !== null &&
+    nodes.present.connectionStartParams !== null
 );
 
 export type UseConnectionStateProps = {
@@ -29,7 +29,7 @@ export const useConnectionState = ({
     () =>
       createSelector(stateSelector, ({ nodes }) =>
         Boolean(
-          nodes.edges.filter((edge) => {
+          nodes.present.edges.filter((edge) => {
             return (
               (kind === 'input' ? edge.target : edge.source) === nodeId &&
               (kind === 'input' ? edge.targetHandle : edge.sourceHandle) ===
@@ -56,9 +56,9 @@ export const useConnectionState = ({
     () =>
       createSelector(stateSelector, ({ nodes }) =>
         Boolean(
-          nodes.connectionStartParams?.nodeId === nodeId &&
-            nodes.connectionStartParams?.handleId === fieldName &&
-            nodes.connectionStartParams?.handleType ===
+          nodes.present.connectionStartParams?.nodeId === nodeId &&
+            nodes.present.connectionStartParams?.handleId === fieldName &&
+            nodes.present.connectionStartParams?.handleType ===
               { input: 'target', output: 'source' }[kind]
         )
       ),

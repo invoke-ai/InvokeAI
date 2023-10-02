@@ -11,12 +11,12 @@ export const useNodeTemplateTitle = (nodeId: string) => {
       createSelector(
         stateSelector,
         ({ nodes }) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
+          const node = nodes.present.nodes.find((node) => node.id === nodeId);
           if (!isInvocationNode(node)) {
             return false;
           }
           const nodeTemplate = node
-            ? nodes.nodeTemplates[node.data.type]
+            ? nodes.present.nodeTemplates[node.data.type]
             : undefined;
 
           return nodeTemplate?.title;
