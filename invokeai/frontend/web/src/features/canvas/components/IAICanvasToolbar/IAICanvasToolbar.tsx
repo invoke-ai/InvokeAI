@@ -291,7 +291,7 @@ const IAICanvasToolbar = () => {
         <IAIIconButton
           aria-label={`${t('unifiedCanvas.clearCanvas')}`}
           tooltip={`${t('unifiedCanvas.clearCanvas')}`}
-          icon={<FaUndo  />}
+          icon={<FaUndo />}
           onClick={handleResetCanvas}
           colorScheme="error"
           isDisabled={isStaging}
