@@ -18,7 +18,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaRecycle } from 'react-icons/fa';
+import { FaTrash } from 'react-icons/fa';
 
 const ResetWorkflowButton = () => {
   const { t } = useTranslation();
@@ -27,7 +27,7 @@ const ResetWorkflowButton = () => {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
 
   const nodesCount = useAppSelector(
-    (state: RootState) => state.nodes.present.nodes.length
+    (state: RootState) => state.nodes.nodes.length
   );
 
   const handleConfirmClear = useCallback(() => {
@@ -48,7 +48,7 @@ const ResetWorkflowButton = () => {
   return (
     <>
       <IAIIconButton
-        icon={<FaRecycle/>}
+        icon={<FaTrash/>}
         tooltip={t('nodes.resetWorkflow')}
         aria-label={t('nodes.resetWorkflow')}
         onClick={onOpen}

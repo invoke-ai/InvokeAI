@@ -16,12 +16,11 @@ import {
   Workflow,
 } from '../types/types';
 
-export type CurrentNodesState = {
+export type NodesState = {
   nodes: Node<NodeData>[];
   edges: Edge<InvocationEdgeExtra>[];
-};
-
-export type NodesState = {
+  past: { nodes: Node<NodeData>[]; edges: Edge<InvocationEdgeExtra>[] }[];
+  future: { nodes: Node<NodeData>[]; edges: Edge<InvocationEdgeExtra>[] }[];
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   currentConnectionFieldType: FieldType | null;
@@ -47,8 +46,4 @@ export type NodesState = {
   addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
   workflow: Omit<Workflow, 'nodes' | 'edges'>;
-  past: CurrentNodesState[];
-  present: CurrentNodesState;
-  future: CurrentNodesState[];
 };
-

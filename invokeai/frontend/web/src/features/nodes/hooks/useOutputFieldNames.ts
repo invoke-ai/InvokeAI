@@ -12,7 +12,7 @@ export const useOutputFieldNames = (nodeId: string) => {
       createSelector(
         stateSelector,
         ({ nodes }) => {
-          const node = nodes.present.nodes.find((node) => node.id === nodeId);
+          const node = nodes.nodes.find((node) => node.id === nodeId);
           if (!isInvocationNode(node)) {
             return [];
           }

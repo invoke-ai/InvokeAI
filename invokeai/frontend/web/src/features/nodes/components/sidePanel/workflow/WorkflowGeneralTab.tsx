@@ -19,7 +19,7 @@ import ScrollableContent from '../ScrollableContent';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
-  stateSelector, 
+  stateSelector,
   ({ nodes }) => {
     const { author, name, description, tags, version, contact, notes } =
       nodes.workflow;

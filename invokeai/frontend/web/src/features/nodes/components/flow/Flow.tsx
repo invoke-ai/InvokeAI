@@ -70,7 +70,7 @@ const proOptions: ProOptions = { hideAttribution: true };
 const selector = createSelector(
   stateSelector,
   ({ nodes }) => {
-    const { shouldSnapToGrid, selectionMode } = nodes.present;
+    const { shouldSnapToGrid, selectionMode } = nodes;
     return {
       shouldSnapToGrid,
       selectionMode,
@@ -81,8 +81,8 @@ const selector = createSelector(
 
 export const Flow = () => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((state) => state.nodes.present.nodes);
-  const edges = useAppSelector((state) => state.nodes.present.edges);
+  const nodes = useAppSelector((state) => state.nodes.nodes);
+  const edges = useAppSelector((state) => state.nodes.edges);
   const viewport = useAppSelector((state) => state.nodes.viewport);
   const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
   const flowWrapper = useRef<HTMLDivElement>(null);

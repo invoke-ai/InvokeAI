@@ -87,11 +87,9 @@ export const initialWorkflow = {
 };
 
 export const initialNodesState: NodesState = {
+  nodes: [],
+  edges: [],
   past: [],
-  present: {
-    nodes: [],
-    edges: [],
-  },
   future: [],
   nodeTemplates: {},
   isReady: false,
@@ -117,8 +115,22 @@ export const initialNodesState: NodesState = {
   nodesToCopy: [],
   edgesToCopy: [],
   selectionMode: SelectionMode.Partial,
-  workflow: initialWorkflow
+  workflow: initialWorkflow,
 };
+
+function resetTransientState(state: NodesState) {
+  state.connectionStartParams = null;
+  state.currentConnectionFieldType = null;
+  state.connectionMade = false;
+  state.modifyingEdge = false;
+  state.selectedNodes = [];
+  state.selectedEdges = [];
+  state.nodeExecutionStates = {};
+  state.mouseOverField = null;
+  state.mouseOverNode = null;
+  state.edgesToCopy = [];
+  state.isAddNodePopoverOpen = false;
+}
 
 type FieldValueAction<T extends InputFieldValue> = PayloadAction<{
   nodeId: string;
@@ -131,8 +143,8 @@ const fieldValueReducer = <T extends InputFieldValue>(
   action: FieldValueAction<T>
 ) => {
   const { nodeId, fieldName, value } = action.payload;
-  const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
-  const node = state.present.nodes?.[nodeIndex];
+  const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+  const node = state.nodes?.[nodeIndex];
   if (!isInvocationNode(node)) {
     return;
   }
@@ -151,23 +163,24 @@ const nodesSlice = createSlice({
   reducers: {
     undo: (state) => {
       if (state.past.length > 0) {
-        const previousState = state.past.pop()!;
-        state.future.unshift(cloneDeep(state.present));
-        state.present = previousState;
+        state.future.unshift({ nodes: state.nodes, edges: state.edges });
+        const lastPast = state.past.pop()!;
+        state.nodes = lastPast.nodes;
+        state.edges = lastPast.edges;
+        resetTransientState(state);
       }
     },
     redo: (state) => {
       if (state.future.length > 0) {
-        const nextState = state.future.shift()!;
-        state.past.push(cloneDeep(state.present));
-        state.present = nextState;
+        state.past.push({ nodes: state.nodes, edges: state.edges });
+        const nextFuture = state.future.shift()!;
+        state.nodes = nextFuture.nodes;
+        state.edges = nextFuture.edges;
+        resetTransientState(state);
       }
     },
     nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
-      state.present.nodes = applyNodeChanges(
-        action.payload,
-        state.present.nodes
-      );
+      state.nodes = applyNodeChanges(action.payload, state.nodes);
     },
     nodeAdded: (
       state,
@@ -175,36 +188,39 @@ const nodesSlice = createSlice({
         Node<InvocationNodeData | CurrentImageNodeData | NotesNodeData>
       >
     ) => {
-      state.past.push(state.present);
+      state.past.push({
+        nodes: cloneDeep(state.nodes),
+        edges: cloneDeep(state.edges),
+      });
       state.future = [];
       const node = action.payload;
       const position = findUnoccupiedPosition(
-        state.present.nodes,
+        state.nodes,
         state.addNewNodePosition?.x ?? node.position.x,
         state.addNewNodePosition?.y ?? node.position.y
       );
       node.position = position;
       node.selected = true;
 
-      state.present.nodes = applyNodeChanges(
-        state.present.nodes.map((n) => ({
+      state.nodes = applyNodeChanges(
+        state.nodes.map((n) => ({
           id: n.id,
           type: 'select',
           selected: false,
         })),
-        state.present.nodes
+        state.nodes
       );
 
-      state.present.edges = applyEdgeChanges(
-        state.present.edges.map((e) => ({
+      state.edges = applyEdgeChanges(
+        state.edges.map((e) => ({
           id: e.id,
           type: 'select',
           selected: false,
         })),
-        state.present.edges
+        state.edges
       );
 
-      state.present.nodes.push(node);
+      state.nodes.push(node);
 
       if (!isInvocationNode(node)) {
         return;
@@ -216,8 +232,7 @@ const nodesSlice = createSlice({
       };
 
       if (state.connectionStartParams) {
-        const { nodeId, handleId, handleType } =
-          state.connectionStartParams;
+        const { nodeId, handleId, handleType } = state.connectionStartParams;
         if (
           nodeId &&
           handleId &&
@@ -226,17 +241,17 @@ const nodesSlice = createSlice({
         ) {
           const newConnection = findConnectionToValidHandle(
             node,
-            state.present.nodes,
-            state.present.edges,
+            state.nodes,
+            state.edges,
             nodeId,
             handleId,
             handleType,
             state.currentConnectionFieldType
           );
           if (newConnection) {
-            state.present.edges = addEdge(
+            state.edges = addEdge(
               { ...newConnection, type: 'default' },
-              state.present.edges
+              state.edges
             );
           }
         }
@@ -249,26 +264,22 @@ const nodesSlice = createSlice({
       state.modifyingEdge = true;
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
-      state.present.edges = applyEdgeChanges(
-        action.payload,
-        state.present.edges
-      );
+      state.edges = applyEdgeChanges(action.payload, state.edges);
     },
     edgeAdded: (state, action: PayloadAction<Edge>) => {
-      state.past.push(state.present);
+      state.past.push({
+        nodes: cloneDeep(state.nodes),
+        edges: cloneDeep(state.edges),
+      });
       state.future = [];
-      state.present.edges = addEdge(action.payload, state.present.edges);
+      state.edges = addEdge(action.payload, state.edges);
     },
     edgeUpdated: (
       state,
       action: PayloadAction<{ oldEdge: Edge; newConnection: Connection }>
     ) => {
       const { oldEdge, newConnection } = action.payload;
-      state.present.edges = updateEdge(
-        oldEdge,
-        newConnection,
-        state.present.edges
-      );
+      state.edges = updateEdge(oldEdge, newConnection, state.edges);
     },
     connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
       state.connectionStartParams = action.payload;
@@ -277,8 +288,8 @@ const nodesSlice = createSlice({
       if (!nodeId || !handleId) {
         return;
       }
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
-      const node = state.present.nodes?.[nodeIndex];
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+      const node = state.nodes?.[nodeIndex];
       if (!isInvocationNode(node)) {
         return;
       }
@@ -293,9 +304,9 @@ const nodesSlice = createSlice({
       if (!fieldType) {
         return;
       }
-      state.present.edges = addEdge(
+      state.edges = addEdge(
         { ...action.payload, type: 'default' },
-        state.present.edges
+        state.edges
       );
 
       state.connectionMade = true;
@@ -303,10 +314,10 @@ const nodesSlice = createSlice({
     connectionEnded: (state, action) => {
       if (!state.connectionMade) {
         if (state.mouseOverNode) {
-          const nodeIndex = state.present.nodes.findIndex(
+          const nodeIndex = state.nodes.findIndex(
             (n) => n.id === state.mouseOverNode
           );
-          const mouseOverNode = state.present.nodes?.[nodeIndex];
+          const mouseOverNode = state.nodes?.[nodeIndex];
           if (mouseOverNode && state.connectionStartParams) {
             const { nodeId, handleId, handleType } =
               state.connectionStartParams;
@@ -318,17 +329,17 @@ const nodesSlice = createSlice({
             ) {
               const newConnection = findConnectionToValidHandle(
                 mouseOverNode,
-                state.present.nodes,
-                state.present.edges,
+                state.nodes,
+                state.edges,
                 nodeId,
                 handleId,
                 handleType,
                 state.currentConnectionFieldType
               );
               if (newConnection) {
-                state.present.edges = addEdge(
+                state.edges = addEdge(
                   { ...newConnection, type: 'default' },
-                  state.present.edges
+                  state.edges
                 );
               }
             }
@@ -358,10 +369,9 @@ const nodesSlice = createSlice({
       state,
       action: PayloadAction<FieldIdentifier>
     ) => {
-      state.workflow.exposedFields =
-        state.workflow.exposedFields.filter(
-          (field) => !isEqual(field, action.payload)
-        );
+      state.workflow.exposedFields = state.workflow.exposedFields.filter(
+        (field) => !isEqual(field, action.payload)
+      );
     },
     fieldLabelChanged: (
       state,
@@ -372,7 +382,7 @@ const nodesSlice = createSlice({
       }>
     ) => {
       const { nodeId, fieldName, label } = action.payload;
-      const node = state.present.nodes.find((n) => n.id === nodeId);
+      const node = state.nodes.find((n) => n.id === nodeId);
       if (!isInvocationNode(node)) {
         return;
       }
@@ -387,9 +397,9 @@ const nodesSlice = createSlice({
       action: PayloadAction<{ nodeId: string; embedWorkflow: boolean }>
     ) => {
       const { nodeId, embedWorkflow } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
-      const node = state.present.nodes?.[nodeIndex];
+      const node = state.nodes?.[nodeIndex];
 
       if (!isInvocationNode(node)) {
         return;
@@ -401,9 +411,9 @@ const nodesSlice = createSlice({
       action: PayloadAction<{ nodeId: string; useCache: boolean }>
     ) => {
       const { nodeId, useCache } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
-      const node = state.present.nodes?.[nodeIndex];
+      const node = state.nodes?.[nodeIndex];
 
       if (!isInvocationNode(node)) {
         return;
@@ -415,9 +425,9 @@ const nodesSlice = createSlice({
       action: PayloadAction<{ nodeId: string; isIntermediate: boolean }>
     ) => {
       const { nodeId, isIntermediate } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
-      const node = state.present.nodes?.[nodeIndex];
+      const node = state.nodes?.[nodeIndex];
 
       if (!isInvocationNode(node)) {
         return;
@@ -429,9 +439,9 @@ const nodesSlice = createSlice({
       action: PayloadAction<{ nodeId: string; isOpen: boolean }>
     ) => {
       const { nodeId, isOpen } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
-      const node = state.present.nodes?.[nodeIndex];
+      const node = state.nodes?.[nodeIndex];
       if (!isInvocationNode(node) && !isNotesNode(node)) {
         return;
       }
@@ -446,7 +456,7 @@ const nodesSlice = createSlice({
       // - if the node was just opened, we need to make all its edges visible
       // - if the edge was just closed, we need to check all its edges and hide them if both nodes are closed
 
-      const connectedEdges = getConnectedEdges([node], state.present.edges);
+      const connectedEdges = getConnectedEdges([node], state.edges);
 
       if (isOpen) {
         // reset hidden status of all edges
@@ -456,24 +466,22 @@ const nodesSlice = createSlice({
         // delete dummy edges
         connectedEdges.forEach((edge) => {
           if (edge.type === 'collapsed') {
-            state.present.edges = state.present.edges.filter(
-              (e) => e.id !== edge.id
-            );
+            state.edges = state.edges.filter((e) => e.id !== edge.id);
           }
         });
       } else {
         const closedIncomers = getIncomers(
           node,
-          state.present.nodes,
-          state.present.edges
+          state.nodes,
+          state.edges
         ).filter(
           (node) => isInvocationNode(node) && node.data.isOpen === false
         );
 
         const closedOutgoers = getOutgoers(
           node,
-          state.present.nodes,
-          state.present.edges
+          state.nodes,
+          state.edges
         ).filter(
           (node) => isInvocationNode(node) && node.data.isOpen === false
         );
@@ -530,22 +538,23 @@ const nodesSlice = createSlice({
           }
         });
         if (collapsedEdgesToCreate.length) {
-          state.present.edges = applyEdgeChanges(
+          state.edges = applyEdgeChanges(
             collapsedEdgesToCreate.map((edge) => ({ type: 'add', item: edge })),
-            state.present.edges
+            state.edges
           );
         }
       }
     },
     edgeDeleted: (state, action: PayloadAction<string>) => {
-      state.past.push(state.present);
+      state.past.push({
+        nodes: cloneDeep(state.nodes),
+        edges: cloneDeep(state.edges),
+      });
       state.future = [];
-      state.present.edges = state.present.edges.filter(
-        (e) => e.id !== action.payload
-      );
+      state.edges = state.edges.filter((e) => e.id !== action.payload);
     },
     edgesDeleted: (state, action: PayloadAction<Edge[]>) => {
-      state.past.push(state.present);
+      state.past.push(state);
       state.future = [];
       const edges = action.payload;
       const collapsedEdges = edges.filter((e) => e.type === 'collapsed');
@@ -554,7 +563,7 @@ const nodesSlice = createSlice({
       if (collapsedEdges.length) {
         const edgeChanges: EdgeRemoveChange[] = [];
         collapsedEdges.forEach((collapsedEdge) => {
-          state.present.edges.forEach((edge) => {
+          state.edges.forEach((edge) => {
             if (
               edge.source === collapsedEdge.source &&
               edge.target === collapsedEdge.target
@@ -563,10 +572,7 @@ const nodesSlice = createSlice({
             }
           });
         });
-        state.present.edges = applyEdgeChanges(
-          edgeChanges,
-          state.present.edges
-        );
+        state.edges = applyEdgeChanges(edgeChanges, state.edges);
       }
     },
     nodesDeleted: (
@@ -575,14 +581,16 @@ const nodesSlice = createSlice({
         Node<InvocationNodeData | NotesNodeData | CurrentImageNodeData>[]
       >
     ) => {
-      state.past.push(state.present);
+      state.past.push({
+        nodes: cloneDeep(state.nodes),
+        edges: cloneDeep(state.edges),
+      });
       state.future = [];
 
       action.payload.forEach((node) => {
-        state.workflow.exposedFields =
-          state.workflow.exposedFields.filter(
-            (f) => f.nodeId !== node.id
-          );
+        state.workflow.exposedFields = state.workflow.exposedFields.filter(
+          (f) => f.nodeId !== node.id
+        );
         if (!isInvocationNode(node)) {
           return;
         }
@@ -594,8 +602,8 @@ const nodesSlice = createSlice({
       action: PayloadAction<{ nodeId: string; label: string }>
     ) => {
       const { nodeId, label } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
-      const node = state.present.nodes?.[nodeIndex];
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+      const node = state.nodes?.[nodeIndex];
       if (!isInvocationNode(node)) {
         return;
       }
@@ -606,8 +614,8 @@ const nodesSlice = createSlice({
       action: PayloadAction<{ nodeId: string; notes: string }>
     ) => {
       const { nodeId, notes } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
-      const node = state.present.nodes?.[nodeIndex];
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+      const node = state.nodes?.[nodeIndex];
       if (!isInvocationNode(node)) {
         return;
       }
@@ -615,13 +623,13 @@ const nodesSlice = createSlice({
     },
     nodeExclusivelySelected: (state, action: PayloadAction<string>) => {
       const nodeId = action.payload;
-      state.present.nodes = applyNodeChanges(
-        state.present.nodes.map((n) => ({
+      state.nodes = applyNodeChanges(
+        state.nodes.map((n) => ({
           id: n.id,
           type: 'select',
           selected: n.id === nodeId ? true : false,
         })),
-        state.present.nodes
+        state.nodes
       );
     },
     selectedNodesChanged: (state, action: PayloadAction<string[]>) => {
@@ -723,13 +731,13 @@ const nodesSlice = createSlice({
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
       if (nodeIndex === -1) {
         return;
       }
 
-      const node = state.present.nodes?.[nodeIndex];
+      const node = state.nodes?.[nodeIndex];
 
       if (!isInvocationNode(node)) {
         return;
@@ -757,8 +765,8 @@ const nodesSlice = createSlice({
       action: PayloadAction<{ nodeId: string; value: string }>
     ) => {
       const { nodeId, value } = action.payload;
-      const nodeIndex = state.present.nodes.findIndex((n) => n.id === nodeId);
-      const node = state.present.nodes?.[nodeIndex];
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+      const node = state.nodes?.[nodeIndex];
       if (!isNotesNode(node)) {
         return;
       }
@@ -781,9 +789,14 @@ const nodesSlice = createSlice({
       state.isReady = true;
     },
     nodeEditorReset: (state) => {
-      state.present.nodes = [];
-      state.present.edges = [];
+      state.past.push({
+        nodes: [...state.nodes],
+        edges: [...state.edges],
+      });
+      state.nodes = [];
+      state.edges = [];
       state.workflow = cloneDeep(initialWorkflow);
+      state.future = [];
     },
     shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldValidateGraph = action.payload;
@@ -825,14 +838,14 @@ const nodesSlice = createSlice({
       const { nodes, edges, ...workflow } = action.payload;
       state.workflow = workflow;
 
-      state.present.nodes = applyNodeChanges(
+      state.nodes = applyNodeChanges(
         nodes.map((node) => ({
           item: { ...node, dragHandle: `.${DRAG_HANDLE_CLASSNAME}` },
           type: 'add',
         })),
         []
       );
-      state.present.edges = applyEdgeChanges(
+      state.edges = applyEdgeChanges(
         edges.map((edge) => ({ item: edge, type: 'add' })),
         []
       );
@@ -863,30 +876,26 @@ const nodesSlice = createSlice({
       state.mouseOverNode = action.payload;
     },
     selectedAll: (state) => {
-      state.present.nodes = applyNodeChanges(
-        state.present.nodes.map((n) => ({
+      state.nodes = applyNodeChanges(
+        state.nodes.map((n) => ({
           id: n.id,
           type: 'select',
           selected: true,
         })),
-        state.present.nodes
+        state.nodes
       );
-      state.present.edges = applyEdgeChanges(
-        state.present.edges.map((e) => ({
+      state.edges = applyEdgeChanges(
+        state.edges.map((e) => ({
           id: e.id,
           type: 'select',
           selected: true,
         })),
-        state.present.edges
+        state.edges
       );
     },
     selectionCopied: (state) => {
-      state.nodesToCopy = state.present.nodes
-        .filter((n) => n.selected)
-        .map(cloneDeep);
-      state.edgesToCopy = state.present.edges
-        .filter((e) => e.selected)
-        .map(cloneDeep);
+      state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
+      state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
 
       if (state.nodesToCopy.length > 0) {
         const averagePosition = { x: 0, y: 0 };
@@ -938,7 +947,7 @@ const nodesSlice = createSlice({
         node.data.id = newNodeId;
 
         const position = findUnoccupiedPosition(
-          state.present.nodes,
+          state.nodes,
           node.position.x + (cursorPosition?.x ?? 0),
           node.position.y + (cursorPosition?.y ?? 0)
         );
@@ -950,34 +959,30 @@ const nodesSlice = createSlice({
         item: n,
         type: 'add',
       }));
-      const nodeSelectionChanges: NodeChange[] = state.present.nodes.map(
-        (n) => ({
-          id: n.data.id,
-          type: 'select',
-          selected: false,
-        })
-      );
+      const nodeSelectionChanges: NodeChange[] = state.nodes.map((n) => ({
+        id: n.data.id,
+        type: 'select',
+        selected: false,
+      }));
 
       const edgeAdditions: EdgeChange[] = newEdges.map((e) => ({
         item: e,
         type: 'add',
       }));
-      const edgeSelectionChanges: EdgeChange[] = state.present.edges.map(
-        (e) => ({
-          id: e.id,
-          type: 'select',
-          selected: false,
-        })
-      );
+      const edgeSelectionChanges: EdgeChange[] = state.edges.map((e) => ({
+        id: e.id,
+        type: 'select',
+        selected: false,
+      }));
 
-      state.present.nodes = applyNodeChanges(
+      state.nodes = applyNodeChanges(
         nodeAdditions.concat(nodeSelectionChanges),
-        state.present.nodes
+        state.nodes
       );
 
-      state.present.edges = applyEdgeChanges(
+      state.edges = applyEdgeChanges(
         edgeAdditions.concat(edgeSelectionChanges),
-        state.present.edges
+        state.edges
       );
 
       newNodes.forEach((node) => {

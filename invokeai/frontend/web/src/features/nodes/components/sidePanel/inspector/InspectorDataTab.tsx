@@ -12,7 +12,7 @@ const selector = createSelector(
     const lastSelectedNodeId =
       nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-    const lastSelectedNode = nodes.present.nodes.find(
+    const lastSelectedNode = nodes.nodes.find(
       (node) => node.id === lastSelectedNodeId
     );
 

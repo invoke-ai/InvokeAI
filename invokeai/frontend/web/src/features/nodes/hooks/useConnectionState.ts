@@ -29,7 +29,7 @@ export const useConnectionState = ({
     () =>
       createSelector(stateSelector, ({ nodes }) =>
         Boolean(
-          nodes.present.edges.filter((edge) => {
+          nodes.edges.filter((edge) => {
             return (
               (kind === 'input' ? edge.target : edge.source) === nodeId &&
               (kind === 'input' ? edge.targetHandle : edge.sourceHandle) ===

@@ -10,7 +10,7 @@ export const useNodeTemplate = (nodeId: string) => {
       createSelector(
         stateSelector,
         ({ nodes }) => {
-          const node = nodes.present.nodes.find((node) => node.id === nodeId);
+          const node = nodes.nodes.find((node) => node.id === nodeId);
           const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
           return nodeTemplate;
         },

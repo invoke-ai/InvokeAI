@@ -15,8 +15,8 @@ export const makeEdgeSelector = (
   createSelector(
     stateSelector,
     ({ nodes }) => {
-      const sourceNode = nodes.present.nodes.find((node) => node.id === source);
-      const targetNode = nodes.present.nodes.find((node) => node.id === target);
+      const sourceNode = nodes.nodes.find((node) => node.id === source);
+      const targetNode = nodes.nodes.find((node) => node.id === target);
 
       const isInvocationToInvocationEdge =
         isInvocationNode(sourceNode) && isInvocationNode(targetNode);
