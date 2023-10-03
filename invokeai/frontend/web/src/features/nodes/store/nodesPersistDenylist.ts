@@ -27,5 +27,4 @@ export const nodesPersistDenylist: (keyof NodesState)[] = [
   'nodeOpacity',
   'shouldSnapToGrid',
   'shouldColorEdges',
-  'workflow'
 ];
