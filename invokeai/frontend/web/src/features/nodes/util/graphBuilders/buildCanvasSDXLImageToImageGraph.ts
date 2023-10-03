@@ -338,6 +338,7 @@ export const buildCanvasSDXLImageToImageGraph = (
     vae: undefined, // option; set in addVAEToGraph
     controlnets: [], // populated in addControlNetToLinearGraph
     loras: [], // populated in addLoRAsToGraph
+    ipAdapters: [], // populated in addIPAdapterToLinearGraph
     strength,
     init_image: initialImage.image_name,
   };

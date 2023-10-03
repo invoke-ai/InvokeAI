@@ -60,6 +60,7 @@ import {
 } from '../types/types';
 import { NodesState } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
+import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 
 export const WORKFLOW_FORMAT_VERSION = '1.0.0';
 
@@ -92,6 +93,9 @@ export const initialNodesState: NodesState = {
   isReady: false,
   connectionStartParams: null,
   currentConnectionFieldType: null,
+  connectionMade: false,
+  modifyingEdge: false,
+  addNewNodePosition: null,
   shouldShowFieldTypeLegend: false,
   shouldShowMinimapPanel: true,
   shouldValidateGraph: true,
@@ -153,8 +157,8 @@ const nodesSlice = createSlice({
       const node = action.payload;
       const position = findUnoccupiedPosition(
         state.nodes,
-        node.position.x,
-        node.position.y
+        state.addNewNodePosition?.x ?? node.position.x,
+        state.addNewNodePosition?.y ?? node.position.y
       );
       node.position = position;
       node.selected = true;
@@ -179,6 +183,38 @@ const nodesSlice = createSlice({
         nodeId: node.id,
         ...initialNodeExecutionState,
       };
+
+      if (state.connectionStartParams) {
+        const { nodeId, handleId, handleType } = state.connectionStartParams;
+        if (
+          nodeId &&
+          handleId &&
+          handleType &&
+          state.currentConnectionFieldType
+        ) {
+          const newConnection = findConnectionToValidHandle(
+            node,
+            state.nodes,
+            state.edges,
+            nodeId,
+            handleId,
+            handleType,
+            state.currentConnectionFieldType
+          );
+          if (newConnection) {
+            state.edges = addEdge(
+              { ...newConnection, type: 'default' },
+              state.edges
+            );
+          }
+        }
+      }
+
+      state.connectionStartParams = null;
+      state.currentConnectionFieldType = null;
+    },
+    edgeChangeStarted: (state) => {
+      state.modifyingEdge = true;
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
@@ -195,6 +231,7 @@ const nodesSlice = createSlice({
     },
     connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
       state.connectionStartParams = action.payload;
+      state.connectionMade = state.modifyingEdge;
       const { nodeId, handleId, handleType } = action.payload;
       if (!nodeId || !handleId) {
         return;
@@ -219,10 +256,53 @@ const nodesSlice = createSlice({
         { ...action.payload, type: 'default' },
         state.edges
       );
+
+      state.connectionMade = true;
     },
-    connectionEnded: (state) => {
-      state.connectionStartParams = null;
-      state.currentConnectionFieldType = null;
+    connectionEnded: (state, action) => {
+      if (!state.connectionMade) {
+        if (state.mouseOverNode) {
+          const nodeIndex = state.nodes.findIndex(
+            (n) => n.id === state.mouseOverNode
+          );
+          const mouseOverNode = state.nodes?.[nodeIndex];
+          if (mouseOverNode && state.connectionStartParams) {
+            const { nodeId, handleId, handleType } =
+              state.connectionStartParams;
+            if (
+              nodeId &&
+              handleId &&
+              handleType &&
+              state.currentConnectionFieldType
+            ) {
+              const newConnection = findConnectionToValidHandle(
+                mouseOverNode,
+                state.nodes,
+                state.edges,
+                nodeId,
+                handleId,
+                handleType,
+                state.currentConnectionFieldType
+              );
+              if (newConnection) {
+                state.edges = addEdge(
+                  { ...newConnection, type: 'default' },
+                  state.edges
+                );
+              }
+            }
+          }
+          state.connectionStartParams = null;
+          state.currentConnectionFieldType = null;
+        } else {
+          state.addNewNodePosition = action.payload.cursorPosition;
+          state.isAddNodePopoverOpen = true;
+        }
+      } else {
+        state.connectionStartParams = null;
+        state.currentConnectionFieldType = null;
+      }
+      state.modifyingEdge = false;
     },
     workflowExposedFieldAdded: (
       state,
@@ -835,10 +915,15 @@ const nodesSlice = createSlice({
       });
     },
     addNodePopoverOpened: (state) => {
+      state.addNewNodePosition = null; //Create the node in viewport center by default
       state.isAddNodePopoverOpen = true;
     },
     addNodePopoverClosed: (state) => {
       state.isAddNodePopoverOpen = false;
+
+      //Make sure these get reset if we close the popover and haven't selected a node
+      state.connectionStartParams = null;
+      state.currentConnectionFieldType = null;
     },
     addNodePopoverToggled: (state) => {
       state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;
@@ -913,6 +998,7 @@ export const {
   connectionMade,
   connectionStarted,
   edgeDeleted,
+  edgeChangeStarted,
   edgesChanged,
   edgesDeleted,
   edgeUpdated,

@@ -107,6 +107,7 @@ const ParamControlNetCollapse = () => {
             flexGrow={1}
             size="sm"
             onClick={handleClickedAddControlNet}
+            data-testid="add controlnet"
           />
         </Flex>
         {controlNetsArray.map((c, i) => (
