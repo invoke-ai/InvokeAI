@@ -24,4 +24,3 @@ export const workflowLoadRequested = createAction<Workflow>(
 
 export const undoAction = createAction('nodes/undo');
 export const redoAction = createAction('nodes/redo');
-

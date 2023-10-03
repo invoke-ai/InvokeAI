@@ -22,11 +22,9 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.noFieldType');
     }
 
-    const { nodes, edges } =
-      state.nodes.present;
+    const { nodes, edges } = state.nodes;
 
-    const { currentConnectionFieldType, connectionStartParams } =
-      state.nodes;
+    const { currentConnectionFieldType, connectionStartParams } = state.nodes;
 
     if (!connectionStartParams || !currentConnectionFieldType) {
       return i18n.t('nodes.noConnectionInProgress');

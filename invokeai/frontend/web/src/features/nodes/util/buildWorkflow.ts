@@ -6,8 +6,7 @@ import { parseify } from 'common/util/serialize';
 import i18n from 'i18next';
 
 export const buildWorkflow = (nodesState: NodesState): Workflow => {
-  const { nodes, edges } = nodesState.present;
-  const { workflow: workflowMeta } = nodesState;
+  const { workflow: workflowMeta, nodes, edges } = nodesState;
   const workflow: Workflow = {
     ...workflowMeta,
     nodes: [],

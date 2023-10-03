@@ -48,7 +48,7 @@ const ResetWorkflowButton = () => {
   return (
     <>
       <IAIIconButton
-        icon={<FaTrash/>}
+        icon={<FaTrash />}
         tooltip={t('nodes.resetWorkflow')}
         aria-label={t('nodes.resetWorkflow')}
         onClick={onOpen}
