@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { undoAction, redoAction } from 'features/nodes/store/actions';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { ButtonGroup } from '@chakra-ui/react';
 
 const UndoRedoButton = () => {
   const { t } = useTranslation();
@@ -26,12 +27,11 @@ const UndoRedoButton = () => {
     dispatch(redoAction());
   };
 
-  // Hotkeys for undo and redo
   useHotkeys('meta+z, ctrl+z', handleUndo);
   useHotkeys('meta+shift+z, ctrl+shift+z', handleRedo);
 
   return (
-    <>
+    <ButtonGroup isAttached>
       <IAIIconButton
         icon={<FaUndo />}
         tooltip={t('nodes.undo')}
@@ -46,7 +46,7 @@ const UndoRedoButton = () => {
         onClick={handleRedo}
         isDisabled={!canRedo}
       />
-    </>
+    </ButtonGroup>
   );
 };
 

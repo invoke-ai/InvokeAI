@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/layout';
+import { Flex, ButtonGroup } from '@chakra-ui/react';
 import { memo } from 'react';
 import LoadWorkflowButton from './LoadWorkflowButton';
 import ResetWorkflowButton from './ResetWorkflowButton';
@@ -16,8 +16,10 @@ const TopCenterPanel = () => {
         transform: 'translate(-50%)',
       }}
     >
-      <DownloadWorkflowButton />
-      <LoadWorkflowButton />
+      <ButtonGroup isAttached>
+        <DownloadWorkflowButton />
+        <LoadWorkflowButton />
+      </ButtonGroup>
       <UndoRedoButton />
       <ResetWorkflowButton />
     </Flex>
