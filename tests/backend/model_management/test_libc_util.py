@@ -20,4 +20,5 @@ def test_struct_mallinfo2_to_str():
     """Smoke test of Struct_mallinfo2.__str__()."""
     info = Struct_mallinfo2()
     info_str = str(info)
-    print(info_str)
+
+    assert len(info_str) > 0

@@ -59,7 +59,7 @@ class LibcUtil:
     Note that this class will raise on __init__() if 'libc.so.6' can't be found. Take care to handle environments where
     this shared library is not available.
 
-    TODO: Improve cross-OS copatibility of this class.
+    TODO: Improve cross-OS compatibility of this class.
     """
 
     def __init__(self):
