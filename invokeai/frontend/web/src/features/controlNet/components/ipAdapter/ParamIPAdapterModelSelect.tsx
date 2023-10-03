@@ -6,7 +6,7 @@ import { ipAdapterModelChanged } from 'features/controlNet/store/controlNetSlice
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToIPAdapterModelParam } from 'features/parameters/util/modelIdToIPAdapterModelParams';
 import { forEach } from 'lodash-es';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetIPAdapterModelsQuery } from 'services/api/endpoints/models';
 
@@ -23,27 +23,6 @@ const ParamIPAdapterModelSelect = () => {
   const { t } = useTranslation();
 
   const { data: ipAdapterModels } = useGetIPAdapterModelsQuery();
-
-  const firstModel = useMemo(() => {
-    if (!ipAdapterModels || !Object.keys(ipAdapterModels.entities).length) {
-      return undefined;
-    }
-    const firstModelId = Object.keys(ipAdapterModels.entities)[0];
-
-    if (!firstModelId) {
-      return undefined;
-    }
-
-    const firstModel = ipAdapterModels.entities[firstModelId];
-
-    return firstModel ? firstModel : undefined;
-  }, [ipAdapterModels]);
-
-  useEffect(() => {
-    if (firstModel) {
-      dispatch(ipAdapterModelChanged(firstModel));
-    }
-  }, [firstModel, dispatch]);
 
   // grab the full model entity from the RTK Query cache
   const selectedModel = useMemo(
@@ -109,12 +88,16 @@ const ParamIPAdapterModelSelect = () => {
       className="nowheel nodrag"
       tooltip={selectedModel?.description}
       value={selectedModel?.id ?? null}
-      placeholder="Pick one"
-      error={!selectedModel}
+      placeholder={
+        data.length > 0
+          ? t('models.selectModel')
+          : t('models.noModelsAvailable')
+      }
+      error={!selectedModel && data.length > 0}
       data={data}
       onChange={handleValueChanged}
       sx={{ width: '100%' }}
-      disabled={!isEnabled}
+      disabled={!isEnabled || data.length === 0}
     />
   );
 };
