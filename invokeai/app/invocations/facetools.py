@@ -138,6 +138,7 @@ def generate_face_box_mask(
     chunk_x_offset: int = 0,
     chunk_y_offset: int = 0,
     draw_mesh: bool = True,
+    check_bounds: bool = True,
 ) -> list[FaceResultData]:
     result = []
     mask_pil = None
@@ -217,7 +218,7 @@ def generate_face_box_mask(
             im_width, im_height = pil_image.size
             over_w = im_width * 0.1
             over_h = im_height * 0.1
-            if (
+            if not check_bounds or (
                 (left_side >= -over_w)
                 and (right_side < im_width + over_w)
                 and (top_side >= -over_h)
@@ -345,6 +346,7 @@ def get_faces_list(
             chunk_x_offset=0,
             chunk_y_offset=0,
             draw_mesh=draw_mesh,
+            check_bounds=False,
         )
     if should_chunk or len(result) == 0:
         context.services.logger.info("FaceTools --> Chunking image (chunk toggled on, or no face found in full image).")
