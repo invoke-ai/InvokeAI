@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from PIL.Image import Image as ImageType
 from pydantic import validator
 
+import invokeai.assets.fonts as font_assets
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     InputField,
@@ -641,9 +642,9 @@ class FaceIdentifierInvocation(BaseInvocation):
             draw_mesh=False,
         )
 
-        path = Path(__file__).resolve().parent.parent.parent
-        font_path = os.path.abspath(path / "assets/fonts/inter/Inter-Regular.ttf")
-        font = ImageFont.truetype(font_path, FONT_SIZE)
+        # Note - font may be found either in the repo if running an editable install, or in the venv if running a package install
+        font_path = [x for x in [Path(y, "inter/Inter-Regular.ttf") for y in font_assets.__path__] if x.exists()]
+        font = ImageFont.truetype(font_path[0].as_posix(), FONT_SIZE)
 
         # Paste face IDs on the output image
         draw = ImageDraw.Draw(image)
