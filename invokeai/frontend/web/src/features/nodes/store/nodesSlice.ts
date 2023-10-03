@@ -161,6 +161,10 @@ const nodesSlice = createSlice({
   name: 'nodes',
   initialState: initialNodesState,
   reducers: {
+    resetHistory: (state) => {
+      state.past = [];
+      state.future = [];
+    },
     undo: (state) => {
       if (state.past.length > 0) {
         state.future.unshift({ nodes: state.nodes, edges: state.edges });
@@ -1138,6 +1142,7 @@ export const {
   edgeAdded,
   undo,
   redo,
+  resetHistory,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

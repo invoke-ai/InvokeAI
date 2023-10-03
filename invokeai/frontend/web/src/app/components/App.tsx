@@ -20,6 +20,7 @@ import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
+import { resetHistory } from 'features/nodes/store/nodesSlice';
 
 const DEFAULT_CONFIG = {};
 
@@ -36,6 +37,9 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
 
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
+  useEffect(() => {
+    dispatch(resetHistory());
+  }, [dispatch]);
 
   const handleReset = useCallback(() => {
     localStorage.clear();
