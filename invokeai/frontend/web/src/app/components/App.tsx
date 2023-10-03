@@ -1,6 +1,8 @@
 import { Flex, Grid } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
+import { $headerComponent } from 'app/store/nanostores/headerComponent';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
@@ -12,34 +14,29 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
-import { ReactNode, memo, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
+import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
 
 const DEFAULT_CONFIG = {};
 
 interface Props {
   config?: PartialAppConfig;
-  headerComponent?: ReactNode;
   selectedImage?: {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
 }
 
-const App = ({
-  config = DEFAULT_CONFIG,
-  headerComponent,
-  selectedImage,
-}: Props) => {
+const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   const language = useAppSelector(languageSelector);
 
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
-  const { handlePreselectedImage } = usePreselectedImage();
+
   const handleReset = useCallback(() => {
     localStorage.clear();
     location.reload();
@@ -61,9 +58,7 @@ const App = ({
     dispatch(appStarted());
   }, [dispatch]);
 
-  useEffect(() => {
-    handlePreselectedImage(selectedImage);
-  }, [handlePreselectedImage, selectedImage]);
+  const headerComponent = useStore($headerComponent);
 
   return (
     <ErrorBoundary
@@ -98,6 +93,7 @@ const App = ({
       <ChangeBoardModal />
       <Toaster />
       <GlobalHotkeys />
+      <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );
 };

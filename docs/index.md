@@ -15,7 +15,8 @@ title: Home
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.1/css/fontawesome.min.css">
 <style>
     .button {
-      width: 300px;
+      width: 100%;
+      max-width: 100%;
       height: 50px;
       background-color: #448AFF;
       color: #fff;
@@ -27,8 +28,9 @@ title: Home
 
     .button-container {
       display: grid;
-      grid-template-columns: repeat(3, 300px);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 20px;
+      justify-content: center;
     }
 
     .button:hover {
@@ -145,6 +147,7 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
 ### InvokeAI Configuration
 - [Guide to InvokeAI Runtime Settings](features/CONFIGURATION.md)
+- [Database Maintenance and other Command Line Utilities](features/UTILITIES.md)
 
 ## :octicons-log-16: Important Changes Since Version 2.3
 

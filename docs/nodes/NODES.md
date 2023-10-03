@@ -1,13 +1,36 @@
-# Using the Node Editor
+# Using the Workflow Editor
 
-The nodes editor is a blank canvas allowing for the use of individual functions and image transformations to control the image generation workflow. Nodes take in inputs on the left side of the node, and return an output on the right side of the node. A node graph is composed of multiple nodes that are connected together to create a workflow. Nodes' inputs and outputs are connected by dragging connectors from node to node. Inputs and outputs are color coded for ease of use.
+The workflow editor is a blank canvas allowing for the use of individual functions and image transformations to control the image generation workflow. Nodes take in inputs on the left side of the node, and return an output on the right side of the node. A node graph is composed of multiple nodes that are connected together to create a workflow. Nodes' inputs and outputs are connected by dragging connectors from node to node. Inputs and outputs are color coded for ease of use.
 
-To better understand how nodes are used, think of how an electric power bar works. It takes in one input (electricity from a wall outlet) and passes it to multiple devices through multiple outputs. Similarly, a node could have multiple inputs and outputs functioning at the same (or different) time, but all node outputs pass information onward like a power bar passes electricity. Not all outputs are compatible with all inputs, however - Each node has different constraints on how it is expecting to input/output information. In general, node outputs are colour-coded to match compatible inputs of other nodes.
+If you're not familiar with Diffusion, take a look at our [Diffusion Overview.](../help/diffusion.md) Understanding how diffusion works will enable you to more easily use the Workflow Editor and build workflows to suit your needs.
+
+## Features
+
+### Linear View
+The Workflow Editor allows you to create a UI for your workflow, to make it easier to iterate on your generations. 
+
+To add an input to the Linear UI, right click on the input label and select "Add to Linear View".
+
+The Linear UI View will also be part of the saved workflow, allowing you share workflows and enable other to use them, regardless of complexity. 
+
+![linearview](../assets/nodes/linearview.png)
+
+### Renaming Fields and Nodes
+Any node or input field can be renamed in the workflow editor. If the input field you have renamed has been added to the Linear View, the changed name will be reflected in the Linear View and the node. 
+
+### Managing Nodes
+
+* Ctrl+C to copy a node
+* Ctrl+V to paste a node
+* Backspace/Delete to delete a node
+* Shift+Click to drag and select multiple nodes 
+
+### Node Caching 
+
+Nodes have a "Use Cache" option in their footer. This allows for performance improvements by using the previously cached values during the workflow processing. 
 
 
-If you're not familiar with Diffusion, take a look at our [Diffusion Overview.](../help/diffusion.md) Understanding how diffusion works will enable you to more easily use the Nodes Editor and build workflows to suit your needs.
-
-## Important Concepts
+## Important Concepts 
 
 There are several node grouping concepts that can be examined with a narrow focus. These (and other) groupings can be pieced together to make up functional graph setups, and are important to understanding how groups of nodes work together as part of a whole. Note that the screenshots below aren't examples of complete functioning node graphs (see Examples).
 
@@ -37,7 +60,7 @@ It is common to want to use both the same seed (for continuity) and random seeds
 
 ### ControlNet
 
-The ControlNet node outputs a Control, which can be provided as input to non-image *ToLatents nodes. Depending on the type of ControlNet desired, ControlNet nodes usually require an image processor node, such as a Canny Processor or Depth Processor, which prepares an input image for use with ControlNet.
+The ControlNet node outputs a Control, which can be provided as input to a Denoise Latents node. Depending on the type of ControlNet desired, ControlNet nodes usually require an image processor node, such as a Canny Processor or Depth Processor, which prepares an input image for use with ControlNet.
 
 ![groupscontrol](../assets/nodes/groupscontrol.png)
 
@@ -59,10 +82,9 @@ Iteration is a common concept in any processing, and means to repeat a process w
 
 ![groupsiterate](../assets/nodes/groupsiterate.png)
 
-### Multiple Image Generation + Random Seeds
+### Batch / Multiple Image Generation + Random Seeds
 
-Multiple image generation in the node editor is done using the RandomRange node. In this case, the 'Size' field represents the number of images to generate. As RandomRange produces a collection of integers, we need to add the Iterate node to iterate through the collection. 
-
-To control seeds across generations takes some care. The first row in the screenshot will generate multiple images with different seeds, but using the same RandomRange parameters across invocations will result in the same group of random seeds being used across the images, producing repeatable results. In the second row, adding the RandomInt node as input to RandomRange's 'Seed' edge point will ensure that seeds are varied across all images across invocations, producing varied results.
+Batch or multiple image generation in the workflow editor is done using the RandomRange node. In this case, the 'Size' field represents the number of images to generate, meaning this example will generate 4 images. As RandomRange produces a collection of integers, we need to add the Iterate node to iterate through the collection. This noise can then be fed to the Denoise Latents node for it to iterate through the denoising process with the different seeds provided.
 
 ![groupsmultigenseeding](../assets/nodes/groupsmultigenseeding.png)
+

@@ -7,8 +7,8 @@ import numpy as np
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from PIL import Image
 from realesrgan import RealESRGANer
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation

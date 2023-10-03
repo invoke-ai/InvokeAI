@@ -1,9 +1,8 @@
-import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredLineartAnimeImageProcessorInvocation } from 'features/controlNet/store/types';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
 
@@ -20,7 +19,7 @@ const LineartAnimeProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isBusy = useAppSelector(selectIsBusy);
+  const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -51,7 +50,7 @@ const LineartAnimeProcessor = (props: Props) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Detect Resolution"
+        label={t('controlnet.detectResolution')}
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
         handleReset={handleDetectResolutionReset}
@@ -60,10 +59,10 @@ const LineartAnimeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
       <IAISlider
-        label="Image Resolution"
+        label={t('controlnet.imageResolution')}
         value={image_resolution}
         onChange={handleImageResolutionChanged}
         handleReset={handleImageResolutionReset}
@@ -72,7 +71,7 @@ const LineartAnimeProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={isBusy || !isEnabled}
+        isDisabled={!isEnabled}
       />
     </ProcessorWrapper>
   );

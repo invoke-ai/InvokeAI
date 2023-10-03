@@ -10,20 +10,20 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
-import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
 import { isEqual } from 'lodash-es';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaCube, FaFont, FaImage } from 'react-icons/fa';
-import { MdDeviceHub, MdGridOn } from 'react-icons/md';
+import { FaCube, FaFont, FaImage, FaStream } from 'react-icons/fa';
+import { FaCircleNodes } from 'react-icons/fa6';
+import { MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import { usePanel } from '../hooks/usePanel';
 import { usePanelStorage } from '../hooks/usePanelStorage';
@@ -37,6 +37,7 @@ import ParametersPanel from './ParametersPanel';
 import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 import ModelManagerTab from './tabs/ModelManager/ModelManagerTab';
 import NodesTab from './tabs/Nodes/NodesTab';
+import QueueTab from './tabs/Queue/QueueTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
@@ -70,7 +71,9 @@ const tabs: InvokeTabInfo[] = [
   {
     id: 'nodes',
     translationKey: 'common.nodes',
-    icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    icon: (
+      <Icon as={FaCircleNodes} sx={{ boxSize: 6, pointerEvents: 'none' }} />
+    ),
     content: <NodesTab />,
   },
   {
@@ -78,6 +81,12 @@ const tabs: InvokeTabInfo[] = [
     translationKey: 'modelManager.modelManager',
     icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ModelManagerTab />,
+  },
+  {
+    id: 'queue',
+    translationKey: 'queue.queue',
+    icon: <Icon as={FaStream} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    content: <QueueTab />,
   },
 ];
 
@@ -97,11 +106,11 @@ const SIDE_PANEL_MIN_SIZE_PX = 448;
 const MAIN_PANEL_MIN_SIZE_PX = 448;
 const GALLERY_PANEL_MIN_SIZE_PX = 360;
 
-export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager'];
-export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager'];
+export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 
 const InvokeTabs = () => {
-  const activeTab = useAppSelector(activeTabIndexSelector);
+  const activeTabIndex = useAppSelector(activeTabIndexSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const { t } = useTranslation();
@@ -141,13 +150,13 @@ const InvokeTabs = () => {
 
   const handleTabChange = useCallback(
     (index: number) => {
-      const activeTabName = tabMap[index];
-      if (!activeTabName) {
+      const tab = enabledTabs[index];
+      if (!tab) {
         return;
       }
-      dispatch(setActiveTab(activeTabName));
+      dispatch(setActiveTab(tab.id));
     },
-    [dispatch]
+    [dispatch, enabledTabs]
   );
 
   const {
@@ -207,8 +216,8 @@ const InvokeTabs = () => {
   return (
     <Tabs
       variant="appTabs"
-      defaultIndex={activeTab}
-      index={activeTab}
+      defaultIndex={activeTabIndex}
+      index={activeTabIndex}
       onChange={handleTabChange}
       sx={{
         flexGrow: 1,
@@ -225,7 +234,6 @@ const InvokeTabs = () => {
       >
         {tabs}
         <Spacer />
-        <AuxiliaryProgressIndicator />
       </TabList>
       <PanelGroup
         id="app"
@@ -254,7 +262,6 @@ const InvokeTabs = () => {
             </Panel>
             <ResizeHandle
               onDoubleClick={resetSidePanel}
-              // isCollapsed={isSidePanelCollapsed}
               collapsedDirection={isSidePanelCollapsed ? 'left' : undefined}
             />
             <FloatingSidePanelButtons
@@ -272,7 +279,6 @@ const InvokeTabs = () => {
           <>
             <ResizeHandle
               onDoubleClick={resetGalleryPanel}
-              // isCollapsed={isGalleryPanelCollapsed}
               collapsedDirection={isGalleryPanelCollapsed ? 'right' : undefined}
             />
             <Panel

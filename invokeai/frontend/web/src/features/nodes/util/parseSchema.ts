@@ -16,7 +16,7 @@ import {
 } from '../types/types';
 import { buildInputFieldTemplate, getFieldType } from './fieldTemplateBuilders';
 
-const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'metadata'];
+const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'metadata', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
 const RESERVED_FIELD_TYPES = [
   'WorkflowField',
@@ -60,11 +60,23 @@ const isNotInDenylist = (schema: InvocationSchemaObject) =>
   !invocationDenylist.includes(schema.properties.type.default);
 
 export const parseSchema = (
-  openAPI: OpenAPIV3.Document
+  openAPI: OpenAPIV3.Document,
+  nodesAllowlistExtra: string[] | undefined = undefined,
+  nodesDenylistExtra: string[] | undefined = undefined
 ): Record<string, InvocationTemplate> => {
   const filteredSchemas = Object.values(openAPI.components?.schemas ?? {})
     .filter(isInvocationSchemaObject)
-    .filter(isNotInDenylist);
+    .filter(isNotInDenylist)
+    .filter((schema) =>
+      nodesAllowlistExtra
+        ? nodesAllowlistExtra.includes(schema.properties.type.default)
+        : true
+    )
+    .filter((schema) =>
+      nodesDenylistExtra
+        ? !nodesDenylistExtra.includes(schema.properties.type.default)
+        : true
+    );
 
   const invocations = filteredSchemas.reduce<
     Record<string, InvocationTemplate>
@@ -73,7 +85,7 @@ export const parseSchema = (
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];
     const description = schema.description ?? '';
-    const version = schema.version ?? '';
+    const version = schema.version;
 
     const inputs = reduce(
       schema.properties,
@@ -223,6 +235,8 @@ export const parseSchema = (
       {} as Record<string, OutputFieldTemplate>
     );
 
+    const useCache = schema.properties.use_cache.default;
+
     const invocation: InvocationTemplate = {
       title,
       type,
@@ -232,6 +246,7 @@ export const parseSchema = (
       outputType,
       inputs,
       outputs,
+      useCache,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });

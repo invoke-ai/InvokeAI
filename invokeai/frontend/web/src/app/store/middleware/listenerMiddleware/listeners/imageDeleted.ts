@@ -3,6 +3,7 @@ import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import {
   controlNetImageChanged,
   controlNetProcessedImageChanged,
+  ipAdapterImageChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
@@ -109,6 +110,14 @@ export const addRequestedSingleImageDeletionListener = () => {
             );
           }
         });
+
+        // Remove IP Adapter Set Image if image is deleted.
+        if (
+          getState().controlNet.ipAdapterInfo.adapterImage ===
+          imageDTO.image_name
+        ) {
+          dispatch(ipAdapterImageChanged(null));
+        }
 
         // reset nodes that use the deleted images
         getState().nodes.nodes.forEach((node) => {
@@ -226,6 +235,14 @@ export const addRequestedMultipleImageDeletionListener = () => {
               );
             }
           });
+
+          // Remove IP Adapter Set Image if image is deleted.
+          if (
+            getState().controlNet.ipAdapterInfo.adapterImage ===
+            imageDTO.image_name
+          ) {
+            dispatch(ipAdapterImageChanged(null));
+          }
 
           // reset nodes that use the deleted images
           getState().nodes.nodes.forEach((node) => {

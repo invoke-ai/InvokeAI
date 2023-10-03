@@ -30,6 +30,7 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
         ref={forwardedRef}
         role={role}
         colorScheme={isChecked ? 'accent' : 'base'}
+        data-testid={tooltip}
         {...rest}
       />
     </Tooltip>

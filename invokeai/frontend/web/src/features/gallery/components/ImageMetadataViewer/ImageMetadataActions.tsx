@@ -1,6 +1,16 @@
-import { CoreMetadata } from 'features/nodes/types/types';
+import {
+  ControlNetMetadataItem,
+  CoreMetadata,
+  LoRAMetadataItem,
+  IPAdapterMetadataItem,
+} from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { memo, useCallback } from 'react';
+import { memo, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  isValidControlNetModel,
+  isValidLoRAModel,
+} from '../../../parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
@@ -9,6 +19,8 @@ type Props = {
 
 const ImageMetadataActions = (props: Props) => {
   const { metadata } = props;
+
+  const { t } = useTranslation();
 
   const {
     recallPositivePrompt,
@@ -21,6 +33,9 @@ const ImageMetadataActions = (props: Props) => {
     recallWidth,
     recallHeight,
     recallStrength,
+    recallLoRA,
+    recallControlNet,
+    recallIPAdapter,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {
@@ -63,6 +78,43 @@ const ImageMetadataActions = (props: Props) => {
     recallStrength(metadata?.strength);
   }, [metadata?.strength, recallStrength]);
 
+  const handleRecallLoRA = useCallback(
+    (lora: LoRAMetadataItem) => {
+      recallLoRA(lora);
+    },
+    [recallLoRA]
+  );
+
+  const handleRecallControlNet = useCallback(
+    (controlnet: ControlNetMetadataItem) => {
+      recallControlNet(controlnet);
+    },
+    [recallControlNet]
+  );
+
+  const handleRecallIPAdapter = useCallback(
+    (ipAdapter: IPAdapterMetadataItem) => {
+      recallIPAdapter(ipAdapter);
+    },
+    [recallIPAdapter]
+  );
+
+  const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
+    return metadata?.controlnets
+      ? metadata.controlnets.filter((controlnet) =>
+          isValidControlNetModel(controlnet.control_model)
+        )
+      : [];
+  }, [metadata?.controlnets]);
+
+  const validIPAdapters: IPAdapterMetadataItem[] = useMemo(() => {
+    return metadata?.ipAdapters
+      ? metadata.ipAdapters.filter((ipAdapter) =>
+          isValidControlNetModel(ipAdapter.ip_adapter_model)
+        )
+      : [];
+  }, [metadata?.ipAdapters]);
+
   if (!metadata || Object.keys(metadata).length === 0) {
     return null;
   }
@@ -70,17 +122,20 @@ const ImageMetadataActions = (props: Props) => {
   return (
     <>
       {metadata.created_by && (
-        <ImageMetadataItem label="Created By" value={metadata.created_by} />
+        <ImageMetadataItem
+          label={t('metadata.createdBy')}
+          value={metadata.created_by}
+        />
       )}
       {metadata.generation_mode && (
         <ImageMetadataItem
-          label="Generation Mode"
+          label={t('metadata.generationMode')}
           value={metadata.generation_mode}
         />
       )}
       {metadata.positive_prompt && (
         <ImageMetadataItem
-          label="Positive Prompt"
+          label={t('metadata.positivePrompt')}
           labelPosition="top"
           value={metadata.positive_prompt}
           onClick={handleRecallPositivePrompt}
@@ -88,7 +143,7 @@ const ImageMetadataActions = (props: Props) => {
       )}
       {metadata.negative_prompt && (
         <ImageMetadataItem
-          label="Negative Prompt"
+          label={t('metadata.negativePrompt')}
           labelPosition="top"
           value={metadata.negative_prompt}
           onClick={handleRecallNegativePrompt}
@@ -96,7 +151,7 @@ const ImageMetadataActions = (props: Props) => {
       )}
       {metadata.seed !== undefined && metadata.seed !== null && (
         <ImageMetadataItem
-          label="Seed"
+          label={t('metadata.seed')}
           value={metadata.seed}
           onClick={handleRecallSeed}
         />
@@ -105,108 +160,82 @@ const ImageMetadataActions = (props: Props) => {
         metadata.model !== null &&
         metadata.model.model_name && (
           <ImageMetadataItem
-            label="Model"
+            label={t('metadata.model')}
             value={metadata.model.model_name}
             onClick={handleRecallModel}
           />
         )}
       {metadata.width && (
         <ImageMetadataItem
-          label="Width"
+          label={t('metadata.width')}
           value={metadata.width}
           onClick={handleRecallWidth}
         />
       )}
       {metadata.height && (
         <ImageMetadataItem
-          label="Height"
+          label={t('metadata.height')}
           value={metadata.height}
           onClick={handleRecallHeight}
         />
       )}
-      {/* {metadata.threshold !== undefined && (
-          <MetadataItem
-            label="Noise Threshold"
-            value={metadata.threshold}
-            onClick={() => dispatch(setThreshold(Number(metadata.threshold)))}
-          />
-        )}
-        {metadata.perlin !== undefined && (
-          <MetadataItem
-            label="Perlin Noise"
-            value={metadata.perlin}
-            onClick={() => dispatch(setPerlin(Number(metadata.perlin)))}
-          />
-        )} */}
       {metadata.scheduler && (
         <ImageMetadataItem
-          label="Scheduler"
+          label={t('metadata.scheduler')}
           value={metadata.scheduler}
           onClick={handleRecallScheduler}
         />
       )}
       {metadata.steps && (
         <ImageMetadataItem
-          label="Steps"
+          label={t('metadata.steps')}
           value={metadata.steps}
           onClick={handleRecallSteps}
         />
       )}
       {metadata.cfg_scale !== undefined && metadata.cfg_scale !== null && (
         <ImageMetadataItem
-          label="CFG scale"
+          label={t('metadata.cfgScale')}
           value={metadata.cfg_scale}
           onClick={handleRecallCfgScale}
         />
       )}
-      {/* {metadata.variations && metadata.variations.length > 0 && (
-          <MetadataItem
-            label="Seed-weight pairs"
-            value={seedWeightsToString(metadata.variations)}
-            onClick={() =>
-              dispatch(
-                setSeedWeights(seedWeightsToString(metadata.variations))
-              )
-            }
-          />
-        )}
-        {metadata.seamless && (
-          <MetadataItem
-            label="Seamless"
-            value={metadata.seamless}
-            onClick={() => dispatch(setSeamless(metadata.seamless))}
-          />
-        )}
-        {metadata.hires_fix && (
-          <MetadataItem
-            label="High Resolution Optimization"
-            value={metadata.hires_fix}
-            onClick={() => dispatch(setHiresFix(metadata.hires_fix))}
-          />
-        )} */}
-
-      {/* {init_image_path && (
-          <MetadataItem
-            label="Initial image"
-            value={init_image_path}
-            isLink
-            onClick={() => dispatch(setInitialImage(init_image_path))}
-          />
-        )} */}
       {metadata.strength && (
         <ImageMetadataItem
-          label="Image to image strength"
+          label={t('metadata.strength')}
           value={metadata.strength}
           onClick={handleRecallStrength}
         />
       )}
-      {/* {metadata.fit && (
-          <MetadataItem
-            label="Image to image fit"
-            value={metadata.fit}
-            onClick={() => dispatch(setShouldFitToWidthHeight(metadata.fit))}
-          />
-        )} */}
+      {metadata.loras &&
+        metadata.loras.map((lora, index) => {
+          if (isValidLoRAModel(lora.lora)) {
+            return (
+              <ImageMetadataItem
+                key={index}
+                label="LoRA"
+                value={`${lora.lora.model_name} - ${lora.weight}`}
+                onClick={() => handleRecallLoRA(lora)}
+              />
+            );
+          }
+        })}
+      {validControlNets.map((controlnet, index) => (
+        <ImageMetadataItem
+          key={index}
+          label="ControlNet"
+          value={`${controlnet.control_model?.model_name} - ${controlnet.control_weight}`}
+          onClick={() => handleRecallControlNet(controlnet)}
+        />
+      ))}
+      {validIPAdapters.map((ipAdapter, index) => (
+        <ImageMetadataItem
+          key={index}
+          label="IP Adapter"
+          value={`${ipAdapter.ip_adapter_model?.model_name} - ${ipAdapter.weight}`}
+          onClick={() => handleRecallIPAdapter(ipAdapter)}
+        />
+      ))}
     </>
   );
 };

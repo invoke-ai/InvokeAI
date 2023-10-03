@@ -196,10 +196,8 @@ class InfillPatchMatchInvocation(BaseInvocation):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
     image: ImageField = InputField(description="The image to infill")
-    downscale: Optional[float] = InputField(
-        default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill"
-    )
-    resample_mode: Optional[PIL_RESAMPLING_MODES] = InputField(default="bicubic", description="The resampling mode")
+    downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
+    resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
@@ -271,7 +269,7 @@ class LaMaInfillInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint")
+@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
 class CV2InfillInvocation(BaseInvocation):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 

@@ -14,6 +14,7 @@ import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -26,6 +27,7 @@ const ParamSDXLRefinerModelSelect = () => {
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
   const { model } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const { data: refinerModels, isLoading } =
     useGetMainModelsQuery(REFINER_BASE_MODELS);
@@ -81,8 +83,8 @@ const ParamSDXLRefinerModelSelect = () => {
 
   return isLoading ? (
     <IAIMantineSearchableSelect
-      label="Refiner Model"
-      placeholder="Loading..."
+      label={t('sdxl.refinermodel')}
+      placeholder={t('sdxl.loading')}
       disabled={true}
       data={[]}
     />
@@ -90,9 +92,11 @@ const ParamSDXLRefinerModelSelect = () => {
     <Flex w="100%" alignItems="center" gap={2}>
       <IAIMantineSearchableSelect
         tooltip={selectedModel?.description}
-        label="Refiner Model"
+        label={t('sdxl.refinermodel')}
         value={selectedModel?.id}
-        placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
+        placeholder={
+          data.length > 0 ? t('sdxl.selectAModel') : t('sdxl.noModelsAvailable')
+        }
         data={data}
         error={data.length === 0}
         disabled={data.length === 0}

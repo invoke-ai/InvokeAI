@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { isInvocationNode } from 'features/nodes/types/types';
 import { some } from 'lodash-es';
 import { ImageUsage } from './types';
-import { isInvocationNode } from 'features/nodes/types/types';
 
 export const getImageUsage = (state: RootState, image_name: string) => {
   const { generation, canvas, nodes, controlNet } = state;
@@ -27,11 +27,14 @@ export const getImageUsage = (state: RootState, image_name: string) => {
       c.controlImage === image_name || c.processedControlImage === image_name
   );
 
+  const isIPAdapterImage = controlNet.ipAdapterInfo.adapterImage === image_name;
+
   const imageUsage: ImageUsage = {
     isInitialImage,
     isCanvasImage,
     isNodesImage,
     isControlNetImage,
+    isIPAdapterImage,
   };
 
   return imageUsage;

@@ -17,8 +17,12 @@ export const useHasImageOutput = (nodeId: string) => {
           if (!isInvocationNode(node)) {
             return false;
           }
-          return some(node.data.outputs, (output) =>
-            IMAGE_FIELDS.includes(output.type)
+          return some(
+            node.data.outputs,
+            (output) =>
+              IMAGE_FIELDS.includes(output.type) &&
+              // the image primitive node does not actually save the image, do not show the image-saving checkboxes
+              node.data.type !== 'image'
           );
         },
         defaultSelectorOptions

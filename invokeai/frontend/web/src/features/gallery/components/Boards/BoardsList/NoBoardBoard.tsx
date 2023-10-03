@@ -22,25 +22,23 @@ interface Props {
 
 const selector = createSelector(
   stateSelector,
-  ({ gallery, system }) => {
+  ({ gallery }) => {
     const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-    const { isProcessing } = system;
-    return { autoAddBoardId, autoAssignBoardOnClick, isProcessing };
+    return { autoAddBoardId, autoAssignBoardOnClick };
   },
   defaultSelectorOptions
 );
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId, autoAssignBoardOnClick, isProcessing } =
-    useAppSelector(selector);
+  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected('none'));
-    if (autoAssignBoardOnClick && !isProcessing) {
+    dispatch(boardIdSelected({ boardId: 'none' }));
+    if (autoAssignBoardOnClick) {
       dispatch(autoAddBoardIdChanged('none'));
     }
-  }, [dispatch, autoAssignBoardOnClick, isProcessing]);
+  }, [dispatch, autoAssignBoardOnClick]);
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseOver = useCallback(() => {

@@ -139,6 +139,11 @@ const IAICanvas = () => {
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
 
+  const handleContextMenu = useCallback(
+    (e: KonvaEventObject<MouseEvent>) => e.evt.preventDefault(),
+    []
+  );
+
   useEffect(() => {
     if (!containerRef.current) {
       return;
@@ -153,6 +158,8 @@ const IAICanvas = () => {
     });
 
     resizeObserver.observe(containerRef.current);
+    const { width, height } = containerRef.current.getBoundingClientRect();
+    dispatch(canvasResized({ width, height }));
 
     return () => {
       resizeObserver.disconnect();
@@ -203,9 +210,7 @@ const IAICanvas = () => {
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
-          onContextMenu={(e: KonvaEventObject<MouseEvent>) =>
-            e.evt.preventDefault()
-          }
+          onContextMenu={handleContextMenu}
           onWheel={handleWheel}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
@@ -221,7 +226,11 @@ const IAICanvas = () => {
           >
             <IAICanvasObjectRenderer />
           </Layer>
-          <Layer id="mask" visible={isMaskEnabled} listening={false}>
+          <Layer
+            id="mask"
+            visible={isMaskEnabled && !isStaging}
+            listening={false}
+          >
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>

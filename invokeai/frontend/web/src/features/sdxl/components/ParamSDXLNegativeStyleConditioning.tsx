@@ -1,33 +1,27 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
-
-import { createSelector } from '@reduxjs/toolkit';
-import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-
-import { userInvoked } from 'app/store/actions';
 import IAITextarea from 'common/components/IAITextarea';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { AnimatePresence } from 'framer-motion';
 import { isEqual } from 'lodash-es';
+import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { setNegativeStylePromptSDXL } from '../store/sdxlSlice';
 import SDXLConcatLink from './SDXLConcatLink';
 
 const promptInputSelector = createSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ sdxl }, activeTabName) => {
+  [stateSelector],
+  ({ sdxl }) => {
     const { negativeStylePrompt, shouldConcatSDXLStylePrompt } = sdxl;
 
     return {
       prompt: negativeStylePrompt,
       shouldConcatSDXLStylePrompt,
-      activeTabName,
     };
   },
   {
@@ -42,11 +36,11 @@ const promptInputSelector = createSelector(
  */
 const ParamSDXLNegativeStyleConditioning = () => {
   const dispatch = useAppDispatch();
-  const isReady = useIsReadyToInvoke();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
+  const { t } = useTranslation();
 
-  const { prompt, activeTabName, shouldConcatSDXLStylePrompt } =
+  const { prompt, shouldConcatSDXLStylePrompt } =
     useAppSelector(promptInputSelector);
 
   const handleChangePrompt = useCallback(
@@ -99,22 +93,12 @@ const ParamSDXLNegativeStyleConditioning = () => {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && e.shiftKey === false && isReady) {
-        e.preventDefault();
-        dispatch(clampSymmetrySteps());
-        dispatch(userInvoked(activeTabName));
-      }
       if (isEmbeddingEnabled && e.key === '<') {
         onOpen();
       }
     },
-    [isReady, dispatch, activeTabName, onOpen, isEmbeddingEnabled]
+    [onOpen, isEmbeddingEnabled]
   );
-
-  // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
-  //   const target = e.target as HTMLTextAreaElement;
-  // setCaret({ start: target.selectionStart, end: target.selectionEnd });
-  // };
 
   return (
     <Box position="relative">
@@ -143,7 +127,7 @@ const ParamSDXLNegativeStyleConditioning = () => {
             name="prompt"
             ref={promptRef}
             value={prompt}
-            placeholder="Negative Style Prompt"
+            placeholder={t('sdxl.negStylePrompt')}
             onChange={handleChangePrompt}
             onKeyDown={handleKeyDown}
             resize="vertical"

@@ -4,6 +4,7 @@ pip install <path_to_git_source>.
 """
 import os
 import platform
+
 import pkg_resources
 import psutil
 import requests
@@ -54,13 +55,15 @@ def welcome(versions: dict):
     def text():
         yield f"InvokeAI Version: [bold yellow]{__version__}"
         yield ""
-        yield "This script will update InvokeAI to the latest release, or to a development version of your choice."
+        yield "This script will update InvokeAI to the latest release, or to the development version of your choice."
+        yield ""
+        yield "When updating to an arbitrary tag or branch, be aware that the front end may be mismatched to the backend,"
+        yield "making the web frontend unusable. Please downgrade to the latest release if this happens."
         yield ""
         yield "[bold yellow]Options:"
         yield f"""[1] Update to the latest official release ([italic]{versions[0]['tag_name']}[/italic])
-[2] Update to the bleeding-edge development version ([italic]main[/italic])
-[3] Manually enter the [bold]tag name[/bold] for the version you wish to update to
-[4] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
+[2] Manually enter the [bold]tag name[/bold] for the version you wish to update to
+[3] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
 
     console.rule()
     print(
@@ -104,11 +107,11 @@ def main():
     if choice == "1":
         release = versions[0]["tag_name"]
     elif choice == "2":
-        release = "main"
+        while not tag:
+            tag = Prompt.ask("Enter an InvokeAI tag name")
     elif choice == "3":
-        tag = Prompt.ask("Enter an InvokeAI tag name")
-    elif choice == "4":
-        branch = Prompt.ask("Enter an InvokeAI branch name")
+        while not branch:
+            branch = Prompt.ask("Enter an InvokeAI branch name")
 
     extras = get_extras()
 

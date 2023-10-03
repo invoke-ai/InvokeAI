@@ -3,7 +3,6 @@ from typing import Literal, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 import PIL.Image
 from easing_functions import (
     BackEaseIn,

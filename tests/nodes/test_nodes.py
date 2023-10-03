@@ -1,5 +1,7 @@
 from typing import Any, Callable, Union
+
 from pydantic import Field
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -51,6 +53,7 @@ class ImageTestInvocationOutput(BaseInvocationOutput):
 @invocation("test_text_to_image")
 class TextToImageTestInvocation(BaseInvocation):
     prompt: str = Field(default="")
+    prompt2: str = Field(default="")
 
     def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
@@ -78,7 +81,7 @@ class PromptCollectionTestInvocation(BaseInvocation):
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
 
 
-# Importing these at the top breaks previous tests
+# Importing these must happen after test invocations are defined or they won't register
 from invokeai.app.services.events import EventServiceBase  # noqa: E402
 from invokeai.app.services.graph import Edge, EdgeConnection  # noqa: E402
 

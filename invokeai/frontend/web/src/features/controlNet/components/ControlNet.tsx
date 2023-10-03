@@ -1,12 +1,12 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { memo, useCallback } from 'react';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
   ControlNetConfig,
   controlNetDuplicated,
   controlNetRemoved,
-  controlNetToggled,
+  controlNetIsEnabledChanged,
 } from '../store/controlNetSlice';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
@@ -18,6 +18,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useTranslation } from 'react-i18next';
 import { useToggle } from 'react-use';
 import { v4 as uuidv4 } from 'uuid';
 import ControlNetImagePreview from './ControlNetImagePreview';
@@ -37,6 +38,7 @@ const ControlNet = (props: ControlNetProps) => {
   const { controlNet } = props;
   const { controlNetId } = controlNet;
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const activeTabName = useAppSelector(activeTabNameSelector);
 
@@ -75,9 +77,17 @@ const ControlNet = (props: ControlNetProps) => {
     );
   }, [controlNetId, dispatch]);
 
-  const handleToggleIsEnabled = useCallback(() => {
-    dispatch(controlNetToggled({ controlNetId }));
-  }, [controlNetId, dispatch]);
+  const handleToggleIsEnabled = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(
+        controlNetIsEnabledChanged({
+          controlNetId,
+          isEnabled: e.target.checked,
+        })
+      );
+    },
+    [controlNetId, dispatch]
+  );
 
   return (
     <Flex
@@ -95,8 +105,8 @@ const ControlNet = (props: ControlNetProps) => {
     >
       <Flex sx={{ gap: 2, alignItems: 'center' }}>
         <IAISwitch
-          tooltip="Toggle this ControlNet"
-          aria-label="Toggle this ControlNet"
+          tooltip={t('controlnet.toggleControlNet')}
+          aria-label={t('controlnet.toggleControlNet')}
           isChecked={isEnabled}
           onChange={handleToggleIsEnabled}
         />
@@ -104,8 +114,8 @@ const ControlNet = (props: ControlNetProps) => {
           sx={{
             w: 'full',
             minW: 0,
-            opacity: isEnabled ? 1 : 0.5,
-            pointerEvents: isEnabled ? 'auto' : 'none',
+            // opacity: isEnabled ? 1 : 0.5,
+            // pointerEvents: isEnabled ? 'auto' : 'none',
             transitionProperty: 'common',
             transitionDuration: '0.1s',
           }}
@@ -117,23 +127,31 @@ const ControlNet = (props: ControlNetProps) => {
         )}
         <IAIIconButton
           size="sm"
-          tooltip="Duplicate"
-          aria-label="Duplicate"
+          tooltip={t('controlnet.duplicate')}
+          aria-label={t('controlnet.duplicate')}
           onClick={handleDuplicate}
           icon={<FaCopy />}
         />
         <IAIIconButton
           size="sm"
-          tooltip="Delete"
-          aria-label="Delete"
+          tooltip={t('controlnet.delete')}
+          aria-label={t('controlnet.delete')}
           colorScheme="error"
           onClick={handleDelete}
           icon={<FaTrash />}
         />
         <IAIIconButton
           size="sm"
-          tooltip={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
-          aria-label={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
+          tooltip={
+            isExpanded
+              ? t('controlnet.hideAdvanced')
+              : t('controlnet.showAdvanced')
+          }
+          aria-label={
+            isExpanded
+              ? t('controlnet.hideAdvanced')
+              : t('controlnet.showAdvanced')
+          }
           onClick={toggleIsExpanded}
           variant="ghost"
           sx={{

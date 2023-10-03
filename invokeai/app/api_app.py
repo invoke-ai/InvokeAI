@@ -1,46 +1,48 @@
-# Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
-import asyncio
-import logging
-import socket
-from inspect import signature
-from pathlib import Path
-
-import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.openapi.utils import get_openapi
-from fastapi.staticfiles import StaticFiles
-from fastapi_events.handlers.local import local_handler
-from fastapi_events.middleware import EventHandlerASGIMiddleware
-from pydantic.schema import schema
-
 from .services.config import InvokeAIAppConfig
-from ..backend.util.logging import InvokeAILogger
 
-from invokeai.version.invokeai_version import __version__
+# parse_args() must be called before any other imports. if it is not called first, consumers of the config
+# which are imported/used before parse_args() is called will get the default config values instead of the
+# values from the command line or config file.
+app_config = InvokeAIAppConfig.get_config()
+app_config.parse_args()
 
-import invokeai.frontend.web as web_dir
-import mimetypes
+if True:  # hack to make flake8 happy with imports coming after setting up the config
+    import asyncio
+    import mimetypes
+    import socket
+    from inspect import signature
+    from pathlib import Path
 
-from .api.dependencies import ApiDependencies
-from .api.routers import sessions, models, images, boards, board_images, app_info
-from .api.sockets import SocketIO
-from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, UIConfigBase
+    import torch
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+    from fastapi.openapi.utils import get_openapi
+    from fastapi.staticfiles import StaticFiles
+    from fastapi_events.handlers.local import local_handler
+    from fastapi_events.middleware import EventHandlerASGIMiddleware
+    from pydantic.schema import schema
 
-import torch
-
-# noinspection PyUnresolvedReferences
-import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
-
-if torch.backends.mps.is_available():
     # noinspection PyUnresolvedReferences
-    import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+    import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+    import invokeai.frontend.web as web_dir
+    from invokeai.version.invokeai_version import __version__
+
+    from ..backend.util.logging import InvokeAILogger
+    from .api.dependencies import ApiDependencies
+    from .api.routers import app_info, board_images, boards, images, models, session_queue, sessions, utilities
+    from .api.sockets import SocketIO
+    from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
+
+    if torch.backends.mps.is_available():
+        # noinspection PyUnresolvedReferences
+        import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
 
 
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
-logger = InvokeAILogger.getLogger(config=app_config)
+logger = InvokeAILogger.get_logger(config=app_config)
 
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
@@ -90,6 +92,8 @@ async def shutdown_event():
 
 app.include_router(sessions.session_router, prefix="/api")
 
+app.include_router(utilities.utilities_router, prefix="/api")
+
 app.include_router(models.models_router, prefix="/api")
 
 app.include_router(images.images_router, prefix="/api")
@@ -99,6 +103,8 @@ app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 
 app.include_router(app_info.app_router, prefix="/api")
+
+app.include_router(session_queue.session_queue_router, prefix="/api")
 
 
 # Build a custom OpenAPI to include all outputs
@@ -218,7 +224,7 @@ def invoke_api():
                 exc_info=e,
             )
         else:
-            jurigged.watch(logger=InvokeAILogger.getLogger(name="jurigged").info)
+            jurigged.watch(logger=InvokeAILogger.get_logger(name="jurigged").info)
 
     port = find_port(app_config.port)
     if port != app_config.port:
@@ -237,7 +243,7 @@ def invoke_api():
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
     for logname in ["uvicorn.access", "uvicorn"]:
-        log = logging.getLogger(logname)
+        log = InvokeAILogger.get_logger(logname)
         log.handlers.clear()
         for ch in logger.handlers:
             log.addHandler(ch)

@@ -43,27 +43,22 @@ into the directory
 
 InvokeAI 2.3 and higher comes with a text console-based training front
 end. From within the `invoke.sh`/`invoke.bat` Invoke launcher script,
-start the front end by selecting choice (3):
+start training tool selecting choice (3):
 
 ```sh
-Do you want to generate images using the
-1: Browser-based UI
-2: Command-line interface
-3: Run textual inversion training
-4: Merge models (diffusers type only)
-5: Download and install models
-6: Change InvokeAI startup options
-7: Re-run the configure script to fix a broken install
-8: Open the developer console
-9: Update InvokeAI
-10: Command-line help
-Q: Quit
-
-Please enter 1-10, Q: [1] 
+1 "Generate images with a browser-based interface"
+2 "Explore InvokeAI nodes using a command-line interface"
+3 "Textual inversion training"
+4 "Merge models (diffusers type only)"
+5 "Download and install models"
+6 "Change InvokeAI startup options"
+7 "Re-run the configure script to fix a broken install or to complete a major upgrade"
+8 "Open the developer console"
+9 "Update InvokeAI"
 ```
 
-From the command line, with the InvokeAI virtual environment active,
-you can launch the front end with the command `invokeai-ti --gui`.
+Alternatively, you can select option (8) or from the command line, with the InvokeAI virtual environment active,
+you can then launch the front end with the command `invokeai-ti --gui`.
 
 This will launch a text-based front end that will look like this:
 

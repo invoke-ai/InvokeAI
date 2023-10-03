@@ -46,7 +46,6 @@ export interface GenerationState {
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   shouldRandomizeSeed: boolean;
-  shouldUseNoiseSettings: boolean;
   steps: StepsParam;
   threshold: number;
   infillTileSize: number;
@@ -80,7 +79,7 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
-  canvasCoherenceMode: 'edge',
+  canvasCoherenceMode: 'unmasked',
   canvasCoherenceSteps: 20,
   canvasCoherenceStrength: 0.3,
   seed: 0,
@@ -88,11 +87,10 @@ export const initialGenerationState: GenerationState = {
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
   shouldRandomizeSeed: true,
-  shouldUseNoiseSettings: false,
   steps: 50,
   threshold: 0,
   infillTileSize: 32,
-  infillPatchmatchDownscaleSize: 2,
+  infillPatchmatchDownscaleSize: 1,
   variationAmount: 0.1,
   width: 512,
   shouldUseSymmetry: false,
@@ -244,9 +242,6 @@ export const generationSlice = createSlice({
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
     },
-    setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseNoiseSettings = action.payload;
-    },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
@@ -278,12 +273,6 @@ export const generationSlice = createSlice({
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
-    setShouldShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowAdvancedOptions = action.payload;
-      if (!action.payload) {
-        state.clipSkip = 0;
-      }
-    },
     setAspectRatio: (state, action: PayloadAction<number | null>) => {
       const newAspectRatio = action.payload;
       state.aspectRatio = newAspectRatio;
@@ -311,12 +300,6 @@ export const generationSlice = createSlice({
         if (result.success) {
           state.model = result.data;
         }
-      }
-    });
-    builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
-      const advancedOptionsStatus = action.payload;
-      if (!advancedOptionsStatus) {
-        state.clipSkip = 0;
       }
     });
   },
@@ -359,12 +342,10 @@ export const {
   initialImageChanged,
   modelChanged,
   vaeSelected,
-  setShouldUseNoiseSettings,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
   shouldUseCpuNoiseChanged,
-  setShouldShowAdvancedOptions,
   setAspectRatio,
   setShouldLockAspectRatio,
   vaePrecisionChanged,

@@ -70,7 +70,6 @@ def get_literal_fields(field) -> list[Any]:
 config = InvokeAIAppConfig.get_config()
 
 Model_dir = "models"
-
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
@@ -93,7 +92,7 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # or renaming it and then running invokeai-configure again.
 """
 
-logger = InvokeAILogger.getLogger()
+logger = InvokeAILogger.get_logger()
 
 
 class DummyWidgetValue(Enum):
@@ -279,8 +278,19 @@ def download_realesrgan():
 
 
 # ---------------------------------------------
+def download_lama():
+    logger.info("Installing lama infill model")
+    download_with_progress_bar(
+        "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
+        config.models_path / "core/misc/lama/lama.pt",
+        "lama infill model",
+    )
+
+
+# ---------------------------------------------
 def download_support_models():
     download_realesrgan()
+    download_lama()
     download_conversion_models()
 
 
@@ -447,7 +457,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
-            name="Model RAM cache size (GB). Make this at least large enough to hold a single full model.",
+            name="Model RAM cache size (GB). Make this at least large enough to hold a single full model (2GB for SD-1, 6GB for SDXL).",
             begin_entry_at=0,
             editable=False,
             color="CONTROL",
@@ -484,7 +494,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
                 scroll_exit=True,
             )
         else:
-            self.vram_cache_size = DummyWidgetValue.zero
+            self.vram = DummyWidgetValue.zero
         self.nextrely += 1
         self.outdir = self.add_widget_intelligent(
             FileBox,
@@ -582,7 +592,8 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
             "vram",
             "outdir",
         ]:
-            setattr(new_opts, attr, getattr(self, attr).value)
+            if hasattr(self, attr):
+                setattr(new_opts, attr, getattr(self, attr).value)
 
         for attr in self.autoimport_dirs:
             directory = Path(self.autoimport_dirs[attr].value)
@@ -639,6 +650,16 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
     return editApp.new_opts()
 
 
+def default_ramcache() -> float:
+    """Run a heuristic for the default RAM cache based on installed RAM."""
+
+    # Note that on my 64 GB machine, psutil.virtual_memory().total gives 62 GB,
+    # So we adjust everthing down a bit.
+    return (
+        15.0 if MAX_RAM >= 60 else 7.5 if MAX_RAM >= 30 else 4 if MAX_RAM >= 14 else 2.1
+    )  # 2.1 is just large enough for sd 1.5 ;-)
+
+
 def import_paths(config: InvokeAIAppConfig):
     return [
         (
@@ -657,6 +678,7 @@ def import_paths(config: InvokeAIAppConfig):
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
+    opts.ram = default_ramcache()
     return opts
 
 
@@ -898,7 +920,7 @@ def main():
     if opt.full_precision:
         invoke_args.extend(["--precision", "float32"])
     config.parse_args(invoke_args)
-    logger = InvokeAILogger().getLogger(config=config)
+    logger = InvokeAILogger().get_logger(config=config)
 
     errors = set()
 

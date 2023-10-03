@@ -1,7 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { CoreMetadata } from 'features/nodes/types/types';
 import { t } from 'i18next';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAppToaster } from '../../../app/components/Toaster';
 import { useAppDispatch } from '../../../app/store/storeHooks';
 import {
@@ -13,70 +13,67 @@ import { setActiveTab } from '../../ui/store/uiSlice';
 import { initialImageSelected } from '../store/actions';
 import { useRecallParameters } from './useRecallParameters';
 
-type SelectedImage = {
+export const usePreselectedImage = (selectedImage?: {
   imageName: string;
   action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-};
-
-export const usePreselectedImage = () => {
+}) => {
   const dispatch = useAppDispatch();
-  const [imageNameForDto, setImageNameForDto] = useState<string | undefined>();
-  const [imageNameForMetadata, setImageNameForMetadata] = useState<
-    string | undefined
-  >();
+
   const { recallAllParameters } = useRecallParameters();
   const toaster = useAppToaster();
 
   const { currentData: selectedImageDto } = useGetImageDTOQuery(
-    imageNameForDto ?? skipToken
+    selectedImage?.imageName ?? skipToken
   );
 
   const { currentData: selectedImageMetadata } = useGetImageMetadataQuery(
-    imageNameForMetadata ?? skipToken
+    selectedImage?.imageName ?? skipToken
   );
 
-  const handlePreselectedImage = useCallback(
-    (selectedImage?: SelectedImage) => {
-      if (!selectedImage) {
-        return;
-      }
+  const handleSendToCanvas = useCallback(() => {
+    if (selectedImageDto) {
+      dispatch(setInitialCanvasImage(selectedImageDto));
+      dispatch(setActiveTab('unifiedCanvas'));
+      toaster({
+        title: t('toast.sentToUnifiedCanvas'),
+        status: 'info',
+        duration: 2500,
+        isClosable: true,
+      });
+    }
+  }, [dispatch, toaster, selectedImageDto]);
 
-      if (selectedImage.action === 'sendToCanvas') {
-        setImageNameForDto(selectedImage?.imageName);
-        if (selectedImageDto) {
-          dispatch(setInitialCanvasImage(selectedImageDto));
-          dispatch(setActiveTab('unifiedCanvas'));
-          toaster({
-            title: t('toast.sentToUnifiedCanvas'),
-            status: 'info',
-            duration: 2500,
-            isClosable: true,
-          });
-        }
-      }
+  const handleSendToImg2Img = useCallback(() => {
+    if (selectedImageDto) {
+      dispatch(initialImageSelected(selectedImageDto));
+    }
+  }, [dispatch, selectedImageDto]);
 
-      if (selectedImage.action === 'sendToImg2Img') {
-        setImageNameForDto(selectedImage?.imageName);
-        if (selectedImageDto) {
-          dispatch(initialImageSelected(selectedImageDto));
-        }
-      }
+  const handleUseAllMetadata = useCallback(() => {
+    if (selectedImageMetadata) {
+      recallAllParameters(selectedImageMetadata.metadata as CoreMetadata);
+    }
+    // disabled because `recallAllParameters` changes the model, but its dep to prepare LoRAs has model as a dep. this introduces circular logic that causes infinite re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedImageMetadata]);
 
-      if (selectedImage.action === 'useAllParameters') {
-        setImageNameForMetadata(selectedImage?.imageName);
-        if (selectedImageMetadata) {
-          recallAllParameters(selectedImageMetadata.metadata as CoreMetadata);
-        }
-      }
-    },
-    [
-      dispatch,
-      selectedImageDto,
-      selectedImageMetadata,
-      recallAllParameters,
-      toaster,
-    ]
-  );
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'sendToCanvas') {
+      handleSendToCanvas();
+    }
+  }, [selectedImage, handleSendToCanvas]);
 
-  return { handlePreselectedImage };
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'sendToImg2Img') {
+      handleSendToImg2Img();
+    }
+  }, [selectedImage, handleSendToImg2Img]);
+
+  useEffect(() => {
+    if (selectedImage && selectedImage.action === 'useAllParameters') {
+      handleUseAllMetadata();
+    }
+  }, [selectedImage, handleUseAllMetadata]);
+
+  return { handleSendToCanvas, handleSendToImg2Img, handleUseAllMetadata };
 };

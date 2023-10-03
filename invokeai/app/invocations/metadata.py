@@ -12,7 +12,9 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.controlnet_image_processors import ControlField
+from invokeai.app.invocations.ip_adapter import IPAdapterModelField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
+from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 from ...version import __version__
@@ -23,6 +25,18 @@ class LoRAMetadataField(BaseModelExcludeNull):
 
     lora: LoRAModelField = Field(description="The LoRA model")
     weight: float = Field(description="The weight of the LoRA model")
+
+
+class IPAdapterMetadataField(BaseModelExcludeNull):
+    image: ImageField = Field(description="The IP-Adapter image prompt.")
+    ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
+    weight: float = Field(description="The weight of the IP-Adapter model")
+    begin_step_percent: float = Field(
+        default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
+    )
+    end_step_percent: float = Field(
+        default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
+    )
 
 
 class CoreMetadata(BaseModelExcludeNull):
@@ -42,11 +56,13 @@ class CoreMetadata(BaseModelExcludeNull):
     cfg_scale: float = Field(description="The classifier-free guidance scale parameter")
     steps: int = Field(description="The number of steps used for inference")
     scheduler: str = Field(description="The scheduler used for inference")
-    clip_skip: int = Field(
+    clip_skip: Optional[int] = Field(
+        default=None,
         description="The number of skipped CLIP layers",
     )
     model: MainModelField = Field(description="The main model used for inference")
     controlnets: list[ControlField] = Field(description="The ControlNets used for inference")
+    ipAdapters: list[IPAdapterMetadataField] = Field(description="The IP Adapters used for inference")
     loras: list[LoRAMetadataField] = Field(description="The LoRAs used for inference")
     vae: Optional[VAEModelField] = Field(
         default=None,
@@ -116,11 +132,13 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     cfg_scale: float = InputField(description="The classifier-free guidance scale parameter")
     steps: int = InputField(description="The number of steps used for inference")
     scheduler: str = InputField(description="The scheduler used for inference")
-    clip_skip: int = InputField(
+    clip_skip: Optional[int] = Field(
+        default=None,
         description="The number of skipped CLIP layers",
     )
     model: MainModelField = InputField(description="The main model used for inference")
     controlnets: list[ControlField] = InputField(description="The ControlNets used for inference")
+    ipAdapters: list[IPAdapterMetadataField] = InputField(description="The IP Adapters used for inference")
     loras: list[LoRAMetadataField] = InputField(description="The LoRAs used for inference")
     strength: Optional[float] = InputField(
         default=None,

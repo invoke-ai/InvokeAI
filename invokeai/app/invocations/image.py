@@ -8,12 +8,12 @@ import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.metadata import CoreMetadata
-from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
+from invokeai.app.invocations.primitives import BoardField, ColorField, ImageField, ImageOutput
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
 from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, FieldDescriptions, Input, InputField, InvocationContext, invocation
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.0")
@@ -98,7 +98,7 @@ class ImageCropInvocation(BaseInvocation):
         )
 
 
-@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image", version="1.0.0")
+@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image", version="1.0.1")
 class ImagePasteInvocation(BaseInvocation):
     """Pastes an image into another image."""
 
@@ -110,6 +110,7 @@ class ImagePasteInvocation(BaseInvocation):
     )
     x: int = InputField(default=0, description="The left x coordinate at which to paste the image")
     y: int = InputField(default=0, description="The top y coordinate at which to paste the image")
+    crop: bool = InputField(default=False, description="Crop to base image dimensions")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get_pil_image(self.base_image.image_name)
@@ -128,6 +129,10 @@ class ImagePasteInvocation(BaseInvocation):
         new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
         new_image.paste(base_image, (abs(min_x), abs(min_y)))
         new_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+
+        if self.crop:
+            base_w, base_h = base_image.size
+            new_image = new_image.crop((abs(min_x), abs(min_y), abs(min_x) + base_w, abs(min_y) + base_h))
 
         image_dto = context.services.images.create(
             image=new_image,
@@ -330,8 +335,8 @@ class ImageResizeInvocation(BaseInvocation):
     """Resizes an image to specific dimensions"""
 
     image: ImageField = InputField(description="The image to resize")
-    width: int = InputField(default=512, ge=64, multiple_of=8, description="The width to resize to (px)")
-    height: int = InputField(default=512, ge=64, multiple_of=8, description="The height to resize to (px)")
+    width: int = InputField(default=512, gt=0, description="The width to resize to (px)")
+    height: int = InputField(default=512, gt=0, description="The height to resize to (px)")
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
     metadata: Optional[CoreMetadata] = InputField(
         default=None, description=FieldDescriptions.core_metadata, ui_hidden=True
@@ -778,39 +783,95 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
         )
 
 
+COLOR_CHANNELS = Literal[
+    "Red (RGBA)",
+    "Green (RGBA)",
+    "Blue (RGBA)",
+    "Alpha (RGBA)",
+    "Cyan (CMYK)",
+    "Magenta (CMYK)",
+    "Yellow (CMYK)",
+    "Black (CMYK)",
+    "Hue (HSV)",
+    "Saturation (HSV)",
+    "Value (HSV)",
+    "Luminosity (LAB)",
+    "A (LAB)",
+    "B (LAB)",
+    "Y (YCbCr)",
+    "Cb (YCbCr)",
+    "Cr (YCbCr)",
+]
+
+CHANNEL_FORMATS = {
+    "Red (RGBA)": ("RGBA", 0),
+    "Green (RGBA)": ("RGBA", 1),
+    "Blue (RGBA)": ("RGBA", 2),
+    "Alpha (RGBA)": ("RGBA", 3),
+    "Cyan (CMYK)": ("CMYK", 0),
+    "Magenta (CMYK)": ("CMYK", 1),
+    "Yellow (CMYK)": ("CMYK", 2),
+    "Black (CMYK)": ("CMYK", 3),
+    "Hue (HSV)": ("HSV", 0),
+    "Saturation (HSV)": ("HSV", 1),
+    "Value (HSV)": ("HSV", 2),
+    "Luminosity (LAB)": ("LAB", 0),
+    "A (LAB)": ("LAB", 1),
+    "B (LAB)": ("LAB", 2),
+    "Y (YCbCr)": ("YCbCr", 0),
+    "Cb (YCbCr)": ("YCbCr", 1),
+    "Cr (YCbCr)": ("YCbCr", 2),
+}
+
+
 @invocation(
-    "img_luminosity_adjust",
-    title="Adjust Image Luminosity",
-    tags=["image", "luminosity", "hsl"],
+    "img_channel_offset",
+    title="Offset Image Channel",
+    tags=[
+        "image",
+        "offset",
+        "red",
+        "green",
+        "blue",
+        "alpha",
+        "cyan",
+        "magenta",
+        "yellow",
+        "black",
+        "hue",
+        "saturation",
+        "luminosity",
+        "value",
+    ],
     category="image",
     version="1.0.0",
 )
-class ImageLuminosityAdjustmentInvocation(BaseInvocation):
-    """Adjusts the Luminosity (Value) of an image."""
+class ImageChannelOffsetInvocation(BaseInvocation):
+    """Add or subtract a value from a specific color channel of an image."""
 
     image: ImageField = InputField(description="The image to adjust")
-    luminosity: float = InputField(
-        default=1.0, ge=0, le=1, description="The factor by which to adjust the luminosity (value)"
-    )
+    channel: COLOR_CHANNELS = InputField(description="Which channel to adjust")
+    offset: int = InputField(default=0, ge=-255, le=255, description="The amount to adjust the channel by")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
 
-        # Convert PIL image to OpenCV format (numpy array), note color channel
-        # ordering is changed from RGB to BGR
-        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
+        # extract the channel and mode from the input and reference tuple
+        mode = CHANNEL_FORMATS[self.channel][0]
+        channel_number = CHANNEL_FORMATS[self.channel][1]
 
-        # Convert image to HSV color space
-        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        # Convert PIL image to new format
+        converted_image = numpy.array(pil_image.convert(mode)).astype(int)
+        image_channel = converted_image[:, :, channel_number]
 
-        # Adjust the luminosity (value)
-        hsv_image[:, :, 2] = numpy.clip(hsv_image[:, :, 2] * self.luminosity, 0, 255)
+        # Adjust the value, clipping to 0..255
+        image_channel = numpy.clip(image_channel + self.offset, 0, 255)
 
-        # Convert image back to BGR color space
-        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+        # Put the channel back into the image
+        converted_image[:, :, channel_number] = image_channel
 
-        # Convert back to PIL format and to original color mode
-        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
+        # Convert back to RGBA format and output
+        pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
 
         image_dto = context.services.images.create(
             image=pil_image,
@@ -832,36 +893,60 @@ class ImageLuminosityAdjustmentInvocation(BaseInvocation):
 
 
 @invocation(
-    "img_saturation_adjust",
-    title="Adjust Image Saturation",
-    tags=["image", "saturation", "hsl"],
+    "img_channel_multiply",
+    title="Multiply Image Channel",
+    tags=[
+        "image",
+        "invert",
+        "scale",
+        "multiply",
+        "red",
+        "green",
+        "blue",
+        "alpha",
+        "cyan",
+        "magenta",
+        "yellow",
+        "black",
+        "hue",
+        "saturation",
+        "luminosity",
+        "value",
+    ],
     category="image",
     version="1.0.0",
 )
-class ImageSaturationAdjustmentInvocation(BaseInvocation):
-    """Adjusts the Saturation of an image."""
+class ImageChannelMultiplyInvocation(BaseInvocation):
+    """Scale a specific color channel of an image."""
 
     image: ImageField = InputField(description="The image to adjust")
-    saturation: float = InputField(default=1.0, ge=0, le=1, description="The factor by which to adjust the saturation")
+    channel: COLOR_CHANNELS = InputField(description="Which channel to adjust")
+    scale: float = InputField(default=1.0, ge=0.0, description="The amount to scale the channel by.")
+    invert_channel: bool = InputField(default=False, description="Invert the channel after scaling")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
 
-        # Convert PIL image to OpenCV format (numpy array), note color channel
-        # ordering is changed from RGB to BGR
-        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
+        # extract the channel and mode from the input and reference tuple
+        mode = CHANNEL_FORMATS[self.channel][0]
+        channel_number = CHANNEL_FORMATS[self.channel][1]
 
-        # Convert image to HSV color space
-        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        # Convert PIL image to new format
+        converted_image = numpy.array(pil_image.convert(mode)).astype(float)
+        image_channel = converted_image[:, :, channel_number]
 
-        # Adjust the saturation
-        hsv_image[:, :, 1] = numpy.clip(hsv_image[:, :, 1] * self.saturation, 0, 255)
+        # Adjust the value, clipping to 0..255
+        image_channel = numpy.clip(image_channel * self.scale, 0, 255)
 
-        # Convert image back to BGR color space
-        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+        # Invert the channel if requested
+        if self.invert_channel:
+            image_channel = 255 - image_channel
 
-        # Convert back to PIL format and to original color mode
-        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
+        # Put the channel back into the image
+        converted_image[:, :, channel_number] = image_channel
+
+        # Convert back to RGBA format and output
+        pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
 
         image_dto = context.services.images.create(
             image=pil_image,
@@ -877,6 +962,47 @@ class ImageSaturationAdjustmentInvocation(BaseInvocation):
             image=ImageField(
                 image_name=image_dto.image_name,
             ),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+@invocation(
+    "save_image",
+    title="Save Image",
+    tags=["primitives", "image"],
+    category="primitives",
+    version="1.0.1",
+    use_cache=False,
+)
+class SaveImageInvocation(BaseInvocation):
+    """Saves an image. Unlike an image primitive, this invocation stores a copy of the image."""
+
+    image: ImageField = InputField(description=FieldDescriptions.image)
+    board: Optional[BoardField] = InputField(default=None, description=FieldDescriptions.board, input=Input.Direct)
+    metadata: CoreMetadata = InputField(
+        default=None,
+        description=FieldDescriptions.core_metadata,
+        ui_hidden=True,
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get_pil_image(self.image.image_name)
+
+        image_dto = context.services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            board_id=self.board.board_id if self.board else None,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
+            workflow=self.workflow,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )

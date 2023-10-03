@@ -25,6 +25,7 @@ Models are described using four attributes:
          ModelType.Lora -- a LoRA or LyCORIS fine-tune
          ModelType.TextualInversion -- a textual inversion embedding
          ModelType.ControlNet -- a ControlNet model
+         ModelType.IPAdapter -- an IPAdapter model
 
   3) BaseModelType -- an enum indicating the stable diffusion base model, one of:
          BaseModelType.StableDiffusion1
@@ -234,8 +235,8 @@ import textwrap
 import types
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import rmtree, move
-from typing import Optional, List, Literal, Tuple, Union, Dict, Set, Callable
+from shutil import move, rmtree
+from typing import Callable, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import torch
 import yaml
@@ -246,20 +247,21 @@ from pydantic import BaseModel, Field
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, Chdir
+
 from .model_cache import ModelCache, ModelLocker
 from .model_search import ModelSearch
 from .models import (
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelError,
-    SchedulerPredictionType,
     MODEL_CLASSES,
-    ModelConfigBase,
-    ModelNotFoundException,
-    InvalidModelException,
+    BaseModelType,
     DuplicateModelException,
+    InvalidModelException,
     ModelBase,
+    ModelConfigBase,
+    ModelError,
+    ModelNotFoundException,
+    ModelType,
+    SchedulerPredictionType,
+    SubModelType,
 )
 
 # We are only starting to number the config file with release 3.
@@ -999,8 +1001,8 @@ class ModelManager(object):
                                 new_models_found = True
                             except DuplicateModelException as e:
                                 self.logger.warning(e)
-                            except InvalidModelException:
-                                self.logger.warning(f"Not a valid model: {model_path}")
+                            except InvalidModelException as e:
+                                self.logger.warning(f"Not a valid model: {model_path}. {e}")
                             except NotImplementedError as e:
                                 self.logger.warning(e)
 

@@ -1,14 +1,14 @@
 import { Flex, Grid, GridItem } from '@chakra-ui/react';
+import { useAnyOrDirectInputFieldNames } from 'features/nodes/hooks/useAnyOrDirectInputFieldNames';
+import { useConnectionInputFieldNames } from 'features/nodes/hooks/useConnectionInputFieldNames';
+import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { memo } from 'react';
+import NodeWrapper from '../common/NodeWrapper';
 import InvocationNodeFooter from './InvocationNodeFooter';
 import InvocationNodeHeader from './InvocationNodeHeader';
-import NodeWrapper from '../common/NodeWrapper';
-import OutputField from './fields/OutputField';
 import InputField from './fields/InputField';
-import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
+import OutputField from './fields/OutputField';
 import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
-import { useConnectionInputFieldNames } from 'features/nodes/hooks/useConnectionInputFieldNames';
-import { useAnyOrDirectInputFieldNames } from 'features/nodes/hooks/useAnyOrDirectInputFieldNames';
 
 type Props = {
   nodeId: string;
@@ -21,8 +21,8 @@ type Props = {
 const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
   const inputConnectionFieldNames = useConnectionInputFieldNames(nodeId);
   const inputAnyOrDirectFieldNames = useAnyOrDirectInputFieldNames(nodeId);
-  const outputFieldNames = useOutputFieldNames(nodeId);
   const withFooter = useWithFooter(nodeId);
+  const outputFieldNames = useOutputFieldNames(nodeId);
 
   return (
     <NodeWrapper nodeId={nodeId} selected={selected}>

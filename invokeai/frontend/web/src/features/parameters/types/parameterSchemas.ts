@@ -210,7 +210,13 @@ export type HeightParam = z.infer<typeof zHeight>;
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
-export const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+export const zBaseModel = z.enum([
+  'any',
+  'sd-1',
+  'sd-2',
+  'sdxl',
+  'sdxl-refiner',
+]);
 
 export type BaseModelParam = z.infer<typeof zBaseModel>;
 
@@ -323,10 +329,26 @@ export type ControlNetModelParam = z.infer<typeof zLoRAModel>;
 export const isValidControlNetModel = (
   val: unknown
 ): val is ControlNetModelParam => zControlNetModel.safeParse(val).success;
-
+/**
+ * Zod schema for IP-Adapter models
+ */
+export const zIPAdapterModel = z.object({
+  model_name: z.string().min(1),
+  base_model: zBaseModel,
+});
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type IPAdapterModelParam = z.infer<typeof zIPAdapterModel>;
 /**
  * Zod schema for l2l strength parameter
  */
+/**
+ * Validates/type-guards a value as a model parameter
+ */
+export const isValidIPAdapterModel = (
+  val: unknown
+): val is IPAdapterModelParam => zIPAdapterModel.safeParse(val).success;
 export const zStrength = z.number().min(0).max(1);
 /**
  * Type alias for l2l strength parameter, inferred from its zod schema

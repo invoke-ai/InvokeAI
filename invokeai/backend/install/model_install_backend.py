@@ -2,35 +2,36 @@
 Utility (backend) functions used by model_install.py
 """
 import os
+import re
 import shutil
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional, List, Dict, Callable, Union, Set
+from typing import Callable, Dict, List, Optional, Set, Union
 
 import requests
+import torch
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
-import torch
-from huggingface_hub import hf_hub_url, HfFolder, HfApi
+from huggingface_hub import HfApi, HfFolder, hf_hub_url
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import invokeai.configs as configs
-
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType, AddModelResult
-from invokeai.backend.model_management.model_probe import ModelProbe, SchedulerPredictionType, ModelProbeInfo
+from invokeai.backend.model_management import AddModelResult, BaseModelType, ModelManager, ModelType, ModelVariantType
+from invokeai.backend.model_management.model_probe import ModelProbe, ModelProbeInfo, SchedulerPredictionType
 from invokeai.backend.util import download_with_resume
-from invokeai.backend.util.devices import torch_dtype, choose_torch_device
+from invokeai.backend.util.devices import choose_torch_device, torch_dtype
+
 from ..util.logging import InvokeAILogger
 
 warnings.filterwarnings("ignore")
 
 # --------------------------globals-----------------------
 config = InvokeAIAppConfig.get_config()
-logger = InvokeAILogger.getLogger(name="InvokeAI")
+logger = InvokeAILogger.get_logger(name="InvokeAI")
 
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
 Dataset_path = Path(configs.__path__[0]) / "INITIAL_MODELS.yaml"
@@ -47,8 +48,14 @@ Config_preamble = """
 
 LEGACY_CONFIGS = {
     BaseModelType.StableDiffusion1: {
-        ModelVariantType.Normal: "v1-inference.yaml",
-        ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
+        ModelVariantType.Normal: {
+            SchedulerPredictionType.Epsilon: "v1-inference.yaml",
+            SchedulerPredictionType.VPrediction: "v1-inference-v.yaml",
+        },
+        ModelVariantType.Inpaint: {
+            SchedulerPredictionType.Epsilon: "v1-inpainting-inference.yaml",
+            SchedulerPredictionType.VPrediction: "v1-inpainting-inference-v.yaml",
+        },
     },
     BaseModelType.StableDiffusion2: {
         ModelVariantType.Normal: {
@@ -70,14 +77,6 @@ LEGACY_CONFIGS = {
 
 
 @dataclass
-class ModelInstallList:
-    """Class for listing models to be installed/removed"""
-
-    install_models: List[str] = field(default_factory=list)
-    remove_models: List[str] = field(default_factory=list)
-
-
-@dataclass
 class InstallSelections:
     install_models: List[str] = field(default_factory=list)
     remove_models: List[str] = field(default_factory=list)
@@ -90,10 +89,12 @@ class ModelLoadInfo:
     base_type: BaseModelType
     path: Optional[Path] = None
     repo_id: Optional[str] = None
+    subfolder: Optional[str] = None
     description: str = ""
     installed: bool = False
     recommended: bool = False
     default: bool = False
+    requires: Optional[List[str]] = field(default_factory=list)
 
 
 class ModelInstall(object):
@@ -127,12 +128,13 @@ class ModelInstall(object):
             value["name"] = name
             value["base_type"] = base
             value["model_type"] = model_type
-            model_dict[key] = ModelLoadInfo(**value)
+            model_info = ModelLoadInfo(**value)
+            if model_info.subfolder and model_info.repo_id:
+                model_info.repo_id += f":{model_info.subfolder}"
+            model_dict[key] = model_info
 
         # supplement with entries in models.yaml
         installed_models = [x for x in self.mgr.list_models()]
-        # suppresses autoloaded models
-        # installed_models = [x for x in self.mgr.list_models() if not self._is_autoloaded(x)]
 
         for md in installed_models:
             base = md["base_model"]
@@ -164,9 +166,12 @@ class ModelInstall(object):
 
     def list_models(self, model_type):
         installed = self.mgr.list_models(model_type=model_type)
+        print()
         print(f"Installed models of type `{model_type}`:")
+        print(f"{'Model Key':50} Model Path")
         for i in installed:
-            print(f"{i['model_name']}\t{i['base_model']}\t{i['path']}")
+            print(f"{'/'.join([i['base_model'],i['model_type'],i['model_name']]):50} {i['path']}")
+        print()
 
     # logic here a little reversed to maintain backward compatibility
     def starter_models(self, all_models: bool = False) -> Set[str]:
@@ -204,6 +209,8 @@ class ModelInstall(object):
             job += 1
 
         # add requested models
+        self._remove_installed(selections.install_models)
+        self._add_required_models(selections.install_models)
         for path in selections.install_models:
             logger.info(f"Installing {path} [{job}/{jobs}]")
             try:
@@ -263,6 +270,26 @@ class ModelInstall(object):
 
         return models_installed
 
+    def _remove_installed(self, model_list: List[str]):
+        all_models = self.all_models()
+        for path in model_list:
+            key = self.reverse_paths.get(path)
+            if key and all_models[key].installed:
+                logger.warning(f"{path} already installed. Skipping.")
+                model_list.remove(path)
+
+    def _add_required_models(self, model_list: List[str]):
+        additional_models = []
+        all_models = self.all_models()
+        for path in model_list:
+            if not (key := self.reverse_paths.get(path)):
+                continue
+            for requirement in all_models[key].requires:
+                requirement_key = self.reverse_paths.get(requirement)
+                if not all_models[requirement_key].installed:
+                    additional_models.append(requirement)
+        model_list.extend(additional_models)
+
     # install a model from a local path. The optional info parameter is there to prevent
     # the model from being probed twice in the event that it has already been probed.
     def _install_path(self, path: Path, info: ModelProbeInfo = None) -> AddModelResult:
@@ -286,7 +313,7 @@ class ModelInstall(object):
             location = download_with_resume(url, Path(staging))
             if not location:
                 logger.error(f"Unable to download {url}. Skipping.")
-            info = ModelProbe().heuristic_probe(location)
+            info = ModelProbe().heuristic_probe(location, self.prediction_helper)
             dest = self.config.models_path / info.base_type.value / info.model_type.value / location.name
             dest.parent.mkdir(parents=True, exist_ok=True)
             models_path = shutil.move(location, dest)
@@ -295,36 +322,63 @@ class ModelInstall(object):
         return self._install_path(Path(models_path), info)
 
     def _install_repo(self, repo_id: str) -> AddModelResult:
+        # hack to recover models stored in subfolders --
+        # Required to get the "v2" model of monster-labs/control_v1p_sd15_qrcode_monster
+        subfolder = None
+        if match := re.match(r"^([^/]+/[^/]+):(\w+)$", repo_id):
+            repo_id = match.group(1)
+            subfolder = match.group(2)
+
         hinfo = HfApi().model_info(repo_id)
 
         # we try to figure out how to download this most economically
         # list all the files in the repo
         files = [x.rfilename for x in hinfo.siblings]
+        if subfolder:
+            files = [x for x in files if x.startswith("v2/")]
+        prefix = f"{subfolder}/" if subfolder else ""
+
         location = None
 
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             staging = Path(staging)
-            if "model_index.json" in files:
-                location = self._download_hf_pipeline(repo_id, staging)  # pipeline
-            elif "unet/model.onnx" in files:
+            if f"{prefix}model_index.json" in files:
+                location = self._download_hf_pipeline(repo_id, staging, subfolder=subfolder)  # pipeline
+            elif f"{prefix}unet/model.onnx" in files:
                 location = self._download_hf_model(repo_id, files, staging)
             else:
                 for suffix in ["safetensors", "bin"]:
-                    if f"pytorch_lora_weights.{suffix}" in files:
-                        location = self._download_hf_model(repo_id, ["pytorch_lora_weights.bin"], staging)  # LoRA
+                    if f"{prefix}pytorch_lora_weights.{suffix}" in files:
+                        location = self._download_hf_model(
+                            repo_id, ["pytorch_lora_weights.bin"], staging, subfolder=subfolder
+                        )  # LoRA
                         break
                     elif (
-                        self.config.precision == "float16" and f"diffusion_pytorch_model.fp16.{suffix}" in files
+                        self.config.precision == "float16" and f"{prefix}diffusion_pytorch_model.fp16.{suffix}" in files
                     ):  # vae, controlnet or some other standalone
                         files = ["config.json", f"diffusion_pytorch_model.fp16.{suffix}"]
-                        location = self._download_hf_model(repo_id, files, staging)
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
-                    elif f"diffusion_pytorch_model.{suffix}" in files:
+                    elif f"{prefix}diffusion_pytorch_model.{suffix}" in files:
                         files = ["config.json", f"diffusion_pytorch_model.{suffix}"]
-                        location = self._download_hf_model(repo_id, files, staging)
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
-                    elif f"learned_embeds.{suffix}" in files:
-                        location = self._download_hf_model(repo_id, [f"learned_embeds.{suffix}"], staging)
+                    elif f"{prefix}learned_embeds.{suffix}" in files:
+                        location = self._download_hf_model(
+                            repo_id, [f"learned_embeds.{suffix}"], staging, subfolder=subfolder
+                        )
+                        break
+                    elif (
+                        f"{prefix}image_encoder.txt" in files and f"{prefix}ip_adapter.{suffix}" in files
+                    ):  # IP-Adapter
+                        files = ["image_encoder.txt", f"ip_adapter.{suffix}"]
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
+                        break
+                    elif f"{prefix}model.{suffix}" in files and f"{prefix}config.json" in files:
+                        # This elif-condition is pretty fragile, but it is intended to handle CLIP Vision models hosted
+                        # by InvokeAI for use with IP-Adapters.
+                        files = ["config.json", f"model.{suffix}"]
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
             if not location:
                 logger.warning(f"Could not determine type of repo {repo_id}. Skipping install.")
@@ -383,7 +437,7 @@ class ModelInstall(object):
                     possible_conf = path.with_suffix(".yaml")
                     if possible_conf.exists():
                         legacy_conf = str(self.relative_to_root(possible_conf))
-                    elif info.base_type == BaseModelType.StableDiffusion2:
+                    elif info.base_type in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
                         legacy_conf = Path(
                             self.config.legacy_conf_dir,
                             LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type],
@@ -411,9 +465,9 @@ class ModelInstall(object):
         else:
             return path
 
-    def _download_hf_pipeline(self, repo_id: str, staging: Path) -> Path:
+    def _download_hf_pipeline(self, repo_id: str, staging: Path, subfolder: str = None) -> Path:
         """
-        This retrieves a StableDiffusion model from cache or remote and then
+        Retrieve a StableDiffusion model from cache or remote and then
         does a save_pretrained() to the indicated staging area.
         """
         _, name = repo_id.split("/")
@@ -428,6 +482,7 @@ class ModelInstall(object):
                     variant=variant,
                     torch_dtype=precision,
                     safety_checker=None,
+                    subfolder=subfolder,
                 )
             except Exception as e:  # most errors are due to fp16 not being present. Fix this to catch other errors
                 if "fp16" not in str(e):
@@ -442,7 +497,7 @@ class ModelInstall(object):
         model.save_pretrained(staging / name, safe_serialization=True)
         return staging / name
 
-    def _download_hf_model(self, repo_id: str, files: List[str], staging: Path) -> Path:
+    def _download_hf_model(self, repo_id: str, files: List[str], staging: Path, subfolder: None) -> Path:
         _, name = repo_id.split("/")
         location = staging / name
         paths = list()
@@ -453,7 +508,7 @@ class ModelInstall(object):
                 model_dir=location / filePath.parent,
                 model_name=filePath.name,
                 access_token=self.access_token,
-                subfolder=filePath.parent,
+                subfolder=filePath.parent / subfolder if subfolder else filePath.parent,
             )
             if p:
                 paths.append(p)
@@ -482,7 +537,7 @@ def yes_or_no(prompt: str, default_yes=True):
 
 # ---------------------------------------------
 def hf_download_from_pretrained(model_class: object, model_name: str, destination: Path, **kwargs):
-    logger = InvokeAILogger.getLogger("InvokeAI")
+    logger = InvokeAILogger.get_logger("InvokeAI")
     logger.addFilter(lambda x: "fp16 is not a valid" not in x.getMessage())
 
     model = model_class.from_pretrained(
@@ -534,14 +589,17 @@ def hf_download_with_resume(
         logger.info(f"{model_name}: Downloading...")
 
     try:
-        with open(model_dest, open_mode) as file, tqdm(
-            desc=model_name,
-            initial=exist_size,
-            total=total + exist_size,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1000,
-        ) as bar:
+        with (
+            open(model_dest, open_mode) as file,
+            tqdm(
+                desc=model_name,
+                initial=exist_size,
+                total=total + exist_size,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
+            ) as bar,
+        ):
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)
                 bar.update(size)

@@ -1,3 +1,4 @@
+import i18n from 'i18next';
 import {
   ControlNetProcessorType,
   RequiredControlNetProcessorNode,
@@ -12,7 +13,6 @@ type ControlNetProcessorsDict = Record<
     default: RequiredControlNetProcessorNode | { type: 'none' };
   }
 >;
-
 /**
  * A dict of ControlNet processors, including:
  * - type
@@ -25,16 +25,24 @@ type ControlNetProcessorsDict = Record<
 export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   none: {
     type: 'none',
-    label: 'none',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.none');
+    },
+    get description() {
+      return i18n.t('controlnet.noneDescription');
+    },
     default: {
       type: 'none',
     },
   },
   canny_image_processor: {
     type: 'canny_image_processor',
-    label: 'Canny',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.canny');
+    },
+    get description() {
+      return i18n.t('controlnet.cannyDescription');
+    },
     default: {
       id: 'canny_image_processor',
       type: 'canny_image_processor',
@@ -42,10 +50,28 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       high_threshold: 200,
     },
   },
+  color_map_image_processor: {
+    type: 'color_map_image_processor',
+    get label() {
+      return i18n.t('controlnet.colorMap');
+    },
+    get description() {
+      return i18n.t('controlnet.colorMapDescription');
+    },
+    default: {
+      id: 'color_map_image_processor',
+      type: 'color_map_image_processor',
+      color_map_tile_size: 64,
+    },
+  },
   content_shuffle_image_processor: {
     type: 'content_shuffle_image_processor',
-    label: 'Content Shuffle',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.contentShuffle');
+    },
+    get description() {
+      return i18n.t('controlnet.contentShuffleDescription');
+    },
     default: {
       id: 'content_shuffle_image_processor',
       type: 'content_shuffle_image_processor',
@@ -58,8 +84,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   hed_image_processor: {
     type: 'hed_image_processor',
-    label: 'HED',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.hed');
+    },
+    get description() {
+      return i18n.t('controlnet.hedDescription');
+    },
     default: {
       id: 'hed_image_processor',
       type: 'hed_image_processor',
@@ -70,8 +100,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   lineart_anime_image_processor: {
     type: 'lineart_anime_image_processor',
-    label: 'Lineart Anime',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.lineartAnime');
+    },
+    get description() {
+      return i18n.t('controlnet.lineartAnimeDescription');
+    },
     default: {
       id: 'lineart_anime_image_processor',
       type: 'lineart_anime_image_processor',
@@ -81,8 +115,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   lineart_image_processor: {
     type: 'lineart_image_processor',
-    label: 'Lineart',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.lineart');
+    },
+    get description() {
+      return i18n.t('controlnet.lineartDescription');
+    },
     default: {
       id: 'lineart_image_processor',
       type: 'lineart_image_processor',
@@ -93,8 +131,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   mediapipe_face_processor: {
     type: 'mediapipe_face_processor',
-    label: 'Mediapipe Face',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.mediapipeFace');
+    },
+    get description() {
+      return i18n.t('controlnet.mediapipeFaceDescription');
+    },
     default: {
       id: 'mediapipe_face_processor',
       type: 'mediapipe_face_processor',
@@ -104,8 +146,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   midas_depth_image_processor: {
     type: 'midas_depth_image_processor',
-    label: 'Depth (Midas)',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.depthMidas');
+    },
+    get description() {
+      return i18n.t('controlnet.depthMidasDescription');
+    },
     default: {
       id: 'midas_depth_image_processor',
       type: 'midas_depth_image_processor',
@@ -115,8 +161,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   mlsd_image_processor: {
     type: 'mlsd_image_processor',
-    label: 'M-LSD',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.mlsd');
+    },
+    get description() {
+      return i18n.t('controlnet.mlsdDescription');
+    },
     default: {
       id: 'mlsd_image_processor',
       type: 'mlsd_image_processor',
@@ -128,8 +178,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   normalbae_image_processor: {
     type: 'normalbae_image_processor',
-    label: 'Normal BAE',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.normalBae');
+    },
+    get description() {
+      return i18n.t('controlnet.normalBaeDescription');
+    },
     default: {
       id: 'normalbae_image_processor',
       type: 'normalbae_image_processor',
@@ -139,8 +193,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   openpose_image_processor: {
     type: 'openpose_image_processor',
-    label: 'Openpose',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.openPose');
+    },
+    get description() {
+      return i18n.t('controlnet.openPoseDescription');
+    },
     default: {
       id: 'openpose_image_processor',
       type: 'openpose_image_processor',
@@ -151,8 +209,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   pidi_image_processor: {
     type: 'pidi_image_processor',
-    label: 'PIDI',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.pidi');
+    },
+    get description() {
+      return i18n.t('controlnet.pidiDescription');
+    },
     default: {
       id: 'pidi_image_processor',
       type: 'pidi_image_processor',
@@ -164,8 +226,12 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
   zoe_depth_image_processor: {
     type: 'zoe_depth_image_processor',
-    label: 'Depth (Zoe)',
-    description: '',
+    get label() {
+      return i18n.t('controlnet.depthZoe');
+    },
+    get description() {
+      return i18n.t('controlnet.depthZoeDescription');
+    },
     default: {
       id: 'zoe_depth_image_processor',
       type: 'zoe_depth_image_processor',
@@ -186,4 +252,7 @@ export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
   shuffle: 'content_shuffle_image_processor',
   openpose: 'openpose_image_processor',
   mediapipe: 'mediapipe_face_processor',
+  pidi: 'pidi_image_processor',
+  zoe: 'zoe_depth_image_processor',
+  color: 'color_map_image_processor',
 };

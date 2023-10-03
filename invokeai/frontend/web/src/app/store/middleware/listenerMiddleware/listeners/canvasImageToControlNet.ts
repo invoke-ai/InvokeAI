@@ -3,6 +3,7 @@ import { canvasImageToControlNet } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
@@ -13,14 +14,15 @@ export const addCanvasImageToControlNetListener = () => {
       const log = logger('canvas');
       const state = getState();
 
-      const blob = await getBaseLayerBlob(state);
-
-      if (!blob) {
-        log.error('Problem getting base layer blob');
+      let blob;
+      try {
+        blob = await getBaseLayerBlob(state, true);
+      } catch (err) {
+        log.error(String(err));
         dispatch(
           addToast({
-            title: 'Problem Saving Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemSavingCanvas'),
+            description: t('toast.problemSavingCanvasDesc'),
             status: 'error',
           })
         );
@@ -34,13 +36,13 @@ export const addCanvasImageToControlNetListener = () => {
           file: new File([blob], 'savedCanvas.png', {
             type: 'image/png',
           }),
-          image_category: 'mask',
+          image_category: 'control',
           is_intermediate: false,
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          crop_visible: true,
+          crop_visible: false,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: 'Canvas Sent to ControlNet & Assets' },
+            toastOptions: { title: t('toast.canvasSentControlnetAssets') },
           },
         })
       ).unwrap();

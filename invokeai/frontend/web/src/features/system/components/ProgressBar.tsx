@@ -1,40 +1,38 @@
 import { Progress } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { SystemState } from 'features/system/store/systemSlice';
-import { isEqual } from 'lodash-es';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { systemSelector } from '../store/systemSelectors';
-
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 const progressBarSelector = createSelector(
-  systemSelector,
-  (system: SystemState) => {
+  stateSelector,
+  ({ system }) => {
     return {
-      isProcessing: system.isProcessing,
-      currentStep: system.currentStep,
-      totalSteps: system.totalSteps,
-      currentStatusHasSteps: system.currentStatusHasSteps,
+      isConnected: system.isConnected,
+      hasSteps: Boolean(system.denoiseProgress),
+      value: (system.denoiseProgress?.percentage ?? 0) * 100,
     };
   },
-  {
-    memoizeOptions: { resultEqualityCheck: isEqual },
-  }
+  defaultSelectorOptions
 );
 
 const ProgressBar = () => {
   const { t } = useTranslation();
-  const { isProcessing, currentStep, totalSteps, currentStatusHasSteps } =
-    useAppSelector(progressBarSelector);
-
-  const value = currentStep ? Math.round((currentStep * 100) / totalSteps) : 0;
+  const { data: queueStatus } = useGetQueueStatusQuery();
+  const { hasSteps, value, isConnected } = useAppSelector(progressBarSelector);
 
   return (
     <Progress
       value={value}
       aria-label={t('accessibility.invokeProgressBar')}
-      isIndeterminate={isProcessing && !currentStatusHasSteps}
-      height="full"
+      isIndeterminate={
+        isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps
+      }
+      h="full"
+      w="full"
+      borderRadius={2}
       colorScheme="accent"
     />
   );

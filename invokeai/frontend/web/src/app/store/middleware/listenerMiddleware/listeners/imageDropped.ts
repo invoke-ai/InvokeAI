@@ -1,7 +1,13 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlNetImageChanged,
+  controlNetIsEnabledChanged,
+  ipAdapterImageChanged,
+  isIPAdapterEnabledChanged,
+} from 'features/controlNet/store/controlNetSlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -14,7 +20,6 @@ import {
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '../';
-import { parseify } from 'common/util/serialize';
 
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;
@@ -96,6 +101,25 @@ export const addImageDroppedListener = () => {
             controlNetId,
           })
         );
+        dispatch(
+          controlNetIsEnabledChanged({
+            controlNetId,
+            isEnabled: true,
+          })
+        );
+        return;
+      }
+
+      /**
+       * Image dropped on IP Adapter image
+       */
+      if (
+        overData.actionType === 'SET_IP_ADAPTER_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        dispatch(ipAdapterImageChanged(activeData.payload.imageDTO.image_name));
+        dispatch(isIPAdapterEnabledChanged(true));
         return;
       }
 

@@ -1,11 +1,10 @@
 import { DeleteIcon } from '@chakra-ui/icons';
 import { Badge, Flex, Text, Tooltip } from '@chakra-ui/react';
 import { makeToast } from 'features/system/util/makeToast';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +24,6 @@ type ModelListItemProps = {
 };
 
 export default function ModelListItem(props: ModelListItemProps) {
-  const isBusy = useAppSelector(selectIsBusy);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [deleteMainModel] = useDeleteMainModelsMutation();
@@ -129,7 +127,6 @@ export default function ModelListItem(props: ModelListItemProps) {
           <IAIIconButton
             icon={<DeleteIcon />}
             aria-label={t('modelManager.deleteConfig')}
-            isDisabled={isBusy}
             colorScheme="error"
           />
         }

@@ -1,11 +1,13 @@
 import torch
 from PIL import Image
+
 from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.models.image import ProgressImage
-from ..invocations.baseinvocation import InvocationContext
-from ...backend.util.util import image_to_dataURL
-from ...backend.stable_diffusion import PipelineIntermediateState
+
 from ...backend.model_management.models import BaseModelType
+from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.util.util import image_to_dataURL
+from ..invocations.baseinvocation import InvocationContext
 
 
 def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=None):
@@ -108,6 +110,9 @@ def stable_diffusion_step_callback(
     dataURL = image_to_dataURL(image, image_format="JPEG")
 
     context.services.events.emit_generator_progress(
+        queue_id=context.queue_id,
+        queue_item_id=context.queue_item_id,
+        queue_batch_id=context.queue_batch_id,
         graph_execution_state_id=context.graph_execution_state_id,
         node=node,
         source_node_id=source_node_id,

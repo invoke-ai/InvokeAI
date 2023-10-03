@@ -1,17 +1,10 @@
 from abc import ABC, abstractmethod
-
 from logging import Logger
+
 from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.board_images import board_record_to_dto
-
-from invokeai.app.services.board_record_storage import (
-    BoardChanges,
-    BoardRecordStorageBase,
-)
-from invokeai.app.services.image_record_storage import (
-    ImageRecordStorageBase,
-    OffsetPaginatedResults,
-)
+from invokeai.app.services.board_record_storage import BoardChanges, BoardRecordStorageBase
+from invokeai.app.services.image_record_storage import ImageRecordStorageBase, OffsetPaginatedResults
 from invokeai.app.services.models.board_record import BoardDTO
 from invokeai.app.services.urls import UrlServiceBase
 

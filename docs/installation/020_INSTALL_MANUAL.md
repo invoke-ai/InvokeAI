@@ -287,7 +287,7 @@ manager, please follow these steps:
     Leave off the `--gui` option to run the script using command-line arguments. Pass the `--help` argument
     to get usage instructions.
 
-### Developer Install
+## Developer Install
 
 If you have an interest in how InvokeAI works, or you would like to
 add features or bugfixes, you are encouraged to install the source
@@ -296,18 +296,29 @@ code for InvokeAI. For this to work, you will need to install the
 on your system, please see the [Git Installation
 Guide](https://github.com/git-guides/install-git)
 
-1. From the command line, run this command:
+You will also need to install the [frontend development toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/docs/contributing/contribution_guides/contributingToFrontend.md).
+
+If you have a "normal" installation, you should create a totally separate virtual environment for the git-based installation, else the two may interfere.
+
+> **Why do I need the frontend toolchain**?
+>
+> The InvokeAI project uses trunk-based development. That means our `main` branch is the development branch, and releases are tags on that branch. Because development is very active, we don't keep an updated build of the UI in `main` - we only build it for production releases.
+>
+> That means that between releases, to have a functioning application when running directly from the repo, you will need to run the UI in dev mode or build it regularly (any time the UI code changes).
+
+1. Create a fork of the InvokeAI repository through the GitHub UI or [this link](https://github.com/invoke-ai/InvokeAI/fork) 
+2. From the command line, run this command:
    ```bash
-   git clone https://github.com/invoke-ai/InvokeAI.git
+   git clone https://github.com/<your_github_username>/InvokeAI.git
    ```
 
     This will create a directory named `InvokeAI` and populate it with the
-    full source code from the InvokeAI repository.
+    full source code from your fork of the InvokeAI repository.
 
-2. Activate the InvokeAI virtual environment as per step (4) of the manual
+3. Activate the InvokeAI virtual environment as per step (4) of the manual
 installation protocol (important!)
 
-3. Enter the InvokeAI repository directory and run one of these
+4. Enter the InvokeAI repository directory and run one of these
    commands, based on your GPU:
 
     === "CUDA (NVidia)"
@@ -333,11 +344,15 @@ installation protocol (important!)
     Be sure to pass `-e` (for an editable install) and don't forget the
     dot ("."). It is part of the command.
 
-    You can now run `invokeai` and its related commands. The code will be
+5.  Install the [frontend toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/docs/contributing/contribution_guides/contributingToFrontend.md) and do a production build of the UI as described.
+
+6.  You can now run `invokeai` and its related commands. The code will be
     read from the repository, so that you can edit the .py source files
     and watch the code's behavior change.
 
-4.  If you wish to contribute to the InvokeAI project, you are
+    When you pull in new changes to the repo, be sure to re-build the UI.
+
+7.  If you wish to contribute to the InvokeAI project, you are
     encouraged to establish a GitHub account and "fork"
     https://github.com/invoke-ai/InvokeAI into your own copy of the
     repository. You can then use GitHub functions to create and submit

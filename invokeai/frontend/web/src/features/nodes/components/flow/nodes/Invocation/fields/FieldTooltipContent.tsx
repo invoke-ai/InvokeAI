@@ -8,6 +8,7 @@ import {
 } from 'features/nodes/types/types';
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   nodeId: string;
@@ -19,6 +20,7 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
   const field = useFieldData(nodeId, fieldName);
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, kind);
   const isInputTemplate = isInputFieldTemplate(fieldTemplate);
+  const { t } = useTranslation();
   const fieldTitle = useMemo(() => {
     if (isInputFieldValue(field)) {
       if (field.label && fieldTemplate?.title) {
@@ -33,11 +35,11 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
         return fieldTemplate.title;
       }
 
-      return 'Unknown Field';
+      return t('nodes.unknownField');
     } else {
-      return fieldTemplate?.title || 'Unknown Field';
+      return fieldTemplate?.title || t('nodes.unknownField');
     }
-  }, [field, fieldTemplate]);
+  }, [field, fieldTemplate, t]);
 
   return (
     <Flex sx={{ flexDir: 'column' }}>

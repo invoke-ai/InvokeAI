@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
 # General
-site_name: InvokeAI Stable Diffusion Toolkit Docs
+site_name: InvokeAI Documentation
 site_url: https://invoke-ai.github.io/InvokeAI
 site_author: mauwii
 dev_addr: '127.0.0.1:8080'
@@ -127,12 +127,12 @@ nav:
         - Manual Installation on Windows: 'installation/deprecated_documentation/INSTALL_WINDOWS.md'
         - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
         - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
-    - Nodes:
+    - Workflows & Nodes:
       - Community Nodes: 'nodes/communityNodes.md'
       - Example Workflows: 'nodes/exampleWorkflows.md'
       - Nodes Overview: 'nodes/overview.md'
       - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Node Editor Usage: 'nodes/NODES.md'
+      - Workflow Editor Usage: 'nodes/NODES.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
     - Features:
@@ -140,7 +140,7 @@ nav:
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Concepts: 'features/CONCEPTS.md'
       - Configuration: 'features/CONFIGURATION.md'
-      - ControlNet: 'features/CONTROLNET.md'
+      - Control Adapters: 'features/CONTROLNET.md'
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
       - Model Merging: 'features/MODEL_MERGING.md'
@@ -148,7 +148,7 @@ nav:
       - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
-      - Training: 'features/TRAINING.md'
+      - Textual Inversion Training: 'features/TRAINING.md'
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
       - InvokeAI Web Server: 'features/WEB.md'
       - WebUI Hotkeys: "features/WEBUIHOTKEYS.md"
@@ -157,8 +157,9 @@ nav:
       - How to Contribute: 'contributing/CONTRIBUTING.md'
       - Development:
         - Overview: 'contributing/contribution_guides/development.md'
+        - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
         - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
-        - Frontend Documentation: 'contributing/contribution_guides/development_guides/contributingToFrontend.md'
+        - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'

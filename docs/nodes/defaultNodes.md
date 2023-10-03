@@ -1,6 +1,6 @@
 # List of Default Nodes
 
-The table below contains a list of the default nodes shipped with InvokeAI and their descriptions. 
+The table below contains a list of the default nodes shipped with InvokeAI and their descriptions.
 
 | Node <img width=160 align="right"> | Function                                                                              |
 |: ---------------------------------- | :--------------------------------------------------------------------------------------|
@@ -17,11 +17,13 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Conditioning Primitive 			| A conditioning tensor primitive value|
 |Content Shuffle Processor 			| Applies content shuffle processing to image|
 |ControlNet 			| Collects ControlNet info to pass to other nodes|
-|OpenCV Inpaint 			| Simple inpaint using opencv.|
 |Denoise Latents 			| Denoises noisy latents to decodable images|
 |Divide Integers 			| Divides two numbers|
 |Dynamic Prompt 			| Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator|
-|Upscale (RealESRGAN) 			| Upscales an image using RealESRGAN.|
+|[FaceMask](./detailedNodes/faceTools.md#facemask) | Generates masks for faces in an image to use with Inpainting|
+|[FaceIdentifier](./detailedNodes/faceTools.md#faceidentifier)             | Identifies and labels faces in an image|
+|[FaceOff](./detailedNodes/faceTools.md#faceoff)             | Creates a new image that is a scaled bounding box with a mask on the face for Inpainting|
+|Float Math             | Perform basic math operations on two floats|
 |Float Primitive Collection 			| A collection of float primitive values|
 |Float Primitive 			| A float primitive value|
 |Float Range 			| Creates a range|
@@ -29,19 +31,22 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Blur Image 			| Blurs an image|
 |Extract Image Channel 			| Gets a channel from an image.|
 |Image Primitive Collection 			| A collection of image primitive values|
+|Integer Math           | Perform basic math operations on two integers|
 |Convert Image Mode 			| Converts an image to a different mode.|
 |Crop Image 			| Crops an image to a specified box. The box can be outside of the image.|
 |Image Hue Adjustment 			| Adjusts the Hue of an image.|
 |Inverse Lerp Image 			| Inverse linear interpolation of all pixels of an image|
 |Image Primitive 			| An image primitive value|
 |Lerp Image 			| Linear interpolation of all pixels of an image|
-|Image Luminosity Adjustment 			| Adjusts the Luminosity (Value) of an image.|
+|Offset Image Channel 			| Add to or subtract from an image color channel by a uniform value.|
+|Multiply Image Channel 			| Multiply or Invert an image color channel by a scalar value.|
 |Multiply Images 			| Multiplies two images together using `PIL.ImageChops.multiply()`.|
 |Blur NSFW Image 			| Add blur to NSFW-flagged images|
 |Paste Image 			| Pastes an image into another image.|
 |ImageProcessor 			| Base class for invocations that preprocess images for ControlNet|
 |Resize Image 			| Resizes an image to specific dimensions|
-|Image Saturation Adjustment 			| Adjusts the Saturation of an image.|
+|Round Float            | Rounds a float to a specified number of decimal places|
+|Float to Integer       | Converts a float to an integer. Optionally rounds to an even multiple of a input number.|
 |Scale Image 			| Scales an image by a factor|
 |Image to Latents 			| Encodes an image into latents.|
 |Add Invisible Watermark 			| Add an invisible watermark to an image|
@@ -72,6 +77,7 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |ONNX Prompt (Raw) 			| A node to process inputs and produce outputs. May use dependency injection in __init__ to receive providers.|
 |ONNX Text to Latents 			| Generates latents from conditionings.|
 |ONNX Model Loader 			| Loads a main model, outputting its submodels.|
+|OpenCV Inpaint 			| Simple inpaint using opencv.|
 |Openpose Processor 			| Applies Openpose processing to image|
 |PIDI Processor 			| Applies PIDI processing to image|
 |Prompts from File 			| Loads prompts from a text file|
@@ -93,5 +99,6 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |String Primitive 			| A string primitive value|
 |Subtract Integers 			| Subtracts two numbers|
 |Tile Resample Processor 			| Tile resampler processor|
+|Upscale (RealESRGAN) 			| Upscales an image using RealESRGAN.|
 |VAE Loader 			| Loads a VAE model, outputting a VaeLoaderOutput|
 |Zoe (Depth) Processor 			| Applies Zoe depth processing to image|
