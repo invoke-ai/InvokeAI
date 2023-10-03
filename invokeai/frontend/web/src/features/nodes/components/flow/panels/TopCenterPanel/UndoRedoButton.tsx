@@ -32,14 +32,14 @@ const UndoRedoButton = () => {
         tooltip={t('nodes.undo')}
         aria-label={t('nodes.undo')}
         onClick={handleUndo}
-        disabled={!canUndo}
+        isDisabled={!canUndo}
       />
       <IAIIconButton
         icon={<FaRedo />}
         tooltip={t('nodes.redo')}
         aria-label={t('nodes.redo')}
         onClick={handleRedo}
-        disabled={!canRedo}
+        isDisabled={!canRedo}
       />
     </>
   );
