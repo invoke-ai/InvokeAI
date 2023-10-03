@@ -66,13 +66,30 @@ class MemorySnapshot:
 
 def get_pretty_snapshot_diff(snapshot_1: MemorySnapshot, snapshot_2: MemorySnapshot) -> str:
     """Get a pretty string describing the difference between two `MemorySnapshot`s."""
-    ram_diff = snapshot_2.process_ram - snapshot_1.process_ram
-    msg = f"RAM ({(ram_diff/GB):+.2f}): {(snapshot_1.process_ram/GB):.2f}GB -> {(snapshot_2.process_ram/GB):.2f}GB"
 
-    vram_diff = None
-    if snapshot_1.vram is not None and snapshot_2.vram is not None:
-        vram_diff = snapshot_2.vram - snapshot_1.vram
+    def get_msg_line(prefix: str, val1: Optional[int], val2: Optional[int]):
+        diff = None
+        if val1 is not None and val2 is not None:
+            diff = val2 - val1
+        return f"{prefix: <30} ({(diff/GB):+5.3f}): {(val1/GB):5.3f}GB -> {(val2/GB):5.3f}GB\n"
 
-    msg += f", VRAM ({(vram_diff/GB):+.2f}): {(snapshot_1.vram/GB):.2f}GB -> {(snapshot_2.vram/GB):.2f}GB"
+    msg = ""
 
-    return msg
+    msg += get_msg_line("Process RAM", snapshot_1.process_ram, snapshot_2.process_ram)
+
+    if snapshot_1.malloc_info is not None and snapshot_2.malloc_info is not None:
+        msg += get_msg_line("libc mmap allocated", snapshot_1.malloc_info.hblkhd, snapshot_2.malloc_info.hblkhd)
+
+        msg += get_msg_line("libc arena used", snapshot_1.malloc_info.uordblks, snapshot_2.malloc_info.uordblks)
+
+        msg += get_msg_line("libc arena free", snapshot_1.malloc_info.fordblks, snapshot_2.malloc_info.fordblks)
+
+        libc_total_allocated_1 = snapshot_1.malloc_info.arena + snapshot_1.malloc_info.hblkhd
+        libc_total_allocated_2 = snapshot_2.malloc_info.arena + snapshot_2.malloc_info.hblkhd
+        msg += get_msg_line("libc total allocated", libc_total_allocated_1, libc_total_allocated_2)
+
+        libc_total_used_1 = snapshot_1.malloc_info.uordblks + snapshot_1.malloc_info.hblkhd
+        libc_total_used_2 = snapshot_2.malloc_info.uordblks + snapshot_2.malloc_info.hblkhd
+        msg += get_msg_line("libc total used", libc_total_used_1, libc_total_used_2)
+
+    msg += get_msg_line("VRAM", snapshot_1.vram, snapshot_2.vram)
