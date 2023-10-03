@@ -65,10 +65,8 @@ class MemorySnapshot:
 def get_pretty_snapshot_diff(snapshot_1: MemorySnapshot, snapshot_2: MemorySnapshot) -> str:
     """Get a pretty string describing the difference between two `MemorySnapshot`s."""
 
-    def get_msg_line(prefix: str, val1: Optional[int], val2: Optional[int]):
-        diff = None
-        if val1 is not None and val2 is not None:
-            diff = val2 - val1
+    def get_msg_line(prefix: str, val1: int, val2: int):
+        diff = val2 - val1
         return f"{prefix: <30} ({(diff/GB):+5.3f}): {(val1/GB):5.3f}GB -> {(val2/GB):5.3f}GB\n"
 
     msg = ""
@@ -90,6 +88,7 @@ def get_pretty_snapshot_diff(snapshot_1: MemorySnapshot, snapshot_2: MemorySnaps
         libc_total_used_2 = snapshot_2.malloc_info.uordblks + snapshot_2.malloc_info.hblkhd
         msg += get_msg_line("libc total used", libc_total_used_1, libc_total_used_2)
 
-    msg += get_msg_line("VRAM", snapshot_1.vram, snapshot_2.vram)
+    if snapshot_1.vram is not None and snapshot_2.vram is not None:
+        msg += get_msg_line("VRAM", snapshot_1.vram, snapshot_2.vram)
 
     return msg
