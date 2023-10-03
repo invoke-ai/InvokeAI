@@ -53,13 +53,11 @@ class MemorySnapshot:
             # time to test it properly.
             vram = None
 
-        malloc_info = None
         try:
             malloc_info = LibcUtil().mallinfo2()
-        except Exception:
-            # TODO(ryand): Catch a more specific exception.
+        except OSError:
             # This is expected in environments that do not have the 'libc.so.6' shared library.
-            pass
+            malloc_info = None
 
         return cls(process_ram, vram, malloc_info)
 
