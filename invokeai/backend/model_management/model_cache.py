@@ -222,9 +222,9 @@ class ModelCache(object):
 
             # Load the model from disk and capture a memory snapshot before/after.
             start_load_time = time.time()
-            snapshot_before = MemorySnapshot.capture()
+            snapshot_before = MemorySnapshot.capture(run_garbage_collector=False)
             model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
-            snapshot_after = MemorySnapshot.capture()
+            snapshot_after = MemorySnapshot.capture(run_garbage_collector=False)
             end_load_time = time.time()
 
             self_reported_model_size_after_load = model_info.get_size(submodel)
@@ -276,9 +276,9 @@ class ModelCache(object):
             return
 
         start_model_to_time = time.time()
-        snapshot_before = MemorySnapshot.capture()
+        snapshot_before = MemorySnapshot.capture(run_garbage_collector=False)
         cache_entry.model.to(target_device)
-        snapshot_after = MemorySnapshot.capture()
+        snapshot_after = MemorySnapshot.capture(run_garbage_collector=False)
         end_model_to_time = time.time()
         self.logger.debug(
             f"Moved model '{key}' from {source_device} to"
