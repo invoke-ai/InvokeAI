@@ -488,11 +488,12 @@ class DownloadQueue(DownloadQueueBase):
             self._update_job_status(job, DownloadJobStatus.ERROR)
 
     def _validate_filename(self, directory: str, filename: str):
+        pc_name_max = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 260
         if "/" in filename:
             raise ValueError
         if filename.startswith(".."):
             raise ValueError
-        if len(filename) > os.pathconf(directory, "PC_NAME_MAX"):
+        if len(filename) > pc_name_max:
             raise ValueError
         if len(os.path.join(directory, filename)) > os.pathconf(directory, "PC_PATH_MAX"):
             raise ValueError
