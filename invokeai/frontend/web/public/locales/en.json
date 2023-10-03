@@ -1017,7 +1017,11 @@
         "variationAmount": "Variation Amount",
         "variations": "Variations",
         "vSymmetryStep": "V Symmetry Step",
-        "width": "Width"
+        "width": "Width",
+        "isAllowedToUpscale": {
+            "useX2Model": "Image is too large to upscale with x4 model, use x2 model",
+            "tooLarge": "Image is too large to upscale, select smaller image"
+        }
     },
     "dynamicPrompts": {
         "combinatorial": "Combinatorial Generation",
