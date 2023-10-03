@@ -404,7 +404,7 @@ def get_faces_list(
     return all_faces
 
 
-@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.0")
+@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.1")
 class FaceOffInvocation(BaseInvocation):
     """Bound, extract, and mask a face from an image using MediaPipe detection"""
 
@@ -498,7 +498,7 @@ class FaceOffInvocation(BaseInvocation):
         return output
 
 
-@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.0")
+@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.1")
 class FaceMaskInvocation(BaseInvocation):
     """Face mask creation using mediapipe face detection"""
 
@@ -616,7 +616,7 @@ class FaceMaskInvocation(BaseInvocation):
 
 
 @invocation(
-    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.0"
+    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.1"
 )
 class FaceIdentifierInvocation(BaseInvocation):
     """Outputs an image with detected face IDs printed on each face. For use with other FaceTools."""
