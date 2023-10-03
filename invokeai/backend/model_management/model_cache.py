@@ -305,25 +305,6 @@ class ModelCache(object):
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
 
-                # Now, we will update our size estimate for `cache_entry` based on the change in VRAM usage. We only use the
-                # change in VRAM usage, not the change in RAM usage, because it is a more accurate measurement. The VRAM
-                # usage measurement only includes the memory used by PyTorch tensors, whereas the RAM usage measurement is
-                # of total process memory and is influenced by other factors.
-
-                # We want to err on the side of over-estimating the model's size, so we only update our estimate if the new
-                # information suggests that the model is larger than we previously thought.
-                if vram_change > cache_entry.size:
-                    self.logger.info(
-                        f"Updating the cache size estimate for model '{key}'. {(cache_entry.size/GIG):.2f}GB ->"
-                        f" {(vram_change/GIG):.2f}GB."
-                    )
-                    cache_entry.size = vram_change
-
-                    self.logger.info(
-                        "Clearing models from cache, if necessary, after updating a model's size estimate."
-                    )
-                    self._make_cache_room(0)
-
     class ModelLocker(object):
         def __init__(self, cache, key, model, gpu_load, size_needed):
             """
