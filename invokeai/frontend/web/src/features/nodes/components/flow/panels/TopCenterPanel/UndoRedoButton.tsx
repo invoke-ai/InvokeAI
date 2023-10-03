@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUndo, FaRedo } from 'react-icons/fa';
 import { undoAction, redoAction } from 'features/nodes/store/actions';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 const UndoRedoButton = () => {
   const { t } = useTranslation();
@@ -24,6 +25,10 @@ const UndoRedoButton = () => {
   const handleRedo = () => {
     dispatch(redoAction());
   };
+
+  // Hotkeys for undo and redo
+  useHotkeys('meta+z, ctrl+z', handleUndo);
+  useHotkeys('meta+shift+z, ctrl+shift+z', handleRedo);
 
   return (
     <>
