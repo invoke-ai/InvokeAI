@@ -6,10 +6,11 @@ Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
 """
 import argparse
 import curses
+import re
 import sys
 from argparse import Namespace
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import npyscreen
 from npyscreen import widget
@@ -328,7 +329,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         ]
         return sorted(models, key=lambda x: x[1])
 
-    def _populate_models(self, value: int):
+    def _populate_models(self, value: List[int]):
         base_model = BASE_TYPES[value[0]][0]
         self.models = self.get_models(base_model)
         self.model_names = [x[1] for x in self.models]
@@ -358,8 +359,8 @@ def run_gui(args: Namespace):
     mergeapp.run()
     args = mergeapp.merge_arguments
     merger = ModelMerger(model_manager, config)
-    merger.merge_diffusion_models_and_save(args)
-    logger.info(f'Models merged into new model: "{args["merged_model_name"]}".')
+    merger.merge_diffusion_models_and_save(**vars(args))
+    logger.info(f'Models merged into new model: "{args.merged_model_name}".')
 
 
 def run_cli(args: Namespace):
@@ -404,6 +405,8 @@ def main():
     args = _parse_args()
     if args.root_dir:
         config.parse_args(["--root", str(args.root_dir)])
+    else:
+        config.parse_args([])
 
     try:
         if args.front_end:
