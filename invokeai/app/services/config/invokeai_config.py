@@ -372,7 +372,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         """
         Path to the custom nodes directory.
         """
-        return self._resolve(self.nodes_path)
+        return self._resolve(self.nodes_dir)
 
     @property
     def model_conf_path(self) -> Path:

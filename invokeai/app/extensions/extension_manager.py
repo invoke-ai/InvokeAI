@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from pydantic import BaseModel, ValidationError
 
-from ...backend.util.logging import getLogger
+from ...backend.util.logging import InvokeAILogger
 from ..services.config import get_invokeai_config
 from .extension_config_manager import ExtensionConfigManager
 from .util import unique_list
@@ -21,7 +21,7 @@ class InvokeAIExtensionManager:
     """
 
     def __init__(self) -> None:
-        self.logger = getLogger("Extension Manager")
+        self.logger = InvokeAILogger.get_logger("Extension Manager")
         self.config = get_invokeai_config()
         self.community_nodes_dir: pathlib.Path = self.config.nodes_path
 
