@@ -158,13 +158,13 @@ class ModelLoad(ModelLoadBase):
 
         self._logger.info(f"Using models database {models_file}")
         self._logger.info(f"Rendering device = {device} ({device_name})")
-        self._logger.info(f"Maximum RAM cache size: {config.ram_cache_size}")
-        self._logger.info(f"Maximum VRAM cache size: {config.vram_cache_size}")
+        self._logger.info(f"Maximum RAM cache size: {config.ram}")
+        self._logger.info(f"Maximum VRAM cache size: {config.vram}")
         self._logger.info(f"Precision: {precision}")
 
         self._cache = ModelCache(
-            max_cache_size=config.ram_cache_size,
-            max_vram_cache_size=config.vram_cache_size,
+            max_cache_size=config.ram,
+            max_vram_cache_size=config.vram,
             lazy_offloading=config.lazy_offload,
             execution_device=device,
             precision=dtype,
