@@ -427,6 +427,14 @@
             "title": "Next Staging Image"
         },
         "nodesHotkeys": "Nodes Hotkeys",
+        "nodeUndo": {
+            "desc": "Undo Changes in Workflow Editor",
+            "title": "Undo"
+        },
+        "nodeRedo": {
+            "desc": "Redo Changes in Workflow Editor",
+            "title": "Redo"
+        },
         "pinOptions": {
             "desc": "Pin the options panel",
             "title": "Pin Options"

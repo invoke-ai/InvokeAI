@@ -282,6 +282,16 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       desc: t('hotkeys.addNodes.desc'),
       hotkey: 'Shift + A / Space',
     },
+    {
+      title: t('hotkeys.nodeUndo.title'),
+      desc: t('hotkeys.nodeUndo.desc'),
+      hotkey: 'Ctrl + Z',
+    },
+    {
+      title: t('hotkeys.nodeRedo.title'),
+      desc: t('hotkeys.nodeRedo.desc'),
+      hotkey: 'Ctrl + Shift + Z',
+    },
   ];
 
   const renderHotkeyModalItems = (hotkeys: HotkeyList[]) => (

@@ -34,15 +34,15 @@ const UndoRedoButton = () => {
     <ButtonGroup isAttached>
       <IAIIconButton
         icon={<FaUndo />}
-        tooltip={t('nodes.undo')}
-        aria-label={t('nodes.undo')}
+        tooltip={`${t('nodes.undo')} (ctrl + Z)`}
+        aria-label={`${t('nodes.undo')} (ctrl + Z)`}
         onClick={handleUndo}
         isDisabled={!canUndo}
       />
       <IAIIconButton
         icon={<FaRedo />}
-        tooltip={t('nodes.redo')}
-        aria-label={t('nodes.redo')}
+        tooltip={`${t('nodes.redo')} (ctrl + shift + Z)`}
+        aria-label={`${t('nodes.redo')} (ctrl + shift + Z)`}
         onClick={handleRedo}
         isDisabled={!canRedo}
       />
