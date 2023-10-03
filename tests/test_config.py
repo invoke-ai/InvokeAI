@@ -6,8 +6,6 @@ import pytest
 from omegaconf import OmegaConf
 from pydantic import ValidationError
 
-from invokeai.app.services.config import InvokeAIAppConfig
-
 
 @pytest.fixture
 def patch_rootdir(tmp_path: Path, monkeypatch: Any) -> None:

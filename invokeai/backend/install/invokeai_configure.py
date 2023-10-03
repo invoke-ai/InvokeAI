@@ -660,22 +660,6 @@ def default_ramcache() -> float:
     )  # 2.1 is just large enough for sd 1.5 ;-)
 
 
-def import_paths(config: InvokeAIAppConfig):
-    return [
-        (
-            "Folder for generated and uploaded images (tab autocompletes, return advances)",
-            "outdir",
-            config.root_path / config.outdir,
-        ),
-        (
-            "Folder to scan for new checkpoints, Controlnets, LoRAs and TI models",
-            "autoimport_dir",
-            config.root_path / config.autoimport_dir,
-        ),
-        ("Folder containing nodes to import", "nodes_dir", config.root_path / config.nodes_dir),
-    ]
-
-
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
     opts.ram = default_ramcache()

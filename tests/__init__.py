@@ -1,7 +1,7 @@
 """ Create phony root directory for subsequent tests to use """
 import os
-from tempfile import TemporaryDirectory
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 td = TemporaryDirectory()
 for file in ["models", "databases", "autoimport", "nodes", "outputs"]:
