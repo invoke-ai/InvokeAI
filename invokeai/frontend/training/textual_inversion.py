@@ -22,6 +22,7 @@ from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.model_manager import ModelConfigStore, ModelType, get_config_store
 
 from ...backend.training import do_textual_inversion_training, parse_args
 
@@ -275,10 +276,13 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             return True
 
     def get_model_names(self) -> Tuple[List[str], int]:
-        conf = OmegaConf.load(config.root_dir / "configs/models.yaml")
-        model_names = [idx for idx in sorted(list(conf.keys())) if conf[idx].get("format", None) == "diffusers"]
-        defaults = [idx for idx in range(len(model_names)) if "default" in conf[model_names[idx]]]
-        default = defaults[0] if len(defaults) > 0 else 0
+        global config
+        store: ModelConfigStore = get_config_store(config.model_conf_path)
+        main_models = store.search_by_name(model_type=ModelType.Main)
+        model_names = [
+            f"{x.base_model.value}/{x.model_type.value}/{x.name}" for x in main_models if x.model_format == "diffusers"
+        ]
+        default = 0
         return (model_names, default)
 
     def marshall_arguments(self) -> dict:
@@ -384,6 +388,7 @@ def previous_args() -> dict:
 
 
 def do_front_end(args: Namespace):
+    global config
     saved_args = previous_args()
     myapplication = MyApplication(saved_args=saved_args)
     myapplication.run()
@@ -399,7 +404,7 @@ def do_front_end(args: Namespace):
         save_args(args)
 
         try:
-            do_textual_inversion_training(InvokeAIAppConfig.get_config(), **args)
+            do_textual_inversion_training(config, **args)
             copy_to_embeddings_folder(args)
         except Exception as e:
             logger.error("An exception occurred during training. The exception was:")
@@ -413,6 +418,7 @@ def main():
 
     args = parse_args()
     config = InvokeAIAppConfig.get_config()
+    config.parse_args([])
 
     # change root if needed
     if args.root_dir:

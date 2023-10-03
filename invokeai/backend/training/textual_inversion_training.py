@@ -11,6 +11,7 @@ import logging
 import math
 import os
 import random
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -41,8 +42,8 @@ from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
 from invokeai.app.services.config import InvokeAIAppConfig, PagingArgumentParser
-from invokeai.app.services.model_manager_service import ModelManagerService
-from invokeai.backend.model_management.models import SubModelType
+from invokeai.app.services.model_manager_service import BaseModelType, ModelManagerService, ModelType
+from invokeai.backend.model_manager import SubModelType
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
     PIL_INTERPOLATION = {
@@ -65,7 +66,6 @@ else:
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 check_min_version("0.10.0.dev0")
-
 
 logger = get_logger(__name__)
 
@@ -114,7 +114,6 @@ def parse_args():
     general_group.add_argument(
         "--output_dir",
         type=Path,
-        default=f"{config.root}/text-inversion-model",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     model_group.add_argument(
@@ -550,8 +549,11 @@ def do_textual_inversion_training(
         local_rank = env_local_rank
 
     # setting up things the way invokeai expects them
+    output_dir = output_dir or config.root_path / "text-inversion-output"
+
+    print(f"output_dir={output_dir}")
     if not os.path.isabs(output_dir):
-        output_dir = os.path.join(config.root, output_dir)
+        output_dir = Path(config.root, output_dir)
 
     logging_dir = output_dir / logging_dir
 
@@ -564,14 +566,15 @@ def do_textual_inversion_training(
         project_config=accelerator_config,
     )
 
-    model_manager = ModelManagerService(config, logger)
+    model_manager = ModelManagerService(config)
 
+    # The InvokeAI logger already does this...
     # Make one log on every process with the configuration for debugging.
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO,
-    )
+    # logging.basicConfig(
+    #     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    #     datefmt="%m/%d/%Y %H:%M:%S",
+    #     level=logging.INFO,
+    # )
     logger.info(accelerator.state, main_process_only=False)
     if accelerator.is_local_main_process:
         datasets.utils.logging.set_verbosity_warning()
@@ -603,17 +606,30 @@ def do_textual_inversion_training(
         elif output_dir is not None:
             os.makedirs(output_dir, exist_ok=True)
 
-    known_models = model_manager.model_names()
-    model_name = model.split("/")[-1]
-    model_meta = next((mm for mm in known_models if mm[0].endswith(model_name)), None)
-    assert model_meta is not None, f"Unknown model: {model}"
-    model_info = model_manager.model_info(*model_meta)
-    assert model_info["model_format"] == "diffusers", "This script only works with models of type 'diffusers'"
-    tokenizer_info = model_manager.get_model(*model_meta, submodel=SubModelType.Tokenizer)
-    noise_scheduler_info = model_manager.get_model(*model_meta, submodel=SubModelType.Scheduler)
-    text_encoder_info = model_manager.get_model(*model_meta, submodel=SubModelType.TextEncoder)
-    vae_info = model_manager.get_model(*model_meta, submodel=SubModelType.Vae)
-    unet_info = model_manager.get_model(*model_meta, submodel=SubModelType.UNet)
+    if len(model) == 32 and re.match(r"^[0-9a-f]+$", model):  # looks like a key, not a model name
+        model_key = model
+    else:
+        parts = model.split("/")
+        if len(parts) == 3:
+            base_model, model_type, model_name = parts
+        else:
+            model_name = parts[-1]
+            base_model = BaseModelType("sd-1")
+            model_type = ModelType.Main
+        models = model_manager.list_models(
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+        )
+        assert len(models) > 0, f"Unknown model: {model}"
+        assert len(models) < 2, "More than one model named {model_name}. Please pass key instead."
+        model_key = models[0].key
+
+    tokenizer_info = model_manager.get_model(model_key, submodel_type=SubModelType.Tokenizer)
+    noise_scheduler_info = model_manager.get_model(model_key, submodel_type=SubModelType.Scheduler)
+    text_encoder_info = model_manager.get_model(model_key, submodel_type=SubModelType.TextEncoder)
+    vae_info = model_manager.get_model(model_key, submodel_type=SubModelType.Vae)
+    unet_info = model_manager.get_model(model_key, submodel_type=SubModelType.UNet)
 
     pipeline_args = dict(local_files_only=True)
     if tokenizer_name:
