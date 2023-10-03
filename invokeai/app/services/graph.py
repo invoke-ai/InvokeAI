@@ -2,7 +2,7 @@
 
 import copy
 import itertools
-from typing import Annotated, Any, Optional, Union, cast, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Optional, Union, get_args, get_origin, get_type_hints
 
 import networkx as nx
 from pydantic import BaseModel, root_validator, validator
