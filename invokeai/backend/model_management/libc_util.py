@@ -50,6 +50,7 @@ class Struct_mallinfo2(ctypes.Structure):
         )
         s += f"{'fordblks': <10}= {(self.fordblks/2**30):15.5f}   # Space in free blocks (non-mmapped) (GB)\n"
         s += f"{'keepcost': <10}= {(self.keepcost/2**30):15.5f}   # Top-most, releasable space (GB)\n"
+        return s
 
 
 class LibcUtil:
