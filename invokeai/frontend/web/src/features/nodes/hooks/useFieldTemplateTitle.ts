@@ -20,7 +20,7 @@ export const useFieldTemplateTitle = (
           if (!isInvocationNode(node)) {
             return;
           }
-          const nodeTemplate = nodes.present.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
           return nodeTemplate?.[KIND_MAP[kind]][fieldName]?.title;
         },
         defaultSelectorOptions

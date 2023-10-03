@@ -31,11 +31,11 @@ const selector = createSelector(
 
     if (activeTabName === 'nodes') {
       if (nodes.shouldValidateGraph) {
-        if (!nodes.nodes.length) {
+        if (!nodes.present.nodes.length) {
           reasons.push(i18n.t('parameters.invoke.noNodesInGraph'));
         }
 
-        nodes.nodes.forEach((node) => {
+        nodes.present.nodes.forEach((node) => {
           if (!isInvocationNode(node)) {
             return;
           }
@@ -48,7 +48,7 @@ const selector = createSelector(
             return;
           }
 
-          const connectedEdges = getConnectedEdges([node], nodes.edges);
+          const connectedEdges = getConnectedEdges([node], nodes.present.edges);
 
           forEach(node.data.inputs, (field) => {
             const fieldTemplate = nodeTemplate.inputs[field.name];

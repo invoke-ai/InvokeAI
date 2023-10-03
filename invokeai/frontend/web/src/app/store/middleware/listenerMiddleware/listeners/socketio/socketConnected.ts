@@ -19,7 +19,7 @@ export const addSocketConnectedEventListener = () => {
       const { disabledTabs } = config;
 
       if (
-        !size(nodes.present.nodeTemplates) &&
+        !size(nodes.nodeTemplates) &&
         !disabledTabs.includes('nodes')
       ) {
         dispatch(receivedOpenAPISchema());

@@ -16,7 +16,7 @@ export const useDoNodeVersionsMatch = (nodeId: string) => {
           if (!isInvocationNode(node)) {
             return false;
           }
-          const nodeTemplate = nodes.present.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
           if (!nodeTemplate?.version || !node.data?.version) {
             return false;
           }

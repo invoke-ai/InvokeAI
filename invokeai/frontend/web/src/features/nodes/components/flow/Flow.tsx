@@ -30,8 +30,8 @@ import {
   connectionEnded,
   connectionMade,
   connectionStarted,
-  edgeChangeStarted,
   edgeAdded,
+  edgeChangeStarted,
   edgeDeleted,
   edgesChanged,
   edgesDeleted,
@@ -83,7 +83,7 @@ export const Flow = () => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.nodes.present.nodes);
   const edges = useAppSelector((state) => state.nodes.present.edges);
-  const viewport = useAppSelector((state) => state.nodes.present.viewport);
+  const viewport = useAppSelector((state) => state.nodes.viewport);
   const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition>();

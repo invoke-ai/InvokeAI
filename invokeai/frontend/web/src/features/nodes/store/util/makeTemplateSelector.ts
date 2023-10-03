@@ -6,6 +6,6 @@ import { AnyInvocationType } from 'services/events/types';
 export const makeTemplateSelector = (type: AnyInvocationType) =>
   createSelector(
     stateSelector,
-    ({ nodes }) => nodes.present.nodeTemplates[type],
+    ({ nodes }) => nodes.nodeTemplates[type],
     defaultSelectorOptions
   );

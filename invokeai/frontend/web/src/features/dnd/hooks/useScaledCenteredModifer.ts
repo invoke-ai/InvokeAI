@@ -9,7 +9,7 @@ import { useCallback } from 'react';
 const selectZoom = createSelector(
   [stateSelector, activeTabNameSelector],
   ({ nodes }, activeTabName) =>
-    activeTabName === 'nodes' ? nodes.present?.viewport?.zoom ?? 1 : 1
+    activeTabName === 'nodes' ? nodes.viewport.zoom : 1
 );
 
 /**

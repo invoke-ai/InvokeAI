@@ -19,6 +19,9 @@ import {
 export type CurrentNodesState = {
   nodes: Node<NodeData>[];
   edges: Edge<InvocationEdgeExtra>[];
+};
+
+export type NodesState = {
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   currentConnectionFieldType: FieldType | null;
@@ -33,7 +36,6 @@ export type CurrentNodesState = {
   shouldColorEdges: boolean;
   selectedNodes: string[];
   selectedEdges: string[];
-  workflow: Omit<Workflow, 'nodes' | 'edges'>;
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
   isReady: boolean;
@@ -44,10 +46,9 @@ export type CurrentNodesState = {
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
-};
-
-export type NodesState = {
+  workflow: Omit<Workflow, 'nodes' | 'edges'>;
   past: CurrentNodesState[];
   present: CurrentNodesState;
   future: CurrentNodesState[];
 };
+

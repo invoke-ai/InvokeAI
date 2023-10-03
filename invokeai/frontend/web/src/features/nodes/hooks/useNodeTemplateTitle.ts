@@ -16,7 +16,7 @@ export const useNodeTemplateTitle = (nodeId: string) => {
             return false;
           }
           const nodeTemplate = node
-            ? nodes.present.nodeTemplates[node.data.type]
+            ? nodes.nodeTemplates[node.data.type]
             : undefined;
 
           return nodeTemplate?.title;

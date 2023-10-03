@@ -11,7 +11,7 @@ export const useNodeTemplate = (nodeId: string) => {
         stateSelector,
         ({ nodes }) => {
           const node = nodes.present.nodes.find((node) => node.id === nodeId);
-          const nodeTemplate = nodes.present.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
           return nodeTemplate;
         },
         defaultSelectorOptions

@@ -20,7 +20,7 @@ export const useConnectionInputFieldNames = (nodeId: string) => {
           if (!isInvocationNode(node)) {
             return [];
           }
-          const nodeTemplate = nodes.present.nodeTemplates[node.data.type];
+          const nodeTemplate = nodes.nodeTemplates[node.data.type];
           if (!nodeTemplate) {
             return [];
           }

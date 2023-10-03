@@ -22,7 +22,7 @@ const selector = createSelector(
   stateSelector, 
   ({ nodes }) => {
     const { author, name, description, tags, version, contact, notes } =
-      nodes.present.workflow;
+      nodes.workflow;
 
     return {
       name,

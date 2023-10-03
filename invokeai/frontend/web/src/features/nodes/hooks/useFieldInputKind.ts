@@ -15,7 +15,7 @@ export const useFieldInputKind = (nodeId: string, fieldName: string) => {
           if (!isInvocationNode(node)) {
             return;
           }
-          const nodeTemplate = nodes.present.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
           const fieldTemplate = nodeTemplate?.inputs[fieldName];
           return fieldTemplate?.input;
         },

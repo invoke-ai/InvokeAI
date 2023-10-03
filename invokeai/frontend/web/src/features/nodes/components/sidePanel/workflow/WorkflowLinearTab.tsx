@@ -13,7 +13,7 @@ const selector = createSelector(
   stateSelector,
   ({ nodes }) => {
     return {
-      fields: nodes.present.workflow.exposedFields,
+      fields: nodes.workflow.exposedFields,
     };
   },
   defaultSelectorOptions

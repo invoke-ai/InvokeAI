@@ -28,13 +28,13 @@ export const makeEdgeSelector = (
         : undefined;
 
       const stroke =
-        sourceType && nodes.present.shouldColorEdges
+        sourceType && nodes.shouldColorEdges
           ? colorTokenToCssVar(FIELDS[sourceType].color)
           : colorTokenToCssVar('base.500');
 
       return {
         isSelected,
-        shouldAnimate: nodes.present.shouldAnimateEdges && isSelected,
+        shouldAnimate: nodes.shouldAnimateEdges && isSelected,
         stroke,
       };
     },

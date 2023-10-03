@@ -10,7 +10,7 @@ const selector = createSelector(
   stateSelector,
   ({ nodes }) => {
     const lastSelectedNodeId =
-      nodes.present.selectedNodes[nodes.present.selectedNodes.length - 1];
+      nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
     const lastSelectedNode = nodes.present.nodes.find(
       (node) => node.id === lastSelectedNodeId

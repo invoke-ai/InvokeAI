@@ -11,7 +11,7 @@ export const useMouseOverNode = (nodeId: string) => {
     () =>
       createSelector(
         stateSelector,
-        ({ nodes }) => nodes.present.mouseOverNode === nodeId,
+        ({ nodes }) => nodes.mouseOverNode === nodeId,
         defaultSelectorOptions
       ),
     [nodeId]

@@ -57,10 +57,10 @@ const AddNodePopover = () => {
   const { t } = useTranslation();
 
   const fieldFilter = useAppSelector(
-    (state) => state.nodes.present.currentConnectionFieldType
+    (state) => state.nodes.currentConnectionFieldType
   );
   const handleFilter = useAppSelector(
-    (state) => state.nodes.present.connectionStartParams?.handleType
+    (state) => state.nodes.connectionStartParams?.handleType
   );
 
   const selector = createSelector(
@@ -68,7 +68,7 @@ const AddNodePopover = () => {
     ({ nodes }) => {
       // If we have a connection in progress, we need to filter the node choices
       const filteredNodeTemplates = fieldFilter
-        ? filter(nodes.present.nodeTemplates, (template) => {
+        ? filter(nodes.nodeTemplates, (template) => {
             const handles =
               handleFilter == 'source' ? template.inputs : template.outputs;
 
@@ -81,7 +81,7 @@ const AddNodePopover = () => {
               return validateSourceAndTargetTypes(sourceType, targetType);
             });
           })
-        : map(nodes.present.nodeTemplates);
+        : map(nodes.nodeTemplates);
 
       const data: NodeTemplate[] = map(filteredNodeTemplates, (template) => {
         return {
@@ -117,7 +117,7 @@ const AddNodePopover = () => {
   );
 
   const { data } = useAppSelector(selector);
-  const isOpen = useAppSelector((state) => state.nodes.present.isAddNodePopoverOpen);
+  const isOpen = useAppSelector((state) => state.nodes.isAddNodePopoverOpen);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addNode = useCallback(

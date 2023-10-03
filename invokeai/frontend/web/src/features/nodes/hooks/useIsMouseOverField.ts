@@ -12,8 +12,8 @@ export const useIsMouseOverField = (nodeId: string, fieldName: string) => {
       createSelector(
         stateSelector,
         ({ nodes }) =>
-          nodes.present.mouseOverField?.nodeId === nodeId &&
-          nodes.present.mouseOverField?.fieldName === fieldName,
+          nodes.mouseOverField?.nodeId === nodeId &&
+          nodes.mouseOverField?.fieldName === fieldName,
         defaultSelectorOptions
       ),
     [fieldName, nodeId]

@@ -18,7 +18,7 @@ import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from '../types/constants';
 
 const templatesSelector = createSelector(
   [(state: RootState) => state.nodes],
-  (nodes) => nodes.present.nodeTemplates
+  (nodes) => nodes.nodeTemplates
 );
 
 export const SHARED_NODE_PROPERTIES: Partial<Node> = {

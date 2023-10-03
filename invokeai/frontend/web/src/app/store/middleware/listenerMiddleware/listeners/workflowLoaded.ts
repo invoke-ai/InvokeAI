@@ -15,7 +15,7 @@ export const addWorkflowLoadedListener = () => {
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
       const workflow = action.payload;
-      const nodeTemplates = getState().nodes.present.nodeTemplates;
+      const nodeTemplates = getState().nodes.nodeTemplates;
 
       const { workflow: validatedWorkflow, errors } = validateWorkflow(
         workflow,

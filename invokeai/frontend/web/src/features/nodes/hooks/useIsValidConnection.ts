@@ -14,7 +14,7 @@ import { InvocationNodeData } from '../types/types';
 export const useIsValidConnection = () => {
   const flow = useReactFlow();
   const shouldValidateGraph = useAppSelector(
-    (state) => state.nodes.present.shouldValidateGraph
+    (state) => state.nodes.shouldValidateGraph
   );
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
