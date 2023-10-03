@@ -231,8 +231,8 @@ class ModelCache(object):
 
             self.logger.debug(
                 f"Moved model '{key}' from disk to cpu in {(end_load_time-start_load_time):.2f}s.\n"
-                f"Self-reported size before/after load: {(self_reported_model_size_before_load/GIG):.2f}GB /"
-                f" {(self_reported_model_size_after_load/GIG):.2f}GB.\n"
+                f"Self-reported size before/after load: {(self_reported_model_size_before_load/GIG):.3f}GB /"
+                f" {(self_reported_model_size_after_load/GIG):.3f}GB.\n"
                 f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
             )
 
@@ -283,7 +283,7 @@ class ModelCache(object):
         self.logger.debug(
             f"Moved model '{key}' from {source_device} to"
             f" {target_device} in {(end_model_to_time-start_model_to_time):.2f}s.\n"
-            f"Estimated model size: {(cache_entry.size/GIG):.2f} GB.\n"
+            f"Estimated model size: {(cache_entry.size/GIG):.3f} GB.\n"
             f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
         )
 
@@ -301,7 +301,7 @@ class ModelCache(object):
                     f"Moving model '{key}' from {source_device} to"
                     f" {target_device} caused an unexpected change in VRAM usage. The model's"
                     " estimated size may be incorrect. Estimated model size:"
-                    f" {(cache_entry.size/GIG):.2f} GB.\n"
+                    f" {(cache_entry.size/GIG):.3f} GB.\n"
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
 

@@ -93,3 +93,5 @@ def get_pretty_snapshot_diff(snapshot_1: MemorySnapshot, snapshot_2: MemorySnaps
         msg += get_msg_line("libc total used", libc_total_used_1, libc_total_used_2)
 
     msg += get_msg_line("VRAM", snapshot_1.vram, snapshot_2.vram)
+
+    return msg
