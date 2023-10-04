@@ -29,7 +29,9 @@ class ESRGANInvocation(BaseInvocation):
 
     image: ImageField = InputField(description="The input image")
     model_name: ESRGAN_MODELS = InputField(default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use")
-    tile_size: int = InputField(default=512, ge=0, description="Tile size for tiled ESRGAN upscaling (0=tiling disabled)")
+    tile_size: int = InputField(
+        default=512, ge=0, description="Tile size for tiled ESRGAN upscaling (0=tiling disabled)"
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
