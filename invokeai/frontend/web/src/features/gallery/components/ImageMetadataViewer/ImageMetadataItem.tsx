@@ -4,6 +4,7 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import {
+  IoArrowUndoCircleOutline,
   IoCaretDownCircleSharp,
   IoCaretForwardCircleSharp,
 } from 'react-icons/io5';
@@ -49,20 +50,30 @@ const ImageMetadataItem = ({
         <Tooltip label={`Recall ${label}`}>
           <IconButton
             aria-label={t('accessibility.useThisParameter')}
-            icon={
-              descVisible ? (
-                <IoCaretDownCircleSharp />
-              ) : (
-                <IoCaretForwardCircleSharp />
-              )
-            }
+            icon={<IoArrowUndoCircleOutline />}
             size="xs"
             variant="ghost"
             fontSize={20}
-            onClick={handleIconClick}
+            onClick={onClick}
           />
         </Tooltip>
       )}
+      <Tooltip label={descVisible ? `Hide ${label}` : `Show ${label}`}>
+        <IconButton
+          aria-label={t('accessibility.useThisParameter')}
+          icon={
+            descVisible ? (
+              <IoCaretDownCircleSharp />
+            ) : (
+              <IoCaretForwardCircleSharp />
+            )
+          }
+          size="xs"
+          variant="ghost"
+          fontSize={20}
+          onClick={handleIconClick}
+        />
+      </Tooltip>
       {withCopy && (
         <Tooltip label={`Copy ${label}`}>
           <IconButton
