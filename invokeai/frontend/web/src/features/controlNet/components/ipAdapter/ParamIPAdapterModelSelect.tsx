@@ -88,12 +88,16 @@ const ParamIPAdapterModelSelect = () => {
       className="nowheel nodrag"
       tooltip={selectedModel?.description}
       value={selectedModel?.id ?? null}
-      placeholder="Pick one"
-      error={!selectedModel}
+      placeholder={
+        data.length > 0
+          ? t('models.selectModel')
+          : t('models.noModelsAvailable')
+      }
+      error={!selectedModel && data.length > 0}
       data={data}
       onChange={handleValueChanged}
       sx={{ width: '100%' }}
-      disabled={!isEnabled}
+      disabled={!isEnabled || data.length === 0}
     />
   );
 };

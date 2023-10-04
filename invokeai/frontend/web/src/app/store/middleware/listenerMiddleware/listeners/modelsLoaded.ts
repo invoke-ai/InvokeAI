@@ -1,5 +1,8 @@
 import { logger } from 'app/logging/logger';
-import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlNetRemoved,
+  ipAdapterModelChanged,
+} from 'features/controlNet/store/controlNetSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import {
   modelChanged,
@@ -16,12 +19,14 @@ import {
 } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import {
+  ipAdapterModelsAdapter,
   mainModelsAdapter,
   modelsApi,
   vaeModelsAdapter,
 } from 'services/api/endpoints/models';
 import { TypeGuardFor } from 'services/api/types';
 import { startAppListening } from '..';
+import { zIPAdapterModel } from 'features/nodes/types/types';
 
 export const addModelsLoadedListener = () => {
   startAppListening({
@@ -232,6 +237,50 @@ export const addModelsLoadedListener = () => {
 
         dispatch(controlNetRemoved({ controlNetId }));
       });
+    },
+  });
+  startAppListening({
+    matcher: modelsApi.endpoints.getIPAdapterModels.matchFulfilled,
+    effect: async (action, { getState, dispatch }) => {
+      // ControlNet models loaded - need to remove missing ControlNets from state
+      const log = logger('models');
+      log.info(
+        { models: action.payload.entities },
+        `IP Adapter models loaded (${action.payload.ids.length})`
+      );
+
+      const { model } = getState().controlNet.ipAdapterInfo;
+
+      const isModelAvailable = some(
+        action.payload.entities,
+        (m) =>
+          m?.model_name === model?.model_name &&
+          m?.base_model === model?.base_model
+      );
+
+      if (isModelAvailable) {
+        return;
+      }
+
+      const firstModel = ipAdapterModelsAdapter
+        .getSelectors()
+        .selectAll(action.payload)[0];
+
+      if (!firstModel) {
+        dispatch(ipAdapterModelChanged(null));
+      }
+
+      const result = zIPAdapterModel.safeParse(firstModel);
+
+      if (!result.success) {
+        log.error(
+          { error: result.error.format() },
+          'Failed to parse IP Adapter model'
+        );
+        return;
+      }
+
+      dispatch(ipAdapterModelChanged(result.data));
     },
   });
   startAppListening({
