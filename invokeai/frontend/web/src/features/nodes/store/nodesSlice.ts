@@ -794,8 +794,8 @@ const nodesSlice = createSlice({
     },
     nodeEditorReset: (state) => {
       state.past.push({
-        nodes: [...state.nodes],
-        edges: [...state.edges],
+        nodes: cloneDeep(state.nodes),
+        edges: cloneDeep(state.edges),
       });
       state.nodes = [];
       state.edges = [];
