@@ -126,7 +126,7 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   return (
     <Box
-      onClick={onClick} // Attach onClick here
+      onClick={onClick}
       sx={{ w: 'full', h: 'full', touchAction: 'none' }}
       data-testid={`image-${imageDTO.image_name}`}
     >
@@ -179,15 +179,10 @@ const GalleryImage = (props: HoverableImageProps) => {
             position="absolute"
             bottom="5px"
             right="5px"
-            bg="gray.700"
-            color="white"
             borderRadius="50%"
-            width="20px"
-            height="20px"
             display="flex"
-            alignItems="center"
-            justifyContent="center"
             fontSize="xs"
+            fontWeight="bold"
           >
             {clickedImageIndex}
           </Box>

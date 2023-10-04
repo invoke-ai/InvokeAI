@@ -141,7 +141,7 @@ const GalleryImageGrid = () => {
               <GalleryImage
                 key={imageName}
                 imageName={imageName as string}
-                showNumber={showImageNumbers} // pass it here
+                showNumber={showImageNumbers}
                 onClick={() => {
                   setClickedImageIndices((prevIndices) => ({
                     ...prevIndices,
