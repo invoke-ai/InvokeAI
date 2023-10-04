@@ -24,7 +24,6 @@ export const buildAdHocUpscaleGraph = ({
     type: 'esrgan',
     image: { image_name },
     model_name: esrganModelName,
-    tile_size: 512,
     is_intermediate: true,
   };
 
