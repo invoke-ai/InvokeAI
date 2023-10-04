@@ -161,16 +161,16 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.packages.find]
 "where" = ["."]
 "include" = [
-    "invokeai.assets.web*","invokeai.version*",
+    "invokeai.assets.fonts*","invokeai.version*",
     "invokeai.generator*","invokeai.backend*",
     "invokeai.frontend*", "invokeai.frontend.web.dist*",
     "invokeai.frontend.web.static*",
     "invokeai.configs*",
-    "invokeai.app*","ldm*",
+    "invokeai.app*",
 ]
 
 [tool.setuptools.package-data]
-"invokeai.assets.web" = ["**.png","**.js","**.woff2","**.css"]
+"invokeai.assets.fonts" = ["**/*.ttf"]
 "invokeai.backend" = ["**.png"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]

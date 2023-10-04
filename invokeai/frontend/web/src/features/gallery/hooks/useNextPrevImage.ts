@@ -20,7 +20,7 @@ export const nextPrevImageButtonsSelector = createSelector(
     const { data, status } =
       imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
-    const { data: total } =
+    const { data: totalsData } =
       state.gallery.galleryView === 'images'
         ? boardsApi.endpoints.getBoardImagesTotal.select(
             baseQueryArgs.board_id ?? 'none'
@@ -34,7 +34,7 @@ export const nextPrevImageButtonsSelector = createSelector(
 
     const isFetching = status === 'pending';
 
-    if (!data || !lastSelectedImage || total === 0) {
+    if (!data || !lastSelectedImage || totalsData?.total === 0) {
       return {
         isFetching,
         queryArgs: baseQueryArgs,
@@ -74,7 +74,7 @@ export const nextPrevImageButtonsSelector = createSelector(
     return {
       loadedImagesCount: images.length,
       currentImageIndex,
-      areMoreImagesAvailable: (total ?? 0) > imagesLength,
+      areMoreImagesAvailable: (totalsData?.total ?? 0) > imagesLength,
       isFetching: status === 'pending',
       nextImage,
       prevImage,
