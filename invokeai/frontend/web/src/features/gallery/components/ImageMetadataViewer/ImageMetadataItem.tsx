@@ -1,9 +1,12 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { Flex, IconButton, Link, Text, Tooltip } from '@chakra-ui/react';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
-import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import {
+  IoCaretDownCircleSharp,
+  IoCaretForwardCircleSharp,
+} from 'react-icons/io5';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -26,10 +29,19 @@ const ImageMetadataItem = ({
   withCopy = false,
 }: MetadataItemProps) => {
   const { t } = useTranslation();
+  const [descVisible, setDescVisible] = useState(true);
 
   if (!value) {
     return null;
   }
+
+  const handleIconClick = () => {
+    if (descVisible) {
+      setDescVisible(false);
+    } else {
+      setDescVisible(true);
+    }
+  };
 
   return (
     <Flex gap={2}>
@@ -37,11 +49,17 @@ const ImageMetadataItem = ({
         <Tooltip label={`Recall ${label}`}>
           <IconButton
             aria-label={t('accessibility.useThisParameter')}
-            icon={<IoArrowUndoCircleOutline />}
+            icon={
+              descVisible ? (
+                <IoCaretDownCircleSharp />
+              ) : (
+                <IoCaretForwardCircleSharp />
+              )
+            }
             size="xs"
             variant="ghost"
             fontSize={20}
-            onClick={onClick}
+            onClick={handleIconClick}
           />
         </Tooltip>
       )}
@@ -61,15 +79,17 @@ const ImageMetadataItem = ({
         <Text fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
           {label}:
         </Text>
-        {isLink ? (
-          <Link href={value.toString()} isExternal wordBreak="break-all">
-            {value.toString()} <ExternalLinkIcon mx="2px" />
-          </Link>
-        ) : (
-          <Text overflowY="scroll" wordBreak="break-all">
-            {value.toString()}
-          </Text>
-        )}
+        {isLink
+          ? descVisible && (
+              <Link href={value.toString()} isExternal wordBreak="break-all">
+                {value.toString()} <ExternalLinkIcon mx="2px" />
+              </Link>
+            )
+          : descVisible && (
+              <Text overflowY="scroll" wordBreak="break-all">
+                {value.toString()}
+              </Text>
+            )}
       </Flex>
     </Flex>
   );
