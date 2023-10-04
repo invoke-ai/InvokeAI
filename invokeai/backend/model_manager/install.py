@@ -476,7 +476,7 @@ class ModelInstall(ModelInstallBase):
             if not path.exists():
                 new_path = path
             counter += 1
-        self._logger.warning('Use shutil.move(), not Path.replace() here; hash before and after move')
+        self._logger.warning("Use shutil.move(), not Path.replace() here; hash before and after move")
         # BUG! This won't work across filesystems.
         # Rehash before and after moving.
         return old_path.replace(new_path)

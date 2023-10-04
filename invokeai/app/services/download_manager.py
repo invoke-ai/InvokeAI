@@ -139,13 +139,13 @@ class DownloadQueueService(DownloadQueueServiceBase):
     ) -> DownloadJobBase:  # noqa D102
         event_handlers = event_handlers or []
         if self._event_bus:
-            event_handlers.append([self._event_bus.emit_model_download_event])   # BUG! This is not a valid method call
+            event_handlers = [*event_handlers, self._event_bus.emit_model_event]
         return self._queue.create_download_job(
-            source,
-            destdir,
-            filename,
-            start,
-            access_token,
+            source=source,
+            destdir=destdir,
+            filename=filename,
+            start=start,
+            access_token=access_token,
             event_handlers=event_handlers,
         )
 
@@ -165,16 +165,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
         return self._queue.cancel_all_jobs()
 
     def start_job(self, job: DownloadJobBase):  # noqa D102
-        return self._queue.start_job(id)
+        return self._queue.start_job(job)
 
     def pause_job(self, job: DownloadJobBase):  # noqa D102
-        return self._queue.pause_job(id)
+        return self._queue.pause_job(job)
 
     def cancel_job(self, job: DownloadJobBase):  # noqa D102
-        return self._queue.cancel_job(id)
+        return self._queue.cancel_job(job)
 
     def change_priority(self, job: DownloadJobBase, delta: int):  # noqa D102
-        return self._queue.change_priority(id, delta)
+        return self._queue.change_priority(job, delta)
 
     def join(self):  # noqa D102
         return self._queue.join()

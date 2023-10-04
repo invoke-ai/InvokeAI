@@ -291,11 +291,11 @@ class EventServiceBase:
             payload=dict(queue_id=queue_id),
         )
 
-    def emit_model_event(self, job: DownloadJobBase):
+    def emit_model_event(self, job: DownloadJobBase) -> None:
         """Emit event when the status of a download/install job changes."""
         logger = InvokeAILogger.get_logger()
         progress = 100 * (job.bytes / job.total_bytes) if job.total_bytes > 0 else 0
-        logger.info(f"Dispatch model_event for job {job.id}, status={job.status.value}, progress={progress:5.2f}%")
+        logger.debug(f"Dispatch model_event for job {job.id}, status={job.status.value}, progress={progress:5.2f}%")
         self.dispatch(  # use dispatch() directly here because we are not a session event.
             event_name="model_event", payload=dict(job=job)
         )
