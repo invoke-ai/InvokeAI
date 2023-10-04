@@ -8,8 +8,8 @@ from typing import Dict, Optional, Union
 from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
-from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 
