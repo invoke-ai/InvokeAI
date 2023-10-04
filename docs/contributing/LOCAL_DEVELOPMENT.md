@@ -226,6 +226,14 @@ Now we can create the InvokeAI debugging configs:
       "justMyCode": true
     },
     {
+      "type": "chrome",
+      "request": "launch",
+      "name": "InvokeAI UI",
+      // You have to run the UI with `yarn dev` for this to work
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/invokeai/frontend/web"
+    },
+    {
       // Run tests
       "name": "InvokeAI Test",
       "type": "python",
@@ -260,7 +268,8 @@ Now we can create the InvokeAI debugging configs:
 
 You'll see these configs in the debugging configs drop down. Running them will
 start InvokeAI with attached debugger, in the correct environment, and work just
-like the normal app.
+like the normal app, though the UI debugger requires you to run the UI in dev 
+mode. See the [frontend guide](contribution_guides/contributingToFrontend.md) for setting that up.
 
 Enjoy debugging InvokeAI with ease (not that we have any bugs of course).
 
