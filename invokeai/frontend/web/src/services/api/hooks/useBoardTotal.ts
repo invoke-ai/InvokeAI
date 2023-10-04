@@ -13,7 +13,7 @@ export const useBoardTotal = (board_id: BoardId) => {
   const { data: totalAssets } = useGetBoardAssetsTotalQuery(board_id);
 
   const currentViewTotal = useMemo(
-    () => (galleryView === 'images' ? totalImages : totalAssets),
+    () => (galleryView === 'images' ? totalImages?.total : totalAssets?.total),
     [galleryView, totalAssets, totalImages]
   );
 

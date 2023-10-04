@@ -80,7 +80,7 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int, error: Optional[str] = None) -> SessionQueueItem:
         """Cancels a session queue item"""
         pass
 
