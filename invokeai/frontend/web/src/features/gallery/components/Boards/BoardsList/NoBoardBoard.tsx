@@ -48,12 +48,12 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   const { data: imagesTotal } = useGetBoardImagesTotalQuery('none');
   const { data: assetsTotal } = useGetBoardAssetsTotalQuery('none');
   const tooltip = useMemo(() => {
-    if (!imagesTotal?.total || !assetsTotal?.total) {
+    if (imagesTotal?.total === undefined || assetsTotal?.total === undefined) {
       return undefined;
     }
-    return `${imagesTotal.total} image${imagesTotal.total > 1 ? 's' : ''}, ${
+    return `${imagesTotal.total} image${imagesTotal.total === 1 ? '' : 's'}, ${
       assetsTotal.total
-    } asset${assetsTotal.total > 1 ? 's' : ''}`;
+    } asset${assetsTotal.total === 1 ? '' : 's'}`;
   }, [assetsTotal, imagesTotal]);
 
   const handleMouseOver = useCallback(() => {
