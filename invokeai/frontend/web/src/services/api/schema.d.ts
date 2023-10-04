@@ -9685,17 +9685,35 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * T2IAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    T2IAdapterModelFormat: "diffusers";
+    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
-     * StableDiffusion2ModelFormat
+     * CLIPVisionModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    CLIPVisionModelFormat: "diffusers";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
@@ -9714,24 +9732,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
-     * T2IAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    T2IAdapterModelFormat: "diffusers";
-    /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
   };
   responses: never;
   parameters: never;
