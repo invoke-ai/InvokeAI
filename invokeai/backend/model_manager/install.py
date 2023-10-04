@@ -458,8 +458,11 @@ class ModelInstall(ModelInstallBase):
         info: ModelProbeInfo = self._probe_model(model_path, overrides)
 
         dest_path = self._app_config.models_path / info.base_type.value / info.model_type.value / model_path.name
+        new_path = self._move_model(model_path, dest_path)
+        new_hash = self.hash(new_path)
+        assert new_hash == info.hash, f"{model_path}: Model hash changed during installation, possibly corrupted."
         return self._register(
-            self._move_model(model_path, dest_path),
+            new_path,
             info,
         )
 
@@ -476,10 +479,7 @@ class ModelInstall(ModelInstallBase):
             if not path.exists():
                 new_path = path
             counter += 1
-        self._logger.warning("Use shutil.move(), not Path.replace() here; hash before and after move")
-        # BUG! This won't work across filesystems.
-        # Rehash before and after moving.
-        return old_path.replace(new_path)
+        return move(old_path, new_path)
 
     def _probe_model(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> ModelProbeInfo:
         info: ModelProbeInfo = ModelProbe.probe(Path(model_path))
@@ -606,6 +606,8 @@ class ModelInstall(ModelInstallBase):
             f"{old_path.name} is not in the right directory for a model of its type. Moving to {new_path}."
         )
         model.path = self._move_model(old_path, new_path).as_posix()
+        new_hash = self.hash(model.path)
+        assert new_hash == key, f"{model.name}: Model hash changed during installation, possibly corrupted."
         self._store.update_model(key, model)
         return model
 

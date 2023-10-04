@@ -122,24 +122,18 @@ class ModelLoad(ModelLoadBase):
     _cache_keys: dict
     _models_file: Path
 
-    def __init__(self, config: InvokeAIAppConfig, event_handlers: List[DownloadEventHandler] = []):
+    def __init__(
+        self,
+        config: InvokeAIAppConfig,
+        store: Optional[ModelConfigStore] = None,
+        event_handlers: List[DownloadEventHandler] = [],
+    ):
         """
         Initialize ModelLoad object.
 
         :param config: The app's InvokeAIAppConfig object.
         """
-        if config.model_conf_path and config.model_conf_path.exists():
-            models_file = config.model_conf_path
-        else:
-            models_file = config.root_path / "configs/models3.yaml"
-        try:
-            store = get_config_store(models_file)
-        except ConfigFileVersionMismatchException:
-            migrate_models_store(config)
-            store = get_config_store(models_file)
-
-        if not store:
-            raise ValueError(f"Invalid model configuration file: {models_file}")
+        store = store or self._create_store(config)
 
         self._app_config = config
         self._store = store
@@ -151,13 +145,13 @@ class ModelLoad(ModelLoadBase):
             event_handlers=event_handlers,
         )
         self._cache_keys = dict()
-        self._models_file = models_file
+        self._models_file = config.model_conf_path
         device = torch.device(choose_torch_device())
         device_name = torch.cuda.get_device_name() if device == torch.device("cuda") else ""
         precision = choose_precision(device) if config.precision == "auto" else config.precision
         dtype = torch.float32 if precision == "float32" else torch.float16
 
-        self._logger.info(f"Using models database {models_file}")
+        self._logger.info(f"Using models database {self._models_file}")
         self._logger.info(f"Rendering device = {device} ({device_name})")
         self._logger.info(f"Maximum RAM cache size: {config.ram}")
         self._logger.info(f"Maximum VRAM cache size: {config.vram}")
@@ -172,13 +166,27 @@ class ModelLoad(ModelLoadBase):
             logger=self._logger,
         )
 
+    def _create_store(self, config: InvokeAIAppConfig) -> ModelConfigStore:
+        if config.model_conf_path and config.model_conf_path.exists():
+            models_file = config.model_conf_path
+        else:
+            models_file = config.root_path / "configs/models.yaml"
+        try:
+            store = get_config_store(models_file)
+        except ConfigFileVersionMismatchException:
+            migrate_models_store(config)
+            store = get_config_store(models_file)
+        if not store:
+            raise ValueError(f"Invalid model configuration file: {models_file}")
+        return store
+
     @property
     def store(self) -> ModelConfigStore:
         """Return the ModelConfigStore instance used by this class."""
         return self._store
 
     @property
-    def precision(self) -> torch.fp32:
+    def precision(self) -> torch.dtype:
         """Return torch.fp16 or torch.fp32."""
         return self._cache.precision
 

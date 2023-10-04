@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from processor import Invoker
 from pydantic import Field, parse_obj_as
 from pydantic.networks import AnyHttpUrl
 
@@ -27,6 +26,9 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.cache import CacheStats
 from invokeai.backend.model_manager.download import DownloadJobBase
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
+
+# processor is giving circular import errors
+# from .processor import Invoker
 
 from .config import InvokeAIAppConfig
 from .events import EventServiceBase
@@ -345,9 +347,10 @@ class ModelManagerService(ModelManagerServiceBase):
         kwargs: Dict[str, Any] = {}
         if self._event_bus:
             kwargs.update(event_handlers=[self._event_bus.emit_model_event])
+        # TO DO - Pass storage service rather than letting loader create storage service
         self._loader = ModelLoad(config, **kwargs)
 
-    def start(self, invoker: Invoker):
+    def start(self, invoker: Any):  # Because .processor is giving circular import errors, declaring invoker an 'Any'
         """Call automatically at process start."""
         self._loader.installer.scan_models_directory()  # synchronize new/deleted models found in models directory
 

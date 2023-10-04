@@ -99,13 +99,14 @@ sd-1/controlnet/ip2p:
 sd-1/embedding/EasyNegative:
    source: https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
    recommended: True
-sd-1/embedding/ahx-beta-453407d:
-   source: sd-concepts-library/ahx-beta-453407d
+   description: A textual inversion to use in the negative prompt to reduce bad anatomy
 sd-1/lora/LowRA:
    source: https://civitai.com/api/download/models/63006
    recommended: True
+   description: An embedding that helps generate low-light images
 sd-1/lora/Ink scenery:
    source: https://civitai.com/api/download/models/83390
+   description: Generate india ink-like landscapes
 sd-1/ip_adapter/ip_adapter_sd15:
    source: InvokeAI/ip_adapter_sd15
    recommended: True
