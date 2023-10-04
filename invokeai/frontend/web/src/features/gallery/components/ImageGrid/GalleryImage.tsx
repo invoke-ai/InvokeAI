@@ -24,11 +24,19 @@ import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
 
 interface HoverableImageProps {
   imageName: string;
+  onClick?: () => void;
+  clickedImageIndex: number | null;
+  showNumber: boolean;
 }
 
 const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { imageName } = props;
+  const {
+    imageName,
+    onClick,
+    clickedImageIndex,
+    showNumber: showImageNumbers,
+  } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
   const shift = useAppSelector((state) => state.hotkeys.shift);
   const { t } = useTranslation();
@@ -118,6 +126,7 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   return (
     <Box
+      onClick={onClick} // Attach onClick here
       sx={{ w: 'full', h: 'full', touchAction: 'none' }}
       data-testid={`image-${imageDTO.image_name}`}
     >
@@ -164,6 +173,25 @@ const GalleryImage = (props: HoverableImageProps) => {
             )}
           </>
         </IAIDndImage>
+
+        {isSelected && showImageNumbers && (
+          <Box
+            position="absolute"
+            bottom="5px"
+            right="5px"
+            bg="gray.700"
+            color="white"
+            borderRadius="50%"
+            width="20px"
+            height="20px"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            fontSize="xs"
+          >
+            {clickedImageIndex}
+          </Box>
+        )}
       </Flex>
     </Box>
   );

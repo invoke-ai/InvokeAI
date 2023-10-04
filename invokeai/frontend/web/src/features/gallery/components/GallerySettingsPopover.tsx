@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
+import { toggleImageNumbers } from 'features/gallery/store/gallerySlice';
 
 const selector = createSelector(
   [stateSelector],
@@ -25,12 +26,14 @@ const selector = createSelector(
       galleryImageMinimumWidth,
       shouldAutoSwitch,
       autoAssignBoardOnClick,
+      showImageNumbers,
     } = state.gallery;
 
     return {
       galleryImageMinimumWidth,
       shouldAutoSwitch,
       autoAssignBoardOnClick,
+      showImageNumbers,
     };
   },
   defaultSelectorOptions
@@ -40,8 +43,12 @@ const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { galleryImageMinimumWidth, shouldAutoSwitch, autoAssignBoardOnClick } =
-    useAppSelector(selector);
+  const {
+    galleryImageMinimumWidth,
+    shouldAutoSwitch,
+    autoAssignBoardOnClick,
+    showImageNumbers,
+  } = useAppSelector(selector);
 
   const handleChangeGalleryImageMinimumWidth = useCallback(
     (v: number) => {
@@ -94,6 +101,11 @@ const GallerySettingsPopover = () => {
           onChange={(e: ChangeEvent<HTMLInputElement>) =>
             dispatch(autoAssignBoardOnClickChanged(e.target.checked))
           }
+        />
+        <IAISimpleCheckbox
+          label={t('gallery.showImageNumbers')}
+          isChecked={showImageNumbers}
+          onChange={() => dispatch(toggleImageNumbers())}
         />
         <BoardAutoAddSelect />
       </Flex>

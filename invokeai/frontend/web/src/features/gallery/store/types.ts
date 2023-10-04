@@ -22,4 +22,5 @@ export type GalleryState = {
   selectedBoardId: BoardId;
   galleryView: GalleryView;
   boardSearchText: string;
+  showImageNumbers: boolean;
 };

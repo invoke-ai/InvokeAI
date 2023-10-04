@@ -14,6 +14,7 @@ export const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
+  showImageNumbers: false,
 };
 
 export const gallerySlice = createSlice({
@@ -55,6 +56,9 @@ export const gallerySlice = createSlice({
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
     },
+    toggleImageNumbers: (state) => {
+      state.showImageNumbers = !state.showImageNumbers;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -93,6 +97,7 @@ export const {
   galleryViewChanged,
   selectionChanged,
   boardSearchTextChanged,
+  toggleImageNumbers,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

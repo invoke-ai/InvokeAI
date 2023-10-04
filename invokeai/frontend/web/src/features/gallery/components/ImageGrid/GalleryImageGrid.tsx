@@ -47,6 +47,12 @@ const GalleryImageGrid = () => {
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
 
+  const [clickedImageIndices, setClickedImageIndices] = useState<
+    Record<string, number>
+  >({});
+
+  const { showImageNumbers } = useAppSelector((state) => state.gallery);
+
   const { currentData, isFetching, isSuccess, isError } =
     useListImagesQuery(queryArgs);
 
@@ -132,7 +138,18 @@ const GalleryImageGrid = () => {
             }}
             scrollerRef={setScroller}
             itemContent={(index, imageName) => (
-              <GalleryImage key={imageName} imageName={imageName as string} />
+              <GalleryImage
+                key={imageName}
+                imageName={imageName as string}
+                showNumber={showImageNumbers} // pass it here
+                onClick={() => {
+                  setClickedImageIndices((prevIndices) => ({
+                    ...prevIndices,
+                    [imageName]: index + 1,
+                  }));
+                }}
+                clickedImageIndex={clickedImageIndices[imageName] || null}
+              />
             )}
           />
         </Box>
