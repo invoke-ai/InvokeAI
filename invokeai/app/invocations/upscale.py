@@ -23,12 +23,13 @@ ESRGAN_MODELS = Literal[
 ]
 
 
-@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.0.0")
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.0.1")
 class ESRGANInvocation(BaseInvocation):
     """Upscales an image using RealESRGAN."""
 
     image: ImageField = InputField(description="The input image")
     model_name: ESRGAN_MODELS = InputField(default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use")
+    tile_size: int = InputField(default=512, ge=0, description="Tile size for tiled ESRGAN upscaling (0=tiling disabled)")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -86,6 +87,7 @@ class ESRGANInvocation(BaseInvocation):
             model_path=str(models_path / esrgan_model_path),
             model=rrdbnet_model,
             half=False,
+            tile=self.tile_size,
         )
 
         # prepare image - Real-ESRGAN uses cv2 internally, and cv2 uses BGR vs RGB for PIL
