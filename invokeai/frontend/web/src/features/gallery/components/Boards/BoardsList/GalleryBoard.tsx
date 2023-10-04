@@ -77,12 +77,12 @@ const GalleryBoard = ({
   const { data: imagesTotal } = useGetBoardImagesTotalQuery(board.board_id);
   const { data: assetsTotal } = useGetBoardAssetsTotalQuery(board.board_id);
   const tooltip = useMemo(() => {
-    if (!imagesTotal?.total || !assetsTotal?.total) {
+    if (imagesTotal?.total === undefined || assetsTotal?.total === undefined) {
       return undefined;
     }
-    return `${imagesTotal.total} image${imagesTotal.total > 1 ? 's' : ''}, ${
+    return `${imagesTotal.total} image${imagesTotal.total === 1 ? '' : 's'}, ${
       assetsTotal.total
-    } asset${assetsTotal.total > 1 ? 's' : ''}`;
+    } asset${assetsTotal.total === 1 ? '' : 's'}`;
   }, [assetsTotal, imagesTotal]);
 
   const { currentData: coverImage } = useGetImageDTOQuery(
