@@ -129,6 +129,7 @@ export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
   'Scheduler',
   'IPAdapterModelField',
   'BoardField',
+  'T2IAdapterModelField',
 ];
 
 export const isPolymorphicItemType = (

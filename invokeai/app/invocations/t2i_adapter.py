@@ -54,6 +54,7 @@ class T2IAdapterInvocation(BaseInvocation):
         description="The T2I-Adapter model.",
         title="T2I-Adapter Model",
         input=Input.Direct,
+        ui_order=-1,
     )
     weight: Union[float, list[float]] = InputField(
         default=1, ge=0, description="The weight given to the T2I-Adapter", ui_type=UIType.Float, title="Weight"
