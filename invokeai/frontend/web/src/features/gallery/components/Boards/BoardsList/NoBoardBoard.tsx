@@ -1,4 +1,4 @@
-import { Box, Flex, Image, Text } from '@chakra-ui/react';
+import { Box, Flex, Image, Text, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -15,6 +15,10 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
+import {
+  useGetBoardAssetsTotalQuery,
+  useGetBoardImagesTotalQuery,
+} from 'services/api/endpoints/boards';
 
 interface Props {
   isSelected: boolean;
@@ -40,6 +44,17 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }
   }, [dispatch, autoAssignBoardOnClick]);
   const [isHovered, setIsHovered] = useState(false);
+
+  const { data: imagesTotal } = useGetBoardImagesTotalQuery('none');
+  const { data: assetsTotal } = useGetBoardAssetsTotalQuery('none');
+  const tooltip = useMemo(() => {
+    if (!imagesTotal?.total || !assetsTotal?.total) {
+      return undefined;
+    }
+    return `${imagesTotal.total} image${imagesTotal.total > 1 ? 's' : ''}, ${
+      assetsTotal.total
+    } asset${assetsTotal.total > 1 ? 's' : ''}`;
+  }, [assetsTotal, imagesTotal]);
 
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
@@ -74,77 +89,82 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
       >
         <BoardContextMenu board_id="none">
           {(ref) => (
-            <Flex
-              ref={ref}
-              onClick={handleSelectBoard}
-              sx={{
-                w: 'full',
-                h: 'full',
-                position: 'relative',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: 'base',
-                cursor: 'pointer',
-                bg: 'base.200',
-                _dark: {
-                  bg: 'base.800',
-                },
-              }}
-            >
+            <Tooltip label={tooltip} openDelay={1000} hasArrow>
               <Flex
+                ref={ref}
+                onClick={handleSelectBoard}
                 sx={{
                   w: 'full',
                   h: 'full',
+                  position: 'relative',
                   justifyContent: 'center',
                   alignItems: 'center',
+                  borderRadius: 'base',
+                  cursor: 'pointer',
+                  bg: 'base.200',
+                  _dark: {
+                    bg: 'base.800',
+                  },
                 }}
               >
-                <Image
-                  src={InvokeAILogoImage}
-                  alt="invoke-ai-logo"
+                <Flex
                   sx={{
-                    opacity: 0.4,
-                    filter: 'grayscale(1)',
-                    mt: -6,
-                    w: 16,
-                    h: 16,
-                    minW: 16,
-                    minH: 16,
-                    userSelect: 'none',
+                    w: 'full',
+                    h: 'full',
+                    justifyContent: 'center',
+                    alignItems: 'center',
                   }}
+                >
+                  <Image
+                    src={InvokeAILogoImage}
+                    alt="invoke-ai-logo"
+                    sx={{
+                      opacity: 0.4,
+                      filter: 'grayscale(1)',
+                      mt: -6,
+                      w: 16,
+                      h: 16,
+                      minW: 16,
+                      minH: 16,
+                      userSelect: 'none',
+                    }}
+                  />
+                </Flex>
+                {autoAddBoardId === 'none' && <AutoAddIcon />}
+                <Flex
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    p: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    w: 'full',
+                    maxW: 'full',
+                    borderBottomRadius: 'base',
+                    bg: isSelected ? 'accent.400' : 'base.500',
+                    color: isSelected ? 'base.50' : 'base.100',
+                    _dark: {
+                      bg: isSelected ? 'accent.500' : 'base.600',
+                      color: isSelected ? 'base.50' : 'base.100',
+                    },
+                    lineHeight: 'short',
+                    fontSize: 'xs',
+                    fontWeight: isSelected ? 700 : 500,
+                  }}
+                >
+                  {boardName}
+                </Flex>
+                <SelectionOverlay
+                  isSelected={isSelected}
+                  isHovered={isHovered}
+                />
+                <IAIDroppable
+                  data={droppableData}
+                  dropLabel={<Text fontSize="md">Move</Text>}
                 />
               </Flex>
-              {autoAddBoardId === 'none' && <AutoAddIcon />}
-              <Flex
-                sx={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  p: 1,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  w: 'full',
-                  maxW: 'full',
-                  borderBottomRadius: 'base',
-                  bg: isSelected ? 'accent.400' : 'base.500',
-                  color: isSelected ? 'base.50' : 'base.100',
-                  _dark: {
-                    bg: isSelected ? 'accent.500' : 'base.600',
-                    color: isSelected ? 'base.50' : 'base.100',
-                  },
-                  lineHeight: 'short',
-                  fontSize: 'xs',
-                  fontWeight: isSelected ? 700 : 500,
-                }}
-              >
-                {boardName}
-              </Flex>
-              <SelectionOverlay isSelected={isSelected} isHovered={isHovered} />
-              <IAIDroppable
-                data={droppableData}
-                dropLabel={<Text fontSize="md">Move</Text>}
-              />
-            </Flex>
+            </Tooltip>
           )}
         </BoardContextMenu>
       </Flex>
