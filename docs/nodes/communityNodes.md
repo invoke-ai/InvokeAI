@@ -15,7 +15,7 @@ To use a community workflow, download the the `.json` node graph file and load i
 
 **Description:** Create compelling 3D stereo images from 2D originals.
 
-**Node Link:** https://gitlab.com/srcrr/shift3d/-/raw/main/make3d.py
+**Node Link:** [https://gitlab.com/srcrr/shift3d/-/raw/main/make3d.py](https://gitlab.com/srcrr/shift3d)
 
 **Example Node Graph:**  https://gitlab.com/srcrr/shift3d/-/raw/main/example-workflow.json?ref_type=heads&inline=false
 
