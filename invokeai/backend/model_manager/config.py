@@ -240,7 +240,12 @@ AnyModelConfig = Union[
     TextualInversionConfig,
     ONNXSD1Config,
     ONNXSD2Config,
+    VaeCheckpointConfig,
+    VaeDiffusersConfig,
+    ControlNetDiffusersConfig,
+    ControlNetCheckpointConfig,
     ModelConfigBase,
+    IPAdapterConfig,
 ]
 
 

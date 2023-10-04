@@ -139,7 +139,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     ) -> DownloadJobBase:  # noqa D102
         event_handlers = event_handlers or []
         if self._event_bus:
-            event_handlers.append([self._event_bus.emit_model_download_event])
+            event_handlers.append([self._event_bus.emit_model_download_event])   # BUG! This is not a valid method call
         return self._queue.create_download_job(
             source,
             destdir,

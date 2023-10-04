@@ -325,14 +325,6 @@ class InvokeAIAppConfig(InvokeAISettings):
             cls.singleton_init = kwargs
         return cls.singleton_config
 
-    @classmethod
-    def clear_config(cls):
-        """
-        This removes the singleton InvokeAIAppConfig configuration object.
-        """
-        cls.singleton_config = None
-        cls.singleton_config = None
-
     @property
     def root_path(self) -> Path:
         """

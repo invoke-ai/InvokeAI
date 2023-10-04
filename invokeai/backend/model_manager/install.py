@@ -294,6 +294,26 @@ class ModelInstallBase(ABC):
         pass
 
     @abstractmethod
+    def convert_model(
+        self,
+        key: str,
+        dest_directory: Optional[Path] = None,
+    ) -> ModelConfigBase:
+        """
+        Convert a checkpoint file into a diffusers folder.
+
+        It will delete the cached version ans well as the
+        original checkpoint file if it is in the models directory.
+        :param key: Unique key of model.
+        :dest_directory: Optional place to put converted file. If not specified,
+        will be stored in the `models_dir`.
+
+        This will raise a ValueError unless the model is a checkpoint.
+        This will raise an UnknownModelException if key is unknown.
+        """
+        pass
+
+    @abstractmethod
     def sync_model_path(self, key) -> ModelConfigBase:
         """
         Move model into the location indicated by its basetype, type and name.
@@ -456,6 +476,9 @@ class ModelInstall(ModelInstallBase):
             if not path.exists():
                 new_path = path
             counter += 1
+        self._logger.warning('Use shutil.move(), not Path.replace() here; hash before and after move')
+        # BUG! This won't work across filesystems.
+        # Rehash before and after moving.
         return old_path.replace(new_path)
 
     def _probe_model(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> ModelProbeInfo:

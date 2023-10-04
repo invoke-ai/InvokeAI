@@ -95,7 +95,6 @@ class ModelCache(object):
         execution_device: torch.device = torch.device("cuda"),
         storage_device: torch.device = torch.device("cpu"),
         precision: torch.dtype = torch.float16,
-        sequential_offload: bool = False,
         lazy_offloading: bool = True,
         sha_chunksize: int = 16777216,
         logger: Logger = InvokeAILogger.get_logger(),
@@ -106,7 +105,6 @@ class ModelCache(object):
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
         :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
-        :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
         """
         self.model_infos: Dict[str, ModelBase] = dict()

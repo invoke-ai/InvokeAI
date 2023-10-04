@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
+from processor import Invoker
 from pydantic import Field, parse_obj_as
 from pydantic.networks import AnyHttpUrl
 
@@ -345,6 +346,9 @@ class ModelManagerService(ModelManagerServiceBase):
         if self._event_bus:
             kwargs.update(event_handlers=[self._event_bus.emit_model_event])
         self._loader = ModelLoad(config, **kwargs)
+
+    def start(self, invoker: Invoker):
+        """Call automatically at process start."""
         self._loader.installer.scan_models_directory()  # synchronize new/deleted models found in models directory
 
     def get_model(

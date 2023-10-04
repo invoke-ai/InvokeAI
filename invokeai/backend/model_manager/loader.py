@@ -78,6 +78,7 @@ class ModelLoadBase(ABC):
         pass
 
     @property
+    @abstractmethod
     def config(self) -> InvokeAIAppConfig:
         """Return the config object used by this installer."""
         pass
@@ -100,8 +101,8 @@ class ModelLoadBase(ABC):
 
     @property
     @abstractmethod
-    def precision(self) -> str:
-        """Return 'float32' or 'float16'."""
+    def precision(self) -> torch.dtype:
+        """Return torch.fp16 or torch.fp32."""
         pass
 
     @abstractmethod
@@ -168,7 +169,6 @@ class ModelLoad(ModelLoadBase):
             lazy_offloading=config.lazy_offload,
             execution_device=device,
             precision=dtype,
-            sequential_offload=config.sequential_guidance,
             logger=self._logger,
         )
 
@@ -178,8 +178,8 @@ class ModelLoad(ModelLoadBase):
         return self._store
 
     @property
-    def precision(self) -> str:
-        """Return 'float32' or 'float16'."""
+    def precision(self) -> torch.fp32:
+        """Return torch.fp16 or torch.fp32."""
         return self._cache.precision
 
     @property
