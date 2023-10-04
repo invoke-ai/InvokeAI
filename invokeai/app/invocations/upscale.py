@@ -4,10 +4,10 @@ from typing import Literal
 
 import cv2 as cv
 import numpy as np
+import torch
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from PIL import Image
 from realesrgan import RealESRGANer
-import torch
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
