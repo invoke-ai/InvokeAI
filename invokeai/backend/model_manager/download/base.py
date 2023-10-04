@@ -5,17 +5,13 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 import requests
 from pydantic import BaseModel, Field
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
-
-# Used to distinguish between repo_id sources and URL sources
-REPO_ID_RE = r"^[\w-]+/[.\w-]+$"
-HTTP_RE = r"^https?://"
 
 
 class DownloadJobStatus(str, Enum):
@@ -53,16 +49,11 @@ class DownloadJobBase(BaseModel):
     """Class to monitor and control a model download request."""
 
     priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
-    id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a placeholder
-    source: Union[str, Path] = Field(description="URL or repo_id to download")
-    destination: Path = Field(description="Destination of URL on local disk")
-    metadata: ModelSourceMetadata = Field(
-        description="Model metadata (source-specific)", default_factory=ModelSourceMetadata
-    )
+    id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
+    source: Any = Field(description="Where to download from. Specific types specified in child classes.")
+    destination: Path = Field(description="Destination of downloaded model on local disk")
     access_token: Optional[str] = Field(description="access token needed to access this resource")
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
-    bytes: int = Field(default=0, description="Bytes downloaded so far")
-    total_bytes: int = Field(default=0, description="Total bytes to download")
     event_handlers: Optional[List[DownloadEventHandler]] = Field(
         description="Callables that will be called whenever job status changes",
         default_factory=list,
@@ -70,15 +61,15 @@ class DownloadJobBase(BaseModel):
     job_started: Optional[float] = Field(description="Timestamp for when the download job started")
     job_ended: Optional[float] = Field(description="Timestamp for when the download job ended (completed or errored)")
     job_sequence: Optional[int] = Field(
-        description="Counter that records order in which this job was dequeued (for debugging)"
-    )
-    subqueue: Optional["DownloadQueueBase"] = Field(
-        description="a subqueue used for downloading repo_ids", default=None
+        description="Counter that records order in which this job was dequeued (used in unit testing)"
     )
     preserve_partial_downloads: bool = Field(
         description="if true, then preserve partial downloads when cancelled or errored", default=False
     )
     error: Optional[Exception] = Field(default=None, description="Exception that caused an error")
+    metadata: ModelSourceMetadata = Field(
+        description="Metadata describing download contents", default_factory=ModelSourceMetadata
+    )
 
     def add_event_handler(self, handler: DownloadEventHandler):
         """Add an event handler to the end of the handlers list."""
@@ -88,6 +79,10 @@ class DownloadJobBase(BaseModel):
     def clear_event_handlers(self):
         """Clear all event handlers."""
         self.event_handlers = list()
+
+    def cleanup(self, preserve_partial_downloads: bool = False):
+        """Possibly do some action when work is finished."""
+        pass
 
     class Config:
         """Config object for this pydantic class."""

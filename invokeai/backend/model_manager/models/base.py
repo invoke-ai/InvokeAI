@@ -8,6 +8,7 @@ from abc import ABCMeta, abstractmethod
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Callable, Dict, Generic, List, Literal, Optional, Type, TypeVar, Union
 
 import numpy as np
@@ -78,7 +79,7 @@ class ModelBase(metaclass=ABCMeta):
         self.base_model = base_model
         self.model_type = model_type
 
-    def _hf_definition_to_type(self, subtypes: List[str]) -> Type:
+    def _hf_definition_to_type(self, subtypes: List[str]) -> Optional[ModuleType]:
         if len(subtypes) < 2:
             raise Exception("Invalid subfolder definition!")
         if all(t is None for t in subtypes):

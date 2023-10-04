@@ -71,16 +71,8 @@ from .config import (
     SchedulerPredictionType,
     SubModelType,
 )
-from .download import (
-    HTTP_RE,
-    REPO_ID_RE,
-    DownloadEventHandler,
-    DownloadJobBase,
-    DownloadQueue,
-    DownloadQueueBase,
-    ModelSourceMetadata,
-)
-from .download.queue import DownloadJobPath, DownloadJobRepoID, DownloadJobURL
+from .download import DownloadEventHandler, DownloadJobBase, DownloadQueue, DownloadQueueBase, ModelSourceMetadata
+from .download.queue import HTTP_RE, REPO_ID_RE, DownloadJobPath, DownloadJobRepoID, DownloadJobURL
 from .hash import FastModelHash
 from .models import InvalidModelException
 from .probe import ModelProbe, ModelProbeInfo
@@ -542,7 +534,7 @@ class ModelInstall(ModelInstallBase):
         return job
 
     def _complete_installation_handler(self, job: DownloadJobBase):
-        job = ModelInstallJob.parse_obj(job)  # this upcast should succeed
+        assert isinstance(job, ModelInstallJob)
         if job.status == "completed":
             self._logger.info(f"{job.source}: Download finished with status {job.status}. Installing.")
             model_id = self.install_path(job.destination, job.probe_override)
@@ -568,7 +560,7 @@ class ModelInstall(ModelInstallBase):
             self._tmpdir = None
 
     def _complete_registration_handler(self, job: DownloadJobBase):
-        job = ModelInstallJob.parse_obj(job)  # upcast should succeed
+        assert isinstance(job, ModelInstallJob)
         if job.status == "completed":
             self._logger.info(f"{job.source}: Installing in place.")
             model_id = self.register_path(job.destination, job.probe_override)

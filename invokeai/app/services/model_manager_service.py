@@ -27,11 +27,12 @@ from invokeai.backend.model_manager.cache import CacheStats
 from invokeai.backend.model_manager.download import DownloadJobBase
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
 
+from .config import InvokeAIAppConfig
+from .events import EventServiceBase
+
 # processor is giving circular import errors
 # from .processor import Invoker
 
-from .config import InvokeAIAppConfig
-from .events import EventServiceBase
 
 if TYPE_CHECKING:
     from ..invocations.baseinvocation import InvocationContext
