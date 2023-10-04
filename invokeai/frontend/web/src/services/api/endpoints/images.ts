@@ -473,6 +473,7 @@ export const imagesApi = api.injectEndpoints({
         if (images[0]) {
           const categories = getCategories(images[0]);
           const boardId = images[0].board_id;
+
           return [
             {
               type: 'ImageList',
@@ -480,6 +481,10 @@ export const imagesApi = api.injectEndpoints({
                 board_id: boardId,
                 categories,
               }),
+            },
+            {
+              type: 'Board',
+              id: boardId,
             },
           ];
         }
@@ -594,6 +599,10 @@ export const imagesApi = api.injectEndpoints({
                 board_id: boardId,
                 categories,
               }),
+            },
+            {
+              type: 'Board',
+              id: boardId,
             },
           ];
         }

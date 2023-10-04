@@ -66,7 +66,8 @@ const ParamIPAdapterImage = () => {
       layerStyle="second"
       sx={{
         position: 'relative',
-        w: 'full',
+        h: 28,
+        w: 28,
         alignItems: 'center',
         justifyContent: 'center',
         aspectRatio: '1/1',
