@@ -71,7 +71,7 @@ export const isValidDrop = (
       // Check if the image's board is the board we are dragging onto
       if (payloadType === 'IMAGE_DTO') {
         const { imageDTO } = active.data.current.payload;
-        const currentBoard = imageDTO.board_id;
+        const currentBoard = imageDTO.board_id ?? 'none';
 
         return currentBoard !== 'none';
       }
