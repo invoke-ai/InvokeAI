@@ -6,7 +6,9 @@ export const canvasSelector = (state: RootState): CanvasState => state.canvas;
 
 export const isStagingSelector = createSelector(
   [stateSelector],
-  ({ canvas }) => canvas.layerState.stagingArea.images.length > 0
+  ({ canvas }) =>
+    canvas.batchIds.length > 0 ||
+    canvas.layerState.stagingArea.images.length > 0
 );
 
 export const initialCanvasImageSelector = (

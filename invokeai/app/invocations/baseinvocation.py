@@ -89,6 +89,12 @@ class FieldDescriptions:
     num_1 = "The first number"
     num_2 = "The second number"
     mask = "The mask to use for the operation"
+    board = "The board to save the image to"
+    image = "The image to process"
+    tile_size = "Tile size"
+    inclusive_low = "The inclusive low value"
+    exclusive_high = "The exclusive high value"
+    decimal_places = "The number of decimal places to round to"
 
 
 class Input(str, Enum):
@@ -174,6 +180,7 @@ class UIType(str, Enum):
     WorkflowField = "WorkflowField"
     IsIntermediate = "IsIntermediate"
     MetadataField = "MetadataField"
+    BoardField = "BoardField"
     # endregion
 
 
@@ -657,6 +664,8 @@ def invocation(
     :param Optional[str] title: Adds a title to the invocation. Use if the auto-generated title isn't quite right. Defaults to None.
     :param Optional[list[str]] tags: Adds tags to the invocation. Invocations may be searched for by their tags. Defaults to None.
     :param Optional[str] category: Adds a category to the invocation. Used to group the invocations in the UI. Defaults to None.
+    :param Optional[str] version: Adds a version to the invocation. Must be a valid semver string. Defaults to None.
+    :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
     """
 
     def wrapper(cls: Type[GenericBaseInvocation]) -> Type[GenericBaseInvocation]:

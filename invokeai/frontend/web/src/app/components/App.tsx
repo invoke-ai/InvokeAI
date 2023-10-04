@@ -1,6 +1,8 @@
 import { Flex, Grid } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
+import { $headerComponent } from 'app/store/nanostores/headerComponent';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
@@ -14,12 +16,10 @@ import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
+import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
-import { useStore } from '@nanostores/react';
-import { $headerComponent } from 'app/store/nanostores/headerComponent';
 
 const DEFAULT_CONFIG = {};
 
@@ -36,7 +36,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
 
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
-  const { handlePreselectedImage } = usePreselectedImage();
+
   const handleReset = useCallback(() => {
     localStorage.clear();
     location.reload();
@@ -57,10 +57,6 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useEffect(() => {
     dispatch(appStarted());
   }, [dispatch]);
-
-  useEffect(() => {
-    handlePreselectedImage(selectedImage);
-  }, [handlePreselectedImage, selectedImage]);
 
   const headerComponent = useStore($headerComponent);
 
@@ -97,6 +93,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <ChangeBoardModal />
       <Toaster />
       <GlobalHotkeys />
+      <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );
 };

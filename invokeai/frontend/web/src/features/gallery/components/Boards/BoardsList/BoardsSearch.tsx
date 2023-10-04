@@ -79,6 +79,7 @@ const BoardsSearch = () => {
         value={boardSearchText}
         onKeyDown={handleKeydown}
         onChange={handleChange}
+        data-testid="board-search-input"
       />
       {boardSearchText && boardSearchText.length && (
         <InputRightElement>

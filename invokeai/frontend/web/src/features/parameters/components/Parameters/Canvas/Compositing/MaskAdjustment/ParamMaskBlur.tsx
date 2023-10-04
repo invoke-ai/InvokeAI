@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setMaskBlur } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ export default function ParamMaskBlur() {
   const { t } = useTranslation();
 
   return (
-    <IAIInformationalPopover details="compositingBlur">
+    <IAIInformationalPopover feature="compositingBlur">
       <IAISlider
         label={t('parameters.maskBlur')}
         min={0}

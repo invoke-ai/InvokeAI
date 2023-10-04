@@ -2,12 +2,11 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
-import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
 import { UIState } from './uiTypes';
 
 export const initialUIState: UIState = {
-  activeTab: 0,
+  activeTab: 'txt2img',
   shouldShowImageDetails: false,
   shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
@@ -26,7 +25,7 @@ export const uiSlice = createSlice({
   initialState: initialUIState,
   reducers: {
     setActiveTab: (state, action: PayloadAction<InvokeTabName>) => {
-      setActiveTabReducer(state, action.payload);
+      state.activeTab = action.payload;
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
@@ -73,7 +72,7 @@ export const uiSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
-      setActiveTabReducer(state, 'img2img');
+      state.activeTab = 'img2img';
     });
   },
 });

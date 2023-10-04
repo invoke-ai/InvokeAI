@@ -15,6 +15,7 @@ import {
   NodeChange,
   OnConnectStartParams,
   SelectionMode,
+  updateEdge,
   Viewport,
   XYPosition,
 } from 'reactflow';
@@ -30,6 +31,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
 import {
+  BoardInputFieldValue,
   BooleanInputFieldValue,
   ColorInputFieldValue,
   ControlNetModelInputFieldValue,
@@ -59,6 +61,7 @@ import {
 } from '../types/types';
 import { NodesState } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
+import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 
 export const WORKFLOW_FORMAT_VERSION = '1.0.0';
 
@@ -91,6 +94,9 @@ export const initialNodesState: NodesState = {
   isReady: false,
   connectionStartParams: null,
   currentConnectionFieldType: null,
+  connectionMade: false,
+  modifyingEdge: false,
+  addNewNodePosition: null,
   shouldShowFieldTypeLegend: false,
   shouldShowMinimapPanel: true,
   shouldValidateGraph: true,
@@ -152,8 +158,8 @@ const nodesSlice = createSlice({
       const node = action.payload;
       const position = findUnoccupiedPosition(
         state.nodes,
-        node.position.x,
-        node.position.y
+        state.addNewNodePosition?.x ?? node.position.x,
+        state.addNewNodePosition?.y ?? node.position.y
       );
       node.position = position;
       node.selected = true;
@@ -178,12 +184,55 @@ const nodesSlice = createSlice({
         nodeId: node.id,
         ...initialNodeExecutionState,
       };
+
+      if (state.connectionStartParams) {
+        const { nodeId, handleId, handleType } = state.connectionStartParams;
+        if (
+          nodeId &&
+          handleId &&
+          handleType &&
+          state.currentConnectionFieldType
+        ) {
+          const newConnection = findConnectionToValidHandle(
+            node,
+            state.nodes,
+            state.edges,
+            nodeId,
+            handleId,
+            handleType,
+            state.currentConnectionFieldType
+          );
+          if (newConnection) {
+            state.edges = addEdge(
+              { ...newConnection, type: 'default' },
+              state.edges
+            );
+          }
+        }
+      }
+
+      state.connectionStartParams = null;
+      state.currentConnectionFieldType = null;
+    },
+    edgeChangeStarted: (state) => {
+      state.modifyingEdge = true;
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
     },
+    edgeAdded: (state, action: PayloadAction<Edge>) => {
+      state.edges = addEdge(action.payload, state.edges);
+    },
+    edgeUpdated: (
+      state,
+      action: PayloadAction<{ oldEdge: Edge; newConnection: Connection }>
+    ) => {
+      const { oldEdge, newConnection } = action.payload;
+      state.edges = updateEdge(oldEdge, newConnection, state.edges);
+    },
     connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
       state.connectionStartParams = action.payload;
+      state.connectionMade = state.modifyingEdge;
       const { nodeId, handleId, handleType } = action.payload;
       if (!nodeId || !handleId) {
         return;
@@ -208,10 +257,53 @@ const nodesSlice = createSlice({
         { ...action.payload, type: 'default' },
         state.edges
       );
+
+      state.connectionMade = true;
     },
-    connectionEnded: (state) => {
-      state.connectionStartParams = null;
-      state.currentConnectionFieldType = null;
+    connectionEnded: (state, action) => {
+      if (!state.connectionMade) {
+        if (state.mouseOverNode) {
+          const nodeIndex = state.nodes.findIndex(
+            (n) => n.id === state.mouseOverNode
+          );
+          const mouseOverNode = state.nodes?.[nodeIndex];
+          if (mouseOverNode && state.connectionStartParams) {
+            const { nodeId, handleId, handleType } =
+              state.connectionStartParams;
+            if (
+              nodeId &&
+              handleId &&
+              handleType &&
+              state.currentConnectionFieldType
+            ) {
+              const newConnection = findConnectionToValidHandle(
+                mouseOverNode,
+                state.nodes,
+                state.edges,
+                nodeId,
+                handleId,
+                handleType,
+                state.currentConnectionFieldType
+              );
+              if (newConnection) {
+                state.edges = addEdge(
+                  { ...newConnection, type: 'default' },
+                  state.edges
+                );
+              }
+            }
+          }
+          state.connectionStartParams = null;
+          state.currentConnectionFieldType = null;
+        } else {
+          state.addNewNodePosition = action.payload.cursorPosition;
+          state.isAddNodePopoverOpen = true;
+        }
+      } else {
+        state.connectionStartParams = null;
+        state.currentConnectionFieldType = null;
+      }
+      state.modifyingEdge = false;
     },
     workflowExposedFieldAdded: (
       state,
@@ -366,6 +458,7 @@ const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
+                updatable: false,
               });
             }
           }
@@ -388,6 +481,7 @@ const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
+                updatable: false,
               });
             }
           }
@@ -399,6 +493,9 @@ const nodesSlice = createSlice({
           );
         }
       }
+    },
+    edgeDeleted: (state, action: PayloadAction<string>) => {
+      state.edges = state.edges.filter((e) => e.id !== action.payload);
     },
     edgesDeleted: (state, action: PayloadAction<Edge[]>) => {
       const edges = action.payload;
@@ -492,6 +589,12 @@ const nodesSlice = createSlice({
     fieldBooleanValueChanged: (
       state,
       action: FieldValueAction<BooleanInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
+    fieldBoardValueChanged: (
+      state,
+      action: FieldValueAction<BoardInputFieldValue>
     ) => {
       fieldValueReducer(state, action);
     },
@@ -819,10 +922,15 @@ const nodesSlice = createSlice({
       });
     },
     addNodePopoverOpened: (state) => {
+      state.addNewNodePosition = null; //Create the node in viewport center by default
       state.isAddNodePopoverOpen = true;
     },
     addNodePopoverClosed: (state) => {
       state.isAddNodePopoverOpen = false;
+
+      //Make sure these get reset if we close the popover and haven't selected a node
+      state.connectionStartParams = null;
+      state.currentConnectionFieldType = null;
     },
     addNodePopoverToggled: (state) => {
       state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;
@@ -878,7 +986,7 @@ const nodesSlice = createSlice({
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
       if (['in_progress'].includes(action.payload.data.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
-          nes.status = NodeStatus.IN_PROGRESS;
+          nes.status = NodeStatus.PENDING;
           nes.error = null;
           nes.progress = null;
           nes.progressImage = null;
@@ -890,69 +998,74 @@ const nodesSlice = createSlice({
 });
 
 export const {
-  nodesChanged,
-  edgesChanged,
-  nodeAdded,
-  nodesDeleted,
+  addNodePopoverClosed,
+  addNodePopoverOpened,
+  addNodePopoverToggled,
+  connectionEnded,
   connectionMade,
   connectionStarted,
-  connectionEnded,
-  shouldShowFieldTypeLegendChanged,
-  shouldShowMinimapPanelChanged,
-  nodeTemplatesBuilt,
-  nodeEditorReset,
-  imageCollectionFieldValueChanged,
-  fieldStringValueChanged,
-  fieldNumberValueChanged,
+  edgeDeleted,
+  edgeChangeStarted,
+  edgesChanged,
+  edgesDeleted,
+  edgeUpdated,
+  fieldBoardValueChanged,
   fieldBooleanValueChanged,
-  fieldImageValueChanged,
   fieldColorValueChanged,
-  fieldMainModelValueChanged,
-  fieldVaeModelValueChanged,
-  fieldLoRAModelValueChanged,
-  fieldEnumModelValueChanged,
   fieldControlNetModelValueChanged,
+  fieldEnumModelValueChanged,
+  fieldImageValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
+  fieldLabelChanged,
+  fieldLoRAModelValueChanged,
+  fieldMainModelValueChanged,
+  fieldNumberValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
+  fieldStringValueChanged,
+  fieldVaeModelValueChanged,
+  imageCollectionFieldValueChanged,
+  mouseOverFieldChanged,
+  mouseOverNodeChanged,
+  nodeAdded,
+  nodeEditorReset,
+  nodeEmbedWorkflowChanged,
+  nodeExclusivelySelected,
+  nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,
-  edgesDeleted,
-  shouldValidateGraphChanged,
-  shouldAnimateEdgesChanged,
   nodeOpacityChanged,
-  shouldSnapToGridChanged,
-  shouldColorEdgesChanged,
-  selectedNodesChanged,
-  selectedEdgesChanged,
-  workflowNameChanged,
-  workflowDescriptionChanged,
-  workflowTagsChanged,
-  workflowAuthorChanged,
-  workflowNotesChanged,
-  workflowVersionChanged,
-  workflowContactChanged,
-  workflowLoaded,
+  nodesChanged,
+  nodesDeleted,
+  nodeTemplatesBuilt,
+  nodeUseCacheChanged,
   notesNodeValueChanged,
+  selectedAll,
+  selectedEdgesChanged,
+  selectedNodesChanged,
+  selectionCopied,
+  selectionModeChanged,
+  selectionPasted,
+  shouldAnimateEdgesChanged,
+  shouldColorEdgesChanged,
+  shouldShowFieldTypeLegendChanged,
+  shouldShowMinimapPanelChanged,
+  shouldSnapToGridChanged,
+  shouldValidateGraphChanged,
+  viewportChanged,
+  workflowAuthorChanged,
+  workflowContactChanged,
+  workflowDescriptionChanged,
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
-  fieldLabelChanged,
-  viewportChanged,
-  mouseOverFieldChanged,
-  selectionCopied,
-  selectionPasted,
-  selectedAll,
-  addNodePopoverOpened,
-  addNodePopoverClosed,
-  addNodePopoverToggled,
-  selectionModeChanged,
-  nodeEmbedWorkflowChanged,
-  nodeIsIntermediateChanged,
-  mouseOverNodeChanged,
-  nodeExclusivelySelected,
-  nodeUseCacheChanged,
+  workflowLoaded,
+  workflowNameChanged,
+  workflowNotesChanged,
+  workflowTagsChanged,
+  workflowVersionChanged,
+  edgeAdded,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

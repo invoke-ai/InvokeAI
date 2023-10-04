@@ -1,5 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISwitch from 'common/components/IAISwitch';
 import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
 import { ChangeEvent, useCallback } from 'react';
@@ -20,7 +20,7 @@ export const ParamCpuNoiseToggle = () => {
   );
 
   return (
-    <IAIInformationalPopover details="noiseUseCPU">
+    <IAIInformationalPopover feature="noiseUseCPU">
       <IAISwitch
         label={t('parameters.useCpuNoise')}
         isChecked={shouldUseCpuNoise}

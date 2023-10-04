@@ -109,6 +109,7 @@ const ImageGalleryContent = () => {
                     w: 'full',
                   }}
                   leftIcon={<FaImages />}
+                  data-testid="images-tab"
                 >
                   Images
                 </Tab>
@@ -121,6 +122,7 @@ const ImageGalleryContent = () => {
                     w: 'full',
                   }}
                   leftIcon={<FaServer />}
+                  data-testid="assets-tab"
                 >
                   Assets
                 </Tab>

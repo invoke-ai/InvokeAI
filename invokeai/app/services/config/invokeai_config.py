@@ -241,7 +241,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
 
     # CACHE
-    ram                 : Union[float, Literal["auto"]] = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number or 'auto')", category="Model Cache", )
+    ram                 : Union[float, Literal["auto"]] = Field(default=7.5, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number or 'auto')", category="Model Cache", )
     vram                : Union[float, Literal["auto"]] = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number or 'auto')", category="Model Cache", )
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", category="Model Cache", )
 
@@ -277,6 +277,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     class Config:
         validate_assignment = True
+        env_prefix = "INVOKEAI"
 
     def parse_args(self, argv: Optional[list[str]] = None, conf: Optional[DictConfig] = None, clobber=False):
         """

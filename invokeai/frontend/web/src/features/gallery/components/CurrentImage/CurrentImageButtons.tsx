@@ -181,7 +181,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     if (!imageDTO) {
       return;
     }
-    dispatch(upscaleRequested({ image_name: imageDTO.image_name }));
+    dispatch(upscaleRequested({ imageDTO }));
   }, [dispatch, imageDTO]);
 
   const handleDelete = useCallback(() => {
@@ -287,7 +287,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={!metadata?.seed}
+            isDisabled={metadata?.seed === null || metadata?.seed === undefined}
             onClick={handleUseSeed}
           />
           <IAIIconButton

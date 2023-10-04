@@ -354,6 +354,12 @@ export type T2IAdapterModelParam = z.infer<typeof zT2IAdapterModel>;
 /**
  * Zod schema for l2l strength parameter
  */
+/**
+ * Validates/type-guards a value as a model parameter
+ */
+export const isValidIPAdapterModel = (
+  val: unknown
+): val is IPAdapterModelParam => zIPAdapterModel.safeParse(val).success;
 export const zStrength = z.number().min(0).max(1);
 /**
  * Type alias for l2l strength parameter, inferred from its zod schema

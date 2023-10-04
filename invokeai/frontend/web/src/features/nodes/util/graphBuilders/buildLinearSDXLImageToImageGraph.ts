@@ -348,6 +348,7 @@ export const buildLinearSDXLImageToImageGraph = (
     vae: undefined,
     controlnets: [],
     loras: [],
+    ipAdapters: [],
     strength: strength,
     init_image: initialImage.imageName,
     positive_style_prompt: positiveStylePrompt,

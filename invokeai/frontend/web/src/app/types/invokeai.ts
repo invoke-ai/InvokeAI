@@ -56,6 +56,7 @@ export type AppConfig = {
   canRestoreDeletedImagesFromBin: boolean;
   nodesAllowlist: string[] | undefined;
   nodesDenylist: string[] | undefined;
+  maxUpscalePixels?: number;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];

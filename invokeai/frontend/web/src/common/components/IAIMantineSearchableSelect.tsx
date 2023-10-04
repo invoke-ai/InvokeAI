@@ -70,26 +70,27 @@ const IAIMantineSearchableSelect = forwardRef((props: IAISelectProps, ref) => {
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
-      <Select
-        ref={inputRef}
-        label={
-          label ? (
-            <FormControl ref={ref} isDisabled={disabled}>
-              <FormLabel>{label}</FormLabel>
-            </FormControl>
-          ) : undefined
-        }
-        disabled={disabled}
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleKeyUp}
-        searchable={searchable}
-        maxDropdownHeight={300}
-        styles={styles}
-        {...rest}
-      />
+      <FormControl
+        ref={ref}
+        isDisabled={disabled}
+        position="static"
+        data-testid={`select-${label || props.placeholder}`}
+      >
+        {label && <FormLabel>{label}</FormLabel>}
+        <Select
+          ref={inputRef}
+          disabled={disabled}
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
+          searchable={searchable}
+          maxDropdownHeight={300}
+          styles={styles}
+          {...rest}
+        />
+      </FormControl>
     </Tooltip>
   );
 });

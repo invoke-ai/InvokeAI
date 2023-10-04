@@ -1,7 +1,11 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  clearPendingControlImages,
+  controlNetImageChanged,
+  controlNetProcessedImageChanged,
+} from 'features/controlNet/store/controlNetSlice';
 import { SAVE_IMAGE } from 'features/nodes/util/graphBuilders/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
@@ -105,8 +109,32 @@ export const addControlNetImageProcessedListener = () => {
             })
           );
         }
-      } catch {
+      } catch (error) {
         log.error({ graph: parseify(graph) }, t('queue.graphFailedToQueue'));
+
+        // handle usage-related errors
+        if (error instanceof Object) {
+          if ('data' in error && 'status' in error) {
+            if (error.status === 403) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const detail = (error.data as any)?.detail || 'Unknown Error';
+              dispatch(
+                addToast({
+                  title: t('queue.graphFailedToQueue'),
+                  status: 'error',
+                  description: detail,
+                  duration: 15000,
+                })
+              );
+              dispatch(clearPendingControlImages());
+              dispatch(
+                controlNetImageChanged({ controlNetId, controlImage: null })
+              );
+              return;
+            }
+          }
+        }
+
         dispatch(
           addToast({
             title: t('queue.graphFailedToQueue'),
