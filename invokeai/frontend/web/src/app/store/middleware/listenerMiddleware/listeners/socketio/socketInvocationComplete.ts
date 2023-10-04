@@ -8,6 +8,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graphBuilders/constants';
+import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
 import { imagesAdapter } from 'services/api/util';
@@ -70,11 +71,21 @@ export const addInvocationCompleteEventListener = () => {
             )
           );
 
+          // update the total images for the board
+          dispatch(
+            boardsApi.util.updateQueryData(
+              'getBoardImagesTotal',
+              imageDTO.board_id ?? 'none',
+              (draft) => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                draft.total += 1;
+              }
+            )
+          );
+
           dispatch(
             imagesApi.util.invalidateTags([
-              { type: 'BoardImagesTotal', id: imageDTO.board_id },
-              { type: 'BoardAssetsTotal', id: imageDTO.board_id },
-              { type: 'Board', id: imageDTO.board_id },
+              { type: 'Board', id: imageDTO.board_id ?? 'none' },
             ])
           );
 

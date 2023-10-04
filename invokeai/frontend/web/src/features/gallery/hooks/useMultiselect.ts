@@ -3,13 +3,12 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { uniq } from 'lodash-es';
 import { MouseEvent, useCallback, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
-import { selectionChanged } from '../store/gallerySlice';
 import { imagesSelectors } from 'services/api/util';
 import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { selectionChanged } from '../store/gallerySlice';
 
 const selector = createSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
@@ -60,7 +59,7 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
           const start = Math.min(lastClickedIndex, currentClickedIndex);
           const end = Math.max(lastClickedIndex, currentClickedIndex);
           const imagesToSelect = imageDTOs.slice(start, end + 1);
-          dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
+          dispatch(selectionChanged(selection.concat(imagesToSelect)));
         }
       } else if (e.ctrlKey || e.metaKey) {
         if (
@@ -73,7 +72,7 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
             )
           );
         } else {
-          dispatch(selectionChanged(uniq(selection.concat(imageDTO))));
+          dispatch(selectionChanged(selection.concat(imageDTO)));
         }
       } else {
         dispatch(selectionChanged([imageDTO]));
