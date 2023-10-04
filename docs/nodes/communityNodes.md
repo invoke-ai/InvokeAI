@@ -11,6 +11,20 @@ To use a community workflow, download the the `.json` node graph file and load i
 --------------------------------
 
 --------------------------------
+### Make 3D
+
+**Description:** Create compelling 3D stereo images from 2D originals.
+
+**Node Link:** https://gitlab.com/srcrr/shift3d/-/raw/main/make3d.py
+
+**Example Node Graph:**  https://gitlab.com/srcrr/shift3d/-/raw/main/example-workflow.json?ref_type=heads&inline=false
+
+**Output Examples** 
+
+![Painting of a cozy delapidated house](https://gitlab.com/srcrr/shift3d/-/raw/main/example-1.png){: style="height:512px;width:512px"}
+![Photo of cute puppies](https://gitlab.com/srcrr/shift3d/-/raw/main/example-2.png){: style="height:512px;width:512px"}
+
+--------------------------------
 ### Ideal Size
 
 **Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
