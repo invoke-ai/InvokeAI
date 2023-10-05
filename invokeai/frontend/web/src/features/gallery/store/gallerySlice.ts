@@ -4,6 +4,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { BoardId, GalleryState, GalleryView } from './types';
+import { uniqBy } from 'lodash-es';
 
 export const initialGalleryState: GalleryState = {
   selection: [],
@@ -25,7 +26,7 @@ export const gallerySlice = createSlice({
       state.selection = action.payload ? [action.payload] : [];
     },
     selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
-      state.selection = action.payload;
+      state.selection = uniqBy(action.payload, (i) => i.image_name);
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
