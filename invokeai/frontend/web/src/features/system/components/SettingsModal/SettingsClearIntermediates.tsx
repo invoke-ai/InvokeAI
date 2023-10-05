@@ -1,6 +1,6 @@
 import { Heading, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
+import { controlAdaptersReset } from 'features/controlNet/store/controlAdaptersSlice';
 import { useCallback, useEffect } from 'react';
 import IAIButton from '../../../../common/components/IAIButton';
 import {
@@ -24,7 +24,7 @@ export default function SettingsClearIntermediates() {
     clearIntermediates()
       .unwrap()
       .then((response) => {
-        dispatch(controlNetReset());
+        dispatch(controlAdaptersReset());
         dispatch(resetCanvas());
         dispatch(
           addToast({

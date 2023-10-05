@@ -1,10 +1,10 @@
 import { logger } from 'app/logging/logger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import {
-  controlNetImageChanged,
-  controlNetProcessedImageChanged,
-  ipAdapterImageChanged,
-} from 'features/controlNet/store/controlNetSlice';
+  controlAdapterImageChanged,
+  controlAdapterProcessedImageChanged,
+  selectControlAdapterAll,
+} from 'features/controlNet/store/controlAdaptersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -17,6 +17,7 @@ import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
 import { startAppListening } from '..';
+import { isControlNetOrT2IAdapter } from 'features/controlNet/store/types';
 
 export const addRequestedSingleImageDeletionListener = () => {
   startAppListening({
@@ -90,34 +91,27 @@ export const addRequestedSingleImageDeletionListener = () => {
           dispatch(clearInitialImage());
         }
 
-        // reset controlNets that use the deleted images
-        forEach(getState().controlNet.controlNets, (controlNet) => {
+        // reset control adapters that use the deleted images
+        forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
           if (
-            controlNet.controlImage === imageDTO.image_name ||
-            controlNet.processedControlImage === imageDTO.image_name
+            ca.controlImage === imageDTO.image_name ||
+            (isControlNetOrT2IAdapter(ca) &&
+              ca.processedControlImage === imageDTO.image_name)
           ) {
             dispatch(
-              controlNetImageChanged({
-                controlNetId: controlNet.controlNetId,
+              controlAdapterImageChanged({
+                id: ca.id,
                 controlImage: null,
               })
             );
             dispatch(
-              controlNetProcessedImageChanged({
-                controlNetId: controlNet.controlNetId,
+              controlAdapterProcessedImageChanged({
+                id: ca.id,
                 processedControlImage: null,
               })
             );
           }
         });
-
-        // Remove IP Adapter Set Image if image is deleted.
-        if (
-          getState().controlNet.ipAdapterInfo.adapterImage ===
-          imageDTO.image_name
-        ) {
-          dispatch(ipAdapterImageChanged(null));
-        }
 
         // reset nodes that use the deleted images
         getState().nodes.nodes.forEach((node) => {
@@ -215,34 +209,27 @@ export const addRequestedMultipleImageDeletionListener = () => {
             dispatch(clearInitialImage());
           }
 
-          // reset controlNets that use the deleted images
-          forEach(getState().controlNet.controlNets, (controlNet) => {
+          // reset control adapters that use the deleted images
+          forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
             if (
-              controlNet.controlImage === imageDTO.image_name ||
-              controlNet.processedControlImage === imageDTO.image_name
+              ca.controlImage === imageDTO.image_name ||
+              (isControlNetOrT2IAdapter(ca) &&
+                ca.processedControlImage === imageDTO.image_name)
             ) {
               dispatch(
-                controlNetImageChanged({
-                  controlNetId: controlNet.controlNetId,
+                controlAdapterImageChanged({
+                  id: ca.id,
                   controlImage: null,
                 })
               );
               dispatch(
-                controlNetProcessedImageChanged({
-                  controlNetId: controlNet.controlNetId,
+                controlAdapterProcessedImageChanged({
+                  id: ca.id,
                   processedControlImage: null,
                 })
               );
             }
           });
-
-          // Remove IP Adapter Set Image if image is deleted.
-          if (
-            getState().controlNet.ipAdapterInfo.adapterImage ===
-            imageDTO.image_name
-          ) {
-            dispatch(ipAdapterImageChanged(null));
-          }
 
           // reset nodes that use the deleted images
           getState().nodes.nodes.forEach((node) => {

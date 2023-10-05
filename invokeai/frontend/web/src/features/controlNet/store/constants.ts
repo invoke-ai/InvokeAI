@@ -1,16 +1,16 @@
 import i18n from 'i18next';
 import {
-  ControlNetProcessorType,
-  RequiredControlNetProcessorNode,
+  ControlAdapterProcessorType,
+  RequiredControlAdapterProcessorNode,
 } from './types';
 
 type ControlNetProcessorsDict = Record<
-  ControlNetProcessorType,
+  ControlAdapterProcessorType,
   {
-    type: ControlNetProcessorType | 'none';
+    type: ControlAdapterProcessorType | 'none';
     label: string;
     description: string;
-    default: RequiredControlNetProcessorNode | { type: 'none' };
+    default: RequiredControlAdapterProcessorNode | { type: 'none' };
   }
 >;
 /**
@@ -240,7 +240,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
 };
 
 export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
-  [key: string]: ControlNetProcessorType;
+  [key: string]: ControlAdapterProcessorType;
 } = {
   canny: 'canny_image_processor',
   mlsd: 'mlsd_image_processor',

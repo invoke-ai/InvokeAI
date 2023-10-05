@@ -1,8 +1,10 @@
 import { logger } from 'app/logging/logger';
 import {
-  controlNetRemoved,
-  ipAdapterModelChanged,
-} from 'features/controlNet/store/controlNetSlice';
+  controlAdapterModelCleared,
+  selectAllControlNets,
+  selectAllIPAdapters,
+  selectAllT2IAdapters,
+} from 'features/controlNet/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import {
   modelChanged,
@@ -19,14 +21,12 @@ import {
 } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import {
-  ipAdapterModelsAdapter,
   mainModelsAdapter,
   modelsApi,
   vaeModelsAdapter,
 } from 'services/api/endpoints/models';
 import { TypeGuardFor } from 'services/api/types';
 import { startAppListening } from '..';
-import { zIPAdapterModel } from 'features/nodes/types/types';
 
 export const addModelsLoadedListener = () => {
   startAppListening({
@@ -221,21 +221,45 @@ export const addModelsLoadedListener = () => {
         `ControlNet models loaded (${action.payload.ids.length})`
       );
 
-      const controlNets = getState().controlNet.controlNets;
-
-      forEach(controlNets, (controlNet, controlNetId) => {
-        const isControlNetAvailable = some(
+      selectAllControlNets(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
           action.payload.entities,
           (m) =>
-            m?.model_name === controlNet?.model?.model_name &&
-            m?.base_model === controlNet?.model?.base_model
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
         );
 
-        if (isControlNetAvailable) {
+        if (isModelAvailable) {
           return;
         }
 
-        dispatch(controlNetRemoved({ controlNetId }));
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
+      });
+    },
+  });
+  startAppListening({
+    matcher: modelsApi.endpoints.getT2IAdapterModels.matchFulfilled,
+    effect: async (action, { getState, dispatch }) => {
+      // ControlNet models loaded - need to remove missing ControlNets from state
+      const log = logger('models');
+      log.info(
+        { models: action.payload.entities },
+        `ControlNet models loaded (${action.payload.ids.length})`
+      );
+
+      selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
+          action.payload.entities,
+          (m) =>
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
+        );
+
+        if (isModelAvailable) {
+          return;
+        }
+
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
       });
     },
   });
@@ -249,38 +273,20 @@ export const addModelsLoadedListener = () => {
         `IP Adapter models loaded (${action.payload.ids.length})`
       );
 
-      const { model } = getState().controlNet.ipAdapterInfo;
-
-      const isModelAvailable = some(
-        action.payload.entities,
-        (m) =>
-          m?.model_name === model?.model_name &&
-          m?.base_model === model?.base_model
-      );
-
-      if (isModelAvailable) {
-        return;
-      }
-
-      const firstModel = ipAdapterModelsAdapter
-        .getSelectors()
-        .selectAll(action.payload)[0];
-
-      if (!firstModel) {
-        dispatch(ipAdapterModelChanged(null));
-      }
-
-      const result = zIPAdapterModel.safeParse(firstModel);
-
-      if (!result.success) {
-        log.error(
-          { error: result.error.format() },
-          'Failed to parse IP Adapter model'
+      selectAllIPAdapters(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
+          action.payload.entities,
+          (m) =>
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
         );
-        return;
-      }
 
-      dispatch(ipAdapterModelChanged(result.data));
+        if (isModelAvailable) {
+          return;
+        }
+
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
+      });
     },
   });
   startAppListening({

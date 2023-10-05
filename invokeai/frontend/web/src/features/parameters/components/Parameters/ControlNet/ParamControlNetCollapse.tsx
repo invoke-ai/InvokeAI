@@ -1,122 +1,100 @@
-import { Divider, Flex } from '@chakra-ui/react';
+import { ButtonGroup, Divider, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIButton from 'common/components/IAIButton';
 import IAICollapse from 'common/components/IAICollapse';
-import IAIIconButton from 'common/components/IAIIconButton';
 import ControlNet from 'features/controlNet/components/ControlNet';
-import IPAdapterPanel from 'features/controlNet/components/ipAdapter/IPAdapterPanel';
-import ParamControlNetFeatureToggle from 'features/controlNet/components/parameters/ParamControlNetFeatureToggle';
+import { useAddControlNet } from 'features/controlNet/hooks/useAddControlNet';
+import { useAddIPAdapter } from 'features/controlNet/hooks/useAddIPAdapter';
+import { useAddT2IAdapter } from 'features/controlNet/hooks/useAddT2IAdapter';
 import {
-  controlNetAdded,
-  controlNetModelChanged,
-} from 'features/controlNet/store/controlNetSlice';
-import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
+  selectAllControlNets,
+  selectAllIPAdapters,
+  selectAllT2IAdapters,
+} from 'features/controlNet/store/controlAdaptersSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { map } from 'lodash-es';
-import { Fragment, memo, useCallback, useMemo } from 'react';
+import { Fragment, memo } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
-import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
   [stateSelector],
-  ({ controlNet }) => {
-    const { controlNets, isEnabled, isIPAdapterEnabled, ipAdapterInfo } =
-      controlNet;
+  ({ controlAdapters }) => {
+    const activeLabel: string[] = [];
 
-    const validControlNets = getValidControlNets(controlNets);
-    const isIPAdapterValid = ipAdapterInfo.model && ipAdapterInfo.adapterImage;
-    let activeLabel = undefined;
-
-    if (isEnabled && validControlNets.length > 0) {
-      activeLabel = `${validControlNets.length} ControlNet`;
+    const validIPAdapters = selectAllIPAdapters(controlAdapters);
+    const validIPAdapterCount = validIPAdapters.length;
+    if (validIPAdapterCount > 0) {
+      activeLabel.push(`${validIPAdapterCount} IP`);
     }
 
-    if (isIPAdapterEnabled && isIPAdapterValid) {
-      if (activeLabel) {
-        activeLabel = `${activeLabel}, IP Adapter`;
-      } else {
-        activeLabel = 'IP Adapter';
-      }
+    const validControlNets = selectAllControlNets(controlAdapters);
+    const validControlNetCount = validControlNets.length;
+    if (validControlNetCount > 0) {
+      activeLabel.push(`${validControlNetCount} ControlNet`);
     }
 
-    return { controlNetsArray: map(controlNets), activeLabel };
+    const validT2IAdapters = selectAllT2IAdapters(controlAdapters);
+    const validT2IAdapterCount = validT2IAdapters.length;
+    if (validT2IAdapterCount > 0) {
+      activeLabel.push(`${validT2IAdapterCount} T2I`);
+    }
+
+    return {
+      controlAdapters: [
+        ...validIPAdapters,
+        ...validControlNets,
+        ...validT2IAdapters,
+      ],
+      activeLabel: activeLabel.join(', '),
+    };
   },
   defaultSelectorOptions
 );
 
 const ParamControlNetCollapse = () => {
-  const { controlNetsArray, activeLabel } = useAppSelector(selector);
+  const { controlAdapters, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();
   const { data: controlnetModels } = useGetControlNetModelsQuery();
-
-  const firstModel = useMemo(() => {
-    if (!controlnetModels || !Object.keys(controlnetModels.entities).length) {
-      return undefined;
-    }
-    const firstModelId = Object.keys(controlnetModels.entities)[0];
-
-    if (!firstModelId) {
-      return undefined;
-    }
-
-    const firstModel = controlnetModels.entities[firstModelId];
-
-    return firstModel ? firstModel : undefined;
-  }, [controlnetModels]);
-
-  const handleClickedAddControlNet = useCallback(() => {
-    if (!firstModel) {
-      return;
-    }
-    const controlNetId = uuidv4();
-    dispatch(controlNetAdded({ controlNetId }));
-    dispatch(controlNetModelChanged({ controlNetId, model: firstModel }));
-  }, [dispatch, firstModel]);
-
-  if (isControlNetDisabled) {
-    return null;
-  }
+  const { addControlNet } = useAddControlNet();
+  const { addIPAdapter } = useAddIPAdapter();
+  const { addT2IAdapter } = useAddT2IAdapter();
 
   return (
     <IAICollapse label="Control Adapters" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
-        <Flex
-          sx={{
-            w: '100%',
-            gap: 2,
-            p: 2,
-            ps: 3,
-            borderRadius: 'base',
-            alignItems: 'center',
-            bg: 'base.250',
-            _dark: {
-              bg: 'base.750',
-            },
-          }}
-        >
-          <ParamControlNetFeatureToggle />
-          <IAIIconButton
-            tooltip="Add ControlNet"
-            aria-label="Add ControlNet"
-            icon={<FaPlus />}
-            isDisabled={!firstModel}
-            flexGrow={1}
-            size="sm"
-            onClick={handleClickedAddControlNet}
+        <ButtonGroup size="sm" w="full" justifyContent="space-between">
+          <IAIButton
+            leftIcon={<FaPlus />}
+            onClick={addControlNet}
             data-testid="add controlnet"
-          />
-        </Flex>
-        {controlNetsArray.map((c, i) => (
-          <Fragment key={c.controlNetId}>
+          >
+            ControlNet
+          </IAIButton>
+          <IAIButton
+            leftIcon={<FaPlus />}
+            onClick={addIPAdapter}
+            data-testid="add ip adapter"
+          >
+            IP Adapter
+          </IAIButton>
+          <IAIButton
+            leftIcon={<FaPlus />}
+            onClick={addT2IAdapter}
+            data-testid="add t2i adapter"
+          >
+            T2I Adapter
+          </IAIButton>
+        </ButtonGroup>
+        {controlAdapters.map((ca, i) => (
+          <Fragment key={ca.id}>
             {i > 0 && <Divider />}
-            <ControlNet controlNet={c} />
+            <ControlNet id={ca.id} />
           </Fragment>
         ))}
-        <IPAdapterPanel />
       </Flex>
     </IAICollapse>
   );

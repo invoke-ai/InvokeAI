@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import { ControlNetConfig } from '../store/controlNetSlice';
 import CannyProcessor from './processors/CannyProcessor';
 import ColorMapProcessor from './processors/ColorMapProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
@@ -13,18 +12,25 @@ import NormalBaeProcessor from './processors/NormalBaeProcessor';
 import OpenposeProcessor from './processors/OpenposeProcessor';
 import PidiProcessor from './processors/PidiProcessor';
 import ZoeDepthProcessor from './processors/ZoeDepthProcessor';
+import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
+import { useControlAdapterProcessorNode } from '../hooks/useControlAdapterProcessorNode';
 
-export type ControlNetProcessorProps = {
-  controlNet: ControlNetConfig;
+export type Props = {
+  id: string;
 };
 
-const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
-  const { controlNetId, isEnabled, processorNode } = props.controlNet;
+const ControlNetProcessorComponent = ({ id }: Props) => {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const processorNode = useControlAdapterProcessorNode(id);
+
+  if (!processorNode) {
+    return null;
+  }
 
   if (processorNode.type === 'canny_image_processor') {
     return (
       <CannyProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -34,7 +40,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'color_map_image_processor') {
     return (
       <ColorMapProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -44,7 +50,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'hed_image_processor') {
     return (
       <HedProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -54,7 +60,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'lineart_image_processor') {
     return (
       <LineartProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -64,7 +70,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'content_shuffle_image_processor') {
     return (
       <ContentShuffleProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -74,7 +80,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'lineart_anime_image_processor') {
     return (
       <LineartAnimeProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -84,7 +90,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'mediapipe_face_processor') {
     return (
       <MediapipeFaceProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -94,7 +100,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'midas_depth_image_processor') {
     return (
       <MidasDepthProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -104,7 +110,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'mlsd_image_processor') {
     return (
       <MlsdImageProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -114,7 +120,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'normalbae_image_processor') {
     return (
       <NormalBaeProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -124,7 +130,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'openpose_image_processor') {
     return (
       <OpenposeProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -134,7 +140,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'pidi_image_processor') {
     return (
       <PidiProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />
@@ -144,7 +150,7 @@ const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
   if (processorNode.type === 'zoe_depth_image_processor') {
     return (
       <ZoeDepthProcessor
-        controlNetId={controlNetId}
+        controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}
       />

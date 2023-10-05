@@ -1,24 +1,24 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
-import {
-  ControlNetConfig,
-  controlNetAutoConfigToggled,
-} from 'features/controlNet/store/controlNetSlice';
+import { controlAdapterAutoConfigToggled } from 'features/controlNet/store/controlAdaptersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
+import { useControlAdapterShouldAutoConfig } from '../hooks/useControlAdapterShouldAutoConfig';
 
 type Props = {
-  controlNet: ControlNetConfig;
+  id: string;
 };
 
-const ParamControlNetShouldAutoConfig = (props: Props) => {
-  const { controlNetId, isEnabled, shouldAutoConfig } = props.controlNet;
+const ParamControlNetShouldAutoConfig = ({ id }: Props) => {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const shouldAutoConfig = useControlAdapterShouldAutoConfig(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleShouldAutoConfigChanged = useCallback(() => {
-    dispatch(controlNetAutoConfigToggled({ controlNetId }));
-  }, [controlNetId, dispatch]);
+    dispatch(controlAdapterAutoConfigToggled({ id }));
+  }, [id, dispatch]);
 
   return (
     <IAISwitch

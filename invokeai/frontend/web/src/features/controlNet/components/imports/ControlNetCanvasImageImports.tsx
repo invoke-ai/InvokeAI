@@ -2,32 +2,31 @@ import { Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
-  canvasImageToControlNet,
-  canvasMaskToControlNet,
+  canvasImageToControlAdapter,
+  canvasMaskToControlAdapter,
 } from 'features/canvas/store/actions';
-import { ControlNetConfig } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
 import { FaImage, FaMask } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 type ControlNetCanvasImageImportsProps = {
-  controlNet: ControlNetConfig;
+  id: string;
 };
 
 const ControlNetCanvasImageImports = (
   props: ControlNetCanvasImageImportsProps
 ) => {
-  const { controlNet } = props;
+  const { id } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleImportImageFromCanvas = useCallback(() => {
-    dispatch(canvasImageToControlNet({ controlNet }));
-  }, [controlNet, dispatch]);
+    dispatch(canvasImageToControlAdapter({ id }));
+  }, [id, dispatch]);
 
   const handleImportMaskFromCanvas = useCallback(() => {
-    dispatch(canvasMaskToControlNet({ controlNet }));
-  }, [controlNet, dispatch]);
+    dispatch(canvasMaskToControlAdapter({ id }));
+  }, [id, dispatch]);
 
   return (
     <Flex

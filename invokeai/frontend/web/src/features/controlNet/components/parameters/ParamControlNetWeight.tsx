@@ -1,27 +1,33 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
-import {
-  ControlNetConfig,
-  controlNetWeightChanged,
-} from 'features/controlNet/store/controlNetSlice';
+import { useControlAdapterIsEnabled } from 'features/controlNet/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterWeight } from 'features/controlNet/hooks/useControlAdapterWeight';
+import { controlAdapterWeightChanged } from 'features/controlNet/store/controlAdaptersSlice';
+import { isNil } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type ParamControlNetWeightProps = {
-  controlNet: ControlNetConfig;
+  id: string;
 };
 
-const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
-  const { weight, isEnabled, controlNetId } = props.controlNet;
+const ParamControlNetWeight = ({ id }: ParamControlNetWeightProps) => {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const weight = useControlAdapterWeight(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const handleWeightChanged = useCallback(
     (weight: number) => {
-      dispatch(controlNetWeightChanged({ controlNetId, weight }));
+      dispatch(controlAdapterWeightChanged({ id, weight }));
     },
-    [controlNetId, dispatch]
+    [dispatch, id]
   );
+
+  if (isNil(weight)) {
+    // should never happen
+    return null;
+  }
 
   return (
     <IAIInformationalPopover feature="controlNetWeight">

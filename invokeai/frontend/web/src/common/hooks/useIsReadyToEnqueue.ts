@@ -2,16 +2,18 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectControlAdapterAll } from 'features/controlNet/store/controlAdaptersSlice';
+import { isControlNetOrT2IAdapter } from 'features/controlNet/store/types';
 import { isInvocationNode } from 'features/nodes/types/types';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
-import { forEach, map } from 'lodash-es';
+import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 
 const selector = createSelector(
   [stateSelector, activeTabNameSelector],
   (
-    { controlNet, generation, system, nodes, dynamicPrompts },
+    { controlAdapters, generation, system, nodes, dynamicPrompts },
     activeTabName
   ) => {
     const { initialImage, model } = generation;
@@ -87,30 +89,29 @@ const selector = createSelector(
         reasons.push(i18n.t('parameters.invoke.noModelSelected'));
       }
 
-      if (controlNet.isEnabled) {
-        map(controlNet.controlNets).forEach((controlNet, i) => {
-          if (!controlNet.isEnabled) {
-            return;
-          }
-          if (!controlNet.model) {
-            reasons.push(
-              i18n.t('parameters.invoke.noModelForControlNet', { index: i + 1 })
-            );
-          }
+      selectControlAdapterAll(controlAdapters).forEach((ca, i) => {
+        if (!ca.isEnabled) {
+          return;
+        }
+        if (!ca.model) {
+          reasons.push(
+            i18n.t('parameters.invoke.noModelForControlNet', { index: i + 1 })
+          );
+        }
 
-          if (
-            !controlNet.controlImage ||
-            (!controlNet.processedControlImage &&
-              controlNet.processorType !== 'none')
-          ) {
-            reasons.push(
-              i18n.t('parameters.invoke.noControlImageForControlNet', {
-                index: i + 1,
-              })
-            );
-          }
-        });
-      }
+        if (
+          !ca.controlImage ||
+          (isControlNetOrT2IAdapter(ca) &&
+            !ca.processedControlImage &&
+            ca.processorType !== 'none')
+        ) {
+          reasons.push(
+            i18n.t('parameters.invoke.noControlImageForControlNet', {
+              index: i + 1,
+            })
+          );
+        }
+      });
     }
 
     return { isReady: !reasons.length, reasons };

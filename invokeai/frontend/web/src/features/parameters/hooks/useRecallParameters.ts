@@ -30,17 +30,6 @@ import {
   useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
-import {
-  ControlNetConfig,
-  IPAdapterConfig,
-  controlNetEnabled,
-  controlNetRecalled,
-  controlNetReset,
-  initialControlNet,
-  initialIPAdapterState,
-  ipAdapterRecalled,
-  isIPAdapterEnabledChanged,
-} from '../../controlNet/store/controlNetSlice';
 import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
@@ -515,7 +504,7 @@ export const useRecallParameters = () => {
       }
 
       dispatch(
-        controlNetRecalled({
+        controlAdapterRecalled({
           ...result.controlnet,
         })
       );
@@ -745,14 +734,14 @@ export const useRecallParameters = () => {
         }
       });
 
-      dispatch(controlNetReset());
+      dispatch(controlAdaptersReset());
       if (controlnets?.length) {
         dispatch(controlNetEnabled());
       }
       controlnets?.forEach((controlnet) => {
         const result = prepareControlNetMetadataItem(controlnet);
         if (result.controlnet) {
-          dispatch(controlNetRecalled(result.controlnet));
+          dispatch(controlAdapterRecalled(result.controlnet));
         }
       });
 
