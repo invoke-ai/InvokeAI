@@ -15,9 +15,6 @@ from invokeai.backend.model_manager import (
     BaseModelType,
     DuplicateModelException,
     ModelConfigBase,
-    ModelInfo,
-    ModelInstallJob,
-    ModelLoad,
     ModelSearch,
     ModelType,
     SubModelType,
@@ -26,6 +23,9 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.cache import CacheStats
 from invokeai.backend.model_manager.download import DownloadJobBase
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
+from invokeai.backend.model_manager.loader import ModelInfo, ModelLoad
+from invokeai.backend.model_manager.install import ModelInstallJob
+
 
 from .config import InvokeAIAppConfig
 from .events import EventServiceBase

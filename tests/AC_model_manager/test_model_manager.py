@@ -4,7 +4,7 @@ import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend import SubModelType
-from invokeai.backend.model_manager import ModelLoad
+from invokeai.backend.model_manager.loader import ModelLoad
 
 BASIC_MODEL_NAME = "sdxl-base-1-0"
 VAE_OVERRIDE_MODEL_NAME = "sdxl-base-with-custom-vae-1-0"

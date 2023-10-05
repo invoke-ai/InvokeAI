@@ -17,7 +17,8 @@ from diffusers import logging as dlogging
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
-from . import BaseModelType, ModelConfigBase, ModelConfigStore, ModelInstall, ModelType
+from . import BaseModelType, ModelConfigBase, ModelConfigStore, ModelType
+from .loader import ModelLoad
 from .config import MainConfig
 
 
