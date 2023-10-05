@@ -273,6 +273,9 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
+    setHrf: (state, action: PayloadAction<number>) => {
+      state.clipSkip = action.payload;
+    },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
@@ -348,6 +351,7 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
+  setHrf,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
   setShouldLockAspectRatio,
