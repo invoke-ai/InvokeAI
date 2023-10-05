@@ -3,11 +3,9 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
-  controlNetImageChanged,
-  controlNetIsEnabledChanged,
-  ipAdapterImageChanged,
-  isIPAdapterEnabledChanged,
-} from 'features/controlNet/store/controlNetSlice';
+  controlAdapterImageChanged,
+  controlAdapterIsEnabledChanged,
+} from 'features/controlNet/store/controlAdaptersSlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -90,36 +88,23 @@ export const addImageDroppedListener = () => {
        * Image dropped on ControlNet
        */
       if (
-        overData.actionType === 'SET_CONTROLNET_IMAGE' &&
+        overData.actionType === 'SET_CONTROL_ADAPTER_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { controlNetId } = overData.context;
+        const { id } = overData.context;
         dispatch(
-          controlNetImageChanged({
+          controlAdapterImageChanged({
+            id,
             controlImage: activeData.payload.imageDTO.image_name,
-            controlNetId,
           })
         );
         dispatch(
-          controlNetIsEnabledChanged({
-            controlNetId,
+          controlAdapterIsEnabledChanged({
+            id,
             isEnabled: true,
           })
         );
-        return;
-      }
-
-      /**
-       * Image dropped on IP Adapter image
-       */
-      if (
-        overData.actionType === 'SET_IP_ADAPTER_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        dispatch(ipAdapterImageChanged(activeData.payload.imageDTO.image_name));
-        dispatch(isIPAdapterEnabledChanged(true));
         return;
       }
 

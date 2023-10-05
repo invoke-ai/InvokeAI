@@ -1,22 +1,20 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import {
-  ControlModes,
-  ControlNetConfig,
-  controlNetControlModeChanged,
-} from 'features/controlNet/store/controlNetSlice';
+import { useControlAdapterControlMode } from 'features/controlNet/hooks/useControlAdapterControlMode';
+import { useControlAdapterIsEnabled } from 'features/controlNet/hooks/useControlAdapterIsEnabled';
+import { controlAdapterControlModeChanged } from 'features/controlNet/store/controlAdaptersSlice';
+import { ControlMode } from 'features/controlNet/store/types';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type ParamControlNetControlModeProps = {
-  controlNet: ControlNetConfig;
+type Props = {
+  id: string;
 };
 
-export default function ParamControlNetControlMode(
-  props: ParamControlNetControlModeProps
-) {
-  const { controlMode, isEnabled, controlNetId } = props.controlNet;
+export default function ParamControlNetControlMode({ id }: Props) {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const controlMode = useControlAdapterControlMode(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -28,11 +26,15 @@ export default function ParamControlNetControlMode(
   ];
 
   const handleControlModeChange = useCallback(
-    (controlMode: ControlModes) => {
-      dispatch(controlNetControlModeChanged({ controlNetId, controlMode }));
+    (controlMode: ControlMode) => {
+      dispatch(controlAdapterControlModeChanged({ id, controlMode }));
     },
-    [controlNetId, dispatch]
+    [id, dispatch]
   );
+
+  if (!controlMode) {
+    return null;
+  }
 
   return (
     <IAIInformationalPopover feature="controlNetControlMode">
@@ -40,7 +42,7 @@ export default function ParamControlNetControlMode(
         disabled={!isEnabled}
         label={t('controlnet.controlMode')}
         data={CONTROL_MODE_DATA}
-        value={String(controlMode)}
+        value={controlMode}
         onChange={handleControlModeChange}
       />
     </IAIInformationalPopover>

@@ -5,19 +5,18 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect, {
   IAISelectDataType,
 } from 'common/components/IAIMantineSearchableSelect';
+import { useControlAdapterIsEnabled } from 'features/controlNet/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterProcessorNode } from 'features/controlNet/hooks/useControlAdapterProcessorNode';
 import { configSelector } from 'features/system/store/configSelectors';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
-import { CONTROLNET_PROCESSORS } from '../../store/constants';
-import {
-  ControlNetConfig,
-  controlNetProcessorTypeChanged,
-} from '../../store/controlNetSlice';
-import { ControlNetProcessorType } from '../../store/types';
 import { useTranslation } from 'react-i18next';
+import { CONTROLNET_PROCESSORS } from '../../store/constants';
+import { controlAdapterProcessortTypeChanged } from '../../store/controlAdaptersSlice';
+import { ControlAdapterProcessorType } from '../../store/types';
 
-type ParamControlNetProcessorSelectProps = {
-  controlNet: ControlNetConfig;
+type Props = {
+  id: string;
 };
 
 const selector = createSelector(
@@ -41,7 +40,7 @@ const selector = createSelector(
       .filter(
         (d) =>
           !config.sd.disabledControlNetProcessors.includes(
-            d.value as ControlNetProcessorType
+            d.value as ControlAdapterProcessorType
           )
       );
 
@@ -50,25 +49,28 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ParamControlNetProcessorSelect = (
-  props: ParamControlNetProcessorSelectProps
-) => {
+const ParamControlNetProcessorSelect = ({ id }: Props) => {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const processorNode = useControlAdapterProcessorNode(id);
   const dispatch = useAppDispatch();
-  const { controlNetId, isEnabled, processorNode } = props.controlNet;
   const controlNetProcessors = useAppSelector(selector);
   const { t } = useTranslation();
 
   const handleProcessorTypeChanged = useCallback(
     (v: string | null) => {
       dispatch(
-        controlNetProcessorTypeChanged({
-          controlNetId,
-          processorType: v as ControlNetProcessorType,
+        controlAdapterProcessortTypeChanged({
+          id,
+          processorType: v as ControlAdapterProcessorType,
         })
       );
     },
-    [controlNetId, dispatch]
+    [id, dispatch]
   );
+
+  if (!processorNode) {
+    return null;
+  }
 
   return (
     <IAIMantineSearchableSelect

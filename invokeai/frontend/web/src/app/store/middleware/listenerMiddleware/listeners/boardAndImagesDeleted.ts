@@ -1,8 +1,5 @@
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import {
-  controlNetReset,
-  ipAdapterStateReset,
-} from 'features/controlNet/store/controlNetSlice';
+import { controlAdaptersReset } from 'features/controlNet/store/controlAdaptersSlice';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
@@ -20,8 +17,7 @@ export const addDeleteBoardAndImagesFulfilledListener = () => {
       let wasInitialImageReset = false;
       let wasCanvasReset = false;
       let wasNodeEditorReset = false;
-      let wasControlNetReset = false;
-      let wasIPAdapterReset = false;
+      let wereControlAdaptersReset = false;
 
       const state = getState();
       deleted_images.forEach((image_name) => {
@@ -42,14 +38,9 @@ export const addDeleteBoardAndImagesFulfilledListener = () => {
           wasNodeEditorReset = true;
         }
 
-        if (imageUsage.isControlNetImage && !wasControlNetReset) {
-          dispatch(controlNetReset());
-          wasControlNetReset = true;
-        }
-
-        if (imageUsage.isIPAdapterImage && !wasIPAdapterReset) {
-          dispatch(ipAdapterStateReset());
-          wasIPAdapterReset = true;
+        if (imageUsage.isControlImage && !wereControlAdaptersReset) {
+          dispatch(controlAdaptersReset());
+          wereControlAdaptersReset = true;
         }
       });
     },

@@ -1,5 +1,5 @@
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
-import { initialControlNetState } from 'features/controlNet/store/controlNetSlice';
+import { initialControlAdapterState } from 'features/controlNet/store/controlAdaptersSlice';
 import { initialDynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
 import { initialNodesState } from 'features/nodes/store/nodesSlice';
@@ -25,7 +25,7 @@ const initialStates: {
   config: initialConfigState,
   ui: initialUIState,
   hotkeys: initialHotkeysState,
-  controlNet: initialControlNetState,
+  controlAdapters: initialControlAdapterState,
   dynamicPrompts: initialDynamicPromptsState,
   sdxl: initialSDXLState,
 };

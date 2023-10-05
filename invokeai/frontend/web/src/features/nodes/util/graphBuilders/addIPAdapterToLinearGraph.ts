@@ -9,35 +9,37 @@ import {
   IP_ADAPTER,
   METADATA_ACCUMULATOR,
 } from './constants';
+import { selectValidIPAdapters } from 'features/controlNet/store/controlAdaptersSlice';
 
 export const addIPAdapterToLinearGraph = (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
-  const { isIPAdapterEnabled, ipAdapterInfo } = state.controlNet;
+  const validIPAdapters = selectValidIPAdapters(state.controlAdapters);
 
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation
     | undefined;
 
-  if (isIPAdapterEnabled && ipAdapterInfo.model) {
+  const ipAdapter = validIPAdapters[0];
+
+  // TODO: handle multiple IP adapters once backend is capable
+  if (ipAdapter && ipAdapter.model) {
+    const { weight, model, beginStepPct, endStepPct } = ipAdapter;
     const ipAdapterNode: IPAdapterInvocation = {
       id: IP_ADAPTER,
       type: 'ip_adapter',
       is_intermediate: true,
-      weight: ipAdapterInfo.weight,
-      ip_adapter_model: {
-        base_model: ipAdapterInfo.model?.base_model,
-        model_name: ipAdapterInfo.model?.model_name,
-      },
-      begin_step_percent: ipAdapterInfo.beginStepPct,
-      end_step_percent: ipAdapterInfo.endStepPct,
+      weight: weight,
+      ip_adapter_model: model,
+      begin_step_percent: beginStepPct,
+      end_step_percent: endStepPct,
     };
 
-    if (ipAdapterInfo.adapterImage) {
+    if (ipAdapter.controlImage) {
       ipAdapterNode.image = {
-        image_name: ipAdapterInfo.adapterImage,
+        image_name: ipAdapter.controlImage,
       };
     } else {
       return;
@@ -47,15 +49,12 @@ export const addIPAdapterToLinearGraph = (
     if (metadataAccumulator?.ipAdapters) {
       const ipAdapterField = {
         image: {
-          image_name: ipAdapterInfo.adapterImage,
+          image_name: ipAdapter.controlImage,
         },
-        ip_adapter_model: {
-          base_model: ipAdapterInfo.model?.base_model,
-          model_name: ipAdapterInfo.model?.model_name,
-        },
-        weight: ipAdapterInfo.weight,
-        begin_step_percent: ipAdapterInfo.beginStepPct,
-        end_step_percent: ipAdapterInfo.endStepPct,
+        weight,
+        ip_adapter_model: model,
+        begin_step_percent: beginStepPct,
+        end_step_percent: endStepPct,
       };
 
       metadataAccumulator.ipAdapters.push(ipAdapterField);

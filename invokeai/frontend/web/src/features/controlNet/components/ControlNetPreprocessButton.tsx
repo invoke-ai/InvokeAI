@@ -1,26 +1,26 @@
-import IAIButton from 'common/components/IAIButton';
-import { memo, useCallback } from 'react';
-import { ControlNetConfig } from '../store/controlNetSlice';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { controlNetImageProcessed } from '../store/actions';
+import IAIButton from 'common/components/IAIButton';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { memo, useCallback } from 'react';
+import { useControlAdapterControlImage } from '../hooks/useControlAdapterControlImage';
+import { controlAdapterImageProcessed } from '../store/actions';
 
 type Props = {
-  controlNet: ControlNetConfig;
+  id: string;
 };
 
-const ControlNetPreprocessButton = (props: Props) => {
-  const { controlNetId, controlImage } = props.controlNet;
+const ControlNetPreprocessButton = ({ id }: Props) => {
+  const controlImage = useControlAdapterControlImage(id);
   const dispatch = useAppDispatch();
   const isReady = useIsReadyToEnqueue();
 
   const handleProcess = useCallback(() => {
     dispatch(
-      controlNetImageProcessed({
-        controlNetId,
+      controlAdapterImageProcessed({
+        id,
       })
     );
-  }, [controlNetId, dispatch]);
+  }, [id, dispatch]);
 
   return (
     <IAIButton

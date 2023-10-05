@@ -1,4 +1,11 @@
+import { EntityState } from '@reduxjs/toolkit';
+import {
+  ControlNetModelParam,
+  IPAdapterModelParam,
+  T2IAdapterModelParam,
+} from 'features/parameters/types/parameterSchemas';
 import { isObject } from 'lodash-es';
+import { components } from 'services/api/schema';
 import {
   CannyImageProcessorInvocation,
   ColorMapImageProcessorInvocation,
@@ -12,6 +19,7 @@ import {
   NormalbaeImageProcessorInvocation,
   OpenposeImageProcessorInvocation,
   PidiImageProcessorInvocation,
+  T2IAdapterModelConfig,
   ZoeDepthImageProcessorInvocation,
 } from 'services/api/types';
 import { O } from 'ts-toolbelt';
@@ -19,7 +27,7 @@ import { O } from 'ts-toolbelt';
 /**
  * Any ControlNet processor node
  */
-export type ControlNetProcessorNode =
+export type ControlAdapterProcessorNode =
   | CannyImageProcessorInvocation
   | ColorMapImageProcessorInvocation
   | ContentShuffleImageProcessorInvocation
@@ -37,8 +45,8 @@ export type ControlNetProcessorNode =
 /**
  * Any ControlNet processor type
  */
-export type ControlNetProcessorType = NonNullable<
-  ControlNetProcessorNode['type'] | 'none'
+export type ControlAdapterProcessorType = NonNullable<
+  ControlAdapterProcessorNode['type'] | 'none'
 >;
 
 /**
@@ -148,7 +156,7 @@ export type RequiredZoeDepthImageProcessorInvocation = O.Required<
 /**
  * Any ControlNet Processor node, with its parameters flagged as required
  */
-export type RequiredControlNetProcessorNode = O.Required<
+export type RequiredControlAdapterProcessorNode = O.Required<
   | RequiredCannyImageProcessorInvocation
   | RequiredColorMapImageProcessorInvocation
   | RequiredContentShuffleImageProcessorInvocation
@@ -355,4 +363,91 @@ export const isZoeDepthImageProcessorInvocation = (
     return true;
   }
   return false;
+};
+
+export type ControlMode = NonNullable<
+  components['schemas']['ControlNetInvocation']['control_mode']
+>;
+
+export type ResizeMode = NonNullable<
+  components['schemas']['ControlNetInvocation']['resize_mode']
+>;
+
+export type ControlNetConfig = {
+  type: 'controlnet';
+  id: string;
+  isEnabled: boolean;
+  model: ControlNetModelParam | null;
+  weight: number;
+  beginStepPct: number;
+  endStepPct: number;
+  controlMode: ControlMode;
+  resizeMode: ResizeMode;
+  controlImage: string | null;
+  processedControlImage: string | null;
+  processorType: ControlAdapterProcessorType;
+  processorNode: RequiredControlAdapterProcessorNode;
+  shouldAutoConfig: boolean;
+};
+
+export type T2IAdapterConfig = {
+  type: 't2i_adapter';
+  id: string;
+  isEnabled: boolean;
+  model: T2IAdapterModelParam | null;
+  weight: number;
+  beginStepPct: number;
+  endStepPct: number;
+  resizeMode: ResizeMode;
+  controlImage: string | null;
+  processedControlImage: string | null;
+  processorType: ControlAdapterProcessorType;
+  processorNode: RequiredControlAdapterProcessorNode;
+  shouldAutoConfig: boolean;
+};
+
+export type IPAdapterConfig = {
+  type: 'ip_adapter';
+  id: string;
+  isEnabled: boolean;
+  controlImage: string | null;
+  model: IPAdapterModelParam | null;
+  weight: number;
+  beginStepPct: number;
+  endStepPct: number;
+};
+
+export type ControlAdapterConfig =
+  | ControlNetConfig
+  | IPAdapterConfig
+  | T2IAdapterConfig;
+
+export type ControlAdapterType = ControlAdapterConfig['type'];
+
+export type ControlAdaptersState = EntityState<ControlAdapterConfig> & {
+  pendingControlImages: string[];
+};
+
+export const isControlNet = (
+  controlAdapter: ControlAdapterConfig
+): controlAdapter is ControlNetConfig => {
+  return controlAdapter.type === 'controlnet';
+};
+
+export const isIPAdapter = (
+  controlAdapter: ControlAdapterConfig
+): controlAdapter is IPAdapterConfig => {
+  return controlAdapter.type === 'ip_adapter';
+};
+
+export const isT2IAdapter = (
+  controlAdapter: ControlAdapterConfig
+): controlAdapter is T2IAdapterConfig => {
+  return controlAdapter.type === 't2i_adapter';
+};
+
+export const isControlNetOrT2IAdapter = (
+  controlAdapter: ControlAdapterConfig
+): controlAdapter is ControlNetConfig | T2IAdapterConfig => {
+  return isControlNet(controlAdapter) || isT2IAdapter(controlAdapter);
 };

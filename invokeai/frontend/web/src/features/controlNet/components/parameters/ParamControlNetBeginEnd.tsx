@@ -11,43 +11,48 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
+import { useControlAdapterBeginEndStepPct } from 'features/controlNet/hooks/useControlAdapterBeginEndStepPct';
+import { useControlAdapterIsEnabled } from 'features/controlNet/hooks/useControlAdapterIsEnabled';
 import {
-  ControlNetConfig,
-  controlNetBeginStepPctChanged,
-  controlNetEndStepPctChanged,
-} from 'features/controlNet/store/controlNetSlice';
+  controlAdapterBeginStepPctChanged,
+  controlAdapterEndStepPctChanged,
+} from 'features/controlNet/store/controlAdaptersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  controlNet: ControlNetConfig;
+  id: string;
 };
 
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 
-const ParamControlNetBeginEnd = (props: Props) => {
-  const { beginStepPct, endStepPct, isEnabled, controlNetId } =
-    props.controlNet;
+const ParamControlNetBeginEnd = ({ id }: Props) => {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const stepPcts = useControlAdapterBeginEndStepPct(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleStepPctChanged = useCallback(
     (v: number[]) => {
       dispatch(
-        controlNetBeginStepPctChanged({
-          controlNetId,
+        controlAdapterBeginStepPctChanged({
+          id,
           beginStepPct: v[0] as number,
         })
       );
       dispatch(
-        controlNetEndStepPctChanged({
-          controlNetId,
+        controlAdapterEndStepPctChanged({
+          id,
           endStepPct: v[1] as number,
         })
       );
     },
-    [controlNetId, dispatch]
+    [dispatch, id]
   );
+
+  if (!stepPcts) {
+    return null;
+  }
 
   return (
     <IAIInformationalPopover feature="controlNetBeginEnd">
@@ -56,7 +61,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
         <HStack w="100%" gap={2} alignItems="center">
           <RangeSlider
             aria-label={['Begin Step %', 'End Step %!']}
-            value={[beginStepPct, endStepPct]}
+            value={[stepPcts.beginStepPct, stepPcts.endStepPct]}
             onChange={handleStepPctChanged}
             min={0}
             max={1}
@@ -67,10 +72,18 @@ const ParamControlNetBeginEnd = (props: Props) => {
             <RangeSliderTrack>
               <RangeSliderFilledTrack />
             </RangeSliderTrack>
-            <Tooltip label={formatPct(beginStepPct)} placement="top" hasArrow>
+            <Tooltip
+              label={formatPct(stepPcts.beginStepPct)}
+              placement="top"
+              hasArrow
+            >
               <RangeSliderThumb index={0} />
             </Tooltip>
-            <Tooltip label={formatPct(endStepPct)} placement="top" hasArrow>
+            <Tooltip
+              label={formatPct(stepPcts.endStepPct)}
+              placement="top"
+              hasArrow
+            >
               <RangeSliderThumb index={1} />
             </Tooltip>
             <RangeSliderMark

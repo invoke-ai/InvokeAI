@@ -3,11 +3,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
-  ControlNetConfig,
-  controlNetDuplicated,
-  controlNetRemoved,
-  controlNetIsEnabledChanged,
-} from '../store/controlNetSlice';
+  controlAdapterDuplicated,
+  controlAdapterIsEnabledChanged,
+  controlAdapterRemoved,
+  selectControlAdapterById,
+} from '../store/controlAdaptersSlice';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
 
@@ -19,8 +19,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useTranslation } from 'react-i18next';
-import { useToggle } from 'react-use';
-import { v4 as uuidv4 } from 'uuid';
+import { isControlNetOrT2IAdapter } from '../store/types';
 import ControlNetImagePreview from './ControlNetImagePreview';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
 import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
@@ -29,14 +28,12 @@ import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ParamControlNetResizeMode from './parameters/ParamControlNetResizeMode';
+import { useToggle } from 'react-use';
+import { useControlAdapterType } from '../hooks/useControlAdapterType';
 
-type ControlNetProps = {
-  controlNet: ControlNetConfig;
-};
-
-const ControlNet = (props: ControlNetProps) => {
-  const { controlNet } = props;
-  const { controlNetId } = controlNet;
+const ControlNet = (props: { id: string }) => {
+  const { id } = props;
+  const controlAdapterType = useControlAdapterType(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -44,8 +41,8 @@ const ControlNet = (props: ControlNetProps) => {
 
   const selector = createSelector(
     stateSelector,
-    ({ controlNet }) => {
-      const cn = controlNet.controlNets[controlNetId];
+    ({ controlAdapters }) => {
+      const cn = selectControlAdapterById(controlAdapters, id);
 
       if (!cn) {
         return {
@@ -54,9 +51,15 @@ const ControlNet = (props: ControlNetProps) => {
         };
       }
 
-      const { isEnabled, shouldAutoConfig } = cn;
+      const isEnabled = cn.isEnabled;
+      const shouldAutoConfig = isControlNetOrT2IAdapter(cn)
+        ? cn.shouldAutoConfig
+        : false;
 
-      return { isEnabled, shouldAutoConfig };
+      return {
+        isEnabled,
+        shouldAutoConfig,
+      };
     },
     defaultSelectorOptions
   );
@@ -65,29 +68,28 @@ const ControlNet = (props: ControlNetProps) => {
   const [isExpanded, toggleIsExpanded] = useToggle(false);
 
   const handleDelete = useCallback(() => {
-    dispatch(controlNetRemoved({ controlNetId }));
-  }, [controlNetId, dispatch]);
+    dispatch(controlAdapterRemoved({ id }));
+  }, [id, dispatch]);
 
   const handleDuplicate = useCallback(() => {
-    dispatch(
-      controlNetDuplicated({
-        sourceControlNetId: controlNetId,
-        newControlNetId: uuidv4(),
-      })
-    );
-  }, [controlNetId, dispatch]);
+    dispatch(controlAdapterDuplicated(id));
+  }, [id, dispatch]);
 
   const handleToggleIsEnabled = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(
-        controlNetIsEnabledChanged({
-          controlNetId,
+        controlAdapterIsEnabledChanged({
+          id,
           isEnabled: e.target.checked,
         })
       );
     },
-    [controlNetId, dispatch]
+    [id, dispatch]
   );
+
+  if (!controlAdapterType) {
+    return null;
+  }
 
   return (
     <Flex
@@ -120,10 +122,10 @@ const ControlNet = (props: ControlNetProps) => {
             transitionDuration: '0.1s',
           }}
         >
-          <ParamControlNetModel controlNet={controlNet} />
+          <ParamControlNetModel id={id} />
         </Box>
         {activeTabName === 'unifiedCanvas' && (
-          <ControlNetCanvasImageImports controlNet={controlNet} />
+          <ControlNetCanvasImageImports id={id} />
         )}
         <IAIIconButton
           size="sm"
@@ -207,8 +209,8 @@ const ControlNet = (props: ControlNetProps) => {
               justifyContent: 'space-between',
             }}
           >
-            <ParamControlNetWeight controlNet={controlNet} />
-            <ParamControlNetBeginEnd controlNet={controlNet} />
+            <ParamControlNetWeight id={id} />
+            <ParamControlNetBeginEnd id={id} />
           </Flex>
           {!isExpanded && (
             <Flex
@@ -220,22 +222,22 @@ const ControlNet = (props: ControlNetProps) => {
                 aspectRatio: '1/1',
               }}
             >
-              <ControlNetImagePreview controlNet={controlNet} isSmall />
+              <ControlNetImagePreview id={id} isSmall />
             </Flex>
           )}
         </Flex>
         <Flex sx={{ gap: 2 }}>
-          <ParamControlNetControlMode controlNet={controlNet} />
-          <ParamControlNetResizeMode controlNet={controlNet} />
+          <ParamControlNetControlMode id={id} />
+          <ParamControlNetResizeMode id={id} />
         </Flex>
-        <ParamControlNetProcessorSelect controlNet={controlNet} />
+        <ParamControlNetProcessorSelect id={id} />
       </Flex>
 
       {isExpanded && (
         <>
-          <ControlNetImagePreview controlNet={controlNet} />
-          <ParamControlNetShouldAutoConfig controlNet={controlNet} />
-          <ControlNetProcessorComponent controlNet={controlNet} />
+          <ControlNetImagePreview id={id} />
+          <ParamControlNetShouldAutoConfig id={id} />
+          <ControlNetProcessorComponent id={id} />
         </>
       )}
     </Flex>

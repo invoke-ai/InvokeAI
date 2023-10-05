@@ -1,9 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
-  controlNetRemoved,
-  ipAdapterStateReset,
-} from 'features/controlNet/store/controlNetSlice';
+  controlAdapterRemoved,
+  selectControlAdapterAll,
+} from 'features/controlNet/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
@@ -60,23 +60,12 @@ export const addModelSelectedListener = () => {
         }
 
         // handle incompatible controlnets
-        const { controlNets } = state.controlNet;
-        forEach(controlNets, (controlNet, controlNetId) => {
-          if (controlNet.model?.base_model !== base_model) {
-            dispatch(controlNetRemoved({ controlNetId }));
+        selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
+          if (ca.model?.base_model !== base_model) {
+            dispatch(controlAdapterRemoved({ id: ca.id }));
             modelsCleared += 1;
           }
         });
-
-        // handle incompatible IP-Adapter
-        const { ipAdapterInfo } = state.controlNet;
-        if (
-          ipAdapterInfo.model &&
-          ipAdapterInfo.model.base_model !== base_model
-        ) {
-          dispatch(ipAdapterStateReset());
-          modelsCleared += 1;
-        }
 
         if (modelsCleared > 0) {
           dispatch(

@@ -1,23 +1,21 @@
-import { SelectItem } from '@mantine/core';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
-import {
-  ControlNetConfig,
-  controlNetModelChanged,
-} from 'features/controlNet/store/controlNetSlice';
+import { useControlAdapterIsEnabled } from 'features/controlNet/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterModel } from 'features/controlNet/hooks/useControlAdapterModel';
+import { useControlAdapterModels } from 'features/controlNet/hooks/useControlAdapterModels';
+import { useControlAdapterType } from 'features/controlNet/hooks/useControlAdapterType';
+import { controlAdapterModelChanged } from 'features/controlNet/store/controlAdaptersSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
-import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
 type ParamControlNetModelProps = {
-  controlNet: ControlNetConfig;
+  id: string;
 };
 
 const selector = createSelector(
@@ -29,23 +27,31 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ParamControlNetModel = (props: ParamControlNetModelProps) => {
-  const { controlNetId, model: controlNetModel, isEnabled } = props.controlNet;
+const ParamControlNetModel = ({ id }: ParamControlNetModelProps) => {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const controlAdapterType = useControlAdapterType(id);
+  const model = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
 
   const { mainModel } = useAppSelector(selector);
   const { t } = useTranslation();
 
-  const { data: controlNetModels } = useGetControlNetModelsQuery();
+  const models = useControlAdapterModels(controlAdapterType);
 
   const data = useMemo(() => {
-    if (!controlNetModels) {
+    if (!models) {
       return [];
     }
 
-    const data: SelectItem[] = [];
+    const data: {
+      value: string;
+      label: string;
+      group: string;
+      disabled: boolean;
+      tooltip?: string;
+    }[] = [];
 
-    forEach(controlNetModels.entities, (model, id) => {
+    models.forEach((model) => {
       if (!model) {
         return;
       }
@@ -53,7 +59,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       const disabled = model?.base_model !== mainModel?.base_model;
 
       data.push({
-        value: id,
+        value: model.id,
         label: model.model_name,
         group: MODEL_TYPE_MAP[model.base_model],
         disabled,
@@ -63,20 +69,24 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       });
     });
 
+    data.sort((a, b) =>
+      // sort 'none' to the top
+      a.disabled ? 1 : b.disabled ? -1 : a.label.localeCompare(b.label)
+    );
+
     return data;
-  }, [controlNetModels, mainModel?.base_model, t]);
+  }, [mainModel?.base_model, models, t]);
 
   // grab the full model entity from the RTK Query cache
   const selectedModel = useMemo(
     () =>
-      controlNetModels?.entities[
-        `${controlNetModel?.base_model}/controlnet/${controlNetModel?.model_name}`
-      ] ?? null,
-    [
-      controlNetModel?.base_model,
-      controlNetModel?.model_name,
-      controlNetModels?.entities,
-    ]
+      models?.find(
+        (m) =>
+          m?.id ===
+          `${model?.base_model}/${controlAdapterType}/${model?.model_name}`
+        // (m) => m?.id === `${model?.base_model}/controlnet/${model?.model_name}`
+      ) ?? null,
+    [controlAdapterType, model?.base_model, model?.model_name, models]
   );
 
   const handleModelChanged = useCallback(
@@ -91,12 +101,12 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
         return;
       }
 
-      dispatch(
-        controlNetModelChanged({ controlNetId, model: newControlNetModel })
-      );
+      dispatch(controlAdapterModelChanged({ id, model: newControlNetModel }));
     },
-    [controlNetId, dispatch]
+    [dispatch, id]
   );
+
+  console.log(model, selectedModel);
 
   return (
     <IAIMantineSearchableSelect

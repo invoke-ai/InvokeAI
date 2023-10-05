@@ -50,6 +50,7 @@
         "close": "Close",
         "communityLabel": "Community",
         "controlNet": "Controlnet",
+        "controlAdapter": "Control Adapter",
         "ipAdapter": "IP Adapter",
         "darkMode": "Dark Mode",
         "discordLabel": "Discord",

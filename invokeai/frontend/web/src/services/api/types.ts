@@ -191,13 +191,9 @@ export type GraphInvocationOutput = s['GraphInvocationOutput'];
 
 // Post-image upload actions, controls workflows when images are uploaded
 
-export type ControlNetAction = {
-  type: 'SET_CONTROLNET_IMAGE';
-  controlNetId: string;
-};
-
-export type IPAdapterAction = {
-  type: 'SET_IP_ADAPTER_IMAGE';
+export type ControlAdapterAction = {
+  type: 'SET_CONTROL_ADAPTER_IMAGE';
+  id: string;
 };
 
 export type InitialImageAction = {
@@ -224,8 +220,7 @@ export type AddToBatchAction = {
 };
 
 export type PostUploadAction =
-  | ControlNetAction
-  | IPAdapterAction
+  | ControlAdapterAction
   | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction

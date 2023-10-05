@@ -1,22 +1,20 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import {
-  ControlNetConfig,
-  ResizeModes,
-  controlNetResizeModeChanged,
-} from 'features/controlNet/store/controlNetSlice';
+import { useControlAdapterIsEnabled } from 'features/controlNet/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterResizeMode } from 'features/controlNet/hooks/useControlAdapterResizeMode';
+import { controlAdapterResizeModeChanged } from 'features/controlNet/store/controlAdaptersSlice';
+import { ResizeMode } from 'features/controlNet/store/types';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type ParamControlNetResizeModeProps = {
-  controlNet: ControlNetConfig;
+type Props = {
+  id: string;
 };
 
-export default function ParamControlNetResizeMode(
-  props: ParamControlNetResizeModeProps
-) {
-  const { resizeMode, isEnabled, controlNetId } = props.controlNet;
+export default function ParamControlNetResizeMode({ id }: Props) {
+  const isEnabled = useControlAdapterIsEnabled(id);
+  const resizeMode = useControlAdapterResizeMode(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -27,11 +25,15 @@ export default function ParamControlNetResizeMode(
   ];
 
   const handleResizeModeChange = useCallback(
-    (resizeMode: ResizeModes) => {
-      dispatch(controlNetResizeModeChanged({ controlNetId, resizeMode }));
+    (resizeMode: ResizeMode) => {
+      dispatch(controlAdapterResizeModeChanged({ id, resizeMode }));
     },
-    [controlNetId, dispatch]
+    [id, dispatch]
   );
+
+  if (!resizeMode) {
+    return null;
+  }
 
   return (
     <IAIInformationalPopover feature="controlNetResizeMode">
@@ -39,7 +41,7 @@ export default function ParamControlNetResizeMode(
         disabled={!isEnabled}
         label={t('controlnet.resizeMode')}
         data={RESIZE_MODE_DATA}
-        value={String(resizeMode)}
+        value={resizeMode}
         onChange={handleResizeModeChange}
       />
     </IAIInformationalPopover>

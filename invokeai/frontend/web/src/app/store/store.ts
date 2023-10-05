@@ -7,7 +7,7 @@ import {
 } from '@reduxjs/toolkit';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import changeBoardModalReducer from 'features/changeBoardModal/store/slice';
-import controlNetReducer from 'features/controlNet/store/controlNetSlice';
+import controlAdaptersReducer from 'features/controlNet/store/controlAdaptersSlice';
 import deleteImageModalReducer from 'features/deleteImageModal/store/slice';
 import dynamicPromptsReducer from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
@@ -44,7 +44,7 @@ const allReducers = {
   config: configReducer,
   ui: uiReducer,
   hotkeys: hotkeysReducer,
-  controlNet: controlNetReducer,
+  controlAdapters: controlAdaptersReducer,
   dynamicPrompts: dynamicPromptsReducer,
   deleteImageModal: deleteImageModalReducer,
   changeBoardModal: changeBoardModalReducer,
@@ -68,7 +68,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'postprocessing',
   'system',
   'ui',
-  'controlNet',
+  'controlAdapters',
   'dynamicPrompts',
   'lora',
   'modelmanager',

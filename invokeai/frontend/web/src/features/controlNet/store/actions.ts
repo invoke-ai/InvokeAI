@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
 
-export const controlNetImageProcessed = createAction<{
-  controlNetId: string;
-}>('controlNet/imageProcessed');
+export const controlAdapterImageProcessed = createAction<{
+  id: string;
+}>('controlAdapters/imageProcessed');

@@ -23,20 +23,20 @@ import {
 } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
-import {
-  ControlNetConfig,
-  controlNetImageChanged,
-} from '../store/controlNetSlice';
+import { controlAdapterImageChanged } from '../store/controlAdaptersSlice';
+import { useControlAdapterControlImage } from '../hooks/useControlAdapterControlImage';
+import { useControlAdapterProcessedControlImage } from '../hooks/useControlAdapterProcessedControlImage';
+import { useControlAdapterProcessorType } from '../hooks/useControlAdapterProcessorType';
 
 type Props = {
-  controlNet: ControlNetConfig;
+  id: string;
   isSmall?: boolean;
 };
 
 const selector = createSelector(
   stateSelector,
-  ({ controlNet, gallery }) => {
-    const { pendingControlImages } = controlNet;
+  ({ controlAdapters, gallery }) => {
+    const { pendingControlImages } = controlAdapters;
     const { autoAddBoardId } = gallery;
 
     return {
@@ -47,13 +47,10 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
-  const {
-    controlImage: controlImageName,
-    processedControlImage: processedControlImageName,
-    processorType,
-    controlNetId,
-  } = controlNet;
+const ControlNetImagePreview = ({ isSmall, id }: Props) => {
+  const controlImageName = useControlAdapterControlImage(id);
+  const processedControlImageName = useControlAdapterProcessedControlImage(id);
+  const processorType = useControlAdapterProcessorType(id);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -75,8 +72,8 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
   const [addToBoard] = useAddImageToBoardMutation();
   const [removeFromBoard] = useRemoveImageFromBoardMutation();
   const handleResetControlImage = useCallback(() => {
-    dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
-  }, [controlNetId, dispatch]);
+    dispatch(controlAdapterImageChanged({ id, controlImage: null }));
+  }, [id, dispatch]);
 
   const handleSaveControlImage = useCallback(async () => {
     if (!processedControlImage) {
@@ -133,32 +130,32 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (controlImage) {
       return {
-        id: controlNetId,
+        id,
         payloadType: 'IMAGE_DTO',
         payload: { imageDTO: controlImage },
       };
     }
-  }, [controlImage, controlNetId]);
+  }, [controlImage, id]);
 
   const droppableData = useMemo<TypesafeDroppableData | undefined>(
     () => ({
-      id: controlNetId,
-      actionType: 'SET_CONTROLNET_IMAGE',
-      context: { controlNetId },
+      id,
+      actionType: 'SET_CONTROL_ADAPTER_IMAGE',
+      context: { id },
     }),
-    [controlNetId]
+    [id]
   );
 
   const postUploadAction = useMemo<PostUploadAction>(
-    () => ({ type: 'SET_CONTROLNET_IMAGE', controlNetId }),
-    [controlNetId]
+    () => ({ type: 'SET_CONTROL_ADAPTER_IMAGE', id }),
+    [id]
   );
 
   const shouldShowProcessedImage =
     controlImage &&
     processedControlImage &&
     !isMouseOverImage &&
-    !pendingControlImages.includes(controlNetId) &&
+    !pendingControlImages.includes(id) &&
     processorType !== 'none';
 
   return (
@@ -222,7 +219,7 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         />
       </>
 
-      {pendingControlImages.includes(controlNetId) && (
+      {pendingControlImages.includes(id) && (
         <Flex
           sx={{
             position: 'absolute',
