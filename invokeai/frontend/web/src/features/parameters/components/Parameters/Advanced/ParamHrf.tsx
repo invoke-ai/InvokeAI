@@ -28,7 +28,7 @@ export default function ParamHrf() {
   return (
     <IAIInformationalPopover feature="hrf" placement="top">
       <IAISlider
-        label={t('parameters.hrf')}
+        label="High Resolution Scale"
         aria-label={t('parameters.hrf')}
         min={0}
         max={20}
