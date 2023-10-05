@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
-from invokeai.backend.util.test_utils import install_and_load_model, model_installer, slow, torch_device
+from invokeai.backend.util.test_utils import install_and_load_model, slow
 
 
 def build_dummy_sd15_unet_input(torch_device):
