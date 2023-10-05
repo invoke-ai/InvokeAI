@@ -1,3 +1,4 @@
+import traceback
 from threading import BoundedSemaphore
 from threading import Event as ThreadEvent
 from threading import Thread
@@ -123,6 +124,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         continue
                 except Exception as e:
                     self.__invoker.services.logger.error(f"Error in session processor: {e}")
+                    if queue_item is not None:
+                        self.__invoker.services.session_queue.cancel_queue_item(
+                            queue_item.item_id, error=traceback.format_exc()
+                        )
                     poll_now_event.wait(POLLING_INTERVAL)
                     continue
         except Exception as e:
