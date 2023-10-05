@@ -8,6 +8,7 @@ import { ImageDTO } from 'services/api/types';
 import { clipSkipMap } from '../types/constants';
 import {
   CanvasCoherenceModeParam,
+  HrfScaleParam,
   CfgScaleParam,
   HeightParam,
   MainModelParam,
@@ -26,6 +27,7 @@ import {
 } from '../types/parameterSchemas';
 
 export interface GenerationState {
+  hrfScale: HrfScaleParam;
   cfgScale: CfgScaleParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
@@ -68,6 +70,7 @@ export interface GenerationState {
 }
 
 export const initialGenerationState: GenerationState = {
+  hrfScale: 1.0,
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
