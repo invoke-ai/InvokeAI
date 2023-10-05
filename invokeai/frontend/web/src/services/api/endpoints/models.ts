@@ -6,6 +6,7 @@ import {
   CheckpointModelConfig,
   ControlNetModelConfig,
   IPAdapterModelConfig,
+  T2IAdapterModelConfig,
   DiffusersModelConfig,
   ImportModelConfig,
   LoRAModelConfig,
@@ -41,6 +42,10 @@ export type IPAdapterModelConfigEntity = IPAdapterModelConfig & {
   id: string;
 };
 
+export type T2IAdapterModelConfigEntity = T2IAdapterModelConfig & {
+  id: string;
+};
+
 export type TextualInversionModelConfigEntity = TextualInversionModelConfig & {
   id: string;
 };
@@ -53,6 +58,7 @@ type AnyModelConfigEntity =
   | LoRAModelConfigEntity
   | ControlNetModelConfigEntity
   | IPAdapterModelConfigEntity
+  | T2IAdapterModelConfigEntity
   | TextualInversionModelConfigEntity
   | VaeModelConfigEntity;
 
@@ -143,6 +149,10 @@ export const controlNetModelsAdapter =
   });
 export const ipAdapterModelsAdapter =
   createEntityAdapter<IPAdapterModelConfigEntity>({
+    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+  });
+export const t2iAdapterModelsAdapter =
+  createEntityAdapter<T2IAdapterModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
 export const textualInversionModelsAdapter =
@@ -470,6 +480,37 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    getT2IAdapterModels: build.query<
+      EntityState<T2IAdapterModelConfigEntity>,
+      void
+    >({
+      query: () => ({ url: 'models/', params: { model_type: 't2i_adapter' } }),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = [
+          { type: 'T2IAdapterModel', id: LIST_TAG },
+        ];
+
+        if (result) {
+          tags.push(
+            ...result.ids.map((id) => ({
+              type: 'T2IAdapterModel' as const,
+              id,
+            }))
+          );
+        }
+
+        return tags;
+      },
+      transformResponse: (response: { models: T2IAdapterModelConfig[] }) => {
+        const entities = createModelEntities<T2IAdapterModelConfigEntity>(
+          response.models
+        );
+        return t2iAdapterModelsAdapter.setAll(
+          t2iAdapterModelsAdapter.getInitialState(),
+          entities
+        );
+      },
+    }),
     getVaeModels: build.query<EntityState<VaeModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
       providesTags: (result) => {
@@ -567,6 +608,7 @@ export const {
   useGetOnnxModelsQuery,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
+  useGetT2IAdapterModelsQuery,
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,

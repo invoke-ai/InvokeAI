@@ -11,6 +11,7 @@ import torchvision.transforms as T
 from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models import UNet2DConditionModel
+from diffusers.models.adapter import FullAdapterXL, T2IAdapter
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -33,6 +34,7 @@ from invokeai.app.invocations.primitives import (
     LatentsOutput,
     build_latents_output,
 )
+from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
@@ -47,6 +49,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
     IPAdapterData,
     StableDiffusionGeneratorPipeline,
+    T2IAdapterData,
     image_resized_to_grid_as_tensor,
 )
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
@@ -196,7 +199,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -226,9 +229,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
     ip_adapter: Optional[IPAdapterField] = InputField(
         description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection, ui_order=6
     )
+    t2i_adapter: Union[T2IAdapterField, list[T2IAdapterField]] = InputField(
+        description=FieldDescriptions.t2i_adapter, title="T2I-Adapter", default=None, input=Input.Connection, ui_order=7
+    )
     latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     denoise_mask: Optional[DenoiseMaskField] = InputField(
-        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=7
+        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=8
     )
 
     @validator("cfg_scale")
@@ -451,6 +457,91 @@ class DenoiseLatentsInvocation(BaseInvocation):
             end_step_percent=ip_adapter.end_step_percent,
         )
 
+    def run_t2i_adapters(
+        self,
+        context: InvocationContext,
+        t2i_adapter: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
+        latents_shape: list[int],
+        do_classifier_free_guidance: bool,
+    ) -> Optional[list[T2IAdapterData]]:
+        if t2i_adapter is None:
+            return None
+
+        # Handle the possibility that t2i_adapter could be a list or a single T2IAdapterField.
+        if isinstance(t2i_adapter, T2IAdapterField):
+            t2i_adapter = [t2i_adapter]
+
+        if len(t2i_adapter) == 0:
+            return None
+
+        t2i_adapter_data = []
+        for t2i_adapter_field in t2i_adapter:
+            t2i_adapter_model_info = context.services.model_manager.get_model(
+                model_name=t2i_adapter_field.t2i_adapter_model.model_name,
+                model_type=ModelType.T2IAdapter,
+                base_model=t2i_adapter_field.t2i_adapter_model.base_model,
+                context=context,
+            )
+            image = context.services.images.get_pil_image(t2i_adapter_field.image.image_name)
+
+            # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
+            if t2i_adapter_field.t2i_adapter_model.base_model == BaseModelType.StableDiffusion1:
+                max_unet_downscale = 8
+            elif t2i_adapter_field.t2i_adapter_model.base_model == BaseModelType.StableDiffusionXL:
+                max_unet_downscale = 4
+            else:
+                raise ValueError(
+                    f"Unexpected T2I-Adapter base model type: '{t2i_adapter_field.t2i_adapter_model.base_model}'."
+                )
+
+            t2i_adapter_model: T2IAdapter
+            with t2i_adapter_model_info as t2i_adapter_model:
+                total_downscale_factor = t2i_adapter_model.total_downscale_factor
+                if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
+                    # HACK(ryand): Work around a bug in FullAdapterXL. This is being addressed upstream in diffusers by
+                    # this PR: https://github.com/huggingface/diffusers/pull/5134.
+                    total_downscale_factor = total_downscale_factor // 2
+
+                # Resize the T2I-Adapter input image.
+                # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
+                # result will match the latent image's dimensions after max_unet_downscale is applied.
+                t2i_input_height = latents_shape[2] // max_unet_downscale * total_downscale_factor
+                t2i_input_width = latents_shape[3] // max_unet_downscale * total_downscale_factor
+
+                # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
+                # a single image. If CFG is enabled, we will duplicate the resultant tensor after applying the
+                # T2I-Adapter model.
+                #
+                # Note: We re-use the `prepare_control_image(...)` from ControlNet for T2I-Adapter, because it has many
+                # of the same requirements (e.g. preserving binary masks during resize).
+                t2i_image = prepare_control_image(
+                    image=image,
+                    do_classifier_free_guidance=False,
+                    width=t2i_input_width,
+                    height=t2i_input_height,
+                    num_channels=t2i_adapter_model.config.in_channels,
+                    device=t2i_adapter_model.device,
+                    dtype=t2i_adapter_model.dtype,
+                    resize_mode=t2i_adapter_field.resize_mode,
+                )
+
+                adapter_state = t2i_adapter_model(t2i_image)
+
+            if do_classifier_free_guidance:
+                for idx, value in enumerate(adapter_state):
+                    adapter_state[idx] = torch.cat([value] * 2, dim=0)
+
+            t2i_adapter_data.append(
+                T2IAdapterData(
+                    adapter_state=adapter_state,
+                    weight=t2i_adapter_field.weight,
+                    begin_step_percent=t2i_adapter_field.begin_step_percent,
+                    end_step_percent=t2i_adapter_field.end_step_percent,
+                )
+            )
+
+        return t2i_adapter_data
+
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
     def init_scheduler(self, scheduler, device, steps, denoising_start, denoising_end):
@@ -521,6 +612,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed = 0
 
             mask, masked_latents = self.prep_inpaint_mask(context, latents)
+
+            # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
+            # below. Investigate whether this is appropriate.
+            t2i_adapter_data = self.run_t2i_adapters(
+                context, self.t2i_adapter, latents.shape, do_classifier_free_guidance=True
+            )
 
             # Get the source node id (we are invoking the prepared node)
             graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
@@ -602,8 +699,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     masked_latents=masked_latents,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
-                    control_data=controlnet_data,  # list[ControlNetData],
-                    ip_adapter_data=ip_adapter_data,  # IPAdapterData,
+                    control_data=controlnet_data,
+                    ip_adapter_data=ip_adapter_data,
+                    t2i_adapter_data=t2i_adapter_data,
                     callback=step_callback,
                 )
 
