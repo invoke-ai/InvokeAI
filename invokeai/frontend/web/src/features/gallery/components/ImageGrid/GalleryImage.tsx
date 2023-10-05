@@ -174,11 +174,11 @@ const GalleryImage = (props: HoverableImageProps) => {
           </>
         </IAIDndImage>
 
-        {isSelected && showImageNumbers && (
+        {isSelected && isHovered && showImageNumbers && (
           <Box
             position="absolute"
-            bottom="5px"
-            right="5px"
+            top="5px"
+            left="5px"
             borderRadius="50%"
             display="flex"
             fontSize="xs"
