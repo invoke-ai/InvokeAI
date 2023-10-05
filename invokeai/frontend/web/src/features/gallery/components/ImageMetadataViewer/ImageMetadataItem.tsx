@@ -1,6 +1,7 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { Flex, IconButton, Link, Text, Tooltip } from '@chakra-ui/react';
-import { memo, useState } from 'react';
+import { useDisclosure } from '@chakra-ui/react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import {
@@ -15,6 +16,7 @@ type MetadataItemProps = {
   onClick?: () => void;
   value: number | string | boolean;
   labelPosition?: string;
+  hideItem?: boolean;
   withCopy?: boolean;
 };
 
@@ -27,22 +29,17 @@ const ImageMetadataItem = ({
   onClick,
   isLink,
   labelPosition,
+  hideItem,
   withCopy = false,
 }: MetadataItemProps) => {
+  const { isOpen, onToggle } = useDisclosure(
+    hideItem ? { defaultIsOpen: false } : { defaultIsOpen: true }
+  );
   const { t } = useTranslation();
-  const [descVisible, setDescVisible] = useState(true);
 
   if (!value) {
     return null;
   }
-
-  const handleIconClick = () => {
-    if (descVisible) {
-      setDescVisible(false);
-    } else {
-      setDescVisible(true);
-    }
-  };
 
   return (
     <Flex gap={2}>
@@ -58,22 +55,24 @@ const ImageMetadataItem = ({
           />
         </Tooltip>
       )}
-      <Tooltip label={descVisible ? `Hide ${label}` : `Show ${label}`}>
-        <IconButton
-          aria-label={t('accessibility.useThisParameter')}
-          icon={
-            descVisible ? (
-              <IoCaretDownCircleSharp />
-            ) : (
-              <IoCaretForwardCircleSharp />
-            )
-          }
-          size="xs"
-          variant="ghost"
-          fontSize={20}
-          onClick={handleIconClick}
-        />
-      </Tooltip>
+      {hideItem && (
+        <Tooltip label={isOpen ? `Hide ${label}` : `Show ${label}`}>
+          <IconButton
+            aria-label={t('accessibility.useThisParameter')}
+            icon={
+              isOpen ? (
+                <IoCaretDownCircleSharp />
+              ) : (
+                <IoCaretForwardCircleSharp />
+              )
+            }
+            size="xs"
+            variant="ghost"
+            fontSize={20}
+            onClick={onToggle}
+          />
+        </Tooltip>
+      )}
       {withCopy && (
         <Tooltip label={`Copy ${label}`}>
           <IconButton
@@ -90,17 +89,19 @@ const ImageMetadataItem = ({
         <Text fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
           {label}:
         </Text>
-        {isLink
-          ? descVisible && (
-              <Link href={value.toString()} isExternal wordBreak="break-all">
-                {value.toString()} <ExternalLinkIcon mx="2px" />
-              </Link>
-            )
-          : descVisible && (
-              <Text overflowY="scroll" wordBreak="break-all">
-                {value.toString()}
-              </Text>
-            )}
+        {isLink ? (
+          <Link href={value.toString()} isExternal wordBreak="break-all">
+            {value.toString()} <ExternalLinkIcon mx="2px" />
+          </Link>
+        ) : (
+          <Text
+            overflowY="scroll"
+            wordBreak="break-all"
+            noOfLines={isOpen ? undefined : 2}
+          >
+            {value.toString()}
+          </Text>
+        )}
       </Flex>
     </Flex>
   );

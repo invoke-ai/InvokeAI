@@ -1,5 +1,6 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
+  Box,
   Flex,
   Link,
   Tab,
@@ -55,6 +56,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         borderRadius: 'base',
         position: 'absolute',
         overflow: 'hidden',
+        overflowY: 'scroll',
       }}
     >
       <Flex gap={2}>
@@ -69,7 +71,12 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
 
       <Tabs
         variant="line"
-        sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
+        sx={{
+          display: 'flex',
+          flexDir: 'column',
+          w: 'full',
+          h: 'full',
+        }}
       >
         <TabList>
           <Tab>{t('metadata.metadata')}</Tab>

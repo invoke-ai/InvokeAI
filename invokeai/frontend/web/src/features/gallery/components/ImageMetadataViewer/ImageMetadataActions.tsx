@@ -139,6 +139,7 @@ const ImageMetadataActions = (props: Props) => {
           labelPosition="top"
           value={metadata.positive_prompt}
           onClick={handleRecallPositivePrompt}
+          hideItem={true}
         />
       )}
       {metadata.negative_prompt && (
@@ -147,6 +148,7 @@ const ImageMetadataActions = (props: Props) => {
           labelPosition="top"
           value={metadata.negative_prompt}
           onClick={handleRecallNegativePrompt}
+          hideItem={true}
         />
       )}
       {metadata.seed !== undefined && metadata.seed !== null && (
