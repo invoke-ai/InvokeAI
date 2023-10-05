@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import platform
 from contextlib import nullcontext
-from typing import Union
+from typing import Union, Literal
 
 import torch
 from packaging import version
@@ -41,6 +41,11 @@ def choose_precision(device: torch.device) -> str:
         return "float16"
     return "float32"
 
+def get_precision() -> Literal['float16', 'float32']:
+    device = torch.device(choose_torch_device())
+    precision = choose_precision(device) if config.precision == "auto" else config.precision
+    assert precision in ['float16', 'float32']
+    return precision
 
 def torch_dtype(device: torch.device) -> torch.dtype:
     if config.full_precision:

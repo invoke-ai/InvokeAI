@@ -11,11 +11,10 @@ import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import InvokeAILogger, Logger, choose_precision, choose_torch_device
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
 
 from .cache import CacheStats, ModelCache
 from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
-from .download import DownloadEventHandler, DownloadQueueBase
-from .install import ModelInstall, ModelInstallBase
 from .models import MODEL_CLASSES, InvalidModelException, ModelBase
 from .storage import ConfigFileVersionMismatchException, ModelConfigStore, get_config_store, migrate_models_store
 
@@ -67,12 +66,6 @@ class ModelLoadBase(ABC):
 
     @property
     @abstractmethod
-    def installer(self) -> ModelInstallBase:
-        """Return the ModelInstallBase object that supports this loader."""
-        pass
-
-    @property
-    @abstractmethod
     def logger(self) -> Logger:
         """Return the current logger."""
         pass
@@ -80,13 +73,7 @@ class ModelLoadBase(ABC):
     @property
     @abstractmethod
     def config(self) -> InvokeAIAppConfig:
-        """Return the config object used by this installer."""
-        pass
-
-    @property
-    @abstractmethod
-    def queue(self) -> DownloadQueueBase:
-        """Return the download queue object used by this object."""
+        """Return the config object used by the loader."""
         pass
 
     @abstractmethod
@@ -105,18 +92,12 @@ class ModelLoadBase(ABC):
         """Return torch.fp16 or torch.fp32."""
         pass
 
-    @abstractmethod
-    def sync_to_config(self):
-        """Reinitialize the store to sync in-memory and in-disk versions."""
-        pass
-
 
 class ModelLoad(ModelLoadBase):
     """Implementation of ModelLoadBase."""
 
     _app_config: InvokeAIAppConfig
-    _store: ModelConfigStore
-    _installer: ModelInstallBase
+    _store: Union[ModelConfigStore, ModelRecordServiceBase]
     _cache: ModelCache
     _logger: Logger
     _cache_keys: dict
@@ -126,7 +107,6 @@ class ModelLoad(ModelLoadBase):
         self,
         config: InvokeAIAppConfig,
         store: Optional[ModelConfigStore] = None,
-        event_handlers: List[DownloadEventHandler] = [],
     ):
         """
         Initialize ModelLoad object.
@@ -138,12 +118,6 @@ class ModelLoad(ModelLoadBase):
         self._app_config = config
         self._store = store
         self._logger = InvokeAILogger.get_logger()
-        self._installer = ModelInstall(
-            store=self._store,
-            logger=self._logger,
-            config=self._app_config,
-            event_handlers=event_handlers,
-        )
         self._cache_keys = dict()
         self._models_file = config.model_conf_path
         device = torch.device(choose_torch_device())
@@ -191,24 +165,14 @@ class ModelLoad(ModelLoadBase):
         return self._cache.precision
 
     @property
-    def installer(self) -> ModelInstallBase:
-        """Return the ModelInstallBase instance used by this class."""
-        return self._installer
-
-    @property
     def logger(self) -> Logger:
         """Return the current logger."""
         return self._logger
 
     @property
     def config(self) -> InvokeAIAppConfig:
-        """Return the config object used by the installer."""
+        """Return the config object."""
         return self._app_config
-
-    @property
-    def queue(self) -> DownloadQueueBase:
-        """Return the download queue object used by this object."""
-        return self._installer.queue
 
     def get_model(self, key: str, submodel_type: Optional[SubModelType] = None) -> ModelInfo:
         """
@@ -303,7 +267,3 @@ class ModelLoad(ModelLoadBase):
         model_path = self.resolve_model_path(model_path)
         return model_path, is_submodel_override
 
-    def sync_to_config(self):
-        """Synchronize models on disk to those in memory."""
-        self._store = get_config_store(self._models_file)
-        self.installer.scan_models_directory()

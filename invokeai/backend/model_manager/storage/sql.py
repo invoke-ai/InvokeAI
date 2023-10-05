@@ -53,21 +53,18 @@ from .base import CONFIG_FILE_VERSION, DuplicateModelException, ModelConfigStore
 class ModelConfigStoreSQL(ModelConfigStore):
     """Implementation of the ModelConfigStore ABC using a YAML file."""
 
-    _filename: Path
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, filename: Path):
+    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock):
         """Initialize ModelConfigStore object with a sqlite3 database."""
         super().__init__()
-        self._filename = Path(filename).absolute()  # don't let chdir mess us up!
-        self._filename.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(filename, check_same_thread=False)
+        self._conn = conn
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
         self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
-        self._lock = threading.Lock()
+        self._lock = lock
 
         try:
             self._lock.acquire()
@@ -174,7 +171,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             ("version", CONFIG_FILE_VERSION),
         )
 
-    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
+    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
         """
         Add a model to the database.
 
@@ -224,6 +221,8 @@ class ModelConfigStoreSQL(ModelConfigStore):
             raise e
         finally:
             self._lock.release()
+
+        return self.get_model(key)
 
     @property
     def version(self) -> str:

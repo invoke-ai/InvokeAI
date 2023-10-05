@@ -84,9 +84,9 @@ class ModelMerger(object):
         self,
         model_keys: List[str],
         merged_model_name: str,
-        alpha: float = 0.5,
+        alpha: Optional[float] = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
-        force: bool = False,
+        force: Optional[bool] = False,
         merge_dest_directory: Optional[Path] = None,
         **kwargs,
     ) -> ModelConfigBase:

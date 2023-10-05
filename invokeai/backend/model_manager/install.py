@@ -60,6 +60,7 @@ from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.backend.util import Chdir, InvokeAILogger, Logger
 
 from .config import (
@@ -320,6 +321,11 @@ class ModelInstallBase(ABC):
         pass
 
     @abstractmethod
+    def sync_to_config(self):
+        """Synchronize models on disk to those in memory."""
+        pass
+
+    @abstractmethod
     def scan_models_directory(self):
         """
         Scan the models directory for new and missing models.
@@ -367,7 +373,7 @@ class ModelInstall(ModelInstallBase):
 
     def __init__(
         self,
-        store: Optional[ModelConfigStore] = None,
+        store: Optional[Union[ModelConfigStore, ModelRecordServiceBase]] = None,
         config: Optional[InvokeAIAppConfig] = None,
         logger: Optional[Logger] = None,
         download: Optional[DownloadQueueBase] = None,
@@ -380,10 +386,6 @@ class ModelInstall(ModelInstallBase):
         self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
         self._installed = set()
         self._tmpdir = None
-
-        # this step synchronizes the `models` directory with the models db
-        # do NOT do this automatically, but only on app startup
-        # self.scan_models_directory()
 
     @property
     def queue(self) -> DownloadQueueBase:
@@ -609,7 +611,7 @@ class ModelInstall(ModelInstallBase):
         variant: Optional[str] = None,
         access_token: Optional[str] = None,
         priority: Optional[int] = 10,
-    ) -> DownloadJobBase:
+    ) -> ModelInstallJob:
         # Clean up a common source of error. Doesn't work with Paths.
         if isinstance(source, str):
             source = source.strip()
@@ -746,6 +748,10 @@ class ModelInstall(ModelInstallBase):
         except DuplicateModelException:
             pass
         return True
+
+    def sync_to_config(self):
+        """Synchronize models on disk to those in memory."""
+        self.scan_models_directory()
 
     def scan_models_directory(self):
         """

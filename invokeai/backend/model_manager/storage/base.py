@@ -39,7 +39,7 @@ class ModelConfigStore(ABC):
         pass
 
     @abstractmethod
-    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> None:
+    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> ModelConfigBase:
         """
         Add a model to the database.
 

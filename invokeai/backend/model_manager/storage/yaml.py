@@ -104,7 +104,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
         """Return version of this config file/database."""
         return self._config.__metadata__.get("version")
 
-    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
+    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
         """
         Add a model to the database.
 
@@ -127,6 +127,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
             self._commit()
         finally:
             self._lock.release()
+        return self.get_model(key)
 
     def _fix_enums(self, original: dict) -> dict:
         """In python 3.9, omegaconf stores incorrectly stringified enums."""
