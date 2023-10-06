@@ -12,7 +12,7 @@ export default function ParamHrf() {
   const dispatch = useAppDispatch();
 
   const handleHrfSkipReset = useCallback(() => {
-    dispatch(setHrf(0));
+    dispatch(setHrf(1));
   }, [dispatch]);
 
   const handleHrfChange = useCallback(

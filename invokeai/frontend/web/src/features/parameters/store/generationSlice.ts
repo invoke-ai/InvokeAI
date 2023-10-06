@@ -274,7 +274,7 @@ export const generationSlice = createSlice({
       state.clipSkip = action.payload;
     },
     setHrf: (state, action: PayloadAction<number>) => {
-      state.clipSkip = action.payload;
+      state.hrfScale = action.payload;
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
