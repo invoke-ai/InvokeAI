@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from invokeai.backend.ip_adapter.unet_patcher import apply_ip_adapter_attention
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
 from invokeai.backend.util.test_utils import install_and_load_model
 
@@ -64,8 +65,8 @@ def test_ip_adapter_unet_patch(model_params, model_installer, torch_device):
         ip_adapter.to(torch_device, dtype=torch.float32)
         unet.to(torch_device, dtype=torch.float32)
 
-        cross_attention_kwargs = {"ip_adapter_image_prompt_embeds": torch.randn((1, 4, 768)).to(torch_device)}
-        with ip_adapter.apply_ip_adapter_attention(unet, 1.0):
+        cross_attention_kwargs = {"ip_adapter_image_prompt_embeds": [torch.randn((1, 4, 768)).to(torch_device)]}
+        with apply_ip_adapter_attention(unet, [ip_adapter]):
             output = unet(**dummy_unet_input, cross_attention_kwargs=cross_attention_kwargs).sample
 
     assert output.shape == dummy_unet_input["sample"].shape
