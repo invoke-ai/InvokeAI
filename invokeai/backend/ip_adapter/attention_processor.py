@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor2_0 as DiffusersAttnProcessor2_0
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
+from invokeai.backend.ip_adapter.scales import Scales
 
 
 # Create a version of AttnProcessor2_0 that is a sub-class of nn.Module. This is required for IP-Adapter state_dict
@@ -47,13 +48,16 @@ class IPAttnProcessor2_0(torch.nn.Module):
             the weight scale of image prompt.
     """
 
-    def __init__(self, weights: list[IPAttentionProcessorWeights]):
+    def __init__(self, weights: list[IPAttentionProcessorWeights], scales: Scales):
         super().__init__()
 
         if not hasattr(F, "scaled_dot_product_attention"):
             raise ImportError("AttnProcessor2_0 requires PyTorch 2.0, to use it, please upgrade PyTorch to 2.0.")
 
-        self.weights = weights
+        assert len(weights) == len(scales)
+
+        self._weights = weights
+        self._scales = scales
 
     def __call__(
         self,
@@ -119,9 +123,11 @@ class IPAttnProcessor2_0(torch.nn.Module):
             # If encoder_hidden_states is not None, then we are doing cross-attention, not self-attention. In this case,
             # we will apply IP-Adapter conditioning. We validate the inputs for IP-Adapter conditioning here.
             assert ip_adapter_image_prompt_embeds is not None
-            assert len(ip_adapter_image_prompt_embeds) == len(self.weights)
+            assert len(ip_adapter_image_prompt_embeds) == len(self._weights)
 
-            for ipa_embed, ipa_weights in zip(ip_adapter_image_prompt_embeds, self.weights):
+            for ipa_embed, ipa_weights, scale in zip(
+                ip_adapter_image_prompt_embeds, self._weights, self._scales.scales
+            ):
                 # The batch dimensions should match.
                 assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
                 # The channel dimensions should match.
@@ -144,7 +150,7 @@ class IPAttnProcessor2_0(torch.nn.Module):
                 ip_hidden_states = ip_hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
                 ip_hidden_states = ip_hidden_states.to(query.dtype)
 
-                hidden_states = hidden_states + ipa_weights.scale * ip_hidden_states
+                hidden_states = hidden_states + scale * ip_hidden_states
 
         # linear proj
         hidden_states = attn.to_out[0](hidden_states)

@@ -8,9 +8,8 @@ class IPAttentionProcessorWeights(torch.nn.Module):
     method.
     """
 
-    def __init__(self, in_dim: int, out_dim: int, scale: float = 1.0):
+    def __init__(self, in_dim: int, out_dim: int):
         super().__init__()
-        self.scale = scale
         self.to_k_ip = torch.nn.Linear(in_dim, out_dim, bias=False)
         self.to_v_ip = torch.nn.Linear(in_dim, out_dim, bias=False)
 
@@ -25,11 +24,6 @@ class IPAttentionWeights(torch.nn.Module):
     def __init__(self, weights: torch.nn.ModuleDict):
         super().__init__()
         self._weights = weights
-
-    def set_scale(self, scale: float):
-        """Set the scale (a.k.a. 'weight') for all of the `IPAttentionProcessorWeights` in this collection."""
-        for w in self._weights.values():
-            w.scale = scale
 
     def get_attention_processor_weights(self, idx: int) -> IPAttentionProcessorWeights:
         """Get the `IPAttentionProcessorWeights` for the idx'th attention processor."""

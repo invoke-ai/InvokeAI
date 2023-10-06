@@ -24,7 +24,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.ip_adapter.unet_patcher import apply_ip_adapter_attention
+from invokeai.backend.ip_adapter.unet_patcher import Scales, apply_ip_adapter_attention
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
 
 from ..util import auto_detect_slice_size, normalize_device
@@ -426,7 +426,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             return latents, attention_map_saver
 
         if conditioning_data.extra is not None and conditioning_data.extra.wants_cross_attention_control:
-            attn_ctx = self.invokeai_diffuser.custom_attention_context(
+            attn_ctx_mgr = self.invokeai_diffuser.custom_attention_context(
                 self.invokeai_diffuser.model,
                 extra_conditioning_info=conditioning_data.extra,
                 step_count=len(self.scheduler.timesteps),
@@ -435,14 +435,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         elif ip_adapter_data is not None:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
-            attn_ctx = apply_ip_adapter_attention(
+            attn_ctx_mgr = apply_ip_adapter_attention(
                 unet=self.invokeai_diffuser.model, ip_adapters=[ipa.ip_adapter_model for ipa in ip_adapter_data]
             )
             self.use_ip_adapter = True
         else:
-            attn_ctx = nullcontext()
+            attn_ctx_mgr = nullcontext()
 
-        with attn_ctx:
+        with attn_ctx_mgr as attn_ctx:
             if callback is not None:
                 callback(
                     PipelineIntermediateState(
@@ -467,6 +467,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     control_data=control_data,
                     ip_adapter_data=ip_adapter_data,
                     t2i_adapter_data=t2i_adapter_data,
+                    attn_ctx=attn_ctx,
                 )
                 latents = step_output.prev_sample
 
@@ -514,6 +515,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_data: List[ControlNetData] = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
+        attn_ctx: Optional[Scales] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
@@ -526,7 +528,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # handle IP-Adapter
         if self.use_ip_adapter and ip_adapter_data is not None:  # somewhat redundant but logic is clearer
-            for single_ip_adapter_data in ip_adapter_data:
+            for i, single_ip_adapter_data in enumerate(ip_adapter_data):
                 first_adapter_step = math.floor(single_ip_adapter_data.begin_step_percent * total_step_count)
                 last_adapter_step = math.ceil(single_ip_adapter_data.end_step_percent * total_step_count)
                 weight = (
@@ -536,10 +538,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 )
                 if step_index >= first_adapter_step and step_index <= last_adapter_step:
                     # Only apply this IP-Adapter if the current step is within the IP-Adapter's begin/end step range.
-                    single_ip_adapter_data.ip_adapter_model.attn_weights.set_scale(weight)
+                    attn_ctx.scales[i] = weight
                 else:
                     # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
-                    single_ip_adapter_data.ip_adapter_model.attn_weights.set_scale(0.0)
+                    attn_ctx.scales[i] = weight
 
         # Handle ControlNet(s) and T2I-Adapter(s)
         down_block_additional_residuals = None
