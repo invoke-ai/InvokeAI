@@ -31,11 +31,14 @@ def _prepare_attention_processors(unet: UNet2DConditionModel, ip_adapters: list[
             attn_procs[name] = AttnProcessor2_0()
         else:
             # Collect the weights from each IP Adapter for the idx'th attention processor.
-            attn_procs[name] = IPAttnProcessor2_0([ip_adapter.attn_weights.weights[idx] for ip_adapter in ip_adapters])
+            attn_procs[name] = IPAttnProcessor2_0(
+                [ip_adapter.attn_weights.get_attention_processor_weights(idx) for ip_adapter in ip_adapters]
+            )
+    return attn_procs
 
 
 @contextmanager
-def apply_ip_adapter_attention(cls, unet: UNet2DConditionModel, ip_adapters: list[IPAdapter]):
+def apply_ip_adapter_attention(unet: UNet2DConditionModel, ip_adapters: list[IPAdapter]):
     """A context manager that patches `unet` with IP-Adapter attention processors."""
     attn_procs = _prepare_attention_processors(unet, ip_adapters)
 

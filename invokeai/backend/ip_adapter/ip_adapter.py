@@ -86,7 +86,7 @@ class IPAdapter:
         self.attn_weights.to(device=self.device, dtype=self.dtype)
 
     def calc_size(self):
-        return calc_model_size_by_data(self._image_proj_model) + calc_model_size_by_data(self._attn_weights)
+        return calc_model_size_by_data(self._image_proj_model) + calc_model_size_by_data(self.attn_weights)
 
     def _init_image_proj_model(self, state_dict):
         return ImageProjModel.from_state_dict(state_dict, self._num_tokens).to(self.device, dtype=self.dtype)

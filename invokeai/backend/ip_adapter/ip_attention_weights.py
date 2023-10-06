@@ -22,25 +22,31 @@ class IPAttentionWeights(torch.nn.Module):
     forward(...) method.
     """
 
-    def __init__(self, weights: dict[int, IPAttentionProcessorWeights]):
+    def __init__(self, weights: torch.nn.ModuleDict):
         super().__init__()
-        self.weights = weights
+        self._weights = weights
 
     def set_scale(self, scale: float):
         """Set the scale (a.k.a. 'weight') for all of the `IPAttentionProcessorWeights` in this collection."""
-        for w in self.weights.values():
+        for w in self._weights.values():
             w.scale = scale
+
+    def get_attention_processor_weights(self, idx: int) -> IPAttentionProcessorWeights:
+        """Get the `IPAttentionProcessorWeights` for the idx'th attention processor."""
+        # Cast to int first, because we expect the key to represent an int. Then cast back to str, because
+        # `torch.nn.ModuleDict` only supports str keys.
+        return self._weights[str(int(idx))]
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, torch.Tensor]):
-        attn_proc_weights: dict[int, IPAttentionProcessorWeights] = {}
+        attn_proc_weights: dict[str, IPAttentionProcessorWeights] = {}
 
         for tensor_name, tensor in state_dict.items():
             if "to_k_ip.weight" in tensor_name:
-                index = int(tensor_name.split(".")[0])
+                index = str(int(tensor_name.split(".")[0]))
                 attn_proc_weights[index] = IPAttentionProcessorWeights(tensor.shape[1], tensor.shape[0])
 
-        attn_proc_weights_module_dict = torch.nn.ModuleDict(attn_proc_weights)
-        attn_proc_weights_module_dict.load_state_dict(state_dict)
+        attn_proc_weights_module = torch.nn.ModuleDict(attn_proc_weights)
+        attn_proc_weights_module.load_state_dict(state_dict)
 
-        return cls(attn_proc_weights)
+        return cls(attn_proc_weights_module)
