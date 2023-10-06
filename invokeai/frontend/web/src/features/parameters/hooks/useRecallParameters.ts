@@ -8,6 +8,18 @@ import {
   CONTROLNET_PROCESSORS,
 } from 'features/controlNet/store/constants';
 import {
+  controlAdapterRecalled,
+  controlAdaptersReset,
+} from 'features/controlNet/store/controlAdaptersSlice';
+import {
+  ControlNetConfig,
+  IPAdapterConfig,
+} from 'features/controlNet/store/types';
+import {
+  initialControlNet,
+  initialIPAdapter,
+} from 'features/controlNet/util/buildControlAdapter';
+import {
   ControlNetMetadataItem,
   CoreMetadata,
   IPAdapterMetadataItem,
@@ -449,8 +461,6 @@ export const useRecallParameters = () => {
         };
       }
 
-      const controlNetId = uuidv4();
-
       let processorType = initialControlNet.processorType;
       for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
         if (matchingControlNetModel.model_name.includes(modelSubstring)) {
@@ -463,6 +473,7 @@ export const useRecallParameters = () => {
       const processorNode = CONTROLNET_PROCESSORS[processorType].default;
 
       const controlnet: ControlNetConfig = {
+        type: 'controlnet',
         isEnabled: true,
         model: matchingControlNetModel,
         weight:
@@ -481,7 +492,7 @@ export const useRecallParameters = () => {
             ? processorNode
             : initialControlNet.processorNode,
         shouldAutoConfig: true,
-        controlNetId,
+        id: uuidv4(),
       };
 
       return { controlnet, error: null };
@@ -498,11 +509,7 @@ export const useRecallParameters = () => {
         return;
       }
 
-      dispatch(
-        controlAdapterRecalled({
-          ...result.controlnet,
-        })
-      );
+      dispatch(controlAdapterRecalled(result.controlnet));
 
       parameterSetToast();
     },
@@ -558,11 +565,14 @@ export const useRecallParameters = () => {
       }
 
       const ipAdapter: IPAdapterConfig = {
-        adapterImage: image?.image_name ?? null,
+        id: uuidv4(),
+        type: 'ip_adapter',
+        isEnabled: true,
+        controlImage: image?.image_name ?? null,
         model: matchingIPAdapterModel,
-        weight: weight ?? initialIPAdapterState.weight,
-        beginStepPct: begin_step_percent ?? initialIPAdapterState.beginStepPct,
-        endStepPct: end_step_percent ?? initialIPAdapterState.endStepPct,
+        weight: weight ?? initialIPAdapter.weight,
+        beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
+        endStepPct: end_step_percent ?? initialIPAdapter.endStepPct,
       };
 
       return { ipAdapter, error: null };
@@ -579,13 +589,7 @@ export const useRecallParameters = () => {
         return;
       }
 
-      dispatch(
-        ipAdapterRecalled({
-          ...result.ipAdapter,
-        })
-      );
-
-      dispatch(isIPAdapterEnabledChanged(true));
+      dispatch(controlAdapterRecalled(result.ipAdapter));
 
       parameterSetToast();
     },
@@ -727,9 +731,6 @@ export const useRecallParameters = () => {
       });
 
       dispatch(controlAdaptersReset());
-      if (controlnets?.length) {
-        dispatch(controlNetEnabled());
-      }
       controlnets?.forEach((controlnet) => {
         const result = prepareControlNetMetadataItem(controlnet);
         if (result.controlnet) {
@@ -737,13 +738,10 @@ export const useRecallParameters = () => {
         }
       });
 
-      if (ipAdapters?.length) {
-        dispatch(isIPAdapterEnabledChanged(true));
-      }
       ipAdapters?.forEach((ipAdapter) => {
         const result = prepareIPAdapterMetadataItem(ipAdapter);
         if (result.ipAdapter) {
-          dispatch(ipAdapterRecalled(result.ipAdapter));
+          dispatch(controlAdapterRecalled(result.ipAdapter));
         }
       });
 
