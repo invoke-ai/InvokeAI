@@ -1,5 +1,4 @@
 import math
-import os
 import re
 from pathlib import Path
 from typing import Optional, TypedDict
@@ -11,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from PIL.Image import Image as ImageType
 from pydantic import validator
 
+import invokeai.assets.fonts as font_assets
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     InputField,
@@ -138,6 +138,7 @@ def generate_face_box_mask(
     chunk_x_offset: int = 0,
     chunk_y_offset: int = 0,
     draw_mesh: bool = True,
+    check_bounds: bool = True,
 ) -> list[FaceResultData]:
     result = []
     mask_pil = None
@@ -217,7 +218,7 @@ def generate_face_box_mask(
             im_width, im_height = pil_image.size
             over_w = im_width * 0.1
             over_h = im_height * 0.1
-            if (
+            if not check_bounds or (
                 (left_side >= -over_w)
                 and (right_side < im_width + over_w)
                 and (top_side >= -over_h)
@@ -345,6 +346,7 @@ def get_faces_list(
             chunk_x_offset=0,
             chunk_y_offset=0,
             draw_mesh=draw_mesh,
+            check_bounds=False,
         )
     if should_chunk or len(result) == 0:
         context.services.logger.info("FaceTools --> Chunking image (chunk toggled on, or no face found in full image).")
@@ -402,7 +404,7 @@ def get_faces_list(
     return all_faces
 
 
-@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.0")
+@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.1")
 class FaceOffInvocation(BaseInvocation):
     """Bound, extract, and mask a face from an image using MediaPipe detection"""
 
@@ -496,7 +498,7 @@ class FaceOffInvocation(BaseInvocation):
         return output
 
 
-@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.0")
+@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.1")
 class FaceMaskInvocation(BaseInvocation):
     """Face mask creation using mediapipe face detection"""
 
@@ -614,7 +616,7 @@ class FaceMaskInvocation(BaseInvocation):
 
 
 @invocation(
-    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.0"
+    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.1"
 )
 class FaceIdentifierInvocation(BaseInvocation):
     """Outputs an image with detected face IDs printed on each face. For use with other FaceTools."""
@@ -641,9 +643,9 @@ class FaceIdentifierInvocation(BaseInvocation):
             draw_mesh=False,
         )
 
-        path = Path(__file__).resolve().parent.parent.parent
-        font_path = os.path.abspath(path / "assets/fonts/inter/Inter-Regular.ttf")
-        font = ImageFont.truetype(font_path, FONT_SIZE)
+        # Note - font may be found either in the repo if running an editable install, or in the venv if running a package install
+        font_path = [x for x in [Path(y, "inter/Inter-Regular.ttf") for y in font_assets.__path__] if x.exists()]
+        font = ImageFont.truetype(font_path[0].as_posix(), FONT_SIZE)
 
         # Paste face IDs on the output image
         draw = ImageDraw.Draw(image)

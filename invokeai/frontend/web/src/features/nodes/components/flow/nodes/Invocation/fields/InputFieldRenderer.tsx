@@ -16,6 +16,7 @@ import SchedulerInputField from './inputs/SchedulerInputField';
 import StringInputField from './inputs/StringInputField';
 import VaeModelInputField from './inputs/VaeModelInputField';
 import IPAdapterModelInputField from './inputs/IPAdapterModelInputField';
+import T2IAdapterModelInputField from './inputs/T2IAdapterModelInputField';
 import BoardInputField from './inputs/BoardInputField';
 
 type InputFieldProps = {
@@ -188,6 +189,18 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     );
   }
 
+  if (
+    field?.type === 'T2IAdapterModelField' &&
+    fieldTemplate?.type === 'T2IAdapterModelField'
+  ) {
+    return (
+      <T2IAdapterModelInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
   if (field?.type === 'ColorField' && fieldTemplate?.type === 'ColorField') {
     return (
       <ColorInputField

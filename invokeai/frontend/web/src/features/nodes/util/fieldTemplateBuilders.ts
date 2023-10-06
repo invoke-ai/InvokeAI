@@ -62,6 +62,11 @@ import {
   ConditioningField,
   IPAdapterInputFieldTemplate,
   IPAdapterModelInputFieldTemplate,
+  T2IAdapterField,
+  T2IAdapterInputFieldTemplate,
+  T2IAdapterModelInputFieldTemplate,
+  T2IAdapterPolymorphicInputFieldTemplate,
+  T2IAdapterCollectionInputFieldTemplate,
   BoardInputFieldTemplate,
   InputFieldTemplate,
 } from '../types/types';
@@ -452,6 +457,19 @@ const buildIPAdapterModelInputFieldTemplate = ({
   return template;
 };
 
+const buildT2IAdapterModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): T2IAdapterModelInputFieldTemplate => {
+  const template: T2IAdapterModelInputFieldTemplate = {
+    ...baseField,
+    type: 'T2IAdapterModelField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildBoardInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -691,6 +709,46 @@ const buildIPAdapterInputFieldTemplate = ({
   return template;
 };
 
+const buildT2IAdapterInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): T2IAdapterInputFieldTemplate => {
+  const template: T2IAdapterInputFieldTemplate = {
+    ...baseField,
+    type: 'T2IAdapterField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildT2IAdapterPolymorphicInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): T2IAdapterPolymorphicInputFieldTemplate => {
+  const template: T2IAdapterPolymorphicInputFieldTemplate = {
+    ...baseField,
+    type: 'T2IAdapterPolymorphic',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildT2IAdapterCollectionInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): T2IAdapterCollectionInputFieldTemplate => {
+  const template: T2IAdapterCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'T2IAdapterCollection',
+    default: schemaObject.default ?? [],
+    item_default: (schemaObject.item_default as T2IAdapterField) ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -910,6 +968,10 @@ const TEMPLATE_BUILDER_MAP: {
   string: buildStringInputFieldTemplate,
   StringCollection: buildStringCollectionInputFieldTemplate,
   StringPolymorphic: buildStringPolymorphicInputFieldTemplate,
+  T2IAdapterCollection: buildT2IAdapterCollectionInputFieldTemplate,
+  T2IAdapterField: buildT2IAdapterInputFieldTemplate,
+  T2IAdapterModelField: buildT2IAdapterModelInputFieldTemplate,
+  T2IAdapterPolymorphic: buildT2IAdapterPolymorphicInputFieldTemplate,
   UNetField: buildUNetInputFieldTemplate,
   VaeField: buildVaeInputFieldTemplate,
   VaeModelField: buildVaeModelInputFieldTemplate,

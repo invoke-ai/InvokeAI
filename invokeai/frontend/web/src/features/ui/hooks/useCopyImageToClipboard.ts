@@ -25,6 +25,9 @@ export const useCopyImageToClipboard = () => {
       try {
         const getImageBlob = async () => {
           const response = await fetch(image_url);
+          if (!response.ok) {
+            throw new Error(`Problem retrieving image data`);
+          }
           return await response.blob();
         };
 
