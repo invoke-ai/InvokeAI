@@ -1,4 +1,4 @@
-import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { O } from 'ts-toolbelt';
 

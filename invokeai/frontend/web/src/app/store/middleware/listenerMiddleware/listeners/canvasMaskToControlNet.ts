@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { canvasMaskToControlAdapter } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
-import { controlAdapterImageChanged } from 'features/controlNet/store/controlAdaptersSlice';
+import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';

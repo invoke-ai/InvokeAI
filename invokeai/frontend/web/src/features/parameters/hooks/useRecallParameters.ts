@@ -6,19 +6,19 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   CONTROLNET_MODEL_DEFAULT_PROCESSORS,
   CONTROLNET_PROCESSORS,
-} from 'features/controlNet/store/constants';
+} from 'features/controlAdapters/store/constants';
 import {
   controlAdapterRecalled,
   controlAdaptersReset,
-} from 'features/controlNet/store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   ControlNetConfig,
   IPAdapterConfig,
-} from 'features/controlNet/store/types';
+} from 'features/controlAdapters/store/types';
 import {
   initialControlNet,
   initialIPAdapter,
-} from 'features/controlNet/util/buildControlAdapter';
+} from 'features/controlAdapters/util/buildControlAdapter';
 import {
   ControlNetMetadataItem,
   CoreMetadata,

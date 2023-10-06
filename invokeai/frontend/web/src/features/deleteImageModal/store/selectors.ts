@@ -4,8 +4,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { isInvocationNode } from 'features/nodes/types/types';
 import { some } from 'lodash-es';
 import { ImageUsage } from './types';
-import { selectControlAdapterAll } from 'features/controlNet/store/controlAdaptersSlice';
-import { isControlNetOrT2IAdapter } from 'features/controlNet/store/types';
+import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 
 export const getImageUsage = (state: RootState, image_name: string) => {
   const { generation, canvas, nodes, controlAdapters } = state;

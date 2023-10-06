@@ -3,7 +3,7 @@ import ParamLoraCollapse from 'features/lora/components/ParamLoraCollapse';
 import ParamAdvancedCollapse from 'features/parameters/components/Parameters/Advanced/ParamAdvancedCollapse';
 import ParamCompositingSettingsCollapse from 'features/parameters/components/Parameters/Canvas/Compositing/ParamCompositingSettingsCollapse';
 import ParamInfillAndScalingCollapse from 'features/parameters/components/Parameters/Canvas/InfillAndScaling/ParamInfillAndScalingCollapse';
-import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
+import ParamControlAdaptersCollapse from 'features/parameters/components/Parameters/ControlAdapters/ParamControlAdaptersCollapse';
 import ParamSDXLPromptArea from './ParamSDXLPromptArea';
 import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
 import SDXLUnifiedCanvasTabCoreParameters from './SDXLUnifiedCanvasTabCoreParameters';
@@ -14,7 +14,7 @@ export default function SDXLUnifiedCanvasTabParameters() {
       <ParamSDXLPromptArea />
       <SDXLUnifiedCanvasTabCoreParameters />
       <ParamSDXLRefinerCollapse />
-      <ParamControlNetCollapse />
+      <ParamControlAdaptersCollapse />
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamInfillAndScalingCollapse />
