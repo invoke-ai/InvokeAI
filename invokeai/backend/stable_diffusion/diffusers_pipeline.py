@@ -541,7 +541,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     attn_ctx.scales[i] = weight
                 else:
                     # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
-                    attn_ctx.scales[i] = weight
+                    attn_ctx.scales[i] = 0.0
 
         # Handle ControlNet(s) and T2I-Adapter(s)
         down_block_additional_residuals = None
