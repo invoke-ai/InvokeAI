@@ -10,7 +10,6 @@ import torch
 import torchvision.transforms as T
 from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.models import UNet2DConditionModel
 from diffusers.models.adapter import FullAdapterXL, T2IAdapter
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,

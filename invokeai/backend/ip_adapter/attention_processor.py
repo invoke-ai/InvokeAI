@@ -9,7 +9,6 @@ import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor2_0 as DiffusersAttnProcessor2_0
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
-from invokeai.backend.ip_adapter.scales import Scales
 
 
 # Create a version of AttnProcessor2_0 that is a sub-class of nn.Module. This is required for IP-Adapter state_dict
@@ -48,7 +47,7 @@ class IPAttnProcessor2_0(torch.nn.Module):
             the weight scale of image prompt.
     """
 
-    def __init__(self, weights: list[IPAttentionProcessorWeights], scales: Scales):
+    def __init__(self, weights: list[IPAttentionProcessorWeights], scales: list[float]):
         super().__init__()
 
         if not hasattr(F, "scaled_dot_product_attention"):
@@ -125,9 +124,7 @@ class IPAttnProcessor2_0(torch.nn.Module):
             assert ip_adapter_image_prompt_embeds is not None
             assert len(ip_adapter_image_prompt_embeds) == len(self._weights)
 
-            for ipa_embed, ipa_weights, scale in zip(
-                ip_adapter_image_prompt_embeds, self._weights, self._scales.scales
-            ):
+            for ipa_embed, ipa_weights, scale in zip(ip_adapter_image_prompt_embeds, self._weights, self._scales):
                 # The batch dimensions should match.
                 assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
                 # The channel dimensions should match.
