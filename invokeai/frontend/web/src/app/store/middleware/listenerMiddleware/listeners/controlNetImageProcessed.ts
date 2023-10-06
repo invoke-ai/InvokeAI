@@ -31,6 +31,10 @@ export const addControlNetImageProcessedListener = () => {
         return;
       }
 
+      if (ca.processorType === 'none' || ca.processorNode.type === 'none') {
+        return;
+      }
+
       // ControlNet one-off procressing graph is just the processor node, no edges.
       // Also we need to grab the image.
       const graph: Graph = {
