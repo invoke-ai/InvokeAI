@@ -291,18 +291,18 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
   },
   IPAdapterField: {
     color: 'teal.500',
-    description: 'IP-Adapter info passed between nodes.',
-    title: 'IP-Adapter',
+    description: t('nodes.ipAdapterDescription'),
+    title: t('nodes.ipAdapter'),
   },
   IPAdapterModelField: {
     color: 'teal.500',
-    description: 'IP-Adapter model',
-    title: 'IP-Adapter Model',
+    description: t('nodes.ipAdapterModelDescription'),
+    title: t('nodes.ipAdapterModel'),
   },
   IPAdapterPolymorphic: {
     color: 'teal.500',
-    description: 'IP-Adapter info passed between nodes.',
-    title: 'IP-Adapter Polymorphic',
+    description: t('nodes.ipAdapterPolymorphicDescription'),
+    title: t('nodes.ipAdapterPolymorphic'),
   },
   LatentsCollection: {
     color: 'pink.500',
