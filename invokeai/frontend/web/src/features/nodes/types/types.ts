@@ -1275,6 +1275,10 @@ const zIPAdapterMetadataItem = zIPAdapterField.deepPartial();
 
 export type IPAdapterMetadataItem = z.infer<typeof zIPAdapterMetadataItem>;
 
+const zT2IAdapterMetadataItem = zT2IAdapterField.deepPartial();
+
+export type T2IAdapterMetadataItem = z.infer<typeof zT2IAdapterMetadataItem>;
+
 export const zCoreMetadata = z
   .object({
     app_version: z.string().nullish().catch(null),
@@ -1296,6 +1300,7 @@ export const zCoreMetadata = z
       .catch(null),
     controlnets: z.array(zControlNetMetadataItem).nullish().catch(null),
     ipAdapters: z.array(zIPAdapterMetadataItem).nullish().catch(null),
+    t2iAdapters: z.array(zT2IAdapterMetadataItem).nullish().catch(null),
     loras: z.array(zLoRAMetadataItem).nullish().catch(null),
     vae: zVaeModelField.nullish().catch(null),
     strength: z.number().nullish().catch(null),

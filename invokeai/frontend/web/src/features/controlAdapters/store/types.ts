@@ -155,22 +155,24 @@ export type RequiredZoeDepthImageProcessorInvocation = O.Required<
 /**
  * Any ControlNet Processor node, with its parameters flagged as required
  */
-export type RequiredControlAdapterProcessorNode = O.Required<
-  | RequiredCannyImageProcessorInvocation
-  | RequiredColorMapImageProcessorInvocation
-  | RequiredContentShuffleImageProcessorInvocation
-  | RequiredHedImageProcessorInvocation
-  | RequiredLineartAnimeImageProcessorInvocation
-  | RequiredLineartImageProcessorInvocation
-  | RequiredMediapipeFaceProcessorInvocation
-  | RequiredMidasDepthImageProcessorInvocation
-  | RequiredMlsdImageProcessorInvocation
-  | RequiredNormalbaeImageProcessorInvocation
-  | RequiredOpenposeImageProcessorInvocation
-  | RequiredPidiImageProcessorInvocation
-  | RequiredZoeDepthImageProcessorInvocation,
-  'id'
->;
+export type RequiredControlAdapterProcessorNode =
+  | O.Required<
+      | RequiredCannyImageProcessorInvocation
+      | RequiredColorMapImageProcessorInvocation
+      | RequiredContentShuffleImageProcessorInvocation
+      | RequiredHedImageProcessorInvocation
+      | RequiredLineartAnimeImageProcessorInvocation
+      | RequiredLineartImageProcessorInvocation
+      | RequiredMediapipeFaceProcessorInvocation
+      | RequiredMidasDepthImageProcessorInvocation
+      | RequiredMlsdImageProcessorInvocation
+      | RequiredNormalbaeImageProcessorInvocation
+      | RequiredOpenposeImageProcessorInvocation
+      | RequiredPidiImageProcessorInvocation
+      | RequiredZoeDepthImageProcessorInvocation,
+      'id'
+    >
+  | { type: 'none' };
 
 /**
  * Type guard for CannyImageProcessorInvocation

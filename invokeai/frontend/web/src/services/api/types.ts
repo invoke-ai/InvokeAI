@@ -155,6 +155,7 @@ export type SaveImageInvocation = s['SaveImageInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];
+export type T2IAdapterInvocation = s['T2IAdapterInvocation'];
 export type IPAdapterInvocation = s['IPAdapterInvocation'];
 export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
 export type ColorMapImageProcessorInvocation =

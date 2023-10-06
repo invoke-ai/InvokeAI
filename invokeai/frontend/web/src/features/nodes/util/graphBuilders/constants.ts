@@ -46,6 +46,7 @@ export const MASK_RESIZE_DOWN = 'mask_resize_down';
 export const COLOR_CORRECT = 'color_correct';
 export const PASTE_IMAGE = 'img_paste';
 export const CONTROL_NET_COLLECT = 'control_net_collect';
+export const T2I_ADAPTER_COLLECT = 't2i_adapter_collect';
 export const IP_ADAPTER = 'ip_adapter';
 export const DYNAMIC_PROMPT = 'dynamic_prompt';
 export const IMAGE_COLLECTION = 'image_collection';

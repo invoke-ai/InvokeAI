@@ -50,7 +50,7 @@ class T2IAdapterInvocation(BaseInvocation):
 
     # Inputs
     image: ImageField = InputField(description="The IP-Adapter image prompt.")
-    ip_adapter_model: T2IAdapterModelField = InputField(
+    t2i_adapter_model: T2IAdapterModelField = InputField(
         description="The T2I-Adapter model.",
         title="T2I-Adapter Model",
         input=Input.Direct,
@@ -74,7 +74,7 @@ class T2IAdapterInvocation(BaseInvocation):
         return T2IAdapterOutput(
             t2i_adapter=T2IAdapterField(
                 image=self.image,
-                t2i_adapter_model=self.ip_adapter_model,
+                t2i_adapter_model=self.t2i_adapter_model,
                 weight=self.weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,

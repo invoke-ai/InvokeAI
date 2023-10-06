@@ -347,6 +347,10 @@ export const zT2IAdapterModel = z.object({
   model_name: z.string().min(1),
   base_model: zBaseModel,
 });
+export const isValidT2IAdapterModel = (
+  val: unknown
+): val is T2IAdapterModelParam => zT2IAdapterModel.safeParse(val).success;
+
 /**
  * Type alias for model parameter, inferred from its zod schema
  */
