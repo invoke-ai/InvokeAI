@@ -1,7 +1,7 @@
 import { ButtonGroup, Divider, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import IAICollapse from 'common/components/IAICollapse';
@@ -17,37 +17,36 @@ import {
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
 const selector = createSelector(
   [stateSelector],
   ({ controlAdapters }) => {
     const activeLabel: string[] = [];
 
-    const validIPAdapters = selectAllIPAdapters(controlAdapters);
-    const validIPAdapterCount = validIPAdapters.length;
-    if (validIPAdapterCount > 0) {
-      activeLabel.push(`${validIPAdapterCount} IP`);
+    const ipAdapters = selectAllIPAdapters(controlAdapters);
+    const ipAdapterCount = ipAdapters.length;
+    if (ipAdapterCount > 0) {
+      activeLabel.push(`${ipAdapterCount} IP`);
     }
 
-    const validControlNets = selectAllControlNets(controlAdapters);
-    const validControlNetCount = validControlNets.length;
-    if (validControlNetCount > 0) {
-      activeLabel.push(`${validControlNetCount} ControlNet`);
+    const controlNets = selectAllControlNets(controlAdapters);
+    const controlNetCount = controlNets.length;
+    if (controlNetCount > 0) {
+      activeLabel.push(`${controlNetCount} ControlNet`);
     }
 
-    const validT2IAdapters = selectAllT2IAdapters(controlAdapters);
-    const validT2IAdapterCount = validT2IAdapters.length;
-    if (validT2IAdapterCount > 0) {
-      activeLabel.push(`${validT2IAdapterCount} T2I`);
+    const t2iAdapters = selectAllT2IAdapters(controlAdapters);
+    const t2iAdapterCount = t2iAdapters.length;
+    if (t2iAdapterCount > 0) {
+      activeLabel.push(`${t2iAdapterCount} T2I`);
     }
+
+    const controlAdapterIds = [ipAdapters, controlNets, t2iAdapters]
+      .flat()
+      .map((ca) => ca.id);
 
     return {
-      controlAdapters: [
-        ...validIPAdapters,
-        ...validControlNets,
-        ...validT2IAdapters,
-      ],
+      controlAdapterIds,
       activeLabel: activeLabel.join(', '),
     };
   },
@@ -55,13 +54,15 @@ const selector = createSelector(
 );
 
 const ParamControlNetCollapse = () => {
-  const { controlAdapters, activeLabel } = useAppSelector(selector);
+  const { controlAdapterIds, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
-  const dispatch = useAppDispatch();
-  const { data: controlnetModels } = useGetControlNetModelsQuery();
   const { addControlNet } = useAddControlNet();
   const { addIPAdapter } = useAddIPAdapter();
   const { addT2IAdapter } = useAddT2IAdapter();
+
+  if (isControlNetDisabled) {
+    return null;
+  }
 
   return (
     <IAICollapse label="Control Adapters" activeLabel={activeLabel}>
@@ -89,10 +90,10 @@ const ParamControlNetCollapse = () => {
             T2I Adapter
           </IAIButton>
         </ButtonGroup>
-        {controlAdapters.map((ca, i) => (
-          <Fragment key={ca.id}>
+        {controlAdapterIds.map((id, i) => (
+          <Fragment key={id}>
             {i > 0 && <Divider />}
-            <ControlNet id={ca.id} />
+            <ControlNet id={id} />
           </Fragment>
         ))}
       </Flex>

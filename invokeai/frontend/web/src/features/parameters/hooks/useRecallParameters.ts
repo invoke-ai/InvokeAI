@@ -2,11 +2,16 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
-  CoreMetadata,
-  LoRAMetadataItem,
+  CONTROLNET_MODEL_DEFAULT_PROCESSORS,
+  CONTROLNET_PROCESSORS,
+} from 'features/controlNet/store/constants';
+import {
   ControlNetMetadataItem,
+  CoreMetadata,
   IPAdapterMetadataItem,
+  LoRAMetadataItem,
 } from 'features/nodes/types/types';
 import {
   refinerModelChanged,
@@ -22,12 +27,13 @@ import {
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageDTO } from 'services/api/types';
+import { v4 as uuidv4 } from 'uuid';
 import {
   controlNetModelsAdapter,
   ipAdapterModelsAdapter,
-  useGetIPAdapterModelsQuery,
   loraModelsAdapter,
   useGetControlNetModelsQuery,
+  useGetIPAdapterModelsQuery,
   useGetLoRAModelsQuery,
 } from '../../../services/api/endpoints/models';
 import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
@@ -45,10 +51,10 @@ import {
 } from '../store/generationSlice';
 import {
   isValidCfgScale,
-  isValidHeight,
-  isValidLoRAModel,
   isValidControlNetModel,
+  isValidHeight,
   isValidIPAdapterModel,
+  isValidLoRAModel,
   isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
@@ -64,22 +70,18 @@ import {
   isValidStrength,
   isValidWidth,
 } from '../types/parameterSchemas';
-import { v4 as uuidv4 } from 'uuid';
-import {
-  CONTROLNET_PROCESSORS,
-  CONTROLNET_MODEL_DEFAULT_PROCESSORS,
-} from 'features/controlNet/store/constants';
 
-const selector = createSelector(stateSelector, ({ generation }) => {
-  const { model } = generation;
-  return { model };
-});
+const selector = createSelector(
+  stateSelector,
+  ({ generation }) => generation.model,
+  defaultSelectorOptions
+);
 
 export const useRecallParameters = () => {
   const dispatch = useAppDispatch();
   const toaster = useAppToaster();
   const { t } = useTranslation();
-  const { model } = useAppSelector(selector);
+  const model = useAppSelector(selector);
 
   const parameterSetToast = useCallback(() => {
     toaster({
@@ -349,13 +351,7 @@ export const useRecallParameters = () => {
    * Recall LoRA with toast
    */
 
-  const { loras } = useGetLoRAModelsQuery(undefined, {
-    selectFromResult: (result) => ({
-      loras: result.data
-        ? loraModelsAdapter.getSelectors().selectAll(result.data)
-        : [],
-    }),
-  });
+  const { data: loras } = useGetLoRAModelsQuery(undefined);
 
   const prepareLoRAMetadataItem = useCallback(
     (loraMetadataItem: LoRAMetadataItem) => {
@@ -365,9 +361,11 @@ export const useRecallParameters = () => {
 
       const { base_model, model_name } = loraMetadataItem.lora;
 
-      const matchingLoRA = loras.find(
-        (l) => l.base_model === base_model && l.model_name === model_name
-      );
+      const matchingLoRA = loras
+        ? loraModelsAdapter
+            .getSelectors()
+            .selectById(loras, `${base_model}/lora/${model_name}`)
+        : undefined;
 
       if (!matchingLoRA) {
         return { lora: null, error: 'LoRA model is not installed' };
@@ -410,13 +408,7 @@ export const useRecallParameters = () => {
    * Recall ControlNet with toast
    */
 
-  const { controlnets } = useGetControlNetModelsQuery(undefined, {
-    selectFromResult: (result) => ({
-      controlnets: result.data
-        ? controlNetModelsAdapter.getSelectors().selectAll(result.data)
-        : [],
-    }),
-  });
+  const { data: controlNets } = useGetControlNetModelsQuery(undefined);
 
   const prepareControlNetMetadataItem = useCallback(
     (controlnetMetadataItem: ControlNetMetadataItem) => {
@@ -434,11 +426,14 @@ export const useRecallParameters = () => {
         resize_mode,
       } = controlnetMetadataItem;
 
-      const matchingControlNetModel = controlnets.find(
-        (c) =>
-          c.base_model === control_model.base_model &&
-          c.model_name === control_model.model_name
-      );
+      const matchingControlNetModel = controlNets
+        ? controlNetModelsAdapter
+            .getSelectors()
+            .selectById(
+              controlNets,
+              `${control_model.base_model}/controlnet/${control_model.model_name}`
+            )
+        : undefined;
 
       if (!matchingControlNetModel) {
         return { controlnet: null, error: 'ControlNet model is not installed' };
@@ -491,7 +486,7 @@ export const useRecallParameters = () => {
 
       return { controlnet, error: null };
     },
-    [controlnets, model?.base_model]
+    [controlNets, model?.base_model]
   );
 
   const recallControlNet = useCallback(
@@ -523,13 +518,7 @@ export const useRecallParameters = () => {
    * Recall IP Adapter with toast
    */
 
-  const { ipAdapters } = useGetIPAdapterModelsQuery(undefined, {
-    selectFromResult: (result) => ({
-      ipAdapters: result.data
-        ? ipAdapterModelsAdapter.getSelectors().selectAll(result.data)
-        : [],
-    }),
-  });
+  const { data: ipAdapters } = useGetIPAdapterModelsQuery(undefined);
 
   const prepareIPAdapterMetadataItem = useCallback(
     (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
@@ -545,11 +534,14 @@ export const useRecallParameters = () => {
         end_step_percent,
       } = ipAdapterMetadataItem;
 
-      const matchingIPAdapterModel = ipAdapters.find(
-        (c) =>
-          c.base_model === ip_adapter_model?.base_model &&
-          c.model_name === ip_adapter_model?.model_name
-      );
+      const matchingIPAdapterModel = ipAdapters
+        ? ipAdapterModelsAdapter
+            .getSelectors()
+            .selectById(
+              ipAdapters,
+              `${ip_adapter_model.base_model}/ip_adapter/${ip_adapter_model.model_name}`
+            )
+        : undefined;
 
       if (!matchingIPAdapterModel) {
         return { ipAdapter: null, error: 'IP Adapter model is not installed' };
