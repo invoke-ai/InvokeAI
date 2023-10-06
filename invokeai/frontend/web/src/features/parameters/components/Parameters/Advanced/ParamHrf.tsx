@@ -3,16 +3,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setHrf } from 'features/parameters/store/generationSlice';
-import { clipSkipMap } from 'features/parameters/types/constants';
-import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useCallback } from 'react';
 
 export default function ParamHrf() {
   const hrfScale = useAppSelector(
     (state: RootState) => state.generation.hrfScale
   );
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
 
   const handleHrfSkipReset = useCallback(() => {
     dispatch(setHrf(0));
@@ -29,10 +26,10 @@ export default function ParamHrf() {
     <IAIInformationalPopover feature="hrf" placement="top">
       <IAISlider
         label="High Resolution Scale"
-        aria-label={t('parameters.hrf')}
-        min={0}
+        aria-label="High Resolution Scale"
+        min={1}
         max={20}
-        step={1}
+        step={0.1}
         value={hrfScale}
         onChange={handleHrfChange}
         withSliderMarks
