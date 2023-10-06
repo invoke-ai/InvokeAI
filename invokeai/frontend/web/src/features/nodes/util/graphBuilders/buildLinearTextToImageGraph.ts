@@ -8,6 +8,7 @@ import {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addHrfToGraph } from './addHrfToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -282,6 +283,11 @@ export const buildLinearTextToImageGraph = (
 
   // add IP Adapter
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  addHrfToGraph(state, graph, DENOISE_LATENTS);
+  // eslint-disable-next-line no-debugger
+  debugger;
+  console.log('Here!');
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
