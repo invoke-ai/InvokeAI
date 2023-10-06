@@ -98,10 +98,6 @@ export const addHrfToGraph = (
     is_intermediate: originalNoiseNode.is_intermediate,
   };
 
-  // LATENTS_TO_IMAGE_HRF,
-  // DENOISE_LATENTS_HRF,
-  // RESCALE_LATENTS,
-  // NOISE_HRF,
   // Add new noes to graph.
   graph.nodes[LATENTS_TO_IMAGE_HRF] =
     latentsToImageHrfNode as LatentsToImageInvocation;
