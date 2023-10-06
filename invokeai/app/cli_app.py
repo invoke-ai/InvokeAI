@@ -52,7 +52,9 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from .services.invocation_services import InvocationServices
     from .services.invoker import Invoker
     from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-    from .services.model_manager_service import ModelManagerService
+    from .services.model_install_service import ModelInstallService
+    from .services.model_loader_service import ModelLoadService
+    from .services.model_record_service import ModelRecordServiceBase
     from .services.processor import DefaultInvocationProcessor
     from .services.sqlite import SqliteItemStorage
 
@@ -239,8 +241,6 @@ def invoke_cli():
     if infile := config.from_file:
         sys.stdin = open(infile, "r")
 
-    model_manager = ModelManagerService(config, logger)
-
     events = EventServiceBase()
     output_folder = config.output_path
 
@@ -253,6 +253,10 @@ def invoke_cli():
 
     db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
     logger.info(f'InvokeAI database location is "{db_location}"')
+
+    model_record_store = ModelRecordServiceBase.get_impl(config, conn=db_conn, lock=None)
+    model_loader = ModelLoadService(config, model_record_store, events)
+    model_installer = ModelInstallService(config, model_record_store, events)
 
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions")
 
@@ -297,7 +301,6 @@ def invoke_cli():
     )
 
     services = InvocationServices(
-        model_manager=model_manager,
         events=events,
         latents=ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents")),
         images=images,
@@ -309,6 +312,9 @@ def invoke_cli():
         processor=DefaultInvocationProcessor(),
         performance_statistics=InvocationStatsService(graph_execution_manager),
         logger=logger,
+        model_record_store=model_record_store,
+        model_loader=model_loader,
+        model_installer=model_installer,
         configuration=config,
         invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),
     )

@@ -58,7 +58,13 @@ class ModelConfigStoreSQL(ModelConfigStore):
     _lock: threading.Lock
 
     def __init__(self, conn: sqlite3.Connection, lock: threading.Lock):
-        """Initialize ModelConfigStore object with a sqlite3 database."""
+        """
+        Initialize a new object from preexisting sqlite3 connection and threading lock objects.
+
+        :param conn: sqlite3 connection object
+        :param lock: threading Lock object
+        """
+
         super().__init__()
         self._conn = conn
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)

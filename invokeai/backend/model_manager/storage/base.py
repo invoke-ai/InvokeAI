@@ -132,3 +132,35 @@ class ModelConfigStore(ABC):
     def all_models(self) -> List[AnyModelConfig]:
         """Return all the model configs in the database."""
         return self.search_by_name()
+
+    def model_info_by_name(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> ModelConfigBase:
+        """
+        Return information about a single model using its name, base type and model type.
+
+        If there are more than one model that match, raises a DuplicateModelException.
+        If no model matches, raises an UnknownModelException
+        """
+        model_configs = self.search_by_name(model_name=model_name, base_model=base_model, model_type=model_type)
+        if len(model_configs) > 1:
+            raise DuplicateModelException(
+                "More than one model share the same name and type: {base_model}/{model_type}/{model_name}"
+            )
+        if len(model_configs) == 0:
+            raise UnknownModelException("No known model with name and type: {base_model}/{model_type}/{model_name}")
+        return model_configs[0]
+
+    def rename_model(
+        self,
+        key: str,
+        new_name: str,
+    ) -> ModelConfigBase:
+        """
+        Rename the indicated model. Just a special case of update_model().
+
+        In some implementations, renaming the model may involve changing where
+        it is stored on the filesystem. So this is broken out.
+
+        :param key: Model key
+        :param new_name: New name for model
+        """
+        return self.update_model(key, {"name": new_name})

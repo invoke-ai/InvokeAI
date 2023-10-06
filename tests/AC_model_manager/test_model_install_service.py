@@ -6,7 +6,9 @@ from pydantic import BaseModel
 
 from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.model_manager_service import ModelManagerService
+from invokeai.app.services.model_install_service import ModelInstallService
+from invokeai.app.services.model_loader_service import ModelLoadService
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.backend.model_manager import BaseModelType, ModelType
 
 # This is a very little embedding model that we can use to test installation
@@ -43,16 +45,18 @@ def test_install(datadir: Path):
         (tmp_path / "configs").mkdir()
         config = InvokeAIAppConfig(
             root=tmp_path,
-            conf_path=tmp_path / "configs" / "models.yaml",
+            model_config_db=tmp_path / "configs" / "models.yaml",
             models_dir=tmp_path / "models",
         )
 
         event_bus = DummyEventService()
-        mm_service = ModelManagerService(config=config, event_bus=event_bus)
+        mm_store = ModelRecordServiceBase.get_impl(config)
+        mm_load = ModelLoadService(config, mm_store)
+        mm_install = ModelInstallService(config=config, store=mm_store, event_bus=event_bus)
 
         source = datadir / TEST_MODEL
-        mm_service.install_model(source=source)
-        id_map = mm_service.wait_for_installs()
+        mm_install.install_model(source=source)
+        id_map = mm_install.wait_for_installs()
         print(id_map)
         assert source in id_map, "model did not install; id_map empty"
         assert id_map[source] is not None, "model did not install: source field empty"
@@ -69,12 +73,12 @@ def test_install(datadir: Path):
         assert "completed" in event_payloads
 
         key = id_map[source]
-        model = mm_service.model_info(key)  # may raise an exception here
+        model = mm_store.get_model(key)  # may raise an exception here
         assert Path(config.models_path / model.path).exists(), "generated path incorrect"
         assert model.base_model == BaseModelType.StableDiffusion1, "probe of model base type didn't work"
         assert model.model_type == ModelType.TextualInversion, "probe of model type didn't work"
 
-        model_info = mm_service.get_model(key)
+        model_info = mm_load.get_model(key)
         assert model_info, "model did not load"
         with model_info as model:
             assert model is not None, "model context not working"

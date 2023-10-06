@@ -80,11 +80,11 @@ class MainModelLoaderInvocation(BaseInvocation):
         key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(key):
+        if not context.services.model_record_store.model_exists(key):
             raise Exception(f"Unknown model {key}")
 
         """
-        if not context.services.model_manager.model_exists(
+        if not context.services.model_record_store.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.Diffusers,
             submodel=SDModelType.Tokenizer,
@@ -93,7 +93,7 @@ class MainModelLoaderInvocation(BaseInvocation):
                 f"Failed to find tokenizer submodel in {self.model_name}! Check if model corrupted"
             )
 
-        if not context.services.model_manager.model_exists(
+        if not context.services.model_record_store.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.Diffusers,
             submodel=SDModelType.TextEncoder,
@@ -102,7 +102,7 @@ class MainModelLoaderInvocation(BaseInvocation):
                 f"Failed to find text_encoder submodel in {self.model_name}! Check if model corrupted"
             )
 
-        if not context.services.model_manager.model_exists(
+        if not context.services.model_record_store.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.Diffusers,
             submodel=SDModelType.UNet,
@@ -173,7 +173,7 @@ class LoraLoaderInvocation(BaseInvocation):
 
         key = self.lora.key
 
-        if not context.services.model_manager.model_exists(key):
+        if not context.services.model_record_store.model_exists(key):
             raise Exception(f"Unkown lora: {key}!")
 
         if self.unet is not None and any(lora.key == key for lora in self.unet.loras):
@@ -238,7 +238,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             raise Exception("No LoRA provided")
 
         key = self.lora.key
-        if not context.services.model_manager.model_exists(key):
+        if not context.services.model_record_store.model_exists(key):
             raise Exception(f"Unknown lora name: {key}!")
 
         if self.unet is not None and any(lora.key == key for lora in self.unet.loras):
@@ -310,7 +310,7 @@ class VaeLoaderInvocation(BaseInvocation):
         """Load a VAE model."""
         key = self.vae_model.key
 
-        if not context.services.model_manager.model_exists(key):
+        if not context.services.model_record_store.model_exists(key):
             raise Exception(f"Unkown vae name: {key}!")
         return VaeLoaderOutput(
             vae=VaeField(

@@ -18,8 +18,8 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
 from . import BaseModelType, ModelConfigBase, ModelConfigStore, ModelType
-from .loader import ModelLoad
 from .config import MainConfig
+from .loader import ModelLoad
 
 
 class MergeInterpolationMethod(str, Enum):

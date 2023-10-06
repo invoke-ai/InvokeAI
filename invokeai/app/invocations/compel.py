@@ -60,23 +60,23 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.services.model_manager.get_model(
+        tokenizer_info = context.services.model_loader.get_model(
             **self.clip.tokenizer.dict(),
             context=context,
         )
-        text_encoder_info = context.services.model_manager.get_model(
+        text_encoder_info = context.services.model_loader.get_model(
             **self.clip.text_encoder.dict(),
             context=context,
         )
 
         def _lora_loader():
             for lora in self.clip.loras:
-                lora_info = context.services.model_manager.get_model(**lora.dict(exclude={"weight"}), context=context)
+                lora_info = context.services.model_loader.get_model(**lora.dict(exclude={"weight"}), context=context)
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
 
-        # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
+        # loras = [(context.services.model_loader.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
         for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
@@ -85,7 +85,7 @@ class CompelInvocation(BaseInvocation):
                 ti_list.append(
                     (
                         name,
-                        context.services.model_manager.get_model(
+                        context.services.model_loader.get_model(
                             model_name=name,
                             base_model=self.clip.text_encoder.base_model,
                             model_type=ModelType.TextualInversion,
@@ -159,11 +159,11 @@ class SDXLPromptInvocationBase:
         lora_prefix: str,
         zero_on_empty: bool,
     ):
-        tokenizer_info = context.services.model_manager.get_model(
+        tokenizer_info = context.services.model_loader.get_model(
             **clip_field.tokenizer.dict(),
             context=context,
         )
-        text_encoder_info = context.services.model_manager.get_model(
+        text_encoder_info = context.services.model_loader.get_model(
             **clip_field.text_encoder.dict(),
             context=context,
         )
@@ -186,12 +186,12 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader():
             for lora in clip_field.loras:
-                lora_info = context.services.model_manager.get_model(**lora.dict(exclude={"weight"}), context=context)
+                lora_info = context.services.model_loader.get_model(**lora.dict(exclude={"weight"}), context=context)
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
 
-        # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
+        # loras = [(context.services.model_loader.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
         for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", prompt):
@@ -200,7 +200,7 @@ class SDXLPromptInvocationBase:
                 ti_list.append(
                     (
                         name,
-                        context.services.model_manager.get_model(
+                        context.services.model_loader.get_model(
                             model_name=name,
                             base_model=clip_field.text_encoder.base_model,
                             model_type=ModelType.TextualInversion,

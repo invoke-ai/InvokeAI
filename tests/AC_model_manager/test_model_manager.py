@@ -13,7 +13,7 @@ VAE_NULL_OVERRIDE_MODEL_NAME = "sdxl-base-with-empty-vae-1-0"
 
 @pytest.fixture
 def model_manager(datadir) -> ModelLoad:
-    config = InvokeAIAppConfig(root=datadir, conf_path="configs/relative_sub.models.yaml")
+    config = InvokeAIAppConfig(root=datadir, model_config_db="configs/relative_sub.models.yaml")
     return ModelLoad(config=config)
 
 

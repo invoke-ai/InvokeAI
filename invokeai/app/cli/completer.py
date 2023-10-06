@@ -11,9 +11,10 @@ from typing import Dict, List, Literal, get_args, get_origin, get_type_hints
 
 import invokeai.backend.util.logging as logger
 
-from ...backend import ModelManager
+from ...backend import ModelManager, ModelType
 from ..invocations.baseinvocation import BaseInvocation
 from ..services.invocation_services import InvocationServices
+from ..services.model_record_service import ModelRecordServiceBase
 from .commands import BaseCommand
 
 # singleton object, class variable
@@ -21,11 +22,11 @@ completer = None
 
 
 class Completer(object):
-    def __init__(self, model_manager: ModelManager):
+    def __init__(self, model_record_store: ModelRecordServiceBase):
         self.commands = self.get_commands()
         self.matches = None
         self.linebuffer = None
-        self.manager = model_manager
+        self.store = model_record_store
         return
 
     def complete(self, text, state):
@@ -127,7 +128,7 @@ class Completer(object):
         if get_origin(typehint) == Literal:
             return get_args(typehint)
         if parameter == "model":
-            return self.manager.model_names()
+            return [x.name for x in self.store.model_info_by_name(model_type=ModelType.Main)]
 
     def _pre_input_hook(self):
         if self.linebuffer:
@@ -142,7 +143,7 @@ def set_autocompleter(services: InvocationServices) -> Completer:
     if completer:
         return completer
 
-    completer = Completer(services.model_manager)
+    completer = Completer(services.model_record_store)
 
     readline.set_completer(completer.complete)
     try:

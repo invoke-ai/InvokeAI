@@ -3,19 +3,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Union, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+
 from pydantic import Field
 
 from invokeai.app.models.exceptions import CanceledException
-from invokeai.backend.model_manager import (
-    ModelConfigStore,
-    SubModelType,
-)
+from invokeai.backend.model_manager import ModelConfigStore, SubModelType
 from invokeai.backend.model_manager.cache import CacheStats
 from invokeai.backend.model_manager.loader import ModelInfo, ModelLoad
 
 from .config import InvokeAIAppConfig
-from .events import EventServiceBase
 from .model_record_service import ModelRecordServiceBase
 
 if TYPE_CHECKING:
@@ -26,16 +23,16 @@ class ModelLoadServiceBase(ABC):
     """Load models into memory."""
 
     @abstractmethod
-    def __init__(self,
-                 config: InvokeAIAppConfig,
-                 store: Union[ModelConfigStore, ModelRecordServiceBase],
-                 event_bus: Optional[EventServiceBase] = None):
+    def __init__(
+        self,
+        config: InvokeAIAppConfig,
+        store: Union[ModelConfigStore, ModelRecordServiceBase],
+    ):
         """
         Initialize a ModelLoadService
 
         :param config: InvokeAIAppConfig object
         :param store: ModelConfigStore object for fetching configuration information
-        :param event_bus: Optional EventServiceBase object. If provided,
         installation and download events will be sent to the event bus.
         """
         pass
@@ -66,26 +63,20 @@ class ModelLoadService(ModelLoadServiceBase):
     """Responsible for managing models on disk and in memory."""
 
     _loader: ModelLoad = Field(description="InvokeAIAppConfig object for the current process")
-    _event_bus: Optional[EventServiceBase] = Field(description="an event bus to send install events to", default=None)
 
-    def __init__(self,
-                 config: InvokeAIAppConfig,
-                 store: Union[ModelConfigStore, ModelRecordServiceBase],
-                 event_bus: Optional[EventServiceBase] = None
-                 ):
+    def __init__(
+        self,
+        config: InvokeAIAppConfig,
+        record_store: Union[ModelConfigStore, ModelRecordServiceBase],
+    ):
         """
-        Initialize a ModelManagerService.
+        Initialize a ModelLoadService.
 
         :param config: InvokeAIAppConfig object
         :param store: ModelRecordServiceBase or ModelConfigStore object for fetching configuration information
-        :param event_bus: Optional EventServiceBase object. If provided,
         installation and download events will be sent to the event bus.
         """
-        self._event_bus = event_bus
-        kwargs: Dict[str, Any] = {}
-        if self._event_bus:
-            kwargs.update(event_handlers=[self._event_bus.emit_model_event])
-        self._loader = ModelLoad(config, store, **kwargs)
+        self._loader = ModelLoad(config, record_store)
 
     def get_model(
         self,

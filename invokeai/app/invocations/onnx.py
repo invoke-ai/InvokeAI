@@ -62,15 +62,15 @@ class ONNXPromptInvocation(BaseInvocation):
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.services.model_manager.get_model(
+        tokenizer_info = context.services.model_loader.get_model(
             **self.clip.tokenizer.dict(),
         )
-        text_encoder_info = context.services.model_manager.get_model(
+        text_encoder_info = context.services.model_loader.get_model(
             **self.clip.text_encoder.dict(),
         )
         with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder:  # , ExitStack() as stack:
             loras = [
-                (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
+                (context.services.model_loader.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
                 for lora in self.clip.loras
             ]
 
@@ -81,7 +81,7 @@ class ONNXPromptInvocation(BaseInvocation):
                     ti_list.append(
                         (
                             name,
-                            context.services.model_manager.get_model(
+                            context.services.model_loader.get_model(
                                 model_name=name,
                                 base_model=self.clip.text_encoder.base_model,
                                 model_type=ModelType.TextualInversion,
@@ -254,12 +254,12 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 eta=0.0,
             )
 
-        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
+        unet_info = context.services.model_loader.get_model(**self.unet.unet.dict())
 
         with unet_info as unet:  # , ExitStack() as stack:
-            # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+            # loras = [(stack.enter_context(context.services.model_loader.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
             loras = [
-                (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
+                (context.services.model_loader.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
                 for lora in self.unet.loras
             ]
 
@@ -345,7 +345,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
         if self.vae.vae.submodel != SubModelType.VaeDecoder:
             raise Exception(f"Expected vae_decoder, found: {self.vae.vae.model_type}")
 
-        vae_info = context.services.model_manager.get_model(
+        vae_info = context.services.model_loader.get_model(
             **self.vae.vae.dict(),
         )
 
@@ -418,7 +418,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
         model_type = ModelType.ONNX
 
         # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
+        if not context.services.model_record_store.model_exists(
             model_name=model_name,
             base_model=base_model,
             model_type=model_type,
@@ -426,7 +426,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
             raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
 
         """
-        if not context.services.model_manager.model_exists(
+        if not context.services.model_record_store.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.Diffusers,
             submodel=SDModelType.Tokenizer,
@@ -435,7 +435,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
                 f"Failed to find tokenizer submodel in {self.model_name}! Check if model corrupted"
             )
 
-        if not context.services.model_manager.model_exists(
+        if not context.services.model_record_store.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.Diffusers,
             submodel=SDModelType.TextEncoder,
@@ -444,7 +444,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
                 f"Failed to find text_encoder submodel in {self.model_name}! Check if model corrupted"
             )
 
-        if not context.services.model_manager.model_exists(
+        if not context.services.model_record_store.model_exists(
             model_name=self.model_name,
             model_type=SDModelType.Diffusers,
             submodel=SDModelType.UNet,

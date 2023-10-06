@@ -26,7 +26,9 @@ from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats import InvocationStatsService
 from ..services.invoker import Invoker
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ..services.model_manager_service import ModelManagerService
+from ..services.model_install_service import ModelInstallService
+from ..services.model_loader_service import ModelLoadService
+from ..services.model_record_service import ModelRecordServiceBase
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.thread import lock
@@ -127,8 +129,11 @@ class ApiDependencies:
             )
         )
 
+        model_record_store = ModelRecordServiceBase.get_impl(config, conn=db_conn, lock=lock)
+        model_loader = ModelLoadService(config, model_record_store)
+        model_installer = ModelInstallService(config, model_record_store, events)
+
         services = InvocationServices(
-            model_manager=ModelManagerService(config, events),
             events=events,
             latents=latents,
             images=images,
@@ -141,6 +146,9 @@ class ApiDependencies:
             configuration=config,
             performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
+            model_record_store=model_record_store,
+            model_loader=model_loader,
+            model_installer=model_installer,
             session_queue=SqliteSessionQueue(conn=db_conn, lock=lock),
             session_processor=DefaultSessionProcessor(),
             invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),

@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     from invokeai.app.services.invoker import InvocationProcessorABC
     from invokeai.app.services.item_storage import ItemStorageABC
     from invokeai.app.services.latent_storage import LatentsStorageBase
-    from invokeai.app.services.model_manager_service import ModelManagerServiceBase
+    from invokeai.app.services.model_install_service import ModelInstallServiceBase
+    from invokeai.app.services.model_loader_service import ModelLoadServiceBase
+    from invokeai.app.services.model_record_service import ModelRecordServiceBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 
@@ -35,8 +37,10 @@ class InvocationServices:
     graph_library: "ItemStorageABC[LibraryGraph]"
     images: "ImageServiceABC"
     latents: "LatentsStorageBase"
+    model_record_store: "ModelRecordServiceBase"
+    model_loader: "ModelLoadServiceBase"
+    model_installer: "ModelInstallServiceBase"
     logger: "Logger"
-    model_manager: "ModelManagerServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
     queue: "InvocationQueueABC"
@@ -55,7 +59,9 @@ class InvocationServices:
         images: "ImageServiceABC",
         latents: "LatentsStorageBase",
         logger: "Logger",
-        model_manager: "ModelManagerServiceBase",
+        model_record_store: "ModelRecordServiceBase",
+        model_loader: "ModelLoadServiceBase",
+        model_installer: "ModelInstallServiceBase",
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
         queue: "InvocationQueueABC",
@@ -72,7 +78,9 @@ class InvocationServices:
         self.images = images
         self.latents = latents
         self.logger = logger
-        self.model_manager = model_manager
+        self.model_record_store = model_record_store
+        self.model_loader = model_loader
+        self.model_installer = model_installer
         self.processor = processor
         self.performance_statistics = performance_statistics
         self.queue = queue

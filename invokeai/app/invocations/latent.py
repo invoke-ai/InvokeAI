@@ -130,7 +130,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         )
 
         if image is not None:
-            vae_info = context.services.model_manager.get_model(
+            vae_info = context.services.model_loader.get_model(
                 **self.vae.vae.dict(),
                 context=context,
             )
@@ -163,7 +163,7 @@ def get_scheduler(
     seed: int,
 ) -> Scheduler:
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
-    orig_scheduler_info = context.services.model_manager.get_model(
+    orig_scheduler_info = context.services.model_loader.get_model(
         **scheduler_info.dict(),
         context=context,
     )
@@ -356,7 +356,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         controlnet_data = []
         for control_info in control_list:
             control_model = exit_stack.enter_context(
-                context.services.model_manager.get_model(
+                context.services.model_loader.get_model(
                     model_name=control_info.control_model.model_name,
                     model_type=ModelType.ControlNet,
                     base_model=control_info.control_model.base_model,
@@ -414,7 +414,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if ip_adapter is None:
             return None
 
-        image_encoder_model_info = context.services.model_manager.get_model(
+        image_encoder_model_info = context.services.model_loader.get_model(
             model_name=ip_adapter.image_encoder_model.model_name,
             model_type=ModelType.CLIPVision,
             base_model=ip_adapter.image_encoder_model.base_model,
@@ -422,7 +422,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         )
 
         ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
-            context.services.model_manager.get_model(
+            context.services.model_loader.get_model(
                 model_name=ip_adapter.ip_adapter_model.model_name,
                 model_type=ModelType.IPAdapter,
                 base_model=ip_adapter.ip_adapter_model.base_model,
@@ -530,7 +530,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             def _lora_loader():
                 for lora in self.unet.loras:
-                    lora_info = context.services.model_manager.get_model(
+                    lora_info = context.services.model_loader.get_model(
                         **lora.dict(exclude={"weight"}),
                         context=context,
                     )
@@ -538,7 +538,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     del lora_info
                 return
 
-            unet_info = context.services.model_manager.get_model(
+            unet_info = context.services.model_loader.get_model(
                 **self.unet.unet.dict(),
                 context=context,
             )
@@ -643,7 +643,7 @@ class LatentsToImageInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
-        vae_info = context.services.model_manager.get_model(
+        vae_info = context.services.model_loader.get_model(
             **self.vae.vae.dict(),
             context=context,
         )
@@ -868,7 +868,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        vae_info = context.services.model_manager.get_model(
+        vae_info = context.services.model_loader.get_model(
             **self.vae.vae.dict(),
             context=context,
         )

@@ -5,18 +5,17 @@ import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import InvokeAILogger, Logger, choose_precision, choose_torch_device
-from invokeai.app.services.model_record_service import ModelRecordServiceBase
 
 from .cache import CacheStats, ModelCache
 from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
 from .models import MODEL_CLASSES, InvalidModelException, ModelBase
-from .storage import ConfigFileVersionMismatchException, ModelConfigStore, get_config_store, migrate_models_store
+from .storage import ModelConfigStore, get_config_store
 
 
 @dataclass
@@ -97,11 +96,10 @@ class ModelLoad(ModelLoadBase):
     """Implementation of ModelLoadBase."""
 
     _app_config: InvokeAIAppConfig
-    _store: Union[ModelConfigStore, ModelRecordServiceBase]
+    _store: ModelConfigStore
     _cache: ModelCache
     _logger: Logger
     _cache_keys: dict
-    _models_file: Path
 
     def __init__(
         self,
@@ -113,19 +111,15 @@ class ModelLoad(ModelLoadBase):
 
         :param config: The app's InvokeAIAppConfig object.
         """
-        store = store or self._create_store(config)
-
         self._app_config = config
-        self._store = store
+        self._store = store or get_config_store(config.root_path / config.model_config_db)
         self._logger = InvokeAILogger.get_logger()
         self._cache_keys = dict()
-        self._models_file = config.model_conf_path
         device = torch.device(choose_torch_device())
         device_name = torch.cuda.get_device_name() if device == torch.device("cuda") else ""
         precision = choose_precision(device) if config.precision == "auto" else config.precision
         dtype = torch.float32 if precision == "float32" else torch.float16
 
-        self._logger.info(f"Using models database {self._models_file}")
         self._logger.info(f"Rendering device = {device} ({device_name})")
         self._logger.info(f"Maximum RAM cache size: {config.ram}")
         self._logger.info(f"Maximum VRAM cache size: {config.vram}")
@@ -139,20 +133,6 @@ class ModelLoad(ModelLoadBase):
             precision=dtype,
             logger=self._logger,
         )
-
-    def _create_store(self, config: InvokeAIAppConfig) -> ModelConfigStore:
-        if config.model_conf_path and config.model_conf_path.exists():
-            models_file = config.model_conf_path
-        else:
-            models_file = config.root_path / "configs/models.yaml"
-        try:
-            store = get_config_store(models_file)
-        except ConfigFileVersionMismatchException:
-            migrate_models_store(config)
-            store = get_config_store(models_file)
-        if not store:
-            raise ValueError(f"Invalid model configuration file: {models_file}")
-        return store
 
     @property
     def store(self) -> ModelConfigStore:
@@ -266,4 +246,3 @@ class ModelLoad(ModelLoadBase):
 
         model_path = self.resolve_model_path(model_path)
         return model_path, is_submodel_override
-

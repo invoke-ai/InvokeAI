@@ -7,14 +7,18 @@ from hashlib import sha256
 import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_record_service import (
+    ModelRecordServiceBase,
+    ModelRecordServiceFile,
+    UnknownModelException,
+)
 from invokeai.backend.model_manager.config import DiffusersConfig, ModelType, TextualInversionConfig, VaeDiffusersConfig
-from invokeai.backend.model_manager.storage import ModelConfigStore, ModelConfigStoreYAML, UnknownModelException
 
 
 @pytest.fixture
-def store(datadir) -> ModelConfigStore:
+def store(datadir) -> ModelRecordServiceBase:
     InvokeAIAppConfig(root=datadir)
-    return ModelConfigStoreYAML(datadir / "configs" / "models.yaml")
+    return ModelRecordServiceFile(datadir / "configs" / "models.yaml")
 
 
 def example_config() -> TextualInversionConfig:
@@ -28,7 +32,7 @@ def example_config() -> TextualInversionConfig:
     )
 
 
-def test_add(store: ModelConfigStore):
+def test_add(store: ModelRecordServiceBase):
     raw = dict(
         path="/tmp/foo.ckpt",
         name="model1",
@@ -53,7 +57,7 @@ def test_add(store: ModelConfigStore):
     assert config2.base_model == "sd-2"
 
 
-def test_update(store: ModelConfigStore):
+def test_update(store: ModelRecordServiceBase):
     config = example_config()
     store.add_model("key1", config)
     config = store.get_model("key1")
@@ -71,7 +75,7 @@ def test_update(store: ModelConfigStore):
         assert True
 
 
-def test_delete(store: ModelConfigStore):
+def test_delete(store: ModelRecordServiceBase):
     config = example_config()
     store.add_model("key1", config)
     config = store.get_model("key1")
@@ -89,14 +93,14 @@ def test_delete(store: ModelConfigStore):
         assert True
 
 
-def test_exists(store: ModelConfigStore):
+def test_exists(store: ModelRecordServiceBase):
     config = example_config()
     store.add_model("key1", config)
     assert store.exists("key1")
     assert not store.exists("key2")
 
 
-def test_filter(store: ModelConfigStore):
+def test_filter(store: ModelRecordServiceBase):
     config1 = DiffusersConfig(
         path="/tmp/config1", name="config1", base_model="sd-1", model_type="main", tags=["sfw", "commercial", "fantasy"]
     )

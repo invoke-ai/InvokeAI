@@ -6,8 +6,8 @@ from invokeai.app.models.image import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import EnqueueBatchResult, SessionQueueItem
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager import SubModelType
-from invokeai.backend.model_manager.loader import ModelInfo
 from invokeai.backend.model_manager.download import DownloadJobBase
+from invokeai.backend.model_manager.loader import ModelInfo
 from invokeai.backend.util.logging import InvokeAILogger
 
 

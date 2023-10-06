@@ -60,7 +60,6 @@ from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.backend.util import Chdir, InvokeAILogger, Logger
 
 from .config import (
@@ -373,7 +372,7 @@ class ModelInstall(ModelInstallBase):
 
     def __init__(
         self,
-        store: Optional[Union[ModelConfigStore, ModelRecordServiceBase]] = None,
+        store: Optional[ModelConfigStore] = None,
         config: Optional[InvokeAIAppConfig] = None,
         logger: Optional[Logger] = None,
         download: Optional[DownloadQueueBase] = None,
@@ -381,7 +380,7 @@ class ModelInstall(ModelInstallBase):
     ):  # noqa D107 - use base class docstrings
         self._app_config = config or InvokeAIAppConfig.get_config()
         self._logger = logger or InvokeAILogger.get_logger(config=self._app_config)
-        self._store = store or get_config_store(self._app_config.model_conf_path)
+        self._store = store or get_config_store(config.root_path / config.model_conf_path)
         self._download_queue = download or DownloadQueue(config=self._app_config, event_handlers=event_handlers)
         self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
         self._installed = set()

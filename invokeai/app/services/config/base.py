@@ -155,6 +155,7 @@ class InvokeAISettings(BaseSettings):
             "free_gpu_mem",
             "xformers_enabled",
             "tiled_decode",
+            "conf_path",
         ]
 
     class Config:

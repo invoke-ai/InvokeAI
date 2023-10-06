@@ -223,7 +223,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     lora_dir            : Path = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
     embedding_dir       : Path = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
     controlnet_dir      : Path = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', category='Paths')
-    conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
+    model_config_db     : Union[Path, Literal['auto']] = Field(default='auto', description='Path to a sqlite .db file or .yaml file for storing model config records; "auto" will reuse the main sqlite db', category='Paths')
     models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
@@ -273,6 +273,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     max_vram_cache_size : Optional[float] = Field(default=None, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
+    conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
 
     # See InvokeAIAppConfig subclass below for CACHE and DEVICE categories
     # fmt: on

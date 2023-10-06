@@ -67,19 +67,21 @@ async def list_models(
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
 ) -> ModelsList:
     """Get a list of models."""
-    manager = ApiDependencies.invoker.services.model_manager
+    record_store = ApiDependencies.invoker.services.model_record_store
     if base_models and len(base_models) > 0:
         models_raw = list()
         for base_model in base_models:
-            models_raw.extend([x.dict() for x in manager.list_models(base_model=base_model, model_type=model_type)])
+            models_raw.extend(
+                [x.dict() for x in record_store.search_by_name(base_model=base_model, model_type=model_type)]
+            )
     else:
-        models_raw = [x.dict() for x in manager.list_models(model_type=model_type)]
+        models_raw = [x.dict() for x in record_store.search_by_name(model_type=model_type)]
     models = parse_obj_as(ModelsList, {"models": models_raw})
     return models
 
 
 @models_router.patch(
-    "/{key}",
+    "/i/{key}",
     operation_id="update_model",
     responses={
         200: {"description": "The model was updated successfully"},
@@ -100,7 +102,13 @@ async def update_model(
     try:
         info_dict = info.dict()
         info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
-        new_config = ApiDependencies.invoker.services.model_manager.update_model(key, new_config=info_dict)
+        record_store = ApiDependencies.invoker.services.model_record_store
+        model_install = ApiDependencies.invoker.services.model_installer
+        new_config = record_store.update_model(key, config=info_dict)
+        # In the event that the model's name, type or base has changed, and the model itself
+        # resides in the invokeai root models directory, then the next statement will move
+        # the model file into its new canonical location.
+        new_config = model_install.sync_model_path(new_config.key)
         model_response = parse_obj_as(InvokeAIModelConfig, new_config.dict())
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -159,7 +167,8 @@ async def import_model(
     logger = ApiDependencies.invoker.services.logger
 
     try:
-        result = ApiDependencies.invoker.services.model_manager.install_model(
+        installer = ApiDependencies.invoker.services.model_installer
+        result = installer.install_model(
             location,
             model_attributes={"prediction_type": SchedulerPredictionType(prediction_type)},
             priority=priority,
@@ -206,15 +215,15 @@ async def add_model(
     logger = ApiDependencies.invoker.services.logger
     try:
         path = info.path
-        job = ApiDependencies.invoker.services.model_manager.add_model(path)
-        ApiDependencies.invoker.services.model_manager.wait_for_installs()
-        key = job.model_key
+        installer = ApiDependencies.invoker.services.model_installer
+        record_store = ApiDependencies.invoker.services.model_record_store
+        key = installer.install_path(path)
         logger.info(f"Created model {key} for {path}")
 
         # update with the provided info
         info_dict = info.dict()
         info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
-        new_config = ApiDependencies.invoker.services.model_manager.update_model(key, new_config=info_dict)
+        new_config = record_store.update_model(key, new_config=info_dict)
         return parse_obj_as(InvokeAIModelConfig, new_config.dict())
     except UnknownModelException as e:
         logger.error(str(e))
@@ -225,7 +234,7 @@ async def add_model(
 
 
 @models_router.delete(
-    "/{key}",
+    "/i/{key}",
     operation_id="del_model",
     responses={204: {"description": "Model deleted successfully"}, 404: {"description": "Model not found"}},
     status_code=204,
@@ -239,7 +248,11 @@ async def delete_model(
     logger = ApiDependencies.invoker.services.logger
 
     try:
-        ApiDependencies.invoker.services.model_manager.del_model(key, delete_files=delete_files)
+        installer = ApiDependencies.invoker.services.model_installer
+        if delete_files:
+            installer.delete(key)
+        else:
+            installer.unregister(key)
         logger.info(f"Deleted model: {key}")
         return Response(status_code=204)
     except UnknownModelException as e:
@@ -267,9 +280,9 @@ async def convert_model(
     """Convert a checkpoint model into a diffusers model, optionally saving to the indicated destination directory, or `models` if none."""
     try:
         dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
-        ApiDependencies.invoker.services.model_manager.convert_model(key, convert_dest_directory=dest)
-        model_raw = ApiDependencies.invoker.services.model_manager.model_info(key).dict()
-        response = parse_obj_as(InvokeAIModelConfig, model_raw)
+        installer = ApiDependencies.invoker.services.model_installer
+        model_config = installer.convert_model(key, convert_dest_directory=dest)
+        response = parse_obj_as(InvokeAIModelConfig, model_config.dict())
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=f"Model '{key}' not found: {str(e)}")
     except ValueError as e:
@@ -295,7 +308,7 @@ async def search_for_models(
         raise HTTPException(
             status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory"
         )
-    return ApiDependencies.invoker.services.model_manager.search_for_models(search_path)
+    return ApiDependencies.invoker.services.model_installer.search_for_models(search_path)
 
 
 @models_router.get(
@@ -309,7 +322,7 @@ async def search_for_models(
 )
 async def list_ckpt_configs() -> List[pathlib.Path]:
     """Return a list of the legacy checkpoint configuration files stored in `ROOT/configs/stable-diffusion`, relative to ROOT."""
-    return ApiDependencies.invoker.services.model_manager.list_checkpoint_configs()
+    return ApiDependencies.invoker.services.model_installer.list_checkpoint_configs()
 
 
 @models_router.post(
@@ -328,7 +341,7 @@ async def sync_to_config() -> bool:
     Call after making changes to models.yaml, autoimport directories
     or models directory.
     """
-    ApiDependencies.invoker.services.model_manager.sync_to_config()
+    ApiDependencies.invoker.services.model_installer.sync_to_config()
     return True
 
 
@@ -362,7 +375,7 @@ async def merge_models(
     try:
         logger.info(f"Merging models: {keys} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
         dest = pathlib.Path(merge_dest_directory) if merge_dest_directory else None
-        result: ModelConfigBase = ApiDependencies.invoker.services.model_manager.merge_models(
+        result: ModelConfigBase = ApiDependencies.invoker.services.model_installer.merge_models(
             model_keys=keys,
             merged_model_name=merged_model_name,
             alpha=alpha,
@@ -393,9 +406,9 @@ async def merge_models(
 async def list_install_jobs() -> List[ModelImportStatus]:
     """List active and pending model installation jobs."""
     logger = ApiDependencies.invoker.services.logger
-    mgr = ApiDependencies.invoker.services.model_manager
+    job_mgr = ApiDependencies.invoker.services.model_installer
     try:
-        jobs = mgr.list_install_jobs()
+        jobs = job_mgr.list_install_jobs()
         return [
             ModelImportStatus(
                 job_id=x.id,
@@ -433,21 +446,21 @@ async def control_install_jobs(
 ) -> ModelImportStatus:
     """Start, pause, cancel, or change the run priority of a running model install job."""
     logger = ApiDependencies.invoker.services.logger
-    mgr = ApiDependencies.invoker.services.model_manager
+    job_mgr = ApiDependencies.invoker.services.model_installer
     try:
-        job = mgr.id_to_job(job_id)
+        job = job_mgr.id_to_job(job_id)
 
         if operation == JobControlOperation.START:
-            mgr.start_job(job_id)
+            job_mgr.start_job(job_id)
 
         elif operation == JobControlOperation.PAUSE:
-            mgr.pause_job(job_id)
+            job_mgr.pause_job(job_id)
 
         elif operation == JobControlOperation.CANCEL:
-            mgr.cancel_job(job_id)
+            job_mgr.cancel_job(job_id)
 
         elif operation == JobControlOperation.CHANGE_PRIORITY:
-            mgr.change_job_priority(job_id, priority_delta)
+            job_mgr.change_job_priority(job_id, priority_delta)
 
         else:
             raise ValueError(f"Unknown operation {JobControlOperation.value}")
@@ -484,9 +497,9 @@ async def cancel_install_jobs():
     """Cancel all pending install jobs."""
     logger = ApiDependencies.invoker.services.logger
     try:
-        mgr = ApiDependencies.invoker.services.model_manager
+        job_mgr = ApiDependencies.invoker.services.model_installer
         logger.info("Cancelling all running model installation jobs.")
-        mgr.cancel_all_jobs()
+        job_mgr.cancel_all_jobs()
         return Response(status_code=204)
     except Exception as e:
         logger.error(str(e))
@@ -507,7 +520,7 @@ async def prune_jobs():
     """Prune all completed and errored jobs."""
     logger = ApiDependencies.invoker.services.logger
     try:
-        mgr = ApiDependencies.invoker.services.model_manager
+        mgr = ApiDependencies.invoker.services.model_installer
         mgr.prune_jobs()
         return Response(status_code=204)
     except Exception as e:

@@ -97,8 +97,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 # Invoke
                 try:
                     graph_id = graph_execution_state.id
-                    model_manager = self.__invoker.services.model_manager
-                    with statistics.collect_stats(invocation, graph_id, model_manager):
+                    model_loader = self.__invoker.services.model_loader
+                    with statistics.collect_stats(invocation, graph_id, model_loader):
                         # use the internal invoke_internal(), which wraps the node's invoke() method,
                         # which handles a few things:
                         # - nodes that require a value, but get it only from a connection

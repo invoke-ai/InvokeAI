@@ -59,7 +59,9 @@ def mock_services() -> InvocationServices:
         conn=db_conn, table_name="graph_executions", lock=lock
     )
     return InvocationServices(
-        model_manager=None,  # type: ignore
+        model_loader=None,  # type: ignore
+        model_installer=None,  # type: ignore
+        model_record_store=None,  # type: ignore
         events=TestEventService(),
         logger=logging,  # type: ignore
         images=None,  # type: ignore

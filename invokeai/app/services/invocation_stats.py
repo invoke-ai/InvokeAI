@@ -43,7 +43,7 @@ from invokeai.backend.model_manager.cache import CacheStats
 from ..invocations.baseinvocation import BaseInvocation
 from .graph import GraphExecutionState
 from .item_storage import ItemStorageABC
-from .model_manager_service import ModelManagerService
+from .model_loader_service import ModelLoadServiceBase
 
 # size of GIG in bytes
 GIG = 1073741824
@@ -174,13 +174,13 @@ class InvocationStatsService(InvocationStatsServiceBase):
         graph_id: str
         start_time: float
         ram_used: int
-        model_manager: ModelManagerService
+        model_loader: ModelLoadServiceBase
 
         def __init__(
             self,
             invocation: BaseInvocation,
             graph_id: str,
-            model_manager: ModelManagerService,
+            model_loader: ModelLoadServiceBase,
             collector: "InvocationStatsServiceBase",
         ):
             """Initialize statistics for this run."""
@@ -189,15 +189,15 @@ class InvocationStatsService(InvocationStatsServiceBase):
             self.graph_id = graph_id
             self.start_time = 0.0
             self.ram_used = 0
-            self.model_manager = model_manager
+            self.model_loader = model_loader
 
         def __enter__(self):
             self.start_time = time.time()
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
             self.ram_used = psutil.Process().memory_info().rss
-            if self.model_manager:
-                self.model_manager.collect_cache_stats(self.collector._cache_stats[self.graph_id])
+            if self.model_loader:
+                self.model_loader.collect_cache_stats(self.collector._cache_stats[self.graph_id])
 
         def __exit__(self, *args):
             """Called on exit from the context."""
@@ -208,7 +208,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             )
             self.collector.update_invocation_stats(
                 graph_id=self.graph_id,
-                invocation_type=self.invocation.type,  # type: ignore - `type` is not on the `BaseInvocation` model, but *is* on all invocations
+                invocation_type=self.invocation.type,
                 time_used=time.time() - self.start_time,
                 vram_used=torch.cuda.max_memory_allocated() / GIG if torch.cuda.is_available() else 0.0,
             )
@@ -217,12 +217,12 @@ class InvocationStatsService(InvocationStatsServiceBase):
         self,
         invocation: BaseInvocation,
         graph_execution_state_id: str,
-        model_manager: ModelManagerService,
+        model_loader: ModelLoadServiceBase,
     ) -> StatsContext:
         if not self._stats.get(graph_execution_state_id):  # first time we're seeing this
             self._stats[graph_execution_state_id] = NodeLog()
             self._cache_stats[graph_execution_state_id] = CacheStats()
-        return self.StatsContext(invocation, graph_execution_state_id, model_manager, self)
+        return self.StatsContext(invocation, graph_execution_state_id, model_loader, self)
 
     def reset_all_stats(self):
         """Zero all statistics"""

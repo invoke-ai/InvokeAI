@@ -3,66 +3,39 @@
 from __future__ import annotations
 
 import shutil
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Set, Literal
+from typing import Any, Dict, List, Literal, Optional, Set, Union
 
 from pydantic import Field, parse_obj_as
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.backend import get_precision
-from invokeai.backend.model_manager.install import ModelInstallBase, ModelInstall, ModelInstallJob
-from invokeai.backend.model_manager import (
-    ModelConfigBase,
-    ModelSearch,
-)
-from invokeai.backend.model_manager.storage import ModelConfigStore
+from invokeai.backend.model_manager import ModelConfigBase, ModelSearch
 from invokeai.backend.model_manager.download import DownloadJobBase
+from invokeai.backend.model_manager.install import ModelInstall, ModelInstallBase, ModelInstallJob
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
-from invokeai.backend.util.logging import InvokeAILogger, Logger
+from invokeai.backend.util.logging import InvokeAILogger
 
 from .config import InvokeAIAppConfig
 from .events import EventServiceBase
 from .model_record_service import ModelRecordServiceBase
 
 
-class ModelInstallServiceBase(ABC):
+class ModelInstallServiceBase(ModelInstallBase):  # This is an ABC
     """Responsible for downloading, installing and deleting models."""
 
     @abstractmethod
-    def __init__(self,
-                 config: InvokeAIAppConfig,
-                 store: Union[ModelConfigStore, ModelRecordServiceBase],
-                 event_bus: Optional[EventServiceBase] = None
-                 ):
+    def __init__(
+        self, config: InvokeAIAppConfig, store: ModelRecordServiceBase, event_bus: Optional[EventServiceBase] = None
+    ):
         """
         Initialize a ModelInstallService instance.
 
         :param config: InvokeAIAppConfig object
-        :param store: Either a ModelRecordServiceBase object or a ModelConfigStore
+        :param store: A ModelRecordServiceBase object install to
         :param event_bus: Optional EventServiceBase object. If provided,
-
-        Installation and download events will be sent to the event bus as "model_event".
-        """
-        pass
-
-    @abstractmethod
-    def convert_model(
-        self,
-        key: str,
-        convert_dest_directory: Path,
-    ) -> ModelConfigBase:
-        """
-        Convert a checkpoint file into a diffusers folder.
-
-        This will delete the cached version if there is any and delete the original
-        checkpoint file if it is in the models directory.
-        :param key: Unique key for the model to convert.
-        :param convert_dest_directory: Save the converted model to the designated directory (`models/etc/etc` by default)
-
-        This will raise a ValueError unless the model is not a checkpoint. It will
-        also raise a ValueError in the event that there is a similarly-named diffusers
-        directory already in place.
+        installation and download events will be sent to the event bus as "model_event".
         """
         pass
 
@@ -100,21 +73,6 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def id_to_job(self, id: int) -> ModelInstallJob:
         """Return the ModelInstallJob instance corresponding to the given job ID."""
-        pass
-
-    @abstractmethod
-    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
-        """
-        Wait for all pending installs to complete.
-
-        This will block until all pending downloads have
-        completed, been cancelled, or errored out. It will
-        block indefinitely if one or more jobs are in the
-        paused state.
-
-        It will return a dict that maps the source model
-        path, URL or repo_id to the ID of the installed model.
-        """
         pass
 
     @abstractmethod
@@ -189,33 +147,17 @@ class ModelInstallServiceBase(ABC):
         """Return list of all models found in the designated directory."""
         pass
 
-    @abstractmethod
-    def sync_to_config(self):
-        """
-        Synchronize the in-memory models with on-disk.
-
-        Re-read models.yaml, rescan the models directory, and reimport models
-        in the autoimport directories. Call after making changes outside the
-        model manager API.
-        """
-        pass
-
 
 # implementation
-class ModelInstallService(ModelInstallServiceBase):
+class ModelInstallService(ModelInstall, ModelInstallServiceBase):
     """Responsible for managing models on disk and in memory."""
 
-    _installer: ModelInstallBase = Field(description="ModelInstall object for the current process")
-    _config: InvokeAIAppConfig = Field(description="App configuration object")
-    _precision: Literal['float16', 'float32'] = Field(description="Floating point precision, string form")
+    _precision: Literal["float16", "float32"] = Field(description="Floating point precision, string form")
     _event_bus: Optional[EventServiceBase] = Field(description="an event bus to send install events to", default=None)
-    _logger: Logger = Field(description="logger module")
 
-    def __init__(self,
-                 config: InvokeAIAppConfig,
-                 store: Union[ModelConfigStore, ModelRecordServiceBase],
-                 event_bus: Optional[EventServiceBase] = None
-                 ):
+    def __init__(
+        self, config: InvokeAIAppConfig, store: ModelRecordServiceBase, event_bus: Optional[EventServiceBase] = None
+    ):
         """
         Initialize a ModelInstallService instance.
 
@@ -226,17 +168,16 @@ class ModelInstallService(ModelInstallServiceBase):
         Installation and download events will be sent to the event bus as "model_event".
         """
         self._event_bus = event_bus
-        self._config = config
         kwargs: Dict[str, Any] = {}
         if self._event_bus:
             kwargs.update(event_handlers=[self._event_bus.emit_model_event])
         self._precision = get_precision()
-        self._installer = ModelInstall(store, config, **kwargs)
-        self._logger = InvokeAILogger.get_logger()
+        logger = InvokeAILogger.get_logger()
+        super().__init__(store=store, config=config, logger=logger, **kwargs)
 
     def start(self, invoker: Any):  # Because .processor is giving circular import errors, declaring invoker an 'Any'
         """Call automatically at process start."""
-        self._installer.scan_models_directory()  # synchronize new/deleted models found in models directory
+        self.scan_models_directory()  # synchronize new/deleted models found in models directory
 
     def install_model(
         self,
@@ -255,7 +196,7 @@ class ModelInstallService(ModelInstallServiceBase):
         """
         self.logger.debug(f"add model {source}")
         variant = "fp16" if self._precision == "float16" else None
-        job = self._installer.install(
+        job = self.install(
             source,
             probe_override=model_attributes,
             variant=variant,
@@ -266,53 +207,39 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def list_install_jobs(self) -> List[ModelInstallJob]:
         """Return a series of active or enqueued ModelInstallJobs."""
-        queue = self._installer.queue
+        queue = self.queue
         jobs: List[DownloadJobBase] = queue.list_jobs()
         return [parse_obj_as(ModelInstallJob, x) for x in jobs]  # downcast to proper type
 
     def id_to_job(self, id: int) -> ModelInstallJob:
         """Return the ModelInstallJob instance corresponding to the given job ID."""
-        job = self._installer.queue.id_to_job(id)
+        job = self.queue.id_to_job(id)
         assert isinstance(job, ModelInstallJob)
         return job
 
-    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
-        """
-        Wait for all pending installs to complete.
-
-        This will block until all pending downloads have
-        completed, been cancelled, or errored out. It will
-        block indefinitely if one or more jobs are in the
-        paused state.
-
-        It will return a dict that maps the source model
-        path, URL or repo_id to the ID of the installed model.
-        """
-        return self._installer.wait_for_installs()
-
     def start_job(self, job_id: int):
         """Start the given install job if it is paused or idle."""
-        queue = self._installer.queue
+        queue = self.queue
         queue.start_job(queue.id_to_job(job_id))
 
     def pause_job(self, job_id: int):
         """Pause the given install job if it is paused or idle."""
-        queue = self._installer.queue
+        queue = self.queue
         queue.pause_job(queue.id_to_job(job_id))
 
     def cancel_job(self, job_id: int):
         """Cancel the given install job."""
-        queue = self._installer.queue
+        queue = self.queue
         queue.cancel_job(queue.id_to_job(job_id))
 
     def cancel_all_jobs(self):
         """Cancel all active install job."""
-        queue = self._loader.queue
+        queue = self.queue
         queue.cancel_all_jobs()
 
     def prune_jobs(self):
         """Cancel all active install job."""
-        queue = self._loader.queue
+        queue = self.queue
         queue.prune_jobs()
 
     def change_job_priority(self, job_id: int, delta: int):
@@ -326,7 +253,7 @@ class ModelInstallService(ModelInstallServiceBase):
         Thus to make this a really high priority job:
            manager.change_job_priority(-10).
         """
-        queue = self._installer.queue
+        queue = self.queue
         queue.change_priority(queue.id_to_job(job_id), delta)
 
     def del_model(
@@ -344,7 +271,7 @@ class ModelInstallService(ModelInstallServiceBase):
         model_info = self.store.get_model(key)
         self.logger.debug(f"delete model {model_info.name}")
         self.store.del_model(key)
-        if delete_files and Path(self._config.models_path / model_info.path).exists():
+        if delete_files and Path(self._app_config.models_path / model_info.path).exists():
             path = Path(model_info.path)
             if path.is_dir():
                 shutil.rmtree(path)
@@ -354,7 +281,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def convert_model(
         self,
         key: str,
-        convert_dest_directory: Path,
+        dest_directory: Optional[Path] = None,
     ) -> ModelConfigBase:
         """
         Convert a checkpoint file into a diffusers folder.
@@ -372,17 +299,17 @@ class ModelInstallService(ModelInstallServiceBase):
         """
         model_info = self.store.get_model(key)
         self.logger.info(f"Converting model {model_info.name} into a diffusers")
-        return self._installer.convert_model(key, convert_dest_directory)
+        return self.convert_model(key, dest_directory)
 
     @property
     def logger(self):
         """Get the logger associated with this instance."""
-        return self._loader.logger
+        return self._logger
 
     @property
     def store(self):
         """Get the store associated with this instance."""
-        return self._installer.store
+        return self._store
 
     def merge_models(
         self,
@@ -431,19 +358,9 @@ class ModelInstallService(ModelInstallServiceBase):
         """
         return ModelSearch().search(directory)
 
-    def sync_to_config(self):
-        """
-        Synchronize the model manager to the database.
-
-        Re-read models.yaml, rescan the models directory, and reimport models
-        in the autoimport directories. Call after making changes outside the
-        model manager API.
-        """
-        return self._installer.sync_to_config()
-
     def list_checkpoint_configs(self) -> List[Path]:
         """List the checkpoint config paths from ROOT/configs/stable-diffusion."""
-        config = self._config
+        config = self._app_config
         conf_path = config.legacy_conf_path
         root_path = config.root_path
         return [(conf_path / x).relative_to(root_path) for x in conf_path.glob("**/*.yaml")]
