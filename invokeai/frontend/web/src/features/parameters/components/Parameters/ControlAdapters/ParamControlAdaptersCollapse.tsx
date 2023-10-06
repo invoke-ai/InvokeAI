@@ -90,11 +90,10 @@ const ParamControlAdaptersCollapse = () => {
             T2I Adapter
           </IAIButton>
         </ButtonGroup>
-        <Divider />
         {controlAdapterIds.map((id, i) => (
           <Fragment key={id}>
-            {i > 0 && <Divider />}
-            <ControlAdapterConfig id={id} />
+            <Divider />
+            <ControlAdapterConfig id={id} number={i + 1} />
           </Fragment>
         ))}
       </Flex>
