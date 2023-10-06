@@ -131,6 +131,10 @@
         "upload": "Upload"
     },
     "controlnet": {
+        "controlAdapter": "Control Adapter",
+        "controlnet": "$t(controlnet.controlAdapter) #{{number}} (Control Net)",
+        "ip_adapter": "$t(controlnet.controlAdapter) #{{number}} (IP Adapter)",
+        "t2i_adapter": "$t(controlnet.controlAdapter) #{{number}} (T2I Adapter)",
         "amult": "a_mult",
         "autoConfigure": "Auto configure processor",
         "balanced": "Balanced",

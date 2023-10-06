@@ -27,8 +27,8 @@ import ParamControlAdapterControlMode from './parameters/ParamControlAdapterCont
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
 
-const ControlAdapterConfig = (props: { id: string }) => {
-  const { id } = props;
+const ControlAdapterConfig = (props: { id: string; number: number }) => {
+  const { id, number } = props;
   const controlAdapterType = useControlAdapterType(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -75,13 +75,19 @@ const ControlAdapterConfig = (props: { id: string }) => {
         },
       }}
     >
-      <Flex sx={{ gap: 2, alignItems: 'center' }}>
+      <Flex
+        sx={{ gap: 2, alignItems: 'center', justifyContent: 'space-between' }}
+      >
         <IAISwitch
-          tooltip={t('controlnet.toggleControlNet')}
+          label={t(`controlnet.${controlAdapterType}`, { number })}
           aria-label={t('controlnet.toggleControlNet')}
           isChecked={isEnabled}
           onChange={handleToggleIsEnabled}
+          formControlProps={{ w: 'full' }}
+          formLabelProps={{ fontWeight: 600 }}
         />
+      </Flex>
+      <Flex sx={{ gap: 2, alignItems: 'center' }}>
         <Box
           sx={{
             w: 'full',
