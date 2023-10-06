@@ -97,7 +97,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
             resume_event.set()
             self.__threadLimit.acquire()
             queue_item: Optional[SessionQueueItem] = None
-            self.__invoker.services.logger
             while not stop_event.is_set():
                 poll_now_event.clear()
                 try:
