@@ -100,8 +100,10 @@ export const zFieldType = z.enum([
   'integer',
   'IntegerCollection',
   'IntegerPolymorphic',
+  'IPAdapterCollection',
   'IPAdapterField',
   'IPAdapterModelField',
+  'IPAdapterPolymorphic',
   'LatentsCollection',
   'LatentsField',
   'LatentsPolymorphic',
@@ -430,6 +432,24 @@ export type IPAdapterInputFieldValue = z.infer<
   typeof zIPAdapterInputFieldValue
 >;
 
+export const zIPAdapterPolymorphicInputFieldValue = zInputFieldValueBase.extend(
+  {
+    type: z.literal('IPAdapterPolymorphic'),
+    value: z.union([zIPAdapterField, z.array(zIPAdapterField)]).optional(),
+  }
+);
+export type IPAdapterPolymorphicInputFieldValue = z.infer<
+  typeof zT2IAdapterPolymorphicInputFieldValue
+>;
+
+export const zIPAdapterCollectionInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterCollection'),
+  value: z.array(zIPAdapterField).optional(),
+});
+export type IPAdapterCollectionInputFieldValue = z.infer<
+  typeof zIPAdapterCollectionInputFieldValue
+>;
+
 export const zT2IAdapterModel = zModelIdentifier;
 export type T2IAdapterModel = z.infer<typeof zT2IAdapterModel>;
 
@@ -734,6 +754,8 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zIntegerInputFieldValue,
   zIPAdapterInputFieldValue,
   zIPAdapterModelInputFieldValue,
+  zIPAdapterCollectionInputFieldValue,
+  zIPAdapterPolymorphicInputFieldValue,
   zLatentsInputFieldValue,
   zLatentsCollectionInputFieldValue,
   zLatentsPolymorphicInputFieldValue,
@@ -950,6 +972,19 @@ export type IPAdapterInputFieldTemplate = InputFieldTemplateBase & {
   type: 'IPAdapterField';
 };
 
+export type IPAdapterCollectionInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'IPAdapterCollection';
+  item_default?: IPAdapterField;
+};
+
+export type IPAdapterPolymorphicInputFieldTemplate = Omit<
+  IPAdapterInputFieldTemplate,
+  'type'
+> & {
+  type: 'IPAdapterPolymorphic';
+};
+
 export type T2IAdapterInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'T2IAdapterField';
@@ -1088,7 +1123,9 @@ export type InputFieldTemplate =
   | IntegerPolymorphicInputFieldTemplate
   | IntegerInputFieldTemplate
   | IPAdapterInputFieldTemplate
+  | IPAdapterCollectionInputFieldTemplate
   | IPAdapterModelInputFieldTemplate
+  | IPAdapterPolymorphicInputFieldTemplate
   | LatentsInputFieldTemplate
   | LatentsCollectionInputFieldTemplate
   | LatentsPolymorphicInputFieldTemplate

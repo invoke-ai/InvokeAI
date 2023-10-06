@@ -32,6 +32,7 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ControlCollection',
   'ColorCollection',
   'T2IAdapterCollection',
+  'IPAdapterCollection',
 ];
 
 export const POLYMORPHIC_TYPES: FieldType[] = [
@@ -45,6 +46,7 @@ export const POLYMORPHIC_TYPES: FieldType[] = [
   'ControlPolymorphic',
   'ColorPolymorphic',
   'T2IAdapterPolymorphic',
+  'IPAdapterPolymorphic',
 ];
 
 export const MODEL_TYPES: FieldType[] = [
@@ -60,6 +62,7 @@ export const MODEL_TYPES: FieldType[] = [
   'VaeField',
   'ClipField',
   'T2IAdapterModelField',
+  'IPAdapterModelField',
 ];
 
 export const COLLECTION_MAP: FieldTypeMapWithNumber = {
@@ -74,6 +77,7 @@ export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   ControlField: 'ControlCollection',
   ColorField: 'ColorCollection',
   T2IAdapterField: 'T2IAdapterCollection',
+  IPAdapterField: 'IPAdapterCollection',
 };
 export const isCollectionItemType = (
   itemType: string | undefined
@@ -92,6 +96,7 @@ export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
   ControlField: 'ControlPolymorphic',
   ColorField: 'ColorPolymorphic',
   T2IAdapterField: 'T2IAdapterPolymorphic',
+  IPAdapterField: 'IPAdapterPolymorphic',
 };
 
 export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
@@ -105,6 +110,7 @@ export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
   ControlPolymorphic: 'ControlField',
   ColorPolymorphic: 'ColorField',
   T2IAdapterPolymorphic: 'T2IAdapterField',
+  IPAdapterPolymorphic: 'IPAdapterField',
 };
 
 export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
@@ -278,6 +284,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: t('nodes.integerPolymorphicDescription'),
     title: t('nodes.integerPolymorphic'),
   },
+  IPAdapterCollection: {
+    color: 'teal.500',
+    description: t('nodes.ipAdapterCollectionDescription'),
+    title: t('nodes.ipAdapterCollection'),
+  },
   IPAdapterField: {
     color: 'teal.500',
     description: 'IP-Adapter info passed between nodes.',
@@ -287,6 +298,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'teal.500',
     description: 'IP-Adapter model',
     title: 'IP-Adapter Model',
+  },
+  IPAdapterPolymorphic: {
+    color: 'teal.500',
+    description: 'IP-Adapter info passed between nodes.',
+    title: 'IP-Adapter Polymorphic',
   },
   LatentsCollection: {
     color: 'pink.500',

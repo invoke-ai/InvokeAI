@@ -60,8 +60,11 @@ import {
   ImageField,
   LatentsField,
   ConditioningField,
+  IPAdapterField,
   IPAdapterInputFieldTemplate,
   IPAdapterModelInputFieldTemplate,
+  IPAdapterPolymorphicInputFieldTemplate,
+  IPAdapterCollectionInputFieldTemplate,
   T2IAdapterField,
   T2IAdapterInputFieldTemplate,
   T2IAdapterModelInputFieldTemplate,
@@ -709,6 +712,33 @@ const buildIPAdapterInputFieldTemplate = ({
   return template;
 };
 
+const buildIPAdapterPolymorphicInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterPolymorphicInputFieldTemplate => {
+  const template: IPAdapterPolymorphicInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterPolymorphic',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildIPAdapterCollectionInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterCollectionInputFieldTemplate => {
+  const template: IPAdapterCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterCollection',
+    default: schemaObject.default ?? [],
+    item_default: (schemaObject.item_default as IPAdapterField) ?? undefined,
+  };
+
+  return template;
+};
+
 const buildT2IAdapterInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -955,8 +985,10 @@ const TEMPLATE_BUILDER_MAP: {
   integer: buildIntegerInputFieldTemplate,
   IntegerCollection: buildIntegerCollectionInputFieldTemplate,
   IntegerPolymorphic: buildIntegerPolymorphicInputFieldTemplate,
+  IPAdapterCollection: buildIPAdapterCollectionInputFieldTemplate,
   IPAdapterField: buildIPAdapterInputFieldTemplate,
   IPAdapterModelField: buildIPAdapterModelInputFieldTemplate,
+  IPAdapterPolymorphic: buildIPAdapterPolymorphicInputFieldTemplate,
   LatentsCollection: buildLatentsCollectionInputFieldTemplate,
   LatentsField: buildLatentsInputFieldTemplate,
   LatentsPolymorphic: buildLatentsPolymorphicInputFieldTemplate,
