@@ -8,7 +8,7 @@ from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
-from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 from .image_files_base import ImageFileStorageBase
@@ -22,7 +22,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
     __cache_ids: Queue  # TODO: this is an incredibly naive cache
     __cache: Dict[Path, PILImageType]
     __max_cache_size: int
-    __compress_level: int
+    __invoker: Invoker
 
     def __init__(self, output_folder: Union[str, Path]):
         self.__cache = dict()
@@ -31,9 +31,11 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
         self.__output_folder: Path = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__thumbnails_folder = self.__output_folder / "thumbnails"
-        self.__compress_level = InvokeAIAppConfig.get_config().png_compress_level
         # Validate required output folders at launch
         self.__validate_storage_folders()
+
+    def start(self, invoker: Invoker) -> None:
+        self.__invoker = invoker
 
     def get(self, image_name: str) -> PILImageType:
         try:
@@ -78,7 +80,12 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 if original_workflow is not None:
                     pnginfo.add_text("invokeai_workflow", original_workflow)
 
-            image.save(image_path, "PNG", pnginfo=pnginfo, compress_level=self.__compress_level)
+            image.save(
+                image_path,
+                "PNG",
+                pnginfo=pnginfo,
+                compress_level=self.__invoker.services.configuration.png_compress_level,
+            )
 
             thumbnail_name = get_thumbnail_name(image_name)
             thumbnail_path = self.get_path(thumbnail_name, thumbnail=True)
