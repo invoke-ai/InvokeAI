@@ -37,14 +37,20 @@ const predicate: AnyListenerPredicate<RootState> = (
   }
 
   const { id } = action.payload;
-  const ca = selectControlAdapterById(prevState.controlAdapters, id);
-  if (!ca || !isControlNetOrT2IAdapter(ca)) {
+  const prevCA = selectControlAdapterById(prevState.controlAdapters, id);
+  const ca = selectControlAdapterById(state.controlAdapters, id);
+  if (
+    !prevCA ||
+    !isControlNetOrT2IAdapter(prevCA) ||
+    !ca ||
+    !isControlNetOrT2IAdapter(ca)
+  ) {
     return false;
   }
 
   if (controlAdapterAutoConfigToggled.match(action)) {
     // do not process if the user just disabled auto-config
-    if (ca.shouldAutoConfig === true) {
+    if (prevCA.shouldAutoConfig === true) {
       return false;
     }
   }
