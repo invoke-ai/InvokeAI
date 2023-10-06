@@ -87,6 +87,64 @@ export const selectValidT2IAdapters = (controlAdapters: ControlAdaptersState) =>
           (ca.processorType === 'none' && Boolean(ca.controlImage)))
     );
 
+const disableAllIPAdapters = (
+  state: ControlAdaptersState,
+  exclude?: string
+) => {
+  const updates: Update<ControlAdapterConfig>[] = selectAllIPAdapters(state)
+    .filter((ca) => ca.id !== exclude)
+    .map((ca) => ({
+      id: ca.id,
+      changes: { isEnabled: false },
+    }));
+  caAdapter.updateMany(state, updates);
+};
+
+const disableAllControlNets = (
+  state: ControlAdaptersState,
+  exclude?: string
+) => {
+  const updates: Update<ControlAdapterConfig>[] = selectAllControlNets(state)
+    .filter((ca) => ca.id !== exclude)
+    .map((ca) => ({
+      id: ca.id,
+      changes: { isEnabled: false },
+    }));
+  caAdapter.updateMany(state, updates);
+};
+
+const disableAllT2IAdapters = (
+  state: ControlAdaptersState,
+  exclude?: string
+) => {
+  const updates: Update<ControlAdapterConfig>[] = selectAllT2IAdapters(state)
+    .filter((ca) => ca.id !== exclude)
+    .map((ca) => ({
+      id: ca.id,
+      changes: { isEnabled: false },
+    }));
+  caAdapter.updateMany(state, updates);
+};
+
+const disableIncompatibleControlAdapters = (
+  state: ControlAdaptersState,
+  type: ControlAdapterType,
+  exclude?: string
+) => {
+  if (type === 'ip_adapter') {
+    // we can only have a single active IP Adapter, if we are enabling this one, disable others
+    disableAllIPAdapters(state, exclude);
+  }
+  if (type === 'controlnet') {
+    // we cannot do controlnet + t2i adapter, if we are enabled a controlnet, disable all t2is
+    disableAllT2IAdapters(state, exclude);
+  }
+  if (type === 't2i_adapter') {
+    // we cannot do controlnet + t2i adapter, if we are enabled a t2i, disable controlnets
+    disableAllControlNets(state, exclude);
+  }
+};
+
 export const controlAdaptersSlice = createSlice({
   name: 'controlAdapters',
   initialState: initialControlAdapterState,
@@ -102,6 +160,7 @@ export const controlAdaptersSlice = createSlice({
       ) => {
         const { id, type, overrides } = action.payload;
         caAdapter.addOne(state, buildControlAdapter(id, type, overrides));
+        disableIncompatibleControlAdapters(state, type, id);
       },
       prepare: ({
         type,
@@ -117,8 +176,9 @@ export const controlAdaptersSlice = createSlice({
       state,
       action: PayloadAction<ControlAdapterConfig>
     ) => {
-      const config = action.payload;
-      caAdapter.addOne(state, config);
+      caAdapter.addOne(state, action.payload);
+      const { type, id } = action.payload;
+      disableIncompatibleControlAdapters(state, type, id);
     },
     controlAdapterDuplicated: {
       reducer: (
@@ -137,6 +197,8 @@ export const controlAdaptersSlice = createSlice({
           id: newId,
         });
         caAdapter.addOne(state, newControlAdapter);
+        const { type } = newControlAdapter;
+        disableIncompatibleControlAdapters(state, type, newId);
       },
       prepare: (id: string) => {
         return { payload: { id, newId: uuidv4() } };
@@ -156,6 +218,7 @@ export const controlAdaptersSlice = createSlice({
           state,
           buildControlAdapter(id, type, { controlImage })
         );
+        disableIncompatibleControlAdapters(state, type, id);
       },
       prepare: (payload: {
         type: ControlAdapterType;
@@ -173,6 +236,12 @@ export const controlAdaptersSlice = createSlice({
     ) => {
       const { id, isEnabled } = action.payload;
       caAdapter.updateOne(state, { id, changes: { isEnabled } });
+      if (isEnabled) {
+        // we are enabling a control adapter. due to limitations in the current system, we may need to disable other adapters
+        // TODO: disable when multiple IP adapters are supported
+        const ca = selectControlAdapterById(state, id);
+        ca && disableIncompatibleControlAdapters(state, ca.type, id);
+      }
     },
     controlAdapterImageChanged: (
       state,
@@ -182,8 +251,8 @@ export const controlAdaptersSlice = createSlice({
       }>
     ) => {
       const { id, controlImage } = action.payload;
-      const cn = selectControlAdapterById(state, id);
-      if (!cn) {
+      const ca = selectControlAdapterById(state, id);
+      if (!ca) {
         return;
       }
 
@@ -194,8 +263,8 @@ export const controlAdaptersSlice = createSlice({
 
       if (
         controlImage !== null &&
-        isControlNetOrT2IAdapter(cn) &&
-        cn.processorType !== 'none'
+        isControlNetOrT2IAdapter(ca) &&
+        ca.processorType !== 'none'
       ) {
         state.pendingControlImages.push(id);
       }

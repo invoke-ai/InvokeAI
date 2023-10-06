@@ -106,8 +106,6 @@ const ParamControlNetModel = ({ id }: ParamControlNetModelProps) => {
     [dispatch, id]
   );
 
-  console.log(model, selectedModel);
-
   return (
     <IAIMantineSearchableSelect
       itemComponent={IAIMantineSelectItemWithTooltip}

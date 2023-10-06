@@ -6,20 +6,18 @@ import {
   controlAdapterDuplicated,
   controlAdapterIsEnabledChanged,
   controlAdapterRemoved,
-  selectControlAdapterById,
 } from '../store/controlAdaptersSlice';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
 
 import { ChevronUpIcon } from '@chakra-ui/icons';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useTranslation } from 'react-i18next';
-import { isControlNetOrT2IAdapter } from '../store/types';
+import { useToggle } from 'react-use';
+import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
+import { useControlAdapterType } from '../hooks/useControlAdapterType';
 import ControlNetImagePreview from './ControlNetImagePreview';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
 import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
@@ -28,8 +26,6 @@ import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ParamControlNetResizeMode from './parameters/ParamControlNetResizeMode';
-import { useToggle } from 'react-use';
-import { useControlAdapterType } from '../hooks/useControlAdapterType';
 
 const ControlNet = (props: { id: string }) => {
   const { id } = props;
@@ -38,33 +34,7 @@ const ControlNet = (props: { id: string }) => {
   const { t } = useTranslation();
 
   const activeTabName = useAppSelector(activeTabNameSelector);
-
-  const selector = createSelector(
-    stateSelector,
-    ({ controlAdapters }) => {
-      const cn = selectControlAdapterById(controlAdapters, id);
-
-      if (!cn) {
-        return {
-          isEnabled: false,
-          shouldAutoConfig: false,
-        };
-      }
-
-      const isEnabled = cn.isEnabled;
-      const shouldAutoConfig = isControlNetOrT2IAdapter(cn)
-        ? cn.shouldAutoConfig
-        : false;
-
-      return {
-        isEnabled,
-        shouldAutoConfig,
-      };
-    },
-    defaultSelectorOptions
-  );
-
-  const { isEnabled, shouldAutoConfig } = useAppSelector(selector);
+  const isEnabled = useControlAdapterIsEnabled(id);
   const [isExpanded, toggleIsExpanded] = useToggle(false);
 
   const handleDelete = useCallback(() => {
@@ -116,8 +86,6 @@ const ControlNet = (props: { id: string }) => {
           sx={{
             w: 'full',
             minW: 0,
-            // opacity: isEnabled ? 1 : 0.5,
-            // pointerEvents: isEnabled ? 'auto' : 'none',
             transitionProperty: 'common',
             transitionDuration: '0.1s',
           }}
@@ -176,23 +144,6 @@ const ControlNet = (props: { id: string }) => {
             />
           }
         />
-
-        {!shouldAutoConfig && (
-          <Box
-            sx={{
-              position: 'absolute',
-              w: 1.5,
-              h: 1.5,
-              borderRadius: 'full',
-              top: 4,
-              insetInlineEnd: 4,
-              bg: 'accent.700',
-              _dark: {
-                bg: 'accent.400',
-              },
-            }}
-          />
-        )}
       </Flex>
 
       <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3 }}>

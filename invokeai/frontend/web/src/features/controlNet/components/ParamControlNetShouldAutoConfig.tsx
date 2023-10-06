@@ -5,6 +5,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
 import { useControlAdapterShouldAutoConfig } from '../hooks/useControlAdapterShouldAutoConfig';
+import { isNil } from 'lodash-es';
 
 type Props = {
   id: string;
@@ -19,6 +20,10 @@ const ParamControlNetShouldAutoConfig = ({ id }: Props) => {
   const handleShouldAutoConfigChanged = useCallback(() => {
     dispatch(controlAdapterAutoConfigToggled({ id }));
   }, [id, dispatch]);
+
+  if (isNil(shouldAutoConfig)) {
+    return null;
+  }
 
   return (
     <IAISwitch

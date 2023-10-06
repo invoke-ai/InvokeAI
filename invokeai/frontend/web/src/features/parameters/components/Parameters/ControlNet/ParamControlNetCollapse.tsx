@@ -13,6 +13,7 @@ import {
   selectAllControlNets,
   selectAllIPAdapters,
   selectAllT2IAdapters,
+  selectControlAdapterIds,
 } from 'features/controlNet/store/controlAdaptersSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
@@ -23,27 +24,23 @@ const selector = createSelector(
   ({ controlAdapters }) => {
     const activeLabel: string[] = [];
 
-    const ipAdapters = selectAllIPAdapters(controlAdapters);
-    const ipAdapterCount = ipAdapters.length;
+    const ipAdapterCount = selectAllIPAdapters(controlAdapters).length;
     if (ipAdapterCount > 0) {
       activeLabel.push(`${ipAdapterCount} IP`);
     }
 
-    const controlNets = selectAllControlNets(controlAdapters);
-    const controlNetCount = controlNets.length;
+    const controlNetCount = selectAllControlNets(controlAdapters).length;
     if (controlNetCount > 0) {
       activeLabel.push(`${controlNetCount} ControlNet`);
     }
 
-    const t2iAdapters = selectAllT2IAdapters(controlAdapters);
-    const t2iAdapterCount = t2iAdapters.length;
+    const t2iAdapterCount = selectAllT2IAdapters(controlAdapters).length;
     if (t2iAdapterCount > 0) {
       activeLabel.push(`${t2iAdapterCount} T2I`);
     }
 
-    const controlAdapterIds = [ipAdapters, controlNets, t2iAdapters]
-      .flat()
-      .map((ca) => ca.id);
+    const controlAdapterIds =
+      selectControlAdapterIds(controlAdapters).map(String);
 
     return {
       controlAdapterIds,
@@ -72,6 +69,7 @@ const ParamControlNetCollapse = () => {
             leftIcon={<FaPlus />}
             onClick={addControlNet}
             data-testid="add controlnet"
+            flexGrow={1}
           >
             ControlNet
           </IAIButton>
@@ -79,6 +77,7 @@ const ParamControlNetCollapse = () => {
             leftIcon={<FaPlus />}
             onClick={addIPAdapter}
             data-testid="add ip adapter"
+            flexGrow={1}
           >
             IP Adapter
           </IAIButton>
@@ -86,10 +85,12 @@ const ParamControlNetCollapse = () => {
             leftIcon={<FaPlus />}
             onClick={addT2IAdapter}
             data-testid="add t2i adapter"
+            flexGrow={1}
           >
             T2I Adapter
           </IAIButton>
         </ButtonGroup>
+        <Divider />
         {controlAdapterIds.map((id, i) => (
           <Fragment key={id}>
             {i > 0 && <Divider />}
