@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
-from invokeai.backend.util.test_utils import install_and_load_model, slow
+from invokeai.backend.util.test_utils import install_and_load_model
 
 
 def build_dummy_sd15_unet_input(torch_device):
@@ -38,7 +38,7 @@ def build_dummy_sd15_unet_input(torch_device):
         },
     ],
 )
-@slow
+@pytest.mark.slow
 def test_ip_adapter_unet_patch(model_params, model_installer, torch_device):
     """Smoke test that IP-Adapter weights can be loaded and used to patch a UNet."""
     ip_adapter_info = install_and_load_model(

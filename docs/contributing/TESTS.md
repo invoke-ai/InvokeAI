@@ -3,7 +3,7 @@
 We use `pytest` to run the backend python tests. (See [pyproject.toml](/pyproject.toml) for the default `pytest` options.)
 
 ## Fast vs. Slow
-All tests are categorized as either 'fast' (no test annotation) or 'slow' (annotated with the `@slow` decorator).
+All tests are categorized as either 'fast' (no test annotation) or 'slow' (annotated with the `@pytest.mark.slow` decorator).
 
 'Fast' tests are run to validate every PR, and are fast enough that they can be run routinely during development.
 
@@ -47,12 +47,13 @@ There are a few things to keep in mind when adding tests that depend on models.
 
 There are several utilities to help with model setup for tests. Here is a sample test that depends on a model:
 ```python
+import pytest
 import torch
 
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType
-from invokeai.backend.util.test_utils import install_and_load_model, slow
+from invokeai.backend.util.test_utils import install_and_load_model
 
-@slow
+@pytest.mark.slow
 def test_model(model_installer, torch_device):
     model_info = install_and_load_model(
         model_installer=model_installer,

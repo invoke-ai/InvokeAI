@@ -11,16 +11,6 @@ from invokeai.backend.model_management.model_manager import ModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelNotFoundException, ModelType, SubModelType
 
 
-def slow(test_case):
-    """Decorator for slow tests.
-
-    Tests should be marked as slow if they download a model, run model inference, or do anything else slow. To judge
-    whether a test is 'slow', consider how it would perform in a CPU-only environment with a low-bandwidth internet
-    connection.
-    """
-    return pytest.mark.slow(test_case)
-
-
 @pytest.fixture(scope="session")
 def torch_device():
     return "cuda" if torch.cuda.is_available() else "cpu"
