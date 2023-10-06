@@ -23,7 +23,7 @@ export default function ParamHrf() {
   );
 
   return (
-    <IAIInformationalPopover feature="hrf" placement="top">
+    <IAIInformationalPopover feature="hrf" placement="bottom">
       <IAISlider
         label="High Resolution Scale"
         aria-label="High Resolution Scale"
