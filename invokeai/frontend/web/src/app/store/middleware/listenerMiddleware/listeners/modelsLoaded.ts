@@ -4,7 +4,7 @@ import {
   selectAllControlNets,
   selectAllIPAdapters,
   selectAllT2IAdapters,
-} from 'features/controlNet/store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import {
   modelChanged,

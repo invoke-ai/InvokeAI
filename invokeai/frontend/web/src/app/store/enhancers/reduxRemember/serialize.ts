@@ -1,5 +1,5 @@
 import { canvasPersistDenylist } from 'features/canvas/store/canvasPersistDenylist';
-import { controlAdaptersPersistDenylist } from 'features/controlNet/store/controlAdaptersPersistDenylist';
+import { controlAdaptersPersistDenylist } from 'features/controlAdapters/store/controlAdaptersPersistDenylist';
 import { dynamicPromptsPersistDenylist } from 'features/dynamicPrompts/store/dynamicPromptsPersistDenylist';
 import { galleryPersistDenylist } from 'features/gallery/store/galleryPersistDenylist';
 import { nodesPersistDenylist } from 'features/nodes/store/nodesPersistDenylist';

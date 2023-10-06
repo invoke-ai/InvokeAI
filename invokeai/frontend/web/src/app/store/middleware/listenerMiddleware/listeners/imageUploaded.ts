@@ -4,7 +4,7 @@ import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
-} from 'features/controlNet/store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';

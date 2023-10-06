@@ -3,7 +3,7 @@ import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterRemoved,
   selectControlAdapterAll,
-} from 'features/controlNet/store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {

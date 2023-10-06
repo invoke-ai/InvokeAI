@@ -5,7 +5,7 @@ import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
-} from 'features/controlNet/store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,

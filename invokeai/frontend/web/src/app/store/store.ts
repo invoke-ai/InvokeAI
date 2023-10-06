@@ -7,7 +7,7 @@ import {
 } from '@reduxjs/toolkit';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import changeBoardModalReducer from 'features/changeBoardModal/store/slice';
-import controlAdaptersReducer from 'features/controlNet/store/controlAdaptersSlice';
+import controlAdaptersReducer from 'features/controlAdapters/store/controlAdaptersSlice';
 import deleteImageModalReducer from 'features/deleteImageModal/store/slice';
 import dynamicPromptsReducer from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';

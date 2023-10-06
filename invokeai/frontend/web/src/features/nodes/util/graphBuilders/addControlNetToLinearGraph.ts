@@ -1,5 +1,5 @@
 import { RootState } from 'app/store/store';
-import { selectValidControlNets } from 'features/controlNet/store/controlAdaptersSlice';
+import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { omit } from 'lodash-es';
 import {
   CollectInvocation,

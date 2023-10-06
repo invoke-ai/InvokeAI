@@ -1,5 +1,5 @@
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
-import { initialControlAdapterState } from 'features/controlNet/store/controlAdaptersSlice';
+import { initialControlAdapterState } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { initialDynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
 import { initialNodesState } from 'features/nodes/store/nodesSlice';

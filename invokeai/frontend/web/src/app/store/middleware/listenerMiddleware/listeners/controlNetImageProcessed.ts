@@ -5,7 +5,7 @@ import {
   controlAdapterImageChanged,
   selectControlAdapterById,
   controlAdapterProcessedImageChanged,
-} from 'features/controlNet/store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { SAVE_IMAGE } from 'features/nodes/util/graphBuilders/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
@@ -15,8 +15,8 @@ import { isImageOutput } from 'services/api/guards';
 import { Graph, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
-import { controlAdapterImageProcessed } from 'features/controlNet/store/actions';
-import { isControlNetOrT2IAdapter } from 'features/controlNet/store/types';
+import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 
 export const addControlNetImageProcessedListener = () => {
   startAppListening({

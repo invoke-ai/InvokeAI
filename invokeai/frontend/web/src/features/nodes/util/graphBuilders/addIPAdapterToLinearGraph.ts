@@ -9,7 +9,7 @@ import {
   IP_ADAPTER,
   METADATA_ACCUMULATOR,
 } from './constants';
-import { selectValidIPAdapters } from 'features/controlNet/store/controlAdaptersSlice';
+import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 
 export const addIPAdapterToLinearGraph = (
   state: RootState,

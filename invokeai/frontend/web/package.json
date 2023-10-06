@@ -157,6 +157,7 @@
     "prettier": "^3.0.2",
     "rollup-plugin-visualizer": "^5.9.2",
     "ts-toolbelt": "^9.6.0",
+    "typescript": "^5.2.2",
     "vite": "^4.4.9",
     "vite-plugin-css-injected-by-js": "^3.3.0",
     "vite-plugin-dts": "^3.5.2",

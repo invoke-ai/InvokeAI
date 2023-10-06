@@ -4,7 +4,7 @@ import {
   controlAdapterImageChanged,
   controlAdapterProcessedImageChanged,
   selectControlAdapterAll,
-} from 'features/controlNet/store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -17,7 +17,7 @@ import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
 import { startAppListening } from '..';
-import { isControlNetOrT2IAdapter } from 'features/controlNet/store/types';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 
 export const addRequestedSingleImageDeletionListener = () => {
   startAppListening({

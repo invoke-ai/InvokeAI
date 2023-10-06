@@ -1,6 +1,6 @@
 import { Heading, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { controlAdaptersReset } from 'features/controlNet/store/controlAdaptersSlice';
+import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { useCallback, useEffect } from 'react';
 import IAIButton from '../../../../common/components/IAIButton';
 import {
