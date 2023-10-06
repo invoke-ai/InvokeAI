@@ -195,6 +195,7 @@ export const controlAdaptersSlice = createSlice({
         }
         const newControlAdapter = merge(cloneDeep(controlAdapter), {
           id: newId,
+          isEnabled: true,
         });
         caAdapter.addOne(state, newControlAdapter);
         const { type } = newControlAdapter;
