@@ -346,12 +346,10 @@ class InvokeAIDiffuserComponent:
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
             cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": torch.cat(
-                    [
-                        conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds,
-                        conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds,
-                    ]
-                )
+                "ip_adapter_image_prompt_embeds": [
+                    torch.cat([ipa_conditioning.uncond_image_prompt_embeds, ipa_conditioning.cond_image_prompt_embeds])
+                    for ipa_conditioning in conditioning_data.ip_adapter_conditioning
+                ]
             }
 
         added_cond_kwargs = None
@@ -418,7 +416,10 @@ class InvokeAIDiffuserComponent:
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
             cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds
+                "ip_adapter_image_prompt_embeds": [
+                    ipa_conditioning.uncond_image_prompt_embeds
+                    for ipa_conditioning in conditioning_data.ip_adapter_conditioning
+                ]
             }
 
         added_cond_kwargs = None
@@ -444,7 +445,10 @@ class InvokeAIDiffuserComponent:
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
             cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds
+                "ip_adapter_image_prompt_embeds": [
+                    ipa_conditioning.cond_image_prompt_embeds
+                    for ipa_conditioning in conditioning_data.ip_adapter_conditioning
+                ]
             }
 
         added_cond_kwargs = None
