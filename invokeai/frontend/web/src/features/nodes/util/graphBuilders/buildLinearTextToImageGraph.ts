@@ -284,7 +284,10 @@ export const buildLinearTextToImageGraph = (
   // add IP Adapter
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
-  addHrfToGraph(state, graph, isUsingOnnxModel);
+  // High resolution fix
+  if (state.generation.hrfToggled) {
+    addHrfToGraph(state, graph, isUsingOnnxModel);
+  }
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

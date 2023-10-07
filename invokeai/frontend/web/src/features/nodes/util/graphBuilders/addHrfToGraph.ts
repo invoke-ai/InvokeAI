@@ -76,8 +76,7 @@ export const addHrfToGraph = (
         cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
         scheduler: originalDenoiseLatentsNode?.scheduler,
         steps: originalDenoiseLatentsNode?.steps,
-        // TODO: Make this customizable.
-        denoising_start: 0.5,
+        denoising_start: state.generation.hrfStrength,
         denoising_end: 1,
       };
 
