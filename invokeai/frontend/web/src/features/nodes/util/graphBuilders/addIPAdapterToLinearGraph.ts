@@ -17,7 +17,9 @@ export const addIPAdapterToLinearGraph = (
   graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
-  const validIPAdapters = selectValidIPAdapters(state.controlAdapters);
+  const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(
+    (ca) => ca.model?.base_model === state.generation.model?.base_model
+  );
 
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation
