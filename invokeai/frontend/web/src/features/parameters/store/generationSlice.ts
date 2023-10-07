@@ -29,6 +29,7 @@ import {
 export interface GenerationState {
   hrfScale: HrfScaleParam;
   hrfToggled: boolean;
+  hrfStrength: StrengthParam;
   cfgScale: CfgScaleParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
@@ -72,6 +73,8 @@ export interface GenerationState {
 
 export const initialGenerationState: GenerationState = {
   hrfScale: 1.0,
+  hrfStrength: 0.75,
+  hrfToggled: true,
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
