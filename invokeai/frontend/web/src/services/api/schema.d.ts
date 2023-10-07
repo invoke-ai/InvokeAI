@@ -5840,6 +5840,16 @@ export type components = {
        */
       vae?: components["schemas"]["VAEModelField"];
       /**
+       * High Resolution Scale
+       * @description The high resolution fix height and width multiplier.
+       */
+      hrf_scale?: number;
+      /**
+       * High Resolution Strength
+       * @description The high resolution fix img2img strength used in the upscale pass.
+       */
+      hrf_strength?: number;
+      /**
        * Positive Style Prompt
        * @description The positive style prompt parameter
        */

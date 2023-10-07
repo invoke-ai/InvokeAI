@@ -2,6 +2,7 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
+  LATENTS_TO_IMAGE_HRF,
   METADATA_ACCUMULATOR,
   NSFW_CHECKER,
   SAVE_IMAGE,
@@ -78,6 +79,14 @@ export const addSaveImageNode = (
     graph.edges.push({
       source: {
         node_id: CANVAS_OUTPUT,
+        field: 'image',
+      },
+      destination,
+    });
+  } else if (LATENTS_TO_IMAGE_HRF in graph.nodes) {
+    graph.edges.push({
+      source: {
+        node_id: LATENTS_TO_IMAGE_HRF,
         field: 'image',
       },
       destination,

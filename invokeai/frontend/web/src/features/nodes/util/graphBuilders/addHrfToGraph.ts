@@ -3,7 +3,7 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
   RescaleLatentsInvocation,
-  ONNXTextToLatentsInvocation,
+  MetadataAccumulatorInvocation,
   NoiseInvocation,
   LatentsToImageInvocation,
 } from 'services/api/types';
@@ -50,6 +50,17 @@ export const addHrfToGraph = (
     ? originalNoiseNode.width * hrfScale
     : undefined;
 
+  // Add hrf information to the metadata accumulator.
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
+  if (metadataAccumulator) {
+    metadataAccumulator.hrf_scale = state.generation.hrfScale;
+    metadataAccumulator.hrf_strength = state.generation.hrfStrength;
+    metadataAccumulator.height = scaledHeight;
+    metadataAccumulator.width = scaledWidth;
+  }
+
   // Define new nodes.
   // Denoise latents node to be run on upscaled latents.
   // Define new nodes.
@@ -89,7 +100,7 @@ export const addHrfToGraph = (
     is_intermediate: originalLatentsToImageNode.is_intermediate,
   };
 
-  // Add new noes to graph.
+  // Add new nodes to graph.
   graph.nodes[LATENTS_TO_IMAGE_HRF] =
     latentsToImageHrfNode as LatentsToImageInvocation;
   graph.nodes[DENOISE_LATENTS_HRF] =
