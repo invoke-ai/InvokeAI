@@ -87,18 +87,19 @@ export const selectValidT2IAdapters = (controlAdapters: ControlAdaptersState) =>
           (ca.processorType === 'none' && Boolean(ca.controlImage)))
     );
 
-const disableAllIPAdapters = (
-  state: ControlAdaptersState,
-  exclude?: string
-) => {
-  const updates: Update<ControlAdapterConfig>[] = selectAllIPAdapters(state)
-    .filter((ca) => ca.id !== exclude)
-    .map((ca) => ({
-      id: ca.id,
-      changes: { isEnabled: false },
-    }));
-  caAdapter.updateMany(state, updates);
-};
+// TODO: I think we can safely remove this?
+// const disableAllIPAdapters = (
+//   state: ControlAdaptersState,
+//   exclude?: string
+// ) => {
+//   const updates: Update<ControlAdapterConfig>[] = selectAllIPAdapters(state)
+//     .filter((ca) => ca.id !== exclude)
+//     .map((ca) => ({
+//       id: ca.id,
+//       changes: { isEnabled: false },
+//     }));
+//   caAdapter.updateMany(state, updates);
+// };
 
 const disableAllControlNets = (
   state: ControlAdaptersState,
@@ -131,10 +132,6 @@ const disableIncompatibleControlAdapters = (
   type: ControlAdapterType,
   exclude?: string
 ) => {
-  if (type === 'ip_adapter') {
-    // we can only have a single active IP Adapter, if we are enabling this one, disable others
-    disableAllIPAdapters(state, exclude);
-  }
   if (type === 'controlnet') {
     // we cannot do controlnet + t2i adapter, if we are enabled a controlnet, disable all t2is
     disableAllT2IAdapters(state, exclude);
