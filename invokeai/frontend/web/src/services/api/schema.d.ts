@@ -5840,7 +5840,7 @@ export type components = {
        */
       vae?: components["schemas"]["VAEModelField"];
       /**
-       * High Resolution Scale
+       * High Resolution Fix Scale
        * @description The high resolution fix height and width multiplier.
        */
       hrf_scale?: number;

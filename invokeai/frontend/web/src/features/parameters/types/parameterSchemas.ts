@@ -95,7 +95,7 @@ export const isValidSteps = (val: unknown): val is StepsParam =>
 /**
  * Zod schema for HRF scale parameter
  */
-export const zHrfScale = z.number().min(1);
+export const zHrfScale = z.number().int().min(1);
 /**
  * Type alias for CFG scale parameter, inferred from its zod schema
  */

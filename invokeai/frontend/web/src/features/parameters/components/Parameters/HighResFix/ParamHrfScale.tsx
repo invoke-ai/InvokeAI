@@ -23,11 +23,11 @@ export default function ParamHrfScale() {
 
   return (
     <IAISlider
-      label="High Resolution Scale"
-      aria-label="High Resolution Scale"
+      label="High Resolution Fix Scale"
+      aria-label="High Fix Resolution Scale"
       min={1}
       max={5}
-      step={0.1}
+      step={1}
       value={hrfScale}
       onChange={handleHrfScaleChange}
       withSliderMarks
