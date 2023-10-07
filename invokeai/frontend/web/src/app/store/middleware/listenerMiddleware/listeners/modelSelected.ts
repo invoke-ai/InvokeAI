@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
-  controlAdapterModelCleared,
+  controlAdapterIsEnabledChanged,
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
@@ -62,7 +62,9 @@ export const addModelSelectedListener = () => {
         // handle incompatible controlnets
         selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
           if (ca.model?.base_model !== base_model) {
-            dispatch(controlAdapterModelCleared({ id: ca.id }));
+            dispatch(
+              controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false })
+            );
             modelsCleared += 1;
           }
         });
@@ -71,11 +73,14 @@ export const addModelSelectedListener = () => {
           dispatch(
             addToast(
               makeToast({
-                title: `${t(
-                  'toast.baseModelChangedCleared'
-                )} ${modelsCleared} ${t('toast.incompatibleSubmodel')}${
-                  modelsCleared === 1 ? '' : 's'
-                }`,
+                title: t(
+                  modelsCleared === 1
+                    ? 'toast.baseModelChangedCleared_one'
+                    : 'toast.baseModelChangedCleared_many',
+                  {
+                    number: modelsCleared,
+                  }
+                ),
                 status: 'warning',
               })
             )

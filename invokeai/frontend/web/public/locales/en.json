@@ -1106,7 +1106,8 @@
     },
     "toast": {
         "addedToBoard": "Added to board",
-        "baseModelChangedCleared": "Base model changed, cleared",
+        "baseModelChangedCleared_one": "Base model changed, cleared or disabled {{number}} incompatible submodel",
+        "baseModelChangedCleared_many": "$t(toast.baseModelChangedCleared_one)s",
         "canceled": "Processing Canceled",
         "canvasCopiedClipboard": "Canvas Copied to Clipboard",
         "canvasDownloaded": "Canvas Downloaded",
@@ -1126,7 +1127,6 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
-        "incompatibleSubmodel": "incompatible submodel",
         "initialImageNotSet": "Initial Image Not Set",
         "initialImageNotSetDesc": "Could not load initial image",
         "initialImageSet": "Initial Image Set",
