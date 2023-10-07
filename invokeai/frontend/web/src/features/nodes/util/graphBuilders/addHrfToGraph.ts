@@ -100,7 +100,7 @@ export const addHrfToGraph = (
     cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
     scheduler: originalDenoiseLatentsNode?.scheduler,
     steps: originalDenoiseLatentsNode?.steps,
-    denoising_start: state.generation.hrfStrength,
+    denoising_start: 1 - state.generation.hrfStrength,
     denoising_end: 1,
   };
 
