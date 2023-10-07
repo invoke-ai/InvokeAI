@@ -21,8 +21,8 @@ from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel,
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management import ModelManager
-from invokeai.backend.model_management.model_probe import BaseModelType, ModelProbe, ModelProbeInfo, ModelType
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
+from invokeai.backend.model_manager import BaseModelType, ModelProbe, ModelProbeInfo, ModelType
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -43,7 +43,7 @@ class MigrateTo3(object):
         self,
         from_root: Path,
         to_models: Path,
-        model_manager: ModelManager,
+        model_manager: ModelRecordServiceBase,
         src_paths: ModelPaths,
     ):
         self.root_directory = from_root
@@ -501,7 +501,7 @@ def get_legacy_embeddings(root: Path) -> ModelPaths:
         return _parse_legacy_yamlfile(root, path)
 
 
-def do_migrate(src_directory: Path, dest_directory: Path):
+def do_migrate(config: InvokeAIAppConfig, src_directory: Path, dest_directory: Path):
     """
     Migrate models from src to dest InvokeAI root directories
     """
@@ -520,7 +520,7 @@ def do_migrate(src_directory: Path, dest_directory: Path):
             shutil.copy(dest_directory / "configs" / "models.yaml", config_file)
         except Exception:
             MigrateTo3.initialize_yaml(config_file)
-        mgr = ModelManager(config_file)  # important to initialize BEFORE moving the models directory
+        mgr = ModelRecordServiceBase.get_impl(config)
         (dest_directory / "models").replace(dest_models)
     else:
         MigrateTo3.initialize_yaml(config_file)
@@ -588,7 +588,7 @@ script, which will perform a full upgrade in place.""",
 
         initialize_rootdir(dest_root, True)
 
-    do_migrate(src_root, dest_root)
+    do_migrate(config, src_root, dest_root)
 
 
 if __name__ == "__main__":

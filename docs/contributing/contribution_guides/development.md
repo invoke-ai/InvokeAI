@@ -12,7 +12,7 @@ To get started, take a look at our [new contributors checklist](newContributorCh
 Once you're setup, for more information, you can review the documentation specific to your area of interest:
 
 * #### [InvokeAI Architecure](../ARCHITECTURE.md)
-* #### [Frontend Documentation](development_guides/contributingToFrontend.md)
+* #### [Frontend Documentation](./contributingToFrontend.md)
 * #### [Node Documentation](../INVOCATIONS.md)
 * #### [Local Development](../LOCAL_DEVELOPMENT.md)
 

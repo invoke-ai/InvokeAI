@@ -147,6 +147,12 @@ class ModelInstallBase(ABC):
         """Return the storage backend used by the installer."""
         pass
 
+    @property
+    @abstractmethod
+    def config(self) -> InvokeAIAppConfig:
+        """Return the app_config used by the installer."""
+        pass
+
     @abstractmethod
     def register_path(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]]) -> str:
         """
@@ -396,6 +402,11 @@ class ModelInstall(ModelInstallBase):
     def store(self) -> ModelConfigStore:
         """Return the storage backend used by the installer."""
         return self._store
+
+    @property
+    def config(self) -> InvokeAIAppConfig:
+        """Return the app_config used by the installer."""
+        return self._app_config
 
     def register_path(
         self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None

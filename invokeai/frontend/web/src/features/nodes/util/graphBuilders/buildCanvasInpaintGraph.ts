@@ -13,7 +13,9 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
+import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -40,7 +42,6 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
-import { addSaveImageNode } from './addSaveImageNode';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -653,7 +654,7 @@ export const buildCanvasInpaintGraph = (
 
   // Add IP Adapter
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-
+  addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!

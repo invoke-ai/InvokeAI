@@ -35,11 +35,8 @@ const ImageUsageMessage = (props: Props) => {
         {imageUsage.isCanvasImage && (
           <ListItem>{t('common.unifiedCanvas')}</ListItem>
         )}
-        {imageUsage.isControlNetImage && (
+        {imageUsage.isControlImage && (
           <ListItem>{t('common.controlNet')}</ListItem>
-        )}
-        {imageUsage.isIPAdapterImage && (
-          <ListItem>{t('common.ipAdapter')}</ListItem>
         )}
         {imageUsage.isNodesImage && (
           <ListItem>{t('common.nodeEditor')}</ListItem>

@@ -23,6 +23,7 @@ from .lora import LoRAModel
 from .sdxl import StableDiffusionXLModel
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .stable_diffusion_onnx import ONNXStableDiffusion1Model, ONNXStableDiffusion2Model
+from .t2i_adapter import T2IAdapterModel
 from .textual_inversion import TextualInversionModel
 from .vae import VaeModel
 
@@ -36,6 +37,7 @@ MODEL_CLASSES = {
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.IPAdapter: IPAdapterModel,
         ModelType.CLIPVision: CLIPVisionModel,
+        ModelType.T2IAdapter: T2IAdapterModel,
     },
     BaseModelType.StableDiffusion2: {
         ModelType.ONNX: ONNXStableDiffusion2Model,
@@ -46,6 +48,7 @@ MODEL_CLASSES = {
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.IPAdapter: IPAdapterModel,
         ModelType.CLIPVision: CLIPVisionModel,
+        ModelType.T2IAdapter: T2IAdapterModel,
     },
     BaseModelType.StableDiffusionXL: {
         ModelType.Main: StableDiffusionXLModel,
@@ -57,6 +60,7 @@ MODEL_CLASSES = {
         ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.IPAdapter: IPAdapterModel,
         ModelType.CLIPVision: CLIPVisionModel,
+        ModelType.T2IAdapter: T2IAdapterModel,
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelType.Main: StableDiffusionXLModel,
@@ -68,6 +72,7 @@ MODEL_CLASSES = {
         ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.IPAdapter: IPAdapterModel,
         ModelType.CLIPVision: CLIPVisionModel,
+        ModelType.T2IAdapter: T2IAdapterModel,
     },
     BaseModelType.Any: {
         ModelType.CLIPVision: CLIPVisionModel,
@@ -79,6 +84,7 @@ MODEL_CLASSES = {
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.IPAdapter: IPAdapterModel,
+        ModelType.T2IAdapter: T2IAdapterModel,
     },
     # BaseModelType.Kandinsky2_1: {
     #    ModelType.Main: Kandinsky2_1Model,

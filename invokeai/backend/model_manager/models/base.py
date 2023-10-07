@@ -37,9 +37,13 @@ from ..config import (  # noqa F401
 class ModelNotFoundException(Exception):
     """Exception for when a model is not found on the expected path."""
 
+    pass
+
 
 class InvalidModelException(Exception):
     """Exception for when a model is corrupted in some way; for example missing files."""
+
+    pass
 
 
 class EmptyConfigLoader(ConfigMixin):

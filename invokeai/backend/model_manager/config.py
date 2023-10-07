@@ -59,6 +59,7 @@ class ModelType(str, Enum):
     TextualInversion = "embedding"
     IPAdapter = "ip_adapter"
     CLIPVision = "clip_vision"
+    T2IAdapter = "t2i_adapter"
 
 
 class SubModelType(str, Enum):

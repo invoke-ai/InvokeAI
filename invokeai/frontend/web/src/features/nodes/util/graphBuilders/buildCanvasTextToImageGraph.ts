@@ -11,6 +11,7 @@ import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
+import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -309,6 +310,7 @@ export const buildCanvasTextToImageGraph = (
     controlnets: [], // populated in addControlNetToLinearGraph
     loras: [], // populated in addLoRAsToGraph
     ipAdapters: [], // populated in addIPAdapterToLinearGraph
+    t2iAdapters: [],
     clip_skip: clipSkip,
   };
 
@@ -340,6 +342,7 @@ export const buildCanvasTextToImageGraph = (
 
   // Add IP Adapter
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+  addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

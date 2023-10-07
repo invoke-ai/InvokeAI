@@ -28,10 +28,10 @@ export type InitialImageDropData = BaseDropData & {
   actionType: 'SET_INITIAL_IMAGE';
 };
 
-export type ControlNetDropData = BaseDropData & {
-  actionType: 'SET_CONTROLNET_IMAGE';
+export type ControlAdapterDropData = BaseDropData & {
+  actionType: 'SET_CONTROL_ADAPTER_IMAGE';
   context: {
-    controlNetId: string;
+    id: string;
   };
 };
 
@@ -76,8 +76,7 @@ export type AddFieldToLinearViewDropData = BaseDropData & {
 export type TypesafeDroppableData =
   | CurrentImageDropData
   | InitialImageDropData
-  | ControlNetDropData
-  | IPAdapterImageDropData
+  | ControlAdapterDropData
   | CanvasInitialImageDropData
   | NodesImageDropData
   | AddToBatchDropData

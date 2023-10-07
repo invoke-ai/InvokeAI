@@ -1,5 +1,4 @@
 import { createAction } from '@reduxjs/toolkit';
-import { ControlNetConfig } from 'features/controlNet/store/controlNetSlice';
 import { ImageDTO } from 'services/api/types';
 
 export const canvasSavedToGallery = createAction('canvas/canvasSavedToGallery');
@@ -22,10 +21,10 @@ export const stagingAreaImageSaved = createAction<{ imageDTO: ImageDTO }>(
   'canvas/stagingAreaImageSaved'
 );
 
-export const canvasMaskToControlNet = createAction<{
-  controlNet: ControlNetConfig;
-}>('canvas/canvasMaskToControlNet');
+export const canvasMaskToControlAdapter = createAction<{ id: string }>(
+  'canvas/canvasMaskToControlAdapter'
+);
 
-export const canvasImageToControlNet = createAction<{
-  controlNet: ControlNetConfig;
-}>('canvas/canvasImageToControlNet');
+export const canvasImageToControlAdapter = createAction<{ id: string }>(
+  'canvas/canvasImageToControlAdapter'
+);
