@@ -284,10 +284,14 @@ export const buildLinearTextToImageGraph = (
   // add IP Adapter
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
-  // High resolution fix
-  if (state.generation.hrfToggled) {
-    addHrfToGraph(state, graph, isUsingOnnxModel);
+  // High resolution fix.
+  // NOTE: Not supported for onnx models.
+  if (state.generation.hrfToggled && !isUsingOnnxModel) {
+    addHrfToGraph(state, graph);
   }
+
+  // eslint-disable-next-line no-debugger
+  debugger;
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

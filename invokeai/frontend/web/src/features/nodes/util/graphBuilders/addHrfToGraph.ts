@@ -19,6 +19,7 @@ import {
   DENOISE_LATENTS_HRF,
   RESCALE_LATENTS,
   NOISE_HRF,
+  VAE_LOADER,
 } from './constants';
 
 // Adds high-res fix to the given graph by
@@ -26,14 +27,15 @@ import {
 // but with an upscaled version of the original latents.
 export const addHrfToGraph = (
   state: RootState,
-  graph: NonNullableGraph,
-  isUsingOnnxModel: boolean
+  graph: NonNullableGraph
 ): void => {
+  const { vae } = state.generation;
+  const isAutoVae = !vae;
+
   // Pre-existing (original) graph nodes.
-  const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
-    | DenoiseLatentsInvocation
-    | ONNXTextToLatentsInvocation
-    | undefined;
+  const originalDenoiseLatentsNode = graph.nodes[
+    DENOISE_LATENTS
+  ] as DenoiseLatentsInvocation;
   const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation;
   const originalLatentsToImageNode = graph.nodes[
     LATENTS_TO_IMAGE
@@ -49,36 +51,18 @@ export const addHrfToGraph = (
     : undefined;
 
   // Define new nodes.
-  const latentsToImageHrfNode: LatentsToImageInvocation = {
-    type: originalLatentsToImageNode.type,
-    id: LATENTS_TO_IMAGE_HRF,
-    vae: originalLatentsToImageNode.vae,
-    fp32: originalLatentsToImageNode.fp32,
-    is_intermediate: originalLatentsToImageNode.is_intermediate,
-  };
-
   // Denoise latents node to be run on upscaled latents.
-  const denoiseLatentsHrfNode:
-    | DenoiseLatentsInvocation
-    | ONNXTextToLatentsInvocation = isUsingOnnxModel
-    ? {
-        type: 't2l_onnx',
-        id: DENOISE_LATENTS_HRF,
-        is_intermediate: originalDenoiseLatentsNode?.is_intermediate,
-        cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
-        scheduler: originalDenoiseLatentsNode?.scheduler,
-        steps: originalDenoiseLatentsNode?.steps,
-      }
-    : {
-        type: 'denoise_latents',
-        id: DENOISE_LATENTS_HRF,
-        is_intermediate: originalDenoiseLatentsNode?.is_intermediate,
-        cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
-        scheduler: originalDenoiseLatentsNode?.scheduler,
-        steps: originalDenoiseLatentsNode?.steps,
-        denoising_start: state.generation.hrfStrength,
-        denoising_end: 1,
-      };
+  // Define new nodes.
+  const denoiseLatentsHrfNode: DenoiseLatentsInvocation = {
+    type: 'denoise_latents',
+    id: DENOISE_LATENTS_HRF,
+    is_intermediate: originalDenoiseLatentsNode?.is_intermediate,
+    cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
+    scheduler: originalDenoiseLatentsNode?.scheduler,
+    steps: originalDenoiseLatentsNode?.steps,
+    denoising_start: state.generation.hrfStrength,
+    denoising_end: 1,
+  };
 
   const rescaleLatentsNode: RescaleLatentsInvocation = {
     id: RESCALE_LATENTS,
@@ -97,12 +81,19 @@ export const addHrfToGraph = (
     is_intermediate: originalNoiseNode.is_intermediate,
   };
 
+  const latentsToImageHrfNode: LatentsToImageInvocation = {
+    type: originalLatentsToImageNode.type,
+    id: LATENTS_TO_IMAGE_HRF,
+    vae: originalLatentsToImageNode.vae,
+    fp32: originalLatentsToImageNode.fp32,
+    is_intermediate: originalLatentsToImageNode.is_intermediate,
+  };
+
   // Add new noes to graph.
   graph.nodes[LATENTS_TO_IMAGE_HRF] =
     latentsToImageHrfNode as LatentsToImageInvocation;
-  graph.nodes[DENOISE_LATENTS_HRF] = denoiseLatentsHrfNode as
-    | LatentsToImageInvocation
-    | ONNXTextToLatentsInvocation;
+  graph.nodes[DENOISE_LATENTS_HRF] =
+    denoiseLatentsHrfNode as DenoiseLatentsInvocation;
   graph.nodes[RESCALE_LATENTS] = rescaleLatentsNode as RescaleLatentsInvocation;
   graph.nodes[NOISE_HRF] = hrfNoiseNode as NoiseInvocation;
 
@@ -153,7 +144,7 @@ export const addHrfToGraph = (
     {
       source: {
         node_id: POSITIVE_CONDITIONING,
-        field: 'positive_conditioning',
+        field: 'conditioning',
       },
       destination: {
         node_id: DENOISE_LATENTS_HRF,
@@ -163,7 +154,7 @@ export const addHrfToGraph = (
     {
       source: {
         node_id: NEGATIVE_CONDITIONING,
-        field: 'negative_conditioning',
+        field: 'conditioning',
       },
       destination: {
         node_id: DENOISE_LATENTS_HRF,
@@ -189,6 +180,16 @@ export const addHrfToGraph = (
       destination: {
         node_id: LATENTS_TO_IMAGE_HRF,
         field: 'metadata',
+      },
+    },
+    {
+      source: {
+        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        field: 'vae',
+      },
+      destination: {
+        node_id: LATENTS_TO_IMAGE_HRF,
+        field: 'vae',
       },
     }
   );
