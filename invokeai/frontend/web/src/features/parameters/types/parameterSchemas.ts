@@ -93,11 +93,11 @@ export const isValidSteps = (val: unknown): val is StepsParam =>
   zSteps.safeParse(val).success;
 
 /**
- * Zod schema for HRF scale parameter
+ * Zod schema for high resolution fix scale parameter
  */
 export const zHrfScale = z.number().int().min(1);
 /**
- * Type alias for CFG scale parameter, inferred from its zod schema
+ * Type alias for high resolution fix scale parameter, inferred from its zod schema
  */
 export type HrfScaleParam = z.infer<typeof zHrfScale>;
 
