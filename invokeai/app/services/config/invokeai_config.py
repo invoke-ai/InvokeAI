@@ -223,7 +223,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     lora_dir            : Path = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
     embedding_dir       : Path = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
     controlnet_dir      : Path = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', category='Paths')
-    model_config_db     : Union[Path, Literal['auto']] = Field(default='auto', description='Path to a sqlite .db file or .yaml file for storing model config records; "auto" will reuse the main sqlite db', category='Paths')
+    model_config_db     : Union[Path, Literal['auto'], None] = Field(default=None, description='Path to a sqlite .db file or .yaml file for storing model config records; "auto" will reuse the main sqlite db', category='Paths')
     models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
@@ -314,9 +314,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     @classmethod
     def get_config(cls, **kwargs) -> InvokeAIAppConfig:
-        """
-        This returns a singleton InvokeAIAppConfig configuration object.
-        """
+        """This returns a singleton InvokeAIAppConfig configuration object."""
         if (
             cls.singleton_config is None
             or type(cls.singleton_config) is not cls
@@ -325,6 +323,26 @@ class InvokeAIAppConfig(InvokeAISettings):
             cls.singleton_config = cls(**kwargs)
             cls.singleton_init = kwargs
         return cls.singleton_config
+
+    @classmethod
+    def _excluded_from_yaml(cls) -> List[str]:
+        el = super()._excluded_from_yaml()
+        el.extend(
+            [
+                "version",
+                "from_file",
+                "model",
+                "root",
+                "max_cache_size",
+                "max_vram_cache_size",
+                "always_use_cpu",
+                "free_gpu_mem",
+                "xformers_enabled",
+                "tiled_decode",
+                "conf_path",
+            ]
+        )
+        return el
 
     @property
     def root_path(self) -> Path:

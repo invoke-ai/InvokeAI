@@ -19,7 +19,7 @@ from npyscreen import fmPopup
 
 # minimum size for UIs
 MIN_COLS = 150
-MIN_LINES = 40
+MIN_LINES = 45
 
 
 class WindowTooSmallException(Exception):
@@ -260,6 +260,17 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
 
     def h_select(self, ch):
         super().h_select(ch)
+        if self.on_changed:
+            self.on_changed(self.value)
+
+
+class CheckboxWithChanged(npyscreen.Checkbox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.on_changed = None
+
+    def whenToggled(self):
+        super().whenToggled
         if self.on_changed:
             self.on_changed(self.value)
 

@@ -145,17 +145,6 @@ class InvokeAISettings(BaseSettings):
         return [
             "type",
             "initconf",
-            "version",
-            "from_file",
-            "model",
-            "root",
-            "max_cache_size",
-            "max_vram_cache_size",
-            "always_use_cpu",
-            "free_gpu_mem",
-            "xformers_enabled",
-            "tiled_decode",
-            "conf_path",
         ]
 
     class Config:

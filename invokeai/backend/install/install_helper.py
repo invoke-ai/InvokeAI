@@ -12,8 +12,8 @@ from tqdm import tqdm
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import BaseModelType, ModelInstall, ModelInstallJob, ModelType
-from invokeai.backend.model_manager.install import ModelSourceMetadata
+from invokeai.backend.model_manager import BaseModelType, ModelType
+from invokeai.backend.model_manager.install import ModelInstall, ModelInstallJob, ModelSourceMetadata
 
 # name of the starter models file
 INITIAL_MODELS = "INITIAL_MODELS.yaml"

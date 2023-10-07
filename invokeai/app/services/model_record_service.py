@@ -51,14 +51,22 @@ class ModelRecordServiceBase(ModelConfigStore):
            a. if the path looks like a .db file, open a new sqlite3 connection and return a ModelRecordServiceSQL
            b. if the path looks like a .yaml file, return a new ModelRecordServiceFile
            c. otherwise bail
-        2. if config.model_config_db is the literal 'auto', then reuse the sqlite3 connection and lock passed
+        2. if config.model_config_db is the literal 'auto', then use the passed sqlite3 connection and thread lock.
+           a. if either of these is missing, then we create our own connection to the invokeai.db file, which *should*
+              be a safe thing to do - sqlite3 will use file-level locking.
+        3. if config.model_config_db is None, then fall back to config.conf_path, using a yaml file
         """
         logger = InvokeAILogger.get_logger()
         db = config.model_config_db
+        if db is None:
+            return ModelRecordServiceFile.from_db_file(config.model_conf_path)
         if str(db) == "auto":
-            assert (conn is not None) and (lock is not None)
             logger.info("Model config storage = main InvokeAI database")
-            return ModelRecordServiceSQL.from_connection(conn, lock)
+            return (
+                ModelRecordServiceSQL.from_connection(conn, lock)
+                if (conn and lock)
+                else ModelRecordServiceSQL.from_db_file(config.db_path)
+            )
         assert isinstance(db, Path)
         suffix = db.suffix
         if suffix == ".yaml":

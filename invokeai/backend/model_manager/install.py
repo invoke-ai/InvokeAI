@@ -54,12 +54,13 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.backend.util import Chdir, InvokeAILogger, Logger
 
 from .config import (
@@ -77,7 +78,7 @@ from .hash import FastModelHash
 from .models import InvalidModelException
 from .probe import ModelProbe, ModelProbeInfo
 from .search import ModelSearch
-from .storage import DuplicateModelException, ModelConfigStore, get_config_store
+from .storage import DuplicateModelException, ModelConfigStore
 
 
 class ModelInstallJob(DownloadJobBase):
@@ -380,7 +381,7 @@ class ModelInstall(ModelInstallBase):
     ):  # noqa D107 - use base class docstrings
         self._app_config = config or InvokeAIAppConfig.get_config()
         self._logger = logger or InvokeAILogger.get_logger(config=self._app_config)
-        self._store = store or get_config_store(config.root_path / config.model_conf_path)
+        self._store = store or ModelRecordServiceBase.get_impl(self._app_config)
         self._download_queue = download or DownloadQueue(config=self._app_config, event_handlers=event_handlers)
         self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
         self._installed = set()

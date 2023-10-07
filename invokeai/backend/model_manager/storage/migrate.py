@@ -12,10 +12,10 @@ from ..config import BaseModelType, MainCheckpointConfig, MainConfig, ModelType
 from .base import CONFIG_FILE_VERSION
 
 
-def migrate_models_store(config: InvokeAIAppConfig):
+def migrate_models_store(config: InvokeAIAppConfig) -> Path:
     """Migrate models from v1 models.yaml to v3.2 models.yaml."""
     # avoid circular import
-    from invokeai.backend.model_manager import DuplicateModelException, ModelInstall
+    from invokeai.backend.model_manager.install import DuplicateModelException, ModelInstall
     from invokeai.backend.model_manager.storage import get_config_store
 
     app_config = InvokeAIAppConfig.get_config()
@@ -64,3 +64,4 @@ def migrate_models_store(config: InvokeAIAppConfig):
     logger.info(f"Original version of models config file saved as {str(old_file) + '.orig'}")
     shutil.move(old_file, str(old_file) + ".orig")
     shutil.move(new_file, old_file)
+    return old_file

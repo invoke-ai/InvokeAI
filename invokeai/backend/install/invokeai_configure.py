@@ -37,8 +37,10 @@ from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextConfig
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.install.install_helper import InstallHelper, InstallSelections
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.model_manager import BaseModelType, ModelType
+from invokeai.backend.model_manager.storage import ConfigFileVersionMismatchException, migrate_models_store
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm
@@ -48,15 +50,15 @@ from invokeai.frontend.install.widgets import (
     MIN_COLS,
     MIN_LINES,
     CenteredButtonPress,
+    CheckboxWithChanged,
     CyclingForm,
     FileBox,
     MultiSelectColumns,
     SingleSelectColumnsSimple,
+    SingleSelectWithChanged,
     WindowTooSmallException,
     set_min_terminal_size,
 )
-
-from .install_helper import InstallHelper, InstallSelections
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -529,6 +531,45 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             )
         else:
             self.vram = DummyWidgetValue.zero
+
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.FixedText,
+            value="Location of the database used to store model path and configuration information:",
+            editable=False,
+            color="CONTROL",
+        )
+        self.nextrely += 1
+        if first_time:
+            old_opts.model_config_db = "auto"
+        self.model_conf_auto = self.add_widget_intelligent(
+            CheckboxWithChanged,
+            value=str(old_opts.model_config_db) == "auto",
+            name="Main database",
+            relx=2,
+            max_width=25,
+            scroll_exit=True,
+        )
+        self.nextrely -= 2
+        config_db = str(old_opts.model_config_db or old_opts.conf_path)
+        self.model_conf_override = self.add_widget_intelligent(
+            FileBox,
+            value=str(old_opts.root_path / config_db)
+            if config_db != "auto"
+            else str(old_opts.root_path / old_opts.conf_path),
+            name="Specify models config database manually",
+            select_dir=False,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            # begin_entry_at=40,
+            relx=30,
+            max_height=3,
+            max_width=100,
+            scroll_exit=True,
+            hidden=str(old_opts.model_config_db) == "auto",
+        )
+        self.model_conf_auto.on_changed = self.show_hide_model_conf_override
         self.nextrely += 1
         self.outdir = self.add_widget_intelligent(
             FileBox,
@@ -540,6 +581,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             labelColor="GOOD",
             begin_entry_at=40,
             max_height=3,
+            max_width=127,
             scroll_exit=True,
         )
         self.autoimport_dirs = {}
@@ -553,6 +595,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             labelColor="GOOD",
             begin_entry_at=32,
             max_height=3,
+            max_width=127,
             scroll_exit=True,
         )
         self.nextrely += 1
@@ -588,6 +631,10 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
         show = ATTENTION_CHOICES[value[0]] == "sliced"
         self.attention_slice_label.hidden = not show
         self.attention_slice_size.hidden = not show
+
+    def show_hide_model_conf_override(self, value):
+        self.model_conf_override.hidden = value
+        self.model_conf_override.display()
 
     def on_ok(self):
         options = self.marshall_arguments()
@@ -636,6 +683,7 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
                 directory = directory.relative_to(config.root_path)
             setattr(new_opts, attr, directory)
 
+        new_opts.model_config_db = "auto" if self.model_conf_auto.value else self.model_conf_override.value
         new_opts.hf_token = self.hf_token.value
         new_opts.license_acceptance = self.license_acceptance.value
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
@@ -934,7 +982,11 @@ def main():
         initialize_rootdir(config.root_path, opt.yes_to_all)
 
         # this will initialize the models.yaml file if not present
-        install_helper = InstallHelper(config)
+        try:
+            install_helper = InstallHelper(config)
+        except ConfigFileVersionMismatchException:
+            config.model_config_db = migrate_models_store(config)
+            install_helper = InstallHelper(config)
 
         models_to_download = default_user_selections(opt, install_helper)
         new_init_file = config.root_path / "invokeai.yaml"
