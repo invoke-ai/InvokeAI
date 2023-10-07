@@ -39,7 +39,20 @@ export default function ParamHrf() {
         label="High Resolution Scale"
         aria-label="High Resolution Scale"
         min={1}
-        max={20}
+        max={5}
+        step={0.1}
+        value={hrfScale}
+        onChange={handleHrfChange}
+        withSliderMarks
+        withInput
+        withReset
+        handleReset={handleHrfSkipReset}
+      />
+      <IAISlider
+        label="Denoising Strength"
+        aria-label="High Resolution Denoising Strength"
+        min={1}
+        max={5}
         step={0.1}
         value={hrfScale}
         onChange={handleHrfChange}

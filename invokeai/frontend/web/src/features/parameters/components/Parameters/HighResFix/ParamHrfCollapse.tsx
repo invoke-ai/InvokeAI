@@ -1,11 +1,10 @@
-import { Divider, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import ParamHrf from './ParamHrf';
 
 const selector = createSelector(

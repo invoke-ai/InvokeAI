@@ -69,6 +69,14 @@ export const initialConfigState: AppConfig = {
       fineStep: 0.01,
       coarseStep: 0.05,
     },
+    hrfStrength: {
+      initial: 0.7,
+      min: 0,
+      sliderMax: 1,
+      inputMax: 1,
+      fineStep: 0.01,
+      coarseStep: 0.05,
+    },
     dynamicPrompts: {
       maxPrompts: {
         initial: 100,
