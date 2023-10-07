@@ -73,7 +73,7 @@ export interface GenerationState {
 
 export const initialGenerationState: GenerationState = {
   hrfScale: 1.0,
-  hrfStrength: 0.3,
+  hrfStrength: 0.75,
   hrfToggled: false,
   cfgScale: 7.5,
   height: 512,
