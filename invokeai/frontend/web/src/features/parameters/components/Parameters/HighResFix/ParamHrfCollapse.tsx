@@ -7,7 +7,7 @@ import IAICollapse from 'common/components/IAICollapse';
 import { useMemo } from 'react';
 import ParamHrfScale from './ParamHrfScale';
 import ParamHrfStrength from './ParamHrfStrength';
-import ParamHrfToggle from './ParamHrfStrength';
+import ParamHrfToggle from './ParamHrfToggle';
 
 const selector = createSelector(
   stateSelector,
@@ -23,9 +23,9 @@ export default function ParamHrfCollapse() {
   const { hrfToggled } = useAppSelector(selector);
   const activeLabel = useMemo(() => {
     if (hrfToggled) {
-      return 'High Res Fix On';
+      return 'On';
     } else {
-      return 'High Res Fix Off';
+      return 'Off';
     }
   }, [hrfToggled]);
 
