@@ -272,7 +272,7 @@ async def delete_model(
     response_model=InvokeAIModelConfig,
 )
 async def convert_model(
-    key: str = Path(description="Unique key of model to remove from model registry."),
+    key: str = Path(description="Unique key of model to convert from checkpoint/safetensors to diffusers format."),
     convert_dest_directory: Optional[str] = Query(
         default=None, description="Save the converted model to the designated directory"
     ),
@@ -281,7 +281,7 @@ async def convert_model(
     try:
         dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
         installer = ApiDependencies.invoker.services.model_installer
-        model_config = installer.convert_model(key, convert_dest_directory=dest)
+        model_config = installer.convert_model(key, dest_directory=dest)
         response = parse_obj_as(InvokeAIModelConfig, model_config.dict())
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=f"Model '{key}' not found: {str(e)}")

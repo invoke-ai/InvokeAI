@@ -417,6 +417,7 @@ class ModelInstall(ModelInstallBase):
             base_model=info.base_type,
             model_type=info.model_type,
             model_format=info.format,
+            hash=key,
         )
         # add 'main' specific fields
         if info.model_type == ModelType.Main:
@@ -577,7 +578,7 @@ class ModelInstall(ModelInstallBase):
         elif job.status == "cancelled":
             self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
 
-    def sync_model_path(self, key) -> ModelConfigBase:
+    def sync_model_path(self, key: str, ignore_hash_change: bool = False) -> ModelConfigBase:
         """
         Move model into the location indicated by its basetype, type and name.
 
@@ -596,12 +597,15 @@ class ModelInstall(ModelInstallBase):
             return model
 
         new_path = models_dir / model.base_model.value / model.model_type.value / model.name
-        self._logger.info(
-            f"{old_path.name} is not in the right directory for a model of its type. Moving to {new_path}."
-        )
-        model.path = self._move_model(old_path, new_path).as_posix()
-        new_hash = self.hash(model.path)
-        assert new_hash == key, f"{model.name}: Model hash changed during installation, possibly corrupted."
+        self._logger.info(f"Moving {model.name} to {new_path}.")
+        new_path = self._move_model(old_path, new_path)
+        model.hash = self.hash(new_path)
+        model.path = new_path.relative_to(models_dir).as_posix()
+        if model.hash != key:
+            assert (
+                ignore_hash_change
+            ), f"{model.name}: Model hash changed during installation, model is possibly corrupted"
+            self._logger.info(f"Model has new hash {model.hash}, but will continue to be identified by {key}")
         self._store.update_model(key, model)
         return model
 
@@ -692,7 +696,7 @@ class ModelInstall(ModelInstallBase):
             # We are taking advantage of a side effect of get_model() that converts check points
             # into cached diffusers directories stored at `path`. It doesn't matter
             # what submodel type we request here, so we get the smallest.
-            loader = ModelLoad(self._app_config)
+            loader = ModelLoad(self._app_config, self.store)
             submodel = {"submodel_type": SubModelType.Scheduler} if info.model_type == ModelType.Main else {}
             converted_model: ModelInfo = loader.get_model(key, **submodel)
 
@@ -703,7 +707,7 @@ class ModelInstall(ModelInstallBase):
             update = info.dict()
             update.pop("config")
             update["model_format"] = "diffusers"
-            update["path"] = converted_model.location
+            update["path"] = str(converted_model.location)
 
             if dest_directory:
                 new_diffusers_path = Path(dest_directory) / info.name
@@ -713,7 +717,7 @@ class ModelInstall(ModelInstallBase):
                 update["path"] = new_diffusers_path.as_posix()
 
             self._store.update_model(key, update)
-            result = self.sync_model_path(key)
+            result = self.sync_model_path(key, ignore_hash_change=True)
         except Exception as excp:
             # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
             if new_diffusers_path:
@@ -752,6 +756,9 @@ class ModelInstall(ModelInstallBase):
     def sync_to_config(self):
         """Synchronize models on disk to those in memory."""
         self.scan_models_directory()
+        if autoimport := self._app_config.autoimport_dir:
+            self._logger.info("Scanning autoimport directory for new models")
+            self.scan_directory(self._app_config.root_path / autoimport)
 
     def scan_models_directory(self):
         """

@@ -118,7 +118,12 @@ class ModelConfigBase(BaseModel):
     base_model: BaseModelType
     model_type: ModelType
     model_format: ModelFormat
-    key: str = Field(description="hash key for model", default="<NOKEY>")  # this will get added by the store
+    key: str = Field(
+        description="key for model derived from original hash", default="<NOKEY>"
+    )  # assigned on the first install
+    hash: Optional[str] = Field(
+        description="current hash key for model", default=None
+    )  # if model is converted or otherwise modified, this will hold updated hash
     description: Optional[str] = Field(None)
     author: Optional[str] = Field(description="Model author")
     license: Optional[str] = Field(description="License string")

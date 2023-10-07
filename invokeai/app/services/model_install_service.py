@@ -296,13 +296,13 @@ class ModelInstallService(ModelInstall, ModelInstallServiceBase):
         :param key: Key of the model to convert
         :param convert_dest_directory: Save the converted model to the designated directory (`models/etc/etc` by default)
 
-        This will raise a ValueError unless the model is not a checkpoint. It will
+        This will raise a ValueError unless the model is a checkpoint. It will
         also raise a ValueError in the event that there is a similarly-named diffusers
         directory already in place.
         """
         model_info = self.store.get_model(key)
         self.logger.info(f"Converting model {model_info.name} into a diffusers")
-        return self.convert_model(key, dest_directory)
+        return super().convert_model(key, dest_directory)
 
     @property
     def logger(self):

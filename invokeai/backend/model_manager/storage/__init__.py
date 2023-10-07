@@ -22,5 +22,5 @@ def get_config_store(location: pathlib.Path) -> ModelConfigStore:
         return ModelConfigStoreSQL(location)
     else:
         raise Exception(
-            "Unable to determine type of configuration file '{location}'. Type 'auto' is not supported outside the app."
+            f"Unable to determine type of configuration file '{location}'. Type 'auto' is not supported outside the app."
         )
