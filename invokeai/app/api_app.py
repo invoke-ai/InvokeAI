@@ -213,6 +213,10 @@ def invoke_api():
 
     from invokeai.backend.install.check_root import check_invokeai_root
 
+    if app_config.version:
+        print(f"InvokeAI version {__version__}")
+        return
+
     check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
 
     if app_config.dev_reload:

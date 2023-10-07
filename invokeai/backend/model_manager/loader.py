@@ -10,12 +10,13 @@ from typing import Optional, Tuple, Union
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.backend.util import InvokeAILogger, Logger, choose_precision, choose_torch_device
 
 from .cache import CacheStats, ModelCache
 from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
 from .models import MODEL_CLASSES, InvalidModelException, ModelBase
-from .storage import ModelConfigStore, get_config_store
+from .storage import ModelConfigStore
 
 
 @dataclass
@@ -112,7 +113,7 @@ class ModelLoad(ModelLoadBase):
         :param config: The app's InvokeAIAppConfig object.
         """
         self._app_config = config
-        self._store = store or get_config_store(config.root_path / config.model_config_db)
+        self._store = store or ModelRecordServiceBase.get_impl(config)
         self._logger = InvokeAILogger.get_logger()
         self._cache_keys = dict()
         device = torch.device(choose_torch_device())

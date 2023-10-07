@@ -63,7 +63,10 @@ def add_parsers(
     for command in commands:
         hints = get_type_hints(command)
         cmd_name = get_args(hints[command_field])[0]
-        command_parser = subparsers.add_parser(cmd_name, help=command.__doc__)
+        try:
+            command_parser = subparsers.add_parser(cmd_name, help=command.__doc__)
+        except argparse.ArgumentError:
+            continue
 
         if add_arguments is not None:
             add_arguments(command_parser)

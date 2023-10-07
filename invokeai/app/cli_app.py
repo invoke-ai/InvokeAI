@@ -22,10 +22,12 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from pydantic.fields import Field
 
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+    from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
     from invokeai.app.services.board_image_record_storage import SqliteBoardImageRecordStorage
     from invokeai.app.services.board_images import BoardImagesService, BoardImagesServiceDependencies
     from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
     from invokeai.app.services.boards import BoardService, BoardServiceDependencies
+    from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
     from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
     from invokeai.app.services.images import ImageService, ImageServiceDependencies
     from invokeai.app.services.invocation_stats import InvocationStatsService
@@ -47,6 +49,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         LibraryGraph,
         are_connection_types_compatible,
     )
+    from .services.thread import lock
     from .services.image_file_storage import DiskImageFileStorage
     from .services.invocation_queue import MemoryInvocationQueue
     from .services.invocation_services import InvocationServices
@@ -230,7 +233,12 @@ def invoke_all(context: CliContext):
 
 
 def invoke_cli():
+    if config.version:
+        print(f"InvokeAI version {__version__}")
+        return
+
     logger.info(f"InvokeAI version {__version__}")
+
     # get the optional list of invocations to execute on the command line
     parser = config.get_parser()
     parser.add_argument("commands", nargs="*")
@@ -255,18 +263,18 @@ def invoke_cli():
     logger.info(f'InvokeAI database location is "{db_location}"')
 
     model_record_store = ModelRecordServiceBase.get_impl(config, conn=db_conn, lock=None)
-    model_loader = ModelLoadService(config, model_record_store, events)
+    model_loader = ModelLoadService(config, model_record_store)
     model_installer = ModelInstallService(config, model_record_store, events)
 
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions")
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions", lock=lock)
 
     urls = LocalUrlService()
-    image_record_storage = SqliteImageRecordStorage(conn=db_conn)
+    image_record_storage = SqliteImageRecordStorage(conn=db_conn, lock=lock)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
     names = SimpleNameService()
 
-    board_record_storage = SqliteBoardRecordStorage(conn=db_conn)
-    board_image_record_storage = SqliteBoardImageRecordStorage(conn=db_conn)
+    board_record_storage = SqliteBoardRecordStorage(conn=db_conn, lock=lock)
+    board_image_record_storage = SqliteBoardImageRecordStorage(conn=db_conn, lock=lock)
 
     boards = BoardService(
         services=BoardServiceDependencies(
@@ -307,7 +315,7 @@ def invoke_cli():
         boards=boards,
         board_images=board_images,
         queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs"),
+        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs", lock=lock),
         graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
         performance_statistics=InvocationStatsService(graph_execution_manager),
@@ -317,6 +325,8 @@ def invoke_cli():
         model_installer=model_installer,
         configuration=config,
         invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),
+        session_queue=SqliteSessionQueue(conn=db_conn, lock=lock),
+        session_processor=DefaultSessionProcessor(),
     )
 
     system_graphs = create_system_graphs(services.graph_library)
@@ -484,7 +494,4 @@ def invoke_cli():
 
 
 if __name__ == "__main__":
-    if config.version:
-        print(f"InvokeAI version {__version__}")
-    else:
-        invoke_cli()
+    invoke_cli()

@@ -3,13 +3,15 @@ Migrate the models directory and models.yaml file from an existing
 InvokeAI 2.3 installation to 3.0.0.
 """
 
+#### NOTE: THIS SCRIPT NO LONGER WORKS WITH REFACTORED MODEL MANAGER, AND WILL NOT BE UPDATED.
+
 import argparse
 import os
 import shutil
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
 import diffusers
 import transformers
@@ -22,6 +24,7 @@ from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel,
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_record_service import ModelRecordServiceBase
+from invokeai.app.services.model_install_service import ModelInstallService
 from invokeai.backend.model_manager import BaseModelType, ModelProbe, ModelProbeInfo, ModelType
 
 warnings.filterwarnings("ignore")
@@ -43,18 +46,13 @@ class MigrateTo3(object):
         self,
         from_root: Path,
         to_models: Path,
-        model_manager: ModelRecordServiceBase,
+        installer: ModelInstallService,
         src_paths: ModelPaths,
     ):
         self.root_directory = from_root
         self.dest_models = to_models
-        self.mgr = model_manager
+        self.installer = installer
         self.src_paths = src_paths
-
-    @classmethod
-    def initialize_yaml(cls, yaml_file: Path):
-        with open(yaml_file, "w") as file:
-            file.write(yaml.dump({"__metadata__": {"version": "3.0.0"}}))
 
     def create_directory_structure(self):
         """
@@ -107,44 +105,10 @@ class MigrateTo3(object):
         Recursively walk through src directory, probe anything
         that looks like a model, and copy the model into the
         appropriate location within the destination models directory.
+
+        This is now trivially easy using the installer service.
         """
-        directories_scanned = set()
-        for root, dirs, files in os.walk(src_dir, followlinks=True):
-            for d in dirs:
-                try:
-                    model = Path(root, d)
-                    info = ModelProbe().heuristic_probe(model)
-                    if not info:
-                        continue
-                    dest = self._model_probe_to_path(info) / model.name
-                    self.copy_dir(model, dest)
-                    directories_scanned.add(model)
-                except Exception as e:
-                    logger.error(str(e))
-                except KeyboardInterrupt:
-                    raise
-                except Exception as e:
-                    logger.error(str(e))
-            for f in files:
-                # don't copy raw learned_embeds.bin or pytorch_lora_weights.bin
-                # let them be copied as part of a tree copy operation
-                try:
-                    if f in {"learned_embeds.bin", "pytorch_lora_weights.bin"}:
-                        continue
-                    model = Path(root, f)
-                    if model.parent in directories_scanned:
-                        continue
-                    info = ModelProbe().heuristic_probe(model)
-                    if not info:
-                        continue
-                    dest = self._model_probe_to_path(info) / f
-                    self.copy_file(model, dest)
-                except Exception as e:
-                    logger.error(str(e))
-                except KeyboardInterrupt:
-                    raise
-                except Exception as e:
-                    logger.error(str(e))
+        self.installer.scan_directory(src_dir)
 
     def migrate_support_models(self):
         """
@@ -260,23 +224,21 @@ class MigrateTo3(object):
             model.save_pretrained(download_path, safe_serialization=True)
             download_path.replace(dest)
 
-    def _download_vae(self, repo_id: str, subfolder: str = None) -> Path:
-        vae = AutoencoderKL.from_pretrained(repo_id, cache_dir=self.root_directory / "models/hub", subfolder=subfolder)
-        info = ModelProbe().heuristic_probe(vae)
-        _, model_name = repo_id.split("/")
-        dest = self._model_probe_to_path(info) / self.unique_name(model_name, info)
-        vae.save_pretrained(dest, safe_serialization=True)
-        return dest
+    def _download_vae(self, repo_id: str, subfolder: str = None) -> Optional[Path]:
+        self.installer.install(repo_id)  # bug! We don't support subfolder yet.
+        ids = self.installer.wait_for_installs()
+        if key := ids.get(repo_id):
+            return self.installer.store.get_model(key).path
+        else:
+            return None
 
-    def _vae_path(self, vae: Union[str, dict]) -> Path:
-        """
-        Convert 2.3 VAE stanza to a straight path.
-        """
-        vae_path = None
+    def _vae_path(self, vae: Union[str, dict]) -> Optional[Path]:
+        """Convert 2.3 VAE stanza to a straight path."""
+        vae_path: Optional[Path] = None
 
         # First get a path
         if isinstance(vae, str):
-            vae_path = vae
+            vae_path = Path(vae)
 
         elif isinstance(vae, DictConfig):
             if p := vae.get("path"):
@@ -284,28 +246,21 @@ class MigrateTo3(object):
             elif repo_id := vae.get("repo_id"):
                 if repo_id == "stabilityai/sd-vae-ft-mse":  # this guy is already downloaded
                     vae_path = "models/core/convert/sd-vae-ft-mse"
-                    return vae_path
+                    return Path(vae_path)
                 else:
                     vae_path = self._download_vae(repo_id, vae.get("subfolder"))
 
-        assert vae_path is not None, "Couldn't find VAE for this model"
+        if vae_path is None:
+            return None
 
         # if the VAE is in the old models directory, then we must move it into the new
         # one. VAEs outside of this directory can stay where they are.
-        vae_path = Path(vae_path)
         if vae_path.is_relative_to(self.src_paths.models):
-            info = ModelProbe().heuristic_probe(vae_path)
-            dest = self._model_probe_to_path(info) / vae_path.name
-            if not dest.exists():
-                if vae_path.is_dir():
-                    self.copy_dir(vae_path, dest)
-                else:
-                    self.copy_file(vae_path, dest)
-            vae_path = dest
-
-        if vae_path.is_relative_to(self.dest_models):
-            rel_path = vae_path.relative_to(self.dest_models)
-            return Path("models", rel_path)
+            key = self.installer.install_path(vae_path)  # this will move the model
+            return self.installer.store.get_model(key).path
+        elif vae_path.is_relative_to(self.dest_models):
+            key = self.installer.register_path(vae_path)  # this will keep the model in place
+            return self.installer.store.get_model(key).path
         else:
             return vae_path
 
@@ -505,40 +460,24 @@ def do_migrate(config: InvokeAIAppConfig, src_directory: Path, dest_directory: P
     """
     Migrate models from src to dest InvokeAI root directories
     """
-    config_file = dest_directory / "configs" / "models.yaml.3"
     dest_models = dest_directory / "models.3"
+    mm_store = ModelRecordServiceBase.get_impl(config)
+    mm_install = ModelInstallService(config=config, store=mm_store)
 
     version_3 = (dest_directory / "models" / "core").exists()
-
-    # Here we create the destination models.yaml file.
-    # If we are writing into a version 3 directory and the
-    # file already exists, then we write into a copy of it to
-    # avoid deleting its previous customizations. Otherwise we
-    # create a new empty one.
-    if version_3:  # write into the dest directory
-        try:
-            shutil.copy(dest_directory / "configs" / "models.yaml", config_file)
-        except Exception:
-            MigrateTo3.initialize_yaml(config_file)
-        mgr = ModelRecordServiceBase.get_impl(config)
-        (dest_directory / "models").replace(dest_models)
-    else:
-        MigrateTo3.initialize_yaml(config_file)
-        mgr = ModelManager(config_file)
+    if not version_3:
+        src_directory = (dest_directory / "models").replace(src_directory / "models.orig")
+        print(f"Original models directory moved to {dest_directory}/models.orig")
 
     paths = get_legacy_embeddings(src_directory)
-    migrator = MigrateTo3(from_root=src_directory, to_models=dest_models, model_manager=mgr, src_paths=paths)
+    migrator = MigrateTo3(from_root=src_directory, to_models=dest_models, installer=mm_install, src_paths=paths)
     migrator.migrate()
     print("Migration successful.")
 
-    if not version_3:
-        (dest_directory / "models").replace(src_directory / "models.orig")
-        print(f"Original models directory moved to {dest_directory}/models.orig")
 
     (dest_directory / "configs" / "models.yaml").replace(src_directory / "configs" / "models.yaml.orig")
     print(f"Original models.yaml file moved to {dest_directory}/configs/models.yaml.orig")
 
-    config_file.replace(config_file.with_suffix(""))
     dest_models.replace(dest_models.with_suffix(""))
 
 

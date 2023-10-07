@@ -24,5 +24,4 @@ from .storage import (  # noqa F401
     ModelConfigStoreSQL,
     ModelConfigStoreYAML,
     UnknownModelException,
-    get_config_store,
 )

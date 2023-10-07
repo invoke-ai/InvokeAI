@@ -142,7 +142,6 @@ dependencies = [
 "invokeai-merge" = "invokeai.frontend.merge:invokeai_merge_diffusers"
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
 "invokeai-model-install" = "invokeai.frontend.install.model_install:main"
-"invokeai-migrate3" = "invokeai.backend.install.migrate_to_3:main"
 "invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
 "invokeai-metadata" = "invokeai.backend.image_util.invoke_metadata:main"
 "invokeai-node-cli" = "invokeai.app.cli_app:invoke_cli"

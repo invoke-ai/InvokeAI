@@ -11,16 +11,3 @@ from .base import (  # noqa F401
 from .migrate import migrate_models_store  # noqa F401
 from .sql import ModelConfigStoreSQL  # noqa F401
 from .yaml import ModelConfigStoreYAML  # noqa F401
-
-
-def get_config_store(location: pathlib.Path) -> ModelConfigStore:
-    """Return the type of ModelConfigStore appropriate to the path."""
-    location = pathlib.Path(location)
-    if location.suffix == ".yaml":
-        return ModelConfigStoreYAML(location)
-    elif location.suffix == ".db":
-        return ModelConfigStoreSQL(location)
-    else:
-        raise Exception(
-            f"Unable to determine type of configuration file '{location}'. Type 'auto' is not supported outside the app."
-        )
