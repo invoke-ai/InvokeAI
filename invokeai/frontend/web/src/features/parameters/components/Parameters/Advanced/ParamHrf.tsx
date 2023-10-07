@@ -2,8 +2,12 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
-import { setHrf } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import IAISwitch from 'common/components/IAISwitch';
+import {
+  setHrfScale,
+  setHrfToggle,
+} from 'features/parameters/store/generationSlice';
+import { useCallback, ChangeEvent } from 'react';
 
 export default function ParamHrf() {
   const hrfScale = useAppSelector(
@@ -12,15 +16,22 @@ export default function ParamHrf() {
   const dispatch = useAppDispatch();
 
   const handleHrfSkipReset = useCallback(() => {
-    dispatch(setHrf(1));
+    dispatch(setHrfScale(1));
   }, [dispatch]);
 
   const handleHrfChange = useCallback(
     (v: number) => {
-      dispatch(setHrf(v));
+      dispatch(setHrfScale(v));
     },
     [dispatch]
   );
+
+  const hrfToggled = useAppSelector(
+    (state: RootState) => state.generation.hrfToggled
+  );
+
+  const handleHrfToggle = (e: ChangeEvent<HTMLInputElement>) =>
+    dispatch(setHrfToggle(e.target.checked));
 
   return (
     <IAIInformationalPopover feature="hrf" placement="bottom">
@@ -36,6 +47,11 @@ export default function ParamHrf() {
         withInput
         withReset
         handleReset={handleHrfSkipReset}
+      />
+      <IAISwitch
+        label="Toggle High Resolution Fix"
+        isChecked={hrfToggled}
+        onChange={handleHrfToggle}
       />
     </IAIInformationalPopover>
   );

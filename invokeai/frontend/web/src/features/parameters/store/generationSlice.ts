@@ -28,6 +28,7 @@ import {
 
 export interface GenerationState {
   hrfScale: HrfScaleParam;
+  hrfToggled: boolean;
   cfgScale: CfgScaleParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
@@ -273,8 +274,11 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
-    setHrf: (state, action: PayloadAction<number>) => {
+    setHrfScale: (state, action: PayloadAction<number>) => {
       state.hrfScale = action.payload;
+    },
+    setHrfToggle: (state, action: PayloadAction<boolean>) => {
+      state.hrfToggled = action.payload;
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
@@ -351,7 +355,8 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
-  setHrf,
+  setHrfScale,
+  setHrfToggle,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
   setShouldLockAspectRatio,
