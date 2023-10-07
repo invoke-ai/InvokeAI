@@ -1,5 +1,5 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
+import { NonNullableGraph, Edge } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
   RescaleLatentsInvocation,
@@ -21,7 +21,7 @@ import {
 } from './constants';
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
-function copyConnectionsToDenoiseLatentsHrf(graph: any): void {
+function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
   const destinationFields = [
     'vae',
     'control',
@@ -31,10 +31,10 @@ function copyConnectionsToDenoiseLatentsHrf(graph: any): void {
     'positive_conditioning',
     'negative_conditioning',
   ];
-  const newEdges: any[] = [];
+  const newEdges: Edge[] = [];
 
   // Loop through the existing edges connected to DENOISE_LATENTS
-  graph.edges.forEach((edge: any) => {
+  graph.edges.forEach((edge: Edge) => {
     if (
       edge.destination.node_id === DENOISE_LATENTS &&
       destinationFields.includes(edge.destination.field)
