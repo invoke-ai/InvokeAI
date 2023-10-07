@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
-  controlAdapterRemoved,
+  controlAdapterModelCleared,
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
@@ -15,9 +15,9 @@ import {
 import { zMainOrOnnxModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
-import { t } from 'i18next';
 
 export const addModelSelectedListener = () => {
   startAppListening({
@@ -62,7 +62,7 @@ export const addModelSelectedListener = () => {
         // handle incompatible controlnets
         selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
           if (ca.model?.base_model !== base_model) {
-            dispatch(controlAdapterRemoved({ id: ca.id }));
+            dispatch(controlAdapterModelCleared({ id: ca.id }));
             modelsCleared += 1;
           }
         });

@@ -6,9 +6,6 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import IAICollapse from 'common/components/IAICollapse';
 import ControlAdapterConfig from 'features/controlAdapters/components/ControlAdapterConfig';
-import { useAddControlNet } from 'features/controlAdapters/hooks/useAddControlNet';
-import { useAddIPAdapter } from 'features/controlAdapters/hooks/useAddIPAdapter';
-import { useAddT2IAdapter } from 'features/controlAdapters/hooks/useAddT2IAdapter';
 import {
   selectAllControlNets,
   selectAllIPAdapters,
@@ -18,6 +15,8 @@ import {
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { FaPlus } from 'react-icons/fa';
+import { useAddControlAdapter } from '../hooks/useAddControlAdapter';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -50,12 +49,17 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ParamControlAdaptersCollapse = () => {
+const ControlAdaptersCollapse = () => {
+  const { t } = useTranslation();
   const { controlAdapterIds, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
-  const { addControlNet } = useAddControlNet();
-  const { addIPAdapter } = useAddIPAdapter();
-  const { addT2IAdapter } = useAddT2IAdapter();
+
+  const [addControlNet, isAddControlNetDisabled] =
+    useAddControlAdapter('controlnet');
+  const [addIPAdapter, isAddIPAdapterDisabled] =
+    useAddControlAdapter('ip_adapter');
+  const [addT2IAdapter, isAddT2IAdapterDisabled] =
+    useAddControlAdapter('t2i_adapter');
 
   if (isControlNetDisabled) {
     return null;
@@ -66,28 +70,34 @@ const ParamControlAdaptersCollapse = () => {
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ButtonGroup size="sm" w="full" justifyContent="space-between">
           <IAIButton
+            tooltip={t('controlnet.addControlNet')}
             leftIcon={<FaPlus />}
             onClick={addControlNet}
             data-testid="add controlnet"
             flexGrow={1}
+            isDisabled={isAddControlNetDisabled}
           >
-            ControlNet
+            {t('common.controlNet')}
           </IAIButton>
           <IAIButton
+            tooltip={t('controlnet.addIPAdapter')}
             leftIcon={<FaPlus />}
             onClick={addIPAdapter}
             data-testid="add ip adapter"
             flexGrow={1}
+            isDisabled={isAddIPAdapterDisabled}
           >
-            IP Adapter
+            {t('common.ipAdapter')}
           </IAIButton>
           <IAIButton
+            tooltip={t('controlnet.addT2IAdapter')}
             leftIcon={<FaPlus />}
             onClick={addT2IAdapter}
             data-testid="add t2i adapter"
             flexGrow={1}
+            isDisabled={isAddT2IAdapterDisabled}
           >
-            T2I Adapter
+            {t('common.t2iAdapter')}
           </IAIButton>
         </ButtonGroup>
         {controlAdapterIds.map((id, i) => (
@@ -101,4 +111,4 @@ const ParamControlAdaptersCollapse = () => {
   );
 };
 
-export default memo(ParamControlAdaptersCollapse);
+export default memo(ControlAdaptersCollapse);
