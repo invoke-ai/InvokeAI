@@ -20,7 +20,7 @@ import {
   VAE_LOADER,
 } from './constants';
 
-// Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF
+// Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: any): void {
   const destinationFields = [
     'vae',
@@ -31,15 +31,16 @@ function copyConnectionsToDenoiseLatentsHrf(graph: any): void {
     'positive_conditioning',
     'negative_conditioning',
   ];
+  const newEdges: any[] = [];
 
   // Loop through the existing edges connected to DENOISE_LATENTS
   graph.edges.forEach((edge: any) => {
     if (
-      edge.source.node_id === DENOISE_LATENTS &&
+      edge.destination.node_id === DENOISE_LATENTS &&
       destinationFields.includes(edge.destination.field)
     ) {
       // Add a similar connection to DENOISE_LATENTS_HRF
-      graph.edges.push({
+      newEdges.push({
         source: {
           node_id: edge.source.node_id,
           field: edge.source.field,
@@ -51,6 +52,7 @@ function copyConnectionsToDenoiseLatentsHrf(graph: any): void {
       });
     }
   });
+  graph.edges = graph.edges.concat(newEdges);
 }
 
 // Adds high-res fix to the given graph by

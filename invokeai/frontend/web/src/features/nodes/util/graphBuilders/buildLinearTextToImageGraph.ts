@@ -295,9 +295,6 @@ export const buildLinearTextToImageGraph = (
     addHrfToGraph(state, graph);
   }
 
-  // eslint-disable-next-line no-debugger
-  debugger;
-
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
