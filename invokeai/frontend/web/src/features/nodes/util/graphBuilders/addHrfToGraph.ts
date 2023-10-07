@@ -1,11 +1,12 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph, Edge } from 'features/nodes/types/types';
+import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
   RescaleLatentsInvocation,
   MetadataAccumulatorInvocation,
   NoiseInvocation,
   LatentsToImageInvocation,
+  Edge,
 } from 'services/api/types';
 import {
   LATENTS_TO_IMAGE,
