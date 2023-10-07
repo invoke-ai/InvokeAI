@@ -9,17 +9,17 @@ import {
 } from 'features/parameters/store/generationSlice';
 import { useCallback, ChangeEvent } from 'react';
 
-export default function ParamHrf() {
+export default function ParamHrfScale() {
   const hrfScale = useAppSelector(
     (state: RootState) => state.generation.hrfScale
   );
   const dispatch = useAppDispatch();
 
-  const handleHrfSkipReset = useCallback(() => {
+  const handleHrfScaleReset = useCallback(() => {
     dispatch(setHrfScale(1));
   }, [dispatch]);
 
-  const handleHrfChange = useCallback(
+  const handleHrfScaleChange = useCallback(
     (v: number) => {
       dispatch(setHrfScale(v));
     },
@@ -42,24 +42,11 @@ export default function ParamHrf() {
         max={5}
         step={0.1}
         value={hrfScale}
-        onChange={handleHrfChange}
+        onChange={handleHrfScaleChange}
         withSliderMarks
         withInput
         withReset
-        handleReset={handleHrfSkipReset}
-      />
-      <IAISlider
-        label="Denoising Strength"
-        aria-label="High Resolution Denoising Strength"
-        min={1}
-        max={5}
-        step={0.1}
-        value={hrfScale}
-        onChange={handleHrfChange}
-        withSliderMarks
-        withInput
-        withReset
-        handleReset={handleHrfSkipReset}
+        handleReset={handleHrfScaleReset}
       />
       <IAISwitch
         label="Toggle High Resolution Fix"

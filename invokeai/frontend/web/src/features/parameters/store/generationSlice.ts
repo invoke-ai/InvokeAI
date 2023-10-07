@@ -280,6 +280,9 @@ export const generationSlice = createSlice({
     setHrfScale: (state, action: PayloadAction<number>) => {
       state.hrfScale = action.payload;
     },
+    setHrfStrength: (state, action: PayloadAction<number>) => {
+      state.hrfStrength = action.payload;
+    },
     setHrfToggle: (state, action: PayloadAction<boolean>) => {
       state.hrfToggled = action.payload;
     },
@@ -359,6 +362,7 @@ export const {
   setSeamlessYAxis,
   setClipSkip,
   setHrfScale,
+  setHrfStrength,
   setHrfToggle,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
