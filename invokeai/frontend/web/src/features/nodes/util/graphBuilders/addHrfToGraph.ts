@@ -55,8 +55,6 @@ export const addHrfToGraph = (
     | MetadataAccumulatorInvocation
     | undefined;
   if (metadataAccumulator) {
-    metadataAccumulator.hrf_scale = state.generation.hrfScale;
-    metadataAccumulator.hrf_strength = state.generation.hrfStrength;
     metadataAccumulator.height = scaledHeight;
     metadataAccumulator.width = scaledWidth;
   }
