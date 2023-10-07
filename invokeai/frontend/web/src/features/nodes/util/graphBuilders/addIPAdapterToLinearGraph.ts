@@ -1,15 +1,16 @@
 import { RootState } from 'app/store/store';
+import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
+  CollectInvocation,
   IPAdapterInvocation,
   MetadataAccumulatorInvocation,
 } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
-  IP_ADAPTER,
+  IP_ADAPTER_COLLECT,
   METADATA_ACCUMULATOR,
 } from './constants';
-import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 
 export const addIPAdapterToLinearGraph = (
   state: RootState,
@@ -22,60 +23,78 @@ export const addIPAdapterToLinearGraph = (
     | MetadataAccumulatorInvocation
     | undefined;
 
-  const ipAdapter = validIPAdapters[0];
-
-  // TODO: handle multiple IP adapters once backend is capable
-  if (ipAdapter && ipAdapter.model) {
-    const { weight, model, beginStepPct, endStepPct } = ipAdapter;
-    const ipAdapterNode: IPAdapterInvocation = {
-      id: IP_ADAPTER,
-      type: 'ip_adapter',
+  if (validIPAdapters.length) {
+    // Even though denoise_latents' control input is polymorphic, keep it simple and always use a collect
+    const ipAdapterCollectNode: CollectInvocation = {
+      id: IP_ADAPTER_COLLECT,
+      type: 'collect',
       is_intermediate: true,
-      weight: weight,
-      ip_adapter_model: model,
-      begin_step_percent: beginStepPct,
-      end_step_percent: endStepPct,
     };
-
-    if (ipAdapter.controlImage) {
-      ipAdapterNode.image = {
-        image_name: ipAdapter.controlImage,
-      };
-    } else {
-      return;
-    }
-
-    graph.nodes[ipAdapterNode.id] = ipAdapterNode as IPAdapterInvocation;
-    if (metadataAccumulator?.ipAdapters) {
-      const ipAdapterField = {
-        image: {
-          image_name: ipAdapter.controlImage,
-        },
-        weight,
-        ip_adapter_model: model,
-        begin_step_percent: beginStepPct,
-        end_step_percent: endStepPct,
-      };
-
-      metadataAccumulator.ipAdapters.push(ipAdapterField);
-    }
-
+    graph.nodes[ipAdapterCollectNode.id] = ipAdapterCollectNode;
     graph.edges.push({
-      source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
+      source: { node_id: ipAdapterCollectNode.id, field: 'collection' },
       destination: {
         node_id: baseNodeId,
         field: 'ip_adapter',
       },
     });
 
-    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+    validIPAdapters.forEach((ipAdapter) => {
+      if (!ipAdapter.model) {
+        return;
+      }
+      const { id, weight, model, beginStepPct, endStepPct } = ipAdapter;
+      const ipAdapterNode: IPAdapterInvocation = {
+        id: `ip_adapter_${id}`,
+        type: 'ip_adapter',
+        is_intermediate: true,
+        weight: weight,
+        ip_adapter_model: model,
+        begin_step_percent: beginStepPct,
+        end_step_percent: endStepPct,
+      };
+
+      if (ipAdapter.controlImage) {
+        ipAdapterNode.image = {
+          image_name: ipAdapter.controlImage,
+        };
+      } else {
+        return;
+      }
+
+      graph.nodes[ipAdapterNode.id] = ipAdapterNode as IPAdapterInvocation;
+
+      if (metadataAccumulator?.ipAdapters) {
+        const ipAdapterField = {
+          image: {
+            image_name: ipAdapter.controlImage,
+          },
+          weight,
+          ip_adapter_model: model,
+          begin_step_percent: beginStepPct,
+          end_step_percent: endStepPct,
+        };
+
+        metadataAccumulator.ipAdapters.push(ipAdapterField);
+      }
+
       graph.edges.push({
         source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
         destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'ip_adapter',
+          node_id: ipAdapterCollectNode.id,
+          field: 'item',
         },
       });
-    }
+
+      if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+        graph.edges.push({
+          source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
+          destination: {
+            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+            field: 'ip_adapter',
+          },
+        });
+      }
+    });
   }
 };
