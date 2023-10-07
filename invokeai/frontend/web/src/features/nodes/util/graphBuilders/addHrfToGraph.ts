@@ -61,7 +61,6 @@ export const addHrfToGraph = (
 
   // Define new nodes.
   // Denoise latents node to be run on upscaled latents.
-  // Define new nodes.
   const denoiseLatentsHrfNode: DenoiseLatentsInvocation = {
     type: 'denoise_latents',
     id: DENOISE_LATENTS_HRF,
