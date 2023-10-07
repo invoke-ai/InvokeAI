@@ -19,7 +19,9 @@ export const addControlNetToLinearGraph = (
   graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
-  const validControlNets = selectValidControlNets(state.controlAdapters);
+  const validControlNets = selectValidControlNets(state.controlAdapters).filter(
+    (ca) => ca.model?.base_model === state.generation.model?.base_model
+  );
 
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation

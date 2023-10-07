@@ -18,7 +18,9 @@ export const addT2IAdaptersToLinearGraph = (
   graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
-  const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters);
+  const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
+    (ca) => ca.model?.base_model === state.generation.model?.base_model
+  );
 
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation
