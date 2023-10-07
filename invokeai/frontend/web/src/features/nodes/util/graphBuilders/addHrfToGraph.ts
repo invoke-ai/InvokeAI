@@ -33,13 +33,13 @@ function copyConnectionsToDenoiseLatentsHrf(graph: any): void {
   ];
   const newEdges: any[] = [];
 
-  // Loop through the existing edges connected to DENOISE_LATENTS.
+  // Loop through the existing edges connected to DENOISE_LATENTS
   graph.edges.forEach((edge: any) => {
     if (
       edge.destination.node_id === DENOISE_LATENTS &&
       destinationFields.includes(edge.destination.field)
     ) {
-      // Add a similar connection to DENOISE_LATENTS_HRF.
+      // Add a similar connection to DENOISE_LATENTS_HRF
       newEdges.push({
         source: {
           node_id: edge.source.node_id,
@@ -121,7 +121,18 @@ export const addHrfToGraph = (
     is_intermediate: originalNoiseNode.is_intermediate,
   };
 
+  // New node to convert latents to image.
+  const latentsToImageHrfNode: LatentsToImageInvocation = {
+    type: originalLatentsToImageNode.type,
+    id: LATENTS_TO_IMAGE_HRF,
+    vae: originalLatentsToImageNode.vae,
+    fp32: originalLatentsToImageNode.fp32,
+    is_intermediate: originalLatentsToImageNode.is_intermediate,
+  };
+
   // Add new nodes to graph.
+  graph.nodes[LATENTS_TO_IMAGE_HRF] =
+    latentsToImageHrfNode as LatentsToImageInvocation;
   graph.nodes[DENOISE_LATENTS_HRF] =
     denoiseLatentsHrfNode as DenoiseLatentsInvocation;
   graph.nodes[RESCALE_LATENTS] = rescaleLatentsNode as RescaleLatentsInvocation;
@@ -193,6 +204,6 @@ export const addHrfToGraph = (
       },
     }
   );
-  // Finish setting up new denoise node.
+
   copyConnectionsToDenoiseLatentsHrf(graph);
 };
