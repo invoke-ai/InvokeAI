@@ -7,6 +7,7 @@ import IAICollapse from 'common/components/IAICollapse';
 import { useMemo } from 'react';
 import ParamHrfScale from './ParamHrfScale';
 import ParamHrfStrength from './ParamHrfStrength';
+import ParamHrfToggle from './ParamHrfStrength';
 
 const selector = createSelector(
   stateSelector,
@@ -31,6 +32,7 @@ export default function ParamHrfCollapse() {
   return (
     <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
+        <ParamHrfToggle />
         <ParamHrfScale />
         <ParamHrfStrength />
       </Flex>

@@ -3,7 +3,6 @@ import { useAppSelector, useAppDispatch } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useCallback } from 'react';
 import { stateSelector } from 'app/store/store';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import { setHrfStrength } from 'features/parameters/store/generationSlice';
 import IAISlider from 'common/components/IAISlider';
 
@@ -44,20 +43,18 @@ export default function ParamHrfStrength() {
   );
 
   return (
-    <IAIInformationalPopover feature="hrf" placement="bottom">
-      <IAISlider
-        label="Denoising Strength"
-        aria-label="High Resolution Denoising Strength"
-        min={min}
-        max={sliderMax}
-        step={step}
-        value={hrfStrength}
-        onChange={handleHrfStrengthChange}
-        withSliderMarks
-        withInput
-        withReset
-        handleReset={handleHrfStrengthReset}
-      />
-    </IAIInformationalPopover>
+    <IAISlider
+      label="Denoising Strength"
+      aria-label="High Resolution Denoising Strength"
+      min={min}
+      max={sliderMax}
+      step={step}
+      value={hrfStrength}
+      onChange={handleHrfStrengthChange}
+      withSliderMarks
+      withInput
+      withReset
+      handleReset={handleHrfStrengthReset}
+    />
   );
 }
