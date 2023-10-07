@@ -239,6 +239,12 @@ class IPAdapterConfig(ModelConfigBase):
     model_format: Literal[ModelFormat.InvokeAI]
 
 
+class CLIPVisionDiffusersConfig(ModelConfigBase):
+    """Model config for ClipVision."""
+
+    model_format: Literal[ModelFormat.Diffusers]
+
+
 AnyModelConfig = Union[
     MainCheckpointConfig,
     MainDiffusersConfig,
@@ -268,6 +274,7 @@ class ModelConfigFactory(object):
             ModelType.Lora: LoRAConfig,
             ModelType.Vae: VaeDiffusersConfig,
             ModelType.ControlNet: ControlNetDiffusersConfig,
+            ModelType.CLIPVision: CLIPVisionDiffusersConfig,
         },
         ModelFormat.Lycoris: {
             ModelType.Lora: LoRAConfig,

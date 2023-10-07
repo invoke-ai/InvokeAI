@@ -11,6 +11,7 @@ from typing import Dict, List, Literal, get_args, get_origin, get_type_hints
 
 import invokeai.backend.util.logging as logger
 from invokeai.backend.model_manager import ModelType
+
 from ..invocations.baseinvocation import BaseInvocation
 from ..services.invocation_services import InvocationServices
 from ..services.model_record_service import ModelRecordServiceBase

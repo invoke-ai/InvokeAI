@@ -426,6 +426,7 @@ class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
         processed_image = zoe_depth_processor(image)
         return processed_image
 
+
 @invocation(
     "mediapipe_face_processor",
     title="Mediapipe Face Processor",

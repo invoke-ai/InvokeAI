@@ -11,7 +11,7 @@ import shutil
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional, Union
 
 import diffusers
 import transformers
@@ -23,8 +23,8 @@ from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel,
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.app.services.model_install_service import ModelInstallService
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.backend.model_manager import BaseModelType, ModelProbe, ModelProbeInfo, ModelType
 
 warnings.filterwarnings("ignore")
@@ -473,7 +473,6 @@ def do_migrate(config: InvokeAIAppConfig, src_directory: Path, dest_directory: P
     migrator = MigrateTo3(from_root=src_directory, to_models=dest_models, installer=mm_install, src_paths=paths)
     migrator.migrate()
     print("Migration successful.")
-
 
     (dest_directory / "configs" / "models.yaml").replace(src_directory / "configs" / "models.yaml.orig")
     print(f"Original models.yaml file moved to {dest_directory}/configs/models.yaml.orig")

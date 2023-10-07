@@ -29,6 +29,7 @@ class UnifiedModelInfo(BaseModel):
     recommended: bool = False
     installed: bool = False
     default: bool = False
+    requires: Optional[List[str]] = Field(default_factory=list)
 
 
 @dataclass
@@ -116,6 +117,7 @@ class InstallHelper(object):
                     description=self._initial_models[key].get("description"),
                     recommended=self._initial_models[key].get("recommended", False),
                     default=self._initial_models[key].get("default", False),
+                    requires=list(self._initial_models[key].get("requires", [])),
                 )
                 self.all_models[key] = info
             if not self.default_model:
@@ -147,8 +149,21 @@ class InstallHelper(object):
     def _to_model(self, key: str) -> UnifiedModelInfo:
         return self.all_models[key]
 
+    def _add_required_models(self, model_list: List[UnifiedModelInfo]):
+        installed = {x.source for x in self.installed_models()}
+        reverse_source = {x.source: x for x in self.all_models.values()}
+        additional_models = []
+        for model_info in model_list:
+            print(f"DEBUG: model_info={model_info}")
+            for requirement in model_info.requires:
+                if requirement not in installed:
+                    print(f"DEBUG: installing {requirement}")
+                    additional_models.append(reverse_source.get(requirement))
+        model_list.extend(additional_models)
+
     def add_or_delete(self, selections: InstallSelections):
         installer = self._installer
+        self._add_required_models(selections.install_models)
         for model in selections.install_models:
             metadata = ModelSourceMetadata(description=model.description, name=model.name)
             installer.install(

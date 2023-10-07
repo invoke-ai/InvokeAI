@@ -227,13 +227,24 @@ class ModelProbe(ModelProbeBase):
         if config_path:
             with open(config_path, "r") as file:
                 conf = json.load(file)
-            class_name = conf["_class_name"]
+            if "_class_name" in conf:
+                class_name = conf["_class_name"]
+            elif "architectures" in conf:
+                class_name = conf["architectures"][0]
+            else:
+                class_name = None
+        else:
+            error_hint = f"No model_index.json or config.json found in {folder_path}."
 
         if class_name and (type := cls.CLASS2TYPE.get(class_name)):
             return type
+        else:
+            error_hint = f"class {class_name} is not one of the supported classes [{', '.join(cls.CLASS2TYPE.keys())}]"
 
         # give up
-        raise InvalidModelException(f"Unable to determine model type for {folder_path}")
+        raise InvalidModelException(
+            f"Unable to determine model type for {folder_path}" + (f"; {error_hint}" if error_hint else "")
+        )
 
     @classmethod
     def _scan_and_load_checkpoint(cls, model: Path) -> dict:
@@ -675,22 +686,25 @@ class T2IAdapterFolderProbe(FolderProbeBase):
 
 
 ############## register probe classes ######
-ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.Lora, LoRAFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
+diffusers = ModelFormat("diffusers")
+checkpoint = ModelFormat("checkpoint")
 
-ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
+ModelProbe.register_probe(diffusers, ModelType.Main, PipelineFolderProbe)
+ModelProbe.register_probe(diffusers, ModelType.Vae, VaeFolderProbe)
+ModelProbe.register_probe(diffusers, ModelType.Lora, LoRAFolderProbe)
+ModelProbe.register_probe(diffusers, ModelType.TextualInversion, TextualInversionFolderProbe)
+ModelProbe.register_probe(diffusers, ModelType.ControlNet, ControlNetFolderProbe)
+ModelProbe.register_probe(diffusers, ModelType.IPAdapter, IPAdapterFolderProbe)
+ModelProbe.register_probe(diffusers, ModelType.CLIPVision, CLIPVisionFolderProbe)
+ModelProbe.register_probe(diffusers, ModelType.T2IAdapter, T2IAdapterFolderProbe)
+
+ModelProbe.register_probe(checkpoint, ModelType.Main, PipelineCheckpointProbe)
+ModelProbe.register_probe(checkpoint, ModelType.Vae, VaeCheckpointProbe)
+ModelProbe.register_probe(checkpoint, ModelType.Lora, LoRACheckpointProbe)
+ModelProbe.register_probe(checkpoint, ModelType.TextualInversion, TextualInversionCheckpointProbe)
+ModelProbe.register_probe(checkpoint, ModelType.ControlNet, ControlNetCheckpointProbe)
+ModelProbe.register_probe(checkpoint, ModelType.IPAdapter, IPAdapterCheckpointProbe)
+ModelProbe.register_probe(checkpoint, ModelType.CLIPVision, CLIPVisionCheckpointProbe)
+ModelProbe.register_probe(checkpoint, ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
 
 ModelProbe.register_probe(ModelFormat("onnx"), ModelType.ONNX, ONNXFolderProbe)

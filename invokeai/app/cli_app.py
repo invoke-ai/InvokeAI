@@ -22,16 +22,16 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from pydantic.fields import Field
 
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
-    from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
     from invokeai.app.services.board_image_record_storage import SqliteBoardImageRecordStorage
     from invokeai.app.services.board_images import BoardImagesService, BoardImagesServiceDependencies
     from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
     from invokeai.app.services.boards import BoardService, BoardServiceDependencies
-    from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
     from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
     from invokeai.app.services.images import ImageService, ImageServiceDependencies
     from invokeai.app.services.invocation_stats import InvocationStatsService
     from invokeai.app.services.resource_name import SimpleNameService
+    from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
+    from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
     from invokeai.app.services.urls import LocalUrlService
     from invokeai.backend.util.logging import InvokeAILogger
     from invokeai.version.invokeai_version import __version__
@@ -49,7 +49,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         LibraryGraph,
         are_connection_types_compatible,
     )
-    from .services.thread import lock
     from .services.image_file_storage import DiskImageFileStorage
     from .services.invocation_queue import MemoryInvocationQueue
     from .services.invocation_services import InvocationServices
@@ -60,6 +59,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from .services.model_record_service import ModelRecordServiceBase
     from .services.processor import DefaultInvocationProcessor
     from .services.sqlite import SqliteItemStorage
+    from .services.thread import lock
 
     if torch.backends.mps.is_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
@@ -266,7 +266,9 @@ def invoke_cli():
     model_loader = ModelLoadService(config, model_record_store)
     model_installer = ModelInstallService(config, model_record_store, events)
 
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions", lock=lock)
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+        conn=db_conn, table_name="graph_executions", lock=lock
+    )
 
     urls = LocalUrlService()
     image_record_storage = SqliteImageRecordStorage(conn=db_conn, lock=lock)
