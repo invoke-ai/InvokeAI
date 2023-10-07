@@ -9,8 +9,6 @@ import {
 } from 'services/api/types';
 import {
   LATENTS_TO_IMAGE,
-  POSITIVE_CONDITIONING,
-  NEGATIVE_CONDITIONING,
   DENOISE_LATENTS,
   NOISE,
   MAIN_MODEL_LOADER,
@@ -21,6 +19,39 @@ import {
   NOISE_HRF,
   VAE_LOADER,
 } from './constants';
+
+// Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF
+function copyConnectionsToDenoiseLatentsHrf(graph: any): void {
+  const destinationFields = [
+    'vae',
+    'control',
+    'ip_adapter',
+    'metadata',
+    'unet',
+    'positive_conditioning',
+    'negative_conditioning',
+  ];
+
+  // Loop through the existing edges connected to DENOISE_LATENTS
+  graph.edges.forEach((edge: any) => {
+    if (
+      edge.source.node_id === DENOISE_LATENTS &&
+      destinationFields.includes(edge.destination.field)
+    ) {
+      // Add a similar connection to DENOISE_LATENTS_HRF
+      graph.edges.push({
+        source: {
+          node_id: edge.source.node_id,
+          field: edge.source.field,
+        },
+        destination: {
+          node_id: DENOISE_LATENTS_HRF,
+          field: edge.destination.field,
+        },
+      });
+    }
+  });
+}
 
 // Adds high-res fix to the given graph by
 // adding an additional denoise latents with the same parameters
@@ -139,36 +170,6 @@ export const addHrfToGraph = (
         field: 'noise',
       },
     },
-    {
-      source: {
-        node_id: MAIN_MODEL_LOADER,
-        field: 'unet',
-      },
-      destination: {
-        node_id: DENOISE_LATENTS_HRF,
-        field: 'unet',
-      },
-    },
-    {
-      source: {
-        node_id: POSITIVE_CONDITIONING,
-        field: 'conditioning',
-      },
-      destination: {
-        node_id: DENOISE_LATENTS_HRF,
-        field: 'positive_conditioning',
-      },
-    },
-    {
-      source: {
-        node_id: NEGATIVE_CONDITIONING,
-        field: 'conditioning',
-      },
-      destination: {
-        node_id: DENOISE_LATENTS_HRF,
-        field: 'negative_conditioning',
-      },
-    },
     // Set up new latents to image node.
     {
       source: {
@@ -201,4 +202,6 @@ export const addHrfToGraph = (
       },
     }
   );
+
+  copyConnectionsToDenoiseLatentsHrf(graph);
 };
