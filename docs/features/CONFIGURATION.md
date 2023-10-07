@@ -207,11 +207,8 @@ if INVOKEAI_ROOT is `/home/fred/invokeai` and the path is
 
 | Setting  | Default Value  |  Description |
 |----------|----------------|--------------|
-| `autoimport_dir` | `autoimport/main`     | At startup time, read and import any main model files found in this directory |
-| `lora_dir` | `autoimport/lora`     | At startup time, read and import any LoRA/LyCORIS models found in this directory |
-| `embedding_dir` | `autoimport/embedding`  | At startup time, read and import any textual inversion (embedding) models found in this directory |
-| `controlnet_dir` | `autoimport/controlnet`  | At startup time, read and import any ControlNet models found in this directory |
-| `conf_path` | `configs/models.yaml`  | Location of the `models.yaml` model configuration file |
+| `autoimport_dir` | `autoimport/main`     | At startup time, read and import any main model files found in this directory (not recommended)|
+| `model_config_db` | `auto`  | Location of the model configuration database. Specify `auto` to use the main invokeai.db database, or specify a `.yaml` or `.db` file to store the data externally.|
 | `models_dir` | `models`  | Location of the directory containing models installed by InvokeAI's model manager |
 | `legacy_conf_dir` | `configs/stable-diffusion`  | Location of the directory containing the .yaml configuration files for legacy checkpoint models |
 | `db_dir` | `databases`  | Location of the directory containing InvokeAI's image, schema and session database |

@@ -764,11 +764,11 @@ class ModelInstall(ModelInstallBase):
         installed = set()
 
         with Chdir(self._app_config.models_path):
-            self._logger.info("Checking for models that have been moved or deleted from disk.")
+            self._logger.info("Checking for models that have been moved or deleted from disk")
             for model_config in self._store.all_models():
                 path = Path(model_config.path)
                 if not path.exists():
-                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering.")
+                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering")
                     defunct_models.add(model_config.key)
             for key in defunct_models:
                 self.unregister(key)

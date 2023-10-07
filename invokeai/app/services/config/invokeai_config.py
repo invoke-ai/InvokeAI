@@ -219,10 +219,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # PATHS
     root                : Path = Field(default=None, description='InvokeAI runtime root directory', category='Paths')
-    autoimport_dir      : Path = Field(default='autoimport', description='Path to a directory of models files to be imported on startup.', category='Paths')
-    lora_dir            : Path = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
-    embedding_dir       : Path = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
-    controlnet_dir      : Path = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', category='Paths')
+    autoimport_dir      : Optional[Path] = Field(default=None, description='Path to a directory of models files to be imported on startup.', category='Paths')
     model_config_db     : Union[Path, Literal['auto'], None] = Field(default=None, description='Path to a sqlite .db file or .yaml file for storing model config records; "auto" will reuse the main sqlite db', category='Paths')
     models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
@@ -274,6 +271,9 @@ class InvokeAIAppConfig(InvokeAISettings):
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
+    lora_dir            : Path = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
+    embedding_dir       : Path = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
+    controlnet_dir      : Path = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', category='Paths')
 
     # See InvokeAIAppConfig subclass below for CACHE and DEVICE categories
     # fmt: on
@@ -340,6 +340,9 @@ class InvokeAIAppConfig(InvokeAISettings):
                 "xformers_enabled",
                 "tiled_decode",
                 "conf_path",
+                "lora_dir",
+                "embedding_dir",
+                "controlnet_dir",
             ]
         )
         return el

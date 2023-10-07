@@ -178,6 +178,9 @@ class ModelInstallService(ModelInstall, ModelInstallServiceBase):
     def start(self, invoker: Any):  # Because .processor is giving circular import errors, declaring invoker an 'Any'
         """Call automatically at process start."""
         self.scan_models_directory()  # synchronize new/deleted models found in models directory
+        if autoimport := self._app_config.autoimport_dir:
+            self._logger.info("Scanning autoimport directory for new models")
+            self.scan_directory(self._app_config.root_path / autoimport)
 
     def install_model(
         self,

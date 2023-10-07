@@ -587,8 +587,8 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.autoimport_dirs = {}
         self.autoimport_dirs["autoimport_dir"] = self.add_widget_intelligent(
             FileBox,
-            name="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models",
-            value=str(config.root_path / config.autoimport_dir),
+            name="Optional folder to scan for new checkpoints, ControlNets, LoRAs and TI models",
+            value=str(config.root_path / config.autoimport_dir) if config.autoimport_dir else "",
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -678,6 +678,8 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
                 setattr(new_opts, attr, getattr(self, attr).value)
 
         for attr in self.autoimport_dirs:
+            if not self.autoimport_dirs[attr].value:
+                continue
             directory = Path(self.autoimport_dirs[attr].value)
             if directory.is_relative_to(config.root_path):
                 directory = directory.relative_to(config.root_path)
