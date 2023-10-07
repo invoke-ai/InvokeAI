@@ -93,9 +93,19 @@ const selector = createSelector(
         if (!ca.isEnabled) {
           return;
         }
+
         if (!ca.model) {
           reasons.push(
-            i18n.t('parameters.invoke.noModelForControlNet', { index: i + 1 })
+            i18n.t('parameters.invoke.noModelForControlAdapter', {
+              number: i + 1,
+            })
+          );
+        } else if (ca.model.base_model !== model?.base_model) {
+          // This should never happen, just a sanity check
+          reasons.push(
+            i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
+              number: i + 1,
+            })
           );
         }
 
@@ -106,8 +116,8 @@ const selector = createSelector(
             ca.processorType !== 'none')
         ) {
           reasons.push(
-            i18n.t('parameters.invoke.noControlImageForControlNet', {
-              index: i + 1,
+            i18n.t('parameters.invoke.noControlImageForControlAdapter', {
+              number: i + 1,
             })
           );
         }
