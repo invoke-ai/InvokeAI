@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 import { ParamCpuNoiseToggle } from '../Noise/ParamCpuNoise';
 import ParamSeamless from '../Seamless/ParamSeamless';
 import ParamClipSkip from './ParamClipSkip';
-import ParamHrf from './ParamHrf';
 
 const selector = createSelector(
   stateSelector,
@@ -63,7 +62,6 @@ export default function ParamAdvancedCollapse() {
             <Divider pt={2} />
           </>
         )}
-        <ParamHrf />
         <ParamCpuNoiseToggle />
       </Flex>
     </IAICollapse>
