@@ -123,11 +123,20 @@ installation. Examples:
 # (list all controlnet models)
 invokeai-model-install --list controlnet
 
-# (install the model at the indicated URL)
+# (install the diffusers model using its hugging face repo_id)
+invokeai-model-install --add stabilityai/stable-diffusion-xl-base-1.0
+
+# (install a diffusers model that lives in a subfolder)
+invokeai-model-install --add stabilityai/stable-diffusion-xl-base-1.0:vae
+
+# (install the checkpoint model at the indicated URL)
 invokeai-model-install --add https://civitai.com/api/download/models/128713
 
-# (delete the named model)
-invokeai-model-install --delete sd-1/main/analog-diffusion
+# (delete the named model if its name is unique)
+invokeai-model-install --delete analog-diffusion
+
+# (delete the named model using its fully qualified name)
+invokeai-model-install --delete sd-1/main/test_model
 ```
 
 ### Installation via the Web GUI
@@ -140,6 +149,24 @@ left-hand panel) and navigate to *Import Models*
 2. In the field labeled *Location* type in the path to the model you
 wish to install. You may use a URL, HuggingFace repo id, or a path on
 your local disk.
+
+There is special scanning for CivitAI URLs which lets
+you cut-and-paste either the URL for a CivitAI model page
+(e.g. https://civitai.com/models/12345), or the direct download link
+for a model (e.g. https://civitai.com/api/download/models/12345).
+
+If the desired model is a HuggingFace diffusers model that is located
+in a subfolder of the repository (e.g. vae), then append the subfolder
+to the end of the repo_id like this:
+
+```
+# a VAE model located in subfolder "vae"a
+stabilityai/stable-diffusion-xl-base-1.0:vae
+
+# version 2 of the model located in subfolder "v2"
+monster-labs/control_v1p_sd15_qrcode_monster:v2
+
+```
 
 3. Alternatively, the *Scan for Models* button allows you to paste in
 the path to a folder somewhere on your machine. It will be scanned for

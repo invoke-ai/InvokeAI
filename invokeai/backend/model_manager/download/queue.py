@@ -46,7 +46,7 @@ CIVITAI_VERSIONS_ENDPOINT = "https://civitai.com/api/v1/model-versions/"
 # Regular expressions to describe repo_ids and http urls
 HTTP_RE = r"^https?://"
 REPO_ID_RE = r"^[\w-]+/[.\w-]+$"
-REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE = r"^[\w-]+/[.\w-]+(?::\w+)?$"
+REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE = r"^([.\w-]+/[.\w-]+)(?::([.\w-]+))?$"
 
 
 class DownloadJobPath(DownloadJobBase):
@@ -73,6 +73,9 @@ class DownloadJobRepoID(DownloadJobRemoteSource):
     """Download repo ids."""
 
     source: str = Field(description="A repo_id (foo/bar), or a repo_id with a subfolder (foo/far:v2)")
+    subfolder: Optional[str] = Field(
+        description="Provide when the desired model is in a subfolder of the repo_id's distro", default=None
+    )
     variant: Optional[str] = Field(description="Variant, such as 'fp16', to download")
     subqueue: Optional["DownloadQueueBase"] = Field(
         description="a subqueue used for downloading the individual files in the repo_id", default=None
@@ -572,7 +575,9 @@ class DownloadQueue(DownloadQueueBase):
             variant = job.variant
             if not job.metadata:
                 job.metadata = ModelSourceMetadata()
-            urls_to_download = self._get_repo_info(repo_id, variant=variant, metadata=job.metadata)
+            urls_to_download = self._get_repo_info(
+                repo_id, variant=variant, metadata=job.metadata, subfolder=job.subfolder
+            )
             if job.destination.name != Path(repo_id).name:
                 job.destination = job.destination / Path(repo_id).name
             bytes_downloaded: Dict[int, int] = dict()
@@ -605,6 +610,7 @@ class DownloadQueue(DownloadQueueBase):
         repo_id: str,
         metadata: ModelSourceMetadata,
         variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
     ) -> List[Tuple[AnyHttpUrl, Path, Path, int]]:
         """
         Given a repo_id and an optional variant, return list of URLs to download to get the model.
@@ -620,15 +626,26 @@ class DownloadQueue(DownloadQueueBase):
         sibs = model_info.siblings
         paths = [x.rfilename for x in sibs]
         sizes = {x.rfilename: x.size for x in sibs}
-        if "model_index.json" in paths:
-            url = hf_hub_url(repo_id, filename="model_index.json")
+
+        prefix = ""
+        if subfolder:
+            prefix = f"{subfolder}/"
+            paths = [x for x in paths if x.startswith(prefix)]
+
+        if f"{prefix}model_index.json" in paths:
+            url = hf_hub_url(repo_id, filename="model_index.json", subfolder=subfolder)
             resp = self._requests.get(url)
             resp.raise_for_status()  # will raise an HTTPError on non-200 status
             submodels = resp.json()
-            paths = [x for x in paths if Path(x).parent.as_posix() in submodels]
-            paths.insert(0, "model_index.json")
+            paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]
+            paths.insert(0, f"{prefix}model_index.json")
         urls = [
-            (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), Path(x.name), sizes[x.as_posix()])
+            (
+                hf_hub_url(repo_id, filename=x.as_posix()),
+                x.parent.relative_to(prefix) or Path("."),
+                Path(x.name),
+                sizes[x.as_posix()],
+            )
             for x in self._select_variants(paths, variant)
         ]
         if hasattr(model_info, "cardData"):

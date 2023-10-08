@@ -25,11 +25,12 @@ class UnifiedModelInfo(BaseModel):
     base_model: Optional[BaseModelType] = None
     model_type: Optional[ModelType] = None
     source: Optional[str] = None
+    subfolder: Optional[str] = None
     description: Optional[str] = None
     recommended: bool = False
     installed: bool = False
     default: bool = False
-    requires: Optional[List[str]] = Field(default_factory=list)
+    requires: List[str] = Field(default_factory=list)
 
 
 @dataclass
@@ -117,6 +118,7 @@ class InstallHelper(object):
                     description=self._initial_models[key].get("description"),
                     recommended=self._initial_models[key].get("recommended", False),
                     default=self._initial_models[key].get("default", False),
+                    subfolder=self._initial_models[key].get("subfolder"),
                     requires=list(self._initial_models[key].get("requires", [])),
                 )
                 self.all_models[key] = info
@@ -154,10 +156,8 @@ class InstallHelper(object):
         reverse_source = {x.source: x for x in self.all_models.values()}
         additional_models = []
         for model_info in model_list:
-            print(f"DEBUG: model_info={model_info}")
             for requirement in model_info.requires:
                 if requirement not in installed:
-                    print(f"DEBUG: installing {requirement}")
                     additional_models.append(reverse_source.get(requirement))
         model_list.extend(additional_models)
 
@@ -168,6 +168,7 @@ class InstallHelper(object):
             metadata = ModelSourceMetadata(description=model.description, name=model.name)
             installer.install(
                 model.source,
+                subfolder=model.subfolder,
                 variant="fp16" if self._config.precision == "float16" else None,
                 access_token=ACCESS_TOKEN,  # this is a global,
                 metadata=metadata,

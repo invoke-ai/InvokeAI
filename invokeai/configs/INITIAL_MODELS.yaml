@@ -60,9 +60,9 @@ sd-1/main/trinart_stable_diffusion_v2:
    description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
    source: naclbit/trinart_stable_diffusion_v2
    recommended: False
-#sd-1/controlnet/qrcode_monster:
-#   repo_id: monster-labs/control_v1p_sd15_qrcode_monster
-#   subfolder: v2
+sd-1/controlnet/qrcode_monster:
+   source: monster-labs/control_v1p_sd15_qrcode_monster
+   subfolder: v2
 sd-1/controlnet/canny:
    source: lllyasviel/control_v11p_sd15_canny
    recommended: True

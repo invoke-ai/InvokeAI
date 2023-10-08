@@ -73,7 +73,14 @@ from .config import (
     SubModelType,
 )
 from .download import DownloadEventHandler, DownloadJobBase, DownloadQueue, DownloadQueueBase, ModelSourceMetadata
-from .download.queue import HTTP_RE, REPO_ID_RE, DownloadJobPath, DownloadJobRepoID, DownloadJobURL
+from .download.queue import (
+    HTTP_RE,
+    REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE,
+    DownloadJobRemoteSource,
+    DownloadJobPath,
+    DownloadJobRepoID,
+    DownloadJobURL,
+)
 from .hash import FastModelHash
 from .models import InvalidModelException
 from .probe import ModelProbe, ModelProbeInfo
@@ -81,7 +88,7 @@ from .search import ModelSearch
 from .storage import DuplicateModelException, ModelConfigStore
 
 
-class ModelInstallJob(DownloadJobBase):
+class ModelInstallJob(DownloadJobRemoteSource):
     """This is a version of DownloadJobBase that has an additional slot for the model key and probe info."""
 
     model_key: Optional[str] = Field(
@@ -185,6 +192,7 @@ class ModelInstallBase(ABC):
         inplace: bool = True,
         priority: int = 10,
         variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
         probe_override: Optional[Dict[str, Any]] = None,
         metadata: Optional[ModelSourceMetadata] = None,
         access_token: Optional[str] = None,
@@ -206,6 +214,8 @@ class ModelInstallBase(ABC):
         the models directory, but registered in place (the default).
         :param variant: For HuggingFace models, this optional parameter
         specifies which variant to download (e.g. 'fp16')
+        :param subfolder: When downloading HF repo_ids this can be used to
+        specify a subfolder of the HF repository to download from.
         :param probe_override: Optional dict. Any fields in this dict
         will override corresponding probe fields. Use it to override
         `base_type`, `model_type`, `format`, `prediction_type` and `image_size`.
@@ -525,13 +535,16 @@ class ModelInstall(ModelInstallBase):
         inplace: bool = True,
         priority: int = 10,
         variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
         probe_override: Optional[Dict[str, Any]] = None,
         metadata: Optional[ModelSourceMetadata] = None,
         access_token: Optional[str] = None,
     ) -> DownloadJobBase:  # noqa D102
         queue = self._download_queue
 
-        job = self._make_download_job(source, variant=variant, access_token=access_token, priority=priority)
+        job = self._make_download_job(
+            source, variant=variant, access_token=access_token, subfolder=subfolder, priority=priority
+        )
         handler = (
             self._complete_registration_handler
             if inplace and Path(source).exists()
@@ -624,6 +637,7 @@ class ModelInstall(ModelInstallBase):
         self,
         source: Union[str, Path, AnyHttpUrl],
         variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
         access_token: Optional[str] = None,
         priority: Optional[int] = 10,
     ) -> ModelInstallJob:
@@ -643,9 +657,11 @@ class ModelInstall(ModelInstallBase):
         self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
 
         cls = ModelInstallJob
-        if re.match(REPO_ID_RE, str(source)):
+        if match := re.match(REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE, str(source)):
             cls = ModelInstallRepoIDJob
-            kwargs = dict(variant=variant)
+            source = match.group(1)
+            subfolder = match.group(2) or subfolder
+            kwargs = dict(variant=variant, subfolder=subfolder)
         elif re.match(HTTP_RE, str(source)):
             cls = ModelInstallURLJob
             kwargs = {}

@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.install.install_helper import InstallHelper
+from invokeai.backend.install.install_helper import InstallHelper, UnifiedModelInfo
 from invokeai.backend.model_manager import BaseModelType, ModelType
 from invokeai.backend.model_manager.install import ModelInstall, ModelInstallJob
 from invokeai.backend.util import choose_precision, choose_torch_device
@@ -54,17 +54,6 @@ NOPRINT_TRANS_TABLE = {i: None for i in range(0, sys.maxunicode + 1) if not chr(
 
 # maximum number of installed models we can display before overflowing vertically
 MAX_OTHER_MODELS = 72
-
-
-class UnifiedModelInfo(BaseModel):
-    name: Optional[str] = None
-    base_model: Optional[BaseModelType] = None
-    model_type: Optional[ModelType] = None
-    source: Optional[str] = None
-    description: Optional[str] = None
-    recommended: bool = False
-    installed: bool = False
-    default: bool = False
 
 
 @dataclass
