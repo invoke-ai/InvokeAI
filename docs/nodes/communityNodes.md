@@ -11,6 +11,20 @@ To use a community workflow, download the the `.json` node graph file and load i
 --------------------------------
 
 --------------------------------
+### Make 3D
+
+**Description:** Create compelling 3D stereo images from 2D originals.
+
+**Node Link:** [https://gitlab.com/srcrr/shift3d/-/raw/main/make3d.py](https://gitlab.com/srcrr/shift3d)
+
+**Example Node Graph:**  https://gitlab.com/srcrr/shift3d/-/raw/main/example-workflow.json?ref_type=heads&inline=false
+
+**Output Examples** 
+
+![Painting of a cozy delapidated house](https://gitlab.com/srcrr/shift3d/-/raw/main/example-1.png){: style="height:512px;width:512px"}
+![Photo of cute puppies](https://gitlab.com/srcrr/shift3d/-/raw/main/example-2.png){: style="height:512px;width:512px"}
+
+--------------------------------
 ### Ideal Size
 
 **Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
@@ -261,6 +275,36 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/README.md
 
 **Node Link:** https://github.com/skunkworxdark/XYGrid_nodes
+
+--------------------------------
+
+### Image to Character Art Image Node's
+
+**Description:** Group of nodes to convert an input image into ascii/unicode art Image
+
+**Node Link:** https://github.com/mickr777/imagetoasciiimage
+
+**Output Examples**
+
+<img src="https://github.com/invoke-ai/InvokeAI/assets/115216705/8e061fcc-9a2c-4fa9-bcc7-c0f7b01e9056" width="300" />
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/3c4990eb-2f42-46b9-90f9-0088b939dc6a" width="300" /></br>
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/fee7f800-a4a8-41e2-a66b-c66e4343307e" width="300" />
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/1d9c1003-a45f-45c2-aac7-46470bb89330" width="300" />
+
+--------------------------------
+
+### Grid to Gif
+
+**Description:** One node that turns a grid image into an image colletion, one node that turns an image collection into a gif
+
+**Node Link:** https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/GridToGif.py
+
+**Example Node Graph:**  https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/Grid%20to%20Gif%20Example%20Workflow.json
+
+**Output Examples** 
+
+<img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/input.png" width="300" />
+<img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/output.gif" width="300" />
 
 --------------------------------
 

@@ -1,5 +1,10 @@
 import { logger } from 'app/logging/logger';
-import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlAdapterModelCleared,
+  selectAllControlNets,
+  selectAllIPAdapters,
+  selectAllT2IAdapters,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import {
   modelChanged,
@@ -216,21 +221,71 @@ export const addModelsLoadedListener = () => {
         `ControlNet models loaded (${action.payload.ids.length})`
       );
 
-      const controlNets = getState().controlNet.controlNets;
-
-      forEach(controlNets, (controlNet, controlNetId) => {
-        const isControlNetAvailable = some(
+      selectAllControlNets(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
           action.payload.entities,
           (m) =>
-            m?.model_name === controlNet?.model?.model_name &&
-            m?.base_model === controlNet?.model?.base_model
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
         );
 
-        if (isControlNetAvailable) {
+        if (isModelAvailable) {
           return;
         }
 
-        dispatch(controlNetRemoved({ controlNetId }));
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
+      });
+    },
+  });
+  startAppListening({
+    matcher: modelsApi.endpoints.getT2IAdapterModels.matchFulfilled,
+    effect: async (action, { getState, dispatch }) => {
+      // ControlNet models loaded - need to remove missing ControlNets from state
+      const log = logger('models');
+      log.info(
+        { models: action.payload.entities },
+        `ControlNet models loaded (${action.payload.ids.length})`
+      );
+
+      selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
+          action.payload.entities,
+          (m) =>
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
+        );
+
+        if (isModelAvailable) {
+          return;
+        }
+
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
+      });
+    },
+  });
+  startAppListening({
+    matcher: modelsApi.endpoints.getIPAdapterModels.matchFulfilled,
+    effect: async (action, { getState, dispatch }) => {
+      // ControlNet models loaded - need to remove missing ControlNets from state
+      const log = logger('models');
+      log.info(
+        { models: action.payload.entities },
+        `IP Adapter models loaded (${action.payload.ids.length})`
+      );
+
+      selectAllIPAdapters(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
+          action.payload.entities,
+          (m) =>
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
+        );
+
+        if (isModelAvailable) {
+          return;
+        }
+
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
       });
     },
   });

@@ -3,6 +3,7 @@ import {
   CoreMetadata,
   LoRAMetadataItem,
   IPAdapterMetadataItem,
+  T2IAdapterMetadataItem,
 } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useMemo, useCallback } from 'react';
@@ -10,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import {
   isValidControlNetModel,
   isValidLoRAModel,
+  isValidT2IAdapterModel,
 } from '../../../parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
@@ -36,6 +38,7 @@ const ImageMetadataActions = (props: Props) => {
     recallLoRA,
     recallControlNet,
     recallIPAdapter,
+    recallT2IAdapter,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {
@@ -99,6 +102,13 @@ const ImageMetadataActions = (props: Props) => {
     [recallIPAdapter]
   );
 
+  const handleRecallT2IAdapter = useCallback(
+    (ipAdapter: T2IAdapterMetadataItem) => {
+      recallT2IAdapter(ipAdapter);
+    },
+    [recallT2IAdapter]
+  );
+
   const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
     return metadata?.controlnets
       ? metadata.controlnets.filter((controlnet) =>
@@ -114,6 +124,14 @@ const ImageMetadataActions = (props: Props) => {
         )
       : [];
   }, [metadata?.ipAdapters]);
+
+  const validT2IAdapters: T2IAdapterMetadataItem[] = useMemo(() => {
+    return metadata?.t2iAdapters
+      ? metadata.t2iAdapters.filter((t2iAdapter) =>
+          isValidT2IAdapterModel(t2iAdapter.t2i_adapter_model)
+        )
+      : [];
+  }, [metadata?.t2iAdapters]);
 
   if (!metadata || Object.keys(metadata).length === 0) {
     return null;
@@ -236,6 +254,14 @@ const ImageMetadataActions = (props: Props) => {
           label="IP Adapter"
           value={`${ipAdapter.ip_adapter_model?.model_name} - ${ipAdapter.weight}`}
           onClick={() => handleRecallIPAdapter(ipAdapter)}
+        />
+      ))}
+      {validT2IAdapters.map((t2iAdapter, index) => (
+        <ImageMetadataItem
+          key={index}
+          label="T2I Adapter"
+          value={`${t2iAdapter.t2i_adapter_model?.model_name} - ${t2iAdapter.weight}`}
+          onClick={() => handleRecallT2IAdapter(t2iAdapter)}
         />
       ))}
     </>

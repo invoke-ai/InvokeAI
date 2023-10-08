@@ -161,16 +161,16 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.packages.find]
 "where" = ["."]
 "include" = [
-    "invokeai.assets.web*","invokeai.version*",
+    "invokeai.assets.fonts*","invokeai.version*",
     "invokeai.generator*","invokeai.backend*",
     "invokeai.frontend*", "invokeai.frontend.web.dist*",
     "invokeai.frontend.web.static*",
     "invokeai.configs*",
-    "invokeai.app*","ldm*",
+    "invokeai.app*",
 ]
 
 [tool.setuptools.package-data]
-"invokeai.assets.web" = ["**.png","**.js","**.woff2","**.css"]
+"invokeai.assets.fonts" = ["**/*.ttf"]
 "invokeai.backend" = ["**.png"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]
@@ -178,7 +178,10 @@ version = { attr = "invokeai.version.__version__" }
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
-addopts = "--cov-report term --cov-report html --cov-report xml"
+addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
+markers = [
+    "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\"."
+]
 [tool.coverage.run]
 branch = true
 source = ["invokeai"]

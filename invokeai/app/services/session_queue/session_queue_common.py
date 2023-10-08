@@ -123,6 +123,11 @@ class Batch(BaseModel):
                     raise NodeNotFoundError(f"Field {batch_data.field_name} not found in node {batch_data.node_path}")
         return values
 
+    @validator("graph")
+    def validate_graph(cls, v: Graph):
+        v.validate_self()
+        return v
+
     class Config:
         schema_extra = {
             "required": [

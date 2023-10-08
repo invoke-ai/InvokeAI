@@ -6,8 +6,10 @@ import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import { startAppListening } from '..';
+import { ImageDTO } from 'services/api/types';
+import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
 
-export const upscaleRequested = createAction<{ image_name: string }>(
+export const upscaleRequested = createAction<{ imageDTO: ImageDTO }>(
   `upscale/upscaleRequested`
 );
 
@@ -17,8 +19,28 @@ export const addUpscaleRequestedListener = () => {
     effect: async (action, { dispatch, getState }) => {
       const log = logger('session');
 
-      const { image_name } = action.payload;
+      const { imageDTO } = action.payload;
+      const { image_name } = imageDTO;
       const state = getState();
+
+      const { isAllowedToUpscale, detailTKey } =
+        createIsAllowedToUpscaleSelector(imageDTO)(state);
+
+      // if we can't upscale, show a toast and return
+      if (!isAllowedToUpscale) {
+        log.error(
+          { imageDTO },
+          t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge') // should never coalesce
+        );
+        dispatch(
+          addToast({
+            title: t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge'), // should never coalesce
+            status: 'error',
+          })
+        );
+        return;
+      }
+
       const { esrganModelName } = state.postprocessing;
       const { autoAddBoardId } = state.gallery;
 
