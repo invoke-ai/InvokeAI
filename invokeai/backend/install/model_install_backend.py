@@ -335,7 +335,7 @@ class ModelInstall(object):
         # list all the files in the repo
         files = [x.rfilename for x in hinfo.siblings]
         if subfolder:
-            files = [x for x in files if x.startswith("v2/")]
+            files = [x for x in files if x.startswith(f"{subfolder}/")]
         prefix = f"{subfolder}/" if subfolder else ""
 
         location = None
