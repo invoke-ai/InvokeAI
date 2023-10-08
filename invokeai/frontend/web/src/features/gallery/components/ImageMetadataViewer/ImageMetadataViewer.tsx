@@ -1,6 +1,5 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
-  Box,
   Flex,
   Link,
   Tab,
