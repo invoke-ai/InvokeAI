@@ -13,6 +13,7 @@ from tqdm import tqdm
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager import BaseModelType, ModelType
+from invokeai.backend.model_manager.download.queue import DownloadJobRemoteSource
 from invokeai.backend.model_manager.install import ModelInstall, ModelInstallJob, ModelSourceMetadata
 
 # name of the starter models file
@@ -48,6 +49,8 @@ class TqdmProgress(object):
         self._last = dict()
 
     def job_update(self, job: ModelInstallJob):
+        if not isinstance(job, DownloadJobRemoteSource):
+            return
         job_id = job.id
         if job.status == "running":
             if job_id not in self._bars:

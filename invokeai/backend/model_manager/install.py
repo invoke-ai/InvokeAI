@@ -122,7 +122,7 @@ ModelInstallEventHandler = Callable[["ModelInstallJob"], None]
 
 
 class ModelInstallBase(ABC):
-    """Abstract base class for InvokeAI model installation"""
+    """Abstract base class for InvokeAI model installation."""
 
     @abstractmethod
     def __init__(
@@ -558,7 +558,7 @@ class ModelInstall(ModelInstallBase):
         )
         if isinstance(job, ModelInstallJob):
             job.probe_override = probe_override
-        if metadata:
+        if metadata and isinstance(job, DownloadJobWithMetadata):
             job.metadata = metadata
         job.add_event_handler(handler)
 
@@ -573,13 +573,14 @@ class ModelInstall(ModelInstallBase):
             model_id = self.install_path(job.destination, job.probe_override)
             info = self._store.get_model(model_id)
             info.source = str(job.source)
-            metadata: ModelSourceMetadata = job.metadata
-            info.description = metadata.description or f"Imported model {info.name}"
-            info.name = metadata.name or info.name
-            info.author = metadata.author
-            info.tags = metadata.tags
-            info.license = metadata.license
-            info.thumbnail_url = metadata.thumbnail_url
+            if isinstance(job, DownloadJobWithMetadata):
+                metadata: ModelSourceMetadata = job.metadata
+                info.description = metadata.description or f"Imported model {info.name}"
+                info.name = metadata.name or info.name
+                info.author = metadata.author
+                info.tags = metadata.tags
+                info.license = metadata.license
+                info.thumbnail_url = metadata.thumbnail_url
             self._store.update_model(model_id, info)
             self._async_installs[job.source] = model_id
             job.model_key = model_id
