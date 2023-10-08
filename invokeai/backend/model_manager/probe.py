@@ -95,6 +95,7 @@ class ModelProbe(ModelProbeBase):
         "StableDiffusionXLPipeline": ModelType.Main,
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
+        "AutoencoderTiny": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
         "T2IAdapter": ModelType.T2IAdapter,
