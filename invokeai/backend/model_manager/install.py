@@ -72,14 +72,20 @@ from .config import (
     SchedulerPredictionType,
     SubModelType,
 )
-from .download import DownloadEventHandler, DownloadJobBase, DownloadQueue, DownloadQueueBase, ModelSourceMetadata
-from .download.queue import (
+from .download import (
+    DownloadEventHandler,
+    DownloadJobBase,
+    DownloadJobPath,
+    DownloadJobURL,
+    DownloadQueueBase,
+    ModelDownloadQueue,
+    ModelSourceMetadata,
+)
+from .download.model_queue import (
     HTTP_RE,
     REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE,
-    DownloadJobRemoteSource,
-    DownloadJobPath,
     DownloadJobRepoID,
-    DownloadJobURL,
+    DownloadJobWithMetadata,
 )
 from .hash import FastModelHash
 from .models import InvalidModelException
@@ -88,7 +94,7 @@ from .search import ModelSearch
 from .storage import DuplicateModelException, ModelConfigStore
 
 
-class ModelInstallJob(DownloadJobRemoteSource):
+class ModelInstallJob(DownloadJobBase):
     """This is a version of DownloadJobBase that has an additional slot for the model key and probe info."""
 
     model_key: Optional[str] = Field(
@@ -100,7 +106,7 @@ class ModelInstallJob(DownloadJobRemoteSource):
     )
 
 
-class ModelInstallURLJob(DownloadJobURL, ModelInstallJob):
+class ModelInstallURLJob(DownloadJobWithMetadata, ModelInstallJob):
     """Job for installing URLs."""
 
 
@@ -398,7 +404,7 @@ class ModelInstall(ModelInstallBase):
         self._app_config = config or InvokeAIAppConfig.get_config()
         self._logger = logger or InvokeAILogger.get_logger(config=self._app_config)
         self._store = store or ModelRecordServiceBase.get_impl(self._app_config)
-        self._download_queue = download or DownloadQueue(config=self._app_config, event_handlers=event_handlers)
+        self._download_queue = download or ModelDownloadQueue(config=self._app_config, event_handlers=event_handlers)
         self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
         self._installed = set()
         self._tmpdir = None

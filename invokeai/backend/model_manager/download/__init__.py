@@ -5,7 +5,7 @@ from .base import (  # noqa F401
     DownloadJobBase,
     DownloadJobStatus,
     DownloadQueueBase,
-    ModelSourceMetadata,
     UnknownJobIDException,
 )
-from .queue import DownloadQueue  # noqa F401
+from .model_queue import ModelDownloadQueue, ModelSourceMetadata  # noqa F401
+from .queue import DownloadJobPath, DownloadJobURL, DownloadQueue  # noqa F401

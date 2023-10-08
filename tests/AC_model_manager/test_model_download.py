@@ -8,11 +8,11 @@ import requests
 from requests import HTTPError
 from requests_testadapter import TestAdapter
 
-import invokeai.backend.model_manager.download.queue as download_queue
+import invokeai.backend.model_manager.download.model_queue as download_queue
 from invokeai.backend.model_manager.download import (
     DownloadJobBase,
     DownloadJobStatus,
-    DownloadQueue,
+    ModelDownloadQueue,
     UnknownJobIDException,
 )
 
@@ -147,7 +147,7 @@ def test_basic_queue_download():
     def event_handler(job: DownloadJobBase):
         events.append(job.status)
 
-    queue = DownloadQueue(
+    queue = ModelDownloadQueue(
         requests_session=session,
         event_handlers=[event_handler],
     )
@@ -167,7 +167,7 @@ def test_basic_queue_download():
 
 
 def test_queue_priority():
-    queue = DownloadQueue(
+    queue = ModelDownloadQueue(
         requests_session=session,
     )
 
@@ -200,7 +200,7 @@ def test_repo_id_download():
     if not INTERNET_AVAILABLE:
         return
     repo_id = "stabilityai/stable-diffusion-2-1"
-    queue = DownloadQueue(
+    queue = ModelDownloadQueue(
         requests_session=session,
     )
 
@@ -224,7 +224,7 @@ def test_repo_id_download():
 
 
 def test_bad_urls():
-    queue = DownloadQueue(
+    queue = ModelDownloadQueue(
         requests_session=session,
     )
 
@@ -270,9 +270,11 @@ def test_bad_urls():
 
 def test_pause_cancel_url():  # this one is tricky because of potential race conditions
     def event_handler(job: DownloadJobBase):
-        time.sleep(0.5)  # slow down the thread by blocking it just a bit at every step
+        if job.id == 0:
+            print(job.status, job.bytes)
+        time.sleep(0.5)  # slow down the thread so that we can recover the paused state
 
-    queue = DownloadQueue(requests_session=session, event_handlers=[event_handler])
+    queue = ModelDownloadQueue(requests_session=session, event_handlers=[event_handler])
     with tempfile.TemporaryDirectory() as tmpdir:
         job1 = queue.create_download_job(source="http://www.civitai.com/models/12345", destdir=tmpdir, start=False)
         job2 = queue.create_download_job(source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False)
@@ -322,7 +324,7 @@ def test_pause_cancel_url():  # this one is tricky because of potential race con
             return
 
         repo_id = "stabilityai/stable-diffusion-2-1"
-        queue = DownloadQueue(requests_session=session, event_handlers=[event_handler])
+        queue = ModelDownloadQueue(requests_session=session, event_handlers=[event_handler])
 
         with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
             job1 = queue.create_download_job(source=repo_id, destdir=tmpdir1, variant="fp16", start=False)

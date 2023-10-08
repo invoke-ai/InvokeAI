@@ -30,17 +30,6 @@ class UnknownJobIDException(Exception):
     """Raised when an invalid Job is referenced."""
 
 
-class ModelSourceMetadata(BaseModel):
-    """Information collected on a downloadable model from its source site."""
-
-    name: Optional[str] = Field(description="Human-readable name of this model")
-    author: Optional[str] = Field(description="Author/creator of the model")
-    description: Optional[str] = Field(description="Description of the model")
-    license: Optional[str] = Field(description="Model license terms")
-    thumbnail_url: Optional[AnyHttpUrl] = Field(description="URL of a thumbnail image for the model")
-    tags: Optional[List[str]] = Field(description="List of descriptive tags")
-
-
 DownloadEventHandler = Callable[["DownloadJobBase"], None]
 
 
@@ -67,9 +56,6 @@ class DownloadJobBase(BaseModel):
         description="if true, then preserve partial downloads when cancelled or errored", default=False
     )
     error: Optional[Exception] = Field(default=None, description="Exception that caused an error")
-    metadata: ModelSourceMetadata = Field(
-        description="Metadata describing download contents", default_factory=ModelSourceMetadata
-    )
 
     def add_event_handler(self, handler: DownloadEventHandler):
         """Add an event handler to the end of the handlers list."""
@@ -134,7 +120,7 @@ class DownloadQueueBase(ABC):
         filename: Optional[Path] = None,
         variant: Optional[str] = None,
         access_token: Optional[str] = None,
-        event_handlers: Optional[List[DownloadEventHandler]] = None,
+        event_handlers: List[DownloadEventHandler] = [],
     ) -> DownloadJobBase:
         """
         Create and submit a download job.
@@ -272,5 +258,19 @@ class DownloadQueueBase(ABC):
 
         Note that once a job is completed, id_to_job() will
         no longer recognize the job.
+        """
+        pass
+
+    @abstractmethod
+    def select_downloader(self, job: DownloadJobBase) -> Callable[[DownloadJobBase], None]:
+        """Based on the job type select the download method."""
+        pass
+
+    @abstractmethod
+    def get_url_for_job(self, job: DownloadJobBase) -> AnyHttpUrl:
+        """
+        Given a job, translate its source field into a downloadable URL.
+
+        Intended to be subclassed to cover various source types.
         """
         pass
