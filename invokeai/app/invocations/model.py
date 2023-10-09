@@ -174,7 +174,7 @@ class LoraLoaderInvocation(BaseInvocation):
         key = self.lora.key
 
         if not context.services.model_record_store.model_exists(key):
-            raise Exception(f"Unkown lora: {key}!")
+            raise Exception(f"Unknown lora: {key}!")
 
         if self.unet is not None and any(lora.key == key for lora in self.unet.loras):
             raise Exception(f'Lora "{key}" already applied to unet')
