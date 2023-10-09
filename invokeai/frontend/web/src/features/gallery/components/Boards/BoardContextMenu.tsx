@@ -11,12 +11,15 @@ import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { BoardId } from 'features/gallery/store/types';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaDownload } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
+import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
+
+import JSZip from 'jszip';
 
 type Props = {
   board?: BoardDTO;
@@ -32,6 +35,48 @@ const BoardContextMenu = ({
   children,
 }: Props) => {
   const dispatch = useAppDispatch();
+  const { data: imageNames } = useListAllImageNamesForBoardQuery(board_id);
+  const boardName = useBoardName(board_id);
+
+  const sanitizeFilename = (input: string): string => {
+    return input.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+  };
+
+  const handleDownloadAllImages = useCallback(() => {
+    if (!imageNames) {
+      return;
+    }
+
+    const downloadImagesAsZip = async () => {
+      const zip = new JSZip();
+
+      for (const imageName of imageNames) {
+        const imageUrl = `/api/v1/images/i/${imageName}/full`;
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        zip.file(imageName, blob);
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+
+      const url = window.URL.createObjectURL(content);
+
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+
+      const sanitizedBoardName = sanitizeFilename(boardName);
+      a.download = `${sanitizedBoardName}.zip`;
+
+      document.body.appendChild(a);
+      a.click();
+
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    };
+
+    downloadImagesAsZip();
+  }, [imageNames, boardName]);
 
   const selector = useMemo(
     () =>
@@ -48,7 +93,6 @@ const BoardContextMenu = ({
   );
 
   const { isAutoAdd, autoAssignBoardOnClick } = useAppSelector(selector);
-  const boardName = useBoardName(board_id);
 
   const handleSetAutoAdd = useCallback(() => {
     dispatch(autoAddBoardIdChanged(board_id));
@@ -81,6 +125,11 @@ const BoardContextMenu = ({
             >
               {t('boards.menuItemAutoAdd')}
             </MenuItem>
+            {board_id !== 'none' && (
+              <MenuItem icon={<FaDownload />} onClick={handleDownloadAllImages}>
+                {t('boards.menuItemDownloadAll')}
+              </MenuItem>
+            )}
             {!board && <NoBoardContextMenuItems />}
             {board && (
               <GalleryBoardContextMenuItems

@@ -129,6 +129,7 @@
   "devDependencies": {
     "@chakra-ui/cli": "^2.4.1",
     "@types/dateformat": "^5.0.0",
+    "@types/jszip": "^3.4.1",
     "@types/lodash-es": "^4.14.194",
     "@types/node": "^20.5.1",
     "@types/react": "^18.2.20",
