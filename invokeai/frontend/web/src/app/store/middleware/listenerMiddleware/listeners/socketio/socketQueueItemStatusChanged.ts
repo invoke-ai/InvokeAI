@@ -12,14 +12,15 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
     effect: async (action, { dispatch }) => {
       const log = logger('socketio');
 
+      // we've got new status for the queue item, batch and queue
       const { queue_item, batch_status, queue_status } = action.payload.data;
 
       log.debug(
         action.payload,
         `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`
       );
-      dispatch(appSocketQueueItemStatusChanged(action.payload));
 
+      // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
           queueItemsAdapter.updateOne(draft, {
@@ -29,11 +30,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         })
       );
 
-      dispatch(
-        queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
-          Object.assign(draft.queue, queue_status);
-        })
-      );
+      // Update the queue status (we do not get the processor status here)
       dispatch(
         queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
           if (!draft) {
@@ -43,6 +40,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         })
       );
 
+      // Update the batch status
       dispatch(
         queueApi.util.updateQueryData(
           'getBatchStatus',
@@ -51,6 +49,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         )
       );
 
+      // Update the queue item status (this is the full queue item, including the session)
       dispatch(
         queueApi.util.updateQueryData(
           'getQueueItem',
@@ -64,6 +63,8 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
         )
       );
 
+      // Invalidate caches for things we cannot update
+      // TODO: technically, we could possibly update the current session queue item, but feels safer to just request it again
       dispatch(
         queueApi.util.invalidateTags([
           'CurrentSessionQueueItem',
@@ -71,6 +72,9 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
           'InvocationCacheStatus',
         ])
       );
+
+      // Pass the event along
+      dispatch(appSocketQueueItemStatusChanged(action.payload));
     },
   });
 };
