@@ -134,13 +134,7 @@ const CurrentImageButtons = () => {
     recallAllParameters(metadata);
   }, [metadata, recallAllParameters]);
 
-  useHotkeys(
-    'a',
-    () => {
-      handleClickUseAllParameters;
-    },
-    [metadata, recallAllParameters]
-  );
+  useHotkeys('a', handleClickUseAllParameters, [metadata]);
 
   const handleUseSeed = useCallback(() => {
     recallSeed(metadata?.seed);
