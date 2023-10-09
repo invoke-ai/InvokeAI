@@ -101,15 +101,16 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.tabs = self.add_widget_intelligent(
             SingleSelectColumns,
             values=[
-                "STARTER MODELS",
-                "MAIN MODELS",
+                "STARTERS",
+                "MAINS",
                 "CONTROLNETS",
+                "T2I-ADAPTERS",
                 "IP-ADAPTERS",
-                "LORA/LYCORIS",
-                "TEXTUAL INVERSION",
+                "LORAS",
+                "TI EMBEDDINGS",
             ],
             value=[self.current_tab],
-            columns=6,
+            columns=7,
             max_height=2,
             relx=8,
             scroll_exit=True,
@@ -134,6 +135,12 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         )
         bottom_of_table = max(bottom_of_table, self.nextrely)
 
+        self.nextrely = top_of_table
+        self.t2i_models = self.add_model_widgets(
+            model_type=ModelType.T2IAdapter,
+            window_width=window_width,
+        )
+        bottom_of_table = max(bottom_of_table, self.nextrely)
         self.nextrely = top_of_table
         self.ipadapter_models = self.add_model_widgets(
             model_type=ModelType.IPAdapter,
@@ -340,6 +347,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.starter_pipelines,
             self.pipeline_models,
             self.controlnet_models,
+            self.t2i_models,
             self.ipadapter_models,
             self.lora_models,
             self.ti_models,
@@ -448,6 +456,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.starter_pipelines,
             self.pipeline_models,
             self.controlnet_models,
+            self.t2i_models,
             self.ipadapter_models,
             self.lora_models,
             self.ti_models,

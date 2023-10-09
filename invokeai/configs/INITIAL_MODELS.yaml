@@ -96,6 +96,22 @@ sd-1/controlnet/tile:
    source: lllyasviel/control_v11f1e_sd15_tile
 sd-1/controlnet/ip2p:
    source: lllyasviel/control_v11e_sd15_ip2p
+sd-1/t2i_adapter/canny-sd15:
+   source: TencentARC/t2iadapter_canny_sd15v2
+sd-1/t2i_adapter/sketch-sd15:
+   source: TencentARC/t2iadapter_sketch_sd15v2
+sd-1/t2i_adapter/depth-sd15:
+   source: TencentARC/t2iadapter_depth_sd15v2
+sd-1/t2i_adapter/zoedepth-sd15:
+   source: TencentARC/t2iadapter_zoedepth_sd15v1
+sdxl/t2i_adapter/canny-sdxl:
+   source: TencentARC/t2i-adapter-canny-sdxl-1.0
+sdxl/t2i_adapter/zoedepth-sdxl:
+   source: TencentARC/t2i-adapter-depth-zoe-sdxl-1.0
+sdxl/t2i_adapter/lineart-sdxl:
+   source: TencentARC/t2i-adapter-lineart-sdxl-1.0
+sdxl/t2i_adapter/sketch-sdxl:
+   source: TencentARC/t2i-adapter-sketch-sdxl-1.0
 sd-1/embedding/EasyNegative:
    source: https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
    recommended: True
