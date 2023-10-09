@@ -21,8 +21,6 @@ export const tagTypes = [
   'ImageMetadataFromFile',
   'IntermediatesCount',
   'SessionQueueItem',
-  'SessionQueueItemDTO',
-  'SessionQueueItemDTOList',
   'SessionQueueStatus',
   'SessionProcessorStatus',
   'CurrentSessionQueueItem',
