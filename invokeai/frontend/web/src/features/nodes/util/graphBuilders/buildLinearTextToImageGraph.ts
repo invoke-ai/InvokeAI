@@ -308,8 +308,5 @@ export const buildLinearTextToImageGraph = (
 
   addSaveImageNode(state, graph);
 
-  //eslint-disable-next-line
-  debugger;
-
   return graph;
 };

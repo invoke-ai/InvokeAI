@@ -75,12 +75,8 @@ export const addHrfToGraph = (
 
   // Scale height and width by hrfScale.
   const hrfScale = state.generation.hrfScale;
-  const scaledHeight = originalNoiseNode?.height
-    ? originalNoiseNode.height * hrfScale
-    : undefined;
-  const scaledWidth = originalNoiseNode?.width
-    ? originalNoiseNode.width * hrfScale
-    : undefined;
+  const scaledHeight = state.generation.height * hrfScale;
+  const scaledWidth = state.generation.width * hrfScale;
 
   // Add hrf information to the metadata accumulator.
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
