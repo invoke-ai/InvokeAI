@@ -271,7 +271,20 @@ class ModelDownloadQueue(DownloadQueue):
         """
         model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True)
         sibs = model_info.siblings
-        paths = [x.rfilename for x in sibs]
+        paths = []
+
+        # unfortunately the HF repo contains both files needed for the model
+        # as well as anything else the owner thought to include in the directory,
+        # including checkpoint files, different EMA versions, etc.
+        # This filters out just the file types needed for the model
+        for x in sibs:
+            if x.rfilename.endswith(('.json', '.txt')):
+                paths.append(x.rfilename)
+            elif x.rfilename.endswith(('learned_embeds.bin', 'ip_adapter.bin')):
+                paths.append(x.rfilename)
+            elif re.search(r'model(\.[^.]+)?\.(safetensors|bin)$', x.rfilename):
+                paths.append(x.rfilename)
+
         sizes = {x.rfilename: x.size for x in sibs}
 
         prefix = ""
