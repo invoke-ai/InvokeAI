@@ -98,13 +98,18 @@ async def update_model(
 ) -> InvokeAIModelConfig:
     """Update model contents with a new config. If the model name or base fields are changed, then the model is renamed."""
     logger = ApiDependencies.invoker.services.logger
+    info_dict = info.dict()
+    record_store = ApiDependencies.invoker.services.model_record_store
+    model_install = ApiDependencies.invoker.services.model_installer
+    try:
+        new_config = record_store.update_model(key, config=info_dict)
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=409, detail=str(e))
 
     try:
-        info_dict = info.dict()
-        info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
-        record_store = ApiDependencies.invoker.services.model_record_store
-        model_install = ApiDependencies.invoker.services.model_installer
-        new_config = record_store.update_model(key, config=info_dict)
         # In the event that the model's name, type or base has changed, and the model itself
         # resides in the invokeai root models directory, then the next statement will move
         # the model file into its new canonical location.
@@ -115,9 +120,6 @@ async def update_model(
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=400, detail=str(e))
 
     return model_response
 
@@ -198,8 +200,8 @@ async def import_model(
     responses={
         201: {"description": "The model added successfully"},
         404: {"description": "The model could not be found"},
-        424: {"description": "The model appeared to add successfully, but could not be found in the model manager"},
         409: {"description": "There is already a model corresponding to this path or repo_id"},
+        415: {"description": "Unrecognized file/folder format"},
     },
     status_code=201,
     response_model=InvokeAIModelConfig,
@@ -213,16 +215,22 @@ async def add_model(
     """
 
     logger = ApiDependencies.invoker.services.logger
+    path = info.path
+    installer = ApiDependencies.invoker.services.model_installer
+    record_store = ApiDependencies.invoker.services.model_record_store
     try:
-        path = info.path
-        installer = ApiDependencies.invoker.services.model_installer
-        record_store = ApiDependencies.invoker.services.model_record_store
         key = installer.install_path(path)
         logger.info(f"Created model {key} for {path}")
+    except DuplicateModelException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=409, detail=str(e))
+    except InvalidModelException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=415)
 
-        # update with the provided info
+    # update with the provided info
+    try:
         info_dict = info.dict()
-        info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
         new_config = record_store.update_model(key, new_config=info_dict)
         return parse_obj_as(InvokeAIModelConfig, new_config.dict())
     except UnknownModelException as e:
@@ -405,24 +413,19 @@ async def merge_models(
 )
 async def list_install_jobs() -> List[ModelImportStatus]:
     """List active and pending model installation jobs."""
-    logger = ApiDependencies.invoker.services.logger
     job_mgr = ApiDependencies.invoker.services.model_installer
-    try:
-        jobs = job_mgr.list_install_jobs()
-        return [
-            ModelImportStatus(
-                job_id=x.id,
-                source=x.source,
-                priority=x.priority,
-                bytes=x.bytes,
-                total_bytes=x.total_bytes,
-                status=x.status,
-            )
-            for x in jobs
-        ]
-    except Exception as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+    jobs = job_mgr.list_install_jobs()
+    return [
+        ModelImportStatus(
+            job_id=x.id,
+            source=x.source,
+            priority=x.priority,
+            bytes=x.bytes,
+            total_bytes=x.total_bytes,
+            status=x.status,
+        )
+        for x in jobs
+    ]
 
 
 @models_router.patch(
@@ -459,11 +462,11 @@ async def control_install_jobs(
         elif operation == JobControlOperation.CANCEL:
             job_mgr.cancel_job(job_id)
 
-        elif operation == JobControlOperation.CHANGE_PRIORITY:
+        elif operation == JobControlOperation.CHANGE_PRIORITY and priority_delta is not None:
             job_mgr.change_job_priority(job_id, priority_delta)
 
         else:
-            raise ValueError(f"Unknown operation {JobControlOperation.value}")
+            raise ValueError(f"Unknown operation {operation.value}")
 
         return ModelImportStatus(
             job_id=job_id,
@@ -478,9 +481,6 @@ async def control_install_jobs(
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @models_router.patch(
@@ -490,39 +490,27 @@ async def control_install_jobs(
         204: {"description": "All jobs cancelled successfully"},
         400: {"description": "Bad request"},
     },
-    status_code=200,
-    response_model=ModelImportStatus,
 )
 async def cancel_install_jobs():
-    """Cancel all pending install jobs."""
+    """Cancel all model installation jobs."""
     logger = ApiDependencies.invoker.services.logger
-    try:
-        job_mgr = ApiDependencies.invoker.services.model_installer
-        logger.info("Cancelling all running model installation jobs.")
-        job_mgr.cancel_all_jobs()
-        return Response(status_code=204)
-    except Exception as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+    job_mgr = ApiDependencies.invoker.services.model_installer
+    logger.info("Cancelling all model installation jobs.")
+    job_mgr.cancel_all_jobs()
+    return Response(status_code=204)
 
 
 @models_router.patch(
     "/jobs/prune",
     operation_id="prune_jobs",
     responses={
-        204: {"description": "All jobs cancelled successfully"},
+        204: {"description": "All completed jobs have been pruned"},
         400: {"description": "Bad request"},
     },
-    status_code=200,
-    response_model=ModelImportStatus,
 )
 async def prune_jobs():
     """Prune all completed and errored jobs."""
     logger = ApiDependencies.invoker.services.logger
-    try:
-        mgr = ApiDependencies.invoker.services.model_installer
-        mgr.prune_jobs()
-        return Response(status_code=204)
-    except Exception as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+    mgr = ApiDependencies.invoker.services.model_installer
+    mgr.prune_jobs()
+    return Response(status_code=204)

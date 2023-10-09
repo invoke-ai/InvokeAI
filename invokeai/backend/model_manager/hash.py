@@ -15,6 +15,8 @@ from typing import Dict, Union
 
 from imohash import hashfile
 
+from .models import InvalidModelException
+
 
 class FastModelHash(object):
     """FastModelHash obect provides one public class method, hash()."""
@@ -32,9 +34,6 @@ class FastModelHash(object):
         elif model_location.is_dir():
             return cls._hash_dir(model_location)
         else:
-            # avoid circular import
-            from .models import InvalidModelException
-
             raise InvalidModelException(f"Not a valid file or directory: {model_location}")
 
     @classmethod
@@ -54,7 +53,8 @@ class FastModelHash(object):
 
         for root, dirs, files in os.walk(model_location):
             for file in files:
-                # only tally tensor files
+                # only tally tensor files because diffusers config files change slightly
+                # depending on how the model was downloaded/converted.
                 if not file.endswith((".ckpt", ".safetensors", ".bin", ".pt", ".pth")):
                     continue
                 path = (Path(root) / file).as_posix()

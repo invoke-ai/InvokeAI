@@ -80,24 +80,18 @@ class ModelConfigStoreYAML(ModelConfigStore):
             raise ConfigFileVersionMismatchException
 
     def _initialize_yaml(self):
-        try:
-            self._lock.acquire()
+        with self._lock:
             self._filename.parent.mkdir(parents=True, exist_ok=True)
             with open(self._filename, "w") as yaml_file:
                 yaml_file.write(yaml.dump({"__metadata__": {"version": CONFIG_FILE_VERSION}}))
-        finally:
-            self._lock.release()
 
     def _commit(self):
-        try:
-            self._lock.acquire()
+        with self._lock:
             newfile = Path(str(self._filename) + ".new")
             yaml_str = OmegaConf.to_yaml(self._config)
             with open(newfile, "w", encoding="utf-8") as outfile:
                 outfile.write(yaml_str)
             newfile.replace(self._filename)
-        finally:
-            self._lock.release()
 
     @property
     def version(self) -> str:
@@ -116,8 +110,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
         """
         record = ModelConfigFactory.make_config(config, key)  # ensure it is a valid config obect
         dict_fields = record.dict()  # and back to a dict with valid fields
-        try:
-            self._lock.acquire()
+        with self._lock:
             if key in self._config:
                 existing_model = self.get_model(key)
                 raise DuplicateModelException(
@@ -125,8 +118,6 @@ class ModelConfigStoreYAML(ModelConfigStore):
                 )
             self._config[key] = self._fix_enums(dict_fields)
             self._commit()
-        finally:
-            self._lock.release()
         return self.get_model(key)
 
     def _fix_enums(self, original: dict) -> dict:
@@ -144,14 +135,11 @@ class ModelConfigStoreYAML(ModelConfigStore):
 
         Can raise an UnknownModelException
         """
-        try:
-            self._lock.acquire()
+        with self._lock:
             if key not in self._config:
                 raise UnknownModelException(f"Unknown key '{key}' for model config")
             self._config.pop(key)
             self._commit()
-        finally:
-            self._lock.release()
 
     def update_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
         """
@@ -163,14 +151,11 @@ class ModelConfigStoreYAML(ModelConfigStore):
         """
         record = ModelConfigFactory.make_config(config, key)  # ensure it is a valid config obect
         dict_fields = record.dict()  # and back to a dict with valid fields
-        try:
-            self._lock.acquire()
+        with self._lock:
             if key not in self._config:
                 raise UnknownModelException(f"Unknown key '{key}' for model config")
             self._config[key] = self._fix_enums(dict_fields)
             self._commit()
-        finally:
-            self._lock.release()
         return self.get_model(key)
 
     def get_model(self, key: str) -> AnyModelConfig:
@@ -203,15 +188,12 @@ class ModelConfigStoreYAML(ModelConfigStore):
         """
         results = []
         tags = set(tags)
-        try:
-            self._lock.acquire()
+        with self._lock:
             for config in self.all_models():
                 config_tags = set(config.tags or [])
                 if tags.difference(config_tags):  # not all tags in the model
                     continue
                 results.append(config)
-        finally:
-            self._lock.release()
         return results
 
     def search_by_name(
@@ -231,8 +213,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
         models in the database.
         """
         results: List[ModelConfigBase] = list()
-        try:
-            self._lock.acquire()
+        with self._lock:
             for key, record in self._config.items():
                 if key == "__metadata__":
                     continue
@@ -244,20 +225,15 @@ class ModelConfigStoreYAML(ModelConfigStore):
                 if model_type and model.model_type != model_type:
                     continue
                 results.append(model)
-        finally:
-            self._lock.release()
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> Optional[ModelConfigBase]:
         """Return the model with the indicated path, or None."""
-        try:
-            self._lock.acquire()
+        with self._lock:
             for key, record in self._config.items():
                 if key == "__metadata__":
                     continue
                 model = ModelConfigFactory.make_config(record, str(key))
                 if model.path == path:
                     return model
-        finally:
-            self._lock.release()
         return None

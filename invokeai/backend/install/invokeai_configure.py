@@ -185,14 +185,17 @@ class ProgressBar:
 
 # ---------------------------------------------
 def hf_download_from_pretrained(model_class: object, model_name: str, destination: Path, **kwargs):
-    logger.addFilter(lambda x: "fp16 is not a valid" not in x.getMessage())
-
-    model = model_class.from_pretrained(
-        model_name,
-        resume_download=True,
-        **kwargs,
-    )
-    model.save_pretrained(destination, safe_serialization=True)
+    filter = lambda x: "fp16 is not a valid" not in x.getMessage()
+    logger.addFilter(filter)
+    try:
+        model = model_class.from_pretrained(
+            model_name,
+            resume_download=True,
+            **kwargs,
+        )
+        model.save_pretrained(destination, safe_serialization=True)
+    finally:
+        logger.removeFilter(filter)
     return destination
 
 

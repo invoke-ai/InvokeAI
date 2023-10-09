@@ -12,8 +12,7 @@ from queue import PriorityQueue
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import requests
-from huggingface_hub import HfApi, hf_hub_url
-from pydantic import Field, parse_obj_as, validator
+from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 
@@ -59,7 +58,7 @@ class DownloadQueue(DownloadQueueBase):
     _jobs: Dict[int, DownloadJobBase]
     _worker_pool: Set[threading.Thread]
     _queue: PriorityQueue
-    _lock: threading.RLock
+    _lock: threading.RLock  # to allow methods called within the same thread to lock without blocking
     _logger: Logger
     _event_handlers: List[DownloadEventHandler] = Field(default_factory=list)
     _next_job_id: int = 0
@@ -136,13 +135,10 @@ class DownloadQueue(DownloadQueueBase):
         # add the queue's handlers
         for handler in self._event_handlers:
             job.add_event_handler(handler)
-        try:
-            self._lock.acquire()
+        with self._lock:
             job.id = self._next_job_id
             self._jobs[job.id] = job
             self._next_job_id += 1
-        finally:
-            self._lock.release()
         if start:
             self.start_job(job)
         return job
@@ -163,29 +159,25 @@ class DownloadQueue(DownloadQueueBase):
 
     def change_priority(self, job: DownloadJobBase, delta: int):
         """Change the priority of a job. Smaller priorities run first."""
-        try:
-            self._lock.acquire()
-            assert isinstance(self._jobs[job.id], DownloadJobBase)
-            job.priority += delta
-        except (AssertionError, KeyError) as excp:
-            raise UnknownJobIDException("Unrecognized job") from excp
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                assert isinstance(self._jobs[job.id], DownloadJobBase)
+                job.priority += delta
+            except (AssertionError, KeyError) as excp:
+                raise UnknownJobIDException("Unrecognized job") from excp
 
     def prune_jobs(self):
         """Prune completed and errored queue items from the job list."""
-        try:
+        with self._lock:
             to_delete = set()
-            self._lock.acquire()
-            for job_id, job in self._jobs.items():
-                if self._in_terminal_state(job):
-                    to_delete.add(job_id)
-            for job_id in to_delete:
-                del self._jobs[job_id]
-        except KeyError as excp:
-            raise UnknownJobIDException("Unrecognized job") from excp
-        finally:
-            self._lock.release()
+            try:
+                for job_id, job in self._jobs.items():
+                    if self._in_terminal_state(job):
+                        to_delete.add(job_id)
+                for job_id in to_delete:
+                    del self._jobs[job_id]
+            except KeyError as excp:
+                raise UnknownJobIDException("Unrecognized job") from excp
 
     def cancel_job(self, job: DownloadJobBase, preserve_partial: bool = False):
         """
@@ -194,16 +186,14 @@ class DownloadQueue(DownloadQueueBase):
         If it is running it will be stopped.
         job.status will be set to DownloadJobStatus.CANCELLED
         """
-        try:
-            self._lock.acquire()
-            assert isinstance(self._jobs[job.id], DownloadJobBase)
-            job.preserve_partial_downloads = preserve_partial
-            self._update_job_status(job, DownloadJobStatus.CANCELLED)
-            job.cleanup()
-        except (AssertionError, KeyError) as excp:
-            raise UnknownJobIDException("Unrecognized job") from excp
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                assert isinstance(self._jobs[job.id], DownloadJobBase)
+                job.preserve_partial_downloads = preserve_partial
+                self._update_job_status(job, DownloadJobStatus.CANCELLED)
+                job.cleanup()
+            except (AssertionError, KeyError) as excp:
+                raise UnknownJobIDException("Unrecognized job") from excp
 
     def id_to_job(self, id: int) -> DownloadJobBase:
         """Translate a job ID into a DownloadJobBase object."""
@@ -214,12 +204,13 @@ class DownloadQueue(DownloadQueueBase):
 
     def start_job(self, job: DownloadJobBase):
         """Enqueue (start) the indicated job."""
-        try:
-            assert isinstance(self._jobs[job.id], DownloadJobBase)
-            self._update_job_status(job, DownloadJobStatus.ENQUEUED)
-            self._queue.put(job)
-        except (AssertionError, KeyError) as excp:
-            raise UnknownJobIDException("Unrecognized job") from excp
+        with self._lock:
+            try:
+                assert isinstance(self._jobs[job.id], DownloadJobBase)
+                self._update_job_status(job, DownloadJobStatus.ENQUEUED)
+                self._queue.put(job)
+            except (AssertionError, KeyError) as excp:
+                raise UnknownJobIDException("Unrecognized job") from excp
 
     def pause_job(self, job: DownloadJobBase):
         """
@@ -228,45 +219,34 @@ class DownloadQueue(DownloadQueueBase):
         The job can be restarted with start_job() and the download will pick up
         from where it left off.
         """
-        try:
-            self._lock.acquire()
-            assert isinstance(self._jobs[job.id], DownloadJobBase)
-            self._update_job_status(job, DownloadJobStatus.PAUSED)
-            job.cleanup()
-        except (AssertionError, KeyError) as excp:
-            raise UnknownJobIDException("Unrecognized job") from excp
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                assert isinstance(self._jobs[job.id], DownloadJobBase)
+                self._update_job_status(job, DownloadJobStatus.PAUSED)
+                job.cleanup()
+            except (AssertionError, KeyError) as excp:
+                raise UnknownJobIDException("Unrecognized job") from excp
 
     def start_all_jobs(self):
         """Start (enqueue) all jobs that are idle or paused."""
-        try:
-            self._lock.acquire()
+        with self._lock:
             for job in self._jobs.values():
                 if job.status in [DownloadJobStatus.IDLE, DownloadJobStatus.PAUSED]:
                     self.start_job(job)
-        finally:
-            self._lock.release()
 
     def pause_all_jobs(self):
         """Pause all running jobs."""
-        try:
-            self._lock.acquire()
+        with self._lock:
             for job in self._jobs.values():
                 if job.status == DownloadJobStatus.RUNNING:
                     self.pause_job(job)
-        finally:
-            self._lock.release()
 
     def cancel_all_jobs(self, preserve_partial: bool = False):
-        """Cancel all running jobs."""
-        try:
-            self._lock.acquire()
+        """Cancel all jobs (those not in enqueued, running or paused state)."""
+        with self._lock:
             for job in self._jobs.values():
                 if not self._in_terminal_state(job):
                     self.cancel_job(job, preserve_partial)
-        finally:
-            self._lock.release()
 
     def _in_terminal_state(self, job: DownloadJobBase):
         return job.status in [
@@ -288,26 +268,26 @@ class DownloadQueue(DownloadQueueBase):
         while not done:
             job = self._queue.get()
 
-            try:  # this is for debugging priority
-                self._lock.acquire()
+            with self._lock:
                 job.job_sequence = self._sequence
                 self._sequence += 1
+
+            try:
+                if job == STOP_JOB:  # marker that queue is done
+                    done = True
+
+                if (
+                    job.status == DownloadJobStatus.ENQUEUED
+                ):  # Don't do anything for non-enqueued jobs (shouldn't happen)
+                    if not self._quiet:
+                        self._logger.info(f"{job.source}: Downloading to {job.destination}")
+                    do_download = self.select_downloader(job)
+                    do_download(job)
+
+                if job.status == DownloadJobStatus.CANCELLED:
+                    self._cleanup_cancelled_job(job)
             finally:
-                self._lock.release()
-
-            if job == STOP_JOB:  # marker that queue is done
-                done = True
-
-            if job.status == DownloadJobStatus.ENQUEUED:  # Don't do anything for non-enqueued jobs (shouldn't happen)
-                if not self._quiet:
-                    self._logger.info(f"{job.source}: Downloading to {job.destination}")
-                do_download = self.select_downloader(job)
-                do_download(job)
-
-            if job.status == DownloadJobStatus.CANCELLED:
-                self._cleanup_cancelled_job(job)
-
-            self._queue.task_done()
+                self._queue.task_done()
 
     def select_downloader(self, job: DownloadJobBase) -> Callable[[DownloadJobBase], None]:
         """Based on the job type select the download method."""
@@ -397,11 +377,7 @@ class DownloadQueue(DownloadQueueBase):
             self._update_job_status(job, DownloadJobStatus.COMPLETED)
         except KeyboardInterrupt as excp:
             raise excp
-        except DuplicateModelException as excp:
-            self._logger.error(f"A model with the same hash as {dest} is already installed.")
-            job.error = excp
-            self._update_job_status(job, DownloadJobStatus.ERROR)
-        except Exception as excp:
+        except (HTTPError, OSError) as excp:
             self._logger.error(f"An error occurred while downloading/installing {job.source}: {str(excp)}")
             print(traceback.format_exc())
             job.error = excp

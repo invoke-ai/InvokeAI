@@ -270,8 +270,6 @@ def test_bad_urls():
 
 def test_pause_cancel_url():  # this one is tricky because of potential race conditions
     def event_handler(job: DownloadJobBase):
-        if job.id == 0:
-            print(job.status, job.bytes)
         time.sleep(0.5)  # slow down the thread so that we can recover the paused state
 
     queue = ModelDownloadQueue(requests_session=session, event_handlers=[event_handler])

@@ -92,7 +92,7 @@ class ModelInstallServiceBase(ModelInstallBase):  # This is an ABC
 
     @abstractmethod
     def cancel_all_jobs(self):
-        """Cancel all active jobs."""
+        """Cancel all installation jobs."""
         pass
 
     @abstractmethod

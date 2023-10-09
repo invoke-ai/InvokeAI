@@ -62,7 +62,7 @@ class ModelLoadServiceBase(ABC):
 class ModelLoadService(ModelLoadServiceBase):
     """Responsible for managing models on disk and in memory."""
 
-    _loader: ModelLoad = Field(description="InvokeAIAppConfig object for the current process")
+    _loader: ModelLoad
 
     def __init__(
         self,

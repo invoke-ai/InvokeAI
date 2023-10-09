@@ -126,7 +126,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         e.g. `max_parallel_dl`.
         """
         self._event_bus = event_bus
-        self._queue = DownloadQueue()
+        self._queue = DownloadQueue(**kwargs)
 
     def create_download_job(
         self,

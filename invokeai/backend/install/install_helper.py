@@ -18,7 +18,6 @@ from invokeai.backend.model_manager.install import ModelInstall, ModelInstallJob
 
 # name of the starter models file
 INITIAL_MODELS = "INITIAL_MODELS.yaml"
-ACCESS_TOKEN = HfFolder.get_token()
 
 
 class UnifiedModelInfo(BaseModel):
@@ -173,7 +172,7 @@ class InstallHelper(object):
                 model.source,
                 subfolder=model.subfolder,
                 variant="fp16" if self._config.precision == "float16" else None,
-                access_token=ACCESS_TOKEN,  # this is a global,
+                access_token=HfFolder.get_token(),
                 metadata=metadata,
             )
 

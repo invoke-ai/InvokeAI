@@ -72,14 +72,11 @@ class ModelConfigStoreSQL(ModelConfigStore):
         self._cursor = self._conn.cursor()
         self._lock = lock
 
-        try:
-            self._lock.acquire()
+        with self._lock:
             # Enable foreign keys
             self._conn.execute("PRAGMA foreign_keys = ON;")
             self._create_tables()
             self._conn.commit()
-        finally:
-            self._lock.release()
         assert (
             str(self.version) == CONFIG_FILE_VERSION
         ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
@@ -189,52 +186,49 @@ class ModelConfigStoreSQL(ModelConfigStore):
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
         json_serialized = json.dumps(record.dict())  # and turn it into a json string.
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                INSERT INTO model_config (
-                   id,
-                   base_model,
-                   model_type,
-                   model_name,
-                   model_path,
-                   config
-                  )
-                VALUES (?,?,?,?,?,?);
-                """,
-                (
-                    key,
-                    record.base_model,
-                    record.model_type,
-                    record.name,
-                    record.path,
-                    json_serialized,
-                ),
-            )
-            if record.tags:
-                self._update_tags(key, record.tags)
-            self._conn.commit()
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    INSERT INTO model_config (
+                       id,
+                       base_model,
+                       model_type,
+                       model_name,
+                       model_path,
+                       config
+                      )
+                    VALUES (?,?,?,?,?,?);
+                    """,
+                    (
+                        key,
+                        record.base_model,
+                        record.model_type,
+                        record.name,
+                        record.path,
+                        json_serialized,
+                    ),
+                )
+                if record.tags:
+                    self._update_tags(key, record.tags)
+                self._conn.commit()
 
-        except sqlite3.IntegrityError as e:
-            self._conn.rollback()
-            if "UNIQUE constraint failed" in str(e):
-                raise DuplicateModelException(f"A model with key '{key}' is already installed") from e
-            else:
+            except sqlite3.IntegrityError as e:
+                self._conn.rollback()
+                if "UNIQUE constraint failed" in str(e):
+                    raise DuplicateModelException(f"A model with key '{key}' is already installed") from e
+                else:
+                    raise e
+            except sqlite3.Error as e:
+                self._conn.rollback()
                 raise e
-        except sqlite3.Error as e:
-            self._conn.rollback()
-            raise e
-        finally:
-            self._lock.release()
 
         return self.get_model(key)
 
     @property
     def version(self) -> str:
         """Return the version of the database schema."""
-        try:
-            self._lock.acquire()
+        with self._lock:
             self._cursor.execute(
                 """--sql
                 SELECT metadata_value FROM model_manager_metadata
@@ -246,8 +240,6 @@ class ModelConfigStoreSQL(ModelConfigStore):
             if not rows:
                 raise KeyError("Models database does not have metadata key 'version'")
             return rows[0]
-        finally:
-            self._lock.release()
 
     def _update_tags(self, key: str, tags: List[str]) -> None:
         """Update tags for model with key."""
@@ -301,23 +293,21 @@ class ModelConfigStoreSQL(ModelConfigStore):
 
         Can raise an UnknownModelException
         """
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                DELETE FROM model_config
-                WHERE id=?;
-                """,
-                (key,),
-            )
-            if self._cursor.rowcount == 0:
-                raise UnknownModelException
-            self._conn.commit()
-        except sqlite3.Error as e:
-            self._conn.rollback()
-            raise e
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    DELETE FROM model_config
+                    WHERE id=?;
+                    """,
+                    (key,),
+                )
+                if self._cursor.rowcount == 0:
+                    raise UnknownModelException
+                self._conn.commit()
+            except sqlite3.Error as e:
+                self._conn.rollback()
+                raise e
 
     def update_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
         """
@@ -329,30 +319,29 @@ class ModelConfigStoreSQL(ModelConfigStore):
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
         json_serialized = json.dumps(record.dict())  # and turn it into a json string.
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                UPDATE model_config
-                SET base_model=?,
-                    model_type=?,
-                    model_name=?,
-                    model_path=?,
-                    config=?
-                WHERE id=?;
-                """,
-                (record.base_model, record.model_type, record.name, record.path, json_serialized, key),
-            )
-            if self._cursor.rowcount == 0:
-                raise UnknownModelException
-            if record.tags:
-                self._update_tags(key, record.tags)
-            self._conn.commit()
-        except sqlite3.Error as e:
-            self._conn.rollback()
-            raise e
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    UPDATE model_config
+                    SET base_model=?,
+                        model_type=?,
+                        model_name=?,
+                        model_path=?,
+                        config=?
+                    WHERE id=?;
+                    """,
+                    (record.base_model, record.model_type, record.name, record.path, json_serialized, key),
+                )
+                if self._cursor.rowcount == 0:
+                    raise UnknownModelException
+                if record.tags:
+                    self._update_tags(key, record.tags)
+                self._conn.commit()
+            except sqlite3.Error as e:
+                self._conn.rollback()
+                raise e
+
         return self.get_model(key)
 
     def get_model(self, key: str) -> AnyModelConfig:
@@ -363,8 +352,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
 
         Exceptions: UnknownModelException
         """
-        try:
-            self._lock.acquire()
+        with self._lock:
             self._cursor.execute(
                 """--sql
                 SELECT config FROM model_config
@@ -376,8 +364,6 @@ class ModelConfigStoreSQL(ModelConfigStore):
             if not rows:
                 raise UnknownModelException
             model = ModelConfigFactory.make_config(json.loads(rows[0]))
-        finally:
-            self._lock.release()
         return model
 
     def exists(self, key: str) -> bool:
@@ -387,20 +373,18 @@ class ModelConfigStoreSQL(ModelConfigStore):
         :param key: Unique key for the model to be deleted
         """
         count = 0
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                select count(*) FROM model_config
-                WHERE id=?;
-                """,
-                (key,),
-            )
-            count = self._cursor.fetchone()[0]
-        except sqlite3.Error as e:
-            raise e
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    select count(*) FROM model_config
+                    WHERE id=?;
+                    """,
+                    (key,),
+                )
+                count = self._cursor.fetchone()[0]
+            except sqlite3.Error as e:
+                raise e
         return count > 0
 
     def search_by_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
@@ -408,34 +392,32 @@ class ModelConfigStoreSQL(ModelConfigStore):
         # rather than create a hairy SQL cross-product, we intersect
         # tag results in a stepwise fashion at the python level.
         results = []
-        try:
-            self._lock.acquire()
-            matches: Set[str] = set()
-            for tag in tags:
-                self._cursor.execute(
-                    """--sql
-                    SELECT a.id FROM model_tag AS a,
-                                       tags AS b
-                    WHERE a.tag_id=b.tag_id
-                      AND b.tag_text=?;
-                    """,
-                    (tag,),
-                )
-                model_keys = {x[0] for x in self._cursor.fetchall()}
-                matches = matches.intersection(model_keys) if len(matches) > 0 else model_keys
-            if matches:
-                self._cursor.execute(
-                    f"""--sql
-                    SELECT config FROM model_config
-                    WHERE id IN ({','.join('?' * len(matches))});
-                    """,
-                    tuple(matches),
-                )
-                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
-        except sqlite3.Error as e:
-            raise e
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                matches: Set[str] = set()
+                for tag in tags:
+                    self._cursor.execute(
+                        """--sql
+                        SELECT a.id FROM model_tag AS a,
+                                           tags AS b
+                        WHERE a.tag_id=b.tag_id
+                          AND b.tag_text=?;
+                        """,
+                        (tag,),
+                    )
+                    model_keys = {x[0] for x in self._cursor.fetchall()}
+                    matches = matches.intersection(model_keys) if len(matches) > 0 else model_keys
+                if matches:
+                    self._cursor.execute(
+                        f"""--sql
+                        SELECT config FROM model_config
+                        WHERE id IN ({','.join('?' * len(matches))});
+                        """,
+                        tuple(matches),
+                    )
+                    results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            except sqlite3.Error as e:
+                raise e
         return results
 
     def search_by_name(
@@ -467,20 +449,18 @@ class ModelConfigStoreSQL(ModelConfigStore):
             where_clause.append("model_type=?")
             bindings.append(model_type)
         where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                f"""--sql
-                select config FROM model_config
-                {where};
-                """,
-                tuple(bindings),
-            )
-            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
-        except sqlite3.Error as e:
-            raise e
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    f"""--sql
+                    select config FROM model_config
+                    {where};
+                    """,
+                    tuple(bindings),
+                )
+                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            except sqlite3.Error as e:
+                raise e
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> Optional[ModelConfigBase]:

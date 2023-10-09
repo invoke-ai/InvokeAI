@@ -212,7 +212,7 @@ class DownloadQueueBase(ABC):
     @abstractmethod
     def cancel_all_jobs(self, preserve_partial: bool = False):
         """
-        Cancel all active and enquedjobs.
+        Cancel all jobs (those in enqueued, running and paused states).
 
         :param preserve_partial: Keep partially downloaded files [False].
         """
