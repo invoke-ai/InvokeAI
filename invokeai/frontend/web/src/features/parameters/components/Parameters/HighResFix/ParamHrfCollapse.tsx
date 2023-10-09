@@ -12,22 +12,22 @@ import ParamHrfToggle from './ParamHrfToggle';
 const selector = createSelector(
   stateSelector,
   (state: RootState) => {
-    const { hrfToggled } = state.generation;
+    const { hrfEnabled } = state.generation;
 
-    return { hrfToggled };
+    return { hrfEnabled };
   },
   defaultSelectorOptions
 );
 
 export default function ParamHrfCollapse() {
-  const { hrfToggled } = useAppSelector(selector);
+  const { hrfEnabled } = useAppSelector(selector);
   const activeLabel = useMemo(() => {
-    if (hrfToggled) {
+    if (hrfEnabled) {
       return 'On';
     } else {
       return 'Off';
     }
-  }, [hrfToggled]);
+  }, [hrfEnabled]);
 
   return (
     <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>

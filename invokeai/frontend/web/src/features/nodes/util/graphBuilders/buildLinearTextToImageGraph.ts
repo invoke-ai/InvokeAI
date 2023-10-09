@@ -49,7 +49,7 @@ export const buildLinearTextToImageGraph = (
     seed,
     hrfScale,
     hrfStrength,
-    hrfToggled,
+    hrfEnabled: hrfToggled,
   } = state.generation;
 
   const use_cpu = shouldUseCpuNoise;
@@ -291,7 +291,7 @@ export const buildLinearTextToImageGraph = (
 
   // High resolution fix.
   // NOTE: Not supported for onnx models.
-  if (state.generation.hrfToggled && !isUsingOnnxModel) {
+  if (state.generation.hrfEnabled && !isUsingOnnxModel) {
     addHrfToGraph(state, graph);
   }
 

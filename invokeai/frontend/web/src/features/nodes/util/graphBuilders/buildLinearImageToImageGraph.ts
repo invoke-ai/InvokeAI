@@ -365,7 +365,7 @@ export const buildLinearImageToImageGraph = (
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // High resolution fix.
-  if (state.generation.hrfToggled) {
+  if (state.generation.hrfEnabled) {
     addHrfToGraph(state, graph);
   }
 

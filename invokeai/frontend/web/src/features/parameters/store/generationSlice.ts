@@ -28,7 +28,7 @@ import {
 
 export interface GenerationState {
   hrfScale: HrfScaleParam;
-  hrfToggled: boolean;
+  hrfEnabled: boolean;
   hrfStrength: StrengthParam;
   cfgScale: CfgScaleParam;
   height: HeightParam;
@@ -74,7 +74,7 @@ export interface GenerationState {
 export const initialGenerationState: GenerationState = {
   hrfScale: 1.0,
   hrfStrength: 0.75,
-  hrfToggled: false,
+  hrfEnabled: false,
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
@@ -283,8 +283,8 @@ export const generationSlice = createSlice({
     setHrfStrength: (state, action: PayloadAction<number>) => {
       state.hrfStrength = action.payload;
     },
-    setHrfToggle: (state, action: PayloadAction<boolean>) => {
-      state.hrfToggled = action.payload;
+    setHrfEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hrfEnabled = action.payload;
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
@@ -363,7 +363,7 @@ export const {
   setClipSkip,
   setHrfScale,
   setHrfStrength,
-  setHrfToggle,
+  setHrfEnabled,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
   setShouldLockAspectRatio,

@@ -5,9 +5,9 @@ import { setHrfScale } from 'features/parameters/store/generationSlice';
 import { useCallback } from 'react';
 
 export default function ParamHrfScale() {
-  const { hrfScale, hrfToggled } = useAppSelector((state: RootState) => ({
+  const { hrfScale, hrfEnabled } = useAppSelector((state: RootState) => ({
     hrfScale: state.generation.hrfScale,
-    hrfToggled: state.generation.hrfToggled,
+    hrfEnabled: state.generation.hrfEnabled,
   }));
   const dispatch = useAppDispatch();
 
@@ -35,7 +35,7 @@ export default function ParamHrfScale() {
       withInput
       withReset
       handleReset={handleHrfScaleReset}
-      isDisabled={!hrfToggled}
+      isDisabled={!hrfEnabled}
     />
   );
 }

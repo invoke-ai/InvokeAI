@@ -1,24 +1,24 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
-import { setHrfToggle } from 'features/parameters/store/generationSlice';
+import { setHrfEnabled } from 'features/parameters/store/generationSlice';
 import { ChangeEvent } from 'react';
 
 export default function ParamHrfToggle() {
   const dispatch = useAppDispatch();
 
-  const hrfToggled = useAppSelector(
-    (state: RootState) => state.generation.hrfToggled
+  const hrfEnabled = useAppSelector(
+    (state: RootState) => state.generation.hrfEnabled
   );
 
-  const handleHrfToggle = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setHrfToggle(e.target.checked));
+  const handleHrfEnabled = (e: ChangeEvent<HTMLInputElement>) =>
+    dispatch(setHrfEnabled(e.target.checked));
 
   return (
     <IAISwitch
       label="Toggle High Resolution Fix"
-      isChecked={hrfToggled}
-      onChange={handleHrfToggle}
+      isChecked={hrfEnabled}
+      onChange={handleHrfEnabled}
     />
   );
 }

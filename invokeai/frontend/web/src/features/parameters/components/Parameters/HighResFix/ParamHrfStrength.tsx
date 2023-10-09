@@ -11,7 +11,7 @@ const selector = createSelector(
   ({ generation, hotkeys, config }) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
       config.sd.hrfStrength;
-    const { hrfStrength, hrfToggled } = generation;
+    const { hrfStrength, hrfEnabled } = generation;
     const step = hotkeys.shift ? fineStep : coarseStep;
 
     return {
@@ -21,14 +21,14 @@ const selector = createSelector(
       sliderMax,
       inputMax,
       step,
-      hrfToggled,
+      hrfEnabled,
     };
   },
   defaultSelectorOptions
 );
 
 export default function ParamHrfStrength() {
-  const { hrfStrength, initial, min, sliderMax, step, hrfToggled } =
+  const { hrfStrength, initial, min, sliderMax, step, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
 
@@ -56,7 +56,7 @@ export default function ParamHrfStrength() {
       withInput
       withReset
       handleReset={handleHrfStrengthReset}
-      isDisabled={!hrfToggled}
+      isDisabled={!hrfEnabled}
     />
   );
 }

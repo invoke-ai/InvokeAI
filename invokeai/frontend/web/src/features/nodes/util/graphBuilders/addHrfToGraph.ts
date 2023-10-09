@@ -2,7 +2,7 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
-  RescaleLatentsInvocation,
+  ResizeLatentsInvocation,
   MetadataAccumulatorInvocation,
   NoiseInvocation,
   LatentsToImageInvocation,
@@ -61,6 +61,11 @@ export const addHrfToGraph = (
   state: RootState,
   graph: NonNullableGraph
 ): void => {
+  // Double check hrf is enabled.
+  if (!state.generation.hrfEnabled) {
+    return;
+  }
+
   const { vae } = state.generation;
   const isAutoVae = !vae;
 
@@ -100,7 +105,7 @@ export const addHrfToGraph = (
     denoising_end: 1,
   };
 
-  const rescaleLatentsNode: RescaleLatentsInvocation = {
+  const rescaleLatentsNode: ResizeLatentsInvocation = {
     id: RESCALE_LATENTS,
     type: 'lresize',
     width: scaledWidth,
@@ -119,21 +124,28 @@ export const addHrfToGraph = (
   };
 
   // New node to convert latents to image.
-  const latentsToImageHrfNode: LatentsToImageInvocation = {
-    type: originalLatentsToImageNode.type,
-    id: LATENTS_TO_IMAGE_HRF,
-    vae: originalLatentsToImageNode.vae,
-    fp32: originalLatentsToImageNode.fp32,
-    is_intermediate: originalLatentsToImageNode.is_intermediate,
-  };
+  const latentsToImageHrfNode: LatentsToImageInvocation | undefined =
+    originalLatentsToImageNode
+      ? {
+          type: originalLatentsToImageNode.type,
+          id: LATENTS_TO_IMAGE_HRF,
+          vae: originalLatentsToImageNode.vae,
+          fp32: originalLatentsToImageNode.fp32,
+          is_intermediate: originalLatentsToImageNode.is_intermediate,
+        }
+      : undefined;
 
   // Add new nodes to graph.
   graph.nodes[LATENTS_TO_IMAGE_HRF] =
     latentsToImageHrfNode as LatentsToImageInvocation;
-  graph.nodes[DENOISE_LATENTS_HRF] =
-    denoiseLatentsHrfNode as DenoiseLatentsInvocation;
-  graph.nodes[RESCALE_LATENTS] = rescaleLatentsNode as RescaleLatentsInvocation;
-  graph.nodes[NOISE_HRF] = hrfNoiseNode as NoiseInvocation;
+
+  graph.nodes[DENOISE_LATENTS_HRF] = denoiseLatentsHrfNode as
+    | DenoiseLatentsInvocation
+    | undefined;
+  graph.nodes[RESCALE_LATENTS] = rescaleLatentsNode as
+    | ResizeLatentsInvocation
+    | undefined;
+  graph.nodes[NOISE_HRF] = hrfNoiseNode as NoiseInvocation | undefined;
 
   // Connect nodes.
   graph.edges.push(
