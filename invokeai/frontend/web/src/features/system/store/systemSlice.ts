@@ -164,7 +164,9 @@ export const systemSlice = createSlice({
 
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
       if (
-        ['completed', 'canceled', 'failed'].includes(action.payload.data.status)
+        ['completed', 'canceled', 'failed'].includes(
+          action.payload.data.queue_item.status
+        )
       ) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;

@@ -427,7 +427,13 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self.__lock.release()
         queue_item = self.get_queue_item(item_id)
-        self.__invoker.services.events.emit_queue_item_status_changed(queue_item)
+        batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
+        queue_status = self.get_queue_status(queue_id=queue_item.queue_id)
+        self.__invoker.services.events.emit_queue_item_status_changed(
+            session_queue_item=queue_item,
+            batch_status=batch_status,
+            queue_status=queue_status,
+        )
         return queue_item
 
     def is_empty(self, queue_id: str) -> IsEmptyResult:
@@ -609,7 +615,13 @@ class SqliteSessionQueue(SessionQueueBase):
                     queue_batch_id=current_queue_item.batch_id,
                     graph_execution_state_id=current_queue_item.session_id,
                 )
-                self.__invoker.services.events.emit_queue_item_status_changed(current_queue_item)
+                batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
+                queue_status = self.get_queue_status(queue_id=queue_id)
+                self.__invoker.services.events.emit_queue_item_status_changed(
+                    session_queue_item=current_queue_item,
+                    batch_status=batch_status,
+                    queue_status=queue_status,
+                )
         except Exception:
             self.__conn.rollback()
             raise
@@ -655,7 +667,13 @@ class SqliteSessionQueue(SessionQueueBase):
                     queue_batch_id=current_queue_item.batch_id,
                     graph_execution_state_id=current_queue_item.session_id,
                 )
-                self.__invoker.services.events.emit_queue_item_status_changed(current_queue_item)
+                batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
+                queue_status = self.get_queue_status(queue_id=queue_id)
+                self.__invoker.services.events.emit_queue_item_status_changed(
+                    session_queue_item=current_queue_item,
+                    batch_status=batch_status,
+                    queue_status=queue_status,
+                )
         except Exception:
             self.__conn.rollback()
             raise

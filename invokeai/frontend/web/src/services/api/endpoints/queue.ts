@@ -135,12 +135,7 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/prune`,
         method: 'PUT',
       }),
-      invalidatesTags: [
-        'SessionQueueStatus',
-        'BatchStatus',
-        'SessionQueueItem',
-        'SessionQueueItemDTO',
-      ],
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
@@ -165,8 +160,6 @@ export const queueApi = api.injectEndpoints({
         'BatchStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
-        'SessionQueueItem',
-        'SessionQueueItemDTO',
       ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
@@ -218,7 +211,6 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/status`,
         method: 'GET',
       }),
-
       providesTags: ['SessionQueueStatus'],
     }),
     getBatchStatus: build.query<
@@ -269,7 +261,11 @@ export const queueApi = api.injectEndpoints({
               (draft) => {
                 queueItemsAdapter.updateOne(draft, {
                   id: item_id,
-                  changes: { status: data.status },
+                  changes: {
+                    status: data.status,
+                    completed_at: data.completed_at,
+                    updated_at: data.updated_at,
+                  },
                 });
               }
             )
@@ -284,7 +280,6 @@ export const queueApi = api.injectEndpoints({
         }
         return [
           { type: 'SessionQueueItem', id: result.item_id },
-          { type: 'SessionQueueItemDTO', id: result.item_id },
           { type: 'BatchStatus', id: result.batch_id },
         ];
       },
@@ -307,11 +302,7 @@ export const queueApi = api.injectEndpoints({
           // no-op
         }
       },
-      invalidatesTags: [
-        'SessionQueueItem',
-        'SessionQueueItemDTO',
-        'BatchStatus',
-      ],
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
     }),
     listQueueItems: build.query<
       EntityState<components['schemas']['SessionQueueItemDTO']> & {

@@ -8,7 +8,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Optional, Union
 
-from invokeai.backend.model_manager import ModelConfigBase, ModelType, SubModelType
+from invokeai.backend.model_manager import ModelConfigBase, BaseModelType, ModelType, SubModelType
 
 from invokeai.backend.model_manager.storage import (
     ModelConfigStore,
