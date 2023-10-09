@@ -4,7 +4,12 @@ from typing import Any, Optional
 
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo, ModelType, SubModelType
-from invokeai.app.services.session_queue.session_queue_common import EnqueueBatchResult, SessionQueueItem
+from invokeai.app.services.session_queue.session_queue_common import (
+    BatchStatus,
+    EnqueueBatchResult,
+    SessionQueueItem,
+    SessionQueueStatus,
+)
 from invokeai.app.util.misc import get_timestamp
 
 
@@ -262,21 +267,31 @@ class EventServiceBase:
             ),
         )
 
-    def emit_queue_item_status_changed(self, session_queue_item: SessionQueueItem) -> None:
+    def emit_queue_item_status_changed(
+        self,
+        session_queue_item: SessionQueueItem,
+        batch_status: BatchStatus,
+        queue_status: SessionQueueStatus,
+    ) -> None:
         """Emitted when a queue item's status changes"""
         self.__emit_queue_event(
             event_name="queue_item_status_changed",
             payload=dict(
-                queue_id=session_queue_item.queue_id,
-                queue_item_id=session_queue_item.item_id,
-                status=session_queue_item.status,
-                batch_id=session_queue_item.batch_id,
-                session_id=session_queue_item.session_id,
-                error=session_queue_item.error,
-                created_at=str(session_queue_item.created_at) if session_queue_item.created_at else None,
-                updated_at=str(session_queue_item.updated_at) if session_queue_item.updated_at else None,
-                started_at=str(session_queue_item.started_at) if session_queue_item.started_at else None,
-                completed_at=str(session_queue_item.completed_at) if session_queue_item.completed_at else None,
+                queue_id=queue_status.queue_id,
+                queue_item=dict(
+                    queue_id=session_queue_item.queue_id,
+                    item_id=session_queue_item.item_id,
+                    status=session_queue_item.status,
+                    batch_id=session_queue_item.batch_id,
+                    session_id=session_queue_item.session_id,
+                    error=session_queue_item.error,
+                    created_at=str(session_queue_item.created_at) if session_queue_item.created_at else None,
+                    updated_at=str(session_queue_item.updated_at) if session_queue_item.updated_at else None,
+                    started_at=str(session_queue_item.started_at) if session_queue_item.started_at else None,
+                    completed_at=str(session_queue_item.completed_at) if session_queue_item.completed_at else None,
+                ),
+                batch_status=batch_status.dict(),
+                queue_status=queue_status.dict(),
             ),
         )
 
