@@ -26,6 +26,7 @@ from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats import InvocationStatsService
 from ..services.invoker import Invoker
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
+from ..services.download_manager import DownloadQueueService
 from ..services.model_install_service import ModelInstallService
 from ..services.model_loader_service import ModelLoadService
 from ..services.model_record_service import ModelRecordServiceBase
@@ -129,9 +130,14 @@ class ApiDependencies:
             )
         )
 
+        download_queue = DownloadQueueService(event_bus=events, config=config)
         model_record_store = ModelRecordServiceBase.get_impl(config, conn=db_conn, lock=lock)
         model_loader = ModelLoadService(config, model_record_store)
-        model_installer = ModelInstallService(config, model_record_store, events)
+        model_installer = ModelInstallService(config,
+                                              queue=download_queue,
+                                              store=model_record_store,
+                                              event_bus=events
+                                              )
 
         services = InvocationServices(
             events=events,
@@ -146,6 +152,7 @@ class ApiDependencies:
             configuration=config,
             performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
+            download_queue=download_queue,
             model_record_store=model_record_store,
             model_loader=model_loader,
             model_installer=model_installer,

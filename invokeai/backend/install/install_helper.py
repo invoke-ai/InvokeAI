@@ -14,7 +14,7 @@ import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager import BaseModelType, ModelType
 from invokeai.backend.model_manager.download.queue import DownloadJobRemoteSource
-from invokeai.backend.model_manager.install import ModelInstall, ModelInstallJob, ModelSourceMetadata
+from invokeai.app.services.model_install_service import ModelInstall, ModelInstallJob, ModelSourceMetadata
 
 # name of the starter models file
 INITIAL_MODELS = "INITIAL_MODELS.yaml"
@@ -168,10 +168,9 @@ class InstallHelper(object):
         self._add_required_models(selections.install_models)
         for model in selections.install_models:
             metadata = ModelSourceMetadata(description=model.description, name=model.name)
-            installer.install(
+            installer.install_model(
                 model.source,
                 subfolder=model.subfolder,
-                variant="fp16" if self._config.precision == "float16" else None,
                 access_token=HfFolder.get_token(),
                 metadata=metadata,
             )

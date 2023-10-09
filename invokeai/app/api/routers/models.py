@@ -19,9 +19,11 @@ from invokeai.backend.model_manager import (
     ModelConfigBase,
     SchedulerPredictionType,
     UnknownModelException,
+    ModelSearch
 )
-from invokeai.backend.model_manager.download import DownloadJobStatus, UnknownJobIDException
-from invokeai.backend.model_manager.merge import MergeInterpolationMethod
+from invokeai.app.services.download_manager import DownloadJobStatus, UnknownJobIDException, DownloadJobRemoteSource
+from invokeai.app.services.model_convert import MergeInterpolationMethod, ModelConvert
+from invokeai.app.services.model_install_service import ModelInstallJob
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -39,7 +41,7 @@ class ModelsList(BaseModel):
     models: List[InvokeAIModelConfig]
 
 
-class ModelImportStatus(BaseModel):
+class ModelDownloadStatus(BaseModel):
     """Return information about a background installation job."""
 
     job_id: int
@@ -55,7 +57,6 @@ class JobControlOperation(str, Enum):
     PAUSE = "Pause"
     CANCEL = "Cancel"
     CHANGE_PRIORITY = "Change Priority"
-
 
 @models_router.get(
     "/",
@@ -135,7 +136,7 @@ async def update_model(
         409: {"description": "There is already a model corresponding to this path or repo_id"},
     },
     status_code=201,
-    response_model=ModelImportStatus,
+    response_model=ModelDownloadStatus,
 )
 async def import_model(
     location: str = Body(description="A model path, repo_id or URL to import"),
@@ -147,7 +148,7 @@ async def import_model(
         description="Which import jobs run first. Lower values run before higher ones.",
         default=10,
     ),
-) -> ModelImportStatus:
+) -> ModelDownloadStatus:
     """
     Add a model using its local path, repo_id, or remote URL.
 
@@ -172,10 +173,10 @@ async def import_model(
         installer = ApiDependencies.invoker.services.model_installer
         result = installer.install_model(
             location,
-            model_attributes={"prediction_type": SchedulerPredictionType(prediction_type)},
+            probe_override={"prediction_type": SchedulerPredictionType(prediction_type) if prediction_type else None},
             priority=priority,
         )
-        return ModelImportStatus(
+        return ModelDownloadStatus(
             job_id=result.id,
             source=result.source,
             priority=result.priority,
@@ -288,8 +289,12 @@ async def convert_model(
     """Convert a checkpoint model into a diffusers model, optionally saving to the indicated destination directory, or `models` if none."""
     try:
         dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
-        installer = ApiDependencies.invoker.services.model_installer
-        model_config = installer.convert_model(key, dest_directory=dest)
+        converter = ModelConvert(
+            loader=ApiDependencies.invoker.services.model_loader,
+            installer=ApiDependencies.invoker.services.model_installer,
+            store=ApiDependencies.invoker.services.model_record_store
+        )
+        model_config = converter.convert_model(key, dest_directory=dest)
         response = parse_obj_as(InvokeAIModelConfig, model_config.dict())
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=f"Model '{key}' not found: {str(e)}")
@@ -316,8 +321,7 @@ async def search_for_models(
         raise HTTPException(
             status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory"
         )
-    return ApiDependencies.invoker.services.model_installer.search_for_models(search_path)
-
+    return ModelSearch().search(search_path)
 
 @models_router.get(
     "/ckpt_confs",
@@ -330,7 +334,10 @@ async def search_for_models(
 )
 async def list_ckpt_configs() -> List[pathlib.Path]:
     """Return a list of the legacy checkpoint configuration files stored in `ROOT/configs/stable-diffusion`, relative to ROOT."""
-    return ApiDependencies.invoker.services.model_installer.list_checkpoint_configs()
+    config = ApiDependencies.invoker.services.configuration
+    conf_path = config.legacy_conf_path
+    root_path = config.root_path
+    return [(conf_path / x).relative_to(root_path) for x in conf_path.glob("**/*.yaml")]
 
 
 @models_router.post(
@@ -349,7 +356,8 @@ async def sync_to_config() -> bool:
     Call after making changes to models.yaml, autoimport directories
     or models directory.
     """
-    ApiDependencies.invoker.services.model_installer.sync_to_config()
+    installer = ApiDependencies.invoker.services.model_installer
+    installer.sync_to_config()
     return True
 
 
@@ -383,7 +391,12 @@ async def merge_models(
     try:
         logger.info(f"Merging models: {keys} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
         dest = pathlib.Path(merge_dest_directory) if merge_dest_directory else None
-        result: ModelConfigBase = ApiDependencies.invoker.services.model_installer.merge_models(
+        converter = ModelConvert(
+            loader=ApiDependencies.invoker.services.model_loader,
+            installer=ApiDependencies.invoker.services.model_installer,
+            store=ApiDependencies.invoker.services.model_record_store
+        )
+        result: ModelConfigBase = converter.merge_models(
             model_keys=keys,
             merged_model_name=merged_model_name,
             alpha=alpha,
@@ -409,14 +422,14 @@ async def merge_models(
         400: {"description": "Bad request"},
     },
     status_code=200,
-    response_model=List[ModelImportStatus],
+    response_model=List[ModelDownloadStatus],
 )
-async def list_install_jobs() -> List[ModelImportStatus]:
+async def list_install_jobs() -> List[ModelDownloadStatus]:
     """List active and pending model installation jobs."""
-    job_mgr = ApiDependencies.invoker.services.model_installer
-    jobs = job_mgr.list_install_jobs()
+    job_mgr = ApiDependencies.invoker.services.download_queue
+    jobs = job_mgr.list_jobs()
     return [
-        ModelImportStatus(
+        ModelDownloadStatus(
             job_id=x.id,
             source=x.source,
             priority=x.priority,
@@ -424,32 +437,32 @@ async def list_install_jobs() -> List[ModelImportStatus]:
             total_bytes=x.total_bytes,
             status=x.status,
         )
-        for x in jobs
+        for x in jobs if isinstance(x, ModelInstallJob)
     ]
 
 
 @models_router.patch(
     "/jobs/control/{operation}/{job_id}",
-    operation_id="control_install_jobs",
+    operation_id="control_download_jobs",
     responses={
         200: {"description": "The control job was updated successfully"},
         400: {"description": "Bad request"},
         404: {"description": "The job could not be found"},
     },
     status_code=200,
-    response_model=ModelImportStatus,
+    response_model=ModelDownloadStatus,
 )
-async def control_install_jobs(
-    job_id: int = Path(description="Install job_id for start, pause and cancel operations"),
+async def control_download_jobs(
+    job_id: int = Path(description="Download/install job_id for start, pause and cancel operations"),
     operation: JobControlOperation = Path(description="The operation to perform on the job."),
     priority_delta: Optional[int] = Body(
         description="Change in job priority for priority operations only. Negative numbers increase priority.",
         default=None,
     ),
-) -> ModelImportStatus:
+) -> ModelDownloadStatus:
     """Start, pause, cancel, or change the run priority of a running model install job."""
     logger = ApiDependencies.invoker.services.logger
-    job_mgr = ApiDependencies.invoker.services.model_installer
+    job_mgr = ApiDependencies.invoker.services.download_queue
     try:
         job = job_mgr.id_to_job(job_id)
 
@@ -467,14 +480,19 @@ async def control_install_jobs(
 
         else:
             raise ValueError(f"Unknown operation {operation.value}")
+        bytes = 0
+        total_bytes = 0
+        if isinstance(job, DownloadJobRemoteSource):
+            bytes = job.bytes
+            total_bytes = job.total_bytes
 
-        return ModelImportStatus(
+        return ModelDownloadStatus(
             job_id=job_id,
             source=job.source,
             priority=job.priority,
             status=job.status,
-            bytes=job.bytes,
-            total_bytes=job.total_bytes,
+            bytes=bytes,
+            total_bytes=total_bytes,
         )
     except UnknownJobIDException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -485,17 +503,17 @@ async def control_install_jobs(
 
 @models_router.patch(
     "/jobs/cancel_all",
-    operation_id="cancel_all_jobs",
+    operation_id="cancel_all_download_jobs",
     responses={
         204: {"description": "All jobs cancelled successfully"},
         400: {"description": "Bad request"},
     },
 )
-async def cancel_install_jobs():
+async def cancel_all_download_jobs():
     """Cancel all model installation jobs."""
     logger = ApiDependencies.invoker.services.logger
-    job_mgr = ApiDependencies.invoker.services.model_installer
-    logger.info("Cancelling all model installation jobs.")
+    job_mgr = ApiDependencies.invoker.services.download_queue
+    logger.info("Cancelling all download jobs.")
     job_mgr.cancel_all_jobs()
     return Response(status_code=204)
 
@@ -510,7 +528,6 @@ async def cancel_install_jobs():
 )
 async def prune_jobs():
     """Prune all completed and errored jobs."""
-    logger = ApiDependencies.invoker.services.logger
-    mgr = ApiDependencies.invoker.services.model_installer
+    mgr = ApiDependencies.invoker.services.download_queue
     mgr.prune_jobs()
     return Response(status_code=204)

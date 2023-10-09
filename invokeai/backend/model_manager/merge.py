@@ -16,10 +16,10 @@ from diffusers import logging as dlogging
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_install_service import ModelInstallService
 
 from . import BaseModelType, ModelConfigBase, ModelConfigStore, ModelType
 from .config import MainConfig
-from .loader import ModelLoad
 
 
 class MergeInterpolationMethod(str, Enum):
@@ -151,7 +151,7 @@ class ModelMerger(object):
         merged_pipe.save_pretrained(dump_path, safe_serialization=True)
 
         # register model and get its unique key
-        installer = ModelInstall(store=self._store, config=self._config)
+        installer = ModelInstallService(store=self._store, config=self._config)
         key = installer.register_path(dump_path)
 
         # update model's config

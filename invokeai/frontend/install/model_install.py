@@ -26,9 +26,9 @@ from pydantic import BaseModel
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_install_service import ModelInstall, ModelInstallJob
 from invokeai.backend.install.install_helper import InstallHelper, UnifiedModelInfo
 from invokeai.backend.model_manager import BaseModelType, ModelType
-from invokeai.backend.model_manager.install import ModelInstall, ModelInstallJob
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.widgets import (

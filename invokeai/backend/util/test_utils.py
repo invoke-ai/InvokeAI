@@ -7,8 +7,8 @@ import torch
 
 from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 from invokeai.app.services.model_record_service import ModelRecordServiceBase
+from invokeai.app.services.model_install_service import ModelInstallService
 from invokeai.backend.model_manager import BaseModelType, ModelType, SubModelType, UnknownModelException
-from invokeai.backend.model_manager.install import ModelInstall
 from invokeai.backend.model_manager.loader import ModelInfo, ModelLoad
 
 
@@ -30,11 +30,11 @@ def model_installer():
     #
     config = InvokeAIAppConfig(log_level="info")
     model_store = ModelRecordServiceBase.get_impl(config)
-    return ModelInstall(model_store, config)
+    return ModelInstallService(store=model_store, config=config)
 
 
 def install_and_load_model(
-    model_installer: ModelInstall,
+    model_installer: ModelInstallService,
     model_path_id_or_url: Union[str, Path],
     model_name: str,
     base_model: BaseModelType,

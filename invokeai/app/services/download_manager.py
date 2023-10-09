@@ -9,7 +9,18 @@ from typing import List, Optional, Union
 
 from pydantic.networks import AnyHttpUrl
 
-from invokeai.backend.model_manager.download import DownloadEventHandler, DownloadJobBase, DownloadQueue
+from invokeai.backend.model_manager.download import (  # noqa F401
+    DownloadEventHandler,
+    DownloadJobBase,
+    DownloadJobPath,
+    DownloadJobStatus,
+    DownloadQueueBase,
+    ModelDownloadQueue,
+    ModelSourceMetadata,
+    UnknownJobIDException,
+)
+from invokeai.backend.model_manager.download import DownloadJobRemoteSource  # noqa F401
+
 
 from .events import EventServiceBase
 
@@ -37,6 +48,22 @@ class DownloadQueueServiceBase(ABC):
         :param start: Immediately start job [True]
         :param event_handler: Callable that receives a DownloadJobBase and acts on it.
         :returns job id: The numeric ID of the DownloadJobBase object for this task.
+        """
+        pass
+
+    @abstractmethod
+    def submit_download_job(
+        self,
+        job: DownloadJobBase,
+        start: bool = True,
+    ):
+        """
+        Submit a download job.
+
+        :param job: A DownloadJobBase
+        :param start: Immediately start job [True]
+
+        After execution, `job.id` will be set to a non-negative value.
         """
         pass
 
@@ -74,6 +101,11 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def cancel_all_jobs(self):
         """Cancel all active and enquedjobs."""
+        pass
+
+    @abstractmethod
+    def prune_jobs(self):
+        """Prune completed and errored queue items from the job list."""
         pass
 
     @abstractmethod
@@ -115,7 +147,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     """Multithreaded queue for downloading models via URL or repo_id."""
 
     _event_bus: EventServiceBase
-    _queue: DownloadQueue
+    _queue: DownloadQueueBase
 
     def __init__(self, event_bus: EventServiceBase, **kwargs):
         """
@@ -126,7 +158,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         e.g. `max_parallel_dl`.
         """
         self._event_bus = event_bus
-        self._queue = DownloadQueue(**kwargs)
+        self._queue = ModelDownloadQueue(**kwargs)
 
     def create_download_job(
         self,
@@ -149,6 +181,13 @@ class DownloadQueueService(DownloadQueueServiceBase):
             event_handlers=event_handlers,
         )
 
+    def submit_download_job(
+        self,
+        job: DownloadJobBase,
+        start: bool = True,
+    ):
+        return self._queue.submit_download_job(job, start)
+
     def list_jobs(self) -> List[DownloadJobBase]:  # noqa D102
         return self._queue.list_jobs()
 
@@ -163,6 +202,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def cancel_all_jobs(self):  # noqa D102
         return self._queue.cancel_all_jobs()
+
+    def prune_jobs(self, job: DownloadJobBase):  # noqa D102
+        return self._queue.prune_jobs()
 
     def start_job(self, job: DownloadJobBase):  # noqa D102
         return self._queue.start_job(job)

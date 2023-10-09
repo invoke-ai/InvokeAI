@@ -1,41 +1,143 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
+# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 
-from __future__ import annotations
-
-import shutil
-from abc import abstractmethod
+import re
+import tempfile
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Set, Union
+from shutil import move, rmtree
+from typing import Any, Callable, Dict, List, Optional, Set, Union, Literal
 
 from pydantic import Field, parse_obj_as
 from pydantic.networks import AnyHttpUrl
 
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
+from invokeai.backend.util import Chdir, InvokeAILogger, Logger
 from invokeai.backend import get_precision
-from invokeai.backend.model_manager import ModelConfigBase, ModelSearch
-from invokeai.backend.model_manager.download import DownloadJobBase
-from invokeai.backend.model_manager.install import ModelInstall, ModelInstallBase, ModelInstallJob
-from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
-from invokeai.backend.util.logging import InvokeAILogger
-
-from .config import InvokeAIAppConfig
+from invokeai.backend.model_manager.config import (
+    BaseModelType,
+    ModelConfigBase,
+    ModelFormat,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+    SubModelType,
+)
+from invokeai.backend.model_manager.download.model_queue import (
+    HTTP_RE,
+    REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE,
+    DownloadJobRepoID,
+    DownloadJobWithMetadata,
+)
+from invokeai.backend.model_manager.hash import FastModelHash
+from invokeai.backend.model_manager.models import InvalidModelException
+from invokeai.backend.model_manager.probe import ModelProbe, ModelProbeInfo
+from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.storage import DuplicateModelException, ModelConfigStore
 from .events import EventServiceBase
-from .model_record_service import ModelRecordServiceBase
+from .download_manager import (
+    DownloadQueueServiceBase,
+    DownloadQueueService,
+    DownloadJobBase,
+    DownloadJobPath,
+    DownloadEventHandler,
+    ModelSourceMetadata,
+)
 
 
-class ModelInstallServiceBase(ModelInstallBase):  # This is an ABC
-    """Responsible for downloading, installing and deleting models."""
+class ModelInstallJob(DownloadJobBase):
+    """This is a version of DownloadJobBase that has an additional slot for the model key and probe info."""
+
+    model_key: Optional[str] = Field(
+        description="After model installation, this field will hold its primary key", default=None
+    )
+    probe_override: Optional[Dict[str, Any]] = Field(
+        description="Keys in this dict will override like-named attributes in the automatic probe info",
+        default=None,
+    )
+
+
+class ModelInstallURLJob(DownloadJobWithMetadata, ModelInstallJob):
+    """Job for installing URLs."""
+
+
+class ModelInstallRepoIDJob(DownloadJobRepoID, ModelInstallJob):
+    """Job for installing repo ids."""
+
+
+class ModelInstallPathJob(DownloadJobPath, ModelInstallJob):
+    """Job for installing local paths."""
+
+
+ModelInstallEventHandler = Callable[["ModelInstallJob"], None]
+
+
+class ModelInstallServiceBase(ABC):
+    """Abstract base class for InvokeAI model installation."""
 
     @abstractmethod
     def __init__(
-        self, config: InvokeAIAppConfig, store: ModelRecordServiceBase, event_bus: Optional[EventServiceBase] = None
+        self,
+        config: Optional[InvokeAIAppConfig] = None,
+        queue: Optional[DownloadQueueServiceBase] = None,
+        store: Optional[ModelRecordServiceBase] = None,
+        event_bus: Optional[EventServiceBase] = None,
     ):
         """
-        Initialize a ModelInstallService instance.
+        Create ModelInstallService object.
 
-        :param config: InvokeAIAppConfig object
-        :param store: A ModelRecordServiceBase object install to
-        :param event_bus: Optional EventServiceBase object. If provided,
-        installation and download events will be sent to the event bus as "model_event".
+        :param store: Optional ModelConfigStore. If None passed,
+        defaults to `configs/models.yaml`.
+        :param config: Optional InvokeAIAppConfig. If None passed,
+        uses the system-wide default app config.
+        :param logger: Optional InvokeAILogger. If None passed,
+        uses the system-wide default logger.
+        :param download: Optional DownloadQueueServiceBase object. If None passed,
+        a default queue object will be created.
+        :param event_handlers: List of event handlers to pass to the queue object.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def queue(self) -> DownloadQueueServiceBase:
+        """Return the download queue used by the installer."""
+        pass
+
+    @property
+    @abstractmethod
+    def store(self) -> ModelRecordServiceBase:
+        """Return the storage backend used by the installer."""
+        pass
+
+    @property
+    @abstractmethod
+    def config(self) -> InvokeAIAppConfig:
+        """Return the app_config used by the installer."""
+        pass
+
+    @abstractmethod
+    def register_path(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]]) -> str:
+        """
+        Probe and register the model at model_path.
+
+        :param model_path: Filesystem Path to the model.
+        :param overrides: Dict of attributes that will override probed values.
+        :returns id: The string ID of the registered model.
+        """
+        pass
+
+    @abstractmethod
+    def install_path(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Probe, register and install the model in the models directory.
+
+        This involves moving the model from its current location into
+        the models directory handled by InvokeAI.
+
+        :param model_path: Filesystem Path to the model.
+        :param overrides: Dictionary of model probe info fields that, if present, override probed values.
+        :returns id: The string ID of the installed model.
         """
         pass
 
@@ -43,327 +145,500 @@ class ModelInstallServiceBase(ModelInstallBase):  # This is an ABC
     def install_model(
         self,
         source: Union[str, Path, AnyHttpUrl],
+        inplace: bool = True,
         priority: int = 10,
-        model_attributes: Optional[Dict[str, Any]] = None,
+        variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
+        probe_override: Optional[Dict[str, Any]] = None,
+        metadata: Optional[ModelSourceMetadata] = None,
+        access_token: Optional[str] = None,
     ) -> ModelInstallJob:
-        """Import a path, repo_id or URL. Returns an ModelInstallJob.
+        """
+        Download and install the indicated model.
 
-        :param model_attributes: Additional attributes to supplement/override
-        the model information gained from automated probing.
-        :param priority: Queue priority. Lower values have higher priority.
+        This will download the model located at `source`,
+        probe it, and install it into the models directory.
+        This call is executed asynchronously in a separate
+        thread, and the returned object is a
+        invokeai.backend.model_manager.download.DownloadJobBase
+        object which can be interrogated to get the status of
+        the download and install process. Call our `wait_for_installs()`
+        method to wait for all downloads and installations to complete.
 
-        Typical usage:
-        job = model_manager.install(
-                   'stabilityai/stable-diffusion-2-1',
-                   model_attributes={'prediction_type": 'v-prediction'}
-        )
+        :param source: Either a URL or a HuggingFace repo_id.
+        :param inplace: If True, local paths will not be moved into
+        the models directory, but registered in place (the default).
+        :param variant: For HuggingFace models, this optional parameter
+        specifies which variant to download (e.g. 'fp16')
+        :param subfolder: When downloading HF repo_ids this can be used to
+        specify a subfolder of the HF repository to download from.
+        :param probe_override: Optional dict. Any fields in this dict
+        will override corresponding probe fields. Use it to override
+        `base_type`, `model_type`, `format`, `prediction_type` and `image_size`.
+        :param metadata: Use this to override the fields 'description`,
+        `author`, `tags`, `source` and `license`.
 
-        The result is an ModelInstallJob object, which provides
-        information on the asynchronous model download and install
-        process. A series of "install_model_event" events will be emitted
-        until the install is completed, cancelled or errors out.
+        :returns ModelInstallJob object.
+
+        The `inplace` flag does not affect the behavior of downloaded
+        models, which are always moved into the `models` directory.
+
+        Variants recognized by HuggingFace currently are:
+        1. onnx
+        2. openvino
+        3. fp16
+        4. None (usually returns fp32 model)
         """
         pass
 
     @abstractmethod
-    def list_install_jobs(self) -> List[ModelInstallJob]:
-        """Return a series of active or enqueued ModelInstallJobs."""
-        pass
-
-    @abstractmethod
-    def id_to_job(self, id: int) -> ModelInstallJob:
-        """Return the ModelInstallJob instance corresponding to the given job ID."""
-        pass
-
-    @abstractmethod
-    def start_job(self, job_id: int):
-        """Start the given install job if it is paused or idle."""
-        pass
-
-    @abstractmethod
-    def pause_job(self, job_id: int):
-        """Pause the given install job if it is paused or idle."""
-        pass
-
-    @abstractmethod
-    def cancel_job(self, job_id: int):
-        """Cancel the given install job."""
-        pass
-
-    @abstractmethod
-    def cancel_all_jobs(self):
-        """Cancel all installation jobs."""
-        pass
-
-    @abstractmethod
-    def prune_jobs(self):
-        """Remove completed or errored install jobs."""
-        pass
-
-    @abstractmethod
-    def change_job_priority(self, job_id: int, delta: int):
+    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
         """
-        Change an install job's priority.
+        Wait for all pending installs to complete.
 
-        :param job_id: Job to change
-        :param delta: Value to increment or decrement priority.
+        This will block until all pending downloads have
+        completed, been cancelled, or errored out. It will
+        block indefinitely if one or more jobs are in the
+        paused state.
 
-        Lower values are higher priority.  The default starting value is 10.
-        Thus to make this a really high priority job:
-           manager.change_job_priority(-10).
+        It will return a dict that maps the source model
+        path, URL or repo_id to the ID of the installed model.
         """
         pass
 
     @abstractmethod
-    def merge_models(
-        self,
-        model_keys: List[str] = Field(
-            default=None, min_items=2, max_items=3, description="List of model keys to merge"
-        ),
-        merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
-        alpha: Optional[float] = 0.5,
-        interp: Optional[MergeInterpolationMethod] = None,
-        force: Optional[bool] = False,
-        merge_dest_directory: Optional[Path] = None,
-    ) -> ModelConfigBase:
+    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:
         """
-        Merge two to three diffusrs pipeline models and save as a new model.
+        Recursively scan directory for new models and register or install them.
 
-        :param model_keys: List of 2-3 model unique keys to merge
-        :param merged_model_name: Name of destination merged model
-        :param alpha: Alpha strength to apply to 2d and 3d model
-        :param interp: Interpolation method. None (default)
-        :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
+        :param scan_dir: Path to the directory to scan.
+        :param install: Install if True, otherwise register in place.
+        :returns list of IDs: Returns list of IDs of models registered/installed
         """
         pass
 
     @abstractmethod
-    def list_checkpoint_configs(self) -> List[Path]:
-        """List the checkpoint config paths from ROOT/configs/stable-diffusion."""
+    def hash(self, model_path: Union[Path, str]) -> str:
+        """
+        Compute and return the fast hash of the model.
+
+        :param model_path: Path to the model on disk.
+        :return str: FastHash of the model for use as an ID.
+        """
         pass
 
-    @abstractmethod
-    def search_for_models(self, directory: Path) -> Set[Path]:
-        """Return list of all models found in the designated directory."""
-        pass
+class ModelInstallService(ModelInstallServiceBase):
+    """Model installer class handles installation from a local path."""
 
-
-# implementation
-class ModelInstallService(ModelInstall, ModelInstallServiceBase):
-    """Responsible for managing models on disk and in memory."""
-
+    _app_config: InvokeAIAppConfig
+    _logger: Logger
+    _store: ModelConfigStore
+    _download_queue: DownloadQueueServiceBase
+    _async_installs: Dict[Union[str, Path, AnyHttpUrl], Optional[str]]
+    _installed: Set[str] = Field(default=set)
+    _tmpdir: Optional[tempfile.TemporaryDirectory]  # used for downloads
+    _cached_model_paths: Set[Path] = Field(default=set)  # used to speed up directory scanning
     _precision: Literal["float16", "float32"] = Field(description="Floating point precision, string form")
     _event_bus: Optional[EventServiceBase] = Field(description="an event bus to send install events to", default=None)
 
+    _legacy_configs: Dict[BaseModelType, Dict[ModelVariantType, Union[str, dict]]] = {
+        BaseModelType.StableDiffusion1: {
+            ModelVariantType.Normal: "v1-inference.yaml",
+            ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
+        },
+        BaseModelType.StableDiffusion2: {
+            ModelVariantType.Normal: {
+                SchedulerPredictionType.Epsilon: "v2-inference.yaml",
+                SchedulerPredictionType.VPrediction: "v2-inference-v.yaml",
+            },
+            ModelVariantType.Inpaint: {
+                SchedulerPredictionType.Epsilon: "v2-inpainting-inference.yaml",
+                SchedulerPredictionType.VPrediction: "v2-inpainting-inference-v.yaml",
+            },
+        },
+        BaseModelType.StableDiffusionXL: {
+            ModelVariantType.Normal: "sd_xl_base.yaml",
+        },
+        BaseModelType.StableDiffusionXLRefiner: {
+            ModelVariantType.Normal: "sd_xl_refiner.yaml",
+        },
+    }
+
     def __init__(
-        self, config: InvokeAIAppConfig, store: ModelRecordServiceBase, event_bus: Optional[EventServiceBase] = None
-    ):
-        """
-        Initialize a ModelInstallService instance.
-
-        :param config: InvokeAIAppConfig object
-        :param store: Either a ModelRecordService object or a ModelConfigStore
-        :param event_bus: Optional EventServiceBase object. If provided,
-
-        Installation and download events will be sent to the event bus as "model_event".
-        """
+        self,
+        config: Optional[InvokeAIAppConfig] = None,
+        queue: Optional[DownloadQueueServiceBase] = None,
+        store: Optional[ModelRecordServiceBase] = None,
+        event_bus: Optional[EventServiceBase] = None,
+        event_handlers: List[DownloadEventHandler] = [],
+    ):  # noqa D107 - use base class docstrings
+        self._app_config = config or InvokeAIAppConfig.get_config()
+        self._store = store or ModelRecordServiceBase.get_impl(self._app_config)
+        self._logger = InvokeAILogger.get_logger(config=self._app_config)
         self._event_bus = event_bus
-        kwargs: Dict[str, Any] = {}
-        if self._event_bus:
-            kwargs.update(event_handlers=[self._event_bus.emit_model_event])
         self._precision = get_precision()
-        logger = InvokeAILogger.get_logger()
-        super().__init__(store=store, config=config, logger=logger, **kwargs)
+        self._handlers = event_handlers
+        if self._event_bus:
+            self._handlers.append(self._event_bus.emit_model_event)
+
+        self._download_queue = queue or DownloadQueueService(
+            event_bus=event_bus,
+            config=self._app_config
+        )
+        self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
+        self._installed = set()
+        self._tmpdir = None
 
     def start(self, invoker: Any):  # Because .processor is giving circular import errors, declaring invoker an 'Any'
         """Call automatically at process start."""
-        self.scan_models_directory()  # synchronize new/deleted models found in models directory
+        self.sync_to_config()
+
+    @property
+    def queue(self) -> DownloadQueueServiceBase:
+        """Return the queue."""
+        return self._download_queue
+
+    @property
+    def store(self) -> ModelConfigStore:
+        """Return the storage backend used by the installer."""
+        return self._store
+
+    @property
+    def config(self) -> InvokeAIAppConfig:
+        """Return the app_config used by the installer."""
+        return self._app_config
+
+    def install_model(
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        inplace: bool = True,
+        priority: int = 10,
+        variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
+        probe_override: Optional[Dict[str, Any]] = None,
+        metadata: Optional[ModelSourceMetadata] = None,
+        access_token: Optional[str] = None,
+    ) -> DownloadJobBase:  # noqa D102
+        queue = self._download_queue
+        variant = variant or ("fp16" if self._precision == "float16" else None)
+
+        job = self._make_download_job(
+            source, variant=variant, access_token=access_token, subfolder=subfolder, priority=priority
+        )
+        handler = (
+            self._complete_registration_handler
+            if inplace and Path(source).exists()
+            else self._complete_installation_handler
+        )
+        if isinstance(job, ModelInstallJob):
+            job.probe_override = probe_override
+        if metadata and isinstance(job, DownloadJobWithMetadata):
+            job.metadata = metadata
+        job.add_event_handler(handler)
+
+        self._async_installs[source] = None
+        queue.submit_download_job(job, True)
+        return job
+
+    def register_path(
+        self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None
+    ) -> str:  # noqa D102
+        model_path = Path(model_path)
+        info: ModelProbeInfo = self._probe_model(model_path, overrides)
+        return self._register(model_path, info)
+
+    def install_path(
+        self,
+        model_path: Union[Path, str],
+        overrides: Optional[Dict[str, Any]] = None,
+    ) -> str:  # noqa D102
+        model_path = Path(model_path)
+        info: ModelProbeInfo = self._probe_model(model_path, overrides)
+
+        dest_path = self._app_config.models_path / info.base_type.value / info.model_type.value / model_path.name
+        new_path = self._move_model(model_path, dest_path)
+        new_hash = self.hash(new_path)
+        assert new_hash == info.hash, f"{model_path}: Model hash changed during installation, possibly corrupted."
+        return self._register(
+            new_path,
+            info,
+        )
+
+    def unregister(self, key: str):  # noqa D102
+        self._store.del_model(key)
+
+    def delete(self, key: str):  # noqa D102
+        model = self._store.get_model(key)
+        path = self._app_config.models_path / model.path
+        if path.is_dir():
+            rmtree(path)
+        else:
+            path.unlink()
+        self.unregister(key)
+
+    def conditionally_delete(self, key: str):  # noqa D102
+        """Unregister the model. Delete its files only if they are within our models directory."""
+        model = self._store.get_model(key)
+        models_dir = self._app_config.models_path
+        model_path = models_dir / model.path
+        if model_path.is_relative_to(models_dir):
+            self.delete(key)
+        else:
+            self.unregister(key)
+
+    def _register(self, model_path: Path, info: ModelProbeInfo) -> str:
+        key: str = FastModelHash.hash(model_path)
+
+        model_path = model_path.absolute()
+        if model_path.is_relative_to(self._app_config.models_path):
+            model_path = model_path.relative_to(self._app_config.models_path)
+
+        registration_data = dict(
+            path=model_path.as_posix(),
+            name=model_path.name if model_path.is_dir() else model_path.stem,
+            base_model=info.base_type,
+            model_type=info.model_type,
+            model_format=info.format,
+            hash=key,
+        )
+        # add 'main' specific fields
+        if info.model_type == ModelType.Main:
+            if info.variant_type:
+                registration_data.update(variant=info.variant_type)
+            if info.format == ModelFormat.Checkpoint:
+                try:
+                    config_file = self._legacy_configs[info.base_type][info.variant_type]
+                    if isinstance(config_file, dict):  # need another tier for sd-2.x models
+                        if prediction_type := info.prediction_type:
+                            config_file = config_file[prediction_type]
+                        else:
+                            self._logger.warning(
+                                f"Could not infer prediction type for {model_path.stem}. Guessing 'v_prediction' for a SD-2 768 pixel model"
+                            )
+                            config_file = config_file[SchedulerPredictionType.VPrediction]
+                    registration_data.update(
+                        config=Path(self._app_config.legacy_conf_dir, str(config_file)).as_posix(),
+                    )
+                except KeyError as exc:
+                    raise InvalidModelException(
+                        "Configuration file for this checkpoint could not be determined"
+                    ) from exc
+        self._store.add_model(key, registration_data)
+        return key
+
+    def _move_model(self, old_path: Path, new_path: Path) -> Path:
+        if old_path == new_path:
+            return old_path
+
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # if path already exists then we jigger the name to make it unique
+        counter: int = 1
+        while new_path.exists():
+            path = new_path.with_stem(new_path.stem + f"_{counter:02d}")
+            if not path.exists():
+                new_path = path
+            counter += 1
+        return move(old_path, new_path)
+
+    def _probe_model(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> ModelProbeInfo:
+        info: ModelProbeInfo = ModelProbe.probe(Path(model_path))
+        if overrides:  # used to override probe fields
+            for key, value in overrides.items():
+                try:
+                    setattr(info, key, value)  # skip validation errors
+                except Exception:
+                    pass
+        return info
+
+    def _complete_installation_handler(self, job: DownloadJobBase):
+        assert isinstance(job, ModelInstallJob)
+        if job.status == "completed":
+            self._logger.info(f"{job.source}: Download finished with status {job.status}. Installing.")
+            model_id = self.install_path(job.destination, job.probe_override)
+            info = self._store.get_model(model_id)
+            info.source = str(job.source)
+            if isinstance(job, DownloadJobWithMetadata):
+                metadata: ModelSourceMetadata = job.metadata
+                info.description = metadata.description or f"Imported model {info.name}"
+                info.name = metadata.name or info.name
+                info.author = metadata.author
+                info.tags = metadata.tags
+                info.license = metadata.license
+                info.thumbnail_url = metadata.thumbnail_url
+            self._store.update_model(model_id, info)
+            self._async_installs[job.source] = model_id
+            job.model_key = model_id
+        elif job.status == "error":
+            self._logger.warning(f"{job.source}: Model installation error: {job.error}")
+        elif job.status == "cancelled":
+            self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
+        jobs = self._download_queue.list_jobs()
+        if self._tmpdir and len(jobs) <= 1 and job.status in ["completed", "error", "cancelled"]:
+            self._tmpdir.cleanup()
+            self._tmpdir = None
+
+    def _complete_registration_handler(self, job: DownloadJobBase):
+        assert isinstance(job, ModelInstallJob)
+        if job.status == "completed":
+            self._logger.info(f"{job.source}: Installing in place.")
+            model_id = self.register_path(job.destination, job.probe_override)
+            info = self._store.get_model(model_id)
+            info.source = str(job.source)
+            info.description = f"Imported model {info.name}"
+            self._store.update_model(model_id, info)
+            self._async_installs[job.source] = model_id
+            job.model_key = model_id
+        elif job.status == "error":
+            self._logger.warning(f"{job.source}: Model installation error: {job.error}")
+        elif job.status == "cancelled":
+            self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
+
+    def sync_model_path(self, key: str, ignore_hash_change: bool = False) -> ModelConfigBase:
+        """
+        Move model into the location indicated by its basetype, type and name.
+
+        Call this after updating a model's attributes in order to move
+        the model's path into the location indicated by its basetype, type and
+        name. Applies only to models whose paths are within the root `models_dir`
+        directory.
+
+        May raise an UnknownModelException.
+        """
+        model = self._store.get_model(key)
+        old_path = Path(model.path)
+        models_dir = self._app_config.models_path
+
+        if not old_path.is_relative_to(models_dir):
+            return model
+
+        new_path = models_dir / model.base_model.value / model.model_type.value / model.name
+        self._logger.info(f"Moving {model.name} to {new_path}.")
+        new_path = self._move_model(old_path, new_path)
+        model.hash = self.hash(new_path)
+        model.path = new_path.relative_to(models_dir).as_posix()
+        if model.hash != key:
+            assert (
+                ignore_hash_change
+            ), f"{model.name}: Model hash changed during installation, model is possibly corrupted"
+            self._logger.info(f"Model has new hash {model.hash}, but will continue to be identified by {key}")
+        self._store.update_model(key, model)
+        return model
+
+    def _make_download_job(
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
+        access_token: Optional[str] = None,
+        priority: Optional[int] = 10,
+    ) -> ModelInstallJob:
+        # Clean up a common source of error. Doesn't work with Paths.
+        if isinstance(source, str):
+            source = source.strip()
+
+        # In the event that we are being asked to install a path that is already on disk,
+        # we simply probe and register/install it. The job does not actually do anything, but we
+        # create one anyway in order to have similar behavior for local files, URLs and repo_ids.
+        if Path(source).exists():  # a path that is already on disk
+            destdir = source
+            return ModelInstallPathJob(source=source, destination=Path(destdir), event_handlers=self._handlers)
+
+        # choose a temporary directory inside the models directory
+        models_dir = self._app_config.models_path
+        self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
+
+        cls = ModelInstallJob
+        if match := re.match(REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE, str(source)):
+            cls = ModelInstallRepoIDJob
+            source = match.group(1)
+            subfolder = match.group(2) or subfolder
+            kwargs = dict(variant=variant, subfolder=subfolder)
+        elif re.match(HTTP_RE, str(source)):
+            cls = ModelInstallURLJob
+            kwargs = {}
+        else:
+            raise ValueError(f"'{source}' is not recognized as a local file, directory, repo_id or URL")
+        return cls(
+            source=str(source),
+            destination=Path(self._tmpdir.name),
+            access_token=access_token,
+            priority=priority,
+            event_handlers=self._handlers,
+            **kwargs,
+        )
+
+    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
+        """Pause until all installation jobs have completed."""
+        self._download_queue.join()
+        id_map = self._async_installs
+        self._async_installs = dict()
+        return id_map
+
+    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
+        self._cached_model_paths = set([Path(x.path) for x in self._store.all_models()])
+        callback = self._scan_install if install else self._scan_register
+        search = ModelSearch(on_model_found=callback)
+        self._installed = set()
+        search.search(scan_dir)
+        return list(self._installed)
+
+    def scan_models_directory(self):
+        """
+        Scan the models directory for new and missing models.
+
+        New models will be added to the storage backend. Missing models
+        will be deleted.
+        """
+        defunct_models = set()
+        installed = set()
+
+        with Chdir(self._app_config.models_path):
+            self._logger.info("Checking for models that have been moved or deleted from disk")
+            for model_config in self._store.all_models():
+                path = Path(model_config.path)
+                if not path.exists():
+                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering")
+                    defunct_models.add(model_config.key)
+            for key in defunct_models:
+                self.unregister(key)
+
+            self._logger.info(f"Scanning {self._app_config.models_path} for new models")
+            for cur_base_model in BaseModelType:
+                for cur_model_type in ModelType:
+                    models_dir = Path(cur_base_model.value, cur_model_type.value)
+                    installed.update(self.scan_directory(models_dir))
+            self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
+
+    def sync_to_config(self):
+        """Synchronize models on disk to those in memory."""
+        self.scan_models_directory()
         if autoimport := self._app_config.autoimport_dir:
             self._logger.info("Scanning autoimport directory for new models")
             self.scan_directory(self._app_config.root_path / autoimport)
 
-    def install_model(
-        self,
-        source: Union[str, Path, AnyHttpUrl],
-        priority: int = 10,
-        model_attributes: Optional[Dict[str, Any]] = None,
-    ) -> ModelInstallJob:
-        """
-        Add a model using a path, repo_id or URL.
+    def hash(self, model_path: Union[Path, str]) -> str:  # noqa D102
+        return FastModelHash.hash(model_path)
 
-        :param model_attributes: Dictionary of ModelConfigBase fields to
-        attach to the model. When installing a URL or repo_id, some metadata
-        values, such as `tags` will be automagically added.
-        :param priority: Queue priority for this install job. Lower value jobs
-        will run before higher value ones.
-        """
-        self.logger.debug(f"add model {source}")
-        variant = "fp16" if self._precision == "float16" else None
-        job = self.install(
-            source,
-            probe_override=model_attributes,
-            variant=variant,
-            priority=priority,
-        )
-        assert isinstance(job, ModelInstallJob)
-        return job
-
-    def list_install_jobs(self) -> List[ModelInstallJob]:
-        """Return a series of active or enqueued ModelInstallJobs."""
-        queue = self.queue
-        jobs: List[DownloadJobBase] = queue.list_jobs()
-        return [parse_obj_as(ModelInstallJob, x) for x in jobs]  # downcast to proper type
-
-    def id_to_job(self, id: int) -> ModelInstallJob:
-        """Return the ModelInstallJob instance corresponding to the given job ID."""
-        job = self.queue.id_to_job(id)
-        assert isinstance(job, ModelInstallJob)
-        return job
-
-    def start_job(self, job_id: int):
-        """Start the given install job if it is paused or idle."""
-        queue = self.queue
-        queue.start_job(queue.id_to_job(job_id))
-
-    def pause_job(self, job_id: int):
-        """Pause the given install job if it is paused or idle."""
-        queue = self.queue
-        queue.pause_job(queue.id_to_job(job_id))
-
-    def cancel_job(self, job_id: int):
-        """Cancel the given install job."""
-        queue = self.queue
-        queue.cancel_job(queue.id_to_job(job_id))
-
-    def cancel_all_jobs(self):
-        """Cancel all active install job."""
-        queue = self.queue
-        queue.cancel_all_jobs()
-
-    def prune_jobs(self):
-        """Cancel all active install job."""
-        queue = self.queue
-        queue.prune_jobs()
-
-    def change_job_priority(self, job_id: int, delta: int):
-        """
-        Change an install job's priority.
-
-        :param job_id: Job to change
-        :param delta: Value to increment or decrement priority.
-
-        Lower values are higher priority.  The default starting value is 10.
-        Thus to make this a really high priority job:
-           manager.change_job_priority(-10).
-        """
-        queue = self.queue
-        queue.change_priority(queue.id_to_job(job_id), delta)
-
-    def del_model(
-        self,
-        key: str,
-        delete_files: bool = False,
-    ):
-        """
-        Delete the named model from configuration.
-
-        If delete_files is true,
-        then the underlying weight file or diffusers directory will be deleted
-        as well.
-        """
-        model_info = self.store.get_model(key)
-        self.logger.debug(f"delete model {model_info.name}")
-        self.store.del_model(key)
-        if delete_files and Path(self._app_config.models_path / model_info.path).exists():
-            path = Path(model_info.path)
-            if path.is_dir():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
-
-    def convert_model(
-        self,
-        key: str,
-        dest_directory: Optional[Path] = None,
-    ) -> ModelConfigBase:
-        """
-        Convert a checkpoint file into a diffusers folder.
-
-        Delete the cached
-        version and delete the original checkpoint file if it is in the models
-        directory.
-
-        :param key: Key of the model to convert
-        :param convert_dest_directory: Save the converted model to the designated directory (`models/etc/etc` by default)
-
-        This will raise a ValueError unless the model is a checkpoint. It will
-        also raise a ValueError in the event that there is a similarly-named diffusers
-        directory already in place.
-        """
-        model_info = self.store.get_model(key)
-        self.logger.info(f"Converting model {model_info.name} into a diffusers")
-        return super().convert_model(key, dest_directory)
-
-    @property
-    def logger(self):
-        """Get the logger associated with this instance."""
-        return self._logger
-
-    @property
-    def store(self):
-        """Get the store associated with this instance."""
-        return self._store
-
-    def merge_models(
-        self,
-        model_keys: List[str] = Field(
-            default=None, min_items=2, max_items=3, description="List of model keys to merge"
-        ),
-        merged_model_name: Optional[str] = Field(default=None, description="Name of destination model after merging"),
-        alpha: Optional[float] = 0.5,
-        interp: Optional[MergeInterpolationMethod] = None,
-        force: Optional[bool] = False,
-        merge_dest_directory: Optional[Path] = None,
-    ) -> ModelConfigBase:
-        """
-        Merge two to three diffusrs pipeline models and save as a new model.
-
-        :param model_keys: List of 2-3 model unique keys to merge
-        :param merged_model_name: Name of destination merged model
-        :param alpha: Alpha strength to apply to 2d and 3d model
-        :param interp: Interpolation method. None (default)
-        :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
-        """
-        merger = ModelMerger(self.store)
+    def _scan_register(self, model: Path) -> bool:
+        if model in self._cached_model_paths:
+            return True
         try:
-            if not merged_model_name:
-                merged_model_name = "+".join([self.store.get_model(x).name for x in model_keys])
-                raise Exception("not implemented")
+            id = self.register_path(model)
+            self.sync_model_path(id)  # possibly move it to right place in `models`
+            self._logger.info(f"Registered {model.name} with id {id}")
+            self._installed.add(id)
+        except DuplicateModelException:
+            pass
+        return True
 
-            result = merger.merge_diffusion_models_and_save(
-                model_keys=model_keys,
-                merged_model_name=merged_model_name,
-                alpha=alpha,
-                interp=interp,
-                force=force,
-                merge_dest_directory=merge_dest_directory,
-            )
-        except AssertionError as e:
-            raise ValueError(e)
-        return result
-
-    def search_for_models(self, directory: Path) -> Set[Path]:
-        """
-        Return list of all models found in the designated directory.
-
-        :param directory: Path to the directory to recursively search.
-        returns a list of model paths
-        """
-        return ModelSearch().search(directory)
-
-    def list_checkpoint_configs(self) -> List[Path]:
-        """List the checkpoint config paths from ROOT/configs/stable-diffusion."""
-        config = self._app_config
-        conf_path = config.legacy_conf_path
-        root_path = config.root_path
-        return [(conf_path / x).relative_to(root_path) for x in conf_path.glob("**/*.yaml")]
+    def _scan_install(self, model: Path) -> bool:
+        if model in self._cached_model_paths:
+            return True
+        try:
+            id = self.install_path(model)
+            self._logger.info(f"Installed {model} with id {id}")
+            self._installed.add(id)
+        except DuplicateModelException:
+            pass
+        return True

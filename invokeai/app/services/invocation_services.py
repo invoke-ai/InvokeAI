@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.invoker import InvocationProcessorABC
     from invokeai.app.services.item_storage import ItemStorageABC
     from invokeai.app.services.latent_storage import LatentsStorageBase
+    from invokeai.app.services.download_manager import DownloadQueueServiceBase
     from invokeai.app.services.model_install_service import ModelInstallServiceBase
     from invokeai.app.services.model_loader_service import ModelLoadServiceBase
     from invokeai.app.services.model_record_service import ModelRecordServiceBase
@@ -37,6 +38,7 @@ class InvocationServices:
     graph_library: "ItemStorageABC[LibraryGraph]"
     images: "ImageServiceABC"
     latents: "LatentsStorageBase"
+    download_queue: "DownloadQueueServiceBase"
     model_record_store: "ModelRecordServiceBase"
     model_loader: "ModelLoadServiceBase"
     model_installer: "ModelInstallServiceBase"
@@ -59,6 +61,7 @@ class InvocationServices:
         images: "ImageServiceABC",
         latents: "LatentsStorageBase",
         logger: "Logger",
+        download_queue: "DownloadQueueServiceBase",
         model_record_store: "ModelRecordServiceBase",
         model_loader: "ModelLoadServiceBase",
         model_installer: "ModelInstallServiceBase",
@@ -78,6 +81,7 @@ class InvocationServices:
         self.images = images
         self.latents = latents
         self.logger = logger
+        self.download_queue = download_queue
         self.model_record_store = model_record_store
         self.model_loader = model_loader
         self.model_installer = model_installer
