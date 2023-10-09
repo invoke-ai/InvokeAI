@@ -170,16 +170,40 @@ export type InvocationRetrievalErrorEvent = {
  */
 export type QueueItemStatusChangedEvent = {
   queue_id: string;
-  queue_item_id: number;
-  queue_batch_id: string;
-  session_id: string;
-  graph_execution_state_id: string;
-  status: components['schemas']['SessionQueueItemDTO']['status'];
-  error: string | undefined;
-  created_at: string;
-  updated_at: string;
-  started_at: string | undefined;
-  completed_at: string | undefined;
+  queue_item: {
+    queue_id: string;
+    item_id: number;
+    batch_id: string;
+    session_id: string;
+    status: components['schemas']['SessionQueueItemDTO']['status'];
+    error: string | undefined;
+    created_at: string;
+    updated_at: string;
+    started_at: string | undefined;
+    completed_at: string | undefined;
+  };
+  batch_status: {
+    queue_id: string;
+    batch_id: string;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+    total: number;
+  };
+  queue_status: {
+    queue_id: string;
+    item_id?: number;
+    batch_id?: string;
+    session_id?: string;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+    total: number;
+  };
 };
 
 export type ClientEmitSubscribeQueue = {

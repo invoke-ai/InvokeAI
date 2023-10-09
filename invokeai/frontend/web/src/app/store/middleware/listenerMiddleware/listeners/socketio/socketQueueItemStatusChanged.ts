@@ -11,24 +11,57 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
     actionCreator: socketQueueItemStatusChanged,
     effect: async (action, { dispatch }) => {
       const log = logger('socketio');
-      const {
-        queue_item_id: item_id,
-        queue_batch_id,
-        status,
-      } = action.payload.data;
+
+      const { queue_item, batch_status, queue_status } = action.payload.data;
+
       log.debug(
         action.payload,
-        `Queue item ${item_id} status updated: ${status}`
+        `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`
       );
       dispatch(appSocketQueueItemStatusChanged(action.payload));
 
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
           queueItemsAdapter.updateOne(draft, {
-            id: item_id,
-            changes: action.payload.data,
+            id: queue_item.item_id,
+            changes: queue_item,
           });
         })
+      );
+
+      dispatch(
+        queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
+          Object.assign(draft.queue, queue_status);
+        })
+      );
+      dispatch(
+        queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
+          if (!draft) {
+            return;
+          }
+          Object.assign(draft.queue, queue_status);
+        })
+      );
+
+      dispatch(
+        queueApi.util.updateQueryData(
+          'getBatchStatus',
+          { batch_id: batch_status.batch_id },
+          () => batch_status
+        )
+      );
+
+      dispatch(
+        queueApi.util.updateQueryData(
+          'getQueueItem',
+          queue_item.item_id,
+          (draft) => {
+            if (!draft) {
+              return;
+            }
+            Object.assign(draft, queue_item);
+          }
+        )
       );
 
       dispatch(
@@ -36,19 +69,8 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
           'InvocationCacheStatus',
-          { type: 'SessionQueueItem', id: item_id },
-          { type: 'SessionQueueItemDTO', id: item_id },
-          { type: 'BatchStatus', id: queue_batch_id },
         ])
       );
-
-      const req = dispatch(
-        queueApi.endpoints.getQueueStatus.initiate(undefined, {
-          forceRefetch: true,
-        })
-      );
-      await req.unwrap();
-      req.unsubscribe();
     },
   });
 };
