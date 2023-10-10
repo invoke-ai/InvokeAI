@@ -10,11 +10,15 @@ import {
 } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
+function findPrevMultipleOfEight(n: number): number {
+  return Math.floor((n - 1) / 8) * 8;
+}
+
 const selector = createSelector(
   [stateSelector],
   ({ generation, hotkeys, config }) => {
     const { min, fineStep, coarseStep } = config.sd.width;
-    const { model, width, hrfWidth, aspectRatio } = generation;
+    const { model, width, hrfWidth, aspectRatio, hrfEnabled } = generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
@@ -25,6 +29,7 @@ const selector = createSelector(
       min,
       step,
       aspectRatio,
+      hrfEnabled,
     };
   },
   defaultSelectorOptions
@@ -33,7 +38,7 @@ const selector = createSelector(
 type ParamWidthProps = Omit<IAIFullSliderProps, 'label' | 'value' | 'onChange'>;
 
 const ParamHrfWidth = (props: ParamWidthProps) => {
-  const { model, width, hrfWidth, min, step, aspectRatio } =
+  const { model, width, hrfWidth, min, step, aspectRatio, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
 
@@ -66,13 +71,14 @@ const ParamHrfWidth = (props: ParamWidthProps) => {
       value={hrfWidth}
       min={min}
       step={step}
-      max={width}
+      max={findPrevMultipleOfEight(width)}
       onChange={handleChange}
       handleReset={handleReset}
       withInput
       withReset
       withSliderMarks
-      sliderNumberInputProps={{ max: width }}
+      sliderNumberInputProps={{ max: findPrevMultipleOfEight(width) }}
+      isDisabled={!hrfEnabled}
       {...props}
     />
   );

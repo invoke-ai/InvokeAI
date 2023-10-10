@@ -34,8 +34,22 @@ export default function ParamHrfCollapse() {
     <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamHrfToggle />
-        <ParamHrfWidth />
-        <ParamHrfHeight />
+        <Flex
+          sx={{
+            gap: 2,
+            p: 4,
+            borderRadius: 4,
+            flexDirection: 'column',
+            w: 'full',
+            bg: 'base.100',
+            _dark: {
+              bg: 'base.750',
+            },
+          }}
+        >
+          <ParamHrfWidth />
+          <ParamHrfHeight />
+        </Flex>
         <ParamHrfStrength />
       </Flex>
     </IAICollapse>

@@ -69,13 +69,13 @@ export const addHrfToGraph = (
   const isAutoVae = !vae;
 
   // Pre-existing (original) graph nodes.
-  const originalDenoiseLatentsNode = graph.nodes[
-    DENOISE_LATENTS
-  ] as DenoiseLatentsInvocation;
-  const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation;
-  const originalLatentsToImageNode = graph.nodes[
-    LATENTS_TO_IMAGE
-  ] as LatentsToImageInvocation;
+  const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
+    | DenoiseLatentsInvocation
+    | undefined;
+  const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation | undefined;
+  const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as
+    | LatentsToImageInvocation
+    | undefined;
 
   // Scale height and width by hrfScale.
   const hrfWidth = state.generation.hrfWidth;
@@ -98,11 +98,11 @@ export const addHrfToGraph = (
   const hrfNoiseNode: NoiseInvocation = {
     type: 'noise',
     id: NOISE_HRF,
-    seed: originalNoiseNode.seed,
+    seed: originalNoiseNode?.seed,
     width: hrfWidth,
     height: hrfHeight,
-    use_cpu: originalNoiseNode.use_cpu,
-    is_intermediate: originalNoiseNode.is_intermediate,
+    use_cpu: originalNoiseNode?.use_cpu,
+    is_intermediate: originalNoiseNode?.is_intermediate,
   };
 
   const rescaleLatentsNode: ResizeLatentsInvocation = {

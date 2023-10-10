@@ -10,11 +10,15 @@ import {
 } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
+function findPrevMultipleOfEight(n: number): number {
+  return Math.floor((n - 1) / 8) * 8;
+}
+
 const selector = createSelector(
   [stateSelector],
   ({ generation, hotkeys, config }) => {
     const { min, fineStep, coarseStep } = config.sd.height;
-    const { model, height, hrfHeight, aspectRatio } = generation;
+    const { model, height, hrfHeight, aspectRatio, hrfEnabled } = generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
@@ -25,6 +29,7 @@ const selector = createSelector(
       min,
       step,
       aspectRatio,
+      hrfEnabled,
     };
   },
   defaultSelectorOptions
@@ -36,7 +41,7 @@ type ParamHeightProps = Omit<
 >;
 
 const ParamHrfHeight = (props: ParamHeightProps) => {
-  const { model, height, hrfHeight, min, step, aspectRatio } =
+  const { model, height, hrfHeight, min, step, aspectRatio, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
 
@@ -69,13 +74,14 @@ const ParamHrfHeight = (props: ParamHeightProps) => {
       value={hrfHeight}
       min={min}
       step={step}
-      max={height}
+      max={findPrevMultipleOfEight(height)}
       onChange={handleChange}
       handleReset={handleReset}
       withInput
       withReset
       withSliderMarks
-      sliderNumberInputProps={{ max: height }}
+      sliderNumberInputProps={{ max: findPrevMultipleOfEight(height) }}
+      isDisabled={!hrfEnabled}
       {...props}
     />
   );
