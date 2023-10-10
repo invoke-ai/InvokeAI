@@ -67,19 +67,25 @@ export const addHrfToGraph = (
 
   const { vae } = state.generation;
   const isAutoVae = !vae;
+  const hrfWidth = state.generation.hrfWidth;
+  const hrfHeight = state.generation.hrfHeight;
 
   // Pre-existing (original) graph nodes.
   const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
     | DenoiseLatentsInvocation
     | undefined;
   const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation | undefined;
+
+  // Change height and width of original noise node to initial resolution.
+  if (originalNoiseNode) {
+    originalNoiseNode.width = hrfWidth;
+    originalNoiseNode.height = hrfHeight;
+  }
+
+  // Original latents to image should pick this up.
   const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as
     | LatentsToImageInvocation
     | undefined;
-
-  // Scale height and width by hrfScale.
-  const hrfWidth = state.generation.hrfWidth;
-  const hrfHeight = state.generation.hrfHeight;
 
   // Define new nodes.
   // Denoise latents node to be run on upscaled latents.
@@ -94,13 +100,13 @@ export const addHrfToGraph = (
     denoising_end: 1,
   };
 
-  // New higher resolution noise node.
+  // New base resolution noise node.
   const hrfNoiseNode: NoiseInvocation = {
     type: 'noise',
     id: NOISE_HRF,
     seed: originalNoiseNode?.seed,
-    width: hrfWidth,
-    height: hrfHeight,
+    width: state.generation.width,
+    height: state.generation.height,
     use_cpu: originalNoiseNode?.use_cpu,
     is_intermediate: originalNoiseNode?.is_intermediate,
   };
