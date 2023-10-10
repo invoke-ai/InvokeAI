@@ -67,4 +67,4 @@ def test_skip_torch_weight_init_restores_base_class_behavior():
     _ = torch.nn.Conv1d(10, 20, 3)
     torch.nn.modules.conv._ConvNd.reset_parameters = saved_fn
 
-    assert called_monkey_patched_fn == True
+    assert called_monkey_patched_fn
