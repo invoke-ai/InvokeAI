@@ -106,7 +106,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
         :param config: Model configuration record, either a dict with the
          required fields or a ModelConfigBase instance.
 
-        Can raise DuplicateModelException and InvalidModelConfig exceptions.
+        Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
         record = ModelConfigFactory.make_config(config, key)  # ensure it is a valid config obect
         dict_fields = record.dict()  # and back to a dict with valid fields

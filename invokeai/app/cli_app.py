@@ -262,7 +262,7 @@ def invoke_cli():
     db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
     logger.info(f'InvokeAI database location is "{db_location}"')
 
-    model_record_store = ModelRecordServiceBase.get_impl(config, conn=db_conn, lock=None)
+    model_record_store = ModelRecordServiceBase.open(config, conn=db_conn, lock=None)
     model_loader = ModelLoadService(config, model_record_store)
     model_installer = ModelInstallService(config, model_record_store, events)
 

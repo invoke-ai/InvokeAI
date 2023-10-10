@@ -8,8 +8,16 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Optional, Union
 
-from invokeai.backend.model_manager import BaseModelType, ModelConfigBase, ModelType, SubModelType
-from invokeai.backend.model_manager.storage import (
+from invokeai.backend.model_manager import (  # noqa F401
+    BaseModelType,
+    ModelConfigBase,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+)
+from invokeai.backend.model_manager.storage import (  # noqa F401
     ModelConfigStore,
     ModelConfigStoreSQL,
     ModelConfigStoreYAML,
@@ -41,7 +49,7 @@ class ModelRecordServiceBase(ModelConfigStore):
         pass
 
     @classmethod
-    def get_impl(
+    def open(
         cls, config: InvokeAIAppConfig, conn: Optional[sqlite3.Connection] = None, lock: Optional[threading.Lock] = None
     ) -> Union[ModelRecordServiceSQL, ModelRecordServiceFile]:
         """

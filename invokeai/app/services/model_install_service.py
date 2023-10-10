@@ -277,7 +277,7 @@ class ModelInstallService(ModelInstallServiceBase):
         event_handlers: List[DownloadEventHandler] = [],
     ):  # noqa D107 - use base class docstrings
         self._app_config = config or InvokeAIAppConfig.get_config()
-        self._store = store or ModelRecordServiceBase.get_impl(self._app_config)
+        self._store = store or ModelRecordServiceBase.open(self._app_config)
         self._logger = InvokeAILogger.get_logger(config=self._app_config)
         self._event_bus = event_bus
         self._precision = get_precision()

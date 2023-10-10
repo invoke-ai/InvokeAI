@@ -211,8 +211,6 @@ class MainConfig(ModelConfigBase):
 class MainCheckpointConfig(CheckpointConfig, MainConfig):
     """Model config for main checkpoint models."""
 
-    config: str
-
 
 class MainDiffusersConfig(DiffusersConfig, MainConfig):
     """Model config for main diffusers models."""
@@ -245,7 +243,14 @@ class CLIPVisionDiffusersConfig(ModelConfigBase):
     model_format: Literal[ModelFormat.Diffusers]
 
 
+class T2IConfig(ModelConfigBase):
+    """Model config for T2I."""
+
+    model_format: Literal[ModelFormat.Diffusers]
+
+
 AnyModelConfig = Union[
+    ModelConfigBase,
     MainCheckpointConfig,
     MainDiffusersConfig,
     LoRAConfig,
@@ -256,8 +261,9 @@ AnyModelConfig = Union[
     VaeDiffusersConfig,
     ControlNetDiffusersConfig,
     ControlNetCheckpointConfig,
-    ModelConfigBase,
     IPAdapterConfig,
+    CLIPVisionDiffusersConfig,
+    T2IConfig,
 ]
 
 

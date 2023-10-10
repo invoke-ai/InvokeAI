@@ -182,7 +182,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
         :param config: Model configuration record, either a dict with the
          required fields or a ModelConfigBase instance.
 
-        Can raise DuplicateModelException and InvalidModelConfig exceptions.
+        Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
         json_serialized = json.dumps(record.dict())  # and turn it into a json string.

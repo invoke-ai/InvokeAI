@@ -131,7 +131,7 @@ class ApiDependencies:
         )
 
         download_queue = DownloadQueueService(event_bus=events, config=config)
-        model_record_store = ModelRecordServiceBase.get_impl(config, conn=db_conn, lock=lock)
+        model_record_store = ModelRecordServiceBase.open(config, conn=db_conn, lock=lock)
         model_loader = ModelLoadService(config, model_record_store)
         model_installer = ModelInstallService(config, queue=download_queue, store=model_record_store, event_bus=events)
 

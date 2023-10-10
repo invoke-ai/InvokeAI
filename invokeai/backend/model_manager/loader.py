@@ -114,7 +114,7 @@ class ModelLoad(ModelLoadBase):
         :param config: The app's InvokeAIAppConfig object.
         """
         self._app_config = config
-        self._store = store or ModelRecordServiceBase.get_impl(config)
+        self._store = store or ModelRecordServiceBase.open(config)
         self._logger = InvokeAILogger.get_logger()
         self._cache_keys = dict()
         device = torch.device(choose_torch_device())

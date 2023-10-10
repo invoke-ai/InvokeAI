@@ -47,7 +47,7 @@ class ModelConfigStore(ABC):
         :param config: Model configuration record, either a dict with the
          required fields or a ModelConfigBase instance.
 
-        Can raise DuplicateModelException and InvalidModelConfig exceptions.
+        Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
         pass
 

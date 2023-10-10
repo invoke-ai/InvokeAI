@@ -14,6 +14,7 @@ Once you're setup, for more information, you can review the documentation specif
 * #### [InvokeAI Architecure](../ARCHITECTURE.md)
 * #### [Frontend Documentation](./contributingToFrontend.md)
 * #### [Node Documentation](../INVOCATIONS.md)
+* #### [InvokeAI Model Manager](../MODEL_MANAGER.md)
 * #### [Local Development](../LOCAL_DEVELOPMENT.md)
 
 

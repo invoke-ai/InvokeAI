@@ -461,7 +461,7 @@ def do_migrate(config: InvokeAIAppConfig, src_directory: Path, dest_directory: P
     Migrate models from src to dest InvokeAI root directories
     """
     dest_models = dest_directory / "models.3"
-    mm_store = ModelRecordServiceBase.get_impl(config)
+    mm_store = ModelRecordServiceBase.open(config)
     mm_install = ModelInstallService(config=config, store=mm_store)
 
     version_3 = (dest_directory / "models" / "core").exists()

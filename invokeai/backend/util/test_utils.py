@@ -29,7 +29,7 @@ def model_installer():
     # REPLY(lstein): Don't use get_config() here. Just use the regular pydantic constructor.
     #
     config = InvokeAIAppConfig(log_level="info")
-    model_store = ModelRecordServiceBase.get_impl(config)
+    model_store = ModelRecordServiceBase.open(config)
     return ModelInstallService(store=model_store, config=config)
 
 
