@@ -11,10 +11,12 @@ import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { BoardId } from 'features/gallery/store/types';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaDownload } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
 
@@ -60,6 +62,52 @@ const BoardContextMenu = ({
 
   const { t } = useTranslation();
 
+  const handleDownloadImages = useCallback(() => {
+    const endpoint = `/api/v1/board_images/${board_id}/export-to-zip`;
+
+    fetch(endpoint)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.blob();
+      })
+      .then((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${boardName}_Board_images.zip`;
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        dispatch(
+          addToast(
+            makeToast({
+              title: 'Notification',
+              description: 'Zip file was Made successfully!',
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((error) => {
+        console.error(
+          'There was a problem with the fetch operation:',
+          error.message
+        );
+        dispatch(
+          addToast(
+            makeToast({
+              title: 'Error',
+              description: 'Failed to download the zip file.',
+              status: 'error',
+            })
+          )
+        );
+      });
+  }, [board_id, boardName, dispatch]);
+
   return (
     <IAIContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
@@ -83,10 +131,15 @@ const BoardContextMenu = ({
             </MenuItem>
             {!board && <NoBoardContextMenuItems />}
             {board && (
-              <GalleryBoardContextMenuItems
-                board={board}
-                setBoardToDelete={setBoardToDelete}
-              />
+              <>
+                <MenuItem icon={<FaDownload />} onClick={handleDownloadImages}>
+                  {t('boards.menuItemDownloadImages')}
+                </MenuItem>
+                <GalleryBoardContextMenuItems
+                  board={board}
+                  setBoardToDelete={setBoardToDelete}
+                />
+              </>
             )}
           </MenuGroup>
         </MenuList>

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from PIL.Image import Image as PILImageType
 
@@ -284,3 +284,15 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error("Problem deleting image records and files")
             raise e
+
+    def export_board_images(self, board_id: Optional[str] = None, image_names: Optional[List[str]] = None) -> str:
+        """
+        Exports images for a given board or a list of image names.
+        """
+        if not image_names and board_id:
+            image_names = [
+                record.image_name
+                for record in self.__invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
+            ]
+
+        return self.__invoker.services.image_files.export_images(image_names)

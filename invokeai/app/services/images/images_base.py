@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -126,4 +126,9 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def delete_images_on_board(self, board_id: str):
         """Deletes all images on a board."""
+        pass
+
+    @abstractmethod
+    def export_board_images(self, board_id: Optional[str] = None, image_names: Optional[List[str]] = None) -> bytes:
+        """Exports images for a given board or a list of image names."""
         pass
