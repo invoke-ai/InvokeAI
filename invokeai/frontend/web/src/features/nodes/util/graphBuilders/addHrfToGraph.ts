@@ -114,11 +114,10 @@ export const addHrfToGraph = (
   const latentsToImageHrfNode: LatentsToImageInvocation | undefined =
     originalLatentsToImageNode
       ? {
-          type: originalLatentsToImageNode.type,
+          type: 'l2i',
           id: LATENTS_TO_IMAGE_HRF,
-          vae: originalLatentsToImageNode.vae,
-          fp32: originalLatentsToImageNode.fp32,
-          is_intermediate: originalLatentsToImageNode.is_intermediate,
+          fp32: originalLatentsToImageNode?.fp32,
+          is_intermediate: originalLatentsToImageNode?.is_intermediate,
         }
       : undefined;
 
