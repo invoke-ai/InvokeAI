@@ -19,6 +19,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
 type Props = {
   board?: BoardDTO;
@@ -100,7 +101,7 @@ const BoardContextMenu = ({
           addToast(
             makeToast({
               title: 'Error',
-              description: 'Failed to download the zip file.',
+              description: 'Failed to make the zip file.',
               status: 'error',
             })
           )
@@ -108,6 +109,8 @@ const BoardContextMenu = ({
       });
   }, [board_id, boardName, dispatch]);
 
+  const boardTotals = useBoardTotal(board_id);
+  const totalImages = boardTotals?.totalImages?.total || 0;
   return (
     <IAIContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
@@ -132,7 +135,11 @@ const BoardContextMenu = ({
             {!board && <NoBoardContextMenuItems />}
             {board && (
               <>
-                <MenuItem icon={<FaDownload />} onClick={handleDownloadImages}>
+                <MenuItem
+                  icon={<FaDownload />}
+                  onClick={handleDownloadImages}
+                  isDisabled={!board || totalImages === 0}
+                >
                   {t('boards.menuItemDownloadImages')}
                 </MenuItem>
                 <GalleryBoardContextMenuItems
