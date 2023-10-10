@@ -19,6 +19,7 @@ import {
   NOISE_HRF,
   VAE_LOADER,
 } from './constants';
+import { logger } from 'app/logging/logger';
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
@@ -64,10 +65,12 @@ export const addHrfToGraph = (
   if (!state.generation.hrfEnabled) {
     return;
   }
+  const log = logger('txt2img');
 
   const { vae } = state.generation;
   const isAutoVae = !vae;
-  const hrfWidth = state.generation.hrfWidth;
+  //const hrfWidth = state.generation.hrfWidth;
+  const hrfWidth = -1;
   const hrfHeight = state.generation.hrfHeight;
 
   // Pre-existing (original) graph nodes.
@@ -75,17 +78,31 @@ export const addHrfToGraph = (
     | DenoiseLatentsInvocation
     | undefined;
   const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation | undefined;
+  // Original latents to image should pick this up.
+  const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as
+    | LatentsToImageInvocation
+    | undefined;
+  // Check if originalDenoiseLatentsNode is undefined and log an error
+  if (!originalDenoiseLatentsNode) {
+    log.error('originalDenoiseLatentsNode is undefined');
+    return;
+  }
+  // Check if originalNoiseNode is undefined and log an error
+  if (!originalNoiseNode) {
+    log.error('originalNoiseNode is undefined');
+    return;
+  }
 
+  // Check if originalLatentsToImageNode is undefined and log an error
+  if (!originalLatentsToImageNode) {
+    log.error('originalLatentsToImageNode is undefined');
+    return;
+  }
   // Change height and width of original noise node to initial resolution.
   if (originalNoiseNode) {
     originalNoiseNode.width = hrfWidth;
     originalNoiseNode.height = hrfHeight;
   }
-
-  // Original latents to image should pick this up.
-  const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as
-    | LatentsToImageInvocation
-    | undefined;
 
   // Define new nodes.
   // Denoise latents node to be run on upscaled latents.
