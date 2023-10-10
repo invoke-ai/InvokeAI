@@ -31,6 +31,7 @@ import torch
 
 import invokeai.backend.util.logging as logger
 from invokeai.backend.model_management.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_management.model_load_optimizations import skip_torch_weight_init
 
 from ..util.devices import choose_torch_device
 from .models import BaseModelType, ModelBase, ModelType, SubModelType
@@ -223,7 +224,8 @@ class ModelCache(object):
             # Load the model from disk and capture a memory snapshot before/after.
             start_load_time = time.time()
             snapshot_before = MemorySnapshot.capture()
-            model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
+            with skip_torch_weight_init():
+                model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
             snapshot_after = MemorySnapshot.capture()
             end_load_time = time.time()
 
