@@ -5,9 +5,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import { useMemo } from 'react';
-import ParamHrfScale from './ParamHrfScale';
 import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
+import ParamHrfInitialRes from './ParamHrfInitialRes';
 
 const selector = createSelector(
   stateSelector,
@@ -33,7 +33,7 @@ export default function ParamHrfCollapse() {
     <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamHrfToggle />
-        <ParamHrfScale />
+        <ParamHrfInitialRes />
         <ParamHrfStrength />
       </Flex>
     </IAICollapse>

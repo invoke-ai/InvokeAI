@@ -8,7 +8,6 @@ import { ImageDTO } from 'services/api/types';
 import { clipSkipMap } from '../types/constants';
 import {
   CanvasCoherenceModeParam,
-  HrfScaleParam,
   CfgScaleParam,
   HeightParam,
   MainModelParam,
@@ -27,7 +26,8 @@ import {
 } from '../types/parameterSchemas';
 
 export interface GenerationState {
-  hrfScale: HrfScaleParam;
+  hrfHeight: HeightParam;
+  hrfWidth: WidthParam;
   hrfEnabled: boolean;
   hrfStrength: StrengthParam;
   cfgScale: CfgScaleParam;
@@ -72,7 +72,8 @@ export interface GenerationState {
 }
 
 export const initialGenerationState: GenerationState = {
-  hrfScale: 1.0,
+  hrfHeight: 64,
+  hrfWidth: 64,
   hrfStrength: 0.75,
   hrfEnabled: false,
   cfgScale: 7.5,
@@ -277,8 +278,11 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
-    setHrfScale: (state, action: PayloadAction<number>) => {
-      state.hrfScale = action.payload;
+    setHrfHeight: (state, action: PayloadAction<number>) => {
+      state.hrfHeight = action.payload;
+    },
+    setHrfWidth: (state, action: PayloadAction<number>) => {
+      state.hrfWidth = action.payload;
     },
     setHrfStrength: (state, action: PayloadAction<number>) => {
       state.hrfStrength = action.payload;
@@ -361,7 +365,8 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
-  setHrfScale,
+  setHrfHeight,
+  setHrfWidth,
   setHrfStrength,
   setHrfEnabled,
   shouldUseCpuNoiseChanged,

@@ -3,7 +3,6 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
   ResizeLatentsInvocation,
-  MetadataAccumulatorInvocation,
   NoiseInvocation,
   LatentsToImageInvocation,
   Edge,
@@ -79,18 +78,8 @@ export const addHrfToGraph = (
   ] as LatentsToImageInvocation;
 
   // Scale height and width by hrfScale.
-  const hrfScale = state.generation.hrfScale;
-  const scaledHeight = state.generation.height * hrfScale;
-  const scaledWidth = state.generation.width * hrfScale;
-
-  // Add hrf information to the metadata accumulator.
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
-  if (metadataAccumulator) {
-    metadataAccumulator.height = scaledHeight;
-    metadataAccumulator.width = scaledWidth;
-  }
+  const hrfWidth = state.generation.hrfWidth;
+  const hrfHeight = state.generation.hrfHeight;
 
   // Define new nodes.
   // Denoise latents node to be run on upscaled latents.
@@ -105,22 +94,20 @@ export const addHrfToGraph = (
     denoising_end: 1,
   };
 
-  const rescaleLatentsNode: ResizeLatentsInvocation = {
-    id: RESCALE_LATENTS,
-    type: 'lresize',
-    width: scaledWidth,
-    height: scaledHeight,
-  };
-
   // New higher resolution noise node.
   const hrfNoiseNode: NoiseInvocation = {
     type: 'noise',
     id: NOISE_HRF,
     seed: originalNoiseNode.seed,
-    width: scaledWidth,
-    height: scaledHeight,
+    width: hrfWidth,
+    height: hrfHeight,
     use_cpu: originalNoiseNode.use_cpu,
     is_intermediate: originalNoiseNode.is_intermediate,
+  };
+
+  const rescaleLatentsNode: ResizeLatentsInvocation = {
+    id: RESCALE_LATENTS,
+    type: 'lresize',
   };
 
   // New node to convert latents to image.
@@ -138,14 +125,10 @@ export const addHrfToGraph = (
   // Add new nodes to graph.
   graph.nodes[LATENTS_TO_IMAGE_HRF] =
     latentsToImageHrfNode as LatentsToImageInvocation;
-
-  graph.nodes[DENOISE_LATENTS_HRF] = denoiseLatentsHrfNode as
-    | DenoiseLatentsInvocation
-    | undefined;
-  graph.nodes[RESCALE_LATENTS] = rescaleLatentsNode as
-    | ResizeLatentsInvocation
-    | undefined;
-  graph.nodes[NOISE_HRF] = hrfNoiseNode as NoiseInvocation | undefined;
+  graph.nodes[DENOISE_LATENTS_HRF] =
+    denoiseLatentsHrfNode as DenoiseLatentsInvocation;
+  graph.nodes[NOISE_HRF] = hrfNoiseNode as NoiseInvocation;
+  graph.nodes[RESCALE_LATENTS] = rescaleLatentsNode as ResizeLatentsInvocation;
 
   // Connect nodes.
   graph.edges.push(
@@ -158,6 +141,26 @@ export const addHrfToGraph = (
       destination: {
         node_id: RESCALE_LATENTS,
         field: 'latents',
+      },
+    },
+    {
+      source: {
+        node_id: NOISE_HRF,
+        field: 'width',
+      },
+      destination: {
+        node_id: RESCALE_LATENTS,
+        field: 'width',
+      },
+    },
+    {
+      source: {
+        node_id: NOISE_HRF,
+        field: 'height',
+      },
+      destination: {
+        node_id: RESCALE_LATENTS,
+        field: 'height',
       },
     },
     // Set up new denoise node.

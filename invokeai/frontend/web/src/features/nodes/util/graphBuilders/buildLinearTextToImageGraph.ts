@@ -47,9 +47,10 @@ export const buildLinearTextToImageGraph = (
     seamlessXAxis,
     seamlessYAxis,
     seed,
-    hrfScale,
+    hrfWidth,
+    hrfHeight,
     hrfStrength,
-    hrfEnabled: hrfToggled,
+    hrfEnabled: hrfEnabled,
   } = state.generation;
 
   const use_cpu = shouldUseCpuNoise;
@@ -256,8 +257,9 @@ export const buildLinearTextToImageGraph = (
     loras: [], // populated in addLoRAsToGraph
     ipAdapters: [], // populated in addIPAdapterToLinearGraph
     clip_skip: clipSkip,
-    hrf_scale: hrfToggled ? hrfScale : undefined,
-    hrf_strength: hrfToggled ? hrfStrength : undefined,
+    hrf_width: hrfEnabled ? hrfWidth : undefined,
+    hrf_height: hrfEnabled ? hrfHeight : undefined,
+    hrf_strength: hrfEnabled ? hrfStrength : undefined,
   };
 
   graph.edges.push({

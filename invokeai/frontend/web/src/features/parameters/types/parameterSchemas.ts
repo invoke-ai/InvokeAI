@@ -93,15 +93,6 @@ export const isValidSteps = (val: unknown): val is StepsParam =>
   zSteps.safeParse(val).success;
 
 /**
- * Zod schema for high resolution fix scale parameter
- */
-export const zHrfScale = z.number().int().min(1);
-/**
- * Type alias for high resolution fix scale parameter, inferred from its zod schema
- */
-export type HrfScaleParam = z.infer<typeof zHrfScale>;
-
-/**
  * Zod schema for CFG scale parameter
  */
 export const zCfgScale = z.number().min(1);
@@ -218,6 +209,15 @@ export type HeightParam = z.infer<typeof zHeight>;
  */
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
+
+/**
+ * Zod schema for resolution parameter
+ */
+export const zResolution = z.tuple([zWidth, zHeight]);
+/**
+ * Type alias for resolution parameter, inferred from its zod schema
+ */
+export type ResolutionParam = z.infer<typeof zResolution>;
 
 export const zBaseModel = z.enum([
   'any',
