@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from invokeai.backend.model_manager import SubModelType
+
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,

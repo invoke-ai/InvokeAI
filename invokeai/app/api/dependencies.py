@@ -19,6 +19,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
 from ..services.default_graphs import create_system_graphs
+from ..services.download_manager import DownloadQueueService
 from ..services.graph import GraphExecutionState, LibraryGraph
 from ..services.image_file_storage import DiskImageFileStorage
 from ..services.invocation_queue import MemoryInvocationQueue
@@ -26,7 +27,6 @@ from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats import InvocationStatsService
 from ..services.invoker import Invoker
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ..services.download_manager import DownloadQueueService
 from ..services.model_install_service import ModelInstallService
 from ..services.model_loader_service import ModelLoadService
 from ..services.model_record_service import ModelRecordServiceBase
@@ -133,11 +133,7 @@ class ApiDependencies:
         download_queue = DownloadQueueService(event_bus=events, config=config)
         model_record_store = ModelRecordServiceBase.get_impl(config, conn=db_conn, lock=lock)
         model_loader = ModelLoadService(config, model_record_store)
-        model_installer = ModelInstallService(config,
-                                              queue=download_queue,
-                                              store=model_record_store,
-                                              event_bus=events
-                                              )
+        model_installer = ModelInstallService(config, queue=download_queue, store=model_record_store, event_bus=events)
 
         services = InvocationServices(
             events=events,

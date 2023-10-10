@@ -7,17 +7,18 @@ Convert and merge models.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
-
-from pydantic import Field
 from pathlib import Path
 from shutil import move, rmtree
+from typing import List, Optional
+
+from pydantic import Field
 
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
+
 from .config import InvokeAIAppConfig
 from .model_install_service import ModelInstallServiceBase
-from .model_loader_service import ModelLoadServiceBase, ModelInfo
-from .model_record_service import ModelRecordServiceBase, ModelConfigBase, ModelType, SubModelType
+from .model_loader_service import ModelInfo, ModelLoadServiceBase
+from .model_record_service import ModelConfigBase, ModelRecordServiceBase, ModelType, SubModelType
 
 
 class ModelConvertBase(ABC):
@@ -25,19 +26,19 @@ class ModelConvertBase(ABC):
 
     @abstractmethod
     def __init__(
-            cls,
-            loader: ModelLoadServiceBase,
-            installer: ModelInstallServiceBase,
-            store: ModelRecordServiceBase,
+        cls,
+        loader: ModelLoadServiceBase,
+        installer: ModelInstallServiceBase,
+        store: ModelRecordServiceBase,
     ):
         """Initialize ModelConvert with loader, installer and configuration store."""
         pass
 
     @abstractmethod
     def convert_model(
-            self,
-            key: str,
-            dest_directory: Optional[Path] = None,
+        self,
+        key: str,
+        dest_directory: Optional[Path] = None,
     ) -> ModelConfigBase:
         """
         Convert a checkpoint file into a diffusers folder.
@@ -75,14 +76,15 @@ class ModelConvertBase(ABC):
         """
         pass
 
+
 class ModelConvert(ModelConvertBase):
     """Implementation of ModelConvertBase."""
 
     def __init__(
-            self,
-            loader: ModelLoadServiceBase,
-            installer: ModelInstallServiceBase,
-            store: ModelRecordServiceBase,
+        self,
+        loader: ModelLoadServiceBase,
+        installer: ModelInstallServiceBase,
+        store: ModelRecordServiceBase,
     ):
         """Initialize ModelConvert with loader, installer and configuration store."""
         self.loader = loader
@@ -90,9 +92,9 @@ class ModelConvert(ModelConvertBase):
         self.store = store
 
     def convert_model(
-            self,
-            key: str,
-            dest_directory: Optional[Path] = None,
+        self,
+        key: str,
+        dest_directory: Optional[Path] = None,
     ) -> ModelConfigBase:
         """
         Convert a checkpoint file into a diffusers folder.

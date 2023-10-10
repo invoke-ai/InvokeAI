@@ -8,4 +8,4 @@ from .base import (  # noqa F401
     UnknownJobIDException,
 )
 from .model_queue import ModelDownloadQueue, ModelSourceMetadata  # noqa F401
-from .queue import DownloadJobPath, DownloadJobURL, DownloadQueue, DownloadJobRemoteSource  # noqa F401
+from .queue import DownloadJobPath, DownloadJobRemoteSource, DownloadJobURL, DownloadQueue  # noqa F401

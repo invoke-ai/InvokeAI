@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from pydantic import Field
-from pathlib import Path
 
 from invokeai.app.models.exceptions import CanceledException
 from invokeai.backend.model_manager import ModelConfigStore, SubModelType
 from invokeai.backend.model_manager.cache import CacheStats
-from invokeai.backend.model_manager.loader import ModelInfo, ModelLoad, ModelConfigBase
+from invokeai.backend.model_manager.loader import ModelConfigBase, ModelInfo, ModelLoad
 
 from .config import InvokeAIAppConfig
 from .model_record_service import ModelRecordServiceBase
@@ -57,8 +57,6 @@ class ModelLoadServiceBase(ABC):
     def collect_cache_stats(self, cache_stats: CacheStats):
         """Reset model cache statistics for graph with graph_id."""
         pass
-
-    
 
 
 # implementation
@@ -140,4 +138,3 @@ class ModelLoadService(ModelLoadServiceBase):
                 model_key=model_key,
                 submodel=submodel,
             )
-

@@ -5,14 +5,13 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Any, Callable, Dict, List, Optional, Set, Union, Literal
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, Set, Union
 
-from pydantic import Field, parse_obj_as
+from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_record_service import ModelRecordServiceBase
-from invokeai.backend.util import Chdir, InvokeAILogger, Logger
 from invokeai.backend import get_precision
 from invokeai.backend.model_manager.config import (
     BaseModelType,
@@ -34,13 +33,17 @@ from invokeai.backend.model_manager.models import InvalidModelException
 from invokeai.backend.model_manager.probe import ModelProbe, ModelProbeInfo
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.storage import DuplicateModelException, ModelConfigStore
-from .events import EventServiceBase
+from invokeai.backend.util import Chdir, InvokeAILogger, Logger
+
+if TYPE_CHECKING:
+    from .events import EventServiceBase
+
 from .download_manager import (
-    DownloadQueueServiceBase,
-    DownloadQueueService,
+    DownloadEventHandler,
     DownloadJobBase,
     DownloadJobPath,
-    DownloadEventHandler,
+    DownloadQueueService,
+    DownloadQueueServiceBase,
     ModelSourceMetadata,
 )
 
@@ -81,7 +84,7 @@ class ModelInstallServiceBase(ABC):
         config: Optional[InvokeAIAppConfig] = None,
         queue: Optional[DownloadQueueServiceBase] = None,
         store: Optional[ModelRecordServiceBase] = None,
-        event_bus: Optional[EventServiceBase] = None,
+        event_bus: Optional["EventServiceBase"] = None,
     ):
         """
         Create ModelInstallService object.
@@ -227,6 +230,7 @@ class ModelInstallServiceBase(ABC):
         """
         pass
 
+
 class ModelInstallService(ModelInstallServiceBase):
     """Model installer class handles installation from a local path."""
 
@@ -239,7 +243,7 @@ class ModelInstallService(ModelInstallServiceBase):
     _tmpdir: Optional[tempfile.TemporaryDirectory]  # used for downloads
     _cached_model_paths: Set[Path] = Field(default=set)  # used to speed up directory scanning
     _precision: Literal["float16", "float32"] = Field(description="Floating point precision, string form")
-    _event_bus: Optional[EventServiceBase] = Field(description="an event bus to send install events to", default=None)
+    _event_bus: Optional["EventServiceBase"] = Field(description="an event bus to send install events to", default=None)
 
     _legacy_configs: Dict[BaseModelType, Dict[ModelVariantType, Union[str, dict]]] = {
         BaseModelType.StableDiffusion1: {
@@ -269,7 +273,7 @@ class ModelInstallService(ModelInstallServiceBase):
         config: Optional[InvokeAIAppConfig] = None,
         queue: Optional[DownloadQueueServiceBase] = None,
         store: Optional[ModelRecordServiceBase] = None,
-        event_bus: Optional[EventServiceBase] = None,
+        event_bus: Optional["EventServiceBase"] = None,
         event_handlers: List[DownloadEventHandler] = [],
     ):  # noqa D107 - use base class docstrings
         self._app_config = config or InvokeAIAppConfig.get_config()
@@ -281,10 +285,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if self._event_bus:
             self._handlers.append(self._event_bus.emit_model_event)
 
-        self._download_queue = queue or DownloadQueueService(
-            event_bus=event_bus,
-            config=self._app_config
-        )
+        self._download_queue = queue or DownloadQueueService(event_bus=event_bus, config=self._app_config)
         self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
         self._installed = set()
         self._tmpdir = None
@@ -318,7 +319,7 @@ class ModelInstallService(ModelInstallServiceBase):
         probe_override: Optional[Dict[str, Any]] = None,
         metadata: Optional[ModelSourceMetadata] = None,
         access_token: Optional[str] = None,
-    ) -> DownloadJobBase:  # noqa D102
+    ) -> ModelInstallJob:  # noqa D102
         queue = self._download_queue
         variant = variant or ("fp16" if self._precision == "float16" else None)
 

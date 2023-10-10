@@ -171,6 +171,7 @@ two configs are kept in separate sections of the config file:
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
 

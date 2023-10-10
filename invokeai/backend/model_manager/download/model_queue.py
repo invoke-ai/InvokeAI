@@ -278,11 +278,11 @@ class ModelDownloadQueue(DownloadQueue):
         # including checkpoint files, different EMA versions, etc.
         # This filters out just the file types needed for the model
         for x in sibs:
-            if x.rfilename.endswith(('.json', '.txt')):
+            if x.rfilename.endswith((".json", ".txt")):
                 paths.append(x.rfilename)
-            elif x.rfilename.endswith(('learned_embeds.bin', 'ip_adapter.bin')):
+            elif x.rfilename.endswith(("learned_embeds.bin", "ip_adapter.bin")):
                 paths.append(x.rfilename)
-            elif re.search(r'model(\.[^.]+)?\.(safetensors|bin)$', x.rfilename):
+            elif re.search(r"model(\.[^.]+)?\.(safetensors|bin)$", x.rfilename):
                 paths.append(x.rfilename)
 
         sizes = {x.rfilename: x.size for x in sibs}

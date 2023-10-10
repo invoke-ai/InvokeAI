@@ -5,10 +5,11 @@ Model download service.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 from pydantic.networks import AnyHttpUrl
 
+from invokeai.backend.model_manager.download import DownloadJobRemoteSource  # noqa F401
 from invokeai.backend.model_manager.download import (  # noqa F401
     DownloadEventHandler,
     DownloadJobBase,
@@ -19,10 +20,9 @@ from invokeai.backend.model_manager.download import (  # noqa F401
     ModelSourceMetadata,
     UnknownJobIDException,
 )
-from invokeai.backend.model_manager.download import DownloadJobRemoteSource  # noqa F401
 
-
-from .events import EventServiceBase
+if TYPE_CHECKING:
+    from .events import EventServiceBase
 
 
 class DownloadQueueServiceBase(ABC):
@@ -146,10 +146,10 @@ class DownloadQueueServiceBase(ABC):
 class DownloadQueueService(DownloadQueueServiceBase):
     """Multithreaded queue for downloading models via URL or repo_id."""
 
-    _event_bus: EventServiceBase
+    _event_bus: Optional["EventServiceBase"] = None
     _queue: DownloadQueueBase
 
-    def __init__(self, event_bus: EventServiceBase, **kwargs):
+    def __init__(self, event_bus: Optional["EventServiceBase"] = None, **kwargs):
         """
         Initialize new DownloadQueueService object.
 

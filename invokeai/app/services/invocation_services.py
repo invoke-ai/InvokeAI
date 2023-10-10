@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.board_images import BoardImagesServiceABC
     from invokeai.app.services.boards import BoardServiceABC
     from invokeai.app.services.config import InvokeAIAppConfig
+    from invokeai.app.services.download_manager import DownloadQueueServiceBase
     from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
     from invokeai.app.services.images import ImageServiceABC
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
     from invokeai.app.services.invoker import InvocationProcessorABC
     from invokeai.app.services.item_storage import ItemStorageABC
     from invokeai.app.services.latent_storage import LatentsStorageBase
-    from invokeai.app.services.download_manager import DownloadQueueServiceBase
     from invokeai.app.services.model_install_service import ModelInstallServiceBase
     from invokeai.app.services.model_loader_service import ModelLoadServiceBase
     from invokeai.app.services.model_record_service import ModelRecordServiceBase

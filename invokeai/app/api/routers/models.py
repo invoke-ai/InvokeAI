@@ -11,19 +11,19 @@ from pydantic import BaseModel, parse_obj_as
 from starlette.exceptions import HTTPException
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.services.download_manager import DownloadJobRemoteSource, DownloadJobStatus, UnknownJobIDException
+from invokeai.app.services.model_convert import MergeInterpolationMethod, ModelConvert
+from invokeai.app.services.model_install_service import ModelInstallJob
 from invokeai.backend import BaseModelType, ModelType
 from invokeai.backend.model_manager import (
     OPENAPI_MODEL_CONFIGS,
     DuplicateModelException,
     InvalidModelException,
     ModelConfigBase,
+    ModelSearch,
     SchedulerPredictionType,
     UnknownModelException,
-    ModelSearch
 )
-from invokeai.app.services.download_manager import DownloadJobStatus, UnknownJobIDException, DownloadJobRemoteSource
-from invokeai.app.services.model_convert import MergeInterpolationMethod, ModelConvert
-from invokeai.app.services.model_install_service import ModelInstallJob
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
@@ -57,6 +57,7 @@ class JobControlOperation(str, Enum):
     PAUSE = "Pause"
     CANCEL = "Cancel"
     CHANGE_PRIORITY = "Change Priority"
+
 
 @models_router.get(
     "/",
@@ -292,7 +293,7 @@ async def convert_model(
         converter = ModelConvert(
             loader=ApiDependencies.invoker.services.model_loader,
             installer=ApiDependencies.invoker.services.model_installer,
-            store=ApiDependencies.invoker.services.model_record_store
+            store=ApiDependencies.invoker.services.model_record_store,
         )
         model_config = converter.convert_model(key, dest_directory=dest)
         response = parse_obj_as(InvokeAIModelConfig, model_config.dict())
@@ -322,6 +323,7 @@ async def search_for_models(
             status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory"
         )
     return ModelSearch().search(search_path)
+
 
 @models_router.get(
     "/ckpt_confs",
@@ -394,7 +396,7 @@ async def merge_models(
         converter = ModelConvert(
             loader=ApiDependencies.invoker.services.model_loader,
             installer=ApiDependencies.invoker.services.model_installer,
-            store=ApiDependencies.invoker.services.model_record_store
+            store=ApiDependencies.invoker.services.model_record_store,
         )
         result: ModelConfigBase = converter.merge_models(
             model_keys=keys,
@@ -437,7 +439,8 @@ async def list_install_jobs() -> List[ModelDownloadStatus]:
             total_bytes=x.total_bytes,
             status=x.status,
         )
-        for x in jobs if isinstance(x, ModelInstallJob)
+        for x in jobs
+        if isinstance(x, ModelInstallJob)
     ]
 
 

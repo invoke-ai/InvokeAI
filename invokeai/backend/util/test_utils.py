@@ -6,8 +6,8 @@ import pytest
 import torch
 
 from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
-from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.app.services.model_install_service import ModelInstallService
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
 from invokeai.backend.model_manager import BaseModelType, ModelType, SubModelType, UnknownModelException
 from invokeai.backend.model_manager.loader import ModelInfo, ModelLoad
 

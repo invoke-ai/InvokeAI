@@ -5,8 +5,8 @@ import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, Union
 from shutil import move, rmtree
+from typing import Optional, Tuple, Union
 
 import torch
 
