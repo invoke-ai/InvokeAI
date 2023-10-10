@@ -546,11 +546,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # Handle ControlNet(s) and T2I-Adapter(s)
         down_block_additional_residuals = None
         mid_block_additional_residual = None
-        if control_data is not None and t2i_adapter_data is not None:
+        down_intrablock_additional_residuals = None
+        # if control_data is not None and t2i_adapter_data is not None:
             # TODO(ryand): This is a limitation of the UNet2DConditionModel API, not a fundamental incompatibility
             # between ControlNets and T2I-Adapters. We will try to fix this upstream in diffusers.
-            raise Exception("ControlNet(s) and T2I-Adapter(s) cannot be used simultaneously (yet).")
-        elif control_data is not None:
+        #    raise Exception("ControlNet(s) and T2I-Adapter(s) cannot be used simultaneously (yet).")
+        # elif control_data is not None:
+        if control_data is not None:
             down_block_additional_residuals, mid_block_additional_residual = self.invokeai_diffuser.do_controlnet_step(
                 control_data=control_data,
                 sample=latent_model_input,
@@ -559,7 +561,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 total_step_count=total_step_count,
                 conditioning_data=conditioning_data,
             )
-        elif t2i_adapter_data is not None:
+        # elif t2i_adapter_data is not None:
+        if t2i_adapter_data is not None:
             accum_adapter_state = None
             for single_t2i_adapter_data in t2i_adapter_data:
                 # Determine the T2I-Adapter weights for the current denoising step.
@@ -584,7 +587,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
                         accum_adapter_state[idx] += value * t2i_adapter_weight
 
-            down_block_additional_residuals = accum_adapter_state
+            # down_block_additional_residuals = accum_adapter_state
+            down_intrablock_additional_residuals = accum_adapter_state
 
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
             sample=latent_model_input,
@@ -593,8 +597,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
             # extra:
-            down_block_additional_residuals=down_block_additional_residuals,
-            mid_block_additional_residual=mid_block_additional_residual,
+            down_block_additional_residuals=down_block_additional_residuals,  # for ControlNet
+            mid_block_additional_residual=mid_block_additional_residual,      # for ControlNet
+            down_intrablock_additional_residuals=down_intrablock_additional_residuals,   # for T2I-Adapter
         )
 
         guidance_scale = conditioning_data.guidance_scale
