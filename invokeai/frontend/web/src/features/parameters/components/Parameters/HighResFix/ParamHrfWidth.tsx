@@ -41,7 +41,7 @@ const ParamHrfWidth = (props: ParamWidthProps) => {
   const { width, hrfWidth, min, step, aspectRatio, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
-  const maxHrfWidth = findPrevMultipleOfEight(width);
+  const maxHrfWidth = Math.max(findPrevMultipleOfEight(width), min);
 
   const handleChange = useCallback(
     (v: number) => {

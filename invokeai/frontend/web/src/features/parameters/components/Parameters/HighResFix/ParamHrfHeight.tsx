@@ -45,7 +45,7 @@ const ParamHrfHeight = (props: ParamHeightProps) => {
     useAppSelector(selector);
   const dispatch = useAppDispatch();
 
-  const maxHrfHeight = findPrevMultipleOfEight(height);
+  const maxHrfHeight = Math.max(findPrevMultipleOfEight(height), min);
 
   const handleChange = useCallback(
     (v: number) => {
