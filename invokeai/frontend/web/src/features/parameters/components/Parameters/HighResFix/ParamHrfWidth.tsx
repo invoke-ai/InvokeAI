@@ -38,13 +38,10 @@ const selector = createSelector(
 type ParamWidthProps = Omit<IAIFullSliderProps, 'label' | 'value' | 'onChange'>;
 
 const ParamHrfWidth = (props: ParamWidthProps) => {
-  const { model, width, hrfWidth, min, step, aspectRatio, hrfEnabled } =
+  const { width, hrfWidth, min, step, aspectRatio, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
-
-  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
-    ? 1016
-    : 504;
+  const maxHrfWidth = findPrevMultipleOfEight(width);
 
   const handleChange = useCallback(
     (v: number) => {
@@ -58,12 +55,12 @@ const ParamHrfWidth = (props: ParamWidthProps) => {
   );
 
   const handleReset = useCallback(() => {
-    dispatch(setHrfWidth(initial));
+    dispatch(setHrfWidth(maxHrfWidth));
     if (aspectRatio) {
-      const newHeight = roundToMultiple(initial / aspectRatio, 8);
+      const newHeight = roundToMultiple(maxHrfWidth / aspectRatio, 8);
       dispatch(setHrfHeight(newHeight));
     }
-  }, [dispatch, initial, aspectRatio]);
+  }, [dispatch, maxHrfWidth, aspectRatio]);
 
   return (
     <IAISlider
@@ -71,13 +68,13 @@ const ParamHrfWidth = (props: ParamWidthProps) => {
       value={hrfWidth}
       min={min}
       step={step}
-      max={findPrevMultipleOfEight(width)}
+      max={maxHrfWidth}
       onChange={handleChange}
       handleReset={handleReset}
       withInput
       withReset
       withSliderMarks
-      sliderNumberInputProps={{ max: findPrevMultipleOfEight(width) }}
+      sliderNumberInputProps={{ max: maxHrfWidth }}
       isDisabled={!hrfEnabled}
       {...props}
     />
