@@ -8,20 +8,27 @@ import {
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { memo, useCallback, useMemo } from 'react';
-import { FaFolder, FaTrash } from 'react-icons/fa';
+import { FaDownload, FaFolder, FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
+  useBulkDownloadImagesMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from '../../../../services/api/endpoints/images';
+import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
+import { addToast } from '../../../system/store/systemSlice';
 
 const MultipleSelectionMenuItems = () => {
   const dispatch = useAppDispatch();
   const selection = useAppSelector((state) => state.gallery.selection);
   const customStarUi = useStore($customStarUI);
 
+  const isBulkDownloadEnabled =
+    useFeatureStatus('bulkDownload').isFeatureEnabled;
+
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
+  const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleChangeBoard = useCallback(() => {
     dispatch(imagesToChangeSelected(selection));
@@ -39,6 +46,29 @@ const MultipleSelectionMenuItems = () => {
   const handleUnstarSelection = useCallback(() => {
     unstarImages({ imageDTOs: selection });
   }, [unstarImages, selection]);
+
+  const handleBulkDownload = useCallback(async () => {
+    try {
+      const response = await bulkDownload({
+        image_names: selection.map((img) => img.image_name),
+      }).unwrap();
+
+      dispatch(
+        addToast({
+          title: 'Downloading Images',
+          status: 'success',
+          ...(response.response ? { description: response.response } : {}),
+        })
+      );
+    } catch {
+      dispatch(
+        addToast({
+          title: 'Problem downloading images',
+          status: 'error',
+        })
+      );
+    }
+  }, [selection, bulkDownload, dispatch]);
 
   const areAllStarred = useMemo(() => {
     return selection.every((img) => img.starred);
@@ -64,6 +94,11 @@ const MultipleSelectionMenuItems = () => {
           onClickCapture={handleStarSelection}
         >
           {customStarUi ? customStarUi.on.text : `Star All`}
+        </MenuItem>
+      )}
+      {isBulkDownloadEnabled && (
+        <MenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
+          Download Selection
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>

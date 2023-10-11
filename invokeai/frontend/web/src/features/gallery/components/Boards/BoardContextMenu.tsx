@@ -1,4 +1,4 @@
-import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
+import { MenuGroup, MenuItem, MenuList, Tooltip, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -11,12 +11,15 @@ import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { BoardId } from 'features/gallery/store/types';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
+import { FaDownload, FaPlus } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
+import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
+import { useBulkDownloadImagesMutation } from '../../../../services/api/endpoints/images';
+import { addToast } from '../../../system/store/systemSlice';
 
 type Props = {
   board?: BoardDTO;
@@ -49,10 +52,38 @@ const BoardContextMenu = ({
 
   const { isAutoAdd, autoAssignBoardOnClick } = useAppSelector(selector);
   const boardName = useBoardName(board_id);
+  const isBulkDownloadEnabled =
+    useFeatureStatus('bulkDownload').isFeatureEnabled;
+
+  const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleSetAutoAdd = useCallback(() => {
     dispatch(autoAddBoardIdChanged(board_id));
   }, [board_id, dispatch]);
+
+  const handleBulkDownload = useCallback(async () => {
+    try {
+      const response = await bulkDownload({
+        image_names: [],
+        board_id: board_id,
+      }).unwrap();
+
+      dispatch(
+        addToast({
+          title: 'Downloading Images',
+          status: 'success',
+          ...(response.response ? { description: response.response } : {}),
+        })
+      );
+    } catch {
+      dispatch(
+        addToast({
+          title: 'Problem downloading images',
+          status: 'error',
+        })
+      );
+    }
+  }, [board_id, bulkDownload, dispatch]);
 
   const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -81,6 +112,14 @@ const BoardContextMenu = ({
             >
               {t('boards.menuItemAutoAdd')}
             </MenuItem>
+            {isBulkDownloadEnabled && (
+              <MenuItem
+                icon={<FaDownload />}
+                onClickCapture={handleBulkDownload}
+              >
+                Download Board
+              </MenuItem>
+            )}
             {!board && <NoBoardContextMenuItems />}
             {board && (
               <GalleryBoardContextMenuItems
