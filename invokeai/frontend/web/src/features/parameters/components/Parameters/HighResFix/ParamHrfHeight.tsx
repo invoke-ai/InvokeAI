@@ -44,7 +44,6 @@ const ParamHrfHeight = (props: ParamHeightProps) => {
   const { height, hrfHeight, min, step, aspectRatio, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
-
   const maxHrfHeight = Math.max(findPrevMultipleOfEight(height), min);
 
   const handleChange = useCallback(
