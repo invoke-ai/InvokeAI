@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector, useAppDispatch } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { stateSelector } from 'app/store/store';
 import { setHrfStrength } from 'features/parameters/store/generationSlice';
 import IAISlider from 'common/components/IAISlider';
@@ -27,7 +27,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-export default function ParamHrfStrength() {
+const ParamHrfStrength = () => {
   const { hrfStrength, initial, min, sliderMax, step, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
@@ -59,4 +59,6 @@ export default function ParamHrfStrength() {
       isDisabled={!hrfEnabled}
     />
   );
-}
+};
+
+export default memo(ParamHrfStrength);
