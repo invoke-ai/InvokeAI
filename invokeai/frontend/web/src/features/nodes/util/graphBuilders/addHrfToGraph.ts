@@ -121,8 +121,6 @@ export const addHrfToGraph = (
     type: 'noise',
     id: NOISE_HRF,
     seed: originalNoiseNode?.seed,
-    width: state.generation.width,
-    height: state.generation.height,
     use_cpu: originalNoiseNode?.use_cpu,
     is_intermediate: originalNoiseNode?.is_intermediate,
   };
@@ -130,6 +128,8 @@ export const addHrfToGraph = (
   const rescaleLatentsNode: ResizeLatentsInvocation = {
     id: RESCALE_LATENTS,
     type: 'lresize',
+    width: state.generation.width,
+    height: state.generation.height,
   };
 
   // New node to convert latents to image.
@@ -154,7 +154,7 @@ export const addHrfToGraph = (
   // Connect nodes.
   graph.edges.push(
     {
-      // Set up resize latents.
+      // Set up rescale latents.
       source: {
         node_id: DENOISE_LATENTS,
         field: 'latents',
@@ -164,24 +164,25 @@ export const addHrfToGraph = (
         field: 'latents',
       },
     },
+    // Set up new noise node
     {
       source: {
-        node_id: NOISE_HRF,
-        field: 'width',
+        node_id: RESCALE_LATENTS,
+        field: 'height',
       },
       destination: {
-        node_id: RESCALE_LATENTS,
-        field: 'width',
+        node_id: NOISE_HRF,
+        field: 'height',
       },
     },
     {
       source: {
-        node_id: NOISE_HRF,
-        field: 'height',
+        node_id: RESCALE_LATENTS,
+        field: 'width',
       },
       destination: {
-        node_id: RESCALE_LATENTS,
-        field: 'height',
+        node_id: NOISE_HRF,
+        field: 'width',
       },
     },
     // Set up new denoise node.
