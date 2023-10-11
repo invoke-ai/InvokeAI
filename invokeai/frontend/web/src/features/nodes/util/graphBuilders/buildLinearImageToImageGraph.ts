@@ -9,7 +9,6 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addHrfToGraph } from './addHrfToGraph';
 import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -363,11 +362,6 @@ export const buildLinearImageToImageGraph = (
 
   // Add IP Adapter
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-
-  // High resolution fix.
-  if (state.generation.hrfEnabled) {
-    addHrfToGraph(state, graph);
-  }
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
