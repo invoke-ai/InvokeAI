@@ -16,7 +16,7 @@ export default function ParamHrfToggle() {
 
   return (
     <IAISwitch
-      label="Toggle High Resolution Fix"
+      label="Enable High Resolution Fix"
       isChecked={hrfEnabled}
       onChange={handleHrfEnabled}
     />
