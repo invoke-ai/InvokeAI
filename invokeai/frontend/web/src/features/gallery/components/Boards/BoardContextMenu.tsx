@@ -11,12 +11,15 @@ import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { BoardId } from 'features/gallery/store/types';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
+import { FaDownload, FaPlus } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
+import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
+import { useBulkDownloadImagesMutation } from '../../../../services/api/endpoints/images';
+import { addToast } from '../../../system/store/systemSlice';
 
 type Props = {
   board?: BoardDTO;
@@ -31,6 +34,7 @@ const BoardContextMenu = ({
   setBoardToDelete,
   children,
 }: Props) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const selector = useMemo(
@@ -49,16 +53,42 @@ const BoardContextMenu = ({
 
   const { isAutoAdd, autoAssignBoardOnClick } = useAppSelector(selector);
   const boardName = useBoardName(board_id);
+  const isBulkDownloadEnabled =
+    useFeatureStatus('bulkDownload').isFeatureEnabled;
+
+  const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleSetAutoAdd = useCallback(() => {
     dispatch(autoAddBoardIdChanged(board_id));
   }, [board_id, dispatch]);
 
+  const handleBulkDownload = useCallback(async () => {
+    try {
+      const response = await bulkDownload({
+        image_names: [],
+        board_id: board_id,
+      }).unwrap();
+
+      dispatch(
+        addToast({
+          title: t('gallery.preparingDownload'),
+          status: 'success',
+          ...(response.response ? { description: response.response } : {}),
+        })
+      );
+    } catch {
+      dispatch(
+        addToast({
+          title: t('gallery.preparingDownloadFailed'),
+          status: 'error',
+        })
+      );
+    }
+  }, [t, board_id, bulkDownload, dispatch]);
+
   const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
-
-  const { t } = useTranslation();
 
   return (
     <IAIContextMenu<HTMLDivElement>
@@ -81,6 +111,14 @@ const BoardContextMenu = ({
             >
               {t('boards.menuItemAutoAdd')}
             </MenuItem>
+            {isBulkDownloadEnabled && (
+              <MenuItem
+                icon={<FaDownload />}
+                onClickCapture={handleBulkDownload}
+              >
+                {t('boards.downloadBoard')}
+              </MenuItem>
+            )}
             {!board && <NoBoardContextMenuItems />}
             {board && (
               <GalleryBoardContextMenuItems

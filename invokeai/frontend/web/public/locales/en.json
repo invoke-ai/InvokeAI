@@ -38,7 +38,8 @@
         "searchBoard": "Search Boards...",
         "selectBoard": "Select a Board",
         "topMessage": "This board contains images used in the following features:",
-        "uncategorized": "Uncategorized"
+        "uncategorized": "Uncategorized",
+        "downloadBoard": "Download Board"
     },
     "common": {
         "accept": "Accept",
@@ -323,7 +324,10 @@
         "showUploads": "Show Uploads",
         "singleColumnLayout": "Single Column Layout",
         "unableToLoad": "Unable to load Gallery",
-        "uploads": "Uploads"
+        "uploads": "Uploads",
+        "downloadSelection": "Download Selection",
+        "preparingDownload": "Preparing Download",
+        "preparingDownloadFailed": "Problem Preparing Download"
     },
     "hotkeys": {
         "acceptStagingImage": {
