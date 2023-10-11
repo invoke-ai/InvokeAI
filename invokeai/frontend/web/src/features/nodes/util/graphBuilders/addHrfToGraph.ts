@@ -69,8 +69,7 @@ export const addHrfToGraph = (
 
   const { vae } = state.generation;
   const isAutoVae = !vae;
-  //const hrfWidth = state.generation.hrfWidth;
-  const hrfWidth = -1;
+  const hrfWidth = state.generation.hrfWidth;
   const hrfHeight = state.generation.hrfHeight;
 
   // Pre-existing (original) graph nodes.

@@ -17,7 +17,6 @@ const ImageToImageTabParameters = () => {
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamSymmetryCollapse />
-      <ParamHrfCollapse />
       <ParamAdvancedCollapse />
     </>
   );
