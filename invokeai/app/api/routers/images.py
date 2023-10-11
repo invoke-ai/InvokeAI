@@ -333,8 +333,9 @@ class ImagesDownloaded(BaseModel):
 @images_router.post("/download", operation_id="download_images_from_list", response_model=ImagesDownloaded)
 async def download_images_from_list(
     image_names: list[str] = Body(description="The list of names of images to download", embed=True),
-    board_id: str
-    | None = Body(default=None, description="The board from which image should be downloaded from", embed=True),
+    board_id: Optional[str] = Body(
+        default=None, description="The board from which image should be downloaded from", embed=True
+    ),
 ) -> ImagesDownloaded:
     # return ImagesDownloaded(response="Your images are downloading")
     raise HTTPException(status_code=501, detail="Endpoint is not yet implemented")
