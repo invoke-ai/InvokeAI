@@ -17,8 +17,10 @@ import {
 } from '../../../../services/api/endpoints/images';
 import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
 import { addToast } from '../../../system/store/systemSlice';
+import { useTranslation } from 'react-i18next';
 
 const MultipleSelectionMenuItems = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selection = useAppSelector((state) => state.gallery.selection);
   const customStarUi = useStore($customStarUI);
@@ -55,7 +57,7 @@ const MultipleSelectionMenuItems = () => {
 
       dispatch(
         addToast({
-          title: 'Downloading Images',
+          title: t('gallery.preparingDownload'),
           status: 'success',
           ...(response.response ? { description: response.response } : {}),
         })
@@ -63,12 +65,12 @@ const MultipleSelectionMenuItems = () => {
     } catch {
       dispatch(
         addToast({
-          title: 'Problem downloading images',
+          title: t('gallery.preparingDownloadFailed'),
           status: 'error',
         })
       );
     }
-  }, [selection, bulkDownload, dispatch]);
+  }, [t, selection, bulkDownload, dispatch]);
 
   const areAllStarred = useMemo(() => {
     return selection.every((img) => img.starred);
@@ -98,7 +100,7 @@ const MultipleSelectionMenuItems = () => {
       )}
       {isBulkDownloadEnabled && (
         <MenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
-          Download Selection
+          {t('gallery.downloadSelection')}
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>

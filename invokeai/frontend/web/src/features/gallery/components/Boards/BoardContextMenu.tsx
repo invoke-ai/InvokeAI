@@ -34,6 +34,7 @@ const BoardContextMenu = ({
   setBoardToDelete,
   children,
 }: Props) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const selector = useMemo(
@@ -70,7 +71,7 @@ const BoardContextMenu = ({
 
       dispatch(
         addToast({
-          title: 'Downloading Images',
+          title: t('gallery.preparingDownload'),
           status: 'success',
           ...(response.response ? { description: response.response } : {}),
         })
@@ -78,18 +79,16 @@ const BoardContextMenu = ({
     } catch {
       dispatch(
         addToast({
-          title: 'Problem downloading images',
+          title: t('gallery.preparingDownloadFailed'),
           status: 'error',
         })
       );
     }
-  }, [board_id, bulkDownload, dispatch]);
+  }, [t, board_id, bulkDownload, dispatch]);
 
   const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
-
-  const { t } = useTranslation();
 
   return (
     <IAIContextMenu<HTMLDivElement>
@@ -117,7 +116,7 @@ const BoardContextMenu = ({
                 icon={<FaDownload />}
                 onClickCapture={handleBulkDownload}
               >
-                Download Board
+                {t('boards.downloadBoard')}
               </MenuItem>
             )}
             {!board && <NoBoardContextMenuItems />}
