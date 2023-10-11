@@ -9,17 +9,15 @@ import time
 import traceback
 from pathlib import Path
 from queue import PriorityQueue
-from typing import Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Callable, Dict, List, Optional, Set, Union
 
 import requests
 from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 
-from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import InvokeAILogger, Logger
 
-from ..storage import DuplicateModelException
 from .base import DownloadEventHandler, DownloadJobBase, DownloadJobStatus, DownloadQueueBase, UnknownJobIDException
 
 # Maximum number of bytes to download during each call to requests.iter_content()
@@ -58,7 +56,7 @@ class DownloadQueue(DownloadQueueBase):
     _jobs: Dict[int, DownloadJobBase]
     _worker_pool: Set[threading.Thread]
     _queue: PriorityQueue
-    _lock: threading.RLock  # to allow methods called within the same thread to lock without blocking
+    _lock: threading.RLock  # to allow for reentrant locking for method calls
     _logger: Logger
     _event_handlers: List[DownloadEventHandler] = Field(default_factory=list)
     _next_job_id: int = 0
@@ -71,7 +69,6 @@ class DownloadQueue(DownloadQueueBase):
         max_parallel_dl: int = 5,
         event_handlers: List[DownloadEventHandler] = [],
         requests_session: Optional[requests.sessions.Session] = None,
-        config: Optional[InvokeAIAppConfig] = None,
         quiet: bool = False,
     ):
         """
@@ -86,7 +83,7 @@ class DownloadQueue(DownloadQueueBase):
         self._queue = PriorityQueue()
         self._worker_pool = set()
         self._lock = threading.RLock()
-        self._logger = InvokeAILogger.get_logger(config=config)
+        self._logger = InvokeAILogger.get_logger()
         self._event_handlers = event_handlers
         self._requests = requests_session or requests.Session()
         self._quiet = quiet
@@ -129,7 +126,7 @@ class DownloadQueue(DownloadQueueBase):
     def submit_download_job(
         self,
         job: DownloadJobBase,
-        start: bool = True,
+        start: Optional[bool] = True,
     ):
         """Submit a job."""
         # add the queue's handlers
@@ -398,7 +395,11 @@ class DownloadQueue(DownloadQueueBase):
         """Optionally change the job status and send an event indicating a change of state."""
         if new_status:
             job.status = new_status
+
         self._logger.debug(f"Status update for download job {job.id}: {job}")
+        if self._in_terminal_state(job) and not self._quiet:
+            self._logger.info(f"{job.source}: download job completed with status {job.status.value}")
+
         if new_status == DownloadJobStatus.RUNNING and not job.job_started:
             job.job_started = time.time()
         elif new_status in [DownloadJobStatus.COMPLETED, DownloadJobStatus.ERROR]:

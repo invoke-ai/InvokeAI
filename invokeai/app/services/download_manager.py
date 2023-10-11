@@ -34,7 +34,7 @@ class DownloadQueueServiceBase(ABC):
         source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
         filename: Optional[Path] = None,
-        start: bool = True,
+        start: Optional[bool] = True,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> DownloadJobBase:
@@ -55,7 +55,7 @@ class DownloadQueueServiceBase(ABC):
     def submit_download_job(
         self,
         job: DownloadJobBase,
-        start: bool = True,
+        start: Optional[bool] = True,
     ):
         """
         Submit a download job.
@@ -90,7 +90,7 @@ class DownloadQueueServiceBase(ABC):
 
     @abstractmethod
     def start_all_jobs(self):
-        """Enqueue all stopped jobs."""
+        """Enqueue all idle and paused jobs."""
         pass
 
     @abstractmethod
@@ -165,7 +165,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
         filename: Optional[Path] = None,
-        start: bool = True,
+        start: Optional[bool] = True,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> DownloadJobBase:  # noqa D102

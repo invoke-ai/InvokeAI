@@ -85,18 +85,18 @@ class ModelInstallServiceBase(ABC):
         queue: Optional[DownloadQueueServiceBase] = None,
         store: Optional[ModelRecordServiceBase] = None,
         event_bus: Optional["EventServiceBase"] = None,
+        event_handlers: List[DownloadEventHandler] = [],
     ):
         """
         Create ModelInstallService object.
 
-        :param store: Optional ModelConfigStore. If None passed,
-        defaults to `configs/models.yaml`.
         :param config: Optional InvokeAIAppConfig. If None passed,
         uses the system-wide default app config.
-        :param logger: Optional InvokeAILogger. If None passed,
-        uses the system-wide default logger.
         :param download: Optional DownloadQueueServiceBase object. If None passed,
         a default queue object will be created.
+        :param store: Optional ModelConfigStore. If None passed,
+        defaults to `configs/models.yaml`.
+        :param event_bus: InvokeAI event bus for reporting events to.
         :param event_handlers: List of event handlers to pass to the queue object.
         """
         pass
@@ -150,6 +150,7 @@ class ModelInstallServiceBase(ABC):
         source: Union[str, Path, AnyHttpUrl],
         inplace: bool = True,
         priority: int = 10,
+        start: Optional[bool] = True,
         variant: Optional[str] = None,
         subfolder: Optional[str] = None,
         probe_override: Optional[Dict[str, Any]] = None,
@@ -221,6 +222,11 @@ class ModelInstallServiceBase(ABC):
         pass
 
     @abstractmethod
+    def sync_to_config(self):
+        """Synchronize models on disk to those in memory."""
+        pass
+
+    @abstractmethod
     def hash(self, model_path: Union[Path, str]) -> str:
         """
         Compute and return the fast hash of the model.
@@ -285,7 +291,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if self._event_bus:
             self._handlers.append(self._event_bus.emit_model_event)
 
-        self._download_queue = queue or DownloadQueueService(event_bus=event_bus, config=self._app_config)
+        self._download_queue = queue or DownloadQueueService(event_bus=event_bus)
         self._async_installs: Dict[Union[str, Path, AnyHttpUrl], Union[str, None]] = dict()
         self._installed = set()
         self._tmpdir = None
@@ -314,6 +320,7 @@ class ModelInstallService(ModelInstallServiceBase):
         source: Union[str, Path, AnyHttpUrl],
         inplace: bool = True,
         priority: int = 10,
+        start: Optional[bool] = True,
         variant: Optional[str] = None,
         subfolder: Optional[str] = None,
         probe_override: Optional[Dict[str, Any]] = None,
@@ -338,7 +345,7 @@ class ModelInstallService(ModelInstallServiceBase):
         job.add_event_handler(handler)
 
         self._async_installs[source] = None
-        queue.submit_download_job(job, True)
+        queue.submit_download_job(job, start=start)
         return job
 
     def register_path(

@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_install_service import ModelInstall, ModelInstallJob
+from invokeai.app.services.model_install_service import ModelInstallJob, ModelInstallService
 from invokeai.backend.install.install_helper import InstallHelper, UnifiedModelInfo
 from invokeai.backend.model_manager import BaseModelType, ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
@@ -514,7 +514,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
         )
 
 
-def list_models(installer: ModelInstall, model_type: ModelType):
+def list_models(installer: ModelInstallService, model_type: ModelType):
     """Print out all models of type model_type."""
     models = installer.store.search_by_name(model_type=model_type)
     print(f"Installed models of type `{model_type}`:")

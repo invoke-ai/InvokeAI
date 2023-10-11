@@ -56,7 +56,6 @@ def test_install(datadir: Path):
 
         source = datadir / TEST_MODEL
         job = mm_install.install_model(source=source)
-        print(f"DEBUG: job={type(job)}")
         id_map = mm_install.wait_for_installs()
         print(id_map)
         assert source in id_map, "model did not install; id_map empty"

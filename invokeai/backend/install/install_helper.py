@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_install_service import ModelInstall, ModelInstallJob, ModelSourceMetadata
+from invokeai.app.services.model_install_service import ModelInstallJob, ModelInstallService, ModelSourceMetadata
 from invokeai.backend.model_manager import BaseModelType, ModelType
 from invokeai.backend.model_manager.download.queue import DownloadJobRemoteSource
 
@@ -70,7 +70,7 @@ class InstallHelper(object):
     """Capture information stored jointly in INITIAL_MODELS.yaml and the installed models db."""
 
     all_models: Dict[str, UnifiedModelInfo] = dict()
-    _installer: ModelInstall
+    _installer: ModelInstallService
     _config: InvokeAIAppConfig
     _installed_models: List[str] = []
     _starter_models: List[str] = []
@@ -79,12 +79,12 @@ class InstallHelper(object):
 
     def __init__(self, config: InvokeAIAppConfig):
         self._config = config
-        self._installer = ModelInstall(config=config, event_handlers=[TqdmProgress().job_update])
+        self._installer = ModelInstallService(config=config, event_handlers=[TqdmProgress().job_update])
         self._initial_models = omegaconf.OmegaConf.load(Path(configs.__path__[0]) / INITIAL_MODELS)
         self._initialize_model_lists()
 
     @property
-    def installer(self) -> ModelInstall:
+    def installer(self) -> ModelInstallService:
         return self._installer
 
     def _initialize_model_lists(self):

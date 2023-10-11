@@ -41,7 +41,6 @@ class DownloadJobBase(BaseModel):
     id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
     source: Any = Field(description="Where to download from. Specific types specified in child classes.")
     destination: Path = Field(description="Destination of downloaded model on local disk")
-    access_token: Optional[str] = Field(description="access token needed to access this resource")
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
     event_handlers: Optional[List[DownloadEventHandler]] = Field(
         description="Callables that will be called whenever job status changes",
@@ -96,7 +95,6 @@ class DownloadQueueBase(ABC):
         max_parallel_dl: int = 5,
         event_handlers: List[DownloadEventHandler] = [],
         requests_session: Optional[requests.sessions.Session] = None,
-        config: Optional[InvokeAIAppConfig] = None,
         quiet: bool = False,
     ):
         """
@@ -105,7 +103,6 @@ class DownloadQueueBase(ABC):
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param event_handler: Optional callable that will be called each time a job status changes.
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
-        :param config: InvokeAIAppConfig object, used to configure the logger and other options.
         :param quiet: If true, don't log the start of download jobs. Useful for subrequests.
         """
         pass
@@ -115,10 +112,10 @@ class DownloadQueueBase(ABC):
         self,
         source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
-        start: bool = True,
         priority: int = 10,
+        start: Optional[bool] = True,
         filename: Optional[Path] = None,
-        variant: Optional[str] = None,
+        variant: Optional[str] = None,  # FIXME: variant is only used in one specific subclass
         access_token: Optional[str] = None,
         event_handlers: List[DownloadEventHandler] = [],
     ) -> DownloadJobBase:
@@ -129,7 +126,7 @@ class DownloadQueueBase(ABC):
         :param destdir: Directory to download into.
         :param priority: Initial priority for this job [10]
         :param filename: Optional name of file, if not provided
-        will use the content-disposition field to assign the name.
+         will use the content-disposition field to assign the name.
         :param start: Immediately start job [True]
         :param variant: Variant to download, such as "fp16" (repo_ids only).
         :param event_handlers: Optional callables that will be called whenever job status changes.
@@ -146,7 +143,7 @@ class DownloadQueueBase(ABC):
     def submit_download_job(
         self,
         job: DownloadJobBase,
-        start: bool = True,
+        start: Optional[bool] = True,
     ):
         """
         Submit a download job.

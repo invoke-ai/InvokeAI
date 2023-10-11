@@ -13,9 +13,9 @@ from invokeai.backend.model_manager import (  # noqa F401
     ModelConfigBase,
     ModelFormat,
     ModelType,
-    SubModelType,
     ModelVariantType,
     SchedulerPredictionType,
+    SubModelType,
 )
 from invokeai.backend.model_manager.storage import (  # noqa F401
     ModelConfigStore,
