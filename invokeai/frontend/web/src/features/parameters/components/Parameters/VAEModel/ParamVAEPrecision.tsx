@@ -7,6 +7,7 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
 import { PrecisionParam } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -20,6 +21,7 @@ const selector = createSelector(
 const DATA = ['fp16', 'fp32'];
 
 const ParamVAEModelSelect = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { vaePrecision } = useAppSelector(selector);
 
@@ -37,7 +39,7 @@ const ParamVAEModelSelect = () => {
   return (
     <IAIInformationalPopover feature="paramVAEPrecision">
       <IAIMantineSelect
-        label="VAE Precision"
+        label={t('modelManager.vaePrecision')}
         value={vaePrecision}
         data={DATA}
         onChange={handleChange}

@@ -1,7 +1,7 @@
 import { Heading, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import IAIButton from '../../../../common/components/IAIButton';
 import {
@@ -33,15 +33,12 @@ export default function SettingsClearIntermediates() {
 
     clearIntermediates()
       .unwrap()
-      .then((number) => {
+      .then((clearedCount) => {
         dispatch(controlAdaptersReset());
         dispatch(resetCanvas());
         dispatch(
           addToast({
-            title:
-              number === 1
-                ? t('settings.intermediatesCleared_one')
-                : t('settings.intermediatesCleared_other', { number }),
+            title: t('settings.intermediatesCleared', { count: clearedCount }),
             status: 'info',
           })
         );
@@ -61,18 +58,6 @@ export default function SettingsClearIntermediates() {
     updateIntermediatesCount();
   }, [updateIntermediatesCount]);
 
-  const buttonText = useMemo(() => {
-    if (!intermediatesCount) {
-      return t('settings.noIntermediates');
-    }
-    if (intermediatesCount === 1) {
-      return t('settings.clearIntermediates_one');
-    }
-    return t('settings.clearIntermediates_other', {
-      number: intermediatesCount,
-    });
-  }, [intermediatesCount, t]);
-
   return (
     <StyledFlex>
       <Heading size="sm">{t('settings.clearIntermediates')}</Heading>
@@ -82,7 +67,9 @@ export default function SettingsClearIntermediates() {
         isLoading={isLoadingClearIntermediates}
         isDisabled={!intermediatesCount}
       >
-        {buttonText}
+        {t('settings.clearIntermediatesWithCount', {
+          count: intermediatesCount ?? 0,
+        })}
       </IAIButton>
       <Text fontWeight="bold">{t('settings.clearIntermediatesDesc1')}</Text>
       <Text variant="subtext">{t('settings.clearIntermediatesDesc2')}</Text>

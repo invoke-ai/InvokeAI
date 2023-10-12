@@ -14,6 +14,7 @@ import { generationSelector } from 'features/parameters/store/generationSelector
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import ParamSDXLImg2ImgDenoisingStrength from './ParamSDXLImg2ImgDenoisingStrength';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [uiSelector, generationSelector],
@@ -29,10 +30,15 @@ const selector = createSelector(
 );
 
 const SDXLImageToImageTabCoreParameters = () => {
+  const { t } = useTranslation();
   const { shouldUseSliders, activeLabel } = useAppSelector(selector);
 
   return (
-    <IAICollapse label="General" activeLabel={activeLabel} defaultIsOpen={true}>
+    <IAICollapse
+      label={t('parameters.general')}
+      activeLabel={activeLabel}
+      defaultIsOpen={true}
+    >
       <Flex
         sx={{
           flexDirection: 'column',
