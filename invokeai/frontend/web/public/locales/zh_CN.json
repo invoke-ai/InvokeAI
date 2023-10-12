@@ -360,7 +360,6 @@
         "img2imgStrength": "图像到图像强度",
         "toggleLoopback": "切换环回",
         "invoke": "Invoke",
-        "promptPlaceholder": "在这里输入提示。可以使用[反提示]、(加权)++、(减权)--、交换和混合（见文档）",
         "sendTo": "发送到",
         "sendToImg2Img": "发送到图像到图像",
         "sendToUnifiedCanvas": "发送到统一画布",

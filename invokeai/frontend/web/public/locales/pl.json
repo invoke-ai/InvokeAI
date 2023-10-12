@@ -310,7 +310,6 @@
         "img2imgStrength": "Wpływ sugestii na obraz",
         "toggleLoopback": "Wł/wył sprzężenie zwrotne",
         "invoke": "Wywołaj",
-        "promptPlaceholder": "W tym miejscu wprowadź swoje sugestie. [negatywne sugestie], (wzmocnienie), (osłabienie)--, po więcej opcji (np. swap lub blend) zajrzyj do dokumentacji",
         "sendTo": "Wyślij do",
         "sendToImg2Img": "Użyj w trybie \"Obraz na obraz\"",
         "sendToUnifiedCanvas": "Użyj w trybie uniwersalnym",

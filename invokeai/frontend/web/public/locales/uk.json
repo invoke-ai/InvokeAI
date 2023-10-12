@@ -453,7 +453,6 @@
         "img2imgStrength": "Сила обробки img2img",
         "toggleLoopback": "Зациклити обробку",
         "invoke": "Викликати",
-        "promptPlaceholder": "Введіть запит тут (англійською). [видалені токени], (більш вагомі)++, (менш вагомі)--, swap и blend також доступні (дивіться Github)",
         "sendTo": "Надіслати",
         "sendToImg2Img": "Надіслати у img2img",
         "sendToUnifiedCanvas": "Надіслати на полотно",
@@ -483,8 +482,7 @@
         "denoisingStrength": "Сила шумоподавлення",
         "copyImage": "Копіювати зображення",
         "symmetry": "Симетрія",
-        "hSymmetryStep": "Крок гор. симетрії",
-        "negativePrompts": "Виключний запит"
+        "hSymmetryStep": "Крок гор. симетрії"
     },
     "settings": {
         "models": "Моделі",
