@@ -68,14 +68,19 @@
         "langHebrew": "עברית",
         "langKorean": "한국어",
         "txt2img": "Tekst naar afbeelding",
-        "postprocessing": "Nabewerking",
+        "postprocessing": "Naverwerking",
         "dontAskMeAgain": "Vraag niet opnieuw",
         "imagePrompt": "Afbeeldingsprompt",
         "random": "Willekeurig",
         "generate": "Genereer",
         "openInNewTab": "Open in nieuw tabblad",
         "areYouSure": "Weet je het zeker?",
-        "linear": "Lineair"
+        "linear": "Lineair",
+        "batch": "Seriebeheer",
+        "modelManager": "Modelbeheer",
+        "clearNodes": "Weet je zeker dat je alle knooppunten wilt weghalen?",
+        "darkMode": "Donkere modus",
+        "lightMode": "Lichte modus"
     },
     "gallery": {
         "generations": "Gegenereerde afbeeldingen",
@@ -91,7 +96,7 @@
         "pinGallery": "Zet galerij vast",
         "allImagesLoaded": "Alle afbeeldingen geladen",
         "loadMore": "Laad meer",
-        "noImagesInGallery": "Geen afbeeldingen in galerij",
+        "noImagesInGallery": "Geen afbeeldingen om te tonen",
         "deleteImage": "Wis afbeelding",
         "deleteImageBin": "Gewiste afbeeldingen worden naar de prullenbak van je besturingssysteem gestuurd.",
         "deleteImagePermanent": "Gewiste afbeeldingen kunnen niet worden hersteld.",
@@ -355,8 +360,8 @@
         "delete": "Verwijder",
         "deleteModel": "Verwijder model",
         "deleteConfig": "Verwijder configuratie",
-        "deleteMsg1": "Weet je zeker dat je deze modelregel wilt verwijderen uit InvokeAI?",
-        "deleteMsg2": "Hiermee wordt het checkpointbestand niet van je schijf verwijderd. Je kunt deze opnieuw toevoegen als je dat wilt.",
+        "deleteMsg1": "Weet je zeker dat je dit model wilt verwijderen uit InvokeAI?",
+        "deleteMsg2": "Hiermee ZAL het model van schijf worden verwijderd als het zich bevindt in de InvokeAI-beginmap. Als je het model vanaf een eigen locatie gebruikt, dan ZAL het model NIET van schijf worden verwijderd.",
         "formMessageDiffusersVAELocationDesc": "Indien niet opgegeven, dan zal InvokeAI kijken naar het VAE-bestand in de hierboven gegeven modellocatie.",
         "repoIDValidationMsg": "Online repository van je model",
         "formMessageDiffusersModelLocation": "Locatie Diffusers-model",
@@ -378,7 +383,7 @@
         "convertToDiffusersHelpText1": "Dit model wordt omgezet naar de🧨 Diffusers-indeling.",
         "convertToDiffusersHelpText2": "Dit proces vervangt het onderdeel in Modelonderhoud met de Diffusers-versie van hetzelfde model.",
         "convertToDiffusersHelpText4": "Dit is een eenmalig proces. Dit neemt ongeveer 30 tot 60 sec. in beslag, afhankelijk van de specificaties van je computer.",
-        "convertToDiffusersHelpText5": "Zorg ervoor dat je genoeg schijfruimte hebt. Modellen nemen gewoonlijk ongeveer 4 - 7 GB ruimte in beslag.",
+        "convertToDiffusersHelpText5": "Zorg ervoor dat je genoeg schijfruimte hebt. Modellen nemen gewoonlijk ongeveer 2 tot 7 GB ruimte in beslag.",
         "convertToDiffusersSaveLocation": "Bewaarlocatie",
         "v1": "v1",
         "inpainting": "v1-inpainting",
@@ -415,7 +420,14 @@
         "none": "geen",
         "addDifference": "Voeg verschil toe",
         "scanForModels": "Scan naar modellen",
-        "pickModelType": "Kies modelsoort"
+        "pickModelType": "Kies modelsoort",
+        "baseModel": "Basismodel",
+        "vae": "VAE",
+        "variant": "Variant",
+        "modelConversionFailed": "Omzetten model mislukt",
+        "modelUpdateFailed": "Bijwerken model mislukt",
+        "modelsMergeFailed": "Samenvoegen model mislukt",
+        "selectModel": "Kies model"
     },
     "parameters": {
         "images": "Afbeeldingen",
@@ -492,7 +504,14 @@
         "seamlessXAxis": "X-as",
         "seamlessYAxis": "Y-as",
         "hidePreview": "Verberg voorvertoning",
-        "showPreview": "Toon voorvertoning"
+        "showPreview": "Toon voorvertoning",
+        "boundingBoxWidth": "Kaderbreedte",
+        "boundingBoxHeight": "Kaderhoogte",
+        "clipSkip": "Overslaan CLIP",
+        "aspectRatio": "Verhouding",
+        "negativePromptPlaceholder": "Negatieve prompt",
+        "controlNetControlMode": "Aansturingsmodus",
+        "positivePromptPlaceholder": "Positieve prompt"
     },
     "settings": {
         "models": "Modellen",
@@ -513,7 +532,10 @@
         "showProgressInViewer": "Toon voortgangsafbeeldingen in viewer",
         "generation": "Generatie",
         "ui": "Gebruikersinterface",
-        "antialiasProgressImages": "Voer anti-aliasing uit op voortgangsafbeeldingen"
+        "antialiasProgressImages": "Voer anti-aliasing uit op voortgangsafbeeldingen",
+        "showAdvancedOptions": "Toon uitgebreide opties",
+        "favoriteSchedulers": "Favoriete planners",
+        "favoriteSchedulersPlaceholder": "Geen favoriete planners ingesteld"
     },
     "toast": {
         "tempFoldersEmptied": "Tijdelijke map geleegd",
@@ -550,7 +572,13 @@
         "connected": "Verbonden met server",
         "canceled": "Verwerking geannuleerd",
         "uploadFailedInvalidUploadDesc": "Moet een enkele PNG- of JPEG-afbeelding zijn",
-        "problemCopyingImageLink": "Kan afbeeldingslink niet kopiëren"
+        "problemCopyingImageLink": "Kan afbeeldingslink niet kopiëren",
+        "parameterNotSet": "Parameter niet ingesteld",
+        "parameterSet": "Instellen parameters",
+        "nodesSaved": "Knooppunten bewaard",
+        "nodesLoaded": "Knooppunten geladen",
+        "nodesCleared": "Knooppunten weggehaald",
+        "nodesLoadedFailed": "Laden knooppunten mislukt"
     },
     "tooltip": {
         "feature": {
@@ -652,6 +680,13 @@
     },
     "ui": {
         "showProgressImages": "Toon voortgangsafbeeldingen",
-        "hideProgressImages": "Verberg voortgangsafbeeldingen"
+        "hideProgressImages": "Verberg voortgangsafbeeldingen",
+        "swapSizes": "Wissel afmetingen om"
+    },
+    "nodes": {
+        "reloadSchema": "Laad schema opnieuw in",
+        "loadNodes": "Laad knooppunten",
+        "saveNodes": "Bewaar knooppunten",
+        "clearNodes": "Haal knooppunten weg"
     }
 }
