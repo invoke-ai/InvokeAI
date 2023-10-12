@@ -402,7 +402,8 @@ class DownloadQueue(DownloadQueueBase):
                     raise excp
                 except Exception as excp:
                     job.error = excp
-                    self._update_job_status(job, DownloadJobStatus.ERROR)
+                    if job.status != DownloadJobStatus.ERROR:  # let handlers know, but don't cause infinite recursion
+                        self._update_job_status(job, DownloadJobStatus.ERROR)
 
     def _download_path(self, job: DownloadJobBase):
         """Call when the source is a Path or pathlike object."""

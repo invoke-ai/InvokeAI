@@ -217,8 +217,8 @@ class ModelDownloadQueue(DownloadQueue):
                 return
 
         assert isinstance(job, DownloadJobRepoID)
-        self._update_job_status(job, DownloadJobStatus.RUNNING)
         self._lock.acquire()  # prevent status from being updated while we are setting up subqueue
+        self._update_job_status(job, DownloadJobStatus.RUNNING)
         try:
             job.subqueue = self.__class__(
                 event_handlers=[subdownload_event],
