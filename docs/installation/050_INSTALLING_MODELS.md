@@ -160,7 +160,7 @@ in a subfolder of the repository (e.g. vae), then append the subfolder
 to the end of the repo_id like this:
 
 ```
-# a VAE model located in subfolder "vae"a
+# a VAE model located in subfolder "vae"
 stabilityai/stable-diffusion-xl-base-1.0:vae
 
 # version 2 of the model located in subfolder "v2"
