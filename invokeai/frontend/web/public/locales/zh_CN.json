@@ -74,8 +74,7 @@
         "postprocessing": "后期处理",
         "loading": "加载中",
         "loadingInvokeAI": "Invoke AI 加载中",
-        "linear": "线性的",
-        "pinOptionsPanel": "固定选项面板"
+        "linear": "线性的"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -88,7 +87,6 @@
         "maintainAspectRatio": "保持比例",
         "autoSwitchNewImages": "自动切换到新图像",
         "singleColumnLayout": "单列布局",
-        "pinGallery": "保持图库常开",
         "allImagesLoaded": "所有图像加载完成",
         "loadMore": "加载更多",
         "noImagesInGallery": "图库中无图像",

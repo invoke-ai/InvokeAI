@@ -62,7 +62,6 @@
         "cancel": "Annuleer",
         "accept": "Akkoord",
         "langPortuguese": "Portugees",
-        "pinOptionsPanel": "Zet deelscherm Opties vast",
         "loading": "Bezig met laden",
         "loadingInvokeAI": "Bezig met laden van Invoke AI",
         "langHebrew": "עברית",
@@ -93,7 +92,6 @@
         "maintainAspectRatio": "Behoud beeldverhoiding",
         "autoSwitchNewImages": "Wissel autom. naar nieuwe afbeeldingen",
         "singleColumnLayout": "Eenkolomsindeling",
-        "pinGallery": "Zet galerij vast",
         "allImagesLoaded": "Alle afbeeldingen geladen",
         "loadMore": "Laad meer",
         "noImagesInGallery": "Geen afbeeldingen om te tonen",
@@ -705,19 +703,14 @@
         "swapSizes": "Wissel afmetingen om"
     },
     "nodes": {
-        "reloadSchema": "Laad schema opnieuw in",
         "zoomOutNodes": "Uitzoomen",
         "fitViewportNodes": "Aanpassen aan beeld",
         "hideMinimapnodes": "Minimap verbergen",
         "showLegendNodes": "Typelegende veld tonen",
         "zoomInNodes": "Inzoomen",
         "hideGraphNodes": "Graph overlay verbergen",
-        "clearGraph": "Graph verwijderen",
         "showGraphNodes": "Graph overlay tonen",
         "showMinimapnodes": "Minimap tonen",
-        "clearGraphDesc": "Ben je zeker dat je alle knooppunten wil verwijderen?",
-        "saveGraph": "Graph opslaan",
-        "loadGraph": "Graph laden (bewaard van knooppunten editor) (Metadata niet kopiëren-plakken)",
         "hideLegendNodes": "Typelegende veld verbergen"
     }
 }

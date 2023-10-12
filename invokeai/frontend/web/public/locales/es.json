@@ -62,7 +62,6 @@
         "langPortuguese": "Portugués",
         "langKorean": "Coreano",
         "langHebrew": "Hebreo",
-        "pinOptionsPanel": "Pin del panel de opciones",
         "loading": "Cargando",
         "loadingInvokeAI": "Cargando invocar a la IA",
         "postprocessing": "Tratamiento posterior",
@@ -93,7 +92,6 @@
         "maintainAspectRatio": "Mantener relación de aspecto",
         "autoSwitchNewImages": "Auto seleccionar Imágenes nuevas",
         "singleColumnLayout": "Diseño de una columna",
-        "pinGallery": "Fijar galería",
         "allImagesLoaded": "Todas las imágenes cargadas",
         "loadMore": "Cargar más",
         "noImagesInGallery": "No hay imágenes para mostrar",
@@ -713,7 +711,6 @@
         "swapSizes": "Cambiar los tamaños"
     },
     "nodes": {
-        "reloadSchema": "Esquema de recarga",
         "showGraphNodes": "Mostrar la superposición de los gráficos",
         "zoomInNodes": "Acercar",
         "hideMinimapnodes": "Ocultar el minimapa",
@@ -722,10 +719,6 @@
         "hideGraphNodes": "Ocultar la superposición de los gráficos",
         "hideLegendNodes": "Ocultar la leyenda del tipo de campo",
         "showLegendNodes": "Mostrar la leyenda del tipo de campo",
-        "showMinimapnodes": "Mostrar el minimapa",
-        "saveGraph": "Guardar el gráfico",
-        "clearGraph": "Borrar el gráfico",
-        "clearGraphDesc": "¿Estás seguro de que deseas borrar todos los nodos?",
-        "loadGraph": "Cargar el gráfico (guardado desde el Editor de nodos) (No copiar y pegar los metadatos)"
+        "showMinimapnodes": "Mostrar el minimapa"
     }
 }

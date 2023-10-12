@@ -51,7 +51,6 @@
         "statusConvertingModel": "Conversion du modèle",
         "statusModelConverted": "Modèle converti",
         "loading": "Chargement",
-        "pinOptionsPanel": "Épingler la page d'options",
         "statusMergedModels": "Modèles mélangés",
         "txt2img": "Texte vers image",
         "postprocessing": "Post-Traitement"
@@ -67,7 +66,6 @@
         "maintainAspectRatio": "Maintenir le rapport d'aspect",
         "autoSwitchNewImages": "Basculer automatiquement vers de nouvelles images",
         "singleColumnLayout": "Mise en page en colonne unique",
-        "pinGallery": "Épingler la galerie",
         "allImagesLoaded": "Toutes les images chargées",
         "loadMore": "Charger plus",
         "noImagesInGallery": "Aucune image dans la galerie"

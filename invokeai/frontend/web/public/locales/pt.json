@@ -59,7 +59,6 @@
         "statusGenerationComplete": "Geração Completa",
         "statusMergingModels": "Mesclando Modelos",
         "statusMergedModels": "Modelos Mesclados",
-        "pinOptionsPanel": "Fixar painel de opções",
         "loading": "A carregar",
         "loadingInvokeAI": "A carregar Invoke AI",
         "langPortuguese": "Português"
@@ -69,7 +68,6 @@
         "gallerySettings": "Configurações de Galeria",
         "maintainAspectRatio": "Mater Proporções",
         "autoSwitchNewImages": "Trocar para Novas Imagens Automaticamente",
-        "pinGallery": "Fixar Galeria",
         "singleColumnLayout": "Disposição em Coluna Única",
         "allImagesLoaded": "Todas as Imagens Carregadas",
         "loadMore": "Carregar Mais",
