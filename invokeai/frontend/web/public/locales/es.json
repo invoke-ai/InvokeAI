@@ -79,7 +79,8 @@
         "batch": "Administrador de lotes",
         "darkMode": "Modo oscuro",
         "lightMode": "Modo claro",
-        "modelManager": "Administrador de modelos"
+        "modelManager": "Administrador de modelos",
+        "communityLabel": "Comunidad"
     },
     "gallery": {
         "generations": "Generaciones",
@@ -100,7 +101,8 @@
         "deleteImageBin": "Las imágenes eliminadas se enviarán a la papelera de tu sistema operativo.",
         "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
         "images": "Imágenes",
-        "assets": "Activos"
+        "assets": "Activos",
+        "autoAssignBoardOnClick": "Asignación automática de tableros al hacer clic"
     },
     "hotkeys": {
         "keyboardShortcuts": "Atajos de teclado",
@@ -436,7 +438,10 @@
         "syncModels": "Sincronizar las plantillas",
         "syncModelsDesc": "Si tus plantillas no están sincronizados con el backend, puedes actualizarlas usando esta opción. Esto suele ser útil en los casos en los que actualizas manualmente tu archivo models.yaml o añades plantillas a la carpeta raíz de InvokeAI después de que la aplicación haya arrancado.",
         "modelsSynced": "Plantillas sincronizadas",
-        "modelSyncFailed": "La sincronización de la plantilla falló"
+        "modelSyncFailed": "La sincronización de la plantilla falló",
+        "loraModels": "LoRA",
+        "onnxModels": "Onnx",
+        "oliveModels": "Olives"
     },
     "parameters": {
         "images": "Imágenes",
@@ -520,7 +525,12 @@
         "negativePromptPlaceholder": "Prompt Negativo",
         "controlNetControlMode": "Modo de control",
         "clipSkip": "Omitir el CLIP",
-        "aspectRatio": "Relación"
+        "aspectRatio": "Relación",
+        "maskAdjustmentsHeader": "Ajustes de la máscara",
+        "maskBlur": "Máscara de Desenfoque",
+        "maskBlurMethod": "Método del desenfoque de la máscara",
+        "seamHighThreshold": "Alto",
+        "seamPaintingHeader": "Pintando las uniones"
     },
     "settings": {
         "models": "Modelos",
