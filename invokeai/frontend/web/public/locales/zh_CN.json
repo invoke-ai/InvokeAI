@@ -630,8 +630,7 @@
         "clearIntermediatesDesc2": "中间产物图像是生成过程中产生的副产品，与图库中的结果图像不同。清除中间产物可释放磁盘空间。",
         "intermediatesCleared_other": "已清除 {{number}} 个中间产物",
         "clearIntermediatesDesc1": "清除中间产物会重置您的画布和 ControlNet 状态。",
-        "intermediatesClearedFailed": "清除中间产物时出现问题",
-        "noIntermediates": "没有可清除的中间产物"
+        "intermediatesClearedFailed": "清除中间产物时出现问题"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",

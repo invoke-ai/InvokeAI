@@ -632,8 +632,7 @@
         "intermediatesCleared_many": "Cancellate {{number}} immagini intermedie",
         "intermediatesCleared_other": "",
         "clearIntermediatesDesc1": "La cancellazione delle immagini intermedie ripristinerà lo stato di Tela Unificata e ControlNet.",
-        "intermediatesClearedFailed": "Problema con la cancellazione delle immagini intermedie",
-        "noIntermediates": "Nessuna immagine intermedia da cancellare"
+        "intermediatesClearedFailed": "Problema con la cancellazione delle immagini intermedie"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
