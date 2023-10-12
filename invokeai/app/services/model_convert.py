@@ -99,7 +99,7 @@ class ModelConvert(ModelConvertBase):
         """
         Convert a checkpoint file into a diffusers folder.
 
-        It will delete the cached version ans well as the
+        It will delete the cached version as well as the
         original checkpoint file if it is in the models directory.
         :param key: Unique key of model.
         :dest_directory: Optional place to put converted file. If not specified,
