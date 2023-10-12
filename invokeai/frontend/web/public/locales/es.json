@@ -79,8 +79,7 @@
         "batch": "Administrador de lotes",
         "darkMode": "Modo oscuro",
         "lightMode": "Modo claro",
-        "modelManager": "Administrador de modelos",
-        "clearNodes": "¿Estás seguro de que deseas borrar todos los nodos?"
+        "modelManager": "Administrador de modelos"
     },
     "gallery": {
         "generations": "Generaciones",
@@ -705,9 +704,6 @@
     },
     "nodes": {
         "reloadSchema": "Esquema de recarga",
-        "loadNodes": "Nodos de carga",
-        "clearNodes": "Borrar los nodos",
-        "saveNodes": "Guardar los nodos",
         "showGraphNodes": "Mostrar la superposición de los gráficos",
         "zoomInNodes": "Acercar",
         "hideMinimapnodes": "Ocultar el minimapa",

@@ -78,7 +78,6 @@
         "linear": "Lineair",
         "batch": "Seriebeheer",
         "modelManager": "Modelbeheer",
-        "clearNodes": "Weet je zeker dat je alle knooppunten wilt weghalen?",
         "darkMode": "Donkere modus",
         "lightMode": "Lichte modus"
     },
@@ -684,9 +683,6 @@
         "swapSizes": "Wissel afmetingen om"
     },
     "nodes": {
-        "reloadSchema": "Laad schema opnieuw in",
-        "loadNodes": "Laad knooppunten",
-        "saveNodes": "Bewaar knooppunten",
-        "clearNodes": "Haal knooppunten weg"
+        "reloadSchema": "Laad schema opnieuw in"
     }
 }
