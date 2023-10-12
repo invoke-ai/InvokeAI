@@ -78,7 +78,9 @@
         "imagePrompt": "Prompt Immagine",
         "darkMode": "Modalità scura",
         "lightMode": "Modalità chiara",
-        "batch": "Gestione Lotto"
+        "batch": "Gestione Lotto",
+        "modelManager": "Gestione del modello",
+        "clearNodes": "Sei sicuro di voler cancellare tutti i nodi?"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -94,7 +96,7 @@
         "pinGallery": "Blocca la galleria",
         "allImagesLoaded": "Tutte le immagini caricate",
         "loadMore": "Carica di più",
-        "noImagesInGallery": "Nessuna immagine nella galleria",
+        "noImagesInGallery": "Nessuna immagine da visualizzare",
         "deleteImage": "Elimina l'immagine",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
         "deleteImageBin": "Le immagini eliminate verranno spostate nel Cestino del tuo sistema operativo.",
@@ -369,7 +371,7 @@
         "deleteModel": "Elimina modello",
         "deleteConfig": "Elimina configurazione",
         "deleteMsg1": "Sei sicuro di voler eliminare questo modello da InvokeAI?",
-        "deleteMsg2": "Questo non eliminerà il file Checkpoint del modello dal tuo disco. Puoi aggiungerlo nuovamente se lo desideri.",
+        "deleteMsg2": "Questo eliminerà il modello dal disco se si trova nella cartella principale di InvokeAI. Se utilizzi una cartella personalizzata, il modello NON verrà eliminato dal disco.",
         "formMessageDiffusersModelLocation": "Ubicazione modelli diffusori",
         "formMessageDiffusersModelLocationDesc": "Inseriscine almeno uno.",
         "formMessageDiffusersVAELocation": "Ubicazione file VAE",
@@ -378,7 +380,7 @@
         "convertToDiffusers": "Converti in Diffusori",
         "convertToDiffusersHelpText2": "Questo processo sostituirà la voce in Gestione Modelli con la versione Diffusori dello stesso modello.",
         "convertToDiffusersHelpText4": "Questo è un processo una tantum. Potrebbero essere necessari circa 30-60 secondi a seconda delle specifiche del tuo computer.",
-        "convertToDiffusersHelpText5": "Assicurati di avere spazio su disco sufficiente. I modelli generalmente variano tra 4 GB e 7 GB di dimensioni.",
+        "convertToDiffusersHelpText5": "Assicurati di avere spazio su disco sufficiente. I modelli generalmente variano tra 2 GB e 7 GB di dimensioni.",
         "convertToDiffusersHelpText6": "Vuoi convertire questo modello?",
         "convertToDiffusersSaveLocation": "Ubicazione salvataggio",
         "inpainting": "v1 Inpainting",
@@ -403,7 +405,7 @@
         "mergedModelSaveLocation": "Ubicazione salvataggio",
         "convertToDiffusersHelpText1": "Questo modello verrà convertito nel formato 🧨 Diffusore.",
         "custom": "Personalizzata",
-        "convertToDiffusersHelpText3": "Il tuo file checkpoint sul disco NON verrà comunque cancellato o modificato. Se lo desideri, puoi aggiungerlo di nuovo in Gestione Modelli.",
+        "convertToDiffusersHelpText3": "Il file checkpoint su disco SARÀ eliminato se si trova nella cartella principale di InvokeAI. Se si trova in una posizione personalizzata, NON verrà eliminato.",
         "v1": "v1",
         "pathToCustomConfig": "Percorso alla configurazione personalizzata",
         "modelThree": "Modello 3",
@@ -421,7 +423,21 @@
         "scanForModels": "Cerca modelli",
         "variant": "Variante",
         "baseModel": "Modello Base",
-        "vae": "VAE"
+        "vae": "VAE",
+        "modelUpdateFailed": "Aggiornamento del modello non riuscito",
+        "modelConversionFailed": "Conversione del modello non riuscita",
+        "modelsMergeFailed": "Unione modelli non riuscita",
+        "selectModel": "Seleziona Modello",
+        "modelDeleted": "Modello cancellato",
+        "modelDeleteFailed": "Impossibile eliminare il modello",
+        "noCustomLocationProvided": "Nessuna posizione personalizzata fornita",
+        "convertingModelBegin": "Conversione del modello. Attendere prego.",
+        "importModels": "Importa modelli",
+        "modelsSynced": "Modelli sincronizzati",
+        "modelSyncFailed": "Sincronizzazione del modello non riuscita",
+        "settings": "Impostazioni",
+        "syncModels": "Sincronizza Modelli",
+        "syncModelsDesc": "Se i tuoi modelli non sono sincronizzati con il back-end, puoi aggiornarli utilizzando questa opzione. Questo è generalmente utile nei casi in cui aggiorni manualmente il tuo file models.yaml o aggiungi modelli alla cartella principale di InvokeAI dopo l'avvio dell'applicazione."
     },
     "parameters": {
         "images": "Immagini",
@@ -529,7 +545,11 @@
         "ui": "Interfaccia Utente",
         "favoriteSchedulersPlaceholder": "Nessun campionatore preferito",
         "favoriteSchedulers": "Campionatori preferiti",
-        "showAdvancedOptions": "Mostra Opzioni Avanzate"
+        "showAdvancedOptions": "Mostra Opzioni Avanzate",
+        "alternateCanvasLayout": "Layout alternativo della tela",
+        "beta": "Beta",
+        "enableNodesEditor": "Abilita l'editor dei nodi",
+        "experimental": "Sperimentale"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -568,7 +588,17 @@
         "problemCopyingImageLink": "Impossibile copiare il collegamento dell'immagine",
         "uploadFailedInvalidUploadDesc": "Deve essere una singola immagine PNG o JPEG",
         "parameterSet": "Parametro impostato",
-        "parameterNotSet": "Parametro non impostato"
+        "parameterNotSet": "Parametro non impostato",
+        "nodesLoadedFailed": "Impossibile caricare i nodi",
+        "nodesSaved": "Nodi salvati",
+        "nodesLoaded": "Nodi caricati",
+        "nodesCleared": "Nodi cancellati",
+        "problemCopyingImage": "Impossibile copiare l'immagine",
+        "nodesNotValidGraph": "Grafico del nodo InvokeAI non valido",
+        "nodesCorruptedGraph": "Impossibile caricare. Il grafico sembra essere danneggiato.",
+        "nodesUnrecognizedTypes": "Impossibile caricare. Il grafico ha tipi di dati non riconosciuti",
+        "nodesNotValidJSON": "JSON non valido",
+        "nodesBrokenConnections": "Impossibile caricare. Alcune connessioni sono interrotte."
     },
     "tooltip": {
         "feature": {
@@ -672,5 +702,24 @@
         "hideProgressImages": "Nascondi avanzamento immagini",
         "showProgressImages": "Mostra avanzamento immagini",
         "swapSizes": "Scambia dimensioni"
+    },
+    "nodes": {
+        "reloadSchema": "Ricarica lo schema",
+        "clearNodes": "Cancella nodi",
+        "saveNodes": "Salva nodi",
+        "loadNodes": "Carica nodi",
+        "zoomOutNodes": "Rimpicciolire",
+        "hideGraphNodes": "Nascondi sovrapposizione grafico",
+        "hideLegendNodes": "Nascondi la legenda del tipo di campo",
+        "showLegendNodes": "Mostra legenda del tipo di campo",
+        "hideMinimapnodes": "Nascondi minimappa",
+        "showMinimapnodes": "Mostra minimappa",
+        "zoomInNodes": "Ingrandire",
+        "fitViewportNodes": "Adatta vista",
+        "showGraphNodes": "Mostra sovrapposizione grafico",
+        "saveGraph": "Salva grafico",
+        "loadGraph": "Carica grafico (salvato dal Editor dei Nodi) (non copiare e incollare i metadati)",
+        "clearGraph": "Cancella il grafico",
+        "clearGraphDesc": "Sei sicuro di voler cancellare tutti i nodi?"
     }
 }
