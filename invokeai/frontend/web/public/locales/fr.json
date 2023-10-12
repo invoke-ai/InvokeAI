@@ -356,7 +356,6 @@
         "cfgScale": "CFG Echelle",
         "width": "Largeur",
         "height": "Hauteur",
-        "sampler": "Echantillonneur",
         "seed": "Graine",
         "randomizeSeed": "Graine Aléatoire",
         "shuffle": "Mélanger",
@@ -426,7 +425,6 @@
     "toast": {
         "tempFoldersEmptied": "Dossiers temporaires vidés",
         "uploadFailed": "Téléchargement échoué",
-        "uploadFailedMultipleImagesDesc": "Plusieurs images collées, peut uniquement télécharger une image à la fois",
         "uploadFailedUnableToLoadDesc": "Impossible de charger le fichier",
         "downloadImageStarted": "Téléchargement de l'image démarré",
         "imageCopied": "Image copiée",

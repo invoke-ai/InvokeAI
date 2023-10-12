@@ -399,7 +399,6 @@
         "cfgScale": "סולם CFG",
         "width": "רוחב",
         "height": "גובה",
-        "sampler": "דוגם",
         "seed": "זרע",
         "imageToImage": "תמונה לתמונה",
         "randomizeSeed": "זרע אקראי",
@@ -483,7 +482,6 @@
     },
     "toast": {
         "uploadFailed": "העלאה נכשלה",
-        "uploadFailedMultipleImagesDesc": "תמונות מרובות הודבקו, ניתן להעלות תמונה אחת בלבד בכל פעם",
         "imageCopied": "התמונה הועתקה",
         "imageLinkCopied": "קישור תמונה הועתק",
         "imageNotLoadedDesc": "לא נמצאה תמונה לשליחה למודול תמונה לתמונה",

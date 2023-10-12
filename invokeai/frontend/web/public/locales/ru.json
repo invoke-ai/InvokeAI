@@ -425,7 +425,6 @@
         "cfgScale": "Уровень CFG",
         "width": "Ширина",
         "height": "Высота",
-        "sampler": "Семплер",
         "seed": "Сид",
         "randomizeSeed": "Случайный сид",
         "shuffle": "Обновить",
@@ -511,13 +510,11 @@
         "consoleLogLevel": "Уровень логирования",
         "shouldLogToConsole": "Логи в консоль",
         "developer": "Разработчик",
-        "autoShowProgress": "Автопоказ изображений прогресса",
         "general": "Основное"
     },
     "toast": {
         "tempFoldersEmptied": "Временная папка очищена",
         "uploadFailed": "Загрузка не удалась",
-        "uploadFailedMultipleImagesDesc": "Можно вставить только одно изображение (вы попробовали вставить несколько)",
         "uploadFailedUnableToLoadDesc": "Невозможно загрузить файл",
         "downloadImageStarted": "Скачивание изображения началось",
         "imageCopied": "Изображение скопировано",

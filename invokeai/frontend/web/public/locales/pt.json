@@ -453,7 +453,6 @@
         "steps": "Passos",
         "cfgScale": "Escala CFG",
         "height": "Altura",
-        "sampler": "Amostrador",
         "imageToImage": "Imagem para Imagem",
         "variationAmount": "Quntidade de Variatções",
         "scaledWidth": "L Escalada",
@@ -493,7 +492,6 @@
     },
     "toast": {
         "uploadFailed": "Envio Falhou",
-        "uploadFailedMultipleImagesDesc": "Várias imagens copiadas, só é permitido uma imagem de cada vez",
         "uploadFailedUnableToLoadDesc": "Não foj possível carregar o ficheiro",
         "downloadImageStarted": "Download de Imagem Começou",
         "imageNotLoadedDesc": "Nenhuma imagem encontrada a enviar para o módulo de imagem para imagem",

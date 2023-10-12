@@ -425,7 +425,6 @@
         "cfgScale": "Escala CFG",
         "width": "Ancho",
         "height": "Alto",
-        "sampler": "Muestreo",
         "seed": "Semilla",
         "randomizeSeed": "Semilla aleatoria",
         "shuffle": "Aleatorizar",
@@ -511,13 +510,11 @@
         "general": "General",
         "consoleLogLevel": "Nivel del registro",
         "shouldLogToConsole": "Registro de la consola",
-        "developer": "Desarrollador",
-        "autoShowProgress": "Mostrar automáticamente el progreso de las imágenes"
+        "developer": "Desarrollador"
     },
     "toast": {
         "tempFoldersEmptied": "Directorio temporal vaciado",
         "uploadFailed": "Error al subir archivo",
-        "uploadFailedMultipleImagesDesc": "Únicamente se puede subir una imágen a la vez",
         "uploadFailedUnableToLoadDesc": "No se pudo cargar la imágen",
         "downloadImageStarted": "Descargando imágen",
         "imageCopied": "Imágen copiada",
