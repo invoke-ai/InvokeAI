@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Teclas de atalho",
-        "themeLabel": "Tema",
         "languagePickerLabel": "Seletor de Idioma",
         "reportBugLabel": "Relatar Bug",
         "settingsLabel": "Configurações",
-        "darkTheme": "Noite",
-        "lightTheme": "Dia",
-        "greenTheme": "Verde",
         "img2img": "Imagem Para Imagem",
         "unifiedCanvas": "Tela Unificada",
         "nodes": "Nódulos",

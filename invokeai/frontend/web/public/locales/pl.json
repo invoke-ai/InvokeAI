@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Skróty klawiszowe",
-        "themeLabel": "Motyw",
         "languagePickerLabel": "Wybór języka",
         "reportBugLabel": "Zgłoś błąd",
         "settingsLabel": "Ustawienia",
-        "darkTheme": "Ciemny",
-        "lightTheme": "Jasny",
-        "greenTheme": "Zielony",
         "img2img": "Obraz na obraz",
         "unifiedCanvas": "Tryb uniwersalny",
         "nodes": "Węzły",

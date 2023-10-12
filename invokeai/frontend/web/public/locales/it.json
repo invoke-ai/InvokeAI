@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Tasti di scelta rapida",
-        "themeLabel": "Tema",
         "languagePickerLabel": "Lingua",
         "reportBugLabel": "Segnala un errore",
         "settingsLabel": "Impostazioni",
-        "darkTheme": "Scuro",
-        "lightTheme": "Chiaro",
-        "greenTheme": "Verde",
         "img2img": "Immagine a Immagine",
         "unifiedCanvas": "Tela unificata",
         "nodes": "Editor dei Nodi",
@@ -67,7 +63,6 @@
         "langPortuguese": "Portoghese",
         "pinOptionsPanel": "Blocca il pannello Opzioni",
         "loading": "Caricamento in corso",
-        "oceanTheme": "Oceano",
         "langHebrew": "Ebraico",
         "loadingInvokeAI": "Caricamento Invoke AI",
         "postprocessing": "Post Elaborazione",
@@ -523,8 +518,7 @@
         "antialiasProgressImages": "Anti aliasing delle immagini di avanzamento",
         "showProgressInViewer": "Mostra le immagini di avanzamento nel visualizzatore",
         "generation": "Generazione",
-        "ui": "Interfaccia Utente",
-        "availableSchedulers": "Campionatori disponibili"
+        "ui": "Interfaccia Utente"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",

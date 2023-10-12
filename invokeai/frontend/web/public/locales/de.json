@@ -1,12 +1,8 @@
 {
     "common": {
-        "themeLabel": "Thema",
         "languagePickerLabel": "Sprachauswahl",
         "reportBugLabel": "Fehler melden",
         "settingsLabel": "Einstellungen",
-        "darkTheme": "Dunkel",
-        "lightTheme": "Hell",
-        "greenTheme": "Grün",
         "img2img": "Bild zu Bild",
         "nodes": "Knoten",
         "langGerman": "Deutsch",
@@ -48,7 +44,6 @@
         "langEnglish": "Englisch",
         "langDutch": "Niederländisch",
         "langFrench": "Französisch",
-        "oceanTheme": "Ozean",
         "langItalian": "Italienisch",
         "langPortuguese": "Portogisisch",
         "langRussian": "Russisch",
