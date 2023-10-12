@@ -673,7 +673,6 @@
         "rotateClockwise": "顺时针旋转",
         "flipHorizontally": "水平翻转",
         "flipVertically": "垂直翻转",
-        "showGallery": "显示图库",
         "showOptionsPanel": "显示选项面板",
         "toggleLogViewer": "切换日志浏览器",
         "modifyConfig": "修改设置",
