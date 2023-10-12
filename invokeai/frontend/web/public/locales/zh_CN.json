@@ -74,7 +74,10 @@
         "postprocessing": "后期处理",
         "loading": "加载中",
         "loadingInvokeAI": "Invoke AI 加载中",
-        "linear": "线性的"
+        "linear": "线性的",
+        "batch": "批次管理器",
+        "communityLabel": "社区",
+        "modelManager": "模型管理器"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -94,7 +97,8 @@
         "deleteImageBin": "被删除的图片会发送到你操作系统的回收站。",
         "deleteImagePermanent": "无法恢复删除的图片。",
         "images": "图片",
-        "assets": "素材"
+        "assets": "素材",
+        "autoAssignBoardOnClick": "点击后自动分配情景板"
     },
     "hotkeys": {
         "keyboardShortcuts": "快捷方式",
@@ -301,6 +305,11 @@
         "acceptStagingImage": {
             "title": "接受暂存图像",
             "desc": "接受当前暂存区中的图像"
+        },
+        "nodesHotkeys": "节点快捷键",
+        "addNodes": {
+            "title": "添加节点",
+            "desc": "打开添加节点菜单"
         }
     },
     "modelManager": {
@@ -413,7 +422,22 @@
         "weightedSum": "加权求和",
         "modelMergeAlphaHelp": "透明度参数控制模型的混合强度。较低的透明度值会导致第二个模型的影响减弱。",
         "sigmoid": "Sigmoid函数",
-        "modelMergeInterpAddDifferenceHelp": "在这种模式下，首先从模型2中减去模型3，得到的版本再用上述值的透明度与模型1进行混合。"
+        "modelMergeInterpAddDifferenceHelp": "在这种模式下，首先从模型2中减去模型3，得到的版本再用上述值的透明度与模型1进行混合。",
+        "modelsSynced": "模型已同步",
+        "modelSyncFailed": "模型同步失败",
+        "modelDeleteFailed": "模型删除失败",
+        "syncModelsDesc": "如果您的模型与后端不同步, 您可以使用此选项刷新它们. 便于您在应用程序启动的情况下手动更新models.yaml文件或将模型添加到InvokeAI根文件夹.",
+        "selectModel": "选择模型",
+        "importModels": "导入模型",
+        "settings": "设置",
+        "syncModels": "同步模型",
+        "noCustomLocationProvided": "未提供自定义路径",
+        "modelDeleted": "模型已删除",
+        "modelUpdateFailed": "模型更新失败",
+        "modelConversionFailed": "模型转换失败",
+        "modelsMergeFailed": "模型融合失败",
+        "baseModel": "基底模型",
+        "convertingModelBegin": "模型转换中. 请稍候."
     },
     "parameters": {
         "images": "图像",
@@ -490,7 +514,14 @@
         "hidePreview": "影藏预览",
         "hSymmetryStep": "横向对称步数",
         "imageToImage": "图生图",
-        "noiseSettings": "噪音"
+        "noiseSettings": "噪音",
+        "controlNetControlMode": "控制模式",
+        "maskAdjustmentsHeader": "调整遮罩",
+        "maskBlur": "模糊遮罩",
+        "maskBlurMethod": "遮罩模糊方式",
+        "aspectRatio": "比率",
+        "seamLowThreshold": "降低",
+        "seamHighThreshold": "提升"
     },
     "settings": {
         "models": "模型",
@@ -511,7 +542,12 @@
         "general": "通用",
         "consoleLogLevel": "日志等级",
         "shouldLogToConsole": "终端日志",
-        "developer": "开发者"
+        "developer": "开发者",
+        "alternateCanvasLayout": "切换统一画布布局",
+        "enableNodesEditor": "启用节点编辑器",
+        "favoriteSchedulersPlaceholder": "没有偏好的采样算法",
+        "showAdvancedOptions": "显示进阶选项",
+        "favoriteSchedulers": "采样算法偏好"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
@@ -550,7 +586,17 @@
         "parameterSet": "参数已设置",
         "parameterNotSet": "参数未设置",
         "serverError": "服务器错误",
-        "canceled": "处理取消"
+        "canceled": "处理取消",
+        "nodesLoaded": "节点图已加载",
+        "nodesSaved": "节点图已保存",
+        "problemCopyingImage": "无法复制图像",
+        "nodesCorruptedGraph": "无法加载. 节点图似乎已损坏.",
+        "nodesBrokenConnections": "无法加载. 部分链接已断开.",
+        "nodesUnrecognizedTypes": "无法加载. 节点图有无法识别的节点类型",
+        "nodesNotValidJSON": "无效的 JSON",
+        "nodesNotValidGraph": "无效的 InvokeAi 节点图",
+        "nodesCleared": "节点图已清空",
+        "nodesLoadedFailed": "节点图加载失败"
     },
     "unifiedCanvas": {
         "layer": "图层",
@@ -637,7 +683,8 @@
     },
     "ui": {
         "showProgressImages": "显示处理中的图片",
-        "hideProgressImages": "隐藏处理中的图片"
+        "hideProgressImages": "隐藏处理中的图片",
+        "swapSizes": "XY尺寸互换"
     },
     "tooltip": {
         "feature": {
@@ -653,5 +700,22 @@
             "seamCorrection": "控制在画布上生成的图像之间出现的可见接缝的处理方式。",
             "infillAndScaling": "管理填充方法（用于画布的掩模或擦除区域）和缩放（对于较小的边界框大小非常有用）。"
         }
+    },
+    "nodes": {
+        "zoomInNodes": "放大",
+        "resetWorkflowDesc": "是否确定要清空节点图?",
+        "resetWorkflow": "清空节点图",
+        "loadWorkflow": "读取节点图",
+        "zoomOutNodes": "缩小",
+        "resetWorkflowDesc2": "重置节点图将清除所有节点、边际和节点图详情",
+        "saveWorkflow": "保存节点图",
+        "reloadNodeTemplates": "重载节点模板",
+        "hideGraphNodes": "隐藏节点图信息",
+        "fitViewportNodes": "自适应视图",
+        "showMinimapnodes": "显示缩略图",
+        "hideMinimapnodes": "隐藏缩略图",
+        "showLegendNodes": "显示字段类型图例",
+        "hideLegendNodes": "隐藏字段类型图例",
+        "showGraphNodes": "显示节点图信息"
     }
 }
