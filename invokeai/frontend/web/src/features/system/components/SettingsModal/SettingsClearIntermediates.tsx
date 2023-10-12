@@ -1,7 +1,8 @@
 import { Heading, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import IAIButton from '../../../../common/components/IAIButton';
 import {
   useClearIntermediatesMutation,
@@ -12,6 +13,7 @@ import { addToast } from '../../store/systemSlice';
 import StyledFlex from './StyledFlex';
 
 export default function SettingsClearIntermediates() {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const { data: intermediatesCount, refetch: updateIntermediatesCount } =
@@ -23,32 +25,49 @@ export default function SettingsClearIntermediates() {
   const handleClickClearIntermediates = useCallback(() => {
     clearIntermediates()
       .unwrap()
-      .then((response) => {
+      .then((number) => {
         dispatch(controlAdaptersReset());
         dispatch(resetCanvas());
         dispatch(
           addToast({
-            title: `Cleared ${response} intermediates`,
+            title:
+              number === 1
+                ? t('settings.intermediatesCleared_one')
+                : t('settings.intermediatesCleared_other', { number }),
             status: 'info',
           })
         );
+      })
+      .catch(() => {
+        dispatch(
+          addToast({
+            title: t('settings.intermediatesClearedFailed'),
+            status: 'error',
+          })
+        );
       });
-  }, [clearIntermediates, dispatch]);
+  }, [t, clearIntermediates, dispatch]);
 
   useEffect(() => {
     // update the count on mount
     updateIntermediatesCount();
   }, [updateIntermediatesCount]);
 
-  const buttonText = intermediatesCount
-    ? `Clear ${intermediatesCount} Intermediate${
-        intermediatesCount > 1 ? 's' : ''
-      }`
-    : 'No Intermediates to Clear';
+  const buttonText = useMemo(() => {
+    if (!intermediatesCount) {
+      return t('settings.noIntermediates');
+    }
+    if (intermediatesCount === 1) {
+      return t('settings.clearIntermediates_one');
+    }
+    return t('settings.clearIntermediates_other', {
+      number: intermediatesCount,
+    });
+  }, [intermediatesCount, t]);
 
   return (
     <StyledFlex>
-      <Heading size="sm">Clear Intermediates</Heading>
+      <Heading size="sm">{t('settings.clearIntermediates')}</Heading>
       <IAIButton
         colorScheme="warning"
         onClick={handleClickClearIntermediates}
@@ -57,15 +76,9 @@ export default function SettingsClearIntermediates() {
       >
         {buttonText}
       </IAIButton>
-      <Text fontWeight="bold">
-        Clearing intermediates will reset your Canvas and ControlNet state.
-      </Text>
-      <Text variant="subtext">
-        Intermediate images are byproducts of generation, different from the
-        result images in the gallery. Clearing intermediates will free disk
-        space.
-      </Text>
-      <Text variant="subtext">Your gallery images will not be deleted.</Text>
+      <Text fontWeight="bold">{t('settings.clearIntermediatesDesc1')}</Text>
+      <Text variant="subtext">{t('settings.clearIntermediatesDesc2')}</Text>
+      <Text variant="subtext">{t('settings.clearIntermediatesDesc3')}</Text>
     </StyledFlex>
   );
 }
