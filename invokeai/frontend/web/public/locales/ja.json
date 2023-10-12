@@ -358,7 +358,6 @@
         "saveSteps": "nステップごとに画像を保存",
         "confirmOnDelete": "削除時に確認",
         "displayHelpIcons": "ヘルプアイコンを表示",
-        "useCanvasBeta": "キャンバスレイアウト(Beta)を使用する",
         "enableImageDebugging": "画像のデバッグを有効化",
         "resetWebUI": "WebUIをリセット",
         "resetWebUIDesc1": "WebUIのリセットは、画像と保存された設定のキャッシュをリセットするだけです。画像を削除するわけではありません。",
