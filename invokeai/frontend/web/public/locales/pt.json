@@ -435,7 +435,6 @@
         "upscale": "Redimensionar",
         "upscaleImage": "Redimensionar Imagem",
         "scaleBeforeProcessing": "Escala Antes do Processamento",
-        "invoke": "Invocar",
         "images": "Imagems",
         "steps": "Passos",
         "cfgScale": "Escala CFG",

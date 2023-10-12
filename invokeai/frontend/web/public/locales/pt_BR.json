@@ -427,7 +427,6 @@
         "infillScalingHeader": "Preencimento e Escala",
         "img2imgStrength": "Força de Imagem Para Imagem",
         "toggleLoopback": "Ativar Loopback",
-        "invoke": "Invoke",
         "sendTo": "Mandar para",
         "sendToImg2Img": "Mandar para Imagem Para Imagem",
         "sendToUnifiedCanvas": "Mandar para Tela Unificada",
