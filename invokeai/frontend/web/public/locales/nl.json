@@ -6,7 +6,7 @@
         "settingsLabel": "Instellingen",
         "img2img": "Afbeelding naar afbeelding",
         "unifiedCanvas": "Centraal canvas",
-        "nodes": "Knooppunt-editor",
+        "nodes": "Werkstroom-editor",
         "langDutch": "Nederlands",
         "nodesDesc": "Een op knooppunten gebaseerd systeem voor het genereren van afbeeldingen is momenteel in ontwikkeling. Blijf op de hoogte voor nieuws over deze verbluffende functie.",
         "postProcessing": "Naverwerking",
@@ -99,7 +99,8 @@
         "deleteImageBin": "Gewiste afbeeldingen worden naar de prullenbak van je besturingssysteem gestuurd.",
         "deleteImagePermanent": "Gewiste afbeeldingen kunnen niet worden hersteld.",
         "assets": "Eigen onderdelen",
-        "images": "Afbeeldingen"
+        "images": "Afbeeldingen",
+        "autoAssignBoardOnClick": "Ken automatisch bord toe bij klikken"
     },
     "hotkeys": {
         "keyboardShortcuts": "Sneltoetsen",
@@ -306,7 +307,12 @@
         "acceptStagingImage": {
             "title": "Accepteer sessie-afbeelding",
             "desc": "Accepteert de huidige sessie-afbeelding"
-        }
+        },
+        "addNodes": {
+            "title": "Voeg knooppunten toe",
+            "desc": "Opent het menu Voeg knooppunt toe"
+        },
+        "nodesHotkeys": "Sneltoetsen knooppunten"
     },
     "modelManager": {
         "modelManager": "Modelonderhoud",
@@ -436,7 +442,9 @@
         "convertingModelBegin": "Model aan het converteren. Even geduld.",
         "importModels": "Importeer Modellen",
         "syncModelsDesc": "Als je modellen niet meer synchroon zijn met de backend, kan je ze met deze optie verversen. Dit wordt typisch gebruikt in het geval je het models.yaml bestand met de hand bewerkt of als je modellen aan de InvokeAI root map toevoegt nadat de applicatie gestart werd.",
-        "loraModels": "LoRA's"
+        "loraModels": "LoRA's",
+        "onnxModels": "Onnx",
+        "oliveModels": "Olives"
     },
     "parameters": {
         "images": "Afbeeldingen",
@@ -515,7 +523,16 @@
         "aspectRatio": "Verhouding",
         "negativePromptPlaceholder": "Negatieve prompt",
         "controlNetControlMode": "Aansturingsmodus",
-        "positivePromptPlaceholder": "Positieve prompt"
+        "positivePromptPlaceholder": "Positieve prompt",
+        "maskAdjustmentsHeader": "Maskeraanpassingen",
+        "compositingSettingsHeader": "Instellingen afbeeldingsopbouw",
+        "coherencePassHeader": "Coherentiestap",
+        "maskBlur": "Vervaag",
+        "maskBlurMethod": "Vervagingsmethode",
+        "coherenceSteps": "Stappen",
+        "coherenceStrength": "Sterkte",
+        "seamHighThreshold": "Hoog",
+        "seamLowThreshold": "Laag"
     },
     "settings": {
         "models": "Modellen",
@@ -527,7 +544,7 @@
         "resetWebUI": "Herstel web-UI",
         "resetWebUIDesc1": "Herstel web-UI herstelt alleen de lokale afbeeldingscache en de onthouden instellingen van je browser. Het verwijdert geen afbeeldingen van schijf.",
         "resetWebUIDesc2": "Als afbeeldingen niet getoond worden in de galerij of iets anders werkt niet, probeer dan eerst deze herstelfunctie voordat je een fout aanmeldt op GitHub.",
-        "resetComplete": "Webgebruikersinterface is hersteld. Vernieuw de pasgina om opnieuw te laden.",
+        "resetComplete": "Webgebruikersinterface is hersteld.",
         "useSlidersForAll": "Gebruik schuifbalken voor alle opties",
         "consoleLogLevel": "Logboekniveau",
         "shouldLogToConsole": "Schrijf logboek naar console",
@@ -543,7 +560,8 @@
         "beta": "Bèta",
         "experimental": "Experimenteel",
         "alternateCanvasLayout": "Omwisselen Canvas Layout",
-        "enableNodesEditor": "Knopen Editor Inschakelen"
+        "enableNodesEditor": "Knopen Editor Inschakelen",
+        "autoChangeDimensions": "Werk bij wijziging afmetingen bij naar modelstandaard"
     },
     "toast": {
         "tempFoldersEmptied": "Tijdelijke map geleegd",
@@ -689,13 +707,14 @@
         "toggleAutoscroll": "Autom. scrollen aan/uit",
         "toggleLogViewer": "Logboekviewer aan/uit",
         "showGallery": "Toon galerij",
-        "showOptionsPanel": "Toon deelscherm Opties",
+        "showOptionsPanel": "Toon zijscherm",
         "menu": "Menu"
     },
     "ui": {
         "showProgressImages": "Toon voortgangsafbeeldingen",
         "hideProgressImages": "Verberg voortgangsafbeeldingen",
-        "swapSizes": "Wissel afmetingen om"
+        "swapSizes": "Wissel afmetingen om",
+        "lockRatio": "Zet verhouding vast"
     },
     "nodes": {
         "zoomOutNodes": "Uitzoomen",
@@ -706,6 +725,12 @@
         "hideGraphNodes": "Graph overlay verbergen",
         "showGraphNodes": "Graph overlay tonen",
         "showMinimapnodes": "Minimap tonen",
-        "hideLegendNodes": "Typelegende veld verbergen"
+        "hideLegendNodes": "Typelegende veld verbergen",
+        "reloadNodeTemplates": "Herlaad knooppuntsjablonen",
+        "loadWorkflow": "Laad werkstroom",
+        "resetWorkflow": "Herstel werkstroom",
+        "resetWorkflowDesc": "Weet je zeker dat je deze werkstroom wilt herstellen?",
+        "resetWorkflowDesc2": "Herstel van een werkstroom haalt alle knooppunten, randen en werkstroomdetails weg.",
+        "downloadWorkflow": "Download JSON van werkstroom"
     }
 }
