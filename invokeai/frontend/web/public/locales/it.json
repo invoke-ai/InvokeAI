@@ -61,7 +61,6 @@
         "statusConvertingModel": "Conversione Modello",
         "langKorean": "Coreano",
         "langPortuguese": "Portoghese",
-        "pinOptionsPanel": "Blocca il pannello Opzioni",
         "loading": "Caricamento in corso",
         "langHebrew": "Ebraico",
         "loadingInvokeAI": "Caricamento Invoke AI",
@@ -93,7 +92,6 @@
         "maintainAspectRatio": "Mantenere le proporzioni",
         "autoSwitchNewImages": "Passaggio automatico a nuove immagini",
         "singleColumnLayout": "Layout a colonna singola",
-        "pinGallery": "Blocca la galleria",
         "allImagesLoaded": "Tutte le immagini caricate",
         "loadMore": "Carica di più",
         "noImagesInGallery": "Nessuna immagine da visualizzare",
@@ -719,7 +717,6 @@
         "swapSizes": "Scambia dimensioni"
     },
     "nodes": {
-        "reloadSchema": "Ricarica lo schema",
         "zoomOutNodes": "Rimpicciolire",
         "hideGraphNodes": "Nascondi sovrapposizione grafico",
         "hideLegendNodes": "Nascondi la legenda del tipo di campo",
@@ -728,10 +725,6 @@
         "showMinimapnodes": "Mostra minimappa",
         "zoomInNodes": "Ingrandire",
         "fitViewportNodes": "Adatta vista",
-        "showGraphNodes": "Mostra sovrapposizione grafico",
-        "saveGraph": "Salva grafico",
-        "loadGraph": "Carica grafico (salvato dal Editor dei Nodi) (non copiare e incollare i metadati)",
-        "clearGraph": "Cancella il grafico",
-        "clearGraphDesc": "Sei sicuro di voler cancellare tutti i nodi?"
+        "showGraphNodes": "Mostra sovrapposizione grafico"
     }
 }

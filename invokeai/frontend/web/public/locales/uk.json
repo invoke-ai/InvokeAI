@@ -51,7 +51,6 @@
         "langHebrew": "Іврит",
         "langKorean": "Корейська",
         "langPortuguese": "Португальська",
-        "pinOptionsPanel": "Закріпити панель налаштувань",
         "langArabic": "Арабська",
         "langSimplifiedChinese": "Китайська (спрощена)",
         "langSpanish": "Іспанська",
@@ -82,7 +81,6 @@
         "maintainAspectRatio": "Зберігати пропорції",
         "autoSwitchNewImages": "Автоматично вибирати нові",
         "singleColumnLayout": "Одна колонка",
-        "pinGallery": "Закріпити галерею",
         "allImagesLoaded": "Всі зображення завантажені",
         "loadMore": "Завантажити більше",
         "noImagesInGallery": "Зображень немає"
