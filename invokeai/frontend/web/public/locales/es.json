@@ -10,7 +10,7 @@
         "greenTheme": "Verde",
         "img2img": "Imagen a Imagen",
         "unifiedCanvas": "Lienzo Unificado",
-        "nodes": "Nodos",
+        "nodes": "Editor de nodos",
         "langSpanish": "Español",
         "nodesDesc": "Un sistema de generación de imágenes basado en nodos, actualmente se encuentra en desarrollo. Mantente pendiente a nuestras actualizaciones acerca de esta fabulosa funcionalidad.",
         "postProcessing": "Post-procesamiento",
@@ -79,7 +79,14 @@
         "generate": "Generar",
         "openInNewTab": "Abrir en una nueva pestaña",
         "dontAskMeAgain": "No me preguntes de nuevo",
-        "areYouSure": "¿Estas seguro?"
+        "areYouSure": "¿Estas seguro?",
+        "imagePrompt": "Indicación de imagen",
+        "batch": "Administrador de lotes",
+        "modelmanager": "Administrador de modelos",
+        "darkMode": "Modo oscuro",
+        "lightMode": "Modo claro",
+        "modelManager": "Administrador de modelos",
+        "clearNodes": "¿Estás seguro de que deseas borrar todos los nodos?"
     },
     "gallery": {
         "generations": "Generaciones",
@@ -95,10 +102,12 @@
         "pinGallery": "Fijar galería",
         "allImagesLoaded": "Todas las imágenes cargadas",
         "loadMore": "Cargar más",
-        "noImagesInGallery": "Sin imágenes en la galería",
+        "noImagesInGallery": "No hay imágenes para mostrar",
         "deleteImage": "Eliminar Imagen",
         "deleteImageBin": "Las imágenes eliminadas se enviarán a la papelera de tu sistema operativo.",
-        "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar."
+        "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
+        "images": "Imágenes",
+        "assets": "Activos"
     },
     "hotkeys": {
         "keyboardShortcuts": "Atajos de teclado",
@@ -357,8 +366,8 @@
         "delete": "Eliminar",
         "deleteModel": "Eliminar Modelo",
         "deleteConfig": "Eliminar Configuración",
-        "deleteMsg1": "¿Estás seguro de querer eliminar esta entrada de modelo de InvokeAI?",
-        "deleteMsg2": "El checkpoint del modelo no se eliminará de tu disco. Puedes volver a añadirlo si lo deseas.",
+        "deleteMsg1": "¿Estás seguro de que deseas eliminar este modelo de InvokeAI?",
+        "deleteMsg2": "Esto eliminará el modelo del disco si está en la carpeta raíz de InvokeAI. Si está utilizando una ubicación personalizada, el modelo NO se eliminará del disco.",
         "safetensorModels": "SafeTensors",
         "addDiffuserModel": "Añadir difusores",
         "inpainting": "v1 Repintado",
@@ -377,8 +386,8 @@
         "convertToDiffusers": "Convertir en difusores",
         "convertToDiffusersHelpText1": "Este modelo se convertirá al formato 🧨 Difusores.",
         "convertToDiffusersHelpText2": "Este proceso sustituirá su entrada del Gestor de Modelos por la versión de Difusores del mismo modelo.",
-        "convertToDiffusersHelpText3": "Su archivo de puntos de control en el disco NO será borrado ni modificado de ninguna manera. Puede volver a añadir su punto de control al Gestor de Modelos si lo desea.",
-        "convertToDiffusersHelpText5": "Asegúrese de que dispone de suficiente espacio en disco. Los modelos suelen variar entre 4 GB y 7 GB de tamaño.",
+        "convertToDiffusersHelpText3": "Tu archivo del punto de control en el disco se eliminará si está en la carpeta raíz de InvokeAI. Si está en una ubicación personalizada, NO se eliminará.",
+        "convertToDiffusersHelpText5": "Por favor, asegúrate de tener suficiente espacio en el disco. Los modelos generalmente varían entre 2 GB y 7 GB de tamaño.",
         "convertToDiffusersHelpText6": "¿Desea transformar este modelo?",
         "convertToDiffusersSaveLocation": "Guardar ubicación",
         "v1": "v1",
@@ -417,7 +426,24 @@
         "pickModelType": "Elige el tipo de modelo",
         "v2_768": "v2 (768px)",
         "addDifference": "Añadir una diferencia",
-        "scanForModels": "Buscar modelos"
+        "scanForModels": "Buscar modelos",
+        "vae": "VAE",
+        "variant": "Variante",
+        "baseModel": "Modelo básico",
+        "modelConversionFailed": "Conversión al modelo fallida",
+        "selectModel": "Seleccionar un modelo",
+        "modelUpdateFailed": "Error al actualizar el modelo",
+        "modelsMergeFailed": "Fusión del modelo fallida",
+        "convertingModelBegin": "Convirtiendo el modelo. Por favor, espere.",
+        "modelDeleted": "Modelo eliminado",
+        "modelDeleteFailed": "Error al borrar el modelo",
+        "noCustomLocationProvided": "‐No se proporcionó una ubicación personalizada",
+        "importModels": "Importar los modelos",
+        "settings": "Ajustes",
+        "syncModels": "Sincronizar las plantillas",
+        "syncModelsDesc": "Si tus plantillas no están sincronizados con el backend, puedes actualizarlas usando esta opción. Esto suele ser útil en los casos en los que actualizas manualmente tu archivo models.yaml o añades plantillas a la carpeta raíz de InvokeAI después de que la aplicación haya arrancado.",
+        "modelsSynced": "Plantillas sincronizadas",
+        "modelSyncFailed": "La sincronización de la plantilla falló"
     },
     "parameters": {
         "images": "Imágenes",
@@ -427,7 +453,7 @@
         "height": "Alto",
         "seed": "Semilla",
         "randomizeSeed": "Semilla aleatoria",
-        "shuffle": "Aleatorizar",
+        "shuffle": "Semilla aleatoria",
         "noiseThreshold": "Umbral de Ruido",
         "perlinNoise": "Ruido Perlin",
         "variations": "Variaciones",
@@ -492,11 +518,22 @@
         "denoisingStrength": "Intensidad de la eliminación del ruido",
         "hiresStrength": "Alta resistencia",
         "showPreview": "Mostrar la vista previa",
-        "hidePreview": "Ocultar la vista previa"
+        "hidePreview": "Ocultar la vista previa",
+        "noiseSettings": "Ruido",
+        "seamlessXAxis": "Eje x",
+        "seamlessYAxis": "Eje y",
+        "scheduler": "Programador",
+        "boundingBoxWidth": "Anchura del recuadro",
+        "boundingBoxHeight": "Altura del recuadro",
+        "positivePromptPlaceholder": "Prompt Positivo",
+        "negativePromptPlaceholder": "Prompt Negativo",
+        "controlNetControlMode": "Modo de control",
+        "clipSkip": "Omitir el CLIP",
+        "aspectRatio": "Relación"
     },
     "settings": {
         "models": "Modelos",
-        "displayInProgress": "Mostrar imágenes en progreso",
+        "displayInProgress": "Mostrar las imágenes del progreso",
         "saveSteps": "Guardar imágenes cada n pasos",
         "confirmOnDelete": "Confirmar antes de eliminar",
         "displayHelpIcons": "Mostrar iconos de ayuda",
@@ -510,7 +547,19 @@
         "general": "General",
         "consoleLogLevel": "Nivel del registro",
         "shouldLogToConsole": "Registro de la consola",
-        "developer": "Desarrollador"
+        "developer": "Desarrollador",
+        "antialiasProgressImages": "Imágenes del progreso de Antialias",
+        "showProgressInViewer": "Mostrar las imágenes del progreso en el visor",
+        "availableSchedulers": "Programadores disponibles",
+        "ui": "Interfaz del usuario",
+        "generation": "Generación",
+        "favoriteSchedulers": "Programadores favoritos",
+        "favoriteSchedulersPlaceholder": "No hay programadores favoritos",
+        "showAdvancedOptions": "Mostrar las opciones avanzadas",
+        "alternateCanvasLayout": "Diseño alternativo del lienzo",
+        "beta": "Beta",
+        "enableNodesEditor": "Activar el editor de nodos",
+        "experimental": "Experimental"
     },
     "toast": {
         "tempFoldersEmptied": "Directorio temporal vaciado",
@@ -520,7 +569,7 @@
         "imageCopied": "Imágen copiada",
         "imageLinkCopied": "Enlace de imágen copiado",
         "imageNotLoaded": "No se cargó la imágen",
-        "imageNotLoadedDesc": "No se encontró imagen para enviar al módulo Imagen a Imagen",
+        "imageNotLoadedDesc": "No se pudo encontrar la imagen",
         "imageSavedToGallery": "Imágen guardada en la galería",
         "canvasMerged": "Lienzo consolidado",
         "sentToImageToImage": "Enviar hacia Imagen a Imagen",
@@ -545,7 +594,21 @@
         "serverError": "Error en el servidor",
         "disconnected": "Desconectado del servidor",
         "canceled": "Procesando la cancelación",
-        "connected": "Conectado al servidor"
+        "connected": "Conectado al servidor",
+        "problemCopyingImageLink": "No se puede copiar el enlace de la imagen",
+        "uploadFailedInvalidUploadDesc": "Debe ser una sola imagen PNG o JPEG",
+        "parameterSet": "Conjunto de parámetros",
+        "parameterNotSet": "Parámetro no configurado",
+        "nodesSaved": "Nodos guardados",
+        "nodesLoadedFailed": "Error al cargar los nodos",
+        "nodesLoaded": "Nodos cargados",
+        "nodesCleared": "Nodos borrados",
+        "problemCopyingImage": "No se puede copiar la imagen",
+        "nodesNotValidJSON": "JSON no válido",
+        "nodesCorruptedGraph": "No se puede cargar. El gráfico parece estar dañado.",
+        "nodesUnrecognizedTypes": "No se puede cargar. El gráfico tiene tipos no reconocidos",
+        "nodesNotValidGraph": "Gráfico del nodo InvokeAI no válido",
+        "nodesBrokenConnections": "No se puede cargar. Algunas conexiones están rotas."
     },
     "tooltip": {
         "feature": {
@@ -619,7 +682,8 @@
         "betaClear": "Limpiar",
         "betaDarkenOutside": "Oscurecer fuera",
         "betaLimitToBox": "Limitar a caja",
-        "betaPreserveMasked": "Preservar área enmascarada"
+        "betaPreserveMasked": "Preservar área enmascarada",
+        "antialiasing": "Suavizado"
     },
     "accessibility": {
         "invokeProgressBar": "Activar la barra de progreso",
@@ -646,6 +710,26 @@
     },
     "ui": {
         "hideProgressImages": "Ocultar el progreso de la imagen",
-        "showProgressImages": "Mostrar el progreso de la imagen"
+        "showProgressImages": "Mostrar el progreso de la imagen",
+        "swapSizes": "Cambiar los tamaños"
+    },
+    "nodes": {
+        "reloadSchema": "Esquema de recarga",
+        "loadNodes": "Nodos de carga",
+        "clearNodes": "Borrar los nodos",
+        "saveNodes": "Guardar los nodos",
+        "showGraphNodes": "Mostrar la superposición de los gráficos",
+        "zoomInNodes": "Acercar",
+        "hideMinimapnodes": "Ocultar el minimapa",
+        "fitViewportNodes": "Ajustar la vista",
+        "zoomOutNodes": "Alejar",
+        "hideGraphNodes": "Ocultar la superposición de los gráficos",
+        "hideLegendNodes": "Ocultar la leyenda del tipo de campo",
+        "showLegendNodes": "Mostrar la leyenda del tipo de campo",
+        "showMinimapnodes": "Mostrar el minimapa",
+        "saveGraph": "Guardar el gráfico",
+        "clearGraph": "Borrar el gráfico",
+        "clearGraphDesc": "¿Estás seguro de que deseas borrar todos los nodos?",
+        "loadGraph": "Cargar el gráfico (guardado desde el Editor de nodos) (No copiar y pegar los metadatos)"
     }
 }
