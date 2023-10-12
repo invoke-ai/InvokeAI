@@ -388,7 +388,6 @@
         "modelThree": "模型 3",
         "v2_768": "v2 (768px)",
         "mergedModelName": "合并的模型名称",
-        "alpha": "",
         "allModels": "全部模型",
         "convertToDiffusers": "转换为 Diffusers",
         "formMessageDiffusersModelLocation": "Diffusers 模型路径",
@@ -452,7 +451,6 @@
         "modelsMergeFailed": "模型融合失败",
         "baseModel": "基底模型",
         "convertingModelBegin": "模型转换中. 请稍候.",
-        "vae": "",
         "noModels": "未找到模型",
         "predictionType": "预测类型（适用于 Stable Diffusion 2.x 模型和部分 Stable Diffusion 1.x 模型）",
         "quickAdd": "快速添加",
@@ -613,7 +611,6 @@
         "showAdvancedOptions": "显示进阶选项",
         "favoriteSchedulers": "采样算法偏好",
         "autoChangeDimensions": "更改时将宽/高更新为模型默认值",
-        "beta": "",
         "experimental": "实验性"
     },
     "toast": {
@@ -666,7 +663,6 @@
         "nodesLoadedFailed": "节点图加载失败",
         "modelAddedSimple": "已添加模型",
         "modelAdded": "已添加模型: {{modelName}}",
-        "baseModelChangedCleared_other": "",
         "imageSavingFailed": "图像保存失败",
         "canvasSentControlnetAssets": "画布已发送到 ControlNet & 素材",
         "problemCopyingCanvasDesc": "无法导出基础层",
