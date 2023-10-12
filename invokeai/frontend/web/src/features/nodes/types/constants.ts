@@ -31,6 +31,8 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ConditioningCollection',
   'ControlCollection',
   'ColorCollection',
+  'T2IAdapterCollection',
+  'IPAdapterCollection',
 ];
 
 export const POLYMORPHIC_TYPES: FieldType[] = [
@@ -43,6 +45,8 @@ export const POLYMORPHIC_TYPES: FieldType[] = [
   'ConditioningPolymorphic',
   'ControlPolymorphic',
   'ColorPolymorphic',
+  'T2IAdapterPolymorphic',
+  'IPAdapterPolymorphic',
 ];
 
 export const MODEL_TYPES: FieldType[] = [
@@ -57,6 +61,8 @@ export const MODEL_TYPES: FieldType[] = [
   'UNetField',
   'VaeField',
   'ClipField',
+  'T2IAdapterModelField',
+  'IPAdapterModelField',
 ];
 
 export const COLLECTION_MAP: FieldTypeMapWithNumber = {
@@ -70,6 +76,8 @@ export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   ConditioningField: 'ConditioningCollection',
   ControlField: 'ControlCollection',
   ColorField: 'ColorCollection',
+  T2IAdapterField: 'T2IAdapterCollection',
+  IPAdapterField: 'IPAdapterCollection',
 };
 export const isCollectionItemType = (
   itemType: string | undefined
@@ -87,6 +95,8 @@ export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
   ConditioningField: 'ConditioningPolymorphic',
   ControlField: 'ControlPolymorphic',
   ColorField: 'ColorPolymorphic',
+  T2IAdapterField: 'T2IAdapterPolymorphic',
+  IPAdapterField: 'IPAdapterPolymorphic',
 };
 
 export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
@@ -99,6 +109,8 @@ export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
   ConditioningPolymorphic: 'ConditioningField',
   ControlPolymorphic: 'ControlField',
   ColorPolymorphic: 'ColorField',
+  T2IAdapterPolymorphic: 'T2IAdapterField',
+  IPAdapterPolymorphic: 'IPAdapterField',
 };
 
 export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
@@ -123,6 +135,7 @@ export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
   'Scheduler',
   'IPAdapterModelField',
   'BoardField',
+  'T2IAdapterModelField',
 ];
 
 export const isPolymorphicItemType = (
@@ -271,15 +284,25 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: t('nodes.integerPolymorphicDescription'),
     title: t('nodes.integerPolymorphic'),
   },
+  IPAdapterCollection: {
+    color: 'teal.500',
+    description: t('nodes.ipAdapterCollectionDescription'),
+    title: t('nodes.ipAdapterCollection'),
+  },
   IPAdapterField: {
-    color: 'green.300',
-    description: 'IP-Adapter info passed between nodes.',
-    title: 'IP-Adapter',
+    color: 'teal.500',
+    description: t('nodes.ipAdapterDescription'),
+    title: t('nodes.ipAdapter'),
   },
   IPAdapterModelField: {
     color: 'teal.500',
-    description: 'IP-Adapter model',
-    title: 'IP-Adapter Model',
+    description: t('nodes.ipAdapterModelDescription'),
+    title: t('nodes.ipAdapterModel'),
+  },
+  IPAdapterPolymorphic: {
+    color: 'teal.500',
+    description: t('nodes.ipAdapterPolymorphicDescription'),
+    title: t('nodes.ipAdapterPolymorphic'),
   },
   LatentsCollection: {
     color: 'pink.500',
@@ -340,6 +363,26 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'yellow.500',
     description: t('nodes.stringPolymorphicDescription'),
     title: t('nodes.stringPolymorphic'),
+  },
+  T2IAdapterCollection: {
+    color: 'teal.500',
+    description: t('nodes.t2iAdapterCollectionDescription'),
+    title: t('nodes.t2iAdapterCollection'),
+  },
+  T2IAdapterField: {
+    color: 'teal.500',
+    description: t('nodes.t2iAdapterFieldDescription'),
+    title: t('nodes.t2iAdapterField'),
+  },
+  T2IAdapterModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'T2I-Adapter',
+  },
+  T2IAdapterPolymorphic: {
+    color: 'teal.500',
+    description: 'T2I-Adapter info passed between nodes.',
+    title: 'T2I-Adapter Polymorphic',
   },
   UNetField: {
     color: 'red.500',

@@ -4,6 +4,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
+import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToUpscale';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,14 +20,15 @@ const ParamUpscalePopover = (props: Props) => {
   const inProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isAllowedToUpscale, detail } = useIsAllowedToUpscale(imageDTO);
 
   const handleClickUpscale = useCallback(() => {
     onClose();
-    if (!imageDTO) {
+    if (!imageDTO || !isAllowedToUpscale) {
       return;
     }
-    dispatch(upscaleRequested({ image_name: imageDTO.image_name }));
-  }, [dispatch, imageDTO, onClose]);
+    dispatch(upscaleRequested({ imageDTO }));
+  }, [dispatch, imageDTO, isAllowedToUpscale, onClose]);
 
   return (
     <IAIPopover
@@ -49,8 +51,9 @@ const ParamUpscalePopover = (props: Props) => {
       >
         <ParamESRGANModel />
         <IAIButton
+          tooltip={detail}
           size="sm"
-          isDisabled={!imageDTO || inProgress}
+          isDisabled={!imageDTO || inProgress || !isAllowedToUpscale}
           onClick={handleClickUpscale}
         >
           {t('parameters.upscaleImage')}

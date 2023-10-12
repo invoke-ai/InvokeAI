@@ -4,7 +4,6 @@ import { isEqual } from 'lodash-es';
 import {
   ButtonGroup,
   Flex,
-  FlexProps,
   Menu,
   MenuButton,
   MenuList,
@@ -82,9 +81,7 @@ const currentImageButtonsSelector = createSelector(
   }
 );
 
-type CurrentImageButtonsProps = FlexProps;
-
-const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
+const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const {
     isConnected,
@@ -181,7 +178,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     if (!imageDTO) {
       return;
     }
-    dispatch(upscaleRequested({ image_name: imageDTO.image_name }));
+    dispatch(upscaleRequested({ imageDTO }));
   }, [dispatch, imageDTO]);
 
   const handleDelete = useCallback(() => {
@@ -248,10 +245,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           alignItems: 'center',
           gap: 2,
         }}
-        {...props}
       >
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
-          <Menu>
+          <Menu isLazy>
             <MenuButton
               as={IAIIconButton}
               aria-label={t('parameters.imageActions')}

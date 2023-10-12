@@ -15,6 +15,7 @@ from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.ip_adapter import IPAdapterModelField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
 from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 from ...version import __version__
@@ -63,6 +64,7 @@ class CoreMetadata(BaseModelExcludeNull):
     model: MainModelField = Field(description="The main model used for inference")
     controlnets: list[ControlField] = Field(description="The ControlNets used for inference")
     ipAdapters: list[IPAdapterMetadataField] = Field(description="The IP Adapters used for inference")
+    t2iAdapters: list[T2IAdapterField] = Field(description="The IP Adapters used for inference")
     loras: list[LoRAMetadataField] = Field(description="The LoRAs used for inference")
     vae: Optional[VAEModelField] = Field(
         default=None,
@@ -139,6 +141,7 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     model: MainModelField = InputField(description="The main model used for inference")
     controlnets: list[ControlField] = InputField(description="The ControlNets used for inference")
     ipAdapters: list[IPAdapterMetadataField] = InputField(description="The IP Adapters used for inference")
+    t2iAdapters: list[T2IAdapterField] = Field(description="The IP Adapters used for inference")
     loras: list[LoRAMetadataField] = InputField(description="The LoRAs used for inference")
     strength: Optional[float] = InputField(
         default=None,

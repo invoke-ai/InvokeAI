@@ -15,7 +15,7 @@ type UseImageUploadButtonArgs = {
  * @example
  * const { getUploadButtonProps, getUploadInputProps, openUploader } = useImageUploadButton({
  *   postUploadAction: {
- *     type: 'SET_CONTROLNET_IMAGE',
+ *     type: 'SET_CONTROL_ADAPTER_IMAGE',
  *     controlNetId: '12345',
  *   },
  *   isDisabled: getIsUploadDisabled(),

@@ -18,8 +18,10 @@ context. Use like this:
 
 import gc
 import hashlib
+import math
 import os
 import sys
+import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,6 +30,7 @@ from typing import Any, Dict, Optional, Type, Union, types
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.backend.model_management.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 
 from ..util.devices import choose_torch_device
 from .models import BaseModelType, ModelBase, ModelType, SubModelType
@@ -44,6 +47,8 @@ DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
 
 # actual size of a gig
 GIG = 1073741824
+# Size of a MB in bytes.
+MB = 2**20
 
 
 @dataclass
@@ -205,22 +210,43 @@ class ModelCache(object):
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
             self.logger.info(
-                f"Loading model {model_path}, type {base_model.value}:{model_type.value}{':'+submodel.value if submodel else ''}"
+                f"Loading model {model_path}, type"
+                f" {base_model.value}:{model_type.value}{':'+submodel.value if submodel else ''}"
             )
             if self.stats:
                 self.stats.misses += 1
 
-            # this will remove older cached models until
-            # there is sufficient room to load the requested model
-            self._make_cache_room(model_info.get_size(submodel))
+            self_reported_model_size_before_load = model_info.get_size(submodel)
+            # Remove old models from the cache to make room for the new model.
+            self._make_cache_room(self_reported_model_size_before_load)
 
-            # clean memory to make MemoryUsage() more accurate
-            gc.collect()
+            # Load the model from disk and capture a memory snapshot before/after.
+            start_load_time = time.time()
+            snapshot_before = MemorySnapshot.capture()
             model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
-            if mem_used := model_info.get_size(submodel):
-                self.logger.debug(f"CPU RAM used for load: {(mem_used/GIG):.2f} GB")
+            snapshot_after = MemorySnapshot.capture()
+            end_load_time = time.time()
 
-            cache_entry = _CacheRecord(self, model, mem_used)
+            self_reported_model_size_after_load = model_info.get_size(submodel)
+
+            self.logger.debug(
+                f"Moved model '{key}' from disk to cpu in {(end_load_time-start_load_time):.2f}s.\n"
+                f"Self-reported size before/after load: {(self_reported_model_size_before_load/GIG):.3f}GB /"
+                f" {(self_reported_model_size_after_load/GIG):.3f}GB.\n"
+                f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
+            )
+
+            # We only log a warning for over-reported (not under-reported) model sizes before load. There is a known
+            # issue where models report their fp32 size before load, and are then loaded as fp16. Once this issue is
+            # addressed, it would make sense to log a warning for both over-reported and under-reported model sizes.
+            if (self_reported_model_size_after_load - self_reported_model_size_before_load) > 10 * MB:
+                self.logger.warning(
+                    f"Model '{key}' mis-reported its size before load. Self-reported size before/after load:"
+                    f" {(self_reported_model_size_before_load/GIG):.2f}GB /"
+                    f" {(self_reported_model_size_after_load/GIG):.2f}GB."
+                )
+
+            cache_entry = _CacheRecord(self, model, self_reported_model_size_after_load)
             self._cached_models[key] = cache_entry
         else:
             if self.stats:
@@ -239,6 +265,45 @@ class ModelCache(object):
         self._cache_stack.append(key)
 
         return self.ModelLocker(self, key, cache_entry.model, gpu_load, cache_entry.size)
+
+    def _move_model_to_device(self, key: str, target_device: torch.device):
+        cache_entry = self._cached_models[key]
+
+        source_device = cache_entry.model.device
+        # Note: We compare device types only so that 'cuda' == 'cuda:0'. This would need to be revised to support
+        # multi-GPU.
+        if torch.device(source_device).type == torch.device(target_device).type:
+            return
+
+        start_model_to_time = time.time()
+        snapshot_before = MemorySnapshot.capture()
+        cache_entry.model.to(target_device)
+        snapshot_after = MemorySnapshot.capture()
+        end_model_to_time = time.time()
+        self.logger.debug(
+            f"Moved model '{key}' from {source_device} to"
+            f" {target_device} in {(end_model_to_time-start_model_to_time):.2f}s.\n"
+            f"Estimated model size: {(cache_entry.size/GIG):.3f} GB.\n"
+            f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
+        )
+
+        if snapshot_before.vram is not None and snapshot_after.vram is not None:
+            vram_change = abs(snapshot_before.vram - snapshot_after.vram)
+
+            # If the estimated model size does not match the change in VRAM, log a warning.
+            if not math.isclose(
+                vram_change,
+                cache_entry.size,
+                rel_tol=0.1,
+                abs_tol=10 * MB,
+            ):
+                self.logger.warning(
+                    f"Moving model '{key}' from {source_device} to"
+                    f" {target_device} caused an unexpected change in VRAM usage. The model's"
+                    " estimated size may be incorrect. Estimated model size:"
+                    f" {(cache_entry.size/GIG):.3f} GB.\n"
+                    f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
+                )
 
     class ModelLocker(object):
         def __init__(self, cache, key, model, gpu_load, size_needed):
@@ -269,11 +334,7 @@ class ModelCache(object):
                     if self.cache.lazy_offloading:
                         self.cache._offload_unlocked_models(self.size_needed)
 
-                    if self.model.device != self.cache.execution_device:
-                        self.cache.logger.debug(f"Moving {self.key} into {self.cache.execution_device}")
-                        with VRAMUsage() as mem:
-                            self.model.to(self.cache.execution_device)  # move into GPU
-                        self.cache.logger.debug(f"GPU VRAM used for load: {(mem.vram_used/GIG):.2f} GB")
+                    self.cache._move_model_to_device(self.key, self.cache.execution_device)
 
                     self.cache.logger.debug(f"Locking {self.key} in {self.cache.execution_device}")
                     self.cache._print_cuda_stats()
@@ -286,7 +347,7 @@ class ModelCache(object):
             # in the event that the caller wants the model in RAM, we
             # move it into CPU if it is in GPU and not locked
             elif self.cache_entry.loaded and not self.cache_entry.locked:
-                self.model.to(self.cache.storage_device)
+                self.cache._move_model_to_device(self.key, self.cache.storage_device)
 
             return self.model
 
@@ -339,7 +400,8 @@ class ModelCache(object):
                 locked_models += 1
 
         self.logger.debug(
-            f"Current VRAM/RAM usage: {vram}/{ram}; cached_models/loaded_models/locked_models/ = {cached_models}/{loaded_models}/{locked_models}"
+            f"Current VRAM/RAM usage: {vram}/{ram}; cached_models/loaded_models/locked_models/ ="
+            f" {cached_models}/{loaded_models}/{locked_models}"
         )
 
     def _cache_size(self) -> int:
@@ -354,7 +416,8 @@ class ModelCache(object):
 
         if current_size + bytes_needed > maximum_size:
             self.logger.debug(
-                f"Max cache size exceeded: {(current_size/GIG):.2f}/{self.max_cache_size:.2f} GB, need an additional {(bytes_needed/GIG):.2f} GB"
+                f"Max cache size exceeded: {(current_size/GIG):.2f}/{self.max_cache_size:.2f} GB, need an additional"
+                f" {(bytes_needed/GIG):.2f} GB"
             )
 
         self.logger.debug(f"Before unloading: cached_models={len(self._cached_models)}")
@@ -387,7 +450,8 @@ class ModelCache(object):
 
             device = cache_entry.model.device if hasattr(cache_entry.model, "device") else None
             self.logger.debug(
-                f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded}, refs: {refs}"
+                f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded},"
+                f" refs: {refs}"
             )
 
             # 2 refs:
@@ -423,11 +487,9 @@ class ModelCache(object):
             if vram_in_use <= reserved:
                 break
             if not cache_entry.locked and cache_entry.loaded:
-                self.logger.debug(f"Offloading {model_key} from {self.execution_device} into {self.storage_device}")
-                with VRAMUsage() as mem:
-                    cache_entry.model.to(self.storage_device)
-                self.logger.debug(f"GPU VRAM freed: {(mem.vram_used/GIG):.2f} GB")
-                vram_in_use += mem.vram_used  # note vram_used is negative
+                self._move_model_to_device(model_key, self.storage_device)
+
+                vram_in_use = torch.cuda.memory_allocated()
                 self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB")
 
         gc.collect()
@@ -454,16 +516,3 @@ class ModelCache(object):
         with open(hashpath, "w") as f:
             f.write(hash)
         return hash
-
-
-class VRAMUsage(object):
-    def __init__(self):
-        self.vram = None
-        self.vram_used = 0
-
-    def __enter__(self):
-        self.vram = torch.cuda.memory_allocated()
-        return self
-
-    def __exit__(self, *args):
-        self.vram_used = torch.cuda.memory_allocated() - self.vram
