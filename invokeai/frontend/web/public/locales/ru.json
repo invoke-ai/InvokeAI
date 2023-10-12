@@ -6,7 +6,7 @@
         "settingsLabel": "Настройки",
         "img2img": "Изображение в изображение (img2img)",
         "unifiedCanvas": "Единый холст",
-        "nodes": "Редактор нод",
+        "nodes": "Редактор рабочего процесса",
         "langRussian": "Русский",
         "nodesDesc": "Cистема генерации изображений на основе нодов (узлов) уже разрабатывается. Следите за новостями об этой замечательной функции.",
         "postProcessing": "Постобработка",
@@ -79,7 +79,10 @@
         "lightMode": "Светлая тема",
         "batch": "Пакетный менеджер",
         "modelManager": "Менеджер моделей",
-        "darkMode": "Темная тема"
+        "darkMode": "Темная тема",
+        "nodeEditor": "Редактор Нодов (Узлов)",
+        "controlNet": "Controlnet",
+        "advanced": "Расширенные"
     },
     "gallery": {
         "generations": "Генерации",
@@ -525,10 +528,14 @@
         "clipSkip": "CLIP Пропуск",
         "aspectRatio": "Соотношение",
         "maskAdjustmentsHeader": "Настройка маски",
-        "maskBlur": "Размытие маски",
-        "maskBlurMethod": "Метод размытия маски",
+        "maskBlur": "Размытие",
+        "maskBlurMethod": "Метод размытия",
         "seamLowThreshold": "Низкий",
-        "seamHighThreshold": "Высокий"
+        "seamHighThreshold": "Высокий",
+        "coherenceSteps": "Шагов",
+        "coherencePassHeader": "Порог Coherence",
+        "coherenceStrength": "Сила",
+        "compositingSettingsHeader": "Настройки компоновки"
     },
     "settings": {
         "models": "Модели",
@@ -540,7 +547,7 @@
         "resetWebUI": "Сброс настроек Web UI",
         "resetWebUIDesc1": "Сброс настроек веб-интерфейса удаляет только локальный кэш браузера с вашими изображениями и настройками. Он не удаляет изображения с диска.",
         "resetWebUIDesc2": "Если изображения не отображаются в галерее или не работает что-то еще, пожалуйста, попробуйте сбросить настройки, прежде чем сообщать о проблеме на GitHub.",
-        "resetComplete": "Интерфейс сброшен. Обновите эту страницу.",
+        "resetComplete": "Настройки веб-интерфейса были сброшены.",
         "useSlidersForAll": "Использовать ползунки для всех параметров",
         "consoleLogLevel": "Уровень логирования",
         "shouldLogToConsole": "Логи в консоль",
@@ -556,7 +563,8 @@
         "experimental": "Экспериментальные",
         "beta": "Бета",
         "alternateCanvasLayout": "Альтернативный слой холста",
-        "showAdvancedOptions": "Показать доп. параметры"
+        "showAdvancedOptions": "Показать доп. параметры",
+        "autoChangeDimensions": "Обновить Ш/В на стандартные для модели при изменении"
     },
     "toast": {
         "tempFoldersEmptied": "Временная папка очищена",
@@ -695,7 +703,7 @@
         "flipHorizontally": "Отразить горизонтально",
         "toggleAutoscroll": "Включить автопрокрутку",
         "toggleLogViewer": "Показать или скрыть просмотрщик логов",
-        "showOptionsPanel": "Показать опции",
+        "showOptionsPanel": "Показать боковую панель",
         "showGallery": "Показать галерею",
         "invokeProgressBar": "Индикатор выполнения",
         "reset": "Сброс",
@@ -708,7 +716,8 @@
     "ui": {
         "showProgressImages": "Показывать промежуточный итог",
         "hideProgressImages": "Не показывать промежуточный итог",
-        "swapSizes": "Поменять местами размеры"
+        "swapSizes": "Поменять местами размеры",
+        "lockRatio": "Зафиксировать пропорции"
     },
     "nodes": {
         "zoomInNodes": "Увеличьте масштаб",
@@ -724,6 +733,48 @@
         "resetWorkflowDesc2": "Сброс рабочего процесса очистит все узлы, ребра и детали рабочего процесса.",
         "resetWorkflow": "Сбросить рабочий процесс",
         "resetWorkflowDesc": "Вы уверены, что хотите сбросить этот рабочий процесс?",
-        "reloadNodeTemplates": "Перезагрузить шаблоны узлов"
+        "reloadNodeTemplates": "Перезагрузить шаблоны узлов",
+        "downloadWorkflow": "Скачать JSON рабочего процесса"
+    },
+    "controlnet": {
+        "amult": "a_mult",
+        "contentShuffleDescription": "Перетасовывает содержимое изображения",
+        "bgth": "bg_th",
+        "contentShuffle": "Перетасовка содержимого",
+        "beginEndStepPercent": "Процент начала/конца шага",
+        "duplicate": "Дублировать",
+        "balanced": "Сбалансированный",
+        "f": "F",
+        "depthMidasDescription": "Генерация карты глубины с использованием Midas",
+        "control": "Контроль",
+        "coarse": "Грубость обработки",
+        "crop": "Обрезка",
+        "depthMidas": "Глубина (Midas)",
+        "enableControlnet": "Включить ControlNet",
+        "detectResolution": "Определить разрешение",
+        "controlMode": "Режим контроля",
+        "cannyDescription": "Детектор границ Canny",
+        "depthZoe": "Глубина (Zoe)",
+        "autoConfigure": "Автонастройка процессора",
+        "delete": "Удалить",
+        "canny": "Canny",
+        "depthZoeDescription": "Генерация карты глубины с использованием Zoe"
+    },
+    "boards": {
+        "autoAddBoard": "Авто добавление Доски",
+        "topMessage": "Эта доска содержит изображения, используемые в следующих функциях:",
+        "move": "Перемещение",
+        "menuItemAutoAdd": "Авто добавление на эту доску",
+        "myBoard": "Моя Доска",
+        "searchBoard": "Поиск Доски...",
+        "noMatching": "Нет подходящих Досок",
+        "selectBoard": "Выбрать Доску",
+        "cancel": "Отменить",
+        "addBoard": "Добавить Доску",
+        "bottomMessage": "Удаление этой доски и ее изображений приведет к сбросу всех функций, использующихся их в данный момент.",
+        "uncategorized": "Без категории",
+        "changeBoard": "Изменить Доску",
+        "loading": "Загрузка...",
+        "clearSearch": "Очистить поиск"
     }
 }
