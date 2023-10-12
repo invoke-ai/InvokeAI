@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Raccourcis clavier",
-        "themeLabel": "Thème",
         "languagePickerLabel": "Sélecteur de langue",
         "reportBugLabel": "Signaler un bug",
         "settingsLabel": "Paramètres",
-        "darkTheme": "Sombre",
-        "lightTheme": "Clair",
-        "greenTheme": "Vert",
         "img2img": "Image en image",
         "unifiedCanvas": "Canvas unifié",
         "nodes": "Nœuds",

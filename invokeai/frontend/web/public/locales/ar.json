@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "مفاتيح الأختصار",
-        "themeLabel": "الموضوع",
         "languagePickerLabel": "منتقي اللغة",
         "reportBugLabel": "بلغ عن خطأ",
         "settingsLabel": "إعدادات",
-        "darkTheme": "داكن",
-        "lightTheme": "فاتح",
-        "greenTheme": "أخضر",
         "img2img": "صورة إلى صورة",
         "unifiedCanvas": "لوحة موحدة",
         "nodes": "عقد",
