@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Sneltoetsen",
-        "themeLabel": "Thema",
         "languagePickerLabel": "Taal",
         "reportBugLabel": "Meld bug",
         "settingsLabel": "Instellingen",
-        "darkTheme": "Donker",
-        "lightTheme": "Licht",
-        "greenTheme": "Groen",
         "img2img": "Afbeelding naar afbeelding",
         "unifiedCanvas": "Centraal canvas",
         "nodes": "Knooppunt-editor",
@@ -69,7 +65,6 @@
         "pinOptionsPanel": "Zet deelscherm Opties vast",
         "loading": "Bezig met laden",
         "loadingInvokeAI": "Bezig met laden van Invoke AI",
-        "oceanTheme": "Oceaan",
         "langHebrew": "עברית",
         "langKorean": "한국어",
         "txt2img": "Tekst naar afbeelding",
@@ -519,7 +514,6 @@
         "showProgressInViewer": "Toon voortgangsafbeeldingen in viewer",
         "generation": "Generatie",
         "ui": "Gebruikersinterface",
-        "availableSchedulers": "Beschikbare planners",
         "antialiasProgressImages": "Voer anti-aliasing uit op voortgangsafbeeldingen"
     },
     "toast": {

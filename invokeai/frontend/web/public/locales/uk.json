@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Гарячi клавіші",
-        "themeLabel": "Тема",
         "languagePickerLabel": "Мова",
         "reportBugLabel": "Повідомити про помилку",
         "settingsLabel": "Налаштування",
-        "darkTheme": "Темна",
-        "lightTheme": "Світла",
-        "greenTheme": "Зелена",
         "img2img": "Зображення із зображення (img2img)",
         "unifiedCanvas": "Універсальне полотно",
         "nodes": "Вузли",
@@ -56,7 +52,6 @@
         "langKorean": "Корейська",
         "langPortuguese": "Португальська",
         "pinOptionsPanel": "Закріпити панель налаштувань",
-        "oceanTheme": "Океан",
         "langArabic": "Арабська",
         "langSimplifiedChinese": "Китайська (спрощена)",
         "langSpanish": "Іспанська",

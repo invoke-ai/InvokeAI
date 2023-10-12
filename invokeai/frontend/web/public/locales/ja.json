@@ -1,12 +1,8 @@
 {
     "common": {
-        "themeLabel": "テーマ",
         "languagePickerLabel": "言語選択",
         "reportBugLabel": "バグ報告",
         "settingsLabel": "設定",
-        "darkTheme": "ダーク",
-        "lightTheme": "ライト",
-        "greenTheme": "緑",
         "langJapanese": "日本語",
         "nodesDesc": "現在、画像生成のためのノードベースシステムを開発中です。機能についてのアップデートにご期待ください。",
         "postProcessing": "後処理",
@@ -63,7 +59,6 @@
         "discordLabel": "Discord",
         "langItalian": "Italiano",
         "langEnglish": "English",
-        "oceanTheme": "オーシャン",
         "langArabic": "アラビア語",
         "langDutch": "Nederlands",
         "langFrench": "Français",

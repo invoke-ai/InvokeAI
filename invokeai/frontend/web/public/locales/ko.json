@@ -1,13 +1,9 @@
 {
     "common": {
-        "themeLabel": "테마 설정",
         "languagePickerLabel": "언어 설정",
         "reportBugLabel": "버그 리포트",
         "githubLabel": "Github",
         "settingsLabel": "설정",
-        "darkTheme": "다크 모드",
-        "lightTheme": "라이트 모드",
-        "greenTheme": "그린 모드",
         "langArabic": "العربية",
         "langEnglish": "English",
         "langDutch": "Nederlands",
