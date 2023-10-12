@@ -79,8 +79,7 @@
         "darkMode": "Modalità scura",
         "lightMode": "Modalità chiara",
         "batch": "Gestione Lotto",
-        "modelManager": "Gestione del modello",
-        "clearNodes": "Sei sicuro di voler cancellare tutti i nodi?"
+        "modelManager": "Gestione del modello"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -705,9 +704,6 @@
     },
     "nodes": {
         "reloadSchema": "Ricarica lo schema",
-        "clearNodes": "Cancella nodi",
-        "saveNodes": "Salva nodi",
-        "loadNodes": "Carica nodi",
         "zoomOutNodes": "Rimpicciolire",
         "hideGraphNodes": "Nascondi sovrapposizione grafico",
         "hideLegendNodes": "Nascondi la legenda del tipo di campo",
