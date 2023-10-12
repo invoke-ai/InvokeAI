@@ -124,20 +124,6 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def change_priority(self, job: DownloadJobBase, delta: int):
-        """
-        Change the job's priority.
-
-        :param job: Job to  apply change to
-        :param delta: Value to increment or decrement priority.
-
-        Lower values are higher priority.  The default starting value is 10.
-        Thus to make this a really high priority job:
-           job.change_priority(-10).
-        """
-        pass
-
-    @abstractmethod
     def join(self):
         """Wait until all jobs are off the queue."""
         pass
@@ -203,7 +189,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def cancel_all_jobs(self):  # noqa D102
         return self._queue.cancel_all_jobs()
 
-    def prune_jobs(self, job: DownloadJobBase):  # noqa D102
+    def prune_jobs(self):  # noqa D102
         return self._queue.prune_jobs()
 
     def start_job(self, job: DownloadJobBase):  # noqa D102
@@ -214,9 +200,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def cancel_job(self, job: DownloadJobBase):  # noqa D102
         return self._queue.cancel_job(job)
-
-    def change_priority(self, job: DownloadJobBase, delta: int):  # noqa D102
-        return self._queue.change_priority(job, delta)
 
     def join(self):  # noqa D102
         return self._queue.join()

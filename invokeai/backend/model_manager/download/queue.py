@@ -154,15 +154,6 @@ class DownloadQueue(DownloadQueueBase):
         """List all the jobs."""
         return list(self._jobs.values())
 
-    def change_priority(self, job: DownloadJobBase, delta: int):
-        """Change the priority of a job. Smaller priorities run first."""
-        with self._lock:
-            try:
-                assert isinstance(self._jobs[job.id], DownloadJobBase)
-                job.priority += delta
-            except (AssertionError, KeyError) as excp:
-                raise UnknownJobIDException("Unrecognized job") from excp
-
     def prune_jobs(self):
         """Prune completed and errored queue items from the job list."""
         with self._lock:
@@ -235,7 +226,7 @@ class DownloadQueue(DownloadQueueBase):
         """Pause all running jobs."""
         with self._lock:
             for job in self._jobs.values():
-                if job.status == DownloadJobStatus.RUNNING:
+                if not self._in_terminal_state(job):
                     self.pause_job(job)
 
     def cancel_all_jobs(self, preserve_partial: bool = False):
@@ -431,7 +422,10 @@ class DownloadQueue(DownloadQueueBase):
         if not job.preserve_partial_downloads:
             self._logger.warning(f"Cleaning up leftover files from cancelled download job {job.destination}")
             dest = Path(job.destination)
-            if dest.is_file():
-                dest.unlink()
-            elif dest.is_dir():
-                shutil.rmtree(dest.as_posix(), ignore_errors=True)
+            try:
+                if dest.is_file():
+                    dest.unlink()
+                elif dest.is_dir():
+                    shutil.rmtree(dest.as_posix(), ignore_errors=True)
+            except OSError as excp:
+                self._logger(excp)

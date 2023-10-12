@@ -859,16 +859,6 @@ restarted and pick up where it left off using `queue.start_job()`.
 This will cancel the job if possible and clean up temporary files and
 other resources that it might have been using.
 
-#### queue.change_priority(job, delta)
-
-This will increase (positive delta) or decrease (negative delta) the
-priority of the job on the queue. Lower priority jobs will be taken off
-the queue and run before higher priority jobs.
-
-Note that this cannot be used to change the job's priority once it has
-begun running. However, you can still pause the job and restart it
-later.
-
 #### queue.start_all_jobs(), queue.pause_all_jobs(), queue.cancel_all_jobs()
 
 This will start/pause/cancel all jobs that have been submitted to the

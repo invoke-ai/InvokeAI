@@ -51,7 +51,7 @@ class TqdmProgress(object):
         if not isinstance(job, DownloadJobRemoteSource):
             return
         job_id = job.id
-        if job.status == "running":
+        if job.status == "running" and job.total_bytes > 0:  # job starts running before total bytes known
             if job_id not in self._bars:
                 dest = Path(job.destination).name
                 self._bars[job_id] = tqdm(

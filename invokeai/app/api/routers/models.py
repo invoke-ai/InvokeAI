@@ -56,7 +56,6 @@ class JobControlOperation(str, Enum):
     START = "Start"
     PAUSE = "Pause"
     CANCEL = "Cancel"
-    CHANGE_PRIORITY = "Change Priority"
 
 
 @models_router.get(
@@ -478,11 +477,8 @@ async def control_download_jobs(
         elif operation == JobControlOperation.CANCEL:
             job_mgr.cancel_job(job_id)
 
-        elif operation == JobControlOperation.CHANGE_PRIORITY and priority_delta is not None:
-            job_mgr.change_job_priority(job_id, priority_delta)
-
         else:
-            raise ValueError("priority_delta must be set for the CHANGE_PRIORITY operation")
+            raise ValueError("unknown operation {operation}")
         bytes = 0
         total_bytes = 0
         if isinstance(job, DownloadJobRemoteSource):

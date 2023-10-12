@@ -236,20 +236,6 @@ class DownloadQueueBase(ABC):
         pass
 
     @abstractmethod
-    def change_priority(self, job: DownloadJobBase, delta: int):
-        """
-        Change the job's priority.
-
-        :param job: Job to change
-        :param delta: Value to increment or decrement priority.
-
-        Lower values are higher priority.  The default starting value is 10.
-        Thus to make this a really high priority job:
-           job.change_priority(-10).
-        """
-        pass
-
-    @abstractmethod
     def join(self):
         """
         Wait until all jobs are off the queue.

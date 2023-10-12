@@ -172,20 +172,26 @@ def test_queue_priority():
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        job1 = queue.create_download_job(source="http://www.civitai.com/models/12345", destdir=tmpdir, start=False)
-        job2 = queue.create_download_job(source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False)
+        job1 = queue.create_download_job(
+            priority=0, source="http://www.civitai.com/models/12345", destdir=tmpdir, start=False
+        )
+        job2 = queue.create_download_job(
+            priority=10, source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False
+        )
 
-        queue.change_priority(job1, -10)  # make id1 run first
         assert job1 < job2
 
         queue.start_all_jobs()
         queue.join()
         assert job1.job_sequence < job2.job_sequence
 
-        job1 = queue.create_download_job(source="http://www.civitai.com/models/12345", destdir=tmpdir, start=False)
-        job2 = queue.create_download_job(source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False)
+        job1 = queue.create_download_job(
+            priority=10, source="http://www.civitai.com/models/12345", destdir=tmpdir, start=False
+        )
+        job2 = queue.create_download_job(
+            priority=0, source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False
+        )
 
-        queue.change_priority(job2, -10)  # make id2 run first
         assert job2 < job1
 
         queue.start_all_jobs()
