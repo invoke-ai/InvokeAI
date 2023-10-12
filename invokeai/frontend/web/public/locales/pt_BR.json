@@ -402,7 +402,6 @@
         "cfgScale": "Escala CFG",
         "width": "Largura",
         "height": "Altura",
-        "sampler": "Amostrador",
         "seed": "Seed",
         "randomizeSeed": "Seed Aleatório",
         "shuffle": "Embaralhar",
@@ -487,7 +486,6 @@
     "toast": {
         "tempFoldersEmptied": "Pasta de Arquivos Temporários Esvaziada",
         "uploadFailed": "Envio Falhou",
-        "uploadFailedMultipleImagesDesc": "Várias imagens copiadas, só é permitido uma imagem de cada vez",
         "uploadFailedUnableToLoadDesc": "Não foj possível carregar o arquivo",
         "downloadImageStarted": "Download de Imagem Começou",
         "imageCopied": "Imagem Copiada",

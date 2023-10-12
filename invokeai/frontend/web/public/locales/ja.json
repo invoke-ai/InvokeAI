@@ -372,7 +372,6 @@
     },
     "toast": {
         "uploadFailed": "アップロード失敗",
-        "uploadFailedMultipleImagesDesc": "一度にアップロードできる画像は1枚のみです。",
         "uploadFailedUnableToLoadDesc": "ファイルを読み込むことができません。",
         "downloadImageStarted": "画像ダウンロード開始",
         "imageCopied": "画像をコピー",

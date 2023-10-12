@@ -324,7 +324,6 @@
         "cfgScale": "CFG 等级",
         "width": "宽度",
         "height": "高度",
-        "sampler": "采样算法",
         "seed": "种子",
         "randomizeSeed": "随机化种子",
         "shuffle": "随机化",
@@ -393,7 +392,6 @@
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
         "uploadFailed": "上传失败",
-        "uploadFailedMultipleImagesDesc": "多张图像被粘贴，同时只能上传一张图像",
         "uploadFailedUnableToLoadDesc": "无法加载文件",
         "downloadImageStarted": "图像下载已开始",
         "imageCopied": "图像已复制",
