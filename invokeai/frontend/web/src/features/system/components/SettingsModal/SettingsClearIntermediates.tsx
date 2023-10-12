@@ -24,7 +24,7 @@ export default function SettingsClearIntermediates() {
     useClearIntermediatesMutation();
 
   const { data: queueStatus } = useGetQueueStatusQuery();
-  const hasPendingItems = queueStatus && (queueStatus.in_progress > 0 || queueStatus.pending > 0);
+  const hasPendingItems = queueStatus && (queueStatus.queue.in_progress > 0 || queueStatus.queue.pending > 0);
 
   const handleClickClearIntermediates = useCallback(() => {
     if (hasPendingItems) {
@@ -51,7 +51,7 @@ export default function SettingsClearIntermediates() {
           })
         );
       });
-  }, [t, clearIntermediates, dispatch]);
+  }, [t, clearIntermediates, dispatch, hasPendingItems]);
 
   useEffect(() => {
     // update the count on mount
