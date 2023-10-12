@@ -525,10 +525,16 @@
         "clipSkip": "Omitir el CLIP",
         "aspectRatio": "Relación",
         "maskAdjustmentsHeader": "Ajustes de la máscara",
-        "maskBlur": "Máscara de Desenfoque",
-        "maskBlurMethod": "Método del desenfoque de la máscara",
+        "maskBlur": "Difuminar",
+        "maskBlurMethod": "Método del desenfoque",
         "seamHighThreshold": "Alto",
-        "seamLowThreshold": "Bajo"
+        "seamLowThreshold": "Bajo",
+        "coherencePassHeader": "Parámetros de la coherencia",
+        "compositingSettingsHeader": "Ajustes de la composición",
+        "coherenceSteps": "Pasos",
+        "coherenceStrength": "Fuerza",
+        "patchmatchDownScaleSize": "Reducir a escala",
+        "coherenceMode": "Modo"
     },
     "settings": {
         "models": "Modelos",
@@ -556,7 +562,8 @@
         "alternateCanvasLayout": "Diseño alternativo del lienzo",
         "beta": "Beta",
         "enableNodesEditor": "Activar el editor de nodos",
-        "experimental": "Experimental"
+        "experimental": "Experimental",
+        "autoChangeDimensions": "Actualiza W/H a los valores predeterminados del modelo cuando se modifica"
     },
     "toast": {
         "tempFoldersEmptied": "Directorio temporal vaciado",
@@ -708,7 +715,8 @@
     "ui": {
         "hideProgressImages": "Ocultar el progreso de la imagen",
         "showProgressImages": "Mostrar el progreso de la imagen",
-        "swapSizes": "Cambiar los tamaños"
+        "swapSizes": "Cambiar los tamaños",
+        "lockRatio": "Proporción del bloqueo"
     },
     "nodes": {
         "showGraphNodes": "Mostrar la superposición de los gráficos",
@@ -724,6 +732,7 @@
         "loadWorkflow": "Cargar el flujo de trabajo",
         "resetWorkflow": "Reiniciar e flujo de trabajo",
         "resetWorkflowDesc": "¿Está seguro de que deseas restablecer este flujo de trabajo?",
-        "resetWorkflowDesc2": "Al reiniciar el flujo de trabajo se borrarán todos los nodos, aristas y detalles del flujo de trabajo."
+        "resetWorkflowDesc2": "Al reiniciar el flujo de trabajo se borrarán todos los nodos, aristas y detalles del flujo de trabajo.",
+        "downloadWorkflow": "Descargar el flujo de trabajo en un archivo JSON"
     }
 }
