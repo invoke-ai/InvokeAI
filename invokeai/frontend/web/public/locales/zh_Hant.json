@@ -33,6 +33,24 @@
         "langBrPortuguese": "巴西葡萄牙語",
         "langRussian": "俄語",
         "langSpanish": "西班牙語",
-        "unifiedCanvas": "統一畫布"
+        "unifiedCanvas": "統一畫布",
+        "cancel": "取消",
+        "langHebrew": "希伯來語",
+        "txt2img": "文字轉圖片"
+    },
+    "accessibility": {
+        "modelSelect": "選擇模型",
+        "invokeProgressBar": "Invoke 進度條",
+        "uploadImage": "上傳圖片",
+        "reset": "重設",
+        "nextImage": "下一張圖片",
+        "previousImage": "上一張圖片",
+        "flipHorizontally": "水平翻轉",
+        "useThisParameter": "使用此參數",
+        "zoomIn": "放大",
+        "zoomOut": "縮小",
+        "flipVertically": "垂直翻轉",
+        "modifyConfig": "修改配置",
+        "menu": "選單"
     }
 }
