@@ -61,7 +61,7 @@ const DataViewer = (props: Props) => {
       >
         <OverlayScrollbarsComponent
           defer
-          style={{ width: '100%' }}
+          style={{ height: '100%', width: '100%' }}
           options={{
             overflow: {
               y: 'scroll',

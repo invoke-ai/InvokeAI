@@ -1,14 +1,9 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { Flex, IconButton, Link, Text, Tooltip } from '@chakra-ui/react';
-import { useDisclosure } from '@chakra-ui/react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
-import {
-  IoArrowUndoCircleOutline,
-  IoCaretDownCircleSharp,
-  IoCaretForwardCircleSharp,
-} from 'react-icons/io5';
+import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -16,7 +11,6 @@ type MetadataItemProps = {
   onClick?: () => void;
   value: number | string | boolean;
   labelPosition?: string;
-  hideItem?: boolean;
   withCopy?: boolean;
 };
 
@@ -29,12 +23,8 @@ const ImageMetadataItem = ({
   onClick,
   isLink,
   labelPosition,
-  hideItem,
   withCopy = false,
 }: MetadataItemProps) => {
-  const { isOpen, onToggle } = useDisclosure(
-    hideItem ? { defaultIsOpen: false } : { defaultIsOpen: true }
-  );
   const { t } = useTranslation();
 
   if (!value) {
@@ -52,24 +42,6 @@ const ImageMetadataItem = ({
             variant="ghost"
             fontSize={20}
             onClick={onClick}
-          />
-        </Tooltip>
-      )}
-      {hideItem && (
-        <Tooltip label={isOpen ? `Hide ${label}` : `Show ${label}`}>
-          <IconButton
-            aria-label={t('accessibility.useThisParameter')}
-            icon={
-              isOpen ? (
-                <IoCaretDownCircleSharp />
-              ) : (
-                <IoCaretForwardCircleSharp />
-              )
-            }
-            size="xs"
-            variant="ghost"
-            fontSize={20}
-            onClick={onToggle}
           />
         </Tooltip>
       )}
@@ -94,11 +66,7 @@ const ImageMetadataItem = ({
             {value.toString()} <ExternalLinkIcon mx="2px" />
           </Link>
         ) : (
-          <Text
-            overflowY="scroll"
-            wordBreak="break-all"
-            noOfLines={isOpen ? undefined : 2}
-          >
+          <Text overflowY="scroll" wordBreak="break-all">
             {value.toString()}
           </Text>
         )}

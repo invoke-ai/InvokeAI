@@ -38,6 +38,14 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
     {
       selectFromResult: (res) => ({
         metadata: res?.currentData?.metadata,
+        metadata: {
+          negative_prompt:
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+          positive_prompt:
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+          width:
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+        },
         workflow: res?.currentData?.workflow,
       }),
     }
@@ -66,8 +74,6 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         </Link>
       </Flex>
 
-      <ImageMetadataActions metadata={metadata} />
-
       <Tabs
         variant="line"
         sx={{
@@ -75,15 +81,24 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
           flexDir: 'column',
           w: 'full',
           h: 'full',
+          overflowX: 'scroll',
         }}
       >
         <TabList>
+          <Tab>{t('metadata.recallParameters')}</Tab>
           <Tab>{t('metadata.metadata')}</Tab>
           <Tab>{t('metadata.imageDetails')}</Tab>
           <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
+          <TabPanel>
+            {metadata ? (
+              <ImageMetadataActions metadata={metadata} />
+            ) : (
+              <IAINoContentFallback label={t('metadata.noRecallParameters')} />
+            )}
+          </TabPanel>
           <TabPanel>
             {metadata ? (
               <DataViewer data={metadata} label={t('metadata.metadata')} />
