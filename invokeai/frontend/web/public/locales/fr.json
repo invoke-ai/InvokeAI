@@ -392,7 +392,6 @@
         "img2imgStrength": "Force de l'Image à l'Image",
         "toggleLoopback": "Activer/Désactiver la Boucle",
         "invoke": "Invoker",
-        "promptPlaceholder": "Tapez le prompt ici. [tokens négatifs], (poids positif)++, (poids négatif)--, swap et blend sont disponibles (voir les docs)",
         "sendTo": "Envoyer à",
         "sendToImg2Img": "Envoyer à Image à Image",
         "sendToUnifiedCanvas": "Envoyer au Canvas Unifié",
