@@ -2,7 +2,7 @@
     "common": {
         "hotkeysLabel": "Sneltoetsen",
         "themeLabel": "Thema",
-        "languagePickerLabel": "Taalkeuze",
+        "languagePickerLabel": "Taal",
         "reportBugLabel": "Meld bug",
         "settingsLabel": "Instellingen",
         "darkTheme": "Donker",
@@ -10,7 +10,7 @@
         "greenTheme": "Groen",
         "img2img": "Afbeelding naar afbeelding",
         "unifiedCanvas": "Centraal canvas",
-        "nodes": "Knooppunten",
+        "nodes": "Knooppunt-editor",
         "langDutch": "Nederlands",
         "nodesDesc": "Een op knooppunten gebaseerd systeem voor het genereren van afbeeldingen is momenteel in ontwikkeling. Blijf op de hoogte voor nieuws over deze verbluffende functie.",
         "postProcessing": "Naverwerking",
@@ -73,7 +73,14 @@
         "langHebrew": "עברית",
         "langKorean": "한국어",
         "txt2img": "Tekst naar afbeelding",
-        "postprocessing": "Nabewerking"
+        "postprocessing": "Nabewerking",
+        "dontAskMeAgain": "Vraag niet opnieuw",
+        "imagePrompt": "Afbeeldingsprompt",
+        "random": "Willekeurig",
+        "generate": "Genereer",
+        "openInNewTab": "Open in nieuw tabblad",
+        "areYouSure": "Weet je het zeker?",
+        "linear": "Lineair"
     },
     "gallery": {
         "generations": "Gegenereerde afbeeldingen",
@@ -89,7 +96,12 @@
         "pinGallery": "Zet galerij vast",
         "allImagesLoaded": "Alle afbeeldingen geladen",
         "loadMore": "Laad meer",
-        "noImagesInGallery": "Geen afbeeldingen in galerij"
+        "noImagesInGallery": "Geen afbeeldingen in galerij",
+        "deleteImage": "Wis afbeelding",
+        "deleteImageBin": "Gewiste afbeeldingen worden naar de prullenbak van je besturingssysteem gestuurd.",
+        "deleteImagePermanent": "Gewiste afbeeldingen kunnen niet worden hersteld.",
+        "assets": "Eigen onderdelen",
+        "images": "Afbeeldingen"
     },
     "hotkeys": {
         "keyboardShortcuts": "Sneltoetsen",
@@ -418,7 +430,7 @@
         "height": "Hoogte",
         "seed": "Seed",
         "randomizeSeed": "Willekeurige seed",
-        "shuffle": "Meng",
+        "shuffle": "Mengseed",
         "noiseThreshold": "Drempelwaarde ruis",
         "perlinNoise": "Perlinruis",
         "variations": "Variaties",
@@ -481,11 +493,17 @@
         "copyImage": "Kopieer afbeelding",
         "imageToImage": "Afbeelding naar afbeelding",
         "denoisingStrength": "Sterkte ontruisen",
-        "hiresStrength": "Sterkte hogere resolutie"
+        "hiresStrength": "Sterkte hogere resolutie",
+        "scheduler": "Planner",
+        "noiseSettings": "Ruis",
+        "seamlessXAxis": "X-as",
+        "seamlessYAxis": "Y-as",
+        "hidePreview": "Verberg voorvertoning",
+        "showPreview": "Toon voorvertoning"
     },
     "settings": {
         "models": "Modellen",
-        "displayInProgress": "Toon afbeeldingen gedurende verwerking",
+        "displayInProgress": "Toon voortgangsafbeeldingen",
         "saveSteps": "Bewaar afbeeldingen elke n stappen",
         "confirmOnDelete": "Bevestig bij verwijderen",
         "displayHelpIcons": "Toon hulppictogrammen",
@@ -495,7 +513,16 @@
         "resetWebUIDesc1": "Herstel web-UI herstelt alleen de lokale afbeeldingscache en de onthouden instellingen van je browser. Het verwijdert geen afbeeldingen van schijf.",
         "resetWebUIDesc2": "Als afbeeldingen niet getoond worden in de galerij of iets anders werkt niet, probeer dan eerst deze herstelfunctie voordat je een fout aanmeldt op GitHub.",
         "resetComplete": "Webgebruikersinterface is hersteld. Vernieuw de pasgina om opnieuw te laden.",
-        "useSlidersForAll": "Gebruik schuifbalken voor alle opties"
+        "useSlidersForAll": "Gebruik schuifbalken voor alle opties",
+        "consoleLogLevel": "Logboekniveau",
+        "shouldLogToConsole": "Schrijf logboek naar console",
+        "developer": "Ontwikkelaar",
+        "general": "Algemeen",
+        "showProgressInViewer": "Toon voortgangsafbeeldingen in viewer",
+        "generation": "Generatie",
+        "ui": "Gebruikersinterface",
+        "availableSchedulers": "Beschikbare planners",
+        "antialiasProgressImages": "Voer anti-aliasing uit op voortgangsafbeeldingen"
     },
     "toast": {
         "tempFoldersEmptied": "Tijdelijke map geleegd",
@@ -505,7 +532,7 @@
         "imageCopied": "Afbeelding gekopieerd",
         "imageLinkCopied": "Afbeeldingskoppeling gekopieerd",
         "imageNotLoaded": "Geen afbeelding geladen",
-        "imageNotLoadedDesc": "Geen afbeelding gevonden om te sturen naar de module Afbeelding naar afbeelding",
+        "imageNotLoadedDesc": "Geen afbeeldingen gevonden",
         "imageSavedToGallery": "Afbeelding opgeslagen naar galerij",
         "canvasMerged": "Canvas samengevoegd",
         "sentToImageToImage": "Gestuurd naar Afbeelding naar afbeelding",
@@ -526,7 +553,13 @@
         "metadataLoadFailed": "Fout bij laden metagegevens",
         "initialImageSet": "Initiële afbeelding ingesteld",
         "initialImageNotSet": "Initiële afbeelding niet ingesteld",
-        "initialImageNotSetDesc": "Kan initiële afbeelding niet laden"
+        "initialImageNotSetDesc": "Kan initiële afbeelding niet laden",
+        "serverError": "Serverfout",
+        "disconnected": "Verbinding met server verbroken",
+        "connected": "Verbonden met server",
+        "canceled": "Verwerking geannuleerd",
+        "uploadFailedInvalidUploadDesc": "Moet een enkele PNG- of JPEG-afbeelding zijn",
+        "problemCopyingImageLink": "Kan afbeeldingslink niet kopiëren"
     },
     "tooltip": {
         "feature": {
@@ -600,7 +633,8 @@
         "betaClear": "Wis",
         "betaDarkenOutside": "Verduister buiten tekenvak",
         "betaLimitToBox": "Beperk tot tekenvak",
-        "betaPreserveMasked": "Behoud masker"
+        "betaPreserveMasked": "Behoud masker",
+        "antialiasing": "Anti-aliasing"
     },
     "accessibility": {
         "exitViewer": "Stop viewer",
@@ -622,6 +656,11 @@
         "toggleAutoscroll": "Autom. scrollen aan/uit",
         "toggleLogViewer": "Logboekviewer aan/uit",
         "showGallery": "Toon galerij",
-        "showOptionsPanel": "Toon deelscherm Opties"
+        "showOptionsPanel": "Toon deelscherm Opties",
+        "menu": "Menu"
+    },
+    "ui": {
+        "showProgressImages": "Toon voortgangsafbeeldingen",
+        "hideProgressImages": "Verberg voortgangsafbeeldingen"
     }
 }
