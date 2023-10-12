@@ -78,8 +78,7 @@
         "imagePrompt": "Prompt Immagine",
         "darkMode": "Modalità scura",
         "lightMode": "Modalità chiara",
-        "batch": "Gestione Lotto",
-        "modelmanager": "Gestione Modello"
+        "batch": "Gestione Lotto"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -514,7 +513,6 @@
         "saveSteps": "Salva le immagini ogni n passaggi",
         "confirmOnDelete": "Conferma l'eliminazione",
         "displayHelpIcons": "Visualizza le icone della Guida",
-        "useCanvasBeta": "Utilizza il layout beta di Canvas",
         "enableImageDebugging": "Abilita il debug dell'immagine",
         "resetWebUI": "Reimposta l'interfaccia utente Web",
         "resetWebUIDesc1": "Il ripristino dell'interfaccia utente Web reimposta solo la cache locale del browser delle immagini e le impostazioni memorizzate. Non cancella alcuna immagine dal disco.",
