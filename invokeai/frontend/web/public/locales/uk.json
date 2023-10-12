@@ -441,7 +441,6 @@
         "infillScalingHeader": "Заповнення і масштабування",
         "img2imgStrength": "Сила обробки img2img",
         "toggleLoopback": "Зациклити обробку",
-        "invoke": "Викликати",
         "sendTo": "Надіслати",
         "sendToImg2Img": "Надіслати у img2img",
         "sendToUnifiedCanvas": "Надіслати на полотно",

@@ -422,7 +422,6 @@
         "symmetry": "סימטריה",
         "vSymmetryStep": "צעד סימטריה V",
         "hSymmetryStep": "צעד סימטריה H",
-        "invoke": "הפעלה",
         "cancel": {
             "schedule": "ביטול לאחר האיטרציה הנוכחית",
             "isScheduled": "מבטל",
