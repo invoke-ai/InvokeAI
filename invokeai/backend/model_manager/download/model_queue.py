@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, parse_obj_as, validator
 from pydantic.networks import AnyHttpUrl
 
 from .base import DownloadEventHandler, DownloadJobBase, DownloadJobStatus, DownloadQueueBase
-from .queue import HTTP_RE, DownloadJobRemoteSource, DownloadQueue
+from .queue import HTTP_RE, DownloadJobRemoteSource, DownloadJobURL, DownloadQueue
 
 # regular expressions used to dispatch appropriate downloaders and metadata retrievers
 # endpoint for civitai get-model API
@@ -38,6 +38,10 @@ class DownloadJobWithMetadata(DownloadJobRemoteSource):
     metadata: ModelSourceMetadata = Field(
         description="Metadata describing the model, derived from source", default_factory=ModelSourceMetadata
     )
+
+
+class DownloadJobMetadataURL(DownloadJobWithMetadata, DownloadJobURL):
+    """DownloadJobWithMetadata with validation of the source URL."""
 
 
 class DownloadJobRepoID(DownloadJobWithMetadata):

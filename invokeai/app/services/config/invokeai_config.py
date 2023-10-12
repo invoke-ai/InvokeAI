@@ -241,8 +241,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
 
     # CACHE
-    ram                 : Union[float, Literal["auto"]] = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number or 'auto')", category="Model Cache", )
-    vram                : Union[float, Literal["auto"]] = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (floating point number or 'auto')", category="Model Cache", )
+    ram                 : float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by model cache for rapid switching", category="Model Cache", )
+    vram                : float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage", category="Model Cache", )
     disk                : float = Field(default=DEFAULT_MAX_DISK_CACHE, ge=0, description="Maximum size (in GB) for the disk-based diffusers model conversion cache", category="Model Cache", )
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", category="Model Cache", )
 
@@ -443,7 +443,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         return self.disk
 
     @property
-    def vram_cache_size(self) -> Union[Literal["auto"], float]:
+    def vram_cache_size(self) -> float:
         return self.max_vram_cache_size or self.vram
 
     @property

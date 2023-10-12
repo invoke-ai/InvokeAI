@@ -50,7 +50,7 @@ def test_install(datadir: Path):
         )
 
         event_bus = DummyEventService()
-        mm_store = ModelRecordServiceBase.get_impl(config)
+        mm_store = ModelRecordServiceBase.open(config)
         mm_load = ModelLoadService(config, mm_store)
         mm_install = ModelInstallService(config=config, store=mm_store, event_bus=event_bus)
 

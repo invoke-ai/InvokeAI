@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.download.model_queue import (
     HTTP_RE,
     REPO_ID_WITH_OPTIONAL_SUBFOLDER_RE,
+    DownloadJobMetadataURL,
     DownloadJobRepoID,
     DownloadJobWithMetadata,
 )
@@ -60,7 +61,7 @@ class ModelInstallJob(DownloadJobBase):
     )
 
 
-class ModelInstallURLJob(DownloadJobWithMetadata, ModelInstallJob):
+class ModelInstallURLJob(DownloadJobMetadataURL, ModelInstallJob):
     """Job for installing URLs."""
 
 
