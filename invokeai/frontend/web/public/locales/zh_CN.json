@@ -84,7 +84,11 @@
         "lightMode": "浅色模式",
         "learnMore": "了解更多",
         "darkMode": "深色模式",
-        "advanced": "高级"
+        "advanced": "高级",
+        "t2iAdapter": "T2I Adapter",
+        "ipAdapter": "IP Adapter",
+        "controlAdapter": "Control Adapter",
+        "controlNet": "ControlNet"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -112,7 +116,10 @@
         "currentlyInUse": "该图像目前在以下功能中使用：",
         "copy": "复制",
         "download": "下载",
-        "setCurrentImage": "设为当前图像"
+        "setCurrentImage": "设为当前图像",
+        "preparingDownload": "准备下载",
+        "preparingDownloadFailed": "准备下载时出现问题",
+        "downloadSelection": "下载所选内容"
     },
     "hotkeys": {
         "keyboardShortcuts": "键盘快捷键",
@@ -460,7 +467,12 @@
         "closeAdvanced": "关闭高级",
         "modelType": "模型类别",
         "customConfigFileLocation": "自定义配置文件目录",
-        "variant": "变体"
+        "variant": "变体",
+        "onnxModels": "Onnx",
+        "vae": "VAE",
+        "oliveModels": "Olive",
+        "loraModels": "LoRA",
+        "alpha": "Alpha"
     },
     "parameters": {
         "images": "图像",
@@ -513,8 +525,8 @@
         "info": "信息",
         "initialImage": "初始图像",
         "showOptionsPanel": "显示侧栏浮窗 (O 或 T)",
-        "seamlessYAxis": "Y轴",
-        "seamlessXAxis": "X轴",
+        "seamlessYAxis": "Y 轴",
+        "seamlessXAxis": "X 轴",
         "boundingBoxWidth": "边界框宽度",
         "boundingBoxHeight": "边界框高度",
         "denoisingStrength": "去噪强度",
@@ -559,9 +571,9 @@
             "addingImagesTo": "添加图像到",
             "noPrompts": "没有已生成的提示词",
             "readyToInvoke": "准备调用",
-            "noControlImageForControlAdapter": "Control Adapter {{number}} 没有控制图像",
-            "noModelForControlAdapter": "Control Adapter {{number}} 没有选择模型。",
-            "incompatibleBaseModelForControlAdapter": "Control Adapter {{number}} 与主模型不匹配。"
+            "noControlImageForControlAdapter": "有 #{{number}} 个 Control Adapter 缺失控制图像",
+            "noModelForControlAdapter": "有 #{{number}} 个 Control Adapter 没有选择模型。",
+            "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不匹配。"
         },
         "patchmatchDownScaleSize": "缩小",
         "coherenceSteps": "步数",
@@ -611,7 +623,15 @@
         "showAdvancedOptions": "显示进阶选项",
         "favoriteSchedulers": "采样算法偏好",
         "autoChangeDimensions": "更改时将宽/高更新为模型默认值",
-        "experimental": "实验性"
+        "experimental": "实验性",
+        "beta": "Beta",
+        "clearIntermediates": "清除中间产物",
+        "clearIntermediatesDesc3": "您图库中的图像不会被删除。",
+        "clearIntermediatesDesc2": "中间产物图像是生成过程中产生的副产品，与图库中的结果图像不同。清除中间产物可释放磁盘空间。",
+        "intermediatesCleared_other": "已清除 {{number}} 个中间产物",
+        "clearIntermediatesDesc1": "清除中间产物会重置您的画布和 ControlNet 状态。",
+        "intermediatesClearedFailed": "清除中间产物时出现问题",
+        "noIntermediates": "没有可清除的中间产物"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
@@ -635,8 +655,8 @@
         "seedNotSet": "种子未设定",
         "seedNotSetDesc": "无法找到该图像的种子。",
         "promptSet": "提示词已设定",
-        "promptNotSet": "提示未设定",
-        "promptNotSetDesc": "无法找到该图像的提示。",
+        "promptNotSet": "提示词未设定",
+        "promptNotSetDesc": "无法找到该图像的提示词。",
         "upscalingFailed": "放大失败",
         "faceRestoreFailed": "面部修复失败",
         "metadataLoadFailed": "加载元数据失败",
@@ -693,7 +713,8 @@
         "maskSentControlnetAssets": "遮罩已发送到 ControlNet & 素材",
         "canvasSavedGallery": "画布已保存到图库",
         "imageUploadFailed": "图像上传失败",
-        "problemImportingMask": "导入遮罩时出现问题"
+        "problemImportingMask": "导入遮罩时出现问题",
+        "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{number}} 个不兼容的子模型"
     },
     "unifiedCanvas": {
         "layer": "图层",
@@ -789,8 +810,8 @@
     },
     "tooltip": {
         "feature": {
-            "prompt": "这是提示词区域。提示词包括生成对象和风格术语。您也可以在提示中添加权重（Token 的重要性），但命令行命令和参数不起作用。",
-            "imageToImage": "图生图模式加载任何图像作为初始图像，然后与提示一起用于生成新图像。值越高，结果图像的变化就越大。可能的值为 0.0 到 1.0，建议的范围是 0.25 到 0.75",
+            "prompt": "这是提示词区域。提示词包括生成对象和风格术语。您也可以在提示词中添加权重（Token 的重要性），但命令行命令和参数不起作用。",
+            "imageToImage": "图生图模式加载任何图像作为初始图像，然后与提示词一起用于生成新图像。值越高，结果图像的变化就越大。可能的值为 0.0 到 1.0，建议的范围是 0.25 到 0.75",
             "upscale": "使用 ESRGAN 可以在图片生成后立即放大图片。",
             "variations": "尝试将变化值设置在 0.1 到 1.0 之间，以更改给定种子的结果。种子的变化在 0.1 到 0.3 之间会很有趣。",
             "boundingBox": "边界框的高和宽的设定对文生图和图生图模式是一样的，只有边界框中的区域会被处理。",
@@ -875,7 +896,7 @@
         "loadingNodes": "加载节点中...",
         "snapToGridHelp": "移动时将节点与网格对齐",
         "workflowSettings": "工作流编辑器设置",
-        "booleanPolymorphicDescription": "布尔集合。",
+        "booleanPolymorphicDescription": "一个布尔值合集。",
         "scheduler": "调度器",
         "inputField": "输入",
         "controlFieldDescription": "节点间传递的控制信息。",
@@ -891,14 +912,14 @@
         "maybeIncompatible": "可能与已安装的不兼容",
         "collectionDescription": "待办事项",
         "skippingReservedFieldType": "跳过保留类型",
-        "booleanCollectionDescription": "布尔集合。",
+        "booleanCollectionDescription": "一个布尔值合集。",
         "sDXLMainModelFieldDescription": "SDXL 模型。",
         "boardField": "面板",
         "problemReadingWorkflow": "从图像读取工作流时出现问题",
         "sourceNode": "源节点",
         "nodeOpacity": "节点不透明度",
         "collectionItemDescription": "待办事项",
-        "integerDescription": "整数 (Integer) 是没有与小数点的数字。",
+        "integerDescription": "整数是没有与小数点的数字。",
         "outputField": "输出",
         "skipped": "跳过",
         "updateNode": "更新节点",
@@ -957,7 +978,32 @@
         "cannotDuplicateConnection": "无法创建重复的连接",
         "ipAdapterModel": "IP-Adapter 模型",
         "ipAdapterDescription": "图像提示词自适应 (IP-Adapter)。",
-        "ipAdapterModelDescription": "IP-Adapter 模型"
+        "ipAdapterModelDescription": "IP-Adapter 模型",
+        "floatCollectionDescription": "一个浮点数合集。",
+        "enum": "Enum (枚举)",
+        "integerPolymorphicDescription": "一个整数值合集。",
+        "float": "浮点",
+        "integer": "整数",
+        "colorField": "颜色",
+        "stringCollectionDescription": "一个字符串合集。",
+        "stringCollection": "字符串合集",
+        "uNetField": "UNet",
+        "integerCollection": "整数合集",
+        "vaeModelField": "VAE",
+        "integerCollectionDescription": "一个整数值合集。",
+        "clipField": "Clip",
+        "stringDescription": "字符串是指文本。",
+        "colorCollection": "一个颜色合集。",
+        "boolean": "布尔值",
+        "stringPolymorphicDescription": "一个字符串合集。",
+        "controlField": "控制信息",
+        "floatPolymorphicDescription": "一个浮点数合集。",
+        "vaeField": "Vae",
+        "floatCollection": "浮点合集",
+        "booleanCollection": "布尔值合集",
+        "imageCollectionDescription": "一个图像合集。",
+        "loRAModelField": "LoRA",
+        "imageCollection": "图像合集"
     },
     "controlnet": {
         "resize": "直接缩放",
@@ -973,7 +1019,7 @@
         "mlsdDescription": "简洁的分割线段（直线）检测器",
         "duplicate": "复制",
         "balanced": "平衡",
-        "prompt": "提示词",
+        "prompt": "Prompt (提示词控制)",
         "depthMidasDescription": "使用 Midas 生成深度图",
         "openPoseDescription": "使用 Openpose 进行人体姿态估计",
         "resizeMode": "缩放模式",
@@ -998,7 +1044,7 @@
         "toggleControlNet": "开关此 ControlNet",
         "delete": "删除",
         "colorMapTileSize": "分块大小",
-        "ipAdapterImageFallback": "无选中的 IP Adapter 图像",
+        "ipAdapterImageFallback": "无已选择的 IP Adapter 图像",
         "mediapipeFaceDescription": "使用 Mediapipe 检测面部",
         "depthZoeDescription": "使用 Zoe 生成深度图",
         "hedDescription": "整体嵌套边缘检测",
@@ -1020,7 +1066,30 @@
         "addIPAdapter": "添加 $t(common.ipAdapter)",
         "safe": "保守模式",
         "scribble": "草绘 (scribble)",
-        "maxFaces": "最大面部数"
+        "maxFaces": "最大面部数",
+        "pidi": "PIDI",
+        "normalBae": "Normal BAE",
+        "hed": "HED",
+        "contentShuffle": "Content Shuffle",
+        "f": "F",
+        "h": "H",
+        "controlnet": "$t(controlnet.controlAdapter) #{{number}} ($t(common.controlNet))",
+        "control": "Control (普通控制)",
+        "coarse": "Coarse",
+        "depthMidas": "Depth (Midas)",
+        "w": "W",
+        "ip_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.ipAdapter))",
+        "mediapipeFace": "Mediapipe Face",
+        "mlsd": "M-LSD",
+        "lineart": "Lineart",
+        "t2i_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.t2iAdapter))",
+        "megaControl": "Mega Control (超级控制)",
+        "depthZoe": "Depth (Zoe)",
+        "colorMap": "Color",
+        "openPose": "Openpose",
+        "controlAdapter": "Control Adapter",
+        "lineartAnime": "Lineart Anime",
+        "canny": "Canny"
     },
     "queue": {
         "status": "状态",
@@ -1096,7 +1165,8 @@
         "concatPromptStyle": "连接提示词 & 样式",
         "loading": "加载中...",
         "steps": "步数",
-        "posStylePrompt": "正向样式提示词"
+        "posStylePrompt": "正向样式提示词",
+        "refiner": "Refiner"
     },
     "metadata": {
         "positivePrompt": "正向提示词",
@@ -1148,7 +1218,8 @@
         "uncategorized": "未分类",
         "changeBoard": "更改面板",
         "loading": "加载中...",
-        "clearSearch": "清除检索"
+        "clearSearch": "清除检索",
+        "downloadBoard": "下载面板"
     },
     "embedding": {
         "noMatchingEmbedding": "不匹配的 Embedding",
@@ -1273,7 +1344,7 @@
         "paramScheduler": {
             "heading": "调度器",
             "paragraphs": [
-                "调度器定义如何在图像迭代过程中添加噪声，或者定义如何根据一个模型的输出来更新采样。"
+                "调度器 (采样器) 定义如何在图像迭代过程中添加噪声，或者定义如何根据一个模型的输出来更新采样。"
             ]
         },
         "controlNetWeight": {
@@ -1358,7 +1429,8 @@
         "paramVAE": {
             "paragraphs": [
                 "用于将 AI 输出转换成最终图像的模型。"
-            ]
+            ],
+            "heading": "VAE"
         },
         "dynamicPromptsSeedBehaviour": {
             "paragraphs": [
@@ -1378,7 +1450,8 @@
         "controlNet": {
             "paragraphs": [
                 "ControlNet 为生成过程提供引导，为生成具有受控构图、结构、样式的图像提供帮助，具体的功能由所选的模型决定。"
-            ]
+            ],
+            "heading": "ControlNet"
         }
     },
     "invocationCache": {
