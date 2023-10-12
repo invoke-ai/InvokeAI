@@ -79,7 +79,8 @@
         "darkMode": "Modalità scura",
         "lightMode": "Modalità chiara",
         "batch": "Gestione Lotto",
-        "modelManager": "Gestione del modello"
+        "modelManager": "Gestione del modello",
+        "communityLabel": "Comunità"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -100,7 +101,8 @@
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
         "deleteImageBin": "Le immagini eliminate verranno spostate nel Cestino del tuo sistema operativo.",
         "images": "Immagini",
-        "assets": "Risorse"
+        "assets": "Risorse",
+        "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti rapidi",
@@ -307,6 +309,10 @@
         "acceptStagingImage": {
             "title": "Accetta l'immagine della sessione",
             "desc": "Accetta l'immagine dell'area della sessione corrente"
+        },
+        "nodesHotkeys": "Tasti di scelta rapida dei Nodi",
+        "addNodes": {
+            "title": "Aggiungi Nodi"
         }
     },
     "modelManager": {
@@ -436,7 +442,10 @@
         "modelSyncFailed": "Sincronizzazione del modello non riuscita",
         "settings": "Impostazioni",
         "syncModels": "Sincronizza Modelli",
-        "syncModelsDesc": "Se i tuoi modelli non sono sincronizzati con il back-end, puoi aggiornarli utilizzando questa opzione. Questo è generalmente utile nei casi in cui aggiorni manualmente il tuo file models.yaml o aggiungi modelli alla cartella principale di InvokeAI dopo l'avvio dell'applicazione."
+        "syncModelsDesc": "Se i tuoi modelli non sono sincronizzati con il back-end, puoi aggiornarli utilizzando questa opzione. Questo è generalmente utile nei casi in cui aggiorni manualmente il tuo file models.yaml o aggiungi modelli alla cartella principale di InvokeAI dopo l'avvio dell'applicazione.",
+        "loraModels": "LoRA",
+        "oliveModels": "Olive",
+        "onnxModels": "ONNX"
     },
     "parameters": {
         "images": "Immagini",
@@ -520,7 +529,14 @@
         "negativePromptPlaceholder": "Prompt Negativo",
         "controlNetControlMode": "Modalità di controllo",
         "clipSkip": "Salta CLIP",
-        "aspectRatio": "Proporzioni"
+        "aspectRatio": "Proporzioni",
+        "maskAdjustmentsHeader": "Regolazioni della maschera",
+        "maskBlur": "Sfocatura maschera",
+        "maskBlurMethod": "Metodo di sfocatura della maschera",
+        "seamPaintingHeader": "Pittura della cucitura",
+        "seamThreshold": "Soglia di cucitura",
+        "seamLowThreshold": "Basso",
+        "seamHighThreshold": "Alto"
     },
     "settings": {
         "models": "Modelli",
