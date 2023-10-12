@@ -39,7 +39,11 @@
         "statusUpscaling": "Powiększanie obrazu",
         "statusUpscalingESRGAN": "Powiększanie (ESRGAN)",
         "statusLoadingModel": "Wczytywanie modelu",
-        "statusModelChanged": "Zmieniono model"
+        "statusModelChanged": "Zmieniono model",
+        "githubLabel": "GitHub",
+        "discordLabel": "Discord",
+        "darkMode": "Tryb ciemny",
+        "lightMode": "Tryb jasny"
     },
     "gallery": {
         "generations": "Wygenerowane",
@@ -437,5 +441,28 @@
         "betaDarkenOutside": "Przyciemnienie",
         "betaLimitToBox": "Ogranicz do zaznaczenia",
         "betaPreserveMasked": "Zachowaj obszar"
+    },
+    "accessibility": {
+        "zoomIn": "Przybliż",
+        "exitViewer": "Wyjdź z podglądu",
+        "modelSelect": "Wybór modelu",
+        "invokeProgressBar": "Pasek postępu",
+        "reset": "Zerowanie",
+        "useThisParameter": "Użyj tego parametru",
+        "copyMetadataJson": "Kopiuj metadane JSON",
+        "uploadImage": "Wgrywanie obrazu",
+        "previousImage": "Poprzedni obraz",
+        "nextImage": "Następny obraz",
+        "zoomOut": "Oddal",
+        "rotateClockwise": "Obróć zgodnie ze wskazówkami zegara",
+        "rotateCounterClockwise": "Obróć przeciwnie do wskazówek zegara",
+        "flipHorizontally": "Odwróć horyzontalnie",
+        "flipVertically": "Odwróć wertykalnie",
+        "modifyConfig": "Modyfikuj ustawienia",
+        "toggleAutoscroll": "Przełącz autoprzewijanie",
+        "toggleLogViewer": "Przełącz podgląd logów",
+        "showGallery": "Pokaż galerię",
+        "showOptionsPanel": "Pokaż panel opcji",
+        "menu": "Menu"
     }
 }
