@@ -438,7 +438,6 @@
             "immediate": "ביטול מיידי",
             "setType": "הגדר סוג ביטול"
         },
-        "negativePrompts": "בקשות שליליות",
         "sendTo": "שליחה אל",
         "copyImage": "העתקת תמונה",
         "downloadImage": "הורדת תמונה",
@@ -463,8 +462,7 @@
         "seamlessTiling": "ריצוף חלק",
         "img2imgStrength": "חוזק תמונה לתמונה",
         "initialImage": "תמונה ראשונית",
-        "copyImageToLink": "העתקת תמונה לקישור",
-        "promptPlaceholder": "הקלד בקשה כאן. [אסימונים שליליים], (העלאת משקל)++ , (הורדת משקל)--, החלפה ומיזוג זמינים (ראה מסמכים)"
+        "copyImageToLink": "העתקת תמונה לקישור"
     },
     "settings": {
         "models": "מודלים",
