@@ -63,10 +63,7 @@ def add_parsers(
     for command in commands:
         hints = get_type_hints(command)
         cmd_name = get_args(hints[command_field])[0]
-        try:
-            command_parser = subparsers.add_parser(cmd_name, help=command.__doc__)
-        except argparse.ArgumentError:
-            continue
+        command_parser = subparsers.add_parser(cmd_name, help=command.__doc__)
 
         if add_arguments is not None:
             add_arguments(command_parser)
@@ -145,7 +142,7 @@ class BaseCommand(ABC, BaseModel):
     """A CLI command"""
 
     # All commands must include a type name like this:
-    # Literal['your_command_name'] = 'your_command_name'
+    # type: Literal['your_command_name'] = 'your_command_name'
 
     @classmethod
     def get_all_subclasses(cls):
