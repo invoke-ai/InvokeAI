@@ -75,7 +75,11 @@
         "openInNewTab": "Apri in una nuova scheda",
         "areYouSure": "Sei sicuro?",
         "dontAskMeAgain": "Non chiedermelo più",
-        "imagePrompt": "Prompt Immagine"
+        "imagePrompt": "Prompt Immagine",
+        "darkMode": "Modalità scura",
+        "lightMode": "Modalità chiara",
+        "batch": "Gestione Lotto",
+        "modelmanager": "Gestione Modello"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -415,7 +419,10 @@
         "none": "niente",
         "addDifference": "Aggiungi differenza",
         "pickModelType": "Scegli il tipo di modello",
-        "scanForModels": "Cerca modelli"
+        "scanForModels": "Cerca modelli",
+        "variant": "Variante",
+        "baseModel": "Modello Base",
+        "vae": "VAE"
     },
     "parameters": {
         "images": "Immagini",
@@ -496,7 +503,10 @@
         "boundingBoxWidth": "Larghezza riquadro di delimitazione",
         "boundingBoxHeight": "Altezza riquadro di delimitazione",
         "positivePromptPlaceholder": "Prompt Positivo",
-        "negativePromptPlaceholder": "Prompt Negativo"
+        "negativePromptPlaceholder": "Prompt Negativo",
+        "controlNetControlMode": "Modalità di controllo",
+        "clipSkip": "Salta CLIP",
+        "aspectRatio": "Proporzioni"
     },
     "settings": {
         "models": "Modelli",
@@ -518,7 +528,10 @@
         "antialiasProgressImages": "Anti aliasing delle immagini di avanzamento",
         "showProgressInViewer": "Mostra le immagini di avanzamento nel visualizzatore",
         "generation": "Generazione",
-        "ui": "Interfaccia Utente"
+        "ui": "Interfaccia Utente",
+        "favoriteSchedulersPlaceholder": "Nessun campionatore preferito",
+        "favoriteSchedulers": "Campionatori preferiti",
+        "showAdvancedOptions": "Mostra Opzioni Avanzate"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -659,6 +672,7 @@
     },
     "ui": {
         "hideProgressImages": "Nascondi avanzamento immagini",
-        "showProgressImages": "Mostra avanzamento immagini"
+        "showProgressImages": "Mostra avanzamento immagini",
+        "swapSizes": "Scambia dimensioni"
     }
 }
