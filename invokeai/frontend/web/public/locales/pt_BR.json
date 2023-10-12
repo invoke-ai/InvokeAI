@@ -59,7 +59,6 @@
         "statusMergedModels": "Modelos Mesclados",
         "langRussian": "Russo",
         "langSpanish": "Espanhol",
-        "pinOptionsPanel": "Fixar painel de opções",
         "loadingInvokeAI": "Carregando Invoke AI",
         "loading": "Carregando"
     },
@@ -74,7 +73,6 @@
         "maintainAspectRatio": "Mater Proporções",
         "autoSwitchNewImages": "Trocar para Novas Imagens Automaticamente",
         "singleColumnLayout": "Disposição em Coluna Única",
-        "pinGallery": "Fixar Galeria",
         "allImagesLoaded": "Todas as Imagens Carregadas",
         "loadMore": "Carregar Mais",
         "noImagesInGallery": "Sem Imagens na Galeria"
