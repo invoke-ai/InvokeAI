@@ -500,7 +500,6 @@
         "saveSteps": "Bewaar afbeeldingen elke n stappen",
         "confirmOnDelete": "Bevestig bij verwijderen",
         "displayHelpIcons": "Toon hulppictogrammen",
-        "useCanvasBeta": "Gebruik bètavormgeving van canvas",
         "enableImageDebugging": "Schakel foutopsporing afbeelding in",
         "resetWebUI": "Herstel web-UI",
         "resetWebUIDesc1": "Herstel web-UI herstelt alleen de lokale afbeeldingscache en de onthouden instellingen van je browser. Het verwijdert geen afbeeldingen van schijf.",

@@ -504,7 +504,6 @@
         "saveSteps": "每n步保存图像",
         "confirmOnDelete": "删除时确认",
         "displayHelpIcons": "显示帮助按钮",
-        "useCanvasBeta": "使用测试版画布视图",
         "enableImageDebugging": "开启图像调试",
         "resetWebUI": "重置网页界面",
         "resetWebUIDesc1": "重置网页只会重置浏览器中缓存的图像和设置，不会删除任何图像。",

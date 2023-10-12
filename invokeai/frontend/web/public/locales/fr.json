@@ -410,7 +410,6 @@
         "saveSteps": "Enregistrer les images tous les n étapes",
         "confirmOnDelete": "Confirmer la suppression",
         "displayHelpIcons": "Afficher les icônes d'aide",
-        "useCanvasBeta": "Utiliser la mise en page bêta de Canvas",
         "enableImageDebugging": "Activer le débogage d'image",
         "resetWebUI": "Réinitialiser l'interface Web",
         "resetWebUIDesc1": "Réinitialiser l'interface Web ne réinitialise que le cache local du navigateur de vos images et de vos paramètres enregistrés. Cela n'efface pas les images du disque.",

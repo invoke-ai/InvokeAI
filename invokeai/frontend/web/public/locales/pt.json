@@ -472,7 +472,6 @@
     "settings": {
         "confirmOnDelete": "Confirmar Antes de Apagar",
         "displayHelpIcons": "Mostrar Ícones de Ajuda",
-        "useCanvasBeta": "Usar Layout de Telas Beta",
         "enableImageDebugging": "Ativar Depuração de Imagem",
         "useSlidersForAll": "Usar deslizadores para todas as opções",
         "resetWebUIDesc1": "Reiniciar a interface apenas reinicia o cache local do broswer para imagens e configurações lembradas. Não apaga nenhuma imagem do disco.",
