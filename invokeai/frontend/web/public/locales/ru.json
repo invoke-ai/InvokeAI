@@ -75,7 +75,12 @@
         "random": "Случайное",
         "generate": "Сгенерировать",
         "openInNewTab": "Открыть в новой вкладке",
-        "imagePrompt": "Запрос"
+        "imagePrompt": "Запрос",
+        "communityLabel": "Сообщество",
+        "lightMode": "Светлая тема",
+        "batch": "Пакетный менеджер",
+        "modelManager": "Менеджер моделей",
+        "darkMode": "Темная тема"
     },
     "gallery": {
         "generations": "Генерации",
@@ -96,7 +101,8 @@
         "deleteImageBin": "Удаленные изображения будут отправлены в корзину вашей операционной системы.",
         "deleteImage": "Удалить изображение",
         "images": "Изображения",
-        "assets": "Ресурсы"
+        "assets": "Ресурсы",
+        "autoAssignBoardOnClick": "Авто-назначение доски по клику"
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
@@ -303,7 +309,12 @@
         "acceptStagingImage": {
             "title": "Принять изображение",
             "desc": "Принять текущее изображение"
-        }
+        },
+        "addNodes": {
+            "desc": "Открывает меню добавления узла",
+            "title": "Добавление узлов"
+        },
+        "nodesHotkeys": "Горячие клавиши узлов"
     },
     "modelManager": {
         "modelManager": "Менеджер моделей",
@@ -356,14 +367,14 @@
         "deleteModel": "Удалить модель",
         "deleteConfig": "Удалить конфигурацию",
         "deleteMsg1": "Вы точно хотите удалить модель из InvokeAI?",
-        "deleteMsg2": "Это не удалит файл модели с диска. Позже вы можете добавить его снова.",
+        "deleteMsg2": "Это приведет К УДАЛЕНИЮ модели С ДИСКА, если она находится в корневой папке Invoke. Если вы используете пользовательское расположение, то модель НЕ будет удалена с диска.",
         "repoIDValidationMsg": "Онлайн-репозиторий модели",
-        "convertToDiffusersHelpText5": "Пожалуйста, убедитесь, что у вас достаточно места на диске. Модели обычно занимают 4 – 7 Гб.",
+        "convertToDiffusersHelpText5": "Пожалуйста, убедитесь, что у вас достаточно места на диске. Модели обычно занимают 2–7 Гб.",
         "invokeAIFolder": "Каталог InvokeAI",
         "ignoreMismatch": "Игнорировать несоответствия между выбранными моделями",
         "addCheckpointModel": "Добавить модель Checkpoint/Safetensor",
         "formMessageDiffusersModelLocationDesc": "Укажите хотя бы одно.",
-        "convertToDiffusersHelpText3": "Файл модели на диске НЕ будет удалён или изменён. Вы сможете заново добавить его в Model Manager при необходимости.",
+        "convertToDiffusersHelpText3": "Ваш файл контрольной точки НА ДИСКЕ будет УДАЛЕН, если он находится в корневой папке InvokeAI. Если он находится в пользовательском расположении, то он НЕ будет удален.",
         "vaeRepoID": "ID репозитория VAE",
         "mergedModelName": "Название объединенной модели",
         "checkpointModels": "Checkpoints",
@@ -415,7 +426,27 @@
         "weightedSum": "Взвешенная сумма",
         "safetensorModels": "SafeTensors",
         "v2_768": "v2 (768px)",
-        "v2_base": "v2 (512px)"
+        "v2_base": "v2 (512px)",
+        "modelDeleted": "Модель удалена",
+        "importModels": "Импорт Моделей",
+        "variant": "Вариант",
+        "baseModel": "Базовая модель",
+        "modelsSynced": "Модели синхронизированы",
+        "modelSyncFailed": "Не удалось синхронизировать модели",
+        "vae": "VAE",
+        "modelDeleteFailed": "Не удалось удалить модель",
+        "noCustomLocationProvided": "Пользовательское местоположение не указано",
+        "convertingModelBegin": "Конвертация модели. Пожалуйста, подождите.",
+        "settings": "Настройки",
+        "selectModel": "Выберите модель",
+        "syncModels": "Синхронизация моделей",
+        "syncModelsDesc": "Если ваши модели не синхронизированы с серверной частью, вы можете обновить их, используя эту опцию. Обычно это удобно в тех случаях, когда вы вручную обновляете свой файл \"models.yaml\" или добавляете модели в корневую папку InvokeAI после загрузки приложения.",
+        "modelUpdateFailed": "Не удалось обновить модель",
+        "modelConversionFailed": "Не удалось сконвертировать модель",
+        "modelsMergeFailed": "Не удалось выполнить слияние моделей",
+        "loraModels": "LoRAs",
+        "onnxModels": "Onnx",
+        "oliveModels": "Olives"
     },
     "parameters": {
         "images": "Изображения",
@@ -496,7 +527,17 @@
         "boundingBoxWidth": "Ширина ограничивающей рамки",
         "boundingBoxHeight": "Высота ограничивающей рамки",
         "positivePromptPlaceholder": "Запрос",
-        "negativePromptPlaceholder": "Исключающий запрос"
+        "negativePromptPlaceholder": "Исключающий запрос",
+        "controlNetControlMode": "Режим управления",
+        "clipSkip": "CLIP Пропуск",
+        "aspectRatio": "Соотношение",
+        "maskAdjustmentsHeader": "Настройка маски",
+        "maskBlur": "Размытие маски",
+        "maskBlurMethod": "Метод размытия маски",
+        "seamPaintingHeader": "Окрашивание швов",
+        "seamThreshold": "Порог шва",
+        "seamLowThreshold": "Низкий",
+        "seamHighThreshold": "Высокий"
     },
     "settings": {
         "models": "Модели",
@@ -518,7 +559,14 @@
         "showProgressInViewer": "Показывать процесс генерации в Просмотрщике",
         "antialiasProgressImages": "Сглаживать предпоказ процесса генерации",
         "generation": "Поколение",
-        "ui": "Пользовательский интерфейс"
+        "ui": "Пользовательский интерфейс",
+        "favoriteSchedulers": "Избранные планировщики",
+        "favoriteSchedulersPlaceholder": "Нет избранных планировщиков",
+        "enableNodesEditor": "Включить редактор узлов",
+        "experimental": "Экспериментальные",
+        "beta": "Бета",
+        "alternateCanvasLayout": "Альтернативный слой холста",
+        "showAdvancedOptions": "Показать доп. параметры"
     },
     "toast": {
         "tempFoldersEmptied": "Временная папка очищена",
@@ -557,7 +605,17 @@
         "problemCopyingImageLink": "Не удалось скопировать ссылку на изображение",
         "uploadFailedInvalidUploadDesc": "Должно быть одно изображение в формате PNG или JPEG",
         "parameterNotSet": "Параметр не задан",
-        "parameterSet": "Параметр задан"
+        "parameterSet": "Параметр задан",
+        "nodesLoaded": "Узлы загружены",
+        "problemCopyingImage": "Не удается скопировать изображение",
+        "nodesLoadedFailed": "Не удалось загрузить Узлы",
+        "nodesCleared": "Узлы очищены",
+        "nodesBrokenConnections": "Не удается загрузить. Некоторые соединения повреждены.",
+        "nodesUnrecognizedTypes": "Не удается загрузить. Граф имеет нераспознанные типы",
+        "nodesNotValidJSON": "Недопустимый JSON",
+        "nodesCorruptedGraph": "Не удается загрузить. Граф, похоже, поврежден.",
+        "nodesSaved": "Узлы сохранены",
+        "nodesNotValidGraph": "Недопустимый граф узлов InvokeAI"
     },
     "tooltip": {
         "feature": {
@@ -659,6 +717,29 @@
     },
     "ui": {
         "showProgressImages": "Показывать промежуточный итог",
-        "hideProgressImages": "Не показывать промежуточный итог"
+        "hideProgressImages": "Не показывать промежуточный итог",
+        "swapSizes": "Поменять местами размеры"
+    },
+    "nodes": {
+        "reloadSchema": "Перезагрузить схему",
+        "saveGraph": "Сохранить граф",
+        "clearGraph": "Очистить граф",
+        "zoomInNodes": "Увеличьте масштаб",
+        "zoomOutNodes": "Уменьшите масштаб",
+        "fitViewportNodes": "Уместить вид",
+        "hideGraphNodes": "Скрыть оверлей графа",
+        "showGraphNodes": "Показать оверлей графа",
+        "showLegendNodes": "Показать тип поля",
+        "hideMinimapnodes": "Скрыть миникарту",
+        "loadGraph": "Загрузить граф (сохраненный из Редактора узлов) (Не копировать и не вставлять метаданные)",
+        "clearGraphDesc": "Вы уверены, что хотите очистить все узлы?",
+        "hideLegendNodes": "Скрыть тип поля",
+        "showMinimapnodes": "Показать миникарту",
+        "saveWorkflow": "Сохранить рабочий процесс",
+        "loadWorkflow": "Загрузить рабочий процесс",
+        "resetWorkflowDesc2": "Сброс рабочего процесса очистит все узлы, ребра и детали рабочего процесса.",
+        "resetWorkflow": "Сбросить рабочий процесс",
+        "resetWorkflowDesc": "Вы уверены, что хотите сбросить этот рабочий процесс?",
+        "reloadNodeTemplates": "Перезагрузить шаблоны узлов"
     }
 }
