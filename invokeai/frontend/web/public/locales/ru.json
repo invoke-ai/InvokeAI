@@ -10,7 +10,7 @@
         "greenTheme": "Зеленая",
         "img2img": "Изображение в изображение (img2img)",
         "unifiedCanvas": "Единый холст",
-        "nodes": "Ноды",
+        "nodes": "Редактор нод",
         "langRussian": "Русский",
         "nodesDesc": "Cистема генерации изображений на основе нодов (узлов) уже разрабатывается. Следите за новостями об этой замечательной функции.",
         "postProcessing": "Постобработка",
@@ -79,7 +79,8 @@
         "areYouSure": "Вы уверены?",
         "random": "Случайное",
         "generate": "Сгенерировать",
-        "openInNewTab": "Открыть в новой вкладке"
+        "openInNewTab": "Открыть в новой вкладке",
+        "imagePrompt": "Запрос"
     },
     "gallery": {
         "generations": "Генерации",
@@ -98,7 +99,9 @@
         "noImagesInGallery": "Изображений нет",
         "deleteImagePermanent": "Удаленные изображения невозможно восстановить.",
         "deleteImageBin": "Удаленные изображения будут отправлены в корзину вашей операционной системы.",
-        "deleteImage": "Удалить изображение"
+        "deleteImage": "Удалить изображение",
+        "images": "Изображения",
+        "assets": "Ресурсы"
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
@@ -427,7 +430,7 @@
         "height": "Высота",
         "seed": "Сид",
         "randomizeSeed": "Случайный сид",
-        "shuffle": "Обновить",
+        "shuffle": "Обновить сид",
         "noiseThreshold": "Порог шума",
         "perlinNoise": "Шум Перлина",
         "variations": "Вариации",
@@ -492,7 +495,15 @@
         "denoisingStrength": "Сила шумоподавления",
         "copyImage": "Скопировать изображение",
         "negativePrompts": "Исключающий запрос",
-        "showPreview": "Показать предпросмотр"
+        "showPreview": "Показать предпросмотр",
+        "noiseSettings": "Шум",
+        "seamlessXAxis": "Ось X",
+        "seamlessYAxis": "Ось Y",
+        "scheduler": "Планировщик",
+        "boundingBoxWidth": "Ширина ограничивающей рамки",
+        "boundingBoxHeight": "Высота ограничивающей рамки",
+        "positivePromptPlaceholder": "Запрос",
+        "negativePromptPlaceholder": "Исключающий запрос"
     },
     "settings": {
         "models": "Модели",
@@ -510,7 +521,12 @@
         "consoleLogLevel": "Уровень логирования",
         "shouldLogToConsole": "Логи в консоль",
         "developer": "Разработчик",
-        "general": "Основное"
+        "general": "Основное",
+        "showProgressInViewer": "Показывать процесс генерации в Просмотрщике",
+        "antialiasProgressImages": "Сглаживать предпоказ процесса генерации",
+        "generation": "Поколение",
+        "ui": "Пользовательский интерфейс",
+        "availableSchedulers": "Доступные планировщики"
     },
     "toast": {
         "tempFoldersEmptied": "Временная папка очищена",
@@ -520,7 +536,7 @@
         "imageCopied": "Изображение скопировано",
         "imageLinkCopied": "Ссылка на изображение скопирована",
         "imageNotLoaded": "Изображение не загружено",
-        "imageNotLoadedDesc": "Не найдены изображения для отправки в img2img",
+        "imageNotLoadedDesc": "Не удалось найти изображение",
         "imageSavedToGallery": "Изображение сохранено в галерею",
         "canvasMerged": "Холст объединен",
         "sentToImageToImage": "Отправить в img2img",
@@ -545,7 +561,11 @@
         "serverError": "Ошибка сервера",
         "disconnected": "Отключено от сервера",
         "connected": "Подключено к серверу",
-        "canceled": "Обработка отменена"
+        "canceled": "Обработка отменена",
+        "problemCopyingImageLink": "Не удалось скопировать ссылку на изображение",
+        "uploadFailedInvalidUploadDesc": "Должно быть одно изображение в формате PNG или JPEG",
+        "parameterNotSet": "Параметр не задан",
+        "parameterSet": "Параметр задан"
     },
     "tooltip": {
         "feature": {
@@ -619,7 +639,8 @@
         "betaClear": "Очистить",
         "betaDarkenOutside": "Затемнить снаружи",
         "betaLimitToBox": "Ограничить выделением",
-        "betaPreserveMasked": "Сохранять маскируемую область"
+        "betaPreserveMasked": "Сохранять маскируемую область",
+        "antialiasing": "Не удалось скопировать ссылку на изображение"
     },
     "accessibility": {
         "modelSelect": "Выбор модели",
