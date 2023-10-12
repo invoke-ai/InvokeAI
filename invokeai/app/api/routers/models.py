@@ -482,7 +482,7 @@ async def control_download_jobs(
             job_mgr.change_job_priority(job_id, priority_delta)
 
         else:
-            raise ValueError(f"Unknown operation {operation.value}")
+            raise ValueError("priority_delta must be set for the CHANGE_PRIORITY operation")
         bytes = 0
         total_bytes = 0
         if isinstance(job, DownloadJobRemoteSource):

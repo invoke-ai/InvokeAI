@@ -201,6 +201,10 @@ app.mount("/", StaticFiles(directory=Path(web_dir.__path__[0], "dist"), html=Tru
 
 
 def invoke_api():
+    if app_config.version:
+        print(f"InvokeAI version {__version__}")
+        return
+
     def find_port(port: int):
         """Find a port not in use starting at given port"""
         # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
@@ -212,10 +216,6 @@ def invoke_api():
                 return port
 
     from invokeai.backend.install.check_root import check_invokeai_root
-
-    if app_config.version:
-        print(f"InvokeAI version {__version__}")
-        return
 
     check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
 
@@ -256,7 +256,4 @@ def invoke_api():
 
 
 if __name__ == "__main__":
-    if app_config.version:
-        print(f"InvokeAI version {__version__}")
-    else:
-        invoke_api()
+    invoke_api()
