@@ -6,7 +6,7 @@
         "settingsLabel": "Ajustes",
         "img2img": "Imagen a Imagen",
         "unifiedCanvas": "Lienzo Unificado",
-        "nodes": "Editor de nodos",
+        "nodes": "Editor del flujo de trabajo",
         "langSpanish": "Español",
         "nodesDesc": "Un sistema de generación de imágenes basado en nodos, actualmente se encuentra en desarrollo. Mantente pendiente a nuestras actualizaciones acerca de esta fabulosa funcionalidad.",
         "postProcessing": "Post-procesamiento",
@@ -307,7 +307,12 @@
         "acceptStagingImage": {
             "title": "Aceptar imagen",
             "desc": "Aceptar la imagen actual en el área de preparación"
-        }
+        },
+        "addNodes": {
+            "title": "Añadir Nodos",
+            "desc": "Abre el menú para añadir nodos"
+        },
+        "nodesHotkeys": "Teclas de acceso rápido a los nodos"
     },
     "modelManager": {
         "modelManager": "Gestor de Modelos",
@@ -528,7 +533,9 @@
         "maskBlur": "Máscara de Desenfoque",
         "maskBlurMethod": "Método del desenfoque de la máscara",
         "seamHighThreshold": "Alto",
-        "seamPaintingHeader": "Pintando las uniones"
+        "seamPaintingHeader": "Pintando las uniones",
+        "seamThreshold": "Umbral de la junta",
+        "seamLowThreshold": "Bajo"
     },
     "settings": {
         "models": "Modelos",
@@ -540,7 +547,7 @@
         "resetWebUI": "Restablecer interfaz web",
         "resetWebUIDesc1": "Al restablecer la interfaz web, solo se restablece la caché local del navegador de sus imágenes y la configuración guardada. No se elimina ninguna imagen de su disco duro.",
         "resetWebUIDesc2": "Si las imágenes no se muestran en la galería o algo más no funciona, intente restablecer antes de reportar un incidente en GitHub.",
-        "resetComplete": "La interfaz web se ha restablecido. Actualice la página para recargarla.",
+        "resetComplete": "Se ha restablecido la interfaz web.",
         "useSlidersForAll": "Utilice controles deslizantes para todas las opciones",
         "general": "General",
         "consoleLogLevel": "Nivel del registro",
@@ -702,7 +709,7 @@
         "toggleAutoscroll": "Activar el autodesplazamiento",
         "toggleLogViewer": "Alternar el visor de registros",
         "showGallery": "Mostrar galería",
-        "showOptionsPanel": "Mostrar el panel de opciones",
+        "showOptionsPanel": "Mostrar el panel lateral",
         "menu": "Menú"
     },
     "ui": {
@@ -719,6 +726,12 @@
         "hideGraphNodes": "Ocultar la superposición de los gráficos",
         "hideLegendNodes": "Ocultar la leyenda del tipo de campo",
         "showLegendNodes": "Mostrar la leyenda del tipo de campo",
-        "showMinimapnodes": "Mostrar el minimapa"
+        "showMinimapnodes": "Mostrar el minimapa",
+        "reloadNodeTemplates": "Recargar las plantillas de nodos",
+        "saveWorkflow": "Guardar el flujo de trabajo",
+        "loadWorkflow": "Cargar el flujo de trabajo",
+        "resetWorkflow": "Reiniciar e flujo de trabajo",
+        "resetWorkflowDesc": "¿Está seguro de que deseas restablecer este flujo de trabajo?",
+        "resetWorkflowDesc2": "Al reiniciar el flujo de trabajo se borrarán todos los nodos, aristas y detalles del flujo de trabajo."
     }
 }
