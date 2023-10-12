@@ -10,14 +10,16 @@ import ImageToImageStrength from 'features/parameters/components/Parameters/Imag
 import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
 import { useCoreParametersCollapseLabel } from 'features/parameters/util/useCoreParametersCollapseLabel';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const UnifiedCanvasCoreParameters = () => {
+  const { t } = useTranslation();
   const shouldUseSliders = useAppSelector((state) => state.ui.shouldUseSliders);
   const { iterationsAndSeedLabel } = useCoreParametersCollapseLabel();
 
   return (
     <IAICollapse
-      label="General"
+      label={t('parameters.general')}
       activeLabel={iterationsAndSeedLabel}
       defaultIsOpen={true}
     >
