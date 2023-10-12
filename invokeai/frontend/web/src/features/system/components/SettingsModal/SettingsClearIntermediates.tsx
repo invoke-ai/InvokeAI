@@ -8,6 +8,7 @@ import {
   useClearIntermediatesMutation,
   useGetIntermediatesCountQuery,
 } from '../../../../services/api/endpoints/images';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { resetCanvas } from '../../../canvas/store/canvasSlice';
 import { addToast } from '../../store/systemSlice';
 import StyledFlex from './StyledFlex';
@@ -22,7 +23,14 @@ export default function SettingsClearIntermediates() {
   const [clearIntermediates, { isLoading: isLoadingClearIntermediates }] =
     useClearIntermediatesMutation();
 
+  const { data: queueStatus } = useGetQueueStatusQuery();
+  const hasPendingItems = queueStatus && (queueStatus.in_progress > 0 || queueStatus.pending > 0);
+
   const handleClickClearIntermediates = useCallback(() => {
+    if (hasPendingItems) {
+      return;
+    }
+
     clearIntermediates()
       .unwrap()
       .then((number) => {
