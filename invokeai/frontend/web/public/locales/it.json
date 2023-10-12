@@ -2,7 +2,7 @@
     "common": {
         "hotkeysLabel": "Tasti di scelta rapida",
         "themeLabel": "Tema",
-        "languagePickerLabel": "Seleziona lingua",
+        "languagePickerLabel": "Lingua",
         "reportBugLabel": "Segnala un errore",
         "settingsLabel": "Impostazioni",
         "darkTheme": "Scuro",
@@ -10,7 +10,7 @@
         "greenTheme": "Verde",
         "img2img": "Immagine a Immagine",
         "unifiedCanvas": "Tela unificata",
-        "nodes": "Nodi",
+        "nodes": "Editor dei Nodi",
         "langItalian": "Italiano",
         "nodesDesc": "Attualmente è in fase di sviluppo un sistema basato su nodi per la generazione di immagini. Resta sintonizzato per gli aggiornamenti su questa fantastica funzionalità.",
         "postProcessing": "Post-elaborazione",
@@ -79,7 +79,8 @@
         "random": "Casuale",
         "openInNewTab": "Apri in una nuova scheda",
         "areYouSure": "Sei sicuro?",
-        "dontAskMeAgain": "Non chiedermelo più"
+        "dontAskMeAgain": "Non chiedermelo più",
+        "imagePrompt": "Prompt Immagine"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -98,7 +99,9 @@
         "noImagesInGallery": "Nessuna immagine nella galleria",
         "deleteImage": "Elimina l'immagine",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
-        "deleteImageBin": "Le immagini eliminate verranno spostate nel Cestino del tuo sistema operativo."
+        "deleteImageBin": "Le immagini eliminate verranno spostate nel Cestino del tuo sistema operativo.",
+        "images": "Immagini",
+        "assets": "Risorse"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti rapidi",
@@ -427,7 +430,7 @@
         "height": "Altezza",
         "seed": "Seme",
         "randomizeSeed": "Seme randomizzato",
-        "shuffle": "Casuale",
+        "shuffle": "Mescola il seme",
         "noiseThreshold": "Soglia del rumore",
         "perlinNoise": "Rumore Perlin",
         "variations": "Variazioni",
@@ -492,11 +495,19 @@
         "vSymmetryStep": "Passi Simmetria Verticale",
         "symmetry": "Simmetria",
         "hidePreview": "Nascondi l'anteprima",
-        "showPreview": "Mostra l'anteprima"
+        "showPreview": "Mostra l'anteprima",
+        "noiseSettings": "Rumore",
+        "seamlessXAxis": "Asse X",
+        "seamlessYAxis": "Asse Y",
+        "scheduler": "Campionatore",
+        "boundingBoxWidth": "Larghezza riquadro di delimitazione",
+        "boundingBoxHeight": "Altezza riquadro di delimitazione",
+        "positivePromptPlaceholder": "Prompt Positivo",
+        "negativePromptPlaceholder": "Prompt Negativo"
     },
     "settings": {
         "models": "Modelli",
-        "displayInProgress": "Visualizza immagini in corso",
+        "displayInProgress": "Visualizza le immagini di avanzamento",
         "saveSteps": "Salva le immagini ogni n passaggi",
         "confirmOnDelete": "Conferma l'eliminazione",
         "displayHelpIcons": "Visualizza le icone della Guida",
@@ -510,7 +521,12 @@
         "general": "Generale",
         "consoleLogLevel": "Livello del registro",
         "shouldLogToConsole": "Registrazione della console",
-        "developer": "Sviluppatore"
+        "developer": "Sviluppatore",
+        "antialiasProgressImages": "Anti aliasing delle immagini di avanzamento",
+        "showProgressInViewer": "Mostra le immagini di avanzamento nel visualizzatore",
+        "generation": "Generazione",
+        "ui": "Interfaccia Utente",
+        "availableSchedulers": "Campionatori disponibili"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -520,7 +536,7 @@
         "imageCopied": "Immagine copiata",
         "imageLinkCopied": "Collegamento immagine copiato",
         "imageNotLoaded": "Nessuna immagine caricata",
-        "imageNotLoadedDesc": "Nessuna immagine trovata da inviare al modulo da Immagine a Immagine",
+        "imageNotLoadedDesc": "Impossibile trovare l'immagine",
         "imageSavedToGallery": "Immagine salvata nella Galleria",
         "canvasMerged": "Tela unita",
         "sentToImageToImage": "Inviato a da Immagine a Immagine",
@@ -545,7 +561,11 @@
         "serverError": "Errore del Server",
         "disconnected": "Disconnesso dal Server",
         "connected": "Connesso al Server",
-        "canceled": "Elaborazione annullata"
+        "canceled": "Elaborazione annullata",
+        "problemCopyingImageLink": "Impossibile copiare il collegamento dell'immagine",
+        "uploadFailedInvalidUploadDesc": "Deve essere una singola immagine PNG o JPEG",
+        "parameterSet": "Parametro impostato",
+        "parameterNotSet": "Parametro non impostato"
     },
     "tooltip": {
         "feature": {
@@ -619,7 +639,8 @@
         "betaClear": "Svuota",
         "betaDarkenOutside": "Oscura all'esterno",
         "betaLimitToBox": "Limita al rettangolo",
-        "betaPreserveMasked": "Conserva quanto mascherato"
+        "betaPreserveMasked": "Conserva quanto mascherato",
+        "antialiasing": "Anti aliasing"
     },
     "accessibility": {
         "modelSelect": "Seleziona modello",
