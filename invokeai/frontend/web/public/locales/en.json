@@ -45,10 +45,12 @@
         "accept": "Accept",
         "advanced": "Advanced",
         "areYouSure": "Are you sure?",
+        "auto": "Auto",
         "back": "Back",
         "batch": "Batch Manager",
         "cancel": "Cancel",
         "close": "Close",
+        "on": "On",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
         "controlAdapter": "Control Adapter",
@@ -133,7 +135,8 @@
         "upload": "Upload"
     },
     "controlnet": {
-        "controlAdapter": "Control Adapter",
+        "controlAdapter_one": "Control Adapter",
+        "controlAdapter_other": "Control Adapters",
         "controlnet": "$t(controlnet.controlAdapter) #{{number}} ($t(common.controlNet))",
         "ip_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.ipAdapter))",
         "t2i_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.t2iAdapter))",
@@ -702,6 +705,7 @@
         "vae": "VAE",
         "vaeLocation": "VAE Location",
         "vaeLocationValidationMsg": "Path to where your VAE is located.",
+        "vaePrecision": "VAE Precision",
         "vaeRepoID": "VAE Repo ID",
         "vaeRepoIDValidationMsg": "Online repository of your VAE",
         "variant": "Variant",
@@ -922,6 +926,7 @@
     },
     "parameters": {
         "aspectRatio": "Aspect Ratio",
+        "aspectRatioFree": "Free",
         "boundingBoxHeader": "Bounding Box",
         "boundingBoxHeight": "Bounding Box Height",
         "boundingBoxWidth": "Bounding Box Width",

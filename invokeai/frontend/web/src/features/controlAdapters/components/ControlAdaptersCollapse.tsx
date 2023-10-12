@@ -89,7 +89,12 @@ const ControlAdaptersCollapse = () => {
   }
 
   return (
-    <IAICollapse label="Control Adapters" activeLabel={activeLabel}>
+    <IAICollapse
+      label={t('controlnet.controlAdapter', {
+        count: controlAdapterIds.length,
+      })}
+      activeLabel={activeLabel}
+    >
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ButtonGroup size="sm" w="full" justifyContent="space-between">
           <IAIButton
