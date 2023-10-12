@@ -30,7 +30,7 @@ export const addBatchEnqueuedListener = () => {
           id: 'batch-queued',
           title: t('queue.batchQueued'),
           description: t('queue.batchQueuedDesc', {
-            item_count: response.enqueued,
+            count: response.enqueued,
             direction: arg.prepend ? t('queue.front') : t('queue.back'),
           }),
           duration: 1000,
