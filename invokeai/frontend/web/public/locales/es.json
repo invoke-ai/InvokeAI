@@ -19,7 +19,7 @@
         "postProcessDesc3": "La Interfaz de Línea de Comandos de Invoke AI ofrece muchas otras características, incluyendo -Embiggen-.",
         "training": "Entrenamiento",
         "trainingDesc1": "Un flujo de trabajo dedicado para el entrenamiento de sus propios -embeddings- y puntos de control utilizando Inversión Textual y Dreambooth desde la interfaz web.",
-        "trainingDesc2": "InvokeAI ya soporta el entrenamiento de -embeddings- personalizados utilizando la Inversión Textual mediante el script principal.",
+        "trainingDesc2": "InvokeAI ya admite el entrenamiento de incrustaciones personalizadas mediante la inversión textual mediante el script principal.",
         "upload": "Subir imagen",
         "close": "Cerrar",
         "load": "Cargar",
@@ -74,7 +74,12 @@
         "txt2img": "De texto a imagen",
         "accept": "Aceptar",
         "cancel": "Cancelar",
-        "linear": "Lineal"
+        "linear": "Lineal",
+        "random": "Aleatorio",
+        "generate": "Generar",
+        "openInNewTab": "Abrir en una nueva pestaña",
+        "dontAskMeAgain": "No me preguntes de nuevo",
+        "areYouSure": "¿Estas seguro?"
     },
     "gallery": {
         "generations": "Generaciones",
@@ -90,7 +95,10 @@
         "pinGallery": "Fijar galería",
         "allImagesLoaded": "Todas las imágenes cargadas",
         "loadMore": "Cargar más",
-        "noImagesInGallery": "Sin imágenes en la galería"
+        "noImagesInGallery": "Sin imágenes en la galería",
+        "deleteImage": "Eliminar Imagen",
+        "deleteImageBin": "Las imágenes eliminadas se enviarán a la papelera de tu sistema operativo.",
+        "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar."
     },
     "hotkeys": {
         "keyboardShortcuts": "Atajos de teclado",
@@ -500,7 +508,12 @@
         "resetWebUIDesc1": "Al restablecer la interfaz web, solo se restablece la caché local del navegador de sus imágenes y la configuración guardada. No se elimina ninguna imagen de su disco duro.",
         "resetWebUIDesc2": "Si las imágenes no se muestran en la galería o algo más no funciona, intente restablecer antes de reportar un incidente en GitHub.",
         "resetComplete": "La interfaz web se ha restablecido. Actualice la página para recargarla.",
-        "useSlidersForAll": "Utilice controles deslizantes para todas las opciones"
+        "useSlidersForAll": "Utilice controles deslizantes para todas las opciones",
+        "general": "General",
+        "consoleLogLevel": "Nivel del registro",
+        "shouldLogToConsole": "Registro de la consola",
+        "developer": "Desarrollador",
+        "autoShowProgress": "Mostrar automáticamente el progreso de las imágenes"
     },
     "toast": {
         "tempFoldersEmptied": "Directorio temporal vaciado",
@@ -634,5 +647,9 @@
         "showGallery": "Mostrar galería",
         "showOptionsPanel": "Mostrar el panel de opciones",
         "menu": "Menú"
+    },
+    "ui": {
+        "hideProgressImages": "Ocultar el progreso de la imagen",
+        "showProgressImages": "Mostrar el progreso de la imagen"
     }
 }
