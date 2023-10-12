@@ -568,9 +568,7 @@
             "addingImagesTo": "Aggiungi immagini a",
             "systemBusy": "Sistema occupato",
             "unableToInvoke": "Impossibile invocare",
-            "systemDisconnected": "Sistema disconnesso",
-            "noControlImageForControlNet": "ControlNet {{index}} non ha un'immagine di controllo",
-            "noModelForControlNet": "ControlNet {{index}} non ha alcun modello selezionato."
+            "systemDisconnected": "Sistema disconnesso"
         },
         "enableNoiseSettings": "Abilita le impostazioni del rumore",
         "cpuNoise": "Rumore CPU",
@@ -683,7 +681,6 @@
         "modelAddedSimple": "Modello aggiunto",
         "problemImportingMaskDesc": "Impossibile importare la maschera",
         "problemCopyingCanvas": "Problema durante la copia della tela",
-        "incompatibleSubmodel": "sottomodello incompatibile",
         "problemSavingCanvas": "Problema nel salvataggio della tela",
         "canvasDownloaded": "Tela scaricata",
         "problemMergingCanvasDesc": "Impossibile unire le tele",
@@ -797,7 +794,6 @@
         "rotateClockwise": "Ruotare in senso orario",
         "flipHorizontally": "Capovolgi orizzontalmente",
         "toggleLogViewer": "Attiva/disattiva visualizzatore registro",
-        "showGallery": "Mostra la galleria immagini",
         "showOptionsPanel": "Mostra il pannello laterale",
         "flipVertically": "Capovolgi verticalmente",
         "toggleAutoscroll": "Attiva/disattiva lo scorrimento automatico",

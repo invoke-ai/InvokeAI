@@ -461,7 +461,6 @@
         "toggleAutoscroll": "自動スクロールの切替",
         "modifyConfig": "Modify Config",
         "toggleLogViewer": "Log Viewerの切替",
-        "showGallery": "ギャラリーを表示",
         "showOptionsPanel": "オプションパネルを表示"
     }
 }
