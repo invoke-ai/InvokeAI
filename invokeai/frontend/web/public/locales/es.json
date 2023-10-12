@@ -473,10 +473,6 @@
         "hiresOptim": "Optimización de Alta Resolución",
         "imageFit": "Ajuste tamaño de imagen inicial al tamaño objetivo",
         "codeformerFidelity": "Fidelidad",
-        "seamSize": "Tamaño del parche",
-        "seamBlur": "Desenfoque del parche",
-        "seamStrength": "Fuerza del parche",
-        "seamSteps": "Pasos del parche",
         "scaleBeforeProcessing": "Redimensionar antes de procesar",
         "scaledWidth": "Ancho escalado",
         "scaledHeight": "Alto escalado",
@@ -533,8 +529,6 @@
         "maskBlur": "Máscara de Desenfoque",
         "maskBlurMethod": "Método del desenfoque de la máscara",
         "seamHighThreshold": "Alto",
-        "seamPaintingHeader": "Pintando las uniones",
-        "seamThreshold": "Umbral de la junta",
         "seamLowThreshold": "Bajo"
     },
     "settings": {
