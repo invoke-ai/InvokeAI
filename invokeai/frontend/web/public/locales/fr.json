@@ -537,6 +537,10 @@
         "useThisParameter": "Utiliser ce paramètre",
         "zoomIn": "Zoom avant",
         "zoomOut": "Zoom arrière",
-        "showOptionsPanel": "Montrer la page d'options"
+        "showOptionsPanel": "Montrer la page d'options",
+        "modelSelect": "Choix du modèle",
+        "invokeProgressBar": "Barre de Progression Invoke",
+        "copyMetadataJson": "Copie des métadonnées JSON",
+        "menu": "Menu"
     }
 }
