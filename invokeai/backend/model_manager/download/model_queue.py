@@ -196,6 +196,8 @@ class ModelDownloadQueue(DownloadQueue):
         def subdownload_event(subjob: DownloadJobBase):
             assert isinstance(subjob, DownloadJobRemoteSource)
             assert isinstance(job, DownloadJobRemoteSource)
+            if job.status != DownloadJobStatus.RUNNING:  # do not update if we are cancelled or paused
+                return
             if subjob.status == DownloadJobStatus.RUNNING:
                 bytes_downloaded[subjob.id] = subjob.bytes
                 job.bytes = sum(bytes_downloaded.values())
@@ -214,13 +216,15 @@ class ModelDownloadQueue(DownloadQueue):
                 self._update_job_status(job, DownloadJobStatus.RUNNING)
                 return
 
-        subqueue = self.__class__(
-            event_handlers=[subdownload_event],
-            requests_session=self._requests,
-            quiet=True,
-        )
         assert isinstance(job, DownloadJobRepoID)
+        self._update_job_status(job, DownloadJobStatus.RUNNING)
+        self._lock.acquire()  # prevent status from being updated while we are setting up subqueue
         try:
+            job.subqueue = self.__class__(
+                event_handlers=[subdownload_event],
+                requests_session=self._requests,
+                quiet=True,
+            )
             repo_id = job.source
             variant = job.variant
             if not job.metadata:
@@ -235,7 +239,7 @@ class ModelDownloadQueue(DownloadQueue):
 
             for url, subdir, file, size in urls_to_download:
                 job.total_bytes += size
-                subqueue.create_download_job(
+                job.subqueue.create_download_job(
                     source=url,
                     destdir=job.destination / subdir,
                     filename=file,
@@ -249,11 +253,11 @@ class ModelDownloadQueue(DownloadQueue):
             self._update_job_status(job, DownloadJobStatus.ERROR)
             self._logger.error(job.error)
         finally:
-            job.subqueue = subqueue
-            job.subqueue.join()
+            self._lock.release()
+            if job.subqueue is not None:
+                job.subqueue.join()
             if job.status == DownloadJobStatus.RUNNING:
                 self._update_job_status(job, DownloadJobStatus.COMPLETED)
-            job.subqueue.release()  # get rid of the subqueue
 
     def _get_repo_info(
         self,

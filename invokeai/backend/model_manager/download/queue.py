@@ -176,22 +176,6 @@ class DownloadQueue(DownloadQueueBase):
             except KeyError as excp:
                 raise UnknownJobIDException("Unrecognized job") from excp
 
-    def cancel_job(self, job: DownloadJobBase, preserve_partial: bool = False):
-        """
-        Cancel the indicated job.
-
-        If it is running it will be stopped.
-        job.status will be set to DownloadJobStatus.CANCELLED
-        """
-        with self._lock:
-            try:
-                assert isinstance(self._jobs[job.id], DownloadJobBase)
-                job.preserve_partial_downloads = preserve_partial
-                self._update_job_status(job, DownloadJobStatus.CANCELLED)
-                job.cleanup()
-            except (AssertionError, KeyError) as excp:
-                raise UnknownJobIDException("Unrecognized job") from excp
-
     def id_to_job(self, id: int) -> DownloadJobBase:
         """Translate a job ID into a DownloadJobBase object."""
         try:
@@ -220,6 +204,22 @@ class DownloadQueue(DownloadQueueBase):
             try:
                 assert isinstance(self._jobs[job.id], DownloadJobBase)
                 self._update_job_status(job, DownloadJobStatus.PAUSED)
+                job.cleanup()
+            except (AssertionError, KeyError) as excp:
+                raise UnknownJobIDException("Unrecognized job") from excp
+
+    def cancel_job(self, job: DownloadJobBase, preserve_partial: bool = False):
+        """
+        Cancel the indicated job.
+
+        If it is running it will be stopped.
+        job.status will be set to DownloadJobStatus.CANCELLED
+        """
+        with self._lock:
+            try:
+                assert isinstance(self._jobs[job.id], DownloadJobBase)
+                job.preserve_partial_downloads = preserve_partial
+                self._update_job_status(job, DownloadJobStatus.CANCELLED)
                 job.cleanup()
             except (AssertionError, KeyError) as excp:
                 raise UnknownJobIDException("Unrecognized job") from excp
@@ -273,9 +273,7 @@ class DownloadQueue(DownloadQueueBase):
                 if job == STOP_JOB:  # marker that queue is done
                     done = True
 
-                if (
-                    job.status == DownloadJobStatus.ENQUEUED
-                ):  # Don't do anything for non-enqueued jobs (shouldn't happen)
+                if job.status == DownloadJobStatus.ENQUEUED:
                     if not self._quiet:
                         self._logger.info(f"{job.source}: Downloading to {job.destination}")
                     do_download = self.select_downloader(job)
@@ -393,17 +391,18 @@ class DownloadQueue(DownloadQueueBase):
 
     def _update_job_status(self, job: DownloadJobBase, new_status: Optional[DownloadJobStatus] = None):
         """Optionally change the job status and send an event indicating a change of state."""
-        if new_status:
-            job.status = new_status
+        with self._lock:
+            if new_status:
+                job.status = new_status
 
-        self._logger.debug(f"Status update for download job {job.id}: {job}")
-        if self._in_terminal_state(job) and not self._quiet:
-            self._logger.info(f"{job.source}: download job completed with status {job.status.value}")
+            if self._in_terminal_state(job) and not self._quiet:
+                self._logger.info(f"{job.source}: Download job completed with status {job.status.value}")
 
-        if new_status == DownloadJobStatus.RUNNING and not job.job_started:
-            job.job_started = time.time()
-        elif new_status in [DownloadJobStatus.COMPLETED, DownloadJobStatus.ERROR]:
-            job.job_ended = time.time()
+            if new_status == DownloadJobStatus.RUNNING and not job.job_started:
+                job.job_started = time.time()
+            elif new_status in [DownloadJobStatus.COMPLETED, DownloadJobStatus.ERROR]:
+                job.job_ended = time.time()
+
         if job.event_handlers:
             for handler in job.event_handlers:
                 try:
@@ -428,11 +427,11 @@ class DownloadQueue(DownloadQueueBase):
             self._update_job_status(job, DownloadJobStatus.ERROR)
 
     def _cleanup_cancelled_job(self, job: DownloadJobBase):
-        if job.preserve_partial_downloads:
-            return
-        self._logger.warning("Cleaning up leftover files from cancelled download job {job.destination}")
-        dest = Path(job.destination)
-        if dest.is_file():
-            dest.unlink()
-        elif dest.is_dir():
-            shutil.rmtree(dest.as_posix(), ignore_errors=True)
+        job.cleanup(job.preserve_partial_downloads)
+        if not job.preserve_partial_downloads:
+            self._logger.warning(f"Cleaning up leftover files from cancelled download job {job.destination}")
+            dest = Path(job.destination)
+            if dest.is_file():
+                dest.unlink()
+            elif dest.is_dir():
+                shutil.rmtree(dest.as_posix(), ignore_errors=True)

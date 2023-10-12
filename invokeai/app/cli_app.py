@@ -40,6 +40,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from .cli.completer import set_autocompleter
     from .invocations.baseinvocation import BaseInvocation
     from .services.default_graphs import create_system_graphs, default_text_to_image_graph_id
+    from .services.download_manager import DownloadQueueService
     from .services.events import EventServiceBase
     from .services.graph import (
         Edge,
@@ -56,7 +57,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
     from .services.model_install_service import ModelInstallService
     from .services.model_loader_service import ModelLoadService
-    from .services.download_manager import DownloadQueueService
     from .services.model_record_service import ModelRecordServiceBase
     from .services.processor import DefaultInvocationProcessor
     from .services.sqlite import SqliteItemStorage

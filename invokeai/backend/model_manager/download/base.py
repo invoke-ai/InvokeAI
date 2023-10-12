@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """Abstract base class for a multithreaded model download queue."""
 
+import threading
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering

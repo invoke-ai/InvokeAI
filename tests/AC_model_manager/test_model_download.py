@@ -114,9 +114,9 @@ hf_sd2_paths = [
 ]
 for path in hf_sd2_paths:
     url = f"https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/main/{path}"
-    path = Path(path)
-    filename = path.name
-    content = b"This is the content for path " + bytearray(path.as_posix(), "utf-8")
+    path = Path(path).as_posix()
+    filename = Path(path).name
+    content = b"This is the content for path " + bytearray(path, "utf-8")
     session.mount(
         url,
         TestAdapter(
@@ -314,48 +314,49 @@ def test_pause_cancel_url():  # this one is tricky because of potential race con
         queue.prune_jobs()
         assert len(queue.list_jobs()) == 0
 
-    def test_pause_cancel_repo_id():  # this one is tricky because of potential race conditions
-        def event_handler(job: DownloadJobBase):
-            time.sleep(0.5)  # slow down the thread by blocking it just a bit at every step
 
-        if not INTERNET_AVAILABLE:
-            return
+def test_pause_cancel_repo_id():  # this one is tricky because of potential race conditions
+    def event_handler(job: DownloadJobBase):
+        time.sleep(0.1)  # slow down the thread by blocking it just a bit at every step
 
-        repo_id = "stabilityai/stable-diffusion-2-1"
-        queue = ModelDownloadQueue(requests_session=session, event_handlers=[event_handler])
+    if not INTERNET_AVAILABLE:
+        return
 
-        with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
-            job1 = queue.create_download_job(source=repo_id, destdir=tmpdir1, variant="fp16", start=False)
-            job2 = queue.create_download_job(source=repo_id, destdir=tmpdir2, variant="fp16", start=False)
-            assert job1.status == "idle"
-            queue.start_job(job1)
-            time.sleep(0.1)  # wait for enqueueing
-            assert job1.status in ["enqueued", "running"]
+    repo_id = "stabilityai/stable-diffusion-2-1"
+    queue = ModelDownloadQueue(requests_session=session, event_handlers=[event_handler])
 
-            # check pause and restart
-            queue.pause_job(job1)
-            time.sleep(0.1)  # wait to be paused
-            assert job1.status == "paused"
+    with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+        job1 = queue.create_download_job(source=repo_id, destdir=tmpdir1, variant="fp16", start=False)
+        job2 = queue.create_download_job(source=repo_id, destdir=tmpdir2, variant="fp16", start=False)
+        assert job1.status == "idle"
+        queue.start_job(job1)
+        time.sleep(0.1)  # wait for enqueueing
+        assert job1.status in ["enqueued", "running"]
 
-            queue.start_job(job1)
-            time.sleep(0.1)
-            assert job1.status == "running"
+        # check pause and restart
+        queue.pause_job(job1)
+        time.sleep(0.1)  # wait to be paused
+        assert job1.status == "paused"
 
-            # check cancel
-            queue.start_job(job2)
-            time.sleep(0.1)
-            assert job2.status == "running"
-            queue.cancel_job(job2)
-            time.sleep(0.1)
-            assert job2.status == "cancelled"
+        queue.start_job(job1)
+        time.sleep(0.5)
+        assert job1.status == "running"
 
-            queue.join()
-            assert job1.status == "completed"
-            assert job2.status == "cancelled"
+        # check cancel
+        queue.start_job(job2)
+        time.sleep(0.1)
+        assert job2.status == "running"
+        queue.cancel_job(job2)
 
-            assert Path(tmpdir1, "stable-diffusion-2-1", "model_index.json").exists()
-            assert not Path(
-                tmpdir2, "stable-diffusion-2-1", "model_index.json"
-            ).exists(), "cancelled file should be deleted"
+        queue.join()
+        assert job1.status == "completed"
+        assert job2.status == "cancelled"
 
-            assert len(queue.list_jobs()) == 0
+        assert Path(tmpdir1, "stable-diffusion-2-1", "model_index.json").exists()
+        assert not Path(
+            tmpdir2, "stable-diffusion-2-1", "model_index.json"
+        ).exists(), "cancelled file should be deleted"
+
+        assert len(queue.list_jobs()) == 2
+        queue.prune_jobs()
+        assert len(queue.list_jobs()) == 0
