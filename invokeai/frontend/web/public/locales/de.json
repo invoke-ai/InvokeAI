@@ -346,7 +346,6 @@
         "cfgScale": "CFG-Skala",
         "width": "Breite",
         "height": "Höhe",
-        "sampler": "Sampler",
         "randomizeSeed": "Zufälliger Seed",
         "shuffle": "Mischen",
         "noiseThreshold": "Rausch-Schwellenwert",
@@ -415,7 +414,6 @@
     "toast": {
         "tempFoldersEmptied": "Temp-Ordner geleert",
         "uploadFailed": "Hochladen fehlgeschlagen",
-        "uploadFailedMultipleImagesDesc": "Mehrere Bilder eingefügt, es kann nur ein Bild auf einmal hochgeladen werden",
         "uploadFailedUnableToLoadDesc": "Datei kann nicht geladen werden",
         "downloadImageStarted": "Bild wird heruntergeladen",
         "imageCopied": "Bild kopiert",

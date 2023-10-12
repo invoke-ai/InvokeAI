@@ -342,7 +342,6 @@
         "cfgScale": "مقياس الإعداد الذاتي للجملة",
         "width": "عرض",
         "height": "ارتفاع",
-        "sampler": "مزج",
         "seed": "بذرة",
         "randomizeSeed": "تبديل بذرة",
         "shuffle": "تشغيل",
@@ -412,7 +411,6 @@
     "toast": {
         "tempFoldersEmptied": "تم تفريغ مجلد المؤقت",
         "uploadFailed": "فشل التحميل",
-        "uploadFailedMultipleImagesDesc": "تم الصق صور متعددة، قد يتم تحميل صورة واحدة فقط في الوقت الحالي",
         "uploadFailedUnableToLoadDesc": "تعذر تحميل الملف",
         "downloadImageStarted": "بدأ تنزيل الصورة",
         "imageCopied": "تم نسخ الصورة",

@@ -416,7 +416,6 @@
         "cfgScale": "CFG-schaal",
         "width": "Breedte",
         "height": "Hoogte",
-        "sampler": "Sampler",
         "seed": "Seed",
         "randomizeSeed": "Willekeurige seed",
         "shuffle": "Meng",
@@ -501,7 +500,6 @@
     "toast": {
         "tempFoldersEmptied": "Tijdelijke map geleegd",
         "uploadFailed": "Upload mislukt",
-        "uploadFailedMultipleImagesDesc": "Meerdere afbeeldingen geplakt, slechts een afbeelding per keer toegestaan",
         "uploadFailedUnableToLoadDesc": "Kan bestand niet laden",
         "downloadImageStarted": "Afbeeldingsdownload gestart",
         "imageCopied": "Afbeelding gekopieerd",

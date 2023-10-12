@@ -274,7 +274,6 @@
         "cfgScale": "Skala CFG",
         "width": "Szerokość",
         "height": "Wysokość",
-        "sampler": "Próbkowanie",
         "seed": "Inicjator",
         "randomizeSeed": "Losowy inicjator",
         "shuffle": "Losuj",
@@ -343,7 +342,6 @@
     "toast": {
         "tempFoldersEmptied": "Wyczyszczono folder tymczasowy",
         "uploadFailed": "Błąd przesyłania obrazu",
-        "uploadFailedMultipleImagesDesc": "Możliwe jest przesłanie tylko jednego obrazu na raz",
         "uploadFailedUnableToLoadDesc": "Błąd wczytywania obrazu",
         "downloadImageStarted": "Rozpoczęto pobieranie",
         "imageCopied": "Skopiowano obraz",

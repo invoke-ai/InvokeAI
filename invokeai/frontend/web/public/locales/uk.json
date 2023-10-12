@@ -417,7 +417,6 @@
         "cfgScale": "Рівень CFG",
         "width": "Ширина",
         "height": "Висота",
-        "sampler": "Семплер",
         "seed": "Сід",
         "randomizeSeed": "Випадковий сид",
         "shuffle": "Оновити",
@@ -504,7 +503,6 @@
     "toast": {
         "tempFoldersEmptied": "Тимчасова папка очищена",
         "uploadFailed": "Не вдалося завантажити",
-        "uploadFailedMultipleImagesDesc": "Можна вставити лише одне зображення (ви спробували вставити декілька)",
         "uploadFailedUnableToLoadDesc": "Неможливо завантажити файл",
         "downloadImageStarted": "Завантаження зображення почалося",
         "imageCopied": "Зображення скопійоване",
