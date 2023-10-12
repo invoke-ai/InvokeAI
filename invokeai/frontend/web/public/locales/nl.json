@@ -61,7 +61,7 @@
         "statusMergedModels": "Modellen samengevoegd",
         "cancel": "Annuleer",
         "accept": "Akkoord",
-        "langPortuguese": "Português",
+        "langPortuguese": "Portugees",
         "pinOptionsPanel": "Zet deelscherm Opties vast",
         "loading": "Bezig met laden",
         "loadingInvokeAI": "Bezig met laden van Invoke AI",
@@ -79,7 +79,8 @@
         "batch": "Seriebeheer",
         "modelManager": "Modelbeheer",
         "darkMode": "Donkere modus",
-        "lightMode": "Lichte modus"
+        "lightMode": "Lichte modus",
+        "communityLabel": "Gemeenschap"
     },
     "gallery": {
         "generations": "Gegenereerde afbeeldingen",
@@ -364,7 +365,7 @@
         "formMessageDiffusersVAELocationDesc": "Indien niet opgegeven, dan zal InvokeAI kijken naar het VAE-bestand in de hierboven gegeven modellocatie.",
         "repoIDValidationMsg": "Online repository van je model",
         "formMessageDiffusersModelLocation": "Locatie Diffusers-model",
-        "convertToDiffusersHelpText3": "Je Checkpoint-bestand op schijf zal NIET worden verwijderd of gewijzigd. Je kunt je Checkpoint opnieuw toevoegen aan Modelonderhoud als je dat wilt.",
+        "convertToDiffusersHelpText3": "Je checkpoint-bestand op schijf ZAL worden verwijderd als het zich in de InvokeAI root map bevindt. Het zal NIET worden verwijderd als het zich in een andere locatie bevindt.",
         "convertToDiffusersHelpText6": "Wil je dit model omzetten?",
         "allModels": "Alle modellen",
         "checkpointModels": "Checkpoints",
@@ -426,7 +427,18 @@
         "modelConversionFailed": "Omzetten model mislukt",
         "modelUpdateFailed": "Bijwerken model mislukt",
         "modelsMergeFailed": "Samenvoegen model mislukt",
-        "selectModel": "Kies model"
+        "selectModel": "Kies model",
+        "settings": "Instellingen",
+        "modelDeleted": "Model verwijderd",
+        "noCustomLocationProvided": "Geen Aangepaste Locatie Opgegeven",
+        "syncModels": "Synchroniseer Modellen",
+        "modelsSynced": "Modellen Gesynchroniseerd",
+        "modelSyncFailed": "Synchronisatie Modellen Gefaald",
+        "modelDeleteFailed": "Model kon niet verwijderd worden",
+        "convertingModelBegin": "Model aan het converteren. Even geduld.",
+        "importModels": "Importeer Modellen",
+        "syncModelsDesc": "Als je modellen niet meer synchroon zijn met de backend, kan je ze met deze optie verversen. Dit wordt typisch gebruikt in het geval je het models.yaml bestand met de hand bewerkt of als je modellen aan de InvokeAI root map toevoegt nadat de applicatie gestart werd.",
+        "loraModels": "LoRA's"
     },
     "parameters": {
         "images": "Afbeeldingen",
@@ -504,8 +516,8 @@
         "seamlessYAxis": "Y-as",
         "hidePreview": "Verberg voorvertoning",
         "showPreview": "Toon voorvertoning",
-        "boundingBoxWidth": "Kaderbreedte",
-        "boundingBoxHeight": "Kaderhoogte",
+        "boundingBoxWidth": "Tekenvak breedte",
+        "boundingBoxHeight": "Tekenvak hoogte",
         "clipSkip": "Overslaan CLIP",
         "aspectRatio": "Verhouding",
         "negativePromptPlaceholder": "Negatieve prompt",
@@ -534,7 +546,11 @@
         "antialiasProgressImages": "Voer anti-aliasing uit op voortgangsafbeeldingen",
         "showAdvancedOptions": "Toon uitgebreide opties",
         "favoriteSchedulers": "Favoriete planners",
-        "favoriteSchedulersPlaceholder": "Geen favoriete planners ingesteld"
+        "favoriteSchedulersPlaceholder": "Geen favoriete planners ingesteld",
+        "beta": "Bèta",
+        "experimental": "Experimenteel",
+        "alternateCanvasLayout": "Omwisselen Canvas Layout",
+        "enableNodesEditor": "Knopen Editor Inschakelen"
     },
     "toast": {
         "tempFoldersEmptied": "Tijdelijke map geleegd",
@@ -577,7 +593,13 @@
         "nodesSaved": "Knooppunten bewaard",
         "nodesLoaded": "Knooppunten geladen",
         "nodesCleared": "Knooppunten weggehaald",
-        "nodesLoadedFailed": "Laden knooppunten mislukt"
+        "nodesLoadedFailed": "Laden knooppunten mislukt",
+        "problemCopyingImage": "Kan Afbeelding Niet Kopiëren",
+        "nodesNotValidJSON": "Ongeldige JSON",
+        "nodesCorruptedGraph": "Kan niet laden. Graph lijkt corrupt.",
+        "nodesUnrecognizedTypes": "Laden mislukt. Graph heeft onherkenbare types",
+        "nodesBrokenConnections": "Laden mislukt. Sommige verbindingen zijn verbroken.",
+        "nodesNotValidGraph": "Geen geldige knooppunten graph"
     },
     "tooltip": {
         "feature": {
@@ -683,6 +705,19 @@
         "swapSizes": "Wissel afmetingen om"
     },
     "nodes": {
-        "reloadSchema": "Laad schema opnieuw in"
+        "reloadSchema": "Laad schema opnieuw in",
+        "zoomOutNodes": "Uitzoomen",
+        "fitViewportNodes": "Aanpassen aan beeld",
+        "hideMinimapnodes": "Minimap verbergen",
+        "showLegendNodes": "Typelegende veld tonen",
+        "zoomInNodes": "Inzoomen",
+        "hideGraphNodes": "Graph overlay verbergen",
+        "clearGraph": "Graph verwijderen",
+        "showGraphNodes": "Graph overlay tonen",
+        "showMinimapnodes": "Minimap tonen",
+        "clearGraphDesc": "Ben je zeker dat je alle knooppunten wil verwijderen?",
+        "saveGraph": "Graph opslaan",
+        "loadGraph": "Graph laden (bewaard van knooppunten editor) (Metadata niet kopiëren-plakken)",
+        "hideLegendNodes": "Typelegende veld verbergen"
     }
 }
