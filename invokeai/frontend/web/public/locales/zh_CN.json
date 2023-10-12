@@ -683,7 +683,8 @@
     "ui": {
         "showProgressImages": "显示处理中的图片",
         "hideProgressImages": "隐藏处理中的图片",
-        "swapSizes": "XY尺寸互换"
+        "swapSizes": "XY尺寸互换",
+        "lockRatio": "锁定比率"
     },
     "tooltip": {
         "feature": {
@@ -706,7 +707,7 @@
         "resetWorkflow": "清空节点图",
         "loadWorkflow": "读取节点图",
         "zoomOutNodes": "缩小",
-        "resetWorkflowDesc2": "重置节点图将清除所有节点、边际和节点图详情",
+        "resetWorkflowDesc2": "重置节点图将清除所有节点、边际和节点图详情.",
         "reloadNodeTemplates": "重载节点模板",
         "hideGraphNodes": "隐藏节点图信息",
         "fitViewportNodes": "自适应视图",
@@ -714,6 +715,7 @@
         "hideMinimapnodes": "隐藏缩略图",
         "showLegendNodes": "显示字段类型图例",
         "hideLegendNodes": "隐藏字段类型图例",
-        "showGraphNodes": "显示节点图信息"
+        "showGraphNodes": "显示节点图信息",
+        "downloadWorkflow": "下载节点图 JSON"
     }
 }
