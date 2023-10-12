@@ -381,7 +381,6 @@
         "infillScalingHeader": "Remplissage et Mise à l'Échelle",
         "img2imgStrength": "Force de l'Image à l'Image",
         "toggleLoopback": "Activer/Désactiver la Boucle",
-        "invoke": "Invoker",
         "sendTo": "Envoyer à",
         "sendToImg2Img": "Envoyer à Image à Image",
         "sendToUnifiedCanvas": "Envoyer au Canvas Unifié",

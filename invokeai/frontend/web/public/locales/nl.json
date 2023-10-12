@@ -475,7 +475,6 @@
         "infillScalingHeader": "Infill en schaling",
         "img2imgStrength": "Sterkte Afbeelding naar afbeelding",
         "toggleLoopback": "Zet recursieve verwerking aan/uit",
-        "invoke": "Genereer",
         "sendTo": "Stuur naar",
         "sendToImg2Img": "Stuur naar Afbeelding naar afbeelding",
         "sendToUnifiedCanvas": "Stuur naar Centraal canvas",
