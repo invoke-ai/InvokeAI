@@ -87,8 +87,7 @@
         "learnMore": "Per saperne di più",
         "ipAdapter": "Adattatore IP",
         "t2iAdapter": "Adattatore T2I",
-        "controlAdapter": "Adattatore di Controllo",
-        "controlNet": ""
+        "controlAdapter": "Adattatore di Controllo"
     },
     "gallery": {
         "generations": "Generazioni",
