@@ -46,6 +46,8 @@ class FaceResultData(TypedDict):
     y_center: float
     mesh_width: int
     mesh_height: int
+    chunk_x_offset: int
+    chunk_y_offset: int
 
 
 class FaceResultDataWithId(FaceResultData):
@@ -78,6 +80,48 @@ FONT_SIZE = 32
 FONT_STROKE_WIDTH = 4
 
 
+def coalesce_faces(face1: FaceResultData, face2: FaceResultData) -> FaceResultData:
+    face1_x_offset = face1["chunk_x_offset"] - min(face1["chunk_x_offset"], face2["chunk_x_offset"])
+    face2_x_offset = face2["chunk_x_offset"] - min(face1["chunk_x_offset"], face2["chunk_x_offset"])
+    face1_y_offset = face1["chunk_y_offset"] - min(face1["chunk_y_offset"], face2["chunk_y_offset"])
+    face2_y_offset = face2["chunk_y_offset"] - min(face1["chunk_y_offset"], face2["chunk_y_offset"])
+
+    new_im_width = (
+        max(face1["image"].width, face2["image"].width)
+        + max(face1["chunk_x_offset"], face2["chunk_x_offset"])
+        - min(face1["chunk_x_offset"], face2["chunk_x_offset"])
+    )
+    new_im_height = (
+        max(face1["image"].height, face2["image"].height)
+        + max(face1["chunk_y_offset"], face2["chunk_y_offset"])
+        - min(face1["chunk_y_offset"], face2["chunk_y_offset"])
+    )
+    pil_image = Image.new(mode=face1["image"].mode, size=(new_im_width, new_im_height))
+    pil_image.paste(face1["image"], (face1_x_offset, face1_y_offset))
+    pil_image.paste(face2["image"], (face2_x_offset, face2_y_offset))
+
+    # Mask images are always from the origin
+    new_mask_im_width = max(face1["mask"].width, face2["mask"].width)
+    new_mask_im_height = max(face1["mask"].height, face2["mask"].height)
+    mask_pil = create_white_image(new_mask_im_width, new_mask_im_height)
+    black_image = create_black_image(face1["mask"].width, face1["mask"].height)
+    mask_pil.paste(black_image, (0, 0), ImageOps.invert(face1["mask"]))
+    black_image = create_black_image(face2["mask"].width, face2["mask"].height)
+    mask_pil.paste(black_image, (0, 0), ImageOps.invert(face2["mask"]))
+
+    new_face = FaceResultData(
+        image=pil_image,
+        mask=mask_pil,
+        x_center=max(face1["x_center"], face2["x_center"]),
+        y_center=max(face1["y_center"], face2["y_center"]),
+        mesh_width=max(face1["mesh_width"], face2["mesh_width"]),
+        mesh_height=max(face1["mesh_height"], face2["mesh_height"]),
+        chunk_x_offset=max(face1["chunk_x_offset"], face2["chunk_x_offset"]),
+        chunk_y_offset=max(face2["chunk_y_offset"], face2["chunk_y_offset"]),
+    )
+    return new_face
+
+
 def prepare_faces_list(
     face_result_list: list[FaceResultData],
 ) -> list[FaceResultDataWithId]:
@@ -91,7 +135,7 @@ def prepare_faces_list(
         should_add = True
         candidate_x_center = candidate["x_center"]
         candidate_y_center = candidate["y_center"]
-        for face in deduped_faces:
+        for idx, face in enumerate(deduped_faces):
             face_center_x = face["x_center"]
             face_center_y = face["y_center"]
             face_radius_w = face["mesh_width"] / 2
@@ -105,6 +149,7 @@ def prepare_faces_list(
             )
 
             if p < 1:  # Inside of the already-added face's radius
+                deduped_faces[idx] = coalesce_faces(face, candidate)
                 should_add = False
                 break
 
@@ -138,7 +183,6 @@ def generate_face_box_mask(
     chunk_x_offset: int = 0,
     chunk_y_offset: int = 0,
     draw_mesh: bool = True,
-    check_bounds: bool = True,
 ) -> list[FaceResultData]:
     result = []
     mask_pil = None
@@ -211,33 +255,20 @@ def generate_face_box_mask(
                 mask_pil = create_white_image(w + chunk_x_offset, h + chunk_y_offset)
                 mask_pil.paste(init_mask_pil, (chunk_x_offset, chunk_y_offset))
 
-            left_side = x_center - mesh_width
-            right_side = x_center + mesh_width
-            top_side = y_center - mesh_height
-            bottom_side = y_center + mesh_height
-            im_width, im_height = pil_image.size
-            over_w = im_width * 0.1
-            over_h = im_height * 0.1
-            if not check_bounds or (
-                (left_side >= -over_w)
-                and (right_side < im_width + over_w)
-                and (top_side >= -over_h)
-                and (bottom_side < im_height + over_h)
-            ):
-                x_center = float(x_center)
-                y_center = float(y_center)
-                face = FaceResultData(
-                    image=pil_image,
-                    mask=mask_pil or create_white_image(*pil_image.size),
-                    x_center=x_center + chunk_x_offset,
-                    y_center=y_center + chunk_y_offset,
-                    mesh_width=mesh_width,
-                    mesh_height=mesh_height,
-                )
+            x_center = float(x_center)
+            y_center = float(y_center)
+            face = FaceResultData(
+                image=pil_image,
+                mask=mask_pil or create_white_image(*pil_image.size),
+                x_center=x_center + chunk_x_offset,
+                y_center=y_center + chunk_y_offset,
+                mesh_width=mesh_width,
+                mesh_height=mesh_height,
+                chunk_x_offset=chunk_x_offset,
+                chunk_y_offset=chunk_y_offset,
+            )
 
-                result.append(face)
-            else:
-                context.services.logger.info("FaceTools --> Face out of bounds, ignoring.")
+            result.append(face)
 
     return result
 
@@ -346,7 +377,6 @@ def get_faces_list(
             chunk_x_offset=0,
             chunk_y_offset=0,
             draw_mesh=draw_mesh,
-            check_bounds=False,
         )
     if should_chunk or len(result) == 0:
         context.services.logger.info("FaceTools --> Chunking image (chunk toggled on, or no face found in full image).")
@@ -360,24 +390,26 @@ def get_faces_list(
         if width > height:
             # Landscape - slice the image horizontally
             fx = 0.0
-            steps = int(width * 2 / height)
+            steps = int(width * 2 / height) + 1
+            increment = (width - height) / (steps - 1)
             while fx <= (width - height):
                 x = int(fx)
-                image_chunks.append(image.crop((x, 0, x + height - 1, height - 1)))
+                image_chunks.append(image.crop((x, 0, x + height, height)))
                 x_offsets.append(x)
                 y_offsets.append(0)
-                fx += (width - height) / steps
+                fx += increment
                 context.services.logger.info(f"FaceTools --> Chunk starting at x = {x}")
         elif height > width:
             # Portrait - slice the image vertically
             fy = 0.0
-            steps = int(height * 2 / width)
+            steps = int(height * 2 / width) + 1
+            increment = (height - width) / (steps - 1)
             while fy <= (height - width):
                 y = int(fy)
-                image_chunks.append(image.crop((0, y, width - 1, y + width - 1)))
+                image_chunks.append(image.crop((0, y, width, y + width)))
                 x_offsets.append(0)
                 y_offsets.append(y)
-                fy += (height - width) / steps
+                fy += increment
                 context.services.logger.info(f"FaceTools --> Chunk starting at y = {y}")
 
         for idx in range(len(image_chunks)):
@@ -404,7 +436,7 @@ def get_faces_list(
     return all_faces
 
 
-@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.1")
+@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.2")
 class FaceOffInvocation(BaseInvocation):
     """Bound, extract, and mask a face from an image using MediaPipe detection"""
 
@@ -498,7 +530,7 @@ class FaceOffInvocation(BaseInvocation):
         return output
 
 
-@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.1")
+@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.2")
 class FaceMaskInvocation(BaseInvocation):
     """Face mask creation using mediapipe face detection"""
 
@@ -616,7 +648,7 @@ class FaceMaskInvocation(BaseInvocation):
 
 
 @invocation(
-    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.1"
+    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.2"
 )
 class FaceIdentifierInvocation(BaseInvocation):
     """Outputs an image with detected face IDs printed on each face. For use with other FaceTools."""
