@@ -192,7 +192,7 @@ def test_deny_nodes(patch_rootdir):
     # must parse config before importing Graph, so its nodes union uses the config
     conf = InvokeAIAppConfig().get_config()
     conf.parse_args(conf=allow_deny_nodes_conf, argv=[])
-    from invokeai.app.services.shared.graph import Graph
+    from invokeai.app.services.graph import Graph
 
     # confirm graph validation fails when using denied node
     Graph(nodes={"1": {"id": "1", "type": "integer"}})

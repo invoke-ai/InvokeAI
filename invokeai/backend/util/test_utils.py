@@ -5,7 +5,7 @@ from typing import Optional, Union
 import pytest
 import torch
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 from invokeai.backend.install.model_install_backend import ModelInstall
 from invokeai.backend.model_management.model_manager import ModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelNotFoundException, ModelType, SubModelType
