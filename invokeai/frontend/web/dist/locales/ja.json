@@ -1,12 +1,8 @@
 {
     "common": {
-        "themeLabel": "テーマ",
         "languagePickerLabel": "言語選択",
         "reportBugLabel": "バグ報告",
         "settingsLabel": "設定",
-        "darkTheme": "ダーク",
-        "lightTheme": "ライト",
-        "greenTheme": "緑",
         "langJapanese": "日本語",
         "nodesDesc": "現在、画像生成のためのノードベースシステムを開発中です。機能についてのアップデートにご期待ください。",
         "postProcessing": "後処理",
@@ -56,14 +52,12 @@
         "loadingInvokeAI": "Invoke AIをロード中",
         "statusConvertingModel": "モデルの変換",
         "statusMergedModels": "マージ済モデル",
-        "pinOptionsPanel": "オプションパネルを固定",
         "githubLabel": "Github",
         "hotkeysLabel": "ホットキー",
         "langHebrew": "עברית",
         "discordLabel": "Discord",
         "langItalian": "Italiano",
         "langEnglish": "English",
-        "oceanTheme": "オーシャン",
         "langArabic": "アラビア語",
         "langDutch": "Nederlands",
         "langFrench": "Français",
@@ -83,7 +77,6 @@
         "gallerySettings": "ギャラリーの設定",
         "maintainAspectRatio": "アスペクト比を維持",
         "singleColumnLayout": "1カラムレイアウト",
-        "pinGallery": "ギャラリーにピン留め",
         "allImagesLoaded": "すべての画像を読み込む",
         "loadMore": "さらに読み込む",
         "noImagesInGallery": "ギャラリーに画像がありません",
@@ -355,7 +348,6 @@
         "useSeed": "シード値を使用",
         "useAll": "すべてを使用",
         "info": "情報",
-        "deleteImage": "画像を削除",
         "showOptionsPanel": "オプションパネルを表示"
     },
     "settings": {
@@ -364,7 +356,6 @@
         "saveSteps": "nステップごとに画像を保存",
         "confirmOnDelete": "削除時に確認",
         "displayHelpIcons": "ヘルプアイコンを表示",
-        "useCanvasBeta": "キャンバスレイアウト(Beta)を使用する",
         "enableImageDebugging": "画像のデバッグを有効化",
         "resetWebUI": "WebUIをリセット",
         "resetWebUIDesc1": "WebUIのリセットは、画像と保存された設定のキャッシュをリセットするだけです。画像を削除するわけではありません。",
@@ -373,7 +364,6 @@
     },
     "toast": {
         "uploadFailed": "アップロード失敗",
-        "uploadFailedMultipleImagesDesc": "一度にアップロードできる画像は1枚のみです。",
         "uploadFailedUnableToLoadDesc": "ファイルを読み込むことができません。",
         "downloadImageStarted": "画像ダウンロード開始",
         "imageCopied": "画像をコピー",
@@ -471,7 +461,6 @@
         "toggleAutoscroll": "自動スクロールの切替",
         "modifyConfig": "Modify Config",
         "toggleLogViewer": "Log Viewerの切替",
-        "showGallery": "ギャラリーを表示",
         "showOptionsPanel": "オプションパネルを表示"
     }
 }
