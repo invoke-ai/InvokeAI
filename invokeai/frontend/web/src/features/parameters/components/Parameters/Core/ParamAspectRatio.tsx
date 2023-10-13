@@ -6,10 +6,11 @@ import {
   setAspectRatio,
   setShouldLockAspectRatio,
 } from 'features/parameters/store/generationSlice';
+import i18next from 'i18next';
 import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 
 const aspectRatios = [
-  { name: 'Free', value: null },
+  { name: i18next.t('parameters.aspectRatioFree'), value: null },
   { name: '2:3', value: 2 / 3 },
   { name: '16:9', value: 16 / 9 },
   { name: '1:1', value: 1 / 1 },

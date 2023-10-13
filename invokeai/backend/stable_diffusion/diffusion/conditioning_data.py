@@ -81,7 +81,7 @@ class ConditioningData:
     """
     postprocessing_settings: Optional[PostprocessingSettings] = None
 
-    ip_adapter_conditioning: Optional[IPAdapterConditioningInfo] = None
+    ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]] = None
 
     @property
     def dtype(self):

@@ -20,6 +20,7 @@ import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -34,6 +35,7 @@ const selector = createSelector(
 );
 
 const ImageGalleryContent = () => {
+  const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const galleryGridRef = useRef<HTMLDivElement>(null);
   const { galleryView } = useAppSelector(selector);
@@ -109,8 +111,9 @@ const ImageGalleryContent = () => {
                     w: 'full',
                   }}
                   leftIcon={<FaImages />}
+                  data-testid="images-tab"
                 >
-                  Images
+                  {t('gallery.images')}
                 </Tab>
                 <Tab
                   as={IAIButton}
@@ -121,8 +124,9 @@ const ImageGalleryContent = () => {
                     w: 'full',
                   }}
                   leftIcon={<FaServer />}
+                  data-testid="assets-tab"
                 >
-                  Assets
+                  {t('gallery.assets')}
                 </Tab>
               </ButtonGroup>
             </TabList>

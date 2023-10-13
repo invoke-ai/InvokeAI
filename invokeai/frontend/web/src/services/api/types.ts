@@ -67,6 +67,7 @@ export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
 export type ControlNetModelField = s['ControlNetModelField'];
 export type IPAdapterModelField = s['IPAdapterModelField'];
+export type T2IAdapterModelField = s['T2IAdapterModelField'];
 export type ModelsList = s['ModelsList'];
 export type ControlField = s['ControlField'];
 export type IPAdapterField = s['IPAdapterField'];
@@ -83,6 +84,9 @@ export type ControlNetModelConfig =
   | ControlNetModelDiffusersConfig;
 export type IPAdapterModelInvokeAIConfig = s['IPAdapterModelInvokeAIConfig'];
 export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
+export type T2IAdapterModelDiffusersConfig =
+  s['T2IAdapterModelDiffusersConfig'];
+export type T2IAdapterModelConfig = T2IAdapterModelDiffusersConfig;
 export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | s['StableDiffusion1ModelDiffusersConfig']
@@ -99,6 +103,7 @@ export type AnyModelConfig =
   | VaeModelConfig
   | ControlNetModelConfig
   | IPAdapterModelConfig
+  | T2IAdapterModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
   | OnnxModelConfig;
@@ -150,6 +155,7 @@ export type SaveImageInvocation = s['SaveImageInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];
+export type T2IAdapterInvocation = s['T2IAdapterInvocation'];
 export type IPAdapterInvocation = s['IPAdapterInvocation'];
 export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
 export type ColorMapImageProcessorInvocation =
@@ -186,13 +192,9 @@ export type GraphInvocationOutput = s['GraphInvocationOutput'];
 
 // Post-image upload actions, controls workflows when images are uploaded
 
-export type ControlNetAction = {
-  type: 'SET_CONTROLNET_IMAGE';
-  controlNetId: string;
-};
-
-export type IPAdapterAction = {
-  type: 'SET_IP_ADAPTER_IMAGE';
+export type ControlAdapterAction = {
+  type: 'SET_CONTROL_ADAPTER_IMAGE';
+  id: string;
 };
 
 export type InitialImageAction = {
@@ -219,8 +221,7 @@ export type AddToBatchAction = {
 };
 
 export type PostUploadAction =
-  | ControlNetAction
-  | IPAdapterAction
+  | ControlAdapterAction
   | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction

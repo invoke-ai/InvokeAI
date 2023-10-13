@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, StrictStr, parse_raw_as, root_validator, 
 from pydantic.json import pydantic_encoder
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
-from invokeai.app.services.graph import Graph, GraphExecutionState, NodeNotFoundError
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.util.misc import uuid_string
 
 # region Errors
@@ -122,6 +122,11 @@ class Batch(BaseModel):
                 if batch_data.field_name not in node.__fields__:
                     raise NodeNotFoundError(f"Field {batch_data.field_name} not found in node {batch_data.node_path}")
         return values
+
+    @validator("graph")
+    def validate_graph(cls, v: Graph):
+        v.validate_self()
+        return v
 
     class Config:
         schema_extra = {

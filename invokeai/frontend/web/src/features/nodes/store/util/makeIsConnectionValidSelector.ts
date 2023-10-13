@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
-import { getIsGraphAcyclic } from 'features/nodes/hooks/useIsValidConnection';
+import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { FieldType } from 'features/nodes/types/types';
 import i18n from 'i18next';
 import { HandleType } from 'reactflow';

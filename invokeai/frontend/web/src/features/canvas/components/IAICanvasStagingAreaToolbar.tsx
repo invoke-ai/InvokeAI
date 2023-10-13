@@ -151,15 +151,10 @@ const IAICanvasStagingAreaToolbar = () => {
           isDisabled={!shouldShowStagingImage}
         />
         <IAIButton
-          colorScheme="accent"
+          colorScheme="base"
           pointerEvents="none"
           isDisabled={!shouldShowStagingImage}
-          sx={{
-            background: 'base.600',
-            _dark: {
-              background: 'base.800',
-            },
-          }}
+          minW={20}
         >{`${currentIndex + 1}/${total}`}</IAIButton>
         <IAIIconButton
           tooltip={`${t('unifiedCanvas.next')} (Right)`}

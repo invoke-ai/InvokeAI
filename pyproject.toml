@@ -40,6 +40,8 @@ dependencies = [
   "controlnet-aux>=0.0.6",
   "timm==0.6.13",   # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
+  # When bumping diffusers beyond 0.21, make sure to address this:
+  # https://github.com/invoke-ai/InvokeAI/blob/fc09ab7e13cb7ca5389100d149b6422ace7b8ed3/invokeai/app/invocations/latent.py#L513
   "diffusers[torch]~=0.21.0",
   "dnspython~=2.4.0",
   "dynamicprompts",
@@ -72,7 +74,7 @@ dependencies = [
   "realesrgan",
   "requests~=2.28.2",
   "rich~=13.3",
-  "safetensors~=0.3.1",
+  "safetensors~=0.4.0",
   "scikit-image~=0.21.0",
   "semver~=3.0.1",
   "send2trash",
@@ -161,16 +163,16 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.packages.find]
 "where" = ["."]
 "include" = [
-    "invokeai.assets.web*","invokeai.version*",
+    "invokeai.assets.fonts*","invokeai.version*",
     "invokeai.generator*","invokeai.backend*",
     "invokeai.frontend*", "invokeai.frontend.web.dist*",
     "invokeai.frontend.web.static*",
     "invokeai.configs*",
-    "invokeai.app*","ldm*",
+    "invokeai.app*",
 ]
 
 [tool.setuptools.package-data]
-"invokeai.assets.web" = ["**.png","**.js","**.woff2","**.css"]
+"invokeai.assets.fonts" = ["**/*.ttf"]
 "invokeai.backend" = ["**.png"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]
@@ -178,7 +180,10 @@ version = { attr = "invokeai.version.__version__" }
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
-addopts = "--cov-report term --cov-report html --cov-report xml"
+addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
+markers = [
+    "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\"."
+]
 [tool.coverage.run]
 branch = true
 source = ["invokeai"]

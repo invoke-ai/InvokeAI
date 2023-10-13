@@ -17,14 +17,15 @@ import {
   addNodePopoverOpened,
   nodeAdded,
 } from 'features/nodes/store/nodesSlice';
-import { map } from 'lodash-es';
+import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
+import { filter, map, some } from 'lodash-es';
 import { memo, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
+import { useTranslation } from 'react-i18next';
 import 'reactflow/dist/style.css';
 import { AnyInvocationType } from 'services/events/types';
 import { AddNodePopoverSelectItem } from './AddNodePopoverSelectItem';
-import { useTranslation } from 'react-i18next';
 
 type NodeTemplate = {
   label: string;
@@ -33,7 +34,7 @@ type NodeTemplate = {
   tags: string[];
 };
 
-const filter = (value: string, item: NodeTemplate) => {
+const selectFilter = (value: string, item: NodeTemplate) => {
   const regex = new RegExp(
     value
       .trim()
@@ -55,10 +56,34 @@ const AddNodePopover = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
+  const fieldFilter = useAppSelector(
+    (state) => state.nodes.currentConnectionFieldType
+  );
+  const handleFilter = useAppSelector(
+    (state) => state.nodes.connectionStartParams?.handleType
+  );
+
   const selector = createSelector(
     [stateSelector],
     ({ nodes }) => {
-      const data: NodeTemplate[] = map(nodes.nodeTemplates, (template) => {
+      // If we have a connection in progress, we need to filter the node choices
+      const filteredNodeTemplates = fieldFilter
+        ? filter(nodes.nodeTemplates, (template) => {
+            const handles =
+              handleFilter == 'source' ? template.inputs : template.outputs;
+
+            return some(handles, (handle) => {
+              const sourceType =
+                handleFilter == 'source' ? fieldFilter : handle.type;
+              const targetType =
+                handleFilter == 'target' ? fieldFilter : handle.type;
+
+              return validateSourceAndTargetTypes(sourceType, targetType);
+            });
+          })
+        : map(nodes.nodeTemplates);
+
+      const data: NodeTemplate[] = map(filteredNodeTemplates, (template) => {
         return {
           label: template.title,
           value: template.type,
@@ -67,19 +92,22 @@ const AddNodePopover = () => {
         };
       });
 
-      data.push({
-        label: t('nodes.currentImage'),
-        value: 'current_image',
-        description: t('nodes.currentImageDescription'),
-        tags: ['progress'],
-      });
+      //We only want these nodes if we're not filtered
+      if (fieldFilter === null) {
+        data.push({
+          label: t('nodes.currentImage'),
+          value: 'current_image',
+          description: t('nodes.currentImageDescription'),
+          tags: ['progress'],
+        });
 
-      data.push({
-        label: t('nodes.notes'),
-        value: 'notes',
-        description: t('nodes.notesDescription'),
-        tags: ['notes'],
-      });
+        data.push({
+          label: t('nodes.notes'),
+          value: 'notes',
+          description: t('nodes.notesDescription'),
+          tags: ['notes'],
+        });
+      }
 
       data.sort((a, b) => a.label.localeCompare(b.label));
 
@@ -190,7 +218,7 @@ const AddNodePopover = () => {
             maxDropdownHeight={400}
             nothingFound={t('nodes.noMatchingNodes')}
             itemComponent={AddNodePopoverSelectItem}
-            filter={filter}
+            filter={selectFilter}
             onChange={handleChange}
             hoverOnSearchChange={true}
             onDropdownClose={onClose}

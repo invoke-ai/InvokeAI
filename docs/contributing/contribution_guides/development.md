@@ -12,7 +12,7 @@ To get started, take a look at our [new contributors checklist](newContributorCh
 Once you're setup, for more information, you can review the documentation specific to your area of interest:
 
 * #### [InvokeAI Architecure](../ARCHITECTURE.md)
-* #### [Frontend Documentation](development_guides/contributingToFrontend.md)
+* #### [Frontend Documentation](./contributingToFrontend.md)
 * #### [Node Documentation](../INVOCATIONS.md)
 * #### [Local Development](../LOCAL_DEVELOPMENT.md)
 
@@ -38,9 +38,9 @@ There are two paths to making a development contribution:
 
 If you need help, you can ask questions in the [#dev-chat](https://discord.com/channels/1020123559063990373/1049495067846524939) channel of the Discord.
 
-For frontend related work, **@pyschedelicious** is the best person to reach out to. 
+For frontend related work, **@psychedelicious** is the best person to reach out to. 
 
-For backend related work, please reach out to **@blessedcoolant**, **@lstein**, **@StAlKeR7779** or **@pyschedelicious**.
+For backend related work, please reach out to **@blessedcoolant**, **@lstein**, **@StAlKeR7779** or **@psychedelicious**.
 
 
 ## **What does the Code of Conduct mean for me?**

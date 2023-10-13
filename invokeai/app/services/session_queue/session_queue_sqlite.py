@@ -5,8 +5,7 @@ from typing import Optional, Union, cast
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event as FastAPIEvent
 
-from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.graph import Graph
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -29,7 +28,9 @@ from invokeai.app.services.session_queue.session_queue_common import (
     calc_session_count,
     prepare_values_to_insert,
 )
-from invokeai.app.services.shared.models import CursorPaginatedResults
+from invokeai.app.services.shared.graph import Graph
+from invokeai.app.services.shared.pagination import CursorPaginatedResults
+from invokeai.app.services.shared.sqlite import SqliteDatabase
 
 
 class SqliteSessionQueue(SessionQueueBase):
@@ -45,13 +46,11 @@ class SqliteSessionQueue(SessionQueueBase):
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_session_event)
         self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
-    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
+    def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
-        self.__conn = conn
-        # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
-        self.__conn.row_factory = sqlite3.Row
+        self.__lock = db.lock
+        self.__conn = db.conn
         self.__cursor = self.__conn.cursor()
-        self.__lock = lock
         self._create_tables()
 
     def _match_event_name(self, event: FastAPIEvent, match_in: list[str]) -> bool:
@@ -427,7 +426,13 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self.__lock.release()
         queue_item = self.get_queue_item(item_id)
-        self.__invoker.services.events.emit_queue_item_status_changed(queue_item)
+        batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
+        queue_status = self.get_queue_status(queue_id=queue_item.queue_id)
+        self.__invoker.services.events.emit_queue_item_status_changed(
+            session_queue_item=queue_item,
+            batch_status=batch_status,
+            queue_status=queue_status,
+        )
         return queue_item
 
     def is_empty(self, queue_id: str) -> IsEmptyResult:
@@ -555,10 +560,11 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return PruneResult(deleted=count)
 
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int, error: Optional[str] = None) -> SessionQueueItem:
         queue_item = self.get_queue_item(item_id)
         if queue_item.status not in ["canceled", "failed", "completed"]:
-            queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
+            status = "failed" if error is not None else "canceled"
+            queue_item = self._set_queue_item_status(item_id=item_id, status=status, error=error)
             self.__invoker.services.queue.cancel(queue_item.session_id)
             self.__invoker.services.events.emit_session_canceled(
                 queue_item_id=queue_item.item_id,
@@ -608,7 +614,13 @@ class SqliteSessionQueue(SessionQueueBase):
                     queue_batch_id=current_queue_item.batch_id,
                     graph_execution_state_id=current_queue_item.session_id,
                 )
-                self.__invoker.services.events.emit_queue_item_status_changed(current_queue_item)
+                batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
+                queue_status = self.get_queue_status(queue_id=queue_id)
+                self.__invoker.services.events.emit_queue_item_status_changed(
+                    session_queue_item=current_queue_item,
+                    batch_status=batch_status,
+                    queue_status=queue_status,
+                )
         except Exception:
             self.__conn.rollback()
             raise
@@ -654,7 +666,13 @@ class SqliteSessionQueue(SessionQueueBase):
                     queue_batch_id=current_queue_item.batch_id,
                     graph_execution_state_id=current_queue_item.session_id,
                 )
-                self.__invoker.services.events.emit_queue_item_status_changed(current_queue_item)
+                batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
+                queue_status = self.get_queue_status(queue_id=queue_id)
+                self.__invoker.services.events.emit_queue_item_status_changed(
+                    session_queue_item=current_queue_item,
+                    batch_status=batch_status,
+                    queue_status=queue_status,
+                )
         except Exception:
             self.__conn.rollback()
             raise

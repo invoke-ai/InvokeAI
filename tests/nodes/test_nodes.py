@@ -82,8 +82,8 @@ class PromptCollectionTestInvocation(BaseInvocation):
 
 
 # Importing these must happen after test invocations are defined or they won't register
-from invokeai.app.services.events import EventServiceBase  # noqa: E402
-from invokeai.app.services.graph import Edge, EdgeConnection  # noqa: E402
+from invokeai.app.services.events.events_base import EventServiceBase  # noqa: E402
+from invokeai.app.services.shared.graph import Edge, EdgeConnection  # noqa: E402
 
 
 def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edge:
