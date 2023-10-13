@@ -662,7 +662,7 @@ def default_ramcache() -> float:
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
-    opts.ram = default_ramcache()
+    opts.ram = opts.ram or default_ramcache()
     return opts
 
 
