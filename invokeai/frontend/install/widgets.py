@@ -381,12 +381,12 @@ def select_stable_diffusion_config_file(
     wrap: bool = True,
     model_name: str = "Unknown",
 ):
-    message = f"Please select the correct base model for the V2 checkpoint named '{model_name}'. Press <CANCEL> to skip installation."
+    message = f"Please select the correct prediction type for the checkpoint named '{model_name}'. Press <CANCEL> to skip installation."
     title = "CONFIG FILE SELECTION"
     options = [
-        "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",
-        "An SD v2.x v-predictive model (768 pixels; 'parameterization: \"v\"' line in its yaml file)",
-        "Skip installation for now and come back later",
+        "'epsilon' - most v1.5 models and v2 models trained on 512 pixel images",
+        "'vprediction' - v2 models trained on 768 pixel images and a few v1.5 models)",
+        "Accept the best guess; you can fix it in the Web UI later",
     ]
 
     F = ConfirmCancelPopup(
@@ -410,7 +410,7 @@ def select_stable_diffusion_config_file(
     choice = F.add(
         npyscreen.SelectOne,
         values=options,
-        value=[0],
+        value=[2],
         max_height=len(options) + 1,
         scroll_exit=True,
     )
@@ -420,5 +420,5 @@ def select_stable_diffusion_config_file(
     if not F.value:
         return None
     assert choice.value[0] in range(0, 3), "invalid choice"
-    choices = ["epsilon", "v", "abort"]
+    choices = ["epsilon", "v", "guess"]
     return choices[choice.value[0]]
