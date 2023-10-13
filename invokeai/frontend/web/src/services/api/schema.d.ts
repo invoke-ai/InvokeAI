@@ -2680,12 +2680,6 @@ export type components = {
        */
       tile_size?: number;
       /**
-       * Tile Size
-       * @description Tile size for tiled ESRGAN upscaling (0=tiling disabled)
-       * @default 400
-       */
-      tile_size?: number;
-      /**
        * Type
        * @default esrgan
        * @enum {string}
@@ -3357,9 +3351,6 @@ export type components = {
           | components['schemas']['ColorInvocation']
           | components['schemas']['ConditioningInvocation']
           | components['schemas']['ConditioningCollectionInvocation']
-          | components['schemas']['FaceOffInvocation']
-          | components['schemas']['FaceMaskInvocation']
-          | components['schemas']['FaceIdentifierInvocation']
           | components['schemas']['ControlNetInvocation']
           | components['schemas']['ImageProcessorInvocation']
           | components['schemas']['MainModelLoaderInvocation']
@@ -3369,9 +3360,8 @@ export type components = {
           | components['schemas']['SeamlessModeInvocation']
           | components['schemas']['SDXLModelLoaderInvocation']
           | components['schemas']['SDXLRefinerModelLoaderInvocation']
-          | components['schemas']['IPAdapterInvocation']
           | components['schemas']['MetadataAccumulatorInvocation']
-          | components['schemas']['T2IAdapterInvocation']
+          | components['schemas']['IPAdapterInvocation']
           | components['schemas']['CompelInvocation']
           | components['schemas']['SDXLCompelPromptInvocation']
           | components['schemas']['SDXLRefinerCompelPromptInvocation']
@@ -3420,7 +3410,6 @@ export type components = {
           | components['schemas']['MultiplyInvocation']
           | components['schemas']['DivideInvocation']
           | components['schemas']['RandomIntInvocation']
-          | components['schemas']['RandomFloatInvocation']
           | components['schemas']['FloatToIntegerInvocation']
           | components['schemas']['RoundInvocation']
           | components['schemas']['IntegerMathInvocation']
@@ -3527,9 +3516,8 @@ export type components = {
           | components['schemas']['SeamlessModeOutput']
           | components['schemas']['SDXLModelLoaderOutput']
           | components['schemas']['SDXLRefinerModelLoaderOutput']
-          | components['schemas']['IPAdapterOutput']
           | components['schemas']['MetadataAccumulatorOutput']
-          | components['schemas']['T2IAdapterOutput']
+          | components['schemas']['IPAdapterOutput']
           | components['schemas']['ClipSkipInvocationOutput']
           | components['schemas']['SchedulerOutput']
           | components['schemas']['ONNXModelLoaderOutput']
@@ -3538,9 +3526,7 @@ export type components = {
           | components['schemas']['String2Output']
           | components['schemas']['GraphInvocationOutput']
           | components['schemas']['IterateInvocationOutput']
-          | components['schemas']['CollectInvocationOutput']
-          | components['schemas']['FaceMaskOutput']
-          | components['schemas']['FaceOffOutput'];
+          | components['schemas']['CollectInvocationOutput'];
       };
       /**
        * Errors
@@ -10223,6 +10209,30 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    T2IAdapterModelFormat: 'diffusers';
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: 'checkpoint' | 'diffusers';
+    /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: 'checkpoint' | 'diffusers';
+    /**
+     * StableDiffusionXLModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    T2IAdapterModelFormat: 'diffusers';
+    /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -10239,7 +10249,7 @@ export type components = {
      * @description An enumeration.
      * @enum {string}
      */
-    ControlNetModelFormat: 'checkpoint' | 'diffusers';
+    StableDiffusion1ModelFormat: 'checkpoint' | 'diffusers';
     /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
@@ -10247,29 +10257,17 @@ export type components = {
      */
     StableDiffusionOnnxModelFormat: 'olive' | 'onnx';
     /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: 'checkpoint' | 'diffusers';
-    /**
-     * T2IAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    T2IAdapterModelFormat: 'diffusers';
-    /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: 'diffusers';
-    /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusion2ModelFormat: 'checkpoint' | 'diffusers';
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: 'checkpoint' | 'diffusers';
   };
   responses: never;
   parameters: never;
@@ -10411,9 +10409,6 @@ export type operations = {
           | components['schemas']['ColorInvocation']
           | components['schemas']['ConditioningInvocation']
           | components['schemas']['ConditioningCollectionInvocation']
-          | components['schemas']['FaceOffInvocation']
-          | components['schemas']['FaceMaskInvocation']
-          | components['schemas']['FaceIdentifierInvocation']
           | components['schemas']['ControlNetInvocation']
           | components['schemas']['ImageProcessorInvocation']
           | components['schemas']['MainModelLoaderInvocation']
@@ -10423,9 +10418,8 @@ export type operations = {
           | components['schemas']['SeamlessModeInvocation']
           | components['schemas']['SDXLModelLoaderInvocation']
           | components['schemas']['SDXLRefinerModelLoaderInvocation']
-          | components['schemas']['IPAdapterInvocation']
           | components['schemas']['MetadataAccumulatorInvocation']
-          | components['schemas']['T2IAdapterInvocation']
+          | components['schemas']['IPAdapterInvocation']
           | components['schemas']['CompelInvocation']
           | components['schemas']['SDXLCompelPromptInvocation']
           | components['schemas']['SDXLRefinerCompelPromptInvocation']
@@ -10474,7 +10468,6 @@ export type operations = {
           | components['schemas']['MultiplyInvocation']
           | components['schemas']['DivideInvocation']
           | components['schemas']['RandomIntInvocation']
-          | components['schemas']['RandomFloatInvocation']
           | components['schemas']['FloatToIntegerInvocation']
           | components['schemas']['RoundInvocation']
           | components['schemas']['IntegerMathInvocation']
@@ -10570,9 +10563,6 @@ export type operations = {
           | components['schemas']['ColorInvocation']
           | components['schemas']['ConditioningInvocation']
           | components['schemas']['ConditioningCollectionInvocation']
-          | components['schemas']['FaceOffInvocation']
-          | components['schemas']['FaceMaskInvocation']
-          | components['schemas']['FaceIdentifierInvocation']
           | components['schemas']['ControlNetInvocation']
           | components['schemas']['ImageProcessorInvocation']
           | components['schemas']['MainModelLoaderInvocation']
@@ -10582,9 +10572,8 @@ export type operations = {
           | components['schemas']['SeamlessModeInvocation']
           | components['schemas']['SDXLModelLoaderInvocation']
           | components['schemas']['SDXLRefinerModelLoaderInvocation']
-          | components['schemas']['IPAdapterInvocation']
           | components['schemas']['MetadataAccumulatorInvocation']
-          | components['schemas']['T2IAdapterInvocation']
+          | components['schemas']['IPAdapterInvocation']
           | components['schemas']['CompelInvocation']
           | components['schemas']['SDXLCompelPromptInvocation']
           | components['schemas']['SDXLRefinerCompelPromptInvocation']
@@ -10633,7 +10622,6 @@ export type operations = {
           | components['schemas']['MultiplyInvocation']
           | components['schemas']['DivideInvocation']
           | components['schemas']['RandomIntInvocation']
-          | components['schemas']['RandomFloatInvocation']
           | components['schemas']['FloatToIntegerInvocation']
           | components['schemas']['RoundInvocation']
           | components['schemas']['IntegerMathInvocation']
