@@ -20,7 +20,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 
 
 @invocation_output("face_mask_output")
