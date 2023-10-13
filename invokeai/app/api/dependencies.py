@@ -1,19 +1,19 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import sqlite3
 from logging import Logger
 
 from invokeai.app.services.board_image_record_storage import SqliteBoardImageRecordStorage
-from invokeai.app.services.board_images import BoardImagesService
+from invokeai.app.services.board_images import BoardImagesService, BoardImagesServiceDependencies
 from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
-from invokeai.app.services.boards import BoardService
+from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
-from invokeai.app.services.images import ImageService
+from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from invokeai.app.services.shared.db import SqliteDatabase
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
@@ -29,6 +29,7 @@ from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsSto
 from ..services.model_manager_service import ModelManagerService
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
+from ..services.thread import lock
 from .events import FastAPIEventService
 
 
@@ -62,64 +63,100 @@ class ApiDependencies:
         logger.info(f"Root directory = {str(config.root_path)}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
 
+        events = FastAPIEventService(event_handler_id)
+
         output_folder = config.output_path
 
-        db = SqliteDatabase(config, logger)
+        # TODO: build a file/path manager?
+        if config.use_memory_db:
+            db_location = ":memory:"
+        else:
+            db_path = config.db_path
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            db_location = str(db_path)
 
-        configuration = config
-        logger = logger
+        logger.info(f"Using database at {db_location}")
+        db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
 
-        board_image_records = SqliteBoardImageRecordStorage(db=db)
-        board_images = BoardImagesService()
-        board_records = SqliteBoardRecordStorage(db=db)
-        boards = BoardService()
-        events = FastAPIEventService(event_handler_id)
-        graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
-        graph_library = SqliteItemStorage[LibraryGraph](db=db, table_name="graphs")
-        image_files = DiskImageFileStorage(f"{output_folder}/images")
-        image_records = SqliteImageRecordStorage(db=db)
-        images = ImageService()
-        invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
-        latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
-        model_manager = ModelManagerService(config, logger)
-        names = SimpleNameService()
-        performance_statistics = InvocationStatsService()
-        processor = DefaultInvocationProcessor()
-        queue = MemoryInvocationQueue()
-        session_processor = DefaultSessionProcessor()
-        session_queue = SqliteSessionQueue(db=db)
+        if config.log_sql:
+            db_conn.set_trace_callback(print)
+        db_conn.execute("PRAGMA foreign_keys = ON;")
+
+        graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+            conn=db_conn, table_name="graph_executions", lock=lock
+        )
+
         urls = LocalUrlService()
+        image_record_storage = SqliteImageRecordStorage(conn=db_conn, lock=lock)
+        image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
+        names = SimpleNameService()
+        latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
+
+        board_record_storage = SqliteBoardRecordStorage(conn=db_conn, lock=lock)
+        board_image_record_storage = SqliteBoardImageRecordStorage(conn=db_conn, lock=lock)
+
+        boards = BoardService(
+            services=BoardServiceDependencies(
+                board_image_record_storage=board_image_record_storage,
+                board_record_storage=board_record_storage,
+                image_record_storage=image_record_storage,
+                url=urls,
+                logger=logger,
+            )
+        )
+
+        board_images = BoardImagesService(
+            services=BoardImagesServiceDependencies(
+                board_image_record_storage=board_image_record_storage,
+                board_record_storage=board_record_storage,
+                image_record_storage=image_record_storage,
+                url=urls,
+                logger=logger,
+            )
+        )
+
+        images = ImageService(
+            services=ImageServiceDependencies(
+                board_image_record_storage=board_image_record_storage,
+                image_record_storage=image_record_storage,
+                image_file_storage=image_file_storage,
+                url=urls,
+                logger=logger,
+                names=names,
+                graph_execution_manager=graph_execution_manager,
+            )
+        )
 
         services = InvocationServices(
-            board_image_records=board_image_records,
-            board_images=board_images,
-            board_records=board_records,
-            boards=boards,
-            configuration=configuration,
+            model_manager=ModelManagerService(config, logger),
             events=events,
-            graph_execution_manager=graph_execution_manager,
-            graph_library=graph_library,
-            image_files=image_files,
-            image_records=image_records,
-            images=images,
-            invocation_cache=invocation_cache,
             latents=latents,
+            images=images,
+            boards=boards,
+            board_images=board_images,
+            queue=MemoryInvocationQueue(),
+            graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, lock=lock, table_name="graphs"),
+            graph_execution_manager=graph_execution_manager,
+            processor=DefaultInvocationProcessor(),
+            configuration=config,
+            performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
-            model_manager=model_manager,
-            names=names,
-            performance_statistics=performance_statistics,
-            processor=processor,
-            queue=queue,
-            session_processor=session_processor,
-            session_queue=session_queue,
-            urls=urls,
+            session_queue=SqliteSessionQueue(conn=db_conn, lock=lock),
+            session_processor=DefaultSessionProcessor(),
+            invocation_cache=MemoryInvocationCache(max_cache_size=config.node_cache_size),
         )
 
         create_system_graphs(services.graph_library)
 
         ApiDependencies.invoker = Invoker(services)
 
-        db.clean()
+        try:
+            lock.acquire()
+            db_conn.execute("VACUUM;")
+            db_conn.commit()
+            logger.info("Cleaned database")
+        finally:
+            lock.release()
 
     @staticmethod
     def shutdown():

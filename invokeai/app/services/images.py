@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from logging import Logger
+from typing import TYPE_CHECKING, Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -10,20 +11,28 @@ from invokeai.app.models.image import (
     InvalidOriginException,
     ResourceOrigin,
 )
+from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.image_file_storage import (
     ImageFileDeleteException,
     ImageFileNotFoundException,
     ImageFileSaveException,
+    ImageFileStorageBase,
 )
 from invokeai.app.services.image_record_storage import (
     ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ImageRecordSaveException,
+    ImageRecordStorageBase,
     OffsetPaginatedResults,
 )
-from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.item_storage import ItemStorageABC
 from invokeai.app.services.models.image_record import ImageDTO, ImageRecord, ImageRecordChanges, image_record_to_dto
+from invokeai.app.services.resource_name import NameServiceBase
+from invokeai.app.services.urls import UrlServiceBase
 from invokeai.app.util.metadata import get_metadata_graph_from_raw_session
+
+if TYPE_CHECKING:
+    from invokeai.app.services.graph import GraphExecutionState
 
 
 class ImageServiceABC(ABC):
@@ -141,11 +150,42 @@ class ImageServiceABC(ABC):
         pass
 
 
-class ImageService(ImageServiceABC):
-    __invoker: Invoker
+class ImageServiceDependencies:
+    """Service dependencies for the ImageService."""
 
-    def start(self, invoker: Invoker) -> None:
-        self.__invoker = invoker
+    image_records: ImageRecordStorageBase
+    image_files: ImageFileStorageBase
+    board_image_records: BoardImageRecordStorageBase
+    urls: UrlServiceBase
+    logger: Logger
+    names: NameServiceBase
+    graph_execution_manager: ItemStorageABC["GraphExecutionState"]
+
+    def __init__(
+        self,
+        image_record_storage: ImageRecordStorageBase,
+        image_file_storage: ImageFileStorageBase,
+        board_image_record_storage: BoardImageRecordStorageBase,
+        url: UrlServiceBase,
+        logger: Logger,
+        names: NameServiceBase,
+        graph_execution_manager: ItemStorageABC["GraphExecutionState"],
+    ):
+        self.image_records = image_record_storage
+        self.image_files = image_file_storage
+        self.board_image_records = board_image_record_storage
+        self.urls = url
+        self.logger = logger
+        self.names = names
+        self.graph_execution_manager = graph_execution_manager
+
+
+class ImageService(ImageServiceABC):
+    _services: ImageServiceDependencies
+
+    def __init__(self, services: ImageServiceDependencies):
+        super().__init__()
+        self._services = services
 
     def create(
         self,
@@ -165,13 +205,24 @@ class ImageService(ImageServiceABC):
         if image_category not in ImageCategory:
             raise InvalidImageCategoryException
 
-        image_name = self.__invoker.services.names.create_image_name()
+        image_name = self._services.names.create_image_name()
+
+        # TODO: Do we want to store the graph in the image at all? I don't think so...
+        # graph = None
+        # if session_id is not None:
+        #     session_raw = self._services.graph_execution_manager.get_raw(session_id)
+        #     if session_raw is not None:
+        #         try:
+        #             graph = get_metadata_graph_from_raw_session(session_raw)
+        #         except Exception as e:
+        #             self._services.logger.warn(f"Failed to parse session graph: {e}")
+        #             graph = None
 
         (width, height) = image.size
 
         try:
             # TODO: Consider using a transaction here to ensure consistency between storage and database
-            self.__invoker.services.image_records.save(
+            self._services.image_records.save(
                 # Non-nullable fields
                 image_name=image_name,
                 image_origin=image_origin,
@@ -186,22 +237,20 @@ class ImageService(ImageServiceABC):
                 session_id=session_id,
             )
             if board_id is not None:
-                self.__invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
-            self.__invoker.services.image_files.save(
-                image_name=image_name, image=image, metadata=metadata, workflow=workflow
-            )
+                self._services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
+            self._services.image_files.save(image_name=image_name, image=image, metadata=metadata, workflow=workflow)
             image_dto = self.get_dto(image_name)
 
             self._on_changed(image_dto)
             return image_dto
         except ImageRecordSaveException:
-            self.__invoker.services.logger.error("Failed to save image record")
+            self._services.logger.error("Failed to save image record")
             raise
         except ImageFileSaveException:
-            self.__invoker.services.logger.error("Failed to save image file")
+            self._services.logger.error("Failed to save image file")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
+            self._services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
 
     def update(
@@ -210,101 +259,101 @@ class ImageService(ImageServiceABC):
         changes: ImageRecordChanges,
     ) -> ImageDTO:
         try:
-            self.__invoker.services.image_records.update(image_name, changes)
+            self._services.image_records.update(image_name, changes)
             image_dto = self.get_dto(image_name)
             self._on_changed(image_dto)
             return image_dto
         except ImageRecordSaveException:
-            self.__invoker.services.logger.error("Failed to update image record")
+            self._services.logger.error("Failed to update image record")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem updating image record")
+            self._services.logger.error("Problem updating image record")
             raise e
 
     def get_pil_image(self, image_name: str) -> PILImageType:
         try:
-            return self.__invoker.services.image_files.get(image_name)
+            return self._services.image_files.get(image_name)
         except ImageFileNotFoundException:
-            self.__invoker.services.logger.error("Failed to get image file")
+            self._services.logger.error("Failed to get image file")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image file")
+            self._services.logger.error("Problem getting image file")
             raise e
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:
-            return self.__invoker.services.image_records.get(image_name)
+            return self._services.image_records.get(image_name)
         except ImageRecordNotFoundException:
-            self.__invoker.services.logger.error("Image record not found")
+            self._services.logger.error("Image record not found")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image record")
+            self._services.logger.error("Problem getting image record")
             raise e
 
     def get_dto(self, image_name: str) -> ImageDTO:
         try:
-            image_record = self.__invoker.services.image_records.get(image_name)
+            image_record = self._services.image_records.get(image_name)
 
             image_dto = image_record_to_dto(
                 image_record,
-                self.__invoker.services.urls.get_image_url(image_name),
-                self.__invoker.services.urls.get_image_url(image_name, True),
-                self.__invoker.services.board_image_records.get_board_for_image(image_name),
+                self._services.urls.get_image_url(image_name),
+                self._services.urls.get_image_url(image_name, True),
+                self._services.board_image_records.get_board_for_image(image_name),
             )
 
             return image_dto
         except ImageRecordNotFoundException:
-            self.__invoker.services.logger.error("Image record not found")
+            self._services.logger.error("Image record not found")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image DTO")
+            self._services.logger.error("Problem getting image DTO")
             raise e
 
     def get_metadata(self, image_name: str) -> Optional[ImageMetadata]:
         try:
-            image_record = self.__invoker.services.image_records.get(image_name)
-            metadata = self.__invoker.services.image_records.get_metadata(image_name)
+            image_record = self._services.image_records.get(image_name)
+            metadata = self._services.image_records.get_metadata(image_name)
 
             if not image_record.session_id:
                 return ImageMetadata(metadata=metadata)
 
-            session_raw = self.__invoker.services.graph_execution_manager.get_raw(image_record.session_id)
+            session_raw = self._services.graph_execution_manager.get_raw(image_record.session_id)
             graph = None
 
             if session_raw:
                 try:
                     graph = get_metadata_graph_from_raw_session(session_raw)
                 except Exception as e:
-                    self.__invoker.services.logger.warn(f"Failed to parse session graph: {e}")
+                    self._services.logger.warn(f"Failed to parse session graph: {e}")
                     graph = None
 
             return ImageMetadata(graph=graph, metadata=metadata)
         except ImageRecordNotFoundException:
-            self.__invoker.services.logger.error("Image record not found")
+            self._services.logger.error("Image record not found")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image DTO")
+            self._services.logger.error("Problem getting image DTO")
             raise e
 
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
-            return self.__invoker.services.image_files.get_path(image_name, thumbnail)
+            return self._services.image_files.get_path(image_name, thumbnail)
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image path")
+            self._services.logger.error("Problem getting image path")
             raise e
 
     def validate_path(self, path: str) -> bool:
         try:
-            return self.__invoker.services.image_files.validate_path(path)
+            return self._services.image_files.validate_path(path)
         except Exception as e:
-            self.__invoker.services.logger.error("Problem validating image path")
+            self._services.logger.error("Problem validating image path")
             raise e
 
     def get_url(self, image_name: str, thumbnail: bool = False) -> str:
         try:
-            return self.__invoker.services.urls.get_image_url(image_name, thumbnail)
+            return self._services.urls.get_image_url(image_name, thumbnail)
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image path")
+            self._services.logger.error("Problem getting image path")
             raise e
 
     def get_many(
@@ -317,7 +366,7 @@ class ImageService(ImageServiceABC):
         board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
         try:
-            results = self.__invoker.services.image_records.get_many(
+            results = self._services.image_records.get_many(
                 offset,
                 limit,
                 image_origin,
@@ -330,9 +379,9 @@ class ImageService(ImageServiceABC):
                 map(
                     lambda r: image_record_to_dto(
                         r,
-                        self.__invoker.services.urls.get_image_url(r.image_name),
-                        self.__invoker.services.urls.get_image_url(r.image_name, True),
-                        self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
+                        self._services.urls.get_image_url(r.image_name),
+                        self._services.urls.get_image_url(r.image_name, True),
+                        self._services.board_image_records.get_board_for_image(r.image_name),
                     ),
                     results.items,
                 )
@@ -345,56 +394,56 @@ class ImageService(ImageServiceABC):
                 total=results.total,
             )
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting paginated image DTOs")
+            self._services.logger.error("Problem getting paginated image DTOs")
             raise e
 
     def delete(self, image_name: str):
         try:
-            self.__invoker.services.image_files.delete(image_name)
-            self.__invoker.services.image_records.delete(image_name)
+            self._services.image_files.delete(image_name)
+            self._services.image_records.delete(image_name)
             self._on_deleted(image_name)
         except ImageRecordDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image record")
+            self._services.logger.error("Failed to delete image record")
             raise
         except ImageFileDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image file")
+            self._services.logger.error("Failed to delete image file")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem deleting image record and file")
+            self._services.logger.error("Problem deleting image record and file")
             raise e
 
     def delete_images_on_board(self, board_id: str):
         try:
-            image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
+            image_names = self._services.board_image_records.get_all_board_image_names_for_board(board_id)
             for image_name in image_names:
-                self.__invoker.services.image_files.delete(image_name)
-            self.__invoker.services.image_records.delete_many(image_names)
+                self._services.image_files.delete(image_name)
+            self._services.image_records.delete_many(image_names)
             for image_name in image_names:
                 self._on_deleted(image_name)
         except ImageRecordDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image records")
+            self._services.logger.error("Failed to delete image records")
             raise
         except ImageFileDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image files")
+            self._services.logger.error("Failed to delete image files")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem deleting image records and files")
+            self._services.logger.error("Problem deleting image records and files")
             raise e
 
     def delete_intermediates(self) -> int:
         try:
-            image_names = self.__invoker.services.image_records.delete_intermediates()
+            image_names = self._services.image_records.delete_intermediates()
             count = len(image_names)
             for image_name in image_names:
-                self.__invoker.services.image_files.delete(image_name)
+                self._services.image_files.delete(image_name)
                 self._on_deleted(image_name)
             return count
         except ImageRecordDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image records")
+            self._services.logger.error("Failed to delete image records")
             raise
         except ImageFileDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image files")
+            self._services.logger.error("Failed to delete image files")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem deleting image records and files")
+            self._services.logger.error("Problem deleting image records and files")
             raise e

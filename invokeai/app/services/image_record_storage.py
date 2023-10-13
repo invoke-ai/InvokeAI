@@ -10,7 +10,6 @@ from pydantic.generics import GenericModel
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.models.image_record import ImageRecord, ImageRecordChanges, deserialize_image_record
-from invokeai.app.services.shared.db import SqliteDatabase
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -153,11 +152,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, db: SqliteDatabase) -> None:
+    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
         super().__init__()
-        self._lock = db.lock
-        self._conn = db.conn
+        self._conn = conn
+        # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
+        self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
+        self._lock = lock
 
         try:
             self._lock.acquire()
@@ -200,16 +201,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(
                 """--sql
                 ALTER TABLE images ADD COLUMN starred BOOLEAN DEFAULT FALSE;
-                """
-            )
-
-        if "workflow" not in columns:
-            self._cursor.execute(
-                """--sql
-                ALTER TABLE images
-                ADD COLUMN workflow_id TEXT;
-                -- TODO: This requires a migration:
-                -- FOREIGN KEY (workflow_id) REFERENCES workflows (workflow_id) ON DELETE SET NULL;
                 """
             )
 

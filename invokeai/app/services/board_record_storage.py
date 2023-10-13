@@ -7,7 +7,6 @@ from pydantic import BaseModel, Extra, Field
 
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
-from invokeai.app.services.shared.db import SqliteDatabase
 from invokeai.app.util.misc import uuid_string
 
 
@@ -92,11 +91,13 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, db: SqliteDatabase) -> None:
+    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
         super().__init__()
-        self._lock = db.lock
-        self._conn = db.conn
+        self._conn = conn
+        # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
+        self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
+        self._lock = lock
 
         try:
             self._lock.acquire()
