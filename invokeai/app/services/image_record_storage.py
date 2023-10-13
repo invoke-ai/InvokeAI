@@ -7,7 +7,7 @@ from typing import Optional, cast
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.models.image_record import ImageRecord, ImageRecordChanges, deserialize_image_record
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.db import SqliteDatabase
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 

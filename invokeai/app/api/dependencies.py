@@ -13,7 +13,7 @@ from invokeai.app.services.invocation_cache.invocation_cache_memory import Memor
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.db import SqliteDatabase
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__

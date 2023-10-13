@@ -6,7 +6,7 @@ from typing import Optional, Union, cast
 from pydantic import BaseModel, Extra, Field
 
 from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.db import SqliteDatabase
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.util.misc import uuid_string
 
