@@ -236,9 +236,16 @@ class ModelInstall(object):
         if not models_installed:
             models_installed = dict()
 
+        model_path_id_or_url = str(model_path_id_or_url).strip()
+
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
         path = Path(model_path_id_or_url)
+
+        # fix relative paths
+        if path.exists() and not path.is_absolute():
+            path = path.absolute()  # make relative to current WD
+
         # checkpoint file, or similar
         if path.is_file():
             models_installed.update({str(path): self._install_path(path)})

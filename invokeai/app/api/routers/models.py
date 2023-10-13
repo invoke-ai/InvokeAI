@@ -152,6 +152,7 @@ async def import_model(
 ) -> ImportModelResponse:
     """Add a model using its local path, repo_id, or remote URL. Model characteristics will be probed and configured automatically"""
 
+    location = location.strip()
     items_to_import = {location}
     prediction_types = {x.value: x for x in SchedulerPredictionType}
     logger = ApiDependencies.invoker.services.logger
