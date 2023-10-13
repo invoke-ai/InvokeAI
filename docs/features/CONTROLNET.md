@@ -17,9 +17,6 @@ image generation, providing you with a way to direct the network
 towards generating images that better fit your desired style or
 outcome.
 
-
-#### How it works
-
 ControlNet works by analyzing an input image, pre-processing that
 image to identify relevant information that can be interpreted by each
 specific ControlNet model, and then inserting that control information
@@ -27,35 +24,21 @@ into the generation process. This can be used to adjust the style,
 composition, or other aspects of the image to better achieve a
 specific result.
 
-
-#### Models
+#### Installation
 
 InvokeAI provides access to a series of ControlNet models that provide
-different effects or styles in your generated images.  Currently
-InvokeAI only supports "diffuser" style ControlNet models. These are
-folders that contain the files `config.json` and/or
-`diffusion_pytorch_model.safetensors` and
-`diffusion_pytorch_model.fp16.safetensors`. The name of the folder is
-the name of the model.
+different effects or styles in your generated images.
 
-***InvokeAI does not currently support checkpoint-format
-ControlNets. These come in the form of a single file with the
-extension `.safetensors`.***
+To install ControlNet Models:
 
-Diffuser-style ControlNet models are available at HuggingFace
-(http://huggingface.co) and accessed via their repo IDs (identifiers
-in the format "author/modelname"). The easiest way to install them is
+1. The easiest way to install them is
 to use the InvokeAI model installer application. Use the
 `invoke.sh`/`invoke.bat` launcher to select item [5] and then navigate
 to the CONTROLNETS section. Select the models you wish to install and
 press "APPLY CHANGES". You may also enter additional HuggingFace
-repo_ids in the "Additional models" textbox:
+repo_ids in the "Additional models" textbox. 
+2. Using the "Add Model" function of the  model manager, enter the HuggingFace Repo ID of the ControlNet. The ID is in the format "author/repoName"
 
-![Model Installer -
-Controlnetl](../assets/installing-models/model-installer-controlnet.png){:width="640px"}
-
-Command-line users can launch the model installer using the command
-`invokeai-model-install`.
 
 _Be aware that some ControlNet models require additional code
 functionality in order to work properly, so just installing a
@@ -63,6 +46,17 @@ third-party ControlNet model may not have the desired effect._ Please
 read and follow the documentation for installing a third party model
 not currently included among InvokeAI's default list.
 
+Currently InvokeAI **only** supports "diffuser" style ControlNet models. These are
+folders that contain the files `config.json` and/or
+`diffusion_pytorch_model.safetensors` and
+`diffusion_pytorch_model.fp16.safetensors`. The name of the folder is
+the name of the model.
+
+Diffuser-style ControlNet models are available at HuggingFace
+(http://huggingface.co) and accessed via their repo IDs (identifiers
+in the format "author/modelname").
+
+#### ControlNet Models
 The models currently supported include:
 
 **Canny**:
@@ -133,6 +127,30 @@ Start/End  - 0 represents the start of the generation, 1 represents the end. The
 
 Additionally, each ControlNet section can be expanded in order to manipulate settings for the image pre-processor that adjusts your uploaded image before using it in when you Invoke.
 
+## T2I-Adapter
+[T2I-Adapter](https://github.com/TencentARC/T2I-Adapter) is a tool similar to ControlNet that allows for control over the generation process by providing control information during the generation process. T2I-Adapter models tend to be smaller and more efficient than ControlNets. 
+
+##### Installation
+To install T2I-Adapter Models:
+
+1. The easiest way to install models is
+to use the InvokeAI model installer application. Use the
+`invoke.sh`/`invoke.bat` launcher to select item [5] and then navigate
+to the T2I-Adapters section. Select the models you wish to install and
+press "APPLY CHANGES". You may also enter additional HuggingFace
+repo_ids in the "Additional models" textbox. 
+2. Using the "Add Model" function of the  model manager, enter the HuggingFace Repo ID of the T2I-Adapter. The ID is in the format "author/repoName"
+
+#### Usage
+Each T2I Adapter has two settings that are applied.
+
+Weight - Strength of the model applied to the generation for the section, defined by start/end.
+
+Start/End  - 0 represents the start of the generation, 1 represents the end. The Start/end setting controls what steps during the generation process have the ControlNet applied.
+
+Additionally, each  section can be expanded with the "Show Advanced" button in order to manipulate settings for the image pre-processor that adjusts your uploaded image before using it in during the generation process.
+
+**Note:** T2I-Adapter and ControlNets cannot be used together. Mu
 
 ## IP-Adapter
 
@@ -140,7 +158,7 @@ Additionally, each ControlNet section can be expanded in order to manipulate set
 
 ![IP-Adapter + T2I](https://github.com/tencent-ailab/IP-Adapter/raw/main/assets/demo/ip_adpter_plus_multi.jpg)
 
-![IP-Adapter + IMG2IMG](https://github.com/tencent-ailab/IP-Adapter/blob/main/assets/demo/image-to-image.jpg)
+![IP-Adapter + IMG2IMG](https://raw.githubusercontent.com/tencent-ailab/IP-Adapter/main/assets/demo/image-to-image.jpg)
 
 #### Installation
 There are several ways to install IP-Adapter models with an existing InvokeAI installation:
