@@ -23,6 +23,7 @@ jobs:
         python-version:
           # - '3.9'
           - '3.10'
+          - '3.11'
         pytorch:
           - linux-cuda-11_7
           - linux-rocm-5_2

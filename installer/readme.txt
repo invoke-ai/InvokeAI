@@ -14,7 +14,7 @@ Preparations:
      python --version
 
   If all is well, it will print "Python 3.X.X", where the version number
-  is at least 3.9.*, and not higher than 3.11.*.
+  is at least 3.10.*, and not higher than 3.11.*.
 
   If this works, check the version of the Python package manager, pip:
 
