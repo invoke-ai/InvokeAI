@@ -32,7 +32,7 @@ class CLIPVisionModelField(BaseModel):
 
 
 class IPAdapterField(BaseModel):
-    image: ImageField = Field(description="The IP-Adapter image prompt.")
+    image: Union[ImageField, List[ImageField]] = Field(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
     image_encoder_model: CLIPVisionModelField = Field(description="The name of the CLIP image encoder model.")
     weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
@@ -56,7 +56,7 @@ class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
     # Inputs
-    image: ImageField = InputField(description="The IP-Adapter image prompt.")
+    image: Union[ImageField, List[ImageField]] = InputField(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: IPAdapterModelField = InputField(
         description="The IP-Adapter model.", title="IP-Adapter Model", input=Input.Direct, ui_order=-1
     )
