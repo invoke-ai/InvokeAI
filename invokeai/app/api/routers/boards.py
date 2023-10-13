@@ -5,8 +5,8 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.board_record_storage import BoardChanges
+from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.board_record import BoardDTO
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 from ..dependencies import ApiDependencies
 

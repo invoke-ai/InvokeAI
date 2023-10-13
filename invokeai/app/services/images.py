@@ -19,10 +19,10 @@ from invokeai.app.services.image_record_storage import (
     ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ImageRecordSaveException,
+    OffsetPaginatedResults,
 )
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.models.image_record import ImageDTO, ImageRecord, ImageRecordChanges, image_record_to_dto
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.util.metadata import get_metadata_graph_from_raw_session
 
 

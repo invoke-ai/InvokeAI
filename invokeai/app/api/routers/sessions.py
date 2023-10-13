@@ -6,12 +6,11 @@ from fastapi import Body, HTTPException, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic.fields import Field
 
-from invokeai.app.services.shared.pagination import PaginatedResults
-
 # Importing * is bad karma but needed here for node detection
 from ...invocations import *  # noqa: F401 F403
 from ...invocations.baseinvocation import BaseInvocation
 from ...services.graph import Edge, EdgeConnection, Graph, GraphExecutionState, NodeAlreadyExecutedError
+from ...services.item_storage import PaginatedResults
 from ..dependencies import ApiDependencies
 
 session_router = APIRouter(prefix="/v1/sessions", tags=["sessions"])

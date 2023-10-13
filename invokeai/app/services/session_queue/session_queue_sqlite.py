@@ -30,7 +30,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     prepare_values_to_insert,
 )
 from invokeai.app.services.shared.db import SqliteDatabase
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
+from invokeai.app.services.shared.models import CursorPaginatedResults
 
 
 class SqliteSessionQueue(SessionQueueBase):
