@@ -10,7 +10,7 @@ from PIL import Image
 from realesrgan import RealESRGANer
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.backend.util.devices import choose_torch_device
 
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation

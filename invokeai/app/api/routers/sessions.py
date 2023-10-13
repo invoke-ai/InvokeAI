@@ -11,7 +11,7 @@ from invokeai.app.services.shared.pagination import PaginatedResults
 # Importing * is bad karma but needed here for node detection
 from ...invocations import *  # noqa: F401 F403
 from ...invocations.baseinvocation import BaseInvocation
-from ...services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState, NodeAlreadyExecutedError
+from ...services.graph import Edge, EdgeConnection, Graph, GraphExecutionState, NodeAlreadyExecutedError
 from ..dependencies import ApiDependencies
 
 session_router = APIRouter(prefix="/v1/sessions", tags=["sessions"])

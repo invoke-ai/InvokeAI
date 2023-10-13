@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, StrictStr, parse_raw_as, root_validator, 
 from pydantic.json import pydantic_encoder
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
-from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
+from invokeai.app.services.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.util.misc import uuid_string
 
 # region Errors

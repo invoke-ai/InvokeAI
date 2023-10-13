@@ -11,8 +11,8 @@ from invokeai.app.invocations.image import ShowImageInvocation
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
 from invokeai.app.invocations.primitives import FloatInvocation, IntegerInvocation
 from invokeai.app.invocations.upscale import ESRGANInvocation
-from invokeai.app.services.shared.default_graphs import create_text_to_image
-from invokeai.app.services.shared.graph import (
+from invokeai.app.services.default_graphs import create_text_to_image
+from invokeai.app.services.graph import (
     CollectInvocation,
     Edge,
     EdgeConnection,

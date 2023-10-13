@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend import BaseModelType, ModelManager, ModelType, SubModelType
 
 BASIC_MODEL_NAME = ("SDXL base", BaseModelType.StableDiffusionXL, ModelType.Main)

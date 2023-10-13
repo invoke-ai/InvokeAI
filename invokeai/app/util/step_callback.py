@@ -1,7 +1,8 @@
 import torch
 from PIL import Image
 
-from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException, ProgressImage
+from invokeai.app.models.exceptions import CanceledException
+from invokeai.app.models.image import ProgressImage
 
 from ...backend.model_management.models import BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState

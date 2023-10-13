@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from invokeai.app.services.graph import Graph
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
@@ -17,7 +18,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemDTO,
     SessionQueueStatus,
 )
-from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
 
 

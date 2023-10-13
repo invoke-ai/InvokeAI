@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError, parse_raw_as
 
+from invokeai.app.services.graph import Graph, GraphExecutionState, GraphInvocation
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchDataCollection,
@@ -11,7 +12,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     populate_graph,
     prepare_values_to_insert,
 )
-from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation
 from tests.nodes.test_nodes import PromptTestInvocation
 
 
