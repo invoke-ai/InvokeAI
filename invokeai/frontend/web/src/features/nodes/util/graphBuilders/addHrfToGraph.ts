@@ -62,7 +62,11 @@ export const addHrfToGraph = (
   graph: NonNullableGraph
 ): void => {
   // Double check hrf is enabled.
-  if (!state.generation.hrfEnabled) {
+  if (
+    !state.generation.hrfEnabled ||
+    state.config.disabledSDFeatures.includes('hrf') ||
+    state.generation.model?.model_type === 'onnx' // TODO: ONNX support
+  ) {
     return;
   }
   const log = logger('txt2img');

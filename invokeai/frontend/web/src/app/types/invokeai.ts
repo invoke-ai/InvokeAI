@@ -39,7 +39,8 @@ export type SDFeature =
   | 'hires'
   | 'lora'
   | 'embedding'
-  | 'vae';
+  | 'vae'
+  | 'hrf';
 
 /**
  * Configuration options for the InvokeAI UI.

@@ -9,6 +9,7 @@ import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
 import ParamHrfWidth from './ParamHrfWidth';
 import ParamHrfHeight from './ParamHrfHeight';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
@@ -21,6 +22,7 @@ const selector = createSelector(
 );
 
 export default function ParamHrfCollapse() {
+  const isHRFFeatureEnabled = useFeatureStatus('hrf').isFeatureEnabled;
   const { hrfEnabled } = useAppSelector(selector);
   const activeLabel = useMemo(() => {
     if (hrfEnabled) {
@@ -29,6 +31,10 @@ export default function ParamHrfCollapse() {
       return 'Off';
     }
   }, [hrfEnabled]);
+
+  if (!isHRFFeatureEnabled) {
+    return null;
+  }
 
   return (
     <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>
