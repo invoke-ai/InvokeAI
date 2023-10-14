@@ -86,7 +86,7 @@ export const addT2IAdaptersToLinearGraph = (
 
       graph.nodes[t2iAdapterNode.id] = t2iAdapterNode as T2IAdapterInvocation;
 
-      if (metadataAccumulator?.ipAdapters) {
+      if (metadataAccumulator?.t2iAdapters) {
         // metadata accumulator only needs a control field - not the whole node
         // extract what we need and add to the accumulator
         const t2iAdapterField = omit(t2iAdapterNode, [
