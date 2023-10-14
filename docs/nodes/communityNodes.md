@@ -144,10 +144,10 @@ This includes 15 Nodes:
 - *Rotate/Flip Image* - Rotate an image in degrees clockwise/counterclockwise about its center, optionally resizing the image boundaries to fit, or flipping it about the vertical and/or horizontal axes.
 - *Shadows/Highlights/Midtones* - Extract three masks (with adjustable hard or soft thresholds) representing shadows, midtones, and highlights regions of an image.
 - *Text Mask (simple 2D)* - create and position a white on black (or black on white) line of text using any font locally available to Invoke.
-  
-</br><img src="https://raw.githubusercontent.com/dwringer/composition-nodes/main/composition_pack_overview.jpg" width="500" />
 
 **Node Link:** https://github.com/dwringer/composition-nodes
+  
+</br><img src="https://raw.githubusercontent.com/dwringer/composition-nodes/main/composition_pack_overview.jpg" width="500" />
 
 --------------------------------
 ### Image to Character Art Image Nodes
