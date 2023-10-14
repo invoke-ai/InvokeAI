@@ -1045,8 +1045,7 @@
         "controlAdapter_other": "",
         "megaControl": "Mega ControlNet",
         "minConfidence": "Confidenza minima",
-        "scribble": "Scribble",
-        "controlnet": ""
+        "scribble": "Scribble"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
