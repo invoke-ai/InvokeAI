@@ -63,9 +63,6 @@ const DataViewer = (props: Props) => {
           defer
           style={{ height: '100%', width: '100%' }}
           options={{
-            overflow: {
-              y: 'scroll',
-            },
             scrollbars: {
               visibility: 'auto',
               autoHide: 'scroll',
