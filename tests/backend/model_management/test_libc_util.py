@@ -11,7 +11,10 @@ def test_libc_util_mallinfo2():
         # TODO: Set the expected result preemptively based on the system properties.
         pytest.xfail("libc shared library is not available on this system.")
 
-    info = libc.mallinfo2()
+    try:
+        info = libc.mallinfo2()
+    except AttributeError:
+        pytest.xfail("`mallinfo2` is not available on this system, likely due to glibc < 2.33.")
 
     assert info.arena > 0
 
