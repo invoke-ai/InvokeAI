@@ -156,6 +156,18 @@ class MetadataAccumulatorInvocation(BaseInvocation):
         description="The VAE used for decoding, if the main model's default was not used",
     )
 
+    # High resolution fix metadata.
+    hrf_width: Optional[int] = InputField(
+        description="The high resolution fix height and width multipler.",
+    )
+    hrf_height: Optional[int] = InputField(
+        description="The high resolution fix height and width multipler.",
+    )
+    hrf_strength: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix img2img strength used in the upscale pass.",
+    )
+
     # SDXL
     positive_style_prompt: Optional[str] = InputField(
         default=None,
