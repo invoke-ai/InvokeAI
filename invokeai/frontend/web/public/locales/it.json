@@ -471,7 +471,8 @@
         "useCustomConfig": "Utilizza configurazione personalizzata",
         "closeAdvanced": "Chiudi Avanzate",
         "modelType": "Tipo di modello",
-        "customConfigFileLocation": "Posizione del file di configurazione personalizzato"
+        "customConfigFileLocation": "Posizione del file di configurazione personalizzato",
+        "vaePrecision": "Precisione VAE"
     },
     "parameters": {
         "images": "Immagini",
@@ -897,7 +898,63 @@
         "notesDescription": "Aggiunge note sul tuo flusso di lavoro",
         "unknownField": "Campo sconosciuto",
         "unknownNode": "Nodo sconosciuto",
-        "vaeFieldDescription": "Sotto modello VAE."
+        "vaeFieldDescription": "Sotto modello VAE.",
+        "booleanPolymorphicDescription": "Una raccolta di booleani.",
+        "missingTemplate": "Modello mancante",
+        "outputSchemaNotFound": "Schema di output non trovato",
+        "colorFieldDescription": "Un colore RGBA.",
+        "maybeIncompatible": "Potrebbe essere incompatibile con quello installato",
+        "noNodeSelected": "Nessun nodo selezionato",
+        "colorPolymorphic": "Colore polimorfico",
+        "booleanCollectionDescription": "Una raccolta di booleani.",
+        "colorField": "Colore",
+        "nodeTemplate": "Modello di nodo",
+        "nodeOpacity": "Opacità del nodo",
+        "pickOne": "Sceglierne uno",
+        "outputField": "Campo di output",
+        "nodeSearch": "Cerca nodi",
+        "nodeOutputs": "Uscite del nodo",
+        "collectionItem": "Oggetto della raccolta",
+        "noConnectionInProgress": "Nessuna connessione in corso",
+        "noConnectionData": "Nessun dato di connessione",
+        "outputFields": "Campi di output",
+        "cannotDuplicateConnection": "Impossibile creare connessioni duplicate",
+        "booleanPolymorphic": "Polimorfico booleano",
+        "colorPolymorphicDescription": "Una collezione di colori polimorfici.",
+        "missingCanvaInitImage": "Immagine iniziale della tela mancante",
+        "clipFieldDescription": "Sottomodelli di tokenizzatore e codificatore di testo.",
+        "noImageFoundState": "Nessuna immagine iniziale trovata nello stato",
+        "clipField": "CLIP",
+        "noMatchingNodes": "Nessun nodo corrispondente",
+        "noFieldType": "Nessun tipo di campo",
+        "colorCollection": "Una collezione di colori.",
+        "noOutputSchemaName": "Nessun nome dello schema di output trovato nell'oggetto di riferimento",
+        "boolean": "Booleani",
+        "missingCanvaInitMaskImages": "Immagini di inizializzazione e maschera della tela mancanti",
+        "oNNXModelField": "Modello ONNX",
+        "node": "Nodo",
+        "booleanDescription": "I booleani sono veri o falsi.",
+        "collection": "Raccolta",
+        "cannotConnectInputToInput": "Impossibile collegare Input a Input",
+        "cannotConnectOutputToOutput": "Impossibile collegare Output ad Output",
+        "booleanCollection": "Raccolta booleana",
+        "cannotConnectToSelf": "Impossibile connettersi a se stesso",
+        "mismatchedVersion": "Ha una versione non corrispondente",
+        "outputNode": "Nodo di Output",
+        "loadingNodes": "Caricamento nodi...",
+        "oNNXModelFieldDescription": "Campo del modello ONNX.",
+        "denoiseMaskFieldDescription": "La maschera di riduzione del rumore può essere passata tra i nodi",
+        "floatCollectionDescription": "Una raccolta di numeri virgola mobile.",
+        "enum": "Enumeratore",
+        "float": "In virgola mobile",
+        "doesNotExist": "non esiste",
+        "currentImageDescription": "Visualizza l'immagine corrente nell'editor dei nodi",
+        "fieldTypesMustMatch": "I tipi di campo devono corrispondere",
+        "edge": "Bordo",
+        "enumDescription": "Gli enumeratori sono valori che possono essere una delle diverse opzioni.",
+        "denoiseMaskField": "Maschera riduzione rumore",
+        "currentImage": "Immagine corrente",
+        "floatCollection": "Raccolta in virgola mobile"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -983,8 +1040,13 @@
         "addControlNet": "Aggiungi $t(common.controlNet)",
         "controlNetT2IMutexDesc": "$t(common.controlNet) e $t(common.t2iAdapter) contemporaneamente non sono attualmente supportati.",
         "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
-        "controlAdapter": "Adattatore di Controllo",
-        "megaControl": "Mega ControlNet"
+        "controlAdapter_one": "Adattatore di Controllo",
+        "controlAdapter_many": "Adattatori di Controllo",
+        "controlAdapter_other": "",
+        "megaControl": "Mega ControlNet",
+        "minConfidence": "Confidenza minima",
+        "scribble": "Scribble",
+        "controlnet": ""
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1100,7 +1162,9 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Regolazioni della maschera",
-            "paragraphs": ["Regola la maschera."]
+            "paragraphs": [
+                "Regola la maschera."
+            ]
         },
         "compositingCoherenceSteps": {
             "heading": "Passi",
@@ -1111,11 +1175,15 @@
         },
         "compositingBlur": {
             "heading": "Sfocatura",
-            "paragraphs": ["Il raggio di sfocatura della maschera."]
+            "paragraphs": [
+                "Il raggio di sfocatura della maschera."
+            ]
         },
         "compositingCoherenceMode": {
             "heading": "Modalità",
-            "paragraphs": ["La modalità del Passaggio di Coerenza."]
+            "paragraphs": [
+                "La modalità del Passaggio di Coerenza."
+            ]
         },
         "clipSkip": {
             "paragraphs": [
@@ -1255,7 +1323,9 @@
             ]
         },
         "infillMethod": {
-            "paragraphs": ["Metodo per riempire l'area selezionata."],
+            "paragraphs": [
+                "Metodo per riempire l'area selezionata."
+            ],
             "heading": "Metodo di riempimento"
         },
         "controlNetWeight": {
@@ -1271,7 +1341,9 @@
             ]
         },
         "controlNetControlMode": {
-            "paragraphs": ["Attribuisce più peso al prompt o a ControlNet."],
+            "paragraphs": [
+                "Attribuisce più peso al prompt o a ControlNet."
+            ],
             "heading": "Modalità di controllo"
         },
         "paramSteps": {
@@ -1335,6 +1407,8 @@
         "createdBy": "Creato da",
         "workflow": "Flusso di lavoro",
         "steps": "Passi",
-        "scheduler": "Campionatore"
+        "scheduler": "Campionatore",
+        "recallParameters": "Richiama i parametri",
+        "noRecallParameters": "Nessun parametro da richiamare trovato"
     }
 }
