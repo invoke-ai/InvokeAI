@@ -40,6 +40,8 @@ dependencies = [
   "controlnet-aux>=0.0.6",
   "timm==0.6.13",   # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
+  # When bumping diffusers beyond 0.21, make sure to address this:
+  # https://github.com/invoke-ai/InvokeAI/blob/fc09ab7e13cb7ca5389100d149b6422ace7b8ed3/invokeai/app/invocations/latent.py#L513
   "diffusers[torch]~=0.21.0",
   "dnspython~=2.4.0",
   "dynamicprompts",
@@ -72,7 +74,7 @@ dependencies = [
   "realesrgan",
   "requests~=2.28.2",
   "rich~=13.3",
-  "safetensors~=0.3.1",
+  "safetensors~=0.4.0",
   "scikit-image~=0.21.0",
   "semver~=3.0.1",
   "send2trash",

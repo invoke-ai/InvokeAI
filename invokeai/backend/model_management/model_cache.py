@@ -31,6 +31,7 @@ import torch
 
 import invokeai.backend.util.logging as logger
 from invokeai.backend.model_management.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_management.model_load_optimizations import skip_torch_weight_init
 
 from ..util.devices import choose_torch_device
 from .models import BaseModelType, ModelBase, ModelType, SubModelType
@@ -223,7 +224,8 @@ class ModelCache(object):
             # Load the model from disk and capture a memory snapshot before/after.
             start_load_time = time.time()
             snapshot_before = MemorySnapshot.capture()
-            model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
+            with skip_torch_weight_init():
+                model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
             snapshot_after = MemorySnapshot.capture()
             end_load_time = time.time()
 
@@ -236,11 +238,8 @@ class ModelCache(object):
                 f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
             )
 
-            # We only log a warning for over-reported (not under-reported) model sizes before load. There is a known
-            # issue where models report their fp32 size before load, and are then loaded as fp16. Once this issue is
-            # addressed, it would make sense to log a warning for both over-reported and under-reported model sizes.
-            if (self_reported_model_size_after_load - self_reported_model_size_before_load) > 10 * MB:
-                self.logger.warning(
+            if abs(self_reported_model_size_after_load - self_reported_model_size_before_load) > 10 * MB:
+                self.logger.debug(
                     f"Model '{key}' mis-reported its size before load. Self-reported size before/after load:"
                     f" {(self_reported_model_size_before_load/GIG):.2f}GB /"
                     f" {(self_reported_model_size_after_load/GIG):.2f}GB."
@@ -297,7 +296,7 @@ class ModelCache(object):
                 rel_tol=0.1,
                 abs_tol=10 * MB,
             ):
-                self.logger.warning(
+                self.logger.debug(
                     f"Moving model '{key}' from {source_device} to"
                     f" {target_device} caused an unexpected change in VRAM usage. The model's"
                     " estimated size may be incorrect. Estimated model size:"

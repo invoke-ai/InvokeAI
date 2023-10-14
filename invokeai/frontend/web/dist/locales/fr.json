@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Raccourcis clavier",
-        "themeLabel": "Thème",
         "languagePickerLabel": "Sélecteur de langue",
         "reportBugLabel": "Signaler un bug",
         "settingsLabel": "Paramètres",
-        "darkTheme": "Sombre",
-        "lightTheme": "Clair",
-        "greenTheme": "Vert",
         "img2img": "Image en image",
         "unifiedCanvas": "Canvas unifié",
         "nodes": "Nœuds",
@@ -55,7 +51,6 @@
         "statusConvertingModel": "Conversion du modèle",
         "statusModelConverted": "Modèle converti",
         "loading": "Chargement",
-        "pinOptionsPanel": "Épingler la page d'options",
         "statusMergedModels": "Modèles mélangés",
         "txt2img": "Texte vers image",
         "postprocessing": "Post-Traitement"
@@ -71,7 +66,6 @@
         "maintainAspectRatio": "Maintenir le rapport d'aspect",
         "autoSwitchNewImages": "Basculer automatiquement vers de nouvelles images",
         "singleColumnLayout": "Mise en page en colonne unique",
-        "pinGallery": "Épingler la galerie",
         "allImagesLoaded": "Toutes les images chargées",
         "loadMore": "Charger plus",
         "noImagesInGallery": "Aucune image dans la galerie"
@@ -356,7 +350,6 @@
         "cfgScale": "CFG Echelle",
         "width": "Largeur",
         "height": "Hauteur",
-        "sampler": "Echantillonneur",
         "seed": "Graine",
         "randomizeSeed": "Graine Aléatoire",
         "shuffle": "Mélanger",
@@ -378,10 +371,6 @@
         "hiresOptim": "Optimisation Haute Résolution",
         "imageFit": "Ajuster Image Initiale à la Taille de Sortie",
         "codeformerFidelity": "Fidélité",
-        "seamSize": "Taille des Joints",
-        "seamBlur": "Flou des Joints",
-        "seamStrength": "Force des Joints",
-        "seamSteps": "Etapes des Joints",
         "scaleBeforeProcessing": "Echelle Avant Traitement",
         "scaledWidth": "Larg. Échelle",
         "scaledHeight": "Haut. Échelle",
@@ -392,8 +381,6 @@
         "infillScalingHeader": "Remplissage et Mise à l'Échelle",
         "img2imgStrength": "Force de l'Image à l'Image",
         "toggleLoopback": "Activer/Désactiver la Boucle",
-        "invoke": "Invoker",
-        "promptPlaceholder": "Tapez le prompt ici. [tokens négatifs], (poids positif)++, (poids négatif)--, swap et blend sont disponibles (voir les docs)",
         "sendTo": "Envoyer à",
         "sendToImg2Img": "Envoyer à Image à Image",
         "sendToUnifiedCanvas": "Envoyer au Canvas Unifié",
@@ -407,7 +394,6 @@
         "useAll": "Tout utiliser",
         "useInitImg": "Utiliser l'image initiale",
         "info": "Info",
-        "deleteImage": "Supprimer l'image",
         "initialImage": "Image initiale",
         "showOptionsPanel": "Afficher le panneau d'options"
     },
@@ -417,7 +403,6 @@
         "saveSteps": "Enregistrer les images tous les n étapes",
         "confirmOnDelete": "Confirmer la suppression",
         "displayHelpIcons": "Afficher les icônes d'aide",
-        "useCanvasBeta": "Utiliser la mise en page bêta de Canvas",
         "enableImageDebugging": "Activer le débogage d'image",
         "resetWebUI": "Réinitialiser l'interface Web",
         "resetWebUIDesc1": "Réinitialiser l'interface Web ne réinitialise que le cache local du navigateur de vos images et de vos paramètres enregistrés. Cela n'efface pas les images du disque.",
@@ -427,7 +412,6 @@
     "toast": {
         "tempFoldersEmptied": "Dossiers temporaires vidés",
         "uploadFailed": "Téléchargement échoué",
-        "uploadFailedMultipleImagesDesc": "Plusieurs images collées, peut uniquement télécharger une image à la fois",
         "uploadFailedUnableToLoadDesc": "Impossible de charger le fichier",
         "downloadImageStarted": "Téléchargement de l'image démarré",
         "imageCopied": "Image copiée",
@@ -538,6 +522,10 @@
         "useThisParameter": "Utiliser ce paramètre",
         "zoomIn": "Zoom avant",
         "zoomOut": "Zoom arrière",
-        "showOptionsPanel": "Montrer la page d'options"
+        "showOptionsPanel": "Montrer la page d'options",
+        "modelSelect": "Choix du modèle",
+        "invokeProgressBar": "Barre de Progression Invoke",
+        "copyMetadataJson": "Copie des métadonnées JSON",
+        "menu": "Menu"
     }
 }

@@ -34,6 +34,7 @@ from invokeai.app.invocations.primitives import (
     build_latents_output,
 )
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
@@ -54,7 +55,6 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
-from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,

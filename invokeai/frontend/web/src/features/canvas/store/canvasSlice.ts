@@ -29,6 +29,7 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
+import { appSocketQueueItemStatusChanged } from 'services/events/actions';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -786,6 +787,18 @@ export const canvasSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+      const batch_status = action.payload.data.batch_status;
+      if (!state.batchIds.includes(batch_status.batch_id)) {
+        return;
+      }
+
+      if (batch_status.in_progress === 0 && batch_status.pending === 0) {
+        state.batchIds = state.batchIds.filter(
+          (id) => id !== batch_status.batch_id
+        );
+      }
+    });
     builder.addCase(setAspectRatio, (state, action) => {
       const ratio = action.payload;
       if (ratio) {

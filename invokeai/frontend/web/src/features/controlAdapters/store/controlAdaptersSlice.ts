@@ -3,6 +3,7 @@ import {
   Update,
   createEntityAdapter,
   createSlice,
+  isAnyOf,
 } from '@reduxjs/toolkit';
 import {
   ControlNetModelParam,
@@ -544,3 +545,9 @@ export const {
 } = controlAdaptersSlice.actions;
 
 export default controlAdaptersSlice.reducer;
+
+export const isAnyControlAdapterAdded = isAnyOf(
+  controlAdapterAdded,
+  controlAdapterAddedFromImage,
+  controlAdapterRecalled
+);

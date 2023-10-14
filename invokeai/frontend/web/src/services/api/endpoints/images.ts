@@ -1599,6 +1599,19 @@ export const imagesApi = api.injectEndpoints({
         }
       },
     }),
+    bulkDownloadImages: build.mutation<
+      components['schemas']['ImagesDownloaded'],
+      components['schemas']['Body_download_images_from_list']
+    >({
+      query: ({ image_names, board_id }) => ({
+        url: `images/download`,
+        method: 'POST',
+        body: {
+          image_names,
+          board_id,
+        },
+      }),
+    }),
   }),
 });
 
@@ -1623,4 +1636,5 @@ export const {
   useStarImagesMutation,
   useUnstarImagesMutation,
   useGetImageMetadataFromFileQuery,
+  useBulkDownloadImagesMutation,
 } = imagesApi;
