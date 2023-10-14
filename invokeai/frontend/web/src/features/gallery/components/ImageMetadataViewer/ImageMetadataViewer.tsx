@@ -18,6 +18,7 @@ import ImageMetadataActions from './ImageMetadataActions';
 import { useAppSelector } from '../../../../app/store/storeHooks';
 import { configSelector } from '../../../system/store/configSelectors';
 import { useTranslation } from 'react-i18next';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -55,7 +56,6 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         borderRadius: 'base',
         position: 'absolute',
         overflow: 'hidden',
-        overflowY: 'scroll',
       }}
     >
       <Flex gap={2}>
@@ -73,7 +73,6 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
           flexDir: 'column',
           w: 'full',
           h: 'full',
-          overflowX: 'scroll',
         }}
       >
         <TabList>
@@ -86,7 +85,9 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         <TabPanels>
           <TabPanel>
             {metadata ? (
-              <ImageMetadataActions metadata={metadata} />
+              <ScrollableContent>
+                <ImageMetadataActions metadata={metadata} />
+              </ScrollableContent>
             ) : (
               <IAINoContentFallback label={t('metadata.noRecallParameters')} />
             )}
