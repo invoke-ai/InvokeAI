@@ -5,6 +5,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 
+import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { clipSkipMap } from '../types/constants';
 import {
   CanvasCoherenceModeParam,
@@ -320,6 +321,15 @@ export const generationSlice = createSlice({
         if (result.success) {
           state.model = result.data;
         }
+      }
+    });
+
+    // TODO: This is a temp fix to reduce issues with T2I adapter having a different downscaling
+    // factor than the UNet. Hopefully we get an upstream fix in diffusers.
+    builder.addMatcher(isAnyControlAdapterAdded, (state, action) => {
+      if (action.payload.type === 't2i_adapter') {
+        state.width = roundToMultiple(state.width, 64);
+        state.height = roundToMultiple(state.height, 64);
       }
     });
   },

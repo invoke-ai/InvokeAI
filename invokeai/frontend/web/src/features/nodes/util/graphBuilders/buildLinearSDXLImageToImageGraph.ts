@@ -12,6 +12,7 @@ import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSaveImageNode } from './addSaveImageNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
+import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -349,6 +350,7 @@ export const buildLinearSDXLImageToImageGraph = (
     controlnets: [],
     loras: [],
     ipAdapters: [],
+    t2iAdapters: [],
     strength: strength,
     init_image: initialImage.imageName,
     positive_style_prompt: positiveStylePrompt,
@@ -391,6 +393,8 @@ export const buildLinearSDXLImageToImageGraph = (
 
   // Add IP Adapter
   addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+
+  addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

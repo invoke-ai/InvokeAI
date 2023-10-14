@@ -1,9 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
-  controlNetRemoved,
-  ipAdapterStateReset,
-} from 'features/controlNet/store/controlNetSlice';
+  controlAdapterIsEnabledChanged,
+  selectControlAdapterAll,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
@@ -15,9 +15,9 @@ import {
 import { zMainOrOnnxModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
-import { t } from 'i18next';
 
 export const addModelSelectedListener = () => {
   startAppListening({
@@ -60,33 +60,22 @@ export const addModelSelectedListener = () => {
         }
 
         // handle incompatible controlnets
-        const { controlNets } = state.controlNet;
-        forEach(controlNets, (controlNet, controlNetId) => {
-          if (controlNet.model?.base_model !== base_model) {
-            dispatch(controlNetRemoved({ controlNetId }));
+        selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
+          if (ca.model?.base_model !== base_model) {
+            dispatch(
+              controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false })
+            );
             modelsCleared += 1;
           }
         });
-
-        // handle incompatible IP-Adapter
-        const { ipAdapterInfo } = state.controlNet;
-        if (
-          ipAdapterInfo.model &&
-          ipAdapterInfo.model.base_model !== base_model
-        ) {
-          dispatch(ipAdapterStateReset());
-          modelsCleared += 1;
-        }
 
         if (modelsCleared > 0) {
           dispatch(
             addToast(
               makeToast({
-                title: `${t(
-                  'toast.baseModelChangedCleared'
-                )} ${modelsCleared} ${t('toast.incompatibleSubmodel')}${
-                  modelsCleared === 1 ? '' : 's'
-                }`,
+                title: t('toast.baseModelChangedCleared', {
+                  count: modelsCleared,
+                }),
                 status: 'warning',
               })
             )

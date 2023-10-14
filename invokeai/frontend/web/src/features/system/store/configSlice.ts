@@ -7,7 +7,7 @@ export const initialConfigState: AppConfig = {
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
   disabledTabs: [],
-  disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
+  disabledFeatures: ['lightbox', 'faceRestore', 'batches', 'bulkDownload'],
   disabledSDFeatures: [
     'variation',
     'symmetry',

@@ -46,6 +46,9 @@ if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
 
+# Avoid glibc memory fragmentation. See invokeai/backend/model_management/README.md for details.
+export MALLOC_MMAP_THRESHOLD_=1048576
+
 # Primary function for the case statement to determine user input
 do_choice() {
     case $1 in

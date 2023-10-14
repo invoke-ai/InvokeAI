@@ -60,9 +60,9 @@ const QueueButtonTooltipContent = ({ prepend = false }: Props) => {
       )}
       <StyledDivider />
       <Text fontWeight={400} fontStyle="oblique 10deg">
-        Adding images to{' '}
+        {t('parameters.invoke.addingImagesTo')}{' '}
         <Text as="span" fontWeight={600}>
-          {autoAddBoardName || 'Uncategorized'}
+          {autoAddBoardName || t('boards.uncategorized')}
         </Text>
       </Text>
     </Flex>

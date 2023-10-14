@@ -256,6 +256,10 @@ manager, please follow these steps:
         *highly recommended** if your virtual environment is located outside of
         your runtime directory.
 
+    !!! tip
+
+        On linux, it is recommended to run invokeai with the following env var: `MALLOC_MMAP_THRESHOLD_=1048576`. For example: `MALLOC_MMAP_THRESHOLD_=1048576 invokeai --web`. This helps to prevent memory fragmentation that can lead to memory accumulation over time. This env var is set automatically when running via `invoke.sh`.
+
 10.  Render away!
 
     Browse the [features](../features/index.md) section to learn about all the

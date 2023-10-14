@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field, validator
 from pydantic.fields import ModelField, Undefined
 from pydantic.typing import NoArgAnyCallable
 
-from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
@@ -68,6 +68,7 @@ class FieldDescriptions:
     height = "Height of output (px)"
     control = "ControlNet(s) to apply"
     ip_adapter = "IP-Adapter to apply"
+    t2i_adapter = "T2I-Adapter(s) to apply"
     denoised_latents = "Denoised latents tensor"
     latents = "Latents tensor"
     strength = "Strength of denoising (proportional to steps)"

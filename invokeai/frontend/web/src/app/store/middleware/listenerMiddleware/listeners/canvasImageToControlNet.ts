@@ -1,20 +1,21 @@
 import { logger } from 'app/logging/logger';
-import { canvasImageToControlNet } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { canvasImageToControlAdapter } from 'features/canvas/store/actions';
 
 export const addCanvasImageToControlNetListener = () => {
   startAppListening({
-    actionCreator: canvasImageToControlNet,
+    actionCreator: canvasImageToControlAdapter,
     effect: async (action, { dispatch, getState }) => {
       const log = logger('canvas');
       const state = getState();
+      const { id } = action.payload;
 
-      let blob;
+      let blob: Blob;
       try {
         blob = await getBaseLayerBlob(state, true);
       } catch (err) {
@@ -50,8 +51,8 @@ export const addCanvasImageToControlNetListener = () => {
       const { image_name } = imageDTO;
 
       dispatch(
-        controlNetImageChanged({
-          controlNetId: action.payload.controlNet.controlNetId,
+        controlAdapterImageChanged({
+          id,
           controlImage: image_name,
         })
       );

@@ -1,4 +1,5 @@
 dist/
+public/locales/*.json
 .husky/
 node_modules/
 patches/

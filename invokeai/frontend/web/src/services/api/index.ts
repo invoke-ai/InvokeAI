@@ -9,6 +9,8 @@ import {
 import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 
 export const tagTypes = [
+  'AppVersion',
+  'AppConfig',
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
@@ -17,15 +19,25 @@ export const tagTypes = [
   'ImageList',
   'ImageMetadata',
   'ImageMetadataFromFile',
-  'Model',
+  'IntermediatesCount',
   'SessionQueueItem',
-  'SessionQueueItemDTO',
-  'SessionQueueItemDTOList',
   'SessionQueueStatus',
   'SessionProcessorStatus',
+  'CurrentSessionQueueItem',
+  'NextSessionQueueItem',
   'BatchStatus',
   'InvocationCacheStatus',
-];
+  'Model',
+  'T2IAdapterModel',
+  'MainModel',
+  'OnnxModel',
+  'VaeModel',
+  'IPAdapterModel',
+  'TextualInversionModel',
+  'ControlNetModel',
+  'LoRAModel',
+  'SDXLRefinerModel',
+] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
 
