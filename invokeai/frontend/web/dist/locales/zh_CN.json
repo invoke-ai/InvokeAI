@@ -630,8 +630,7 @@
         "clearIntermediatesDesc2": "中间产物图像是生成过程中产生的副产品，与图库中的结果图像不同。清除中间产物可释放磁盘空间。",
         "intermediatesCleared_other": "已清除 {{number}} 个中间产物",
         "clearIntermediatesDesc1": "清除中间产物会重置您的画布和 ControlNet 状态。",
-        "intermediatesClearedFailed": "清除中间产物时出现问题",
-        "noIntermediates": "没有可清除的中间产物"
+        "intermediatesClearedFailed": "清除中间产物时出现问题"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
@@ -1243,9 +1242,7 @@
     "popovers": {
         "compositingMaskAdjustments": {
             "heading": "遮罩调整",
-            "paragraphs": [
-                "调整遮罩。"
-            ]
+            "paragraphs": ["调整遮罩。"]
         },
         "paramRatio": {
             "heading": "纵横比",
@@ -1263,9 +1260,7 @@
         },
         "compositingBlur": {
             "heading": "模糊",
-            "paragraphs": [
-                "遮罩模糊半径。"
-            ]
+            "paragraphs": ["遮罩模糊半径。"]
         },
         "noiseUseCPU": {
             "heading": "使用 CPU 噪声",
@@ -1283,15 +1278,11 @@
         },
         "compositingCoherenceMode": {
             "heading": "模式",
-            "paragraphs": [
-                "一致性层模式。"
-            ]
+            "paragraphs": ["一致性层模式。"]
         },
         "controlNetResizeMode": {
             "heading": "缩放模式",
-            "paragraphs": [
-                "ControlNet 输入图像适应输出图像大小的方法。"
-            ]
+            "paragraphs": ["ControlNet 输入图像适应输出图像大小的方法。"]
         },
         "clipSkip": {
             "paragraphs": [
@@ -1317,9 +1308,7 @@
         },
         "compositingCoherencePass": {
             "heading": "一致性层",
-            "paragraphs": [
-                "第二轮去噪有助于合成内补/外扩图像。"
-            ]
+            "paragraphs": ["第二轮去噪有助于合成内补/外扩图像。"]
         },
         "compositingStrength": {
             "heading": "强度",
@@ -1337,9 +1326,7 @@
         },
         "compositingBlurMethod": {
             "heading": "模糊方式",
-            "paragraphs": [
-                "应用于遮罩区域的模糊方法。"
-            ]
+            "paragraphs": ["应用于遮罩区域的模糊方法。"]
         },
         "paramScheduler": {
             "heading": "调度器",
@@ -1349,15 +1336,11 @@
         },
         "controlNetWeight": {
             "heading": "权重",
-            "paragraphs": [
-                "ControlNet 对生成图像的影响强度。"
-            ]
+            "paragraphs": ["ControlNet 对生成图像的影响强度。"]
         },
         "paramCFGScale": {
             "heading": "CFG 等级",
-            "paragraphs": [
-                "控制提示词对生成过程的影响程度。"
-            ]
+            "paragraphs": ["控制提示词对生成过程的影响程度。"]
         },
         "paramSteps": {
             "heading": "步数",
@@ -1375,15 +1358,11 @@
         },
         "lora": {
             "heading": "LoRA 权重",
-            "paragraphs": [
-                "更高的 LoRA 权重会对最终图像产生更大的影响。"
-            ]
+            "paragraphs": ["更高的 LoRA 权重会对最终图像产生更大的影响。"]
         },
         "infillMethod": {
             "heading": "填充方法",
-            "paragraphs": [
-                "填充选定区域的方式。"
-            ]
+            "paragraphs": ["填充选定区域的方式。"]
         },
         "controlNetBeginEnd": {
             "heading": "开始 / 结束步数百分比",
@@ -1394,9 +1373,7 @@
         },
         "scaleBeforeProcessing": {
             "heading": "处理前缩放",
-            "paragraphs": [
-                "生成图像前将所选区域缩放为最适合模型的大小。"
-            ]
+            "paragraphs": ["生成图像前将所选区域缩放为最适合模型的大小。"]
         },
         "paramDenoisingStrength": {
             "heading": "去噪强度",
@@ -1414,9 +1391,7 @@
         },
         "controlNetControlMode": {
             "heading": "控制模式",
-            "paragraphs": [
-                "给提示词或 ControlNet 增加更大的权重。"
-            ]
+            "paragraphs": ["给提示词或 ControlNet 增加更大的权重。"]
         },
         "dynamicPrompts": {
             "paragraphs": [
@@ -1427,9 +1402,7 @@
             "heading": "动态提示词"
         },
         "paramVAE": {
-            "paragraphs": [
-                "用于将 AI 输出转换成最终图像的模型。"
-            ],
+            "paragraphs": ["用于将 AI 输出转换成最终图像的模型。"],
             "heading": "VAE"
         },
         "dynamicPromptsSeedBehaviour": {
@@ -1443,9 +1416,7 @@
         },
         "dynamicPromptsMaxPrompts": {
             "heading": "最大提示词数量",
-            "paragraphs": [
-                "限制动态提示词可生成的提示词数量。"
-            ]
+            "paragraphs": ["限制动态提示词可生成的提示词数量。"]
         },
         "controlNet": {
             "paragraphs": [
