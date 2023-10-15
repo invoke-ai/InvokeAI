@@ -87,7 +87,8 @@
         "learnMore": "Per saperne di più",
         "ipAdapter": "Adattatore IP",
         "t2iAdapter": "Adattatore T2I",
-        "controlAdapter": "Adattatore di Controllo"
+        "controlAdapter": "Adattatore di Controllo",
+        "controlNet": "ControlNet"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -115,7 +116,10 @@
         "currentlyInUse": "Questa immagine è attualmente utilizzata nelle seguenti funzionalità:",
         "copy": "Copia",
         "download": "Scarica",
-        "setCurrentImage": "Imposta come immagine corrente"
+        "setCurrentImage": "Imposta come immagine corrente",
+        "preparingDownload": "Preparazione del download",
+        "preparingDownloadFailed": "Problema durante la preparazione del download",
+        "downloadSelection": "Scarica gli elementi selezionati"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti rapidi",
@@ -468,7 +472,8 @@
         "useCustomConfig": "Utilizza configurazione personalizzata",
         "closeAdvanced": "Chiudi Avanzate",
         "modelType": "Tipo di modello",
-        "customConfigFileLocation": "Posizione del file di configurazione personalizzato"
+        "customConfigFileLocation": "Posizione del file di configurazione personalizzato",
+        "vaePrecision": "Precisione VAE"
     },
     "parameters": {
         "images": "Immagini",
@@ -570,9 +575,10 @@
             "systemBusy": "Sistema occupato",
             "unableToInvoke": "Impossibile invocare",
             "systemDisconnected": "Sistema disconnesso",
-            "noControlImageForControlAdapter": "L'adattatore di controllo {{number}} non ha un'immagine di controllo",
-            "noModelForControlAdapter": "Nessun modello selezionato per l'adattatore di controllo {{number}}.",
-            "incompatibleBaseModelForControlAdapter": "Il modello dell'adattatore di controllo {{number}} non è compatibile con il modello principale."
+            "noControlImageForControlAdapter": "L'adattatore di controllo #{{number}} non ha un'immagine di controllo",
+            "noModelForControlAdapter": "Nessun modello selezionato per l'adattatore di controllo #{{number}}.",
+            "incompatibleBaseModelForControlAdapter": "Il modello dell'adattatore di controllo #{{number}} non è compatibile con il modello principale.",
+            "missingNodeTemplate": "Modello di nodo mancante"
         },
         "enableNoiseSettings": "Abilita le impostazioni del rumore",
         "cpuNoise": "Rumore CPU",
@@ -620,7 +626,15 @@
         "beta": "Beta",
         "enableNodesEditor": "Abilita l'editor dei nodi",
         "experimental": "Sperimentale",
-        "autoChangeDimensions": "Aggiorna L/A alle impostazioni predefinite del modello in caso di modifica"
+        "autoChangeDimensions": "Aggiorna L/A alle impostazioni predefinite del modello in caso di modifica",
+        "clearIntermediates": "Cancella le immagini intermedie",
+        "clearIntermediatesDesc3": "Le immagini della galleria non verranno eliminate.",
+        "clearIntermediatesDesc2": "Le immagini intermedie sono sottoprodotti della generazione, diversi dalle immagini risultanti nella galleria. La cancellazione degli intermedi libererà spazio su disco.",
+        "intermediatesCleared_one": "Cancellata {{count}} immagine intermedia",
+        "intermediatesCleared_many": "Cancellate {{count}} immagini intermedie",
+        "intermediatesCleared_other": "",
+        "clearIntermediatesDesc1": "La cancellazione delle immagini intermedie ripristinerà lo stato di Tela Unificata e ControlNet.",
+        "intermediatesClearedFailed": "Problema con la cancellazione delle immagini intermedie"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -670,8 +684,8 @@
         "nodesUnrecognizedTypes": "Impossibile caricare. Il grafico ha tipi di dati non riconosciuti",
         "nodesNotValidJSON": "JSON non valido",
         "nodesBrokenConnections": "Impossibile caricare. Alcune connessioni sono interrotte.",
-        "baseModelChangedCleared_one": "Il modello base è stato modificato, cancellato o disabilitato {{number}} sotto-modello incompatibile",
-        "baseModelChangedCleared_many": "",
+        "baseModelChangedCleared_one": "Il modello base è stato modificato, cancellato o disabilitato {{count}} sotto-modello incompatibile",
+        "baseModelChangedCleared_many": "Il modello base è stato modificato, cancellato o disabilitato {{count}} sotto-modelli incompatibili",
         "baseModelChangedCleared_other": "",
         "imageSavingFailed": "Salvataggio dell'immagine non riuscito",
         "canvasSentControlnetAssets": "Tela inviata a ControlNet & Risorse",
@@ -866,7 +880,82 @@
         "workflowValidation": "Errore di convalida del flusso di lavoro",
         "workflowAuthor": "Autore",
         "workflowName": "Nome",
-        "workflowNotes": "Note"
+        "workflowNotes": "Note",
+        "unhandledInputProperty": "Proprietà di input non gestita",
+        "versionUnknown": " Versione sconosciuta",
+        "unableToValidateWorkflow": "Impossibile convalidare il flusso di lavoro",
+        "updateApp": "Aggiorna App",
+        "problemReadingWorkflow": "Problema durante la lettura del flusso di lavoro dall'immagine",
+        "unableToLoadWorkflow": "Impossibile caricare il flusso di lavoro",
+        "updateNode": "Aggiorna nodo",
+        "version": "Versione",
+        "notes": "Note",
+        "problemSettingTitle": "Problema nell'impostazione del titolo",
+        "unkownInvocation": "Tipo di invocazione sconosciuta",
+        "unknownTemplate": "Modello sconosciuto",
+        "nodeType": "Tipo di nodo",
+        "vaeField": "VAE",
+        "unhandledOutputProperty": "Proprietà di output non gestita",
+        "notesDescription": "Aggiunge note sul tuo flusso di lavoro",
+        "unknownField": "Campo sconosciuto",
+        "unknownNode": "Nodo sconosciuto",
+        "vaeFieldDescription": "Sotto modello VAE.",
+        "booleanPolymorphicDescription": "Una raccolta di booleani.",
+        "missingTemplate": "Modello mancante",
+        "outputSchemaNotFound": "Schema di output non trovato",
+        "colorFieldDescription": "Un colore RGBA.",
+        "maybeIncompatible": "Potrebbe essere incompatibile con quello installato",
+        "noNodeSelected": "Nessun nodo selezionato",
+        "colorPolymorphic": "Colore polimorfico",
+        "booleanCollectionDescription": "Una raccolta di booleani.",
+        "colorField": "Colore",
+        "nodeTemplate": "Modello di nodo",
+        "nodeOpacity": "Opacità del nodo",
+        "pickOne": "Sceglierne uno",
+        "outputField": "Campo di output",
+        "nodeSearch": "Cerca nodi",
+        "nodeOutputs": "Uscite del nodo",
+        "collectionItem": "Oggetto della raccolta",
+        "noConnectionInProgress": "Nessuna connessione in corso",
+        "noConnectionData": "Nessun dato di connessione",
+        "outputFields": "Campi di output",
+        "cannotDuplicateConnection": "Impossibile creare connessioni duplicate",
+        "booleanPolymorphic": "Polimorfico booleano",
+        "colorPolymorphicDescription": "Una collezione di colori polimorfici.",
+        "missingCanvaInitImage": "Immagine iniziale della tela mancante",
+        "clipFieldDescription": "Sottomodelli di tokenizzatore e codificatore di testo.",
+        "noImageFoundState": "Nessuna immagine iniziale trovata nello stato",
+        "clipField": "CLIP",
+        "noMatchingNodes": "Nessun nodo corrispondente",
+        "noFieldType": "Nessun tipo di campo",
+        "colorCollection": "Una collezione di colori.",
+        "noOutputSchemaName": "Nessun nome dello schema di output trovato nell'oggetto di riferimento",
+        "boolean": "Booleani",
+        "missingCanvaInitMaskImages": "Immagini di inizializzazione e maschera della tela mancanti",
+        "oNNXModelField": "Modello ONNX",
+        "node": "Nodo",
+        "booleanDescription": "I booleani sono veri o falsi.",
+        "collection": "Raccolta",
+        "cannotConnectInputToInput": "Impossibile collegare Input a Input",
+        "cannotConnectOutputToOutput": "Impossibile collegare Output ad Output",
+        "booleanCollection": "Raccolta booleana",
+        "cannotConnectToSelf": "Impossibile connettersi a se stesso",
+        "mismatchedVersion": "Ha una versione non corrispondente",
+        "outputNode": "Nodo di Output",
+        "loadingNodes": "Caricamento nodi...",
+        "oNNXModelFieldDescription": "Campo del modello ONNX.",
+        "denoiseMaskFieldDescription": "La maschera di riduzione del rumore può essere passata tra i nodi",
+        "floatCollectionDescription": "Una raccolta di numeri virgola mobile.",
+        "enum": "Enumeratore",
+        "float": "In virgola mobile",
+        "doesNotExist": "non esiste",
+        "currentImageDescription": "Visualizza l'immagine corrente nell'editor dei nodi",
+        "fieldTypesMustMatch": "I tipi di campo devono corrispondere",
+        "edge": "Bordo",
+        "enumDescription": "Gli enumeratori sono valori che possono essere una delle diverse opzioni.",
+        "denoiseMaskField": "Maschera riduzione rumore",
+        "currentImage": "Immagine corrente",
+        "floatCollection": "Raccolta in virgola mobile"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -883,7 +972,8 @@
         "searchBoard": "Cerca bacheche ...",
         "noMatching": "Nessuna bacheca corrispondente",
         "selectBoard": "Seleziona una Bacheca",
-        "uncategorized": "Non categorizzato"
+        "uncategorized": "Non categorizzato",
+        "downloadBoard": "Scarica la bacheca"
     },
     "controlnet": {
         "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
@@ -951,8 +1041,12 @@
         "addControlNet": "Aggiungi $t(common.controlNet)",
         "controlNetT2IMutexDesc": "$t(common.controlNet) e $t(common.t2iAdapter) contemporaneamente non sono attualmente supportati.",
         "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
-        "controlAdapter": "Adattatore di Controllo",
-        "megaControl": "Mega ControlNet"
+        "controlAdapter_one": "Adattatore di Controllo",
+        "controlAdapter_many": "Adattatori di Controllo",
+        "controlAdapter_other": "Adattatori di Controllo",
+        "megaControl": "Mega ControlNet",
+        "minConfidence": "Confidenza minima",
+        "scribble": "Scribble"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -979,7 +1073,9 @@
         "pause": "Sospendi",
         "pruneTooltip": "Rimuovi {{item_count}} elementi completati",
         "cancelSucceeded": "Elemento annullato",
-        "batchQueuedDesc": "Aggiunte {{item_count}} sessioni a {{direction}} della coda",
+        "batchQueuedDesc_one": "Aggiunta {{count}} sessione a {{direction}} della coda",
+        "batchQueuedDesc_many": "Aggiunte {{count}} sessioni a {{direction}} della coda",
+        "batchQueuedDesc_other": "",
         "graphQueued": "Grafico in coda",
         "batch": "Lotto",
         "clearQueueAlertDialog": "Lo svuotamento della coda annulla immediatamente tutti gli elementi in elaborazione e cancella completamente la coda.",
@@ -1268,7 +1364,8 @@
         "controlNet": {
             "paragraphs": [
                 "ControlNet fornisce una guida al processo di generazione, aiutando a creare immagini con composizione, struttura o stile controllati, a seconda del modello selezionato."
-            ]
+            ],
+            "heading": "ControlNet"
         }
     },
     "sdxl": {
@@ -1313,6 +1410,8 @@
         "createdBy": "Creato da",
         "workflow": "Flusso di lavoro",
         "steps": "Passi",
-        "scheduler": "Campionatore"
+        "scheduler": "Campionatore",
+        "recallParameters": "Richiama i parametri",
+        "noRecallParameters": "Nessun parametro da richiamare trovato"
     }
 }
