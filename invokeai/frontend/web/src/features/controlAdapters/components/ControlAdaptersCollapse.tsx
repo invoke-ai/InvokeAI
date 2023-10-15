@@ -90,9 +90,7 @@ const ControlAdaptersCollapse = () => {
 
   return (
     <IAICollapse
-      label={t('controlnet.controlAdapter', {
-        count: controlAdapterIds.length,
-      })}
+      label={t('controlnet.controlAdapter_other')}
       activeLabel={activeLabel}
     >
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
