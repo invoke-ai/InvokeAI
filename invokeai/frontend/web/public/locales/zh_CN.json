@@ -638,7 +638,8 @@
         "intermediatesCleared_other": "已清除 {{count}} 个中间产物",
         "clearIntermediatesDesc1": "清除中间产物会重置您的画布和 ControlNet 状态。",
         "intermediatesClearedFailed": "清除中间产物时出现问题",
-        "clearIntermediatesWithCount_other": "清除 {{count}} 个中间产物"
+        "clearIntermediatesWithCount_other": "清除 {{count}} 个中间产物",
+        "clearIntermediatesDisabled": "队列为空才能清理中间产物"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
