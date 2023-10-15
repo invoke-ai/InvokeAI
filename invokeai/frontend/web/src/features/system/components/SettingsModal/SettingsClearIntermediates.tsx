@@ -67,7 +67,7 @@ export default function SettingsClearIntermediates() {
         colorScheme="warning"
         onClick={handleClickClearIntermediates}
         isLoading={isLoadingClearIntermediates}
-        isDisabled={!intermediatesCount}
+        isDisabled={!intermediatesCount || hasPendingItems}
       >
         {t('settings.clearIntermediatesWithCount', {
           count: intermediatesCount ?? 0,
