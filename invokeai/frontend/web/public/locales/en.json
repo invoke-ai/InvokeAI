@@ -1115,6 +1115,7 @@
         "showProgressInViewer": "Show Progress Images in Viewer",
         "ui": "User Interface",
         "useSlidersForAll": "Use Sliders For All Options",
+        "clearIntermediatesDisabled": "Queue must be empty to clear intermediates",
         "clearIntermediatesDesc1": "Clearing intermediates will reset your Canvas and ControlNet state.",
         "clearIntermediatesDesc2": "Intermediate images are byproducts of generation, different from the result images in the gallery. Clearing intermediates will free disk space.",
         "clearIntermediatesDesc3": "Your gallery images will not be deleted.",
