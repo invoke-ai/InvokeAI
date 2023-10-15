@@ -1,10 +1,10 @@
-import sqlite3
-import threading
-
 import pytest
 from pydantic import BaseModel, Field
 
-from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
+from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 class TestModel(BaseModel):
@@ -14,8 +14,8 @@ class TestModel(BaseModel):
 
 @pytest.fixture
 def db() -> SqliteItemStorage[TestModel]:
-    db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
-    return SqliteItemStorage[TestModel](db_conn, table_name="test", id_field="id", lock=threading.Lock())
+    sqlite_db = SqliteDatabase(InvokeAIAppConfig(use_memory_db=True), InvokeAILogger.get_logger())
+    return SqliteItemStorage[TestModel](db=sqlite_db, table_name="test", id_field="id")
 
 
 def test_sqlite_service_can_create_and_get(db: SqliteItemStorage[TestModel]):

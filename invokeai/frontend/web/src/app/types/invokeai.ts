@@ -39,7 +39,8 @@ export type SDFeature =
   | 'hires'
   | 'lora'
   | 'embedding'
-  | 'vae';
+  | 'vae'
+  | 'hrf';
 
 /**
  * Configuration options for the InvokeAI UI.
@@ -103,6 +104,14 @@ export type AppConfig = {
       coarseStep: number;
     };
     img2imgStrength: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    hrfStrength: {
       initial: number;
       min: number;
       sliderMax: number;

@@ -5,8 +5,7 @@ from typing import Optional, Union, cast
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event as FastAPIEvent
 
-from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.graph import Graph
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -29,7 +28,9 @@ from invokeai.app.services.session_queue.session_queue_common import (
     calc_session_count,
     prepare_values_to_insert,
 )
-from invokeai.app.services.shared.models import CursorPaginatedResults
+from invokeai.app.services.shared.graph import Graph
+from invokeai.app.services.shared.pagination import CursorPaginatedResults
+from invokeai.app.services.shared.sqlite import SqliteDatabase
 
 
 class SqliteSessionQueue(SessionQueueBase):
@@ -45,13 +46,11 @@ class SqliteSessionQueue(SessionQueueBase):
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_session_event)
         self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
-    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
+    def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
-        self.__conn = conn
-        # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
-        self.__conn.row_factory = sqlite3.Row
+        self.__lock = db.lock
+        self.__conn = db.conn
         self.__cursor = self.__conn.cursor()
-        self.__lock = lock
         self._create_tables()
 
     def _match_event_name(self, event: FastAPIEvent, match_in: list[str]) -> bool:

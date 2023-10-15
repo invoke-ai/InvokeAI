@@ -8,9 +8,9 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.metadata import ImageMetadata
-from invokeai.app.models.image import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.image_record import ImageDTO, ImageRecordChanges, ImageUrlsDTO
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
+from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 from ..dependencies import ApiDependencies
 
