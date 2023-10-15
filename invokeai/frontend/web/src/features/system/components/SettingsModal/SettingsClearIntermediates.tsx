@@ -24,7 +24,9 @@ export default function SettingsClearIntermediates() {
     useClearIntermediatesMutation();
 
   const { data: queueStatus } = useGetQueueStatusQuery();
-  const hasPendingItems = queueStatus && (queueStatus.queue.in_progress > 0 || queueStatus.queue.pending > 0);
+  const hasPendingItems =
+    queueStatus &&
+    (queueStatus.queue.in_progress > 0 || queueStatus.queue.pending > 0);
 
   const handleClickClearIntermediates = useCallback(() => {
     if (hasPendingItems) {
