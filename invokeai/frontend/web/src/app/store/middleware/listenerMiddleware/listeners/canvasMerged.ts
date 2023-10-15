@@ -44,7 +44,7 @@ export const addCanvasMergedListener = () => {
       }
 
       const baseLayerRect = canvasBaseLayer.getClientRect({
-        relativeTo: canvasBaseLayer.getParent(),
+        relativeTo: canvasBaseLayer.getParent() ?? undefined,
       });
 
       const imageDTO = await dispatch(
