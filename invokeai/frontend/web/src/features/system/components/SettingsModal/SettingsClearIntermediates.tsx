@@ -3,12 +3,12 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import IAIButton from '../../../../common/components/IAIButton';
 import {
   useClearIntermediatesMutation,
   useGetIntermediatesCountQuery,
 } from '../../../../services/api/endpoints/images';
-import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { resetCanvas } from '../../../canvas/store/canvasSlice';
 import { addToast } from '../../store/systemSlice';
 import StyledFlex from './StyledFlex';
@@ -64,6 +64,9 @@ export default function SettingsClearIntermediates() {
     <StyledFlex>
       <Heading size="sm">{t('settings.clearIntermediates')}</Heading>
       <IAIButton
+        tooltip={
+          hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined
+        }
         colorScheme="warning"
         onClick={handleClickClearIntermediates}
         isLoading={isLoadingClearIntermediates}
