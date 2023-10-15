@@ -1043,7 +1043,7 @@
         "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
         "controlAdapter_one": "Adattatore di Controllo",
         "controlAdapter_many": "Adattatori di Controllo",
-        "controlAdapter_other": "",
+        "controlAdapter_other": "Adattatori di Controllo",
         "megaControl": "Mega ControlNet",
         "minConfidence": "Confidenza minima",
         "scribble": "Scribble"
