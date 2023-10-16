@@ -89,9 +89,9 @@ class BoardRecordStorageBase(ABC):
 class SqliteBoardRecordStorage(BoardRecordStorageBase):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
-    _lock: threading.Lock
+    _lock: threading.RLock
 
-    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
+    def __init__(self, conn: sqlite3.Connection, lock: threading.RLock) -> None:
         super().__init__()
         self._conn = conn
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)

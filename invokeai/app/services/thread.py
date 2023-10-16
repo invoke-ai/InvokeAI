@@ -1,3 +1,3 @@
 import threading
 
-lock = threading.Lock()
+lock = threading.RLock()

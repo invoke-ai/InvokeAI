@@ -36,7 +36,7 @@ class SqliteSessionQueue(SessionQueueBase):
     __invoker: Invoker
     __conn: sqlite3.Connection
     __cursor: sqlite3.Cursor
-    __lock: threading.Lock
+    __lock: threading.RLock
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
@@ -45,7 +45,7 @@ class SqliteSessionQueue(SessionQueueBase):
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_session_event)
         self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
-    def __init__(self, conn: sqlite3.Connection, lock: threading.Lock) -> None:
+    def __init__(self, conn: sqlite3.Connection, lock: threading.RLock) -> None:
         super().__init__()
         self.__conn = conn
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
