@@ -8,7 +8,7 @@ import {
   setHrfHeight,
   setHrfWidth,
 } from 'features/parameters/store/generationSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 
 function findPrevMultipleOfEight(n: number): number {
   return Math.floor((n - 1) / 8) * 8;
@@ -18,7 +18,8 @@ const selector = createSelector(
   [stateSelector],
   ({ generation, hotkeys, config }) => {
     const { min, fineStep, coarseStep } = config.sd.width;
-    const { model, width, hrfWidth, aspectRatio, hrfEnabled } = generation;
+    const { model, width, hrfWidth, aspectRatio, hrfManualResEnabled } =
+      generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
@@ -29,7 +30,7 @@ const selector = createSelector(
       min,
       step,
       aspectRatio,
-      hrfEnabled,
+      hrfManualResEnabled,
     };
   },
   defaultSelectorOptions
@@ -38,10 +39,17 @@ const selector = createSelector(
 type ParamWidthProps = Omit<IAIFullSliderProps, 'label' | 'value' | 'onChange'>;
 
 const ParamHrfWidth = (props: ParamWidthProps) => {
-  const { width, hrfWidth, min, step, aspectRatio, hrfEnabled } =
+  const { width, hrfWidth, min, step, aspectRatio, hrfManualResEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
   const maxHrfWidth = Math.max(findPrevMultipleOfEight(width), min);
+
+  // Makes sure the slider never goes above its max.
+  useEffect(() => {
+    if (hrfWidth > maxHrfWidth) {
+      dispatch(setHrfWidth(maxHrfWidth));
+    }
+  }, [dispatch, hrfWidth, maxHrfWidth]);
 
   const handleChange = useCallback(
     (v: number) => {
@@ -54,14 +62,6 @@ const ParamHrfWidth = (props: ParamWidthProps) => {
     [dispatch, aspectRatio]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setHrfWidth(maxHrfWidth));
-    if (aspectRatio) {
-      const newHeight = roundToMultiple(maxHrfWidth / aspectRatio, 8);
-      dispatch(setHrfHeight(newHeight));
-    }
-  }, [dispatch, maxHrfWidth, aspectRatio]);
-
   return (
     <IAISlider
       label="Initial Width"
@@ -70,12 +70,10 @@ const ParamHrfWidth = (props: ParamWidthProps) => {
       step={step}
       max={maxHrfWidth}
       onChange={handleChange}
-      handleReset={handleReset}
       withInput
-      withReset
       withSliderMarks
       sliderNumberInputProps={{ max: maxHrfWidth }}
-      isDisabled={!hrfEnabled}
+      isDisabled={!hrfManualResEnabled}
       {...props}
     />
   );

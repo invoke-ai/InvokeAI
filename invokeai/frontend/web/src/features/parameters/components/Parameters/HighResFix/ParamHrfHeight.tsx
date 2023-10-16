@@ -8,7 +8,7 @@ import {
   setHrfHeight,
   setHrfWidth,
 } from 'features/parameters/store/generationSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 
 function findPrevMultipleOfEight(n: number): number {
   return Math.floor((n - 1) / 8) * 8;
@@ -18,7 +18,8 @@ const selector = createSelector(
   [stateSelector],
   ({ generation, hotkeys, config }) => {
     const { min, fineStep, coarseStep } = config.sd.height;
-    const { model, height, hrfHeight, aspectRatio, hrfEnabled } = generation;
+    const { model, height, hrfHeight, aspectRatio, hrfManualResEnabled } =
+      generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
@@ -29,7 +30,7 @@ const selector = createSelector(
       min,
       step,
       aspectRatio,
-      hrfEnabled,
+      hrfManualResEnabled,
     };
   },
   defaultSelectorOptions
@@ -41,10 +42,17 @@ type ParamHeightProps = Omit<
 >;
 
 const ParamHrfHeight = (props: ParamHeightProps) => {
-  const { height, hrfHeight, min, step, aspectRatio, hrfEnabled } =
+  const { height, hrfHeight, min, step, aspectRatio, hrfManualResEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
   const maxHrfHeight = Math.max(findPrevMultipleOfEight(height), min);
+
+  // Makes sure the slider never goes above its max.
+  useEffect(() => {
+    if (hrfHeight > maxHrfHeight) {
+      dispatch(setHrfHeight(maxHrfHeight));
+    }
+  }, [dispatch, hrfHeight, maxHrfHeight]);
 
   const handleChange = useCallback(
     (v: number) => {
@@ -57,14 +65,6 @@ const ParamHrfHeight = (props: ParamHeightProps) => {
     [dispatch, aspectRatio]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setHrfHeight(maxHrfHeight));
-    if (aspectRatio) {
-      const newWidth = roundToMultiple(maxHrfHeight * aspectRatio, 8);
-      dispatch(setHrfWidth(newWidth));
-    }
-  }, [dispatch, maxHrfHeight, aspectRatio]);
-
   return (
     <IAISlider
       label="Initial Height"
@@ -73,12 +73,10 @@ const ParamHrfHeight = (props: ParamHeightProps) => {
       step={step}
       max={maxHrfHeight}
       onChange={handleChange}
-      handleReset={handleReset}
       withInput
-      withReset
       withSliderMarks
       sliderNumberInputProps={{ max: maxHrfHeight }}
-      isDisabled={!hrfEnabled}
+      isDisabled={!hrfManualResEnabled}
       {...props}
     />
   );

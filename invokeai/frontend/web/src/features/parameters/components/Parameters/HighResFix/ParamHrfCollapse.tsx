@@ -7,6 +7,7 @@ import IAICollapse from 'common/components/IAICollapse';
 import { useMemo } from 'react';
 import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
+import ParamHrfManualResToggle from './ParamHrfManualResToggle';
 import ParamHrfWidth from './ParamHrfWidth';
 import ParamHrfHeight from './ParamHrfHeight';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -14,16 +15,16 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 const selector = createSelector(
   stateSelector,
   (state: RootState) => {
-    const { hrfEnabled } = state.generation;
+    const { hrfEnabled, hrfManualResEnabled } = state.generation;
 
-    return { hrfEnabled };
+    return { hrfEnabled, hrfManualResEnabled };
   },
   defaultSelectorOptions
 );
 
 export default function ParamHrfCollapse() {
   const isHRFFeatureEnabled = useFeatureStatus('hrf').isFeatureEnabled;
-  const { hrfEnabled } = useAppSelector(selector);
+  const { hrfEnabled, hrfManualResEnabled } = useAppSelector(selector);
   const activeLabel = useMemo(() => {
     if (hrfEnabled) {
       return 'On';
@@ -40,6 +41,8 @@ export default function ParamHrfCollapse() {
     <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamHrfToggle />
+        {hrfEnabled && <ParamHrfStrength />}
+        <ParamHrfManualResToggle />
         {hrfEnabled && (
           <Flex
             sx={{
@@ -58,7 +61,6 @@ export default function ParamHrfCollapse() {
             <ParamHrfHeight />
           </Flex>
         )}
-        {hrfEnabled && <ParamHrfStrength />}
       </Flex>
     </IAICollapse>
   );
