@@ -66,25 +66,21 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.services.model_manager.get_model(
+        tokenizer_info = context.get_model(
             **self.clip.tokenizer.model_dump(),
-            context=context,
         )
-        text_encoder_info = context.services.model_manager.get_model(
+        text_encoder_info = context.get_model(
             **self.clip.text_encoder.model_dump(),
-            context=context,
         )
 
         def _lora_loader():
             for lora in self.clip.loras:
-                lora_info = context.services.model_manager.get_model(
-                    **lora.model_dump(exclude={"weight"}), context=context
-                )
+                lora_info = context.get_model(**lora.model_dump(exclude={"weight"}))
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
 
-        # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
+        # loras = [(context.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
         for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
@@ -93,11 +89,10 @@ class CompelInvocation(BaseInvocation):
                 ti_list.append(
                     (
                         name,
-                        context.services.model_manager.get_model(
+                        context.get_model(
                             model_name=name,
                             base_model=self.clip.text_encoder.base_model,
                             model_type=ModelType.TextualInversion,
-                            context=context,
                         ).context.model,
                     )
                 )
@@ -126,7 +121,7 @@ class CompelInvocation(BaseInvocation):
 
             conjunction = Compel.parse_prompt_string(self.prompt)
 
-            if context.services.configuration.log_tokenization:
+            if context.config.log_tokenization:
                 log_tokenization_for_conjunction(conjunction, tokenizer)
 
             c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
@@ -147,8 +142,7 @@ class CompelInvocation(BaseInvocation):
             ]
         )
 
-        conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
-        context.services.latents.save(conditioning_name, conditioning_data)
+        conditioning_name = context.save_conditioning(conditioning_data)
 
         return ConditioningOutput(
             conditioning=ConditioningField(

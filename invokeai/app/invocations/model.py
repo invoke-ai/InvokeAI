@@ -98,7 +98,7 @@ class MainModelLoaderInvocation(BaseInvocation):
         model_type = ModelType.Main
 
         # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
+        if not context.model_exists(
             model_name=model_name,
             base_model=base_model,
             model_type=model_type,

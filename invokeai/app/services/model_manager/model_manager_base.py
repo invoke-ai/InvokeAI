@@ -48,9 +48,12 @@ class ModelManagerServiceBase(ABC):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
+        queue_id: str,
+        queue_item_id: int,
+        queue_batch_id: str,
+        graph_execution_state_id: str,
         submodel: Optional[SubModelType] = None,
         node: Optional[BaseInvocation] = None,
-        context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
         """Retrieve the indicated model with name and type.
         submodel can be used to get a part (such as the vae)

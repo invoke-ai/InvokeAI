@@ -397,7 +397,7 @@ class ImageResizeInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+        image = context.get_image(self.image.image_name)
 
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
 
@@ -406,21 +406,12 @@ class ImageResizeInvocation(BaseInvocation):
             resample=resample_mode,
         )
 
-        image_dto = context.services.images.create(
-            image=resize_image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata.model_dump() if self.metadata else None,
-            workflow=self.workflow,
-        )
+        image_name = context.save_image(image=resize_image)
 
         return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
+            image=ImageField(image_name=image_name),
+            width=resize_image.width,
+            height=resize_image.height,
         )
 
 

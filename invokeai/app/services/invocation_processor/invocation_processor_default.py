@@ -4,7 +4,7 @@ from threading import BoundedSemaphore, Event, Thread
 from typing import Optional
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.invocations.baseinvocation import InvocationContext
+from invokeai.app.invocations.baseinvocation import AppInvocationContext
 from invokeai.app.services.invocation_queue.invocation_queue_common import InvocationQueueItem
 
 from ..invoker import Invoker
@@ -96,18 +96,21 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 # Invoke
                 try:
                     graph_id = graph_execution_state.id
+                    source_node_id = graph_execution_state.prepared_source_mapping[invocation.id]
+
                     with self.__invoker.services.performance_statistics.collect_stats(invocation, graph_id):
                         # use the internal invoke_internal(), which wraps the node's invoke() method,
                         # which handles a few things:
                         # - nodes that require a value, but get it only from a connection
                         # - referencing the invocation cache instead of executing the node
                         outputs = invocation.invoke_internal(
-                            InvocationContext(
+                            AppInvocationContext(
                                 services=self.__invoker.services,
                                 graph_execution_state_id=graph_execution_state.id,
                                 queue_item_id=queue_item.session_queue_item_id,
                                 queue_id=queue_item.session_queue_id,
                                 queue_batch_id=queue_item.session_queue_batch_id,
+                                source_node_id=source_node_id,
                             )
                         )
 

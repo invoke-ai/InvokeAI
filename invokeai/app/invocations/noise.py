@@ -124,6 +124,5 @@ class NoiseInvocation(BaseInvocation):
             seed=self.seed,
             use_cpu=self.use_cpu,
         )
-        name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.save(name, noise)
-        return build_noise_output(latents_name=name, latents=noise, seed=self.seed)
+        latents_name = context.save_latents(noise)
+        return build_noise_output(latents_name=latents_name, latents=noise, seed=self.seed)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException
+from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_management import (
     AddModelResult,
     BaseModelType,
@@ -86,28 +87,35 @@ class ModelManagerService(ModelManagerServiceBase):
         )
         logger.info("Model manager service initialized")
 
+    def start(self, invoker: Invoker) -> None:
+        self._invoker = invoker
+
     def get_model(
         self,
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
+        queue_id: str,
+        queue_item_id: int,
+        queue_batch_id: str,
+        graph_execution_state_id: str,
         submodel: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
         """
         Retrieve the indicated model. submodel can be used to get a
         part (such as the vae) of a diffusers mode.
         """
 
-        # we can emit model loading events if we are executing with access to the invocation context
-        if context:
-            self._emit_load_event(
-                context=context,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
-                submodel=submodel,
-            )
+        self._emit_load_event(
+            queue_id=queue_id,
+            queue_item_id=queue_item_id,
+            queue_batch_id=queue_batch_id,
+            graph_execution_state_id=graph_execution_state_id,
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+            submodel=submodel,
+        )
 
         model_info = self.mgr.get_model(
             model_name,
@@ -116,15 +124,17 @@ class ModelManagerService(ModelManagerServiceBase):
             submodel,
         )
 
-        if context:
-            self._emit_load_event(
-                context=context,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
-                submodel=submodel,
-                model_info=model_info,
-            )
+        self._emit_load_event(
+            queue_id=queue_id,
+            queue_item_id=queue_item_id,
+            queue_batch_id=queue_batch_id,
+            graph_execution_state_id=graph_execution_state_id,
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+            submodel=submodel,
+            model_info=model_info,
+        )
 
         return model_info
 
@@ -263,22 +273,25 @@ class ModelManagerService(ModelManagerServiceBase):
 
     def _emit_load_event(
         self,
-        context: InvocationContext,
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
+        queue_id: str,
+        queue_item_id: int,
+        queue_batch_id: str,
+        graph_execution_state_id: str,
         submodel: Optional[SubModelType] = None,
         model_info: Optional[ModelInfo] = None,
     ):
-        if context.services.queue.is_canceled(context.graph_execution_state_id):
+        if self._invoker.services.queue.is_canceled(graph_execution_state_id):
             raise CanceledException()
 
         if model_info:
-            context.services.events.emit_model_load_completed(
-                queue_id=context.queue_id,
-                queue_item_id=context.queue_item_id,
-                queue_batch_id=context.queue_batch_id,
-                graph_execution_state_id=context.graph_execution_state_id,
+            self._invoker.services.events.emit_model_load_completed(
+                queue_id=queue_id,
+                queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
+                graph_execution_state_id=graph_execution_state_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,
@@ -286,11 +299,11 @@ class ModelManagerService(ModelManagerServiceBase):
                 model_info=model_info,
             )
         else:
-            context.services.events.emit_model_load_started(
-                queue_id=context.queue_id,
-                queue_item_id=context.queue_item_id,
-                queue_batch_id=context.queue_batch_id,
-                graph_execution_state_id=context.graph_execution_state_id,
+            self._invoker.services.events.emit_model_load_started(
+                queue_id=queue_id,
+                queue_item_id=queue_item_id,
+                queue_batch_id=queue_batch_id,
+                graph_execution_state_id=graph_execution_state_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,

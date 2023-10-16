@@ -182,9 +182,8 @@ def get_scheduler(
     seed: int,
 ) -> Scheduler:
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
-    orig_scheduler_info = context.services.model_manager.get_model(
+    orig_scheduler_info = context.get_model(
         **scheduler_info.model_dump(),
-        context=context,
     )
     with orig_scheduler_info as orig_scheduler:
         scheduler_config = orig_scheduler.config
@@ -298,15 +297,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
     def dispatch_progress(
         self,
         context: InvocationContext,
-        source_node_id: str,
         intermediate_state: PipelineIntermediateState,
         base_model: BaseModelType,
     ) -> None:
         stable_diffusion_step_callback(
             context=context,
             intermediate_state=intermediate_state,
-            node=self.model_dump(),
-            source_node_id=source_node_id,
             base_model=base_model,
         )
 
@@ -317,11 +313,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
         unet,
         seed,
     ) -> ConditioningData:
-        positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
+        positive_cond_data = context.get_conditioning(self.positive_conditioning.conditioning_name)
         c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
         extra_conditioning_info = c.extra_conditioning
 
-        negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
+        negative_cond_data = context.get_conditioning(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
         conditioning_data = ConditioningData(
@@ -408,17 +404,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
         controlnet_data = []
         for control_info in control_list:
             control_model = exit_stack.enter_context(
-                context.services.model_manager.get_model(
+                context.get_model(
                     model_name=control_info.control_model.model_name,
                     model_type=ModelType.ControlNet,
                     base_model=control_info.control_model.base_model,
-                    context=context,
                 )
             )
 
             # control_models.append(control_model)
             control_image_field = control_info.image
-            input_image = context.services.images.get_pil_image(control_image_field.image_name)
+            input_image = context.get_image(control_image_field.image_name)
             # self.image.image_type, self.image.image_name
             # FIXME: still need to test with different widths, heights, devices, dtypes
             #        and add in batch_size, num_images_per_prompt?
@@ -476,22 +471,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
         conditioning_data.ip_adapter_conditioning = []
         for single_ip_adapter in ip_adapter:
             ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
-                context.services.model_manager.get_model(
+                context.get_model(
                     model_name=single_ip_adapter.ip_adapter_model.model_name,
                     model_type=ModelType.IPAdapter,
                     base_model=single_ip_adapter.ip_adapter_model.base_model,
-                    context=context,
                 )
             )
 
-            image_encoder_model_info = context.services.model_manager.get_model(
+            image_encoder_model_info = context.get_model(
                 model_name=single_ip_adapter.image_encoder_model.model_name,
                 model_type=ModelType.CLIPVision,
                 base_model=single_ip_adapter.image_encoder_model.base_model,
-                context=context,
             )
 
-            input_image = context.services.images.get_pil_image(single_ip_adapter.image.image_name)
+            input_image = context.get_image(single_ip_adapter.image.image_name)
 
             # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
             # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
@@ -535,13 +528,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
-            t2i_adapter_model_info = context.services.model_manager.get_model(
+            t2i_adapter_model_info = context.get_model(
                 model_name=t2i_adapter_field.t2i_adapter_model.model_name,
                 model_type=ModelType.T2IAdapter,
                 base_model=t2i_adapter_field.t2i_adapter_model.base_model,
-                context=context,
             )
-            image = context.services.images.get_pil_image(t2i_adapter_field.image.image_name)
+            image = context.get_image(t2i_adapter_field.image.image_name)
 
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
             if t2i_adapter_field.t2i_adapter_model.base_model == BaseModelType.StableDiffusion1:
@@ -651,11 +643,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
             seed = None
             noise = None
             if self.noise is not None:
-                noise = context.services.latents.get(self.noise.latents_name)
+                noise = context.get_latents(self.noise.latents_name)
                 seed = self.noise.seed
 
             if self.latents is not None:
-                latents = context.services.latents.get(self.latents.latents_name)
+                latents = context.get_latents(self.latents.latents_name)
                 if seed is None:
                     seed = self.latents.seed
 
@@ -681,26 +673,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 do_classifier_free_guidance=True,
             )
 
-            # Get the source node id (we are invoking the prepared node)
-            graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-            source_node_id = graph_execution_state.prepared_source_mapping[self.id]
-
             def step_callback(state: PipelineIntermediateState):
-                self.dispatch_progress(context, source_node_id, state, self.unet.unet.base_model)
+                self.dispatch_progress(context, state, self.unet.unet.base_model)
 
             def _lora_loader():
                 for lora in self.unet.loras:
-                    lora_info = context.services.model_manager.get_model(
+                    lora_info = context.get_model(
                         **lora.model_dump(exclude={"weight"}),
-                        context=context,
                     )
                     yield (lora_info.context.model, lora.weight)
                     del lora_info
                 return
 
-            unet_info = context.services.model_manager.get_model(
+            unet_info = context.get_model(
                 **self.unet.unet.model_dump(),
-                context=context,
             )
             with (
                 ExitStack() as exit_stack,
@@ -775,9 +761,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if choose_torch_device() == torch.device("mps"):
                 mps.empty_cache()
 
-            name = f"{context.graph_execution_state_id}__{self.id}"
-            context.services.latents.save(name, result_latents)
-        return build_latents_output(latents_name=name, latents=result_latents, seed=seed)
+            latents_name = context.save_latents(result_latents)
+        return build_latents_output(latents_name=latents_name, latents=result_latents, seed=seed)
 
 
 @invocation(
@@ -808,11 +793,10 @@ class LatentsToImageInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        latents = context.services.latents.get(self.latents.latents_name)
+        latents = context.get_latents(self.latents.latents_name)
 
-        vae_info = context.services.model_manager.get_model(
+        vae_info = context.get_model(
             **self.vae.vae.model_dump(),
-            context=context,
         )
 
         with set_seamless(vae_info.context.model, self.vae.seamless_axes), vae_info as vae:
@@ -842,7 +826,7 @@ class LatentsToImageInvocation(BaseInvocation):
                 vae.to(dtype=torch.float16)
                 latents = latents.half()
 
-            if self.tiled or context.services.configuration.tiled_decode:
+            if self.tiled or context.config.tiled_decode:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
@@ -866,21 +850,12 @@ class LatentsToImageInvocation(BaseInvocation):
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
 
-        image_dto = context.services.images.create(
-            image=image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata.model_dump() if self.metadata else None,
-            workflow=self.workflow,
-        )
+        image_name = context.save_image(image, category=context.categories.GENERAL)
 
         return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
+            image=ImageField(image_name=image_name),
+            width=image.width,
+            height=image.height,
         )
 
 

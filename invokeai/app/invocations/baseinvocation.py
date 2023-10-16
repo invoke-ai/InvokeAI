@@ -8,15 +8,21 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
 from types import UnionType
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Literal, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Literal, Optional, Protocol, Type, TypeVar, Union
 
 import semver
+from PIL.Image import Image as ImageType
 from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator
 from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
+import torch
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.model_management.model_manager import ModelInfo
+from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
@@ -460,7 +466,123 @@ class UIConfigBase(BaseModel):
     )
 
 
+class GetImage(Protocol):
+    def __call__(self, name: str) -> ImageType:
+        ...
+
+
+class SaveImage(Protocol):
+    def __call__(self, image: ImageType, category: ImageCategory = ImageCategory.GENERAL) -> str:
+        ...
+
+
+class GetLatents(Protocol):
+    def __call__(self, name: str) -> torch.Tensor:
+        ...
+
+
+class SaveLatents(Protocol):
+    def __call__(self, latents: torch.Tensor) -> str:
+        ...
+
+
+class GetConditioning(Protocol):
+    def __call__(self, name: str) -> torch.Tensor:
+        ...
+
+
+class SaveConditioning(Protocol):
+    def __call__(self, conditioning: torch.Tensor) -> str:
+        ...
+
+
+class IsCanceled(Protocol):
+    def __call__(self) -> bool:
+        ...
+
+
+class EmitDenoisingProgress(Protocol):
+    def __call__(self, progress_image: ProgressImage, step: int, order: int, total_steps: int) -> None:
+        ...
+
+
+class GetModel(Protocol):
+    def __call__(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: Optional[SubModelType] = None,
+    ) -> ModelInfo:
+        ...
+
+
+class ModelExists(Protocol):
+    def __call__(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+    ) -> bool:
+        ...
+
+
 class InvocationContext:
+    def __init__(
+        self,
+        # context
+        queue_id: str,
+        queue_item_id: int,
+        queue_batch_id: str,
+        graph_execution_state_id: str,
+        source_node_id: str,
+        # methods
+        get_image: GetImage,
+        save_image: SaveImage,
+        get_latents: GetLatents,
+        save_latents: SaveLatents,
+        get_conditioning: GetConditioning,
+        save_conditioning: SaveConditioning,
+        is_canceled: IsCanceled,
+        get_model: GetModel,
+        emit_denoising_progress: EmitDenoisingProgress,
+        model_exists: ModelExists,
+        # services
+        config: InvokeAIAppConfig,
+    ) -> None:
+        # context
+        self.queue_id = queue_id
+        self.queue_item_id = queue_item_id
+        self.queue_batch_id = queue_batch_id
+        self.graph_execution_state_id = graph_execution_state_id
+        self.source_node_id = source_node_id
+
+        # resource methods
+        self.get_image = get_image
+        self.save_image = save_image
+        self.get_latents = get_latents
+        self.save_latents = save_latents
+        self.get_conditioning = get_conditioning
+        self.save_conditioning = save_conditioning
+
+        # execution state
+        self.is_canceled = is_canceled
+
+        # models
+        self.get_model = get_model
+        self.model_exists = model_exists
+
+        # events
+        self.emit_denoising_progress = emit_denoising_progress
+
+        # services
+        self.config = config
+
+        # misc
+        self.categories = ImageCategory
+
+
+class AppInvocationContext:
     """Initialized and provided to on execution of invocations."""
 
     services: InvocationServices
@@ -468,6 +590,7 @@ class InvocationContext:
     queue_id: str
     queue_item_id: int
     queue_batch_id: str
+    source_node_id: str
 
     def __init__(
         self,
@@ -476,12 +599,113 @@ class InvocationContext:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
+        source_node_id: str,
     ):
         self.services = services
         self.graph_execution_state_id = graph_execution_state_id
         self.queue_id = queue_id
         self.queue_item_id = queue_item_id
         self.queue_batch_id = queue_batch_id
+        self.source_node_id = source_node_id
+
+    def get_restricted_context(self, invocation: BaseInvocation) -> InvocationContext:
+        def get_image(name: str) -> ImageType:
+            return self.services.images.get_pil_image(name)
+
+        def save_image(image: ImageType, category: ImageCategory = ImageCategory.GENERAL) -> str:
+            metadata = getattr(invocation, "metadata")
+            workflow = getattr(invocation, "workflow")
+
+            image_dto = self.services.images.create(
+                image=image,
+                image_origin=ResourceOrigin.INTERNAL,
+                image_category=category,
+                session_id=self.graph_execution_state_id,
+                node_id=invocation.id,
+                is_intermediate=invocation.is_intermediate,
+                metadata=metadata.model_dump() if metadata else None,
+                workflow=workflow,
+            )
+            return image_dto.image_name
+
+        def get_latents(name: str) -> torch.Tensor:
+            return self.services.latents.get(name)
+
+        def save_latents(latents: torch.Tensor) -> str:
+            name = f"{self.graph_execution_state_id}__{invocation.id}"
+            self.services.latents.save(name=name, data=latents)
+            return name
+
+        def get_conditioning(name: str) -> torch.Tensor:
+            return self.services.latents.get(name)
+
+        def save_conditioning(conditioning: torch.Tensor) -> str:
+            name = f"{self.graph_execution_state_id}__{invocation.id}_conditioning"
+            self.services.latents.save(name=name, data=conditioning)
+            return name
+
+        def is_canceled() -> bool:
+            return self.services.queue.is_canceled(self.graph_execution_state_id)
+
+        def get_model(
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+            submodel: Optional[SubModelType] = None,
+        ) -> ModelInfo:
+            return self.services.model_manager.get_model(
+                model_name=model_name,
+                base_model=base_model,
+                model_type=model_type,
+                submodel=submodel,
+                queue_id=self.queue_id,
+                queue_item_id=self.queue_item_id,
+                queue_batch_id=self.queue_batch_id,
+                graph_execution_state_id=self.graph_execution_state_id,
+            )
+
+        def model_exists(
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+        ) -> bool:
+            return self.services.model_manager.model_exists(model_name, base_model, model_type)
+
+        def emit_denoising_progress(progress_image: ProgressImage, step: int, order: int, total_steps: int) -> None:
+            self.services.events.emit_generator_progress(
+                queue_id=self.queue_id,
+                queue_item_id=self.queue_item_id,
+                queue_batch_id=self.queue_batch_id,
+                graph_execution_state_id=self.graph_execution_state_id,
+                node=invocation.model_dump(),
+                source_node_id=self.source_node_id,
+                progress_image=progress_image,
+                step=step,
+                order=order,
+                total_steps=total_steps,
+            )
+
+        return InvocationContext(
+            # context
+            queue_id=self.queue_id,
+            queue_item_id=self.queue_item_id,
+            queue_batch_id=self.queue_batch_id,
+            graph_execution_state_id=self.graph_execution_state_id,
+            source_node_id=self.source_node_id,
+            # methods
+            get_image=get_image,
+            save_image=save_image,
+            get_latents=get_latents,
+            save_latents=save_latents,
+            get_conditioning=get_conditioning,
+            save_conditioning=save_conditioning,
+            is_canceled=is_canceled,
+            emit_denoising_progress=emit_denoising_progress,
+            get_model=get_model,
+            model_exists=model_exists,
+            # services
+            config=self.services.configuration,
+        )
 
 
 class BaseInvocationOutput(BaseModel):
@@ -613,7 +837,7 @@ class BaseInvocation(ABC, BaseModel):
         """Invoke with provided context and return outputs."""
         pass
 
-    def invoke_internal(self, context: InvocationContext) -> BaseInvocationOutput:
+    def invoke_internal(self, context: AppInvocationContext) -> BaseInvocationOutput:
         for field_name, field in self.model_fields.items():
             if not field.json_schema_extra or callable(field.json_schema_extra):
                 # something has gone terribly awry, we should always have this and it should be a dict
@@ -635,7 +859,7 @@ class BaseInvocation(ABC, BaseModel):
 
         # skip node cache codepath if it's disabled
         if context.services.configuration.node_cache_size == 0:
-            return self.invoke(context)
+            return self.invoke(context.get_restricted_context(invocation=self))
 
         output: BaseInvocationOutput
         if self.use_cache:
@@ -643,7 +867,7 @@ class BaseInvocation(ABC, BaseModel):
             cached_value = context.services.invocation_cache.get(key)
             if cached_value is None:
                 context.services.logger.debug(f'Invocation cache miss for type "{self.get_type()}": {self.id}')
-                output = self.invoke(context)
+                output = self.invoke(context.get_restricted_context(invocation=self))
                 context.services.invocation_cache.save(key, output)
                 return output
             else:
@@ -651,7 +875,7 @@ class BaseInvocation(ABC, BaseModel):
                 return cached_value
         else:
             context.services.logger.debug(f'Skipping invocation cache for "{self.get_type()}": {self.id}')
-            return self.invoke(context)
+            return self.invoke(context.get_restricted_context(invocation=self))
 
     def get_type(self) -> str:
         return self.model_fields["type"].default

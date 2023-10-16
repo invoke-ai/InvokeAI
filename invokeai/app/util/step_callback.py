@@ -27,11 +27,9 @@ def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=
 def stable_diffusion_step_callback(
     context: InvocationContext,
     intermediate_state: PipelineIntermediateState,
-    node: dict,
-    source_node_id: str,
     base_model: BaseModelType,
 ):
-    if context.services.queue.is_canceled(context.graph_execution_state_id):
+    if context.is_canceled():
         raise CanceledException
 
     # Some schedulers report not only the noisy latents at the current timestep,
@@ -108,13 +106,7 @@ def stable_diffusion_step_callback(
 
     dataURL = image_to_dataURL(image, image_format="JPEG")
 
-    context.services.events.emit_generator_progress(
-        queue_id=context.queue_id,
-        queue_item_id=context.queue_item_id,
-        queue_batch_id=context.queue_batch_id,
-        graph_execution_state_id=context.graph_execution_state_id,
-        node=node,
-        source_node_id=source_node_id,
+    context.emit_denoising_progress(
         progress_image=ProgressImage(width=width, height=height, dataURL=dataURL),
         step=intermediate_state.step,
         order=intermediate_state.order,
