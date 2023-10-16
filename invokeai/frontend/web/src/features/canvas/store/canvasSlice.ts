@@ -30,6 +30,7 @@ import {
   isCanvasMaskLine,
 } from './canvasTypes';
 import { appSocketQueueItemStatusChanged } from 'services/events/actions';
+import { queueApi } from 'services/api/endpoints/queue';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -812,6 +813,20 @@ export const canvasSlice = createSlice({
         );
       }
     });
+    builder.addMatcher(
+      queueApi.endpoints.clearQueue.matchFulfilled,
+      (state) => {
+        state.batchIds = [];
+      }
+    );
+    builder.addMatcher(
+      queueApi.endpoints.cancelByBatchIds.matchFulfilled,
+      (state, action) => {
+        state.batchIds = state.batchIds.filter(
+          (id) => !action.meta.arg.originalArgs.batch_ids.includes(id)
+        );
+      }
+    );
   },
 });
 

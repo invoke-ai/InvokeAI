@@ -17,7 +17,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _id_field: str
-    _lock: threading.Lock
+    _lock: threading.RLock
 
     def __init__(self, db: SqliteDatabase, table_name: str, id_field: str = "id"):
         super().__init__()
