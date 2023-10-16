@@ -12,7 +12,7 @@ from .board_image_records_base import BoardImageRecordStorageBase
 class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
-    _lock: threading.Lock
+    _lock: threading.RLock
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
