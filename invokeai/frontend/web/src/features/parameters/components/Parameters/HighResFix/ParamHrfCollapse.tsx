@@ -16,16 +16,16 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 const selector = createSelector(
   stateSelector,
   (state: RootState) => {
-    const { hrfEnabled, hrfManualResEnabled } = state.generation;
+    const { hrfEnabled } = state.generation;
 
-    return { hrfEnabled, hrfManualResEnabled };
+    return { hrfEnabled };
   },
   defaultSelectorOptions
 );
 
 export default function ParamHrfCollapse() {
   const isHRFFeatureEnabled = useFeatureStatus('hrf').isFeatureEnabled;
-  const { hrfEnabled, hrfManualResEnabled } = useAppSelector(selector);
+  const { hrfEnabled } = useAppSelector(selector);
   const activeLabel = useMemo(() => {
     if (hrfEnabled) {
       return 'On';

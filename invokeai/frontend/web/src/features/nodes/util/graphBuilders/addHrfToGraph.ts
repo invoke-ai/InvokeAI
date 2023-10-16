@@ -25,17 +25,6 @@ import {
   VAE_LOADER,
 } from './constants';
 import { logger } from 'app/logging/logger';
-import { I } from 'ts-toolbelt';
-
-// To recap, next steps for this feature might include:
-
-// Automatic calculation of initial dimensions
-// Support ESRGAN & PIL image upscaling to allow for lower denoising strength & to retain original image composition
-// Add control adapters used for txt2img phase to img2img phase
-
-// I want to capture that the recommended way now is to convert latents to an image, upscale that image, then convert the image back to latents
-
-// model_name?: "RealESRGAN_x4plus.pth" | "RealESRGAN_x4plus_anime_6B.pth" | "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth" | "RealESRGAN_x2plus.pth" | undefined;
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
