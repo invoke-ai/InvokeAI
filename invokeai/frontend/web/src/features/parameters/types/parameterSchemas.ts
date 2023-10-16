@@ -401,7 +401,7 @@ export const isValidPrecision = (val: unknown): val is PrecisionParam =>
 /**
  * Zod schema for a high resolution fix method parameter.
  */
-export const zHrfMethod = z.enum(['ERSGAN', 'bilinear']);
+export const zHrfMethod = z.enum(['ESRGAN', 'bilinear']);
 /**
  * Type alias for high resolution fix method parameter, inferred from its zod schema
  */

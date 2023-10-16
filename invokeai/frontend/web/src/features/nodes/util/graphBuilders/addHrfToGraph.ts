@@ -5,6 +5,7 @@ import {
   NoiseInvocation,
   LatentsToImageInvocation,
   ImageResizeInvocation,
+  ESRGANInvocation,
   Edge,
   ImageToLatentsInvocation,
 } from 'services/api/types';
@@ -19,10 +20,12 @@ import {
   IMAGE_TO_LATENTS_HRF,
   DENOISE_LATENTS_HRF,
   RESIZE_HRF,
+  ESRGAN_HRF,
   NOISE_HRF,
   VAE_LOADER,
 } from './constants';
 import { logger } from 'app/logging/logger';
+import { I } from 'ts-toolbelt';
 
 // To recap, next steps for this feature might include:
 
@@ -31,6 +34,8 @@ import { logger } from 'app/logging/logger';
 // Add control adapters used for txt2img phase to img2img phase
 
 // I want to capture that the recommended way now is to convert latents to an image, upscale that image, then convert the image back to latents
+
+// model_name?: "RealESRGAN_x4plus.pth" | "RealESRGAN_x4plus_anime_6B.pth" | "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth" | "RealESRGAN_x2plus.pth" | undefined;
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
@@ -86,6 +91,9 @@ export const addHrfToGraph = (
   const isAutoVae = !vae;
   const hrfWidth = state.generation.hrfWidth;
   const hrfHeight = state.generation.hrfHeight;
+  const width = state.generation.width;
+  const height = state.generation.height;
+  const method = state.generation.hrfMethod;
 
   // Pre-existing (original) graph nodes.
   const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
@@ -148,19 +156,54 @@ export const addHrfToGraph = (
     id: RESIZE_HRF,
     type: 'img_resize',
     is_intermediate: true,
-    width: state.generation.width,
-    height: state.generation.height,
+    width: width,
+    height: height,
   } as ImageResizeInvocation;
-  graph.edges.push({
-    source: {
-      node_id: LATENTS_TO_IMAGE_HRF_LR,
-      field: 'image',
-    },
-    destination: {
-      node_id: RESIZE_HRF,
-      field: 'image',
-    },
-  });
+  if (method == 'ESRGAN') {
+    let model_name = 'RealESRGAN_x2plus.pth';
+    if ((width * height) / (hrfWidth * hrfHeight) > 2) {
+      model_name = 'RealESRGAN_x4plus.pth';
+    }
+    graph.nodes[ESRGAN_HRF] = {
+      id: ESRGAN_HRF,
+      type: 'esrgan',
+      model_name: model_name,
+      is_intermediate: true,
+    } as ESRGANInvocation;
+    graph.edges.push(
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE_HRF_LR,
+          field: 'image',
+        },
+        destination: {
+          node_id: ESRGAN_HRF,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: ESRGAN_HRF,
+          field: 'image',
+        },
+        destination: {
+          node_id: RESIZE_HRF,
+          field: 'image',
+        },
+      }
+    );
+  } else {
+    graph.edges.push({
+      source: {
+        node_id: LATENTS_TO_IMAGE_HRF_LR,
+        field: 'image',
+      },
+      destination: {
+        node_id: RESIZE_HRF,
+        field: 'image',
+      },
+    });
+  }
 
   graph.nodes[NOISE_HRF] = {
     type: 'noise',

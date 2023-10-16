@@ -16,7 +16,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const DATA = ['ERSGAN', 'bilinear'];
+const DATA = ['ESRGAN', 'bilinear'];
 
 // Dropdown selection for the type of high resolution fix method to use.
 const ParamHrfMethodSelect = () => {
