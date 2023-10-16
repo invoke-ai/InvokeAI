@@ -11,6 +11,7 @@ import {
   CanvasCoherenceModeParam,
   CfgScaleParam,
   HeightParam,
+  HrfMethodParam,
   MainModelParam,
   MaskBlurMethodParam,
   NegativePromptParam,
@@ -32,6 +33,7 @@ export interface GenerationState {
   hrfEnabled: boolean;
   hrfManualResEnabled: boolean;
   hrfStrength: StrengthParam;
+  hrfMethod: HrfMethodParam;
   cfgScale: CfgScaleParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
@@ -79,6 +81,7 @@ export const initialGenerationState: GenerationState = {
   hrfStrength: 0.75,
   hrfEnabled: false,
   hrfManualResEnabled: false,
+  hrfMethod: 'bilinear',
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
@@ -296,6 +299,9 @@ export const generationSlice = createSlice({
     setHrfManualResEnabled: (state, action: PayloadAction<boolean>) => {
       state.hrfManualResEnabled = action.payload;
     },
+    setHrfMethod: (state, action: PayloadAction<HrfMethodParam>) => {
+      state.hrfMethod = action.payload;
+    },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
@@ -384,6 +390,7 @@ export const {
   setHrfWidth,
   setHrfStrength,
   setHrfEnabled,
+  setHrfMethod,
   setHrfManualResEnabled,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
