@@ -3,7 +3,7 @@
 from typing import Literal
 
 import numpy as np
-from pydantic import field_validator
+from pydantic import ValidationInfo, field_validator
 
 from invokeai.app.invocations.primitives import FloatOutput, IntegerOutput
 
@@ -186,12 +186,12 @@ class IntegerMathInvocation(BaseInvocation):
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
     @field_validator("b")
-    def no_unrepresentable_results(cls, v, values):
-        if values["operation"] == "DIV" and v == 0:
+    def no_unrepresentable_results(cls, v: int, info: ValidationInfo):
+        if info.data["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "MOD" and v == 0:
+        elif info.data["operation"] == "MOD" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "EXP" and v < 0:
+        elif info.data["operation"] == "EXP" and v < 0:
             raise ValueError("Result of exponentiation is not an integer")
         return v
 
@@ -260,12 +260,12 @@ class FloatMathInvocation(BaseInvocation):
     b: float = InputField(default=0, description=FieldDescriptions.num_2)
 
     @field_validator("b")
-    def no_unrepresentable_results(cls, v, values):
-        if values["operation"] == "DIV" and v == 0:
+    def no_unrepresentable_results(cls, v: float, info: ValidationInfo):
+        if info.data["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "EXP" and values["a"] == 0 and v < 0:
+        elif info.data["operation"] == "EXP" and info.data["a"] == 0 and v < 0:
             raise ValueError("Cannot raise zero to a negative power")
-        elif values["operation"] == "EXP" and type(values["a"] ** v) is complex:
+        elif info.data["operation"] == "EXP" and type(info.data["a"] ** v) is complex:
             raise ValueError("Root operation resulted in a complex number")
         return v
 
