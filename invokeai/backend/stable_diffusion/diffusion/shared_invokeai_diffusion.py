@@ -411,7 +411,6 @@ class InvokeAIDiffuserComponent:
         if down_intrablock_additional_residuals is not None:
             uncond_down_intrablock, cond_down_intrablock = [], []
             for down_intrablock in down_intrablock_additional_residuals:
-                print("down_intrablock shape: ", down_intrablock.shape)
                 _uncond_down, _cond_down = down_intrablock.chunk(2)
                 uncond_down_intrablock.append(_uncond_down)
                 cond_down_intrablock.append(_cond_down)
