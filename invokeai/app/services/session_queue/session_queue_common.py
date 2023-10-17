@@ -3,11 +3,11 @@ import json
 from itertools import chain, product
 from typing import Generator, Iterable, Literal, NamedTuple, Optional, TypeAlias, Union, cast
 
-from pydantic import BaseModel, Field, StrictStr, parse_raw_as, root_validator, validator
-from pydantic.json import pydantic_encoder
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, TypeAdapter, field_validator, model_validator
+from pydantic_core import to_jsonable_python
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
-from invokeai.app.services.graph import Graph, GraphExecutionState, NodeNotFoundError
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.util.misc import uuid_string
 
 # region Errors
@@ -17,7 +17,7 @@ class BatchZippedLengthError(ValueError):
     """Raise when a batch has items of different lengths."""
 
 
-class BatchItemsTypeError(TypeError):
+class BatchItemsTypeError(ValueError):  # this cannot be a TypeError in pydantic v2
     """Raise when a batch has items of different types."""
 
 
@@ -70,7 +70,7 @@ class Batch(BaseModel):
         default=1, ge=1, description="Int stating how many times to iterate through all possible batch indices"
     )
 
-    @validator("data")
+    @field_validator("data")
     def validate_lengths(cls, v: Optional[BatchDataCollection]):
         if v is None:
             return v
@@ -81,7 +81,7 @@ class Batch(BaseModel):
                     raise BatchZippedLengthError("Zipped batch items must all have the same length")
         return v
 
-    @validator("data")
+    @field_validator("data")
     def validate_types(cls, v: Optional[BatchDataCollection]):
         if v is None:
             return v
@@ -94,7 +94,7 @@ class Batch(BaseModel):
                         raise BatchItemsTypeError("All items in a batch must have the same type")
         return v
 
-    @validator("data")
+    @field_validator("data")
     def validate_unique_field_mappings(cls, v: Optional[BatchDataCollection]):
         if v is None:
             return v
@@ -107,34 +107,35 @@ class Batch(BaseModel):
                 paths.add(pair)
         return v
 
-    @root_validator(skip_on_failure=True)
+    @model_validator(mode="after")
     def validate_batch_nodes_and_edges(cls, values):
-        batch_data_collection = cast(Optional[BatchDataCollection], values["data"])
+        batch_data_collection = cast(Optional[BatchDataCollection], values.data)
         if batch_data_collection is None:
             return values
-        graph = cast(Graph, values["graph"])
+        graph = cast(Graph, values.graph)
         for batch_data_list in batch_data_collection:
             for batch_data in batch_data_list:
                 try:
                     node = cast(BaseInvocation, graph.get_node(batch_data.node_path))
                 except NodeNotFoundError:
                     raise NodeNotFoundError(f"Node {batch_data.node_path} not found in graph")
-                if batch_data.field_name not in node.__fields__:
+                if batch_data.field_name not in node.model_fields:
                     raise NodeNotFoundError(f"Field {batch_data.field_name} not found in node {batch_data.node_path}")
         return values
 
-    @validator("graph")
+    @field_validator("graph")
     def validate_graph(cls, v: Graph):
         v.validate_self()
         return v
 
-    class Config:
-        schema_extra = {
-            "required": [
+    model_config = ConfigDict(
+        json_schema_extra=dict(
+            required=[
                 "graph",
                 "runs",
             ]
-        }
+        )
+    )
 
 
 # endregion Batch
@@ -146,15 +147,21 @@ DEFAULT_QUEUE_ID = "default"
 
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
 
+adapter_NodeFieldValue = TypeAdapter(list[NodeFieldValue])
+
 
 def get_field_values(queue_item_dict: dict) -> Optional[list[NodeFieldValue]]:
     field_values_raw = queue_item_dict.get("field_values", None)
-    return parse_raw_as(list[NodeFieldValue], field_values_raw) if field_values_raw is not None else None
+    return adapter_NodeFieldValue.validate_json(field_values_raw) if field_values_raw is not None else None
+
+
+adapter_GraphExecutionState = TypeAdapter(GraphExecutionState)
 
 
 def get_session(queue_item_dict: dict) -> GraphExecutionState:
     session_raw = queue_item_dict.get("session", "{}")
-    return parse_raw_as(GraphExecutionState, session_raw)
+    session = adapter_GraphExecutionState.validate_json(session_raw, strict=False)
+    return session
 
 
 class SessionQueueItemWithoutGraph(BaseModel):
@@ -178,14 +185,14 @@ class SessionQueueItemWithoutGraph(BaseModel):
     )
 
     @classmethod
-    def from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemDTO":
+    def queue_item_dto_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemDTO":
         # must parse these manually
         queue_item_dict["field_values"] = get_field_values(queue_item_dict)
         return SessionQueueItemDTO(**queue_item_dict)
 
-    class Config:
-        schema_extra = {
-            "required": [
+    model_config = ConfigDict(
+        json_schema_extra=dict(
+            required=[
                 "item_id",
                 "status",
                 "batch_id",
@@ -196,7 +203,8 @@ class SessionQueueItemWithoutGraph(BaseModel):
                 "created_at",
                 "updated_at",
             ]
-        }
+        )
+    )
 
 
 class SessionQueueItemDTO(SessionQueueItemWithoutGraph):
@@ -207,15 +215,15 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
     session: GraphExecutionState = Field(description="The fully-populated session to be executed")
 
     @classmethod
-    def from_dict(cls, queue_item_dict: dict) -> "SessionQueueItem":
+    def queue_item_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItem":
         # must parse these manually
         queue_item_dict["field_values"] = get_field_values(queue_item_dict)
         queue_item_dict["session"] = get_session(queue_item_dict)
         return SessionQueueItem(**queue_item_dict)
 
-    class Config:
-        schema_extra = {
-            "required": [
+    model_config = ConfigDict(
+        json_schema_extra=dict(
+            required=[
                 "item_id",
                 "status",
                 "batch_id",
@@ -227,7 +235,8 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
                 "created_at",
                 "updated_at",
             ]
-        }
+        )
+    )
 
 
 # endregion Queue Items
@@ -321,7 +330,7 @@ def populate_graph(graph: Graph, node_field_values: Iterable[NodeFieldValue]) ->
     """
     Populates the given graph with the given batch data items.
     """
-    graph_clone = graph.copy(deep=True)
+    graph_clone = graph.model_copy(deep=True)
     for item in node_field_values:
         node = graph_clone.get_node(item.node_path)
         if node is None:
@@ -354,7 +363,7 @@ def create_session_nfv_tuples(
                 for item in batch_datum.items
             ]
             node_field_values_to_zip.append(node_field_values)
-        data.append(list(zip(*node_field_values_to_zip)))
+        data.append(list(zip(*node_field_values_to_zip)))  # type: ignore [arg-type]
 
     # create generator to yield session,nfv tuples
     count = 0
@@ -409,11 +418,11 @@ def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new
         values_to_insert.append(
             SessionQueueValueToInsert(
                 queue_id,  # queue_id
-                session.json(),  # session (json)
+                session.model_dump_json(warnings=False, exclude_none=True),  # session (json)
                 session.id,  # session_id
                 batch.batch_id,  # batch_id
                 # must use pydantic_encoder bc field_values is a list of models
-                json.dumps(field_values, default=pydantic_encoder) if field_values else None,  # field_values (json)
+                json.dumps(field_values, default=to_jsonable_python) if field_values else None,  # field_values (json)
                 priority,  # priority
             )
         )
@@ -421,3 +430,6 @@ def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new
 
 
 # endregion Util
+
+Batch.model_rebuild(force=True)
+SessionQueueItem.model_rebuild(force=True)

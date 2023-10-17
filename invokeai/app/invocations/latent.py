@@ -19,7 +19,7 @@ from diffusers.models.attention_processor import (
 )
 from diffusers.schedulers import DPMSolverSDEScheduler
 from diffusers.schedulers import SchedulerMixin as Scheduler
-from pydantic import validator
+from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.ip_adapter import IPAdapterField
@@ -34,6 +34,7 @@ from invokeai.app.invocations.primitives import (
     build_latents_output,
 )
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
@@ -54,7 +55,6 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
-from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -84,12 +84,20 @@ class SchedulerOutput(BaseInvocationOutput):
     scheduler: SAMPLER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
 
 
-@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents", version="1.0.0")
+@invocation(
+    "scheduler",
+    title="Scheduler",
+    tags=["scheduler"],
+    category="latents",
+    version="1.0.0",
+)
 class SchedulerInvocation(BaseInvocation):
     """Selects a scheduler."""
 
     scheduler: SAMPLER_NAME_VALUES = InputField(
-        default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
+        default="euler",
+        description=FieldDescriptions.scheduler,
+        ui_type=UIType.Scheduler,
     )
 
     def invoke(self, context: InvocationContext) -> SchedulerOutput:
@@ -97,7 +105,11 @@ class SchedulerInvocation(BaseInvocation):
 
 
 @invocation(
-    "create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents", version="1.0.0"
+    "create_denoise_mask",
+    title="Create Denoise Mask",
+    tags=["mask", "denoise"],
+    category="latents",
+    version="1.0.0",
 )
 class CreateDenoiseMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
@@ -106,7 +118,11 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
     image: Optional[ImageField] = InputField(default=None, description="Image which will be masked", ui_order=1)
     mask: ImageField = InputField(description="The mask to use when pasting", ui_order=2)
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=3)
-    fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32, ui_order=4)
+    fp32: bool = InputField(
+        default=DEFAULT_PRECISION == "float32",
+        description=FieldDescriptions.fp32,
+        ui_order=4,
+    )
 
     def prep_mask_tensor(self, mask_image):
         if mask_image.mode != "L":
@@ -134,7 +150,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
 
         if image is not None:
             vae_info = context.services.model_manager.get_model(
-                **self.vae.vae.dict(),
+                **self.vae.vae.model_dump(),
                 context=context,
             )
 
@@ -167,7 +183,7 @@ def get_scheduler(
 ) -> Scheduler:
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
     orig_scheduler_info = context.services.model_manager.get_model(
-        **scheduler_info.dict(),
+        **scheduler_info.model_dump(),
         context=context,
     )
     with orig_scheduler_info as orig_scheduler:
@@ -209,34 +225,64 @@ class DenoiseLatentsInvocation(BaseInvocation):
     negative_conditioning: ConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection, ui_order=1
     )
-    noise: Optional[LatentsField] = InputField(description=FieldDescriptions.noise, input=Input.Connection, ui_order=3)
+    noise: Optional[LatentsField] = InputField(
+        default=None,
+        description=FieldDescriptions.noise,
+        input=Input.Connection,
+        ui_order=3,
+    )
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     cfg_scale: Union[float, List[float]] = InputField(
         default=7.5, ge=1, description=FieldDescriptions.cfg_scale, title="CFG Scale"
     )
-    denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+    denoising_start: float = InputField(
+        default=0.0,
+        ge=0,
+        le=1,
+        description=FieldDescriptions.denoising_start,
+    )
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     scheduler: SAMPLER_NAME_VALUES = InputField(
-        default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
+        default="euler",
+        description=FieldDescriptions.scheduler,
+        ui_type=UIType.Scheduler,
     )
-    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet", ui_order=2)
-    control: Union[ControlField, list[ControlField]] = InputField(
+    unet: UNetField = InputField(
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
+        ui_order=2,
+    )
+    control: Optional[Union[ControlField, list[ControlField]]] = InputField(
         default=None,
         input=Input.Connection,
         ui_order=5,
     )
     ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]] = InputField(
-        description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection, ui_order=6
+        description=FieldDescriptions.ip_adapter,
+        title="IP-Adapter",
+        default=None,
+        input=Input.Connection,
+        ui_order=6,
     )
-    t2i_adapter: Union[T2IAdapterField, list[T2IAdapterField]] = InputField(
-        description=FieldDescriptions.t2i_adapter, title="T2I-Adapter", default=None, input=Input.Connection, ui_order=7
+    t2i_adapter: Optional[Union[T2IAdapterField, list[T2IAdapterField]]] = InputField(
+        description=FieldDescriptions.t2i_adapter,
+        title="T2I-Adapter",
+        default=None,
+        input=Input.Connection,
+        ui_order=7,
     )
-    latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
+    latents: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
-        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=8
+        default=None,
+        description=FieldDescriptions.mask,
+        input=Input.Connection,
+        ui_order=8,
     )
 
-    @validator("cfg_scale")
+    @field_validator("cfg_scale")
     def ge_one(cls, v):
         """validate that all cfg_scale values are >= 1"""
         if isinstance(v, list):
@@ -259,7 +305,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         stable_diffusion_step_callback(
             context=context,
             intermediate_state=intermediate_state,
-            node=self.dict(),
+            node=self.model_dump(),
             source_node_id=source_node_id,
             base_model=base_model,
         )
@@ -451,9 +497,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
             with image_encoder_model_info as image_encoder_model:
                 # Get image embeddings from CLIP and ImageProjModel.
-                image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
-                    input_image, image_encoder_model
-                )
+                (
+                    image_prompt_embeds,
+                    uncond_image_prompt_embeds,
+                ) = ip_adapter_model.get_image_embeds(input_image, image_encoder_model)
                 conditioning_data.ip_adapter_conditioning.append(
                     IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds)
                 )
@@ -628,7 +675,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
             # below. Investigate whether this is appropriate.
             t2i_adapter_data = self.run_t2i_adapters(
-                context, self.t2i_adapter, latents.shape, do_classifier_free_guidance=True
+                context,
+                self.t2i_adapter,
+                latents.shape,
+                do_classifier_free_guidance=True,
             )
 
             # Get the source node id (we are invoking the prepared node)
@@ -641,7 +691,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             def _lora_loader():
                 for lora in self.unet.loras:
                     lora_info = context.services.model_manager.get_model(
-                        **lora.dict(exclude={"weight"}),
+                        **lora.model_dump(exclude={"weight"}),
                         context=context,
                     )
                     yield (lora_info.context.model, lora.weight)
@@ -649,7 +699,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 return
 
             unet_info = context.services.model_manager.get_model(
-                **self.unet.unet.dict(),
+                **self.unet.unet.model_dump(),
                 context=context,
             )
             with (
@@ -701,7 +751,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     denoising_end=self.denoising_end,
                 )
 
-                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                (
+                    result_latents,
+                    result_attention_map_saver,
+                ) = pipeline.latents_from_embeddings(
                     latents=latents,
                     timesteps=timesteps,
                     init_timestep=init_timestep,
@@ -729,7 +782,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
 
 @invocation(
-    "l2i", title="Latents to Image", tags=["latents", "image", "vae", "l2i"], category="latents", version="1.0.0"
+    "l2i",
+    title="Latents to Image",
+    tags=["latents", "image", "vae", "l2i"],
+    category="latents",
+    version="1.0.0",
 )
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
@@ -744,7 +801,7 @@ class LatentsToImageInvocation(BaseInvocation):
     )
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
     fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32)
-    metadata: CoreMetadata = InputField(
+    metadata: Optional[CoreMetadata] = InputField(
         default=None,
         description=FieldDescriptions.core_metadata,
         ui_hidden=True,
@@ -755,7 +812,7 @@ class LatentsToImageInvocation(BaseInvocation):
         latents = context.services.latents.get(self.latents.latents_name)
 
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.model_dump(),
             context=context,
         )
 
@@ -817,7 +874,7 @@ class LatentsToImageInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.dict() if self.metadata else None,
+            metadata=self.metadata.model_dump() if self.metadata else None,
             workflow=self.workflow,
         )
 
@@ -831,7 +888,13 @@ class LatentsToImageInvocation(BaseInvocation):
 LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
 
 
-@invocation("lresize", title="Resize Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
+@invocation(
+    "lresize",
+    title="Resize Latents",
+    tags=["latents", "resize"],
+    category="latents",
+    version="1.0.0",
+)
 class ResizeLatentsInvocation(BaseInvocation):
     """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
 
@@ -877,7 +940,13 @@ class ResizeLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@invocation("lscale", title="Scale Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
+@invocation(
+    "lscale",
+    title="Scale Latents",
+    tags=["latents", "resize"],
+    category="latents",
+    version="1.0.0",
+)
 class ScaleLatentsInvocation(BaseInvocation):
     """Scales latents by a given factor."""
 
@@ -916,7 +985,11 @@ class ScaleLatentsInvocation(BaseInvocation):
 
 
 @invocation(
-    "i2l", title="Image to Latents", tags=["latents", "image", "vae", "i2l"], category="latents", version="1.0.0"
+    "i2l",
+    title="Image to Latents",
+    tags=["latents", "image", "vae", "i2l"],
+    category="latents",
+    version="1.0.0",
 )
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
@@ -980,7 +1053,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         image = context.services.images.get_pil_image(self.image.image_name)
 
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.model_dump(),
             context=context,
         )
 
@@ -1008,7 +1081,13 @@ class ImageToLatentsInvocation(BaseInvocation):
         return vae.encode(image_tensor).latents
 
 
-@invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents", version="1.0.0")
+@invocation(
+    "lblend",
+    title="Blend Latents",
+    tags=["latents", "blend"],
+    category="latents",
+    version="1.0.0",
+)
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
 

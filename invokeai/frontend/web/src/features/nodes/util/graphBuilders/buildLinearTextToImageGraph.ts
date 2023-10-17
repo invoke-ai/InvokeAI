@@ -6,6 +6,7 @@ import {
   ONNXTextToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
+import { addHrfToGraph } from './addHrfToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
@@ -47,6 +48,10 @@ export const buildLinearTextToImageGraph = (
     seamlessXAxis,
     seamlessYAxis,
     seed,
+    hrfWidth,
+    hrfHeight,
+    hrfStrength,
+    hrfEnabled: hrfEnabled,
   } = state.generation;
 
   const use_cpu = shouldUseCpuNoise;
@@ -254,6 +259,9 @@ export const buildLinearTextToImageGraph = (
     ipAdapters: [], // populated in addIPAdapterToLinearGraph
     t2iAdapters: [], // populated in addT2IAdapterToLinearGraph
     clip_skip: clipSkip,
+    hrf_width: hrfEnabled ? hrfWidth : undefined,
+    hrf_height: hrfEnabled ? hrfHeight : undefined,
+    hrf_strength: hrfEnabled ? hrfStrength : undefined,
   };
 
   graph.edges.push({
@@ -286,6 +294,12 @@ export const buildLinearTextToImageGraph = (
   addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  // High resolution fix.
+  // NOTE: Not supported for onnx models.
+  if (state.generation.hrfEnabled && !isUsingOnnxModel) {
+    addHrfToGraph(state, graph);
+  }
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

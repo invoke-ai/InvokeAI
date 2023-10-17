@@ -73,14 +73,9 @@ export const addModelSelectedListener = () => {
           dispatch(
             addToast(
               makeToast({
-                title: t(
-                  modelsCleared === 1
-                    ? 'toast.baseModelChangedCleared_one'
-                    : 'toast.baseModelChangedCleared_many',
-                  {
-                    number: modelsCleared,
-                  }
-                ),
+                title: t('toast.baseModelChangedCleared', {
+                  count: modelsCleared,
+                }),
                 status: 'warning',
               })
             )

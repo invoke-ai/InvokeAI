@@ -11,31 +11,53 @@ import {
   selectAllIPAdapters,
   selectAllT2IAdapters,
   selectControlAdapterIds,
+  selectValidControlNets,
+  selectValidIPAdapters,
+  selectValidT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaPlus } from 'react-icons/fa';
 import { useAddControlAdapter } from '../hooks/useAddControlAdapter';
-import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
   ({ controlAdapters }) => {
     const activeLabel: string[] = [];
+    let isError = false;
 
-    const ipAdapterCount = selectAllIPAdapters(controlAdapters).length;
-    if (ipAdapterCount > 0) {
-      activeLabel.push(`${ipAdapterCount} IP`);
+    const enabledIPAdapterCount = selectAllIPAdapters(controlAdapters).filter(
+      (ca) => ca.isEnabled
+    ).length;
+    const validIPAdapterCount = selectValidIPAdapters(controlAdapters).length;
+    if (enabledIPAdapterCount > 0) {
+      activeLabel.push(`${enabledIPAdapterCount} IP`);
+    }
+    if (enabledIPAdapterCount > validIPAdapterCount) {
+      isError = true;
     }
 
-    const controlNetCount = selectAllControlNets(controlAdapters).length;
-    if (controlNetCount > 0) {
-      activeLabel.push(`${controlNetCount} ControlNet`);
+    const enabledControlNetCount = selectAllControlNets(controlAdapters).filter(
+      (ca) => ca.isEnabled
+    ).length;
+    const validControlNetCount = selectValidControlNets(controlAdapters).length;
+    if (enabledControlNetCount > 0) {
+      activeLabel.push(`${enabledControlNetCount} ControlNet`);
+    }
+    if (enabledControlNetCount > validControlNetCount) {
+      isError = true;
     }
 
-    const t2iAdapterCount = selectAllT2IAdapters(controlAdapters).length;
-    if (t2iAdapterCount > 0) {
-      activeLabel.push(`${t2iAdapterCount} T2I`);
+    const enabledT2IAdapterCount = selectAllT2IAdapters(controlAdapters).filter(
+      (ca) => ca.isEnabled
+    ).length;
+    const validT2IAdapterCount = selectValidT2IAdapters(controlAdapters).length;
+    if (enabledT2IAdapterCount > 0) {
+      activeLabel.push(`${enabledT2IAdapterCount} T2I`);
+    }
+    if (enabledT2IAdapterCount > validT2IAdapterCount) {
+      isError = true;
     }
 
     const controlAdapterIds =
@@ -44,6 +66,7 @@ const selector = createSelector(
     return {
       controlAdapterIds,
       activeLabel: activeLabel.join(', '),
+      isError, // TODO: Add some visual indicator that the control adapters are in an error state
     };
   },
   defaultSelectorOptions
@@ -66,7 +89,10 @@ const ControlAdaptersCollapse = () => {
   }
 
   return (
-    <IAICollapse label="Control Adapters" activeLabel={activeLabel}>
+    <IAICollapse
+      label={t('controlnet.controlAdapter_other')}
+      activeLabel={activeLabel}
+    >
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ButtonGroup size="sm" w="full" justifyContent="space-between">
           <IAIButton

@@ -1,11 +1,10 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from abc import ABC
 from typing import Optional
 
-from .graph import Graph, GraphExecutionState
-from .invocation_queue import InvocationQueueItem
+from .invocation_queue.invocation_queue_common import InvocationQueueItem
 from .invocation_services import InvocationServices
+from .shared.graph import Graph, GraphExecutionState
 
 
 class Invoker:
@@ -84,7 +83,3 @@ class Invoker:
             self.__stop_service(getattr(self.services, service))
 
         self.services.queue.put(None)
-
-
-class InvocationProcessorABC(ABC):
-    pass

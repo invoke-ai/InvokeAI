@@ -1,4 +1,5 @@
 import pytest
+from pydantic import TypeAdapter
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -11,8 +12,8 @@ from invokeai.app.invocations.image import ShowImageInvocation
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
 from invokeai.app.invocations.primitives import FloatInvocation, IntegerInvocation
 from invokeai.app.invocations.upscale import ESRGANInvocation
-from invokeai.app.services.default_graphs import create_text_to_image
-from invokeai.app.services.graph import (
+from invokeai.app.services.shared.default_graphs import create_text_to_image
+from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Edge,
     EdgeConnection,
@@ -593,20 +594,21 @@ def test_graph_can_serialize():
     g.add_edge(e)
 
     # Not throwing on this line is sufficient
-    _ = g.json()
+    _ = g.model_dump_json()
 
 
 def test_graph_can_deserialize():
     g = Graph()
     n1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
-    n2 = ESRGANInvocation(id="2")
+    n2 = ImageToImageTestInvocation(id="2")
     g.add_node(n1)
     g.add_node(n2)
     e = create_edge(n1.id, "image", n2.id, "image")
     g.add_edge(e)
 
-    json = g.json()
-    g2 = Graph.parse_raw(json)
+    json = g.model_dump_json()
+    adapter_graph = TypeAdapter(Graph)
+    g2 = adapter_graph.validate_json(json)
 
     assert g2 is not None
     assert g2.nodes["1"] is not None
@@ -619,7 +621,7 @@ def test_graph_can_deserialize():
 
 
 def test_invocation_decorator():
-    invocation_type = "test_invocation"
+    invocation_type = "test_invocation_decorator"
     title = "Test Invocation"
     tags = ["first", "second", "third"]
     category = "category"
@@ -630,7 +632,7 @@ def test_invocation_decorator():
         def invoke(self):
             pass
 
-    schema = TestInvocation.schema()
+    schema = TestInvocation.model_json_schema()
 
     assert schema.get("title") == title
     assert schema.get("tags") == tags
@@ -640,18 +642,17 @@ def test_invocation_decorator():
 
 
 def test_invocation_version_must_be_semver():
-    invocation_type = "test_invocation"
     valid_version = "1.0.0"
     invalid_version = "not_semver"
 
-    @invocation(invocation_type, version=valid_version)
+    @invocation("test_invocation_version_valid", version=valid_version)
     class ValidVersionInvocation(BaseInvocation):
         def invoke(self):
             pass
 
     with pytest.raises(InvalidVersionError):
 
-        @invocation(invocation_type, version=invalid_version)
+        @invocation("test_invocation_version_invalid", version=invalid_version)
         class InvalidVersionInvocation(BaseInvocation):
             def invoke(self):
                 pass
@@ -694,4 +695,4 @@ def test_ints_do_not_accept_floats():
 def test_graph_can_generate_schema():
     # Not throwing on this line is sufficient
     # NOTE: if this test fails, it's PROBABLY because a new invocation type is breaking schema generation
-    _ = Graph.schema_json(indent=2)
+    _ = Graph.model_json_schema()

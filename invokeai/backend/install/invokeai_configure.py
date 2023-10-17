@@ -662,7 +662,7 @@ def default_ramcache() -> float:
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
-    opts.ram = default_ramcache()
+    opts.ram = opts.ram or default_ramcache()
     return opts
 
 
@@ -793,7 +793,11 @@ def migrate_init_file(legacy_format: Path):
     old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
     new = InvokeAIAppConfig.get_config()
 
-    fields = [x for x, y in InvokeAIAppConfig.__fields__.items() if y.field_info.extra.get("category") != "DEPRECATED"]
+    fields = [
+        x
+        for x, y in InvokeAIAppConfig.model_fields.items()
+        if (y.json_schema_extra.get("category", None) if y.json_schema_extra else None) != "DEPRECATED"
+    ]
     for attr in fields:
         if hasattr(old, attr):
             try:
