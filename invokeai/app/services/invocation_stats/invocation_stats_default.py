@@ -72,7 +72,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             )
             self.collector.update_invocation_stats(
                 graph_id=self.graph_id,
-                invocation_type=self.invocation.type,  # type: ignore - `type` is not on the `BaseInvocation` model, but *is* on all invocations
+                invocation_type=self.invocation.type,  # type: ignore # `type` is not on the `BaseInvocation` model, but *is* on all invocations
                 time_used=time.time() - self.start_time,
                 vram_used=torch.cuda.max_memory_allocated() / GIG if torch.cuda.is_available() else 0.0,
             )

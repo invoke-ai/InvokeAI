@@ -520,7 +520,7 @@ export const imagesApi = api.injectEndpoints({
         // assume all images are on the same board/category
         if (images[0]) {
           const categories = getCategories(images[0]);
-          const boardId = images[0].board_id;
+          const boardId = images[0].board_id ?? undefined;
 
           return [
             {
@@ -637,7 +637,7 @@ export const imagesApi = api.injectEndpoints({
         // assume all images are on the same board/category
         if (images[0]) {
           const categories = getCategories(images[0]);
-          const boardId = images[0].board_id;
+          const boardId = images[0].board_id ?? undefined;
           return [
             {
               type: 'ImageList',

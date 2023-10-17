@@ -1,12 +1,11 @@
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
 
 GenericBaseModel = TypeVar("GenericBaseModel", bound=BaseModel)
 
 
-class CursorPaginatedResults(GenericModel, Generic[GenericBaseModel]):
+class CursorPaginatedResults(BaseModel, Generic[GenericBaseModel]):
     """
     Cursor-paginated results
     Generic must be a Pydantic model
@@ -17,7 +16,7 @@ class CursorPaginatedResults(GenericModel, Generic[GenericBaseModel]):
     items: list[GenericBaseModel] = Field(..., description="Items")
 
 
-class OffsetPaginatedResults(GenericModel, Generic[GenericBaseModel]):
+class OffsetPaginatedResults(BaseModel, Generic[GenericBaseModel]):
     """
     Offset-paginated results
     Generic must be a Pydantic model
@@ -29,7 +28,7 @@ class OffsetPaginatedResults(GenericModel, Generic[GenericBaseModel]):
     items: list[GenericBaseModel] = Field(description="Items")
 
 
-class PaginatedResults(GenericModel, Generic[GenericBaseModel]):
+class PaginatedResults(BaseModel, Generic[GenericBaseModel]):
     """
     Paginated results
     Generic must be a Pydantic model

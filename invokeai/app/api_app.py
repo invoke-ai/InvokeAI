@@ -22,7 +22,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.staticfiles import StaticFiles
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
-    from pydantic.schema import schema
+    from pydantic.json_schema import models_json_schema
 
     # noinspection PyUnresolvedReferences
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
@@ -51,7 +51,7 @@ mimetypes.add_type("text/css", ".css")
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
-app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None)
+app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
 
 # Add event handler
 event_handler_id: int = id(app)
@@ -63,18 +63,18 @@ app.add_middleware(
 
 socket_io = SocketIO(app)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=app_config.allow_origins,
+    allow_credentials=app_config.allow_credentials,
+    allow_methods=app_config.allow_methods,
+    allow_headers=app_config.allow_headers,
+)
+
 
 # Add startup event to load dependencies
 @app.on_event("startup")
 async def startup_event():
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=app_config.allow_origins,
-        allow_credentials=app_config.allow_credentials,
-        allow_methods=app_config.allow_methods,
-        allow_headers=app_config.allow_headers,
-    )
-
     ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
 
 
@@ -85,11 +85,6 @@ async def shutdown_event():
 
 
 # Include all routers
-# TODO: REMOVE
-# app.include_router(
-#     invocation.invocation_router,
-#     prefix = '/api')
-
 app.include_router(sessions.session_router, prefix="/api")
 
 app.include_router(utilities.utilities_router, prefix="/api")
@@ -117,6 +112,7 @@ def custom_openapi():
         description="An API for invoking AI image operations",
         version="1.0.0",
         routes=app.routes,
+        separate_input_output_schemas=False,  # https://fastapi.tiangolo.com/how-to/separate-openapi-schemas/
     )
 
     # Add all outputs
@@ -127,29 +123,32 @@ def custom_openapi():
         output_type = signature(invoker.invoke).return_annotation
         output_types.add(output_type)
 
-    output_schemas = schema(output_types, ref_prefix="#/components/schemas/")
-    for schema_key, output_schema in output_schemas["definitions"].items():
-        output_schema["class"] = "output"
-        openapi_schema["components"]["schemas"][schema_key] = output_schema
-
+    output_schemas = models_json_schema(
+        models=[(o, "serialization") for o in output_types], ref_template="#/components/schemas/{model}"
+    )
+    for schema_key, output_schema in output_schemas[1]["$defs"].items():
         # TODO: note that we assume the schema_key here is the TYPE.__name__
         # This could break in some cases, figure out a better way to do it
         output_type_titles[schema_key] = output_schema["title"]
 
     # Add Node Editor UI helper schemas
-    ui_config_schemas = schema([UIConfigBase, _InputField, _OutputField], ref_prefix="#/components/schemas/")
-    for schema_key, ui_config_schema in ui_config_schemas["definitions"].items():
+    ui_config_schemas = models_json_schema(
+        [(UIConfigBase, "serialization"), (_InputField, "serialization"), (_OutputField, "serialization")],
+        ref_template="#/components/schemas/{model}",
+    )
+    for schema_key, ui_config_schema in ui_config_schemas[1]["$defs"].items():
         openapi_schema["components"]["schemas"][schema_key] = ui_config_schema
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
         invoker_name = invoker.__name__
-        output_type = signature(invoker.invoke).return_annotation
+        output_type = signature(obj=invoker.invoke).return_annotation
         output_type_title = output_type_titles[output_type.__name__]
-        invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
+        invoker_schema = openapi_schema["components"]["schemas"][f"{invoker_name}"]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
         invoker_schema["output"] = outputs_ref
         invoker_schema["class"] = "invocation"
+        openapi_schema["components"]["schemas"][f"{output_type_title}"]["class"] = "output"
 
     from invokeai.backend.model_management.models import get_model_config_enums
 
@@ -172,7 +171,7 @@ def custom_openapi():
     return app.openapi_schema
 
 
-app.openapi = custom_openapi
+app.openapi = custom_openapi  # type: ignore [method-assign] # this is a valid assignment
 
 # Override API doc favicons
 app.mount("/static", StaticFiles(directory=Path(web_dir.__path__[0], "static/dream_web")), name="static")

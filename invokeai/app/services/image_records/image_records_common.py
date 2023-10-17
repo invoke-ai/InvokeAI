@@ -3,7 +3,7 @@ import datetime
 from enum import Enum
 from typing import Optional, Union
 
-from pydantic import Extra, Field, StrictBool, StrictStr
+from pydantic import Field, StrictBool, StrictStr
 
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import get_iso_timestamp
@@ -129,7 +129,9 @@ class ImageRecord(BaseModelExcludeNull):
     """The created timestamp of the image."""
     updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the image.")
     """The updated timestamp of the image."""
-    deleted_at: Union[datetime.datetime, str, None] = Field(description="The deleted timestamp of the image.")
+    deleted_at: Optional[Union[datetime.datetime, str]] = Field(
+        default=None, description="The deleted timestamp of the image."
+    )
     """The deleted timestamp of the image."""
     is_intermediate: bool = Field(description="Whether this is an intermediate image.")
     """Whether this is an intermediate image."""
@@ -147,7 +149,7 @@ class ImageRecord(BaseModelExcludeNull):
     """Whether this image is starred."""
 
 
-class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
+class ImageRecordChanges(BaseModelExcludeNull, extra="allow"):
     """A set of changes to apply to an image record.
 
     Only limited changes are valid:

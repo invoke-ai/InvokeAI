@@ -277,8 +277,8 @@ class SqliteSessionQueue(SessionQueueBase):
         if result is None:
             raise SessionQueueItemNotFoundError(f"No queue item with batch id {enqueue_result.batch.batch_id}")
         return EnqueueGraphResult(
-            **enqueue_result.dict(),
-            queue_item=SessionQueueItemDTO.from_dict(dict(result)),
+            **enqueue_result.model_dump(),
+            queue_item=SessionQueueItemDTO.queue_item_dto_from_dict(dict(result)),
         )
 
     def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
@@ -351,7 +351,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         if result is None:
             return None
-        queue_item = SessionQueueItem.from_dict(dict(result))
+        queue_item = SessionQueueItem.queue_item_from_dict(dict(result))
         queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="in_progress")
         return queue_item
 
@@ -380,7 +380,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         if result is None:
             return None
-        return SessionQueueItem.from_dict(dict(result))
+        return SessionQueueItem.queue_item_from_dict(dict(result))
 
     def get_current(self, queue_id: str) -> Optional[SessionQueueItem]:
         try:
@@ -404,7 +404,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         if result is None:
             return None
-        return SessionQueueItem.from_dict(dict(result))
+        return SessionQueueItem.queue_item_from_dict(dict(result))
 
     def _set_queue_item_status(
         self, item_id: int, status: QUEUE_ITEM_STATUS, error: Optional[str] = None
@@ -564,7 +564,7 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_item = self.get_queue_item(item_id)
         if queue_item.status not in ["canceled", "failed", "completed"]:
             status = "failed" if error is not None else "canceled"
-            queue_item = self._set_queue_item_status(item_id=item_id, status=status, error=error)
+            queue_item = self._set_queue_item_status(item_id=item_id, status=status, error=error)  # type: ignore [arg-type] # mypy seems to not narrow the Literals here
             self.__invoker.services.queue.cancel(queue_item.session_id)
             self.__invoker.services.events.emit_session_canceled(
                 queue_item_id=queue_item.item_id,
@@ -699,7 +699,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         if result is None:
             raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
-        return SessionQueueItem.from_dict(dict(result))
+        return SessionQueueItem.queue_item_from_dict(dict(result))
 
     def list_queue_items(
         self,
@@ -751,7 +751,7 @@ class SqliteSessionQueue(SessionQueueBase):
             params.append(limit + 1)
             self.__cursor.execute(query, params)
             results = cast(list[sqlite3.Row], self.__cursor.fetchall())
-            items = [SessionQueueItemDTO.from_dict(dict(result)) for result in results]
+            items = [SessionQueueItemDTO.queue_item_dto_from_dict(dict(result)) for result in results]
             has_more = False
             if len(items) > limit:
                 # remove the extra item

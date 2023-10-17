@@ -1,6 +1,6 @@
 from typing import Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -22,6 +22,8 @@ from invokeai.backend.model_management.models.base import BaseModelType
 class T2IAdapterModelField(BaseModel):
     model_name: str = Field(description="Name of the T2I-Adapter model")
     base_model: BaseModelType = Field(description="Base model")
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class T2IAdapterField(BaseModel):

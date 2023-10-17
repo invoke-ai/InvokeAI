@@ -34,8 +34,8 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_many(
         self,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
+        offset: int = 0,
+        limit: int = 10,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
@@ -69,11 +69,11 @@ class ImageRecordStorageBase(ABC):
         image_category: ImageCategory,
         width: int,
         height: int,
-        session_id: Optional[str],
-        node_id: Optional[str],
-        metadata: Optional[dict],
-        is_intermediate: bool = False,
-        starred: bool = False,
+        is_intermediate: Optional[bool] = False,
+        starred: Optional[bool] = False,
+        session_id: Optional[str] = None,
+        node_id: Optional[str] = None,
+        metadata: Optional[dict] = None,
     ) -> datetime:
         """Saves an image record."""
         pass
