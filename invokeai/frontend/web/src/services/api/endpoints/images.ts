@@ -100,14 +100,12 @@ export const imagesApi = api.injectEndpoints({
       keepUnusedDataFor: 86400,
     }),
     getIntermediatesCount: build.query<number, void>({
-      query: () => ({ url: getListImagesUrl({ is_intermediate: true }) }),
+      query: () => ({ url: 'images/intermediates' }),
       providesTags: ['IntermediatesCount'],
-      transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        // TODO: This is storing a primitive value in the cache. `immer` cannot track state changes, so
-        // attempts to use manual cache updates on this value will fail. This should be changed into an
-        // object.
-        return response.total;
-      },
+    }),
+    clearIntermediates: build.mutation<number, void>({
+      query: () => ({ url: `images/intermediates`, method: 'DELETE' }),
+      invalidatesTags: ['IntermediatesCount'],
     }),
     getImageDTO: build.query<ImageDTO, string>({
       query: (image_name) => ({ url: `images/i/${image_name}` }),
@@ -184,10 +182,6 @@ export const imagesApi = api.injectEndpoints({
         { type: 'ImageMetadataFromFile', id: image.image_name },
       ],
       keepUnusedDataFor: 86400, // 24 hours
-    }),
-    clearIntermediates: build.mutation<number, void>({
-      query: () => ({ url: `images/clear-intermediates`, method: 'POST' }),
-      invalidatesTags: ['IntermediatesCount'],
     }),
     deleteImage: build.mutation<void, ImageDTO>({
       query: ({ image_name }) => ({

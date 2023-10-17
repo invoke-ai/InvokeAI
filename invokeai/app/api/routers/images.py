@@ -87,7 +87,7 @@ async def delete_image(
         pass
 
 
-@images_router.post("/clear-intermediates", operation_id="clear_intermediates")
+@images_router.delete("/intermediates", operation_id="clear_intermediates")
 async def clear_intermediates() -> int:
     """Clears all intermediates"""
 
@@ -96,6 +96,17 @@ async def clear_intermediates() -> int:
         return count_deleted
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to clear intermediates")
+        pass
+
+
+@images_router.get("/intermediates", operation_id="get_intermediates_count")
+async def get_intermediates_count() -> int:
+    """Gets the count of intermediate images"""
+
+    try:
+        return ApiDependencies.invoker.services.images.get_intermediates_count()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get intermediates")
         pass
 
 

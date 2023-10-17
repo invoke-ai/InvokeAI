@@ -124,6 +124,11 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def get_intermediates_count(self) -> int:
+        """Gets the number of intermediate images."""
+        pass
+
+    @abstractmethod
     def delete_images_on_board(self, board_id: str):
         """Deletes all images on a board."""
         pass

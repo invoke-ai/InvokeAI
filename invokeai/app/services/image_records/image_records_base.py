@@ -62,6 +62,11 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def get_intermediates_count(self) -> int:
+        """Gets a count of all intermediate images."""
+        pass
+
+    @abstractmethod
     def save(
         self,
         image_name: str,
