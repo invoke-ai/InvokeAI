@@ -48,7 +48,7 @@ class CoreMetadata(BaseModelExcludeNull):
         default=None,
         description="The generation mode that output this image",
     )
-    created_by: Optional[str] = Field(description="The name of the creator of the image")
+    created_by: Optional[str] = Field(default=None, description="The name of the creator of the image")
     positive_prompt: Optional[str] = Field(default=None, description="The positive prompt parameter")
     negative_prompt: Optional[str] = Field(default=None, description="The negative prompt parameter")
     width: Optional[int] = Field(default=None, description="The width parameter")
