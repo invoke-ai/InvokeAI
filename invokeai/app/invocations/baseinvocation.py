@@ -830,9 +830,6 @@ class MetadataField(RootModel):
 
     root: dict[str, Any] = Field(description="A dictionary of metadata, shape of which is arbitrary")
 
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
-        return super().model_dump(*args, **kwargs)["root"]
-
 
 type_adapter_MetadataField = TypeAdapter(MetadataField)
 

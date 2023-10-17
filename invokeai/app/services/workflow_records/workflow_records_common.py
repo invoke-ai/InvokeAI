@@ -15,8 +15,5 @@ class WorkflowField(RootModel):
 
     root: dict[str, Any] = Field(description="Workflow dict")
 
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
-        return super().model_dump(*args, **kwargs)["root"]
-
 
 type_adapter_WorkflowField = TypeAdapter(WorkflowField)
