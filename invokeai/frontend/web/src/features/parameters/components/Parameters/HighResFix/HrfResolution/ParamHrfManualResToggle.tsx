@@ -2,7 +2,7 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setHrfManualResEnabled } from 'features/parameters/store/generationSlice';
-import { ChangeEvent, useCallback } from 'react';
+import { ChangeEvent, useCallback, useEffect } from 'react';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
   setHrfHeight,
@@ -27,6 +27,8 @@ export const calculateHrfRes = (
 // automatically.
 export default function ParamHrfAutoRes() {
   const dispatch = useAppDispatch();
+  const tooltip =
+    'When not specified, the initial height and width are determined automatically.';
 
   const hrfManualResEnabled = useAppSelector(
     (state: RootState) => state.generation.hrfManualResEnabled
@@ -36,6 +38,12 @@ export default function ParamHrfAutoRes() {
   const aspectRatio = useAppSelector(
     (state: RootState) => state.generation.aspectRatio
   );
+
+  useEffect(() => {
+    if (!hrfManualResEnabled) {
+      calculateHrfRes(dispatch, width, height, aspectRatio);
+    }
+  }, [dispatch, hrfManualResEnabled, width, height, aspectRatio]);
 
   const handleHrfManualResEnabled = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -53,6 +61,7 @@ export default function ParamHrfAutoRes() {
       label="Manual Initial Resolution"
       isChecked={hrfManualResEnabled}
       onChange={handleHrfManualResEnabled}
+      tooltip={tooltip}
     />
   );
 }

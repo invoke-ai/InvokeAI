@@ -5,6 +5,7 @@ import { memo, useCallback } from 'react';
 import { stateSelector } from 'app/store/store';
 import { setHrfStrength } from 'features/parameters/store/generationSlice';
 import IAISlider from 'common/components/IAISlider';
+import { Tooltip } from '@chakra-ui/react';
 
 const selector = createSelector(
   [stateSelector],
@@ -31,6 +32,8 @@ const ParamHrfStrength = () => {
   const { hrfStrength, initial, min, sliderMax, step, hrfEnabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
+  const tooltip =
+    'Lower values result in fewer details, which may reduce potential artifacts.';
 
   const handleHrfStrengthReset = useCallback(() => {
     dispatch(setHrfStrength(initial));
@@ -44,20 +47,22 @@ const ParamHrfStrength = () => {
   );
 
   return (
-    <IAISlider
-      label="Denoising Strength"
-      aria-label="High Resolution Denoising Strength"
-      min={min}
-      max={sliderMax}
-      step={step}
-      value={hrfStrength}
-      onChange={handleHrfStrengthChange}
-      withSliderMarks
-      withInput
-      withReset
-      handleReset={handleHrfStrengthReset}
-      isDisabled={!hrfEnabled}
-    />
+    <Tooltip label={tooltip} placement="right" hasArrow>
+      <IAISlider
+        label="Denoising Strength"
+        aria-label="High Resolution Denoising Strength"
+        min={min}
+        max={sliderMax}
+        step={step}
+        value={hrfStrength}
+        onChange={handleHrfStrengthChange}
+        withSliderMarks
+        withInput
+        withReset
+        handleReset={handleHrfStrengthReset}
+        isDisabled={!hrfEnabled}
+      />
+    </Tooltip>
   );
 };
 

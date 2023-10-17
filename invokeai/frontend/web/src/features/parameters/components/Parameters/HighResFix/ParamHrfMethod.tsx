@@ -35,7 +35,7 @@ const ParamHrfMethodSelect = () => {
 
   return (
     <IAIMantineSelect
-      label="Method"
+      label="Upscale Method"
       value={hrfMethod}
       data={DATA}
       onChange={handleChange}
