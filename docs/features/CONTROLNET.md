@@ -52,7 +52,7 @@ folders that contain the files `config.json` and/or
 `diffusion_pytorch_model.fp16.safetensors`. The name of the folder is
 the name of the model.
 
-Diffuser-style ControlNet models are available at HuggingFace
+🤗 Diffusers-format ControlNet models are available at HuggingFace
 (http://huggingface.co) and accessed via their repo IDs (identifiers
 in the format "author/modelname").
 
