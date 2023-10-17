@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 from invokeai.app.invocations.baseinvocation import (
     MetadataField,
-    type_adapter_MetadataField,
-    type_adapter_WorkflowField,
+    MetadataFieldValidator,
+    WorkflowFieldValidator,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
@@ -66,7 +66,7 @@ async def upload_image(
     metadata_raw = pil_image.info.get("invokeai_metadata", None)
     if metadata_raw:
         try:
-            metadata = type_adapter_MetadataField.validate_json(metadata_raw)
+            metadata = MetadataFieldValidator.validate_json(metadata_raw)
         except ValidationError:
             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
             pass
@@ -75,7 +75,7 @@ async def upload_image(
     workflow_raw = pil_image.info.get("invokeai_workflow", None)
     if workflow_raw is not None:
         try:
-            workflow = type_adapter_WorkflowField.validate_json(workflow_raw)
+            workflow = WorkflowFieldValidator.validate_json(workflow_raw)
         except ValidationError:
             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
             pass
