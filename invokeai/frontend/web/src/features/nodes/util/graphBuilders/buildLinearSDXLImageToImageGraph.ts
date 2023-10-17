@@ -18,7 +18,6 @@ import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -30,6 +29,7 @@ import {
   SEAMLESS,
 } from './constants';
 import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { addCoreMetadataNode } from './metadata';
 
 /**
  * Builds the Image to Image tab graph.
@@ -331,10 +331,7 @@ export const buildLinearSDXLImageToImageGraph = (
     });
   }
 
-  // add metadata accumulator, which is only mostly populated - some fields are added later
-  graph.nodes[METADATA_ACCUMULATOR] = {
-    id: METADATA_ACCUMULATOR,
-    type: 'metadata_accumulator',
+  addCoreMetadataNode(graph, {
     generation_mode: 'sdxl_img2img',
     cfg_scale,
     height,
@@ -346,26 +343,10 @@ export const buildLinearSDXLImageToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined,
-    controlnets: [],
-    loras: [],
-    ipAdapters: [],
-    t2iAdapters: [],
-    strength: strength,
+    strength,
     init_image: initialImage.imageName,
     positive_style_prompt: positiveStylePrompt,
     negative_style_prompt: negativeStylePrompt,
-  };
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: LATENTS_TO_IMAGE,
-      field: 'metadata',
-    },
   });
 
   // Add Seamless To Graph

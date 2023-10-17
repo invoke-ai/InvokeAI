@@ -44,8 +44,8 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         boards,
         images,
         models,
-        sessions,
         session_queue,
+        sessions,
         utilities,
         workflows,
     )

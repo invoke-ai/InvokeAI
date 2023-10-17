@@ -5,14 +5,14 @@ import {
   CollectInvocation,
   ControlField,
   ControlNetInvocation,
-  MetadataAccumulatorInvocation,
+  CoreMetadataInvocation,
 } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CONTROL_NET_COLLECT,
-  METADATA_ACCUMULATOR,
 } from './constants';
+import { upsertMetadata } from './metadata';
 
 export const addControlNetToLinearGraph = (
   state: RootState,
@@ -23,9 +23,11 @@ export const addControlNetToLinearGraph = (
     (ca) => ca.model?.base_model === state.generation.model?.base_model
   );
 
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
+  // const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+  //   | MetadataAccumulatorInvocation
+  //   | undefined;
+
+  const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
 
   if (validControlNets.length) {
     // Even though denoise_latents' control input is polymorphic, keep it simple and always use a collect
@@ -99,15 +101,9 @@ export const addControlNetToLinearGraph = (
 
       graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
 
-      if (metadataAccumulator?.controlnets) {
-        // metadata accumulator only needs a control field - not the whole node
-        // extract what we need and add to the accumulator
-        const controlField = omit(controlNetNode, [
-          'id',
-          'type',
-        ]) as ControlField;
-        metadataAccumulator.controlnets.push(controlField);
-      }
+      controlNetMetadata.push(
+        omit(controlNetNode, ['id', 'type', 'is_intermediate']) as ControlField
+      );
 
       graph.edges.push({
         source: { node_id: controlNetNode.id, field: 'control' },
@@ -117,5 +113,6 @@ export const addControlNetToLinearGraph = (
         },
       });
     });
+    upsertMetadata(graph, { controlnets: controlNetMetadata });
   }
 };

@@ -38,6 +38,8 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
+    WithMetadata,
+    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -127,12 +129,12 @@ class ControlNetInvocation(BaseInvocation):
 
 
 # This invocation exists for other invocations to subclass it - do not register with @invocation!
-class ImageProcessorInvocation(BaseInvocation):
+class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Base class for invocations that preprocess images for ControlNet"""
 
     image: ImageField = InputField(description="The image to process")
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image) -> Image.Image:
         # superclass just passes through image without processing
         return image
 
@@ -150,6 +152,7 @@ class ImageProcessorInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             node_id=self.id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata,
             workflow=self.workflow,
         )
 

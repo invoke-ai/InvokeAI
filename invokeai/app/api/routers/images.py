@@ -5,12 +5,13 @@ from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadF
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from invokeai.app.invocations.metadata import ImageMetadata
+from invokeai.app.invocations.baseinvocation import MetadataField, type_adapter_MetadataField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.workflow_records.workflow_records_common import type_adapter_WorkflowField
 
 from ..dependencies import ApiDependencies
 
@@ -45,8 +46,10 @@ async def upload_image(
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
-    contents = await file.read()
+    metadata = None
+    workflow = None
 
+    contents = await file.read()
     try:
         pil_image = Image.open(io.BytesIO(contents))
         if crop_visible:
@@ -56,6 +59,24 @@ async def upload_image(
         # Error opening the image
         raise HTTPException(status_code=415, detail="Failed to read image")
 
+    # attempt to parse metadata from image
+    metadata_raw = pil_image.info.get("invokeai_metadata", None)
+    if metadata_raw:
+        try:
+            metadata = type_adapter_MetadataField.validate_json(metadata_raw)
+        except ValidationError:
+            ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
+            pass
+
+    # attempt to parse workflow from image
+    workflow_raw = pil_image.info.get("invokeai_workflow", None)
+    if workflow_raw is not None:
+        try:
+            workflow = type_adapter_WorkflowField.validate_json(workflow_raw)
+        except ValidationError:
+            ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
+            pass
+
     try:
         image_dto = ApiDependencies.invoker.services.images.create(
             image=pil_image,
@@ -63,6 +84,8 @@ async def upload_image(
             image_category=image_category,
             session_id=session_id,
             board_id=board_id,
+            metadata=metadata,
+            workflow=workflow,
             is_intermediate=is_intermediate,
         )
 
@@ -146,11 +169,11 @@ async def get_image_dto(
 @images_router.get(
     "/i/{image_name}/metadata",
     operation_id="get_image_metadata",
-    response_model=ImageMetadata,
+    response_model=Optional[MetadataField],
 )
 async def get_image_metadata(
     image_name: str = Path(description="The name of image to get"),
-) -> ImageMetadata:
+) -> Optional[MetadataField]:
     """Gets an image's metadata"""
 
     try:

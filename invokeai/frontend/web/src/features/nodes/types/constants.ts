@@ -33,6 +33,8 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ColorCollection',
   'T2IAdapterCollection',
   'IPAdapterCollection',
+  'MetadataItemCollection',
+  'MetadataCollection',
 ];
 
 export const POLYMORPHIC_TYPES: FieldType[] = [
@@ -47,6 +49,7 @@ export const POLYMORPHIC_TYPES: FieldType[] = [
   'ColorPolymorphic',
   'T2IAdapterPolymorphic',
   'IPAdapterPolymorphic',
+  'MetadataItemPolymorphic',
 ];
 
 export const MODEL_TYPES: FieldType[] = [
@@ -78,6 +81,8 @@ export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   ColorField: 'ColorCollection',
   T2IAdapterField: 'T2IAdapterCollection',
   IPAdapterField: 'IPAdapterCollection',
+  MetadataItemField: 'MetadataItemCollection',
+  MetadataField: 'MetadataCollection',
 };
 export const isCollectionItemType = (
   itemType: string | undefined
@@ -97,6 +102,7 @@ export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
   ColorField: 'ColorPolymorphic',
   T2IAdapterField: 'T2IAdapterPolymorphic',
   IPAdapterField: 'IPAdapterPolymorphic',
+  MetadataItemField: 'MetadataItemPolymorphic',
 };
 
 export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
@@ -111,6 +117,7 @@ export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
   ColorPolymorphic: 'ColorField',
   T2IAdapterPolymorphic: 'T2IAdapterField',
   IPAdapterPolymorphic: 'IPAdapterField',
+  MetadataItemPolymorphic: 'MetadataItemField',
 };
 
 export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
@@ -144,6 +151,37 @@ export const isPolymorphicItemType = (
   Boolean(itemType && itemType in SINGLE_TO_POLYMORPHIC_MAP);
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
+  Any: {
+    color: 'gray.500',
+    description: 'Any field type is accepted.',
+    title: 'Any',
+  },
+  MetadataField: {
+    color: 'gray.500',
+    description: 'A metadata dict.',
+    title: 'Metadata Dict',
+  },
+  MetadataCollection: {
+    color: 'gray.500',
+    description: 'A collection of metadata dicts.',
+    title: 'Metadata Dict Collection',
+  },
+  MetadataItemField: {
+    color: 'gray.500',
+    description: 'A metadata item.',
+    title: 'Metadata Item',
+  },
+  MetadataItemCollection: {
+    color: 'gray.500',
+    description: 'Any field type is accepted.',
+    title: 'Metadata Item Collection',
+  },
+  MetadataItemPolymorphic: {
+    color: 'gray.500',
+    description:
+      'MetadataItem or MetadataItemCollection field types are accepted.',
+    title: 'Metadata Item Polymorphic',
+  },
   boolean: {
     color: 'green.500',
     description: t('nodes.booleanDescription'),

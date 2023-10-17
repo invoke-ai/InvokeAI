@@ -2,7 +2,6 @@ import { RootState } from 'app/store/store';
 import {
   CreateDenoiseMaskInvocation,
   ImageDTO,
-  MetadataAccumulatorInvocation,
   SeamlessModeInvocation,
 } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
@@ -12,7 +11,6 @@ import {
   LATENTS_TO_IMAGE,
   MASK_COMBINE,
   MASK_RESIZE_UP,
-  METADATA_ACCUMULATOR,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_CANVAS_OUTPAINT_GRAPH,
@@ -26,6 +24,7 @@ import {
   SDXL_REFINER_SEAMLESS,
 } from './constants';
 import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { upsertMetadata } from './metadata';
 
 export const addSDXLRefinerToGraph = (
   state: RootState,
@@ -58,21 +57,15 @@ export const addSDXLRefinerToGraph = (
     return;
   }
 
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
-
-  if (metadataAccumulator) {
-    metadataAccumulator.refiner_model = refinerModel;
-    metadataAccumulator.refiner_positive_aesthetic_score =
-      refinerPositiveAestheticScore;
-    metadataAccumulator.refiner_negative_aesthetic_score =
-      refinerNegativeAestheticScore;
-    metadataAccumulator.refiner_cfg_scale = refinerCFGScale;
-    metadataAccumulator.refiner_scheduler = refinerScheduler;
-    metadataAccumulator.refiner_start = refinerStart;
-    metadataAccumulator.refiner_steps = refinerSteps;
-  }
+  upsertMetadata(graph, {
+    refiner_model: refinerModel,
+    refiner_positive_aesthetic_score: refinerPositiveAestheticScore,
+    refiner_negative_aesthetic_score: refinerNegativeAestheticScore,
+    refiner_cfg_scale: refinerCFGScale,
+    refiner_scheduler: refinerScheduler,
+    refiner_start: refinerStart,
+    refiner_steps: refinerSteps,
+  });
 
   const modelLoaderId = modelLoaderNodeId
     ? modelLoaderNodeId

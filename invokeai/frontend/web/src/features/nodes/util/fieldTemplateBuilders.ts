@@ -7,6 +7,7 @@ import {
   startCase,
 } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
+import { ControlField } from 'services/api/types';
 import {
   COLLECTION_MAP,
   POLYMORPHIC_TYPES,
@@ -15,36 +16,70 @@ import {
   isPolymorphicItemType,
 } from '../types/constants';
 import {
+  AnyInputFieldTemplate,
+  BoardInputFieldTemplate,
   BooleanCollectionInputFieldTemplate,
   BooleanInputFieldTemplate,
+  BooleanPolymorphicInputFieldTemplate,
   ClipInputFieldTemplate,
   CollectionInputFieldTemplate,
   CollectionItemInputFieldTemplate,
+  ColorCollectionInputFieldTemplate,
   ColorInputFieldTemplate,
+  ColorPolymorphicInputFieldTemplate,
+  ConditioningCollectionInputFieldTemplate,
+  ConditioningField,
   ConditioningInputFieldTemplate,
+  ConditioningPolymorphicInputFieldTemplate,
+  ControlCollectionInputFieldTemplate,
   ControlInputFieldTemplate,
   ControlNetModelInputFieldTemplate,
+  ControlPolymorphicInputFieldTemplate,
   DenoiseMaskInputFieldTemplate,
   EnumInputFieldTemplate,
   FieldType,
   FloatCollectionInputFieldTemplate,
-  FloatPolymorphicInputFieldTemplate,
   FloatInputFieldTemplate,
+  FloatPolymorphicInputFieldTemplate,
+  IPAdapterCollectionInputFieldTemplate,
+  IPAdapterField,
+  IPAdapterInputFieldTemplate,
+  IPAdapterModelInputFieldTemplate,
+  IPAdapterPolymorphicInputFieldTemplate,
   ImageCollectionInputFieldTemplate,
+  ImageField,
   ImageInputFieldTemplate,
+  ImagePolymorphicInputFieldTemplate,
+  InputFieldTemplate,
   InputFieldTemplateBase,
   IntegerCollectionInputFieldTemplate,
   IntegerInputFieldTemplate,
+  IntegerPolymorphicInputFieldTemplate,
   InvocationFieldSchema,
   InvocationSchemaObject,
+  LatentsCollectionInputFieldTemplate,
+  LatentsField,
   LatentsInputFieldTemplate,
+  LatentsPolymorphicInputFieldTemplate,
   LoRAModelInputFieldTemplate,
   MainModelInputFieldTemplate,
+  MetadataCollectionInputFieldTemplate,
+  MetadataInputFieldTemplate,
+  MetadataItemCollectionInputFieldTemplate,
+  MetadataItemInputFieldTemplate,
+  MetadataItemPolymorphicInputFieldTemplate,
+  OpenAPIV3_1SchemaOrRef,
   SDXLMainModelInputFieldTemplate,
   SDXLRefinerModelInputFieldTemplate,
   SchedulerInputFieldTemplate,
   StringCollectionInputFieldTemplate,
   StringInputFieldTemplate,
+  StringPolymorphicInputFieldTemplate,
+  T2IAdapterCollectionInputFieldTemplate,
+  T2IAdapterField,
+  T2IAdapterInputFieldTemplate,
+  T2IAdapterModelInputFieldTemplate,
+  T2IAdapterPolymorphicInputFieldTemplate,
   UNetInputFieldTemplate,
   VaeInputFieldTemplate,
   VaeModelInputFieldTemplate,
@@ -52,36 +87,7 @@ import {
   isNonArraySchemaObject,
   isRefObject,
   isSchemaObject,
-  ControlPolymorphicInputFieldTemplate,
-  ColorPolymorphicInputFieldTemplate,
-  ColorCollectionInputFieldTemplate,
-  IntegerPolymorphicInputFieldTemplate,
-  StringPolymorphicInputFieldTemplate,
-  BooleanPolymorphicInputFieldTemplate,
-  ImagePolymorphicInputFieldTemplate,
-  LatentsPolymorphicInputFieldTemplate,
-  LatentsCollectionInputFieldTemplate,
-  ConditioningPolymorphicInputFieldTemplate,
-  ConditioningCollectionInputFieldTemplate,
-  ControlCollectionInputFieldTemplate,
-  ImageField,
-  LatentsField,
-  ConditioningField,
-  IPAdapterField,
-  IPAdapterInputFieldTemplate,
-  IPAdapterModelInputFieldTemplate,
-  IPAdapterPolymorphicInputFieldTemplate,
-  IPAdapterCollectionInputFieldTemplate,
-  T2IAdapterField,
-  T2IAdapterInputFieldTemplate,
-  T2IAdapterModelInputFieldTemplate,
-  T2IAdapterPolymorphicInputFieldTemplate,
-  T2IAdapterCollectionInputFieldTemplate,
-  BoardInputFieldTemplate,
-  InputFieldTemplate,
-  OpenAPIV3_1SchemaOrRef,
 } from '../types/types';
-import { ControlField } from 'services/api/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
 
@@ -851,6 +857,78 @@ const buildCollectionItemInputFieldTemplate = ({
   return template;
 };
 
+const buildAnyInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): AnyInputFieldTemplate => {
+  const template: AnyInputFieldTemplate = {
+    ...baseField,
+    type: 'Any',
+    default: undefined,
+  };
+
+  return template;
+};
+
+const buildMetadataItemInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): MetadataItemInputFieldTemplate => {
+  const template: MetadataItemInputFieldTemplate = {
+    ...baseField,
+    type: 'MetadataItemField',
+    default: undefined,
+  };
+
+  return template;
+};
+
+const buildMetadataItemCollectionInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): MetadataItemCollectionInputFieldTemplate => {
+  const template: MetadataItemCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'MetadataItemCollection',
+    default: undefined,
+  };
+
+  return template;
+};
+
+const buildMetadataItemPolymorphicInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): MetadataItemPolymorphicInputFieldTemplate => {
+  const template: MetadataItemPolymorphicInputFieldTemplate = {
+    ...baseField,
+    type: 'MetadataItemPolymorphic',
+    default: undefined,
+  };
+
+  return template;
+};
+
+const buildMetadataDictInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): MetadataInputFieldTemplate => {
+  const template: MetadataInputFieldTemplate = {
+    ...baseField,
+    type: 'MetadataField',
+    default: undefined,
+  };
+
+  return template;
+};
+
+const buildMetadataCollectionInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): MetadataCollectionInputFieldTemplate => {
+  const template: MetadataCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'MetadataCollection',
+    default: undefined,
+  };
+
+  return template;
+};
+
 const buildColorInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -1012,6 +1090,7 @@ const TEMPLATE_BUILDER_MAP: {
   [key in FieldType]?: (arg: BuildInputFieldArg) => InputFieldTemplate;
 } = {
   BoardField: buildBoardInputFieldTemplate,
+  Any: buildAnyInputFieldTemplate,
   boolean: buildBooleanInputFieldTemplate,
   BooleanCollection: buildBooleanCollectionInputFieldTemplate,
   BooleanPolymorphic: buildBooleanPolymorphicInputFieldTemplate,
@@ -1047,6 +1126,11 @@ const TEMPLATE_BUILDER_MAP: {
   LatentsField: buildLatentsInputFieldTemplate,
   LatentsPolymorphic: buildLatentsPolymorphicInputFieldTemplate,
   LoRAModelField: buildLoRAModelInputFieldTemplate,
+  MetadataItemField: buildMetadataItemInputFieldTemplate,
+  MetadataItemCollection: buildMetadataItemCollectionInputFieldTemplate,
+  MetadataItemPolymorphic: buildMetadataItemPolymorphicInputFieldTemplate,
+  MetadataField: buildMetadataDictInputFieldTemplate,
+  MetadataCollection: buildMetadataCollectionInputFieldTemplate,
   MainModelField: buildMainModelInputFieldTemplate,
   Scheduler: buildSchedulerInputFieldTemplate,
   SDXLMainModelField: buildSDXLMainModelInputFieldTemplate,

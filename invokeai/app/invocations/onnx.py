@@ -4,7 +4,7 @@ import inspect
 import re
 
 # from contextlib import ExitStack
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Union
 
 import numpy as np
 import torch
@@ -12,7 +12,6 @@ from diffusers.image_processor import VaeImageProcessor
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from tqdm import tqdm
 
-from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
@@ -31,6 +30,8 @@ from .baseinvocation import (
     OutputField,
     UIComponent,
     UIType,
+    WithMetadata,
+    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -327,7 +328,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     category="image",
     version="1.0.0",
 )
-class ONNXLatentsToImageInvocation(BaseInvocation):
+class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
@@ -337,11 +338,6 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
     vae: VaeField = InputField(
         description=FieldDescriptions.vae,
         input=Input.Connection,
-    )
-    metadata: Optional[CoreMetadata] = InputField(
-        default=None,
-        description=FieldDescriptions.core_metadata,
-        ui_hidden=True,
     )
     # tiled: bool = InputField(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
 
@@ -381,7 +377,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.model_dump() if self.metadata else None,
+            metadata=self.metadata,
             workflow=self.workflow,
         )
 

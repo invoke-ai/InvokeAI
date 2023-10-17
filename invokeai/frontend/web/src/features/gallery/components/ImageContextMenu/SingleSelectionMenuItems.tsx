@@ -1,8 +1,9 @@
 import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
@@ -32,12 +33,13 @@ import {
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
-  useGetImageMetadataFromFileQuery,
+  useGetImageMetadataQuery,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
+import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 import { ImageDTO } from 'services/api/types';
-import { configSelector } from '../../../system/store/configSelectors';
+import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 
 type SingleSelectionMenuItemsProps = {
@@ -53,18 +55,16 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const toaster = useAppToaster();
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
   const customStarUi = useStore($customStarUI);
 
-  const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    { image: imageDTO, shouldFetchMetadataFromApi },
-    {
-      selectFromResult: (res) => ({
-        isLoading: res.isFetching,
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
+  const [debouncedImageName] = useDebounce(imageDTO?.image_name, 300);
+  const [debouncedWorkflowId] = useDebounce(imageDTO?.workflow_id, 300);
+
+  const { data: metadata, isLoading: isLoadingMetadata } =
+    useGetImageMetadataQuery(debouncedImageName ?? skipToken);
+
+  const { data: workflow, isLoading: isLoadingWorkflow } = useGetWorkflowQuery(
+    debouncedWorkflowId ?? skipToken
   );
 
   const [starImages] = useStarImagesMutation();
@@ -181,17 +181,17 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('parameters.downloadImage')}
       </MenuItem>
       <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaCircleNodes />}
+        icon={isLoadingWorkflow ? <SpinnerIcon /> : <FaCircleNodes />}
         onClickCapture={handleLoadWorkflow}
-        isDisabled={isLoading || !workflow}
+        isDisabled={isLoadingWorkflow || !workflow}
       >
         {t('nodes.loadWorkflow')}
       </MenuItem>
       <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaQuoteRight />}
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <FaQuoteRight />}
         onClickCapture={handleRecallPrompt}
         isDisabled={
-          isLoading ||
+          isLoadingMetadata ||
           (metadata?.positive_prompt === undefined &&
             metadata?.negative_prompt === undefined)
         }
@@ -199,16 +199,16 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('parameters.usePrompt')}
       </MenuItem>
       <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaSeedling />}
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <FaSeedling />}
         onClickCapture={handleRecallSeed}
-        isDisabled={isLoading || metadata?.seed === undefined}
+        isDisabled={isLoadingMetadata || metadata?.seed === undefined}
       >
         {t('parameters.useSeed')}
       </MenuItem>
       <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaAsterisk />}
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <FaAsterisk />}
         onClickCapture={handleUseAllParameters}
-        isDisabled={isLoading || !metadata}
+        isDisabled={isLoadingMetadata || !metadata}
       >
         {t('parameters.useAll')}
       </MenuItem>
