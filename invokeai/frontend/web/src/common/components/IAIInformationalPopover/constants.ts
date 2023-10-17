@@ -2,6 +2,7 @@ import { PopoverProps } from '@chakra-ui/react';
 
 export type Feature =
   | 'clipSkip'
+  | 'hrf'
   | 'paramNegativeConditioning'
   | 'paramPositiveConditioning'
   | 'paramScheduler'

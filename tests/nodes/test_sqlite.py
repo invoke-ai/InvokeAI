@@ -15,7 +15,8 @@ class TestModel(BaseModel):
 @pytest.fixture
 def db() -> SqliteItemStorage[TestModel]:
     sqlite_db = SqliteDatabase(InvokeAIAppConfig(use_memory_db=True), InvokeAILogger.get_logger())
-    return SqliteItemStorage[TestModel](db=sqlite_db, table_name="test", id_field="id")
+    sqlite_item_storage = SqliteItemStorage[TestModel](db=sqlite_db, table_name="test", id_field="id")
+    return sqlite_item_storage
 
 
 def test_sqlite_service_can_create_and_get(db: SqliteItemStorage[TestModel]):

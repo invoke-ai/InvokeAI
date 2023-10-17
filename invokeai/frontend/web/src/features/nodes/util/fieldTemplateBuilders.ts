@@ -1,5 +1,12 @@
-import { isBoolean, isInteger, isNumber, isString } from 'lodash-es';
-import { OpenAPIV3 } from 'openapi-types';
+import {
+  isArray,
+  isBoolean,
+  isInteger,
+  isNumber,
+  isString,
+  startCase,
+} from 'lodash-es';
+import { OpenAPIV3_1 } from 'openapi-types';
 import {
   COLLECTION_MAP,
   POLYMORPHIC_TYPES,
@@ -72,6 +79,7 @@ import {
   T2IAdapterCollectionInputFieldTemplate,
   BoardInputFieldTemplate,
   InputFieldTemplate,
+  OpenAPIV3_1SchemaOrRef,
 } from '../types/types';
 import { ControlField } from 'services/api/types';
 
@@ -90,7 +98,7 @@ export type BuildInputFieldArg = {
  * @example
  * refObjectToFieldType({ "$ref": "#/components/schemas/ImageField" }) --> 'ImageField'
  */
-export const refObjectToSchemaName = (refObject: OpenAPIV3.ReferenceObject) =>
+export const refObjectToSchemaName = (refObject: OpenAPIV3_1.ReferenceObject) =>
   refObject.$ref.split('/').slice(-1)[0];
 
 const buildIntegerInputFieldTemplate = ({
@@ -111,7 +119,10 @@ const buildIntegerInputFieldTemplate = ({
     template.maximum = schemaObject.maximum;
   }
 
-  if (schemaObject.exclusiveMaximum !== undefined) {
+  if (
+    schemaObject.exclusiveMaximum !== undefined &&
+    isNumber(schemaObject.exclusiveMaximum)
+  ) {
     template.exclusiveMaximum = schemaObject.exclusiveMaximum;
   }
 
@@ -119,7 +130,10 @@ const buildIntegerInputFieldTemplate = ({
     template.minimum = schemaObject.minimum;
   }
 
-  if (schemaObject.exclusiveMinimum !== undefined) {
+  if (
+    schemaObject.exclusiveMinimum !== undefined &&
+    isNumber(schemaObject.exclusiveMinimum)
+  ) {
     template.exclusiveMinimum = schemaObject.exclusiveMinimum;
   }
 
@@ -144,7 +158,10 @@ const buildIntegerPolymorphicInputFieldTemplate = ({
     template.maximum = schemaObject.maximum;
   }
 
-  if (schemaObject.exclusiveMaximum !== undefined) {
+  if (
+    schemaObject.exclusiveMaximum !== undefined &&
+    isNumber(schemaObject.exclusiveMaximum)
+  ) {
     template.exclusiveMaximum = schemaObject.exclusiveMaximum;
   }
 
@@ -152,7 +169,10 @@ const buildIntegerPolymorphicInputFieldTemplate = ({
     template.minimum = schemaObject.minimum;
   }
 
-  if (schemaObject.exclusiveMinimum !== undefined) {
+  if (
+    schemaObject.exclusiveMinimum !== undefined &&
+    isNumber(schemaObject.exclusiveMinimum)
+  ) {
     template.exclusiveMinimum = schemaObject.exclusiveMinimum;
   }
 
@@ -195,7 +215,10 @@ const buildFloatInputFieldTemplate = ({
     template.maximum = schemaObject.maximum;
   }
 
-  if (schemaObject.exclusiveMaximum !== undefined) {
+  if (
+    schemaObject.exclusiveMaximum !== undefined &&
+    isNumber(schemaObject.exclusiveMaximum)
+  ) {
     template.exclusiveMaximum = schemaObject.exclusiveMaximum;
   }
 
@@ -203,7 +226,10 @@ const buildFloatInputFieldTemplate = ({
     template.minimum = schemaObject.minimum;
   }
 
-  if (schemaObject.exclusiveMinimum !== undefined) {
+  if (
+    schemaObject.exclusiveMinimum !== undefined &&
+    isNumber(schemaObject.exclusiveMinimum)
+  ) {
     template.exclusiveMinimum = schemaObject.exclusiveMinimum;
   }
 
@@ -227,7 +253,10 @@ const buildFloatPolymorphicInputFieldTemplate = ({
     template.maximum = schemaObject.maximum;
   }
 
-  if (schemaObject.exclusiveMaximum !== undefined) {
+  if (
+    schemaObject.exclusiveMaximum !== undefined &&
+    isNumber(schemaObject.exclusiveMaximum)
+  ) {
     template.exclusiveMaximum = schemaObject.exclusiveMaximum;
   }
 
@@ -235,7 +264,10 @@ const buildFloatPolymorphicInputFieldTemplate = ({
     template.minimum = schemaObject.minimum;
   }
 
-  if (schemaObject.exclusiveMinimum !== undefined) {
+  if (
+    schemaObject.exclusiveMinimum !== undefined &&
+    isNumber(schemaObject.exclusiveMinimum)
+  ) {
     template.exclusiveMinimum = schemaObject.exclusiveMinimum;
   }
   return template;
@@ -872,84 +904,106 @@ const buildSchedulerInputFieldTemplate = ({
 };
 
 export const getFieldType = (
-  schemaObject: InvocationFieldSchema
+  schemaObject: OpenAPIV3_1SchemaOrRef
 ): string | undefined => {
-  if (schemaObject?.ui_type) {
-    return schemaObject.ui_type;
-  } else if (!schemaObject.type) {
-    // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
+  if (isSchemaObject(schemaObject)) {
+    if (!schemaObject.type) {
+      // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
 
-    if (schemaObject.allOf) {
-      const allOf = schemaObject.allOf;
-      if (allOf && allOf[0] && isRefObject(allOf[0])) {
-        return refObjectToSchemaName(allOf[0]);
-      }
-    } else if (schemaObject.anyOf) {
-      const anyOf = schemaObject.anyOf;
-      /**
-       * Handle Polymorphic inputs, eg string | string[]. In OpenAPI, this is:
-       * - an `anyOf` with two items
-       * - one is an `ArraySchemaObject` with a single `SchemaObject or ReferenceObject` of type T in its `items`
-       * - the other is a `SchemaObject` or `ReferenceObject` of type T
-       *
-       * Any other cases we ignore.
-       */
-
-      let firstType: string | undefined;
-      let secondType: string | undefined;
-
-      if (isArraySchemaObject(anyOf[0])) {
-        // first is array, second is not
-        const first = anyOf[0].items;
-        const second = anyOf[1];
-        if (isRefObject(first) && isRefObject(second)) {
-          firstType = refObjectToSchemaName(first);
-          secondType = refObjectToSchemaName(second);
-        } else if (
-          isNonArraySchemaObject(first) &&
-          isNonArraySchemaObject(second)
-        ) {
-          firstType = first.type;
-          secondType = second.type;
+      if (schemaObject.allOf) {
+        const allOf = schemaObject.allOf;
+        if (allOf && allOf[0] && isRefObject(allOf[0])) {
+          return refObjectToSchemaName(allOf[0]);
         }
-      } else if (isArraySchemaObject(anyOf[1])) {
-        // first is not array, second is
-        const first = anyOf[0];
-        const second = anyOf[1].items;
-        if (isRefObject(first) && isRefObject(second)) {
-          firstType = refObjectToSchemaName(first);
-          secondType = refObjectToSchemaName(second);
-        } else if (
-          isNonArraySchemaObject(first) &&
-          isNonArraySchemaObject(second)
-        ) {
-          firstType = first.type;
-          secondType = second.type;
+      } else if (schemaObject.anyOf) {
+        // ignore null types
+        const anyOf = schemaObject.anyOf.filter((i) => {
+          if (isSchemaObject(i)) {
+            if (i.type === 'null') {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (anyOf.length === 1) {
+          if (isRefObject(anyOf[0])) {
+            return refObjectToSchemaName(anyOf[0]);
+          } else if (isSchemaObject(anyOf[0])) {
+            return getFieldType(anyOf[0]);
+          }
+        }
+        /**
+         * Handle Polymorphic inputs, eg string | string[]. In OpenAPI, this is:
+         * - an `anyOf` with two items
+         * - one is an `ArraySchemaObject` with a single `SchemaObject or ReferenceObject` of type T in its `items`
+         * - the other is a `SchemaObject` or `ReferenceObject` of type T
+         *
+         * Any other cases we ignore.
+         */
+
+        let firstType: string | undefined;
+        let secondType: string | undefined;
+
+        if (isArraySchemaObject(anyOf[0])) {
+          // first is array, second is not
+          const first = anyOf[0].items;
+          const second = anyOf[1];
+          if (isRefObject(first) && isRefObject(second)) {
+            firstType = refObjectToSchemaName(first);
+            secondType = refObjectToSchemaName(second);
+          } else if (
+            isNonArraySchemaObject(first) &&
+            isNonArraySchemaObject(second)
+          ) {
+            firstType = first.type;
+            secondType = second.type;
+          }
+        } else if (isArraySchemaObject(anyOf[1])) {
+          // first is not array, second is
+          const first = anyOf[0];
+          const second = anyOf[1].items;
+          if (isRefObject(first) && isRefObject(second)) {
+            firstType = refObjectToSchemaName(first);
+            secondType = refObjectToSchemaName(second);
+          } else if (
+            isNonArraySchemaObject(first) &&
+            isNonArraySchemaObject(second)
+          ) {
+            firstType = first.type;
+            secondType = second.type;
+          }
+        }
+        if (firstType === secondType && isPolymorphicItemType(firstType)) {
+          return SINGLE_TO_POLYMORPHIC_MAP[firstType];
         }
       }
-      if (firstType === secondType && isPolymorphicItemType(firstType)) {
-        return SINGLE_TO_POLYMORPHIC_MAP[firstType];
+    } else if (schemaObject.enum) {
+      return 'enum';
+    } else if (schemaObject.type) {
+      if (schemaObject.type === 'number') {
+        // floats are "number" in OpenAPI, while ints are "integer" - we need to distinguish them
+        return 'float';
+      } else if (schemaObject.type === 'array') {
+        const itemType = isSchemaObject(schemaObject.items)
+          ? schemaObject.items.type
+          : refObjectToSchemaName(schemaObject.items);
+
+        if (isArray(itemType)) {
+          // This is a nested array, which we don't support
+          return;
+        }
+
+        if (isCollectionItemType(itemType)) {
+          return COLLECTION_MAP[itemType];
+        }
+
+        return;
+      } else if (!isArray(schemaObject.type)) {
+        return schemaObject.type;
       }
     }
-  } else if (schemaObject.enum) {
-    return 'enum';
-  } else if (schemaObject.type) {
-    if (schemaObject.type === 'number') {
-      // floats are "number" in OpenAPI, while ints are "integer" - we need to distinguish them
-      return 'float';
-    } else if (schemaObject.type === 'array') {
-      const itemType = isSchemaObject(schemaObject.items)
-        ? schemaObject.items.type
-        : refObjectToSchemaName(schemaObject.items);
-
-      if (isCollectionItemType(itemType)) {
-        return COLLECTION_MAP[itemType];
-      }
-
-      return;
-    } else {
-      return schemaObject.type;
-    }
+  } else if (isRefObject(schemaObject)) {
+    return refObjectToSchemaName(schemaObject);
   }
   return;
 };
@@ -1025,7 +1079,15 @@ export const buildInputFieldTemplate = (
   name: string,
   fieldType: FieldType
 ) => {
-  const { input, ui_hidden, ui_component, ui_type, ui_order } = fieldSchema;
+  const {
+    input,
+    ui_hidden,
+    ui_component,
+    ui_type,
+    ui_order,
+    ui_choice_labels,
+    item_default,
+  } = fieldSchema;
 
   const extra = {
     // TODO: Can we support polymorphic inputs in the UI?
@@ -1035,11 +1097,13 @@ export const buildInputFieldTemplate = (
     ui_type,
     required: nodeSchema.required?.includes(name) ?? false,
     ui_order,
+    ui_choice_labels,
+    item_default,
   };
 
   const baseField = {
     name,
-    title: fieldSchema.title ?? '',
+    title: fieldSchema.title ?? (name ? startCase(name) : ''),
     description: fieldSchema.description ?? '',
     fieldKind: 'input' as const,
     ...extra,

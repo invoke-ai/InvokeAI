@@ -39,7 +39,10 @@ export const dynamicPromptsSlice = createSlice({
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
     },
-    parsingErrorChanged: (state, action: PayloadAction<string | undefined>) => {
+    parsingErrorChanged: (
+      state,
+      action: PayloadAction<string | null | undefined>
+    ) => {
       state.parsingError = action.payload;
     },
     isErrorChanged: (state, action: PayloadAction<boolean>) => {

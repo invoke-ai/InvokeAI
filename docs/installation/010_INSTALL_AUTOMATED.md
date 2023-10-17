@@ -40,7 +40,7 @@ experimental versions later.
     this, open up a command-line window ("Terminal" on Linux and
     Macintosh, "Command" or "Powershell" on Windows) and type `python
     --version`. If Python is installed, it will print out the version
-    number. If it is version `3.9.*`, `3.10.*` or `3.11.*` you meet
+    number. If it is version `3.10.*` or `3.11.*` you meet
     requirements.
 
     !!! warning "What to do if you have an unsupported version"
@@ -48,7 +48,7 @@ experimental versions later.
         Go to [Python Downloads](https://www.python.org/downloads/)
         and download the appropriate installer package for your
         platform. We recommend [Version
-        3.10.9](https://www.python.org/downloads/release/python-3109/),
+        3.10.12](https://www.python.org/downloads/release/python-3109/),
         which has been extensively tested with InvokeAI.
 
     _Please select your platform in the section below for platform-specific
