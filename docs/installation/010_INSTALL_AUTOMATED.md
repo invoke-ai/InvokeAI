@@ -48,7 +48,7 @@ experimental versions later.
         Go to [Python Downloads](https://www.python.org/downloads/)
         and download the appropriate installer package for your
         platform. We recommend [Version
-        3.10.9](https://www.python.org/downloads/release/python-3109/),
+        3.10.12](https://www.python.org/downloads/release/python-3109/),
         which has been extensively tested with InvokeAI.
 
     _Please select your platform in the section below for platform-specific

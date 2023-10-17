@@ -4,7 +4,7 @@ Project homepage: https://github.com/invoke-ai/InvokeAI
 
 Preparations:
 
-  You will need to install Python 3.9 or higher for this installer
+  You will need to install Python 3.10 or higher for this installer
   to work. Instructions are given here:
   https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 
@@ -21,8 +21,8 @@ Preparations:
      pip --version
 
   You should get a message that indicates that the pip package
-  installer was derived from Python 3.9 or 3.10. For example:
-  "pip 22.3.1 from /usr/bin/pip (python 3.9)"
+  installer was derived from Python 3.10 or 3.11. For example:
+  "pip 22.0.1 from /usr/bin/pip (python 3.10)"
 
 Long Paths on Windows:
 
