@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Path
 
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField
+from invokeai.app.invocations.baseinvocation import WorkflowField
 
 workflows_router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
 

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField
+from invokeai.app.invocations.baseinvocation import WorkflowField
 
 
 class WorkflowRecordsStorageBase(ABC):

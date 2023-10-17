@@ -1,14 +1,11 @@
 import sqlite3
 import threading
 
+from invokeai.app.invocations.baseinvocation import WorkflowField, type_adapter_WorkflowField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
-from invokeai.app.services.workflow_records.workflow_records_common import (
-    WorkflowField,
-    WorkflowNotFoundError,
-    type_adapter_WorkflowField,
-)
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowNotFoundError
 from invokeai.app.util.misc import uuid_string
 
 

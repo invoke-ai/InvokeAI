@@ -3,7 +3,7 @@ from typing import Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.metadata import MetadataField
+from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
@@ -12,7 +12,6 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField
 
 
 class ImageServiceABC(ABC):
