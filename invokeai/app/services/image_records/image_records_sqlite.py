@@ -297,11 +297,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             images_query += query_conditions + query_pagination + ";"
             # Add all the parameters
             images_params = query_params.copy()
-
-            if limit is not None:
-                images_params.append(limit)
-            if offset is not None:
-                images_params.append(offset)
+            # Add the pagination parameters
+            images_params.extend([limit, offset])
 
             # Build the list of images, deserializing each row
             self._cursor.execute(images_query, images_params)
@@ -351,6 +348,24 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(query, image_names)
 
             self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordDeleteException from e
+        finally:
+            self._lock.release()
+
+    def get_intermediates_count(self) -> int:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT COUNT(*) FROM images
+                WHERE is_intermediate = TRUE;
+                """
+            )
+            count = cast(int, self._cursor.fetchone()[0])
+            self._conn.commit()
+            return count
         except sqlite3.Error as e:
             self._conn.rollback()
             raise ImageRecordDeleteException from e
