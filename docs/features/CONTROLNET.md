@@ -46,7 +46,7 @@ third-party ControlNet model may not have the desired effect._ Please
 read and follow the documentation for installing a third party model
 not currently included among InvokeAI's default list.
 
-Currently InvokeAI **only** supports "diffuser" style ControlNet models. These are
+Currently InvokeAI **only** supports 🤗 Diffusers-format ControlNet models. These are
 folders that contain the files `config.json` and/or
 `diffusion_pytorch_model.safetensors` and
 `diffusion_pytorch_model.fp16.safetensors`. The name of the folder is
