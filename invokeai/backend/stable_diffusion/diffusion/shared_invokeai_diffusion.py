@@ -260,6 +260,7 @@ class InvokeAIDiffuserComponent:
                 conditioning_data,
                 **kwargs,
             )
+
         else:
             (
                 unconditioned_next_x,
@@ -406,15 +407,6 @@ class InvokeAIDiffuserComponent:
                 uncond_down_block.append(_uncond_down)
                 cond_down_block.append(_cond_down)
 
-        uncond_down_intrablock, cond_down_intrablock = None, None
-        down_intrablock_additional_residuals = kwargs.pop("down_intrablock_additional_residuals", None)
-        if down_intrablock_additional_residuals is not None:
-            uncond_down_intrablock, cond_down_intrablock = [], []
-            for down_intrablock in down_intrablock_additional_residuals:
-                _uncond_down, _cond_down = down_intrablock.chunk(2)
-                uncond_down_intrablock.append(_uncond_down)
-                cond_down_intrablock.append(_cond_down)
-
         uncond_mid_block, cond_mid_block = None, None
         mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
         if mid_block_additional_residual is not None:
@@ -445,7 +437,6 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
-            down_intrablock_additional_residuals=uncond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
@@ -474,7 +465,6 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
-            down_intrablock_additional_residuals=cond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
@@ -498,15 +488,6 @@ class InvokeAIDiffuserComponent:
                 _uncond_down, _cond_down = down_block.chunk(2)
                 uncond_down_block.append(_uncond_down)
                 cond_down_block.append(_cond_down)
-
-        uncond_down_intrablock, cond_down_intrablock = None, None
-        down_intrablock_additional_residuals = kwargs.pop("down_intrablock_additional_residuals", None)
-        if down_intrablock_additional_residuals is not None:
-            uncond_down_intrablock, cond_down_intrablock = [], []
-            for down_intrablock in down_intrablock_additional_residuals:
-                _uncond_down, _cond_down = down_intrablock.chunk(2)
-                uncond_down_intrablock.append(_uncond_down)
-                cond_down_intrablock.append(_cond_down)
 
         uncond_mid_block, cond_mid_block = None, None
         mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
@@ -536,7 +517,6 @@ class InvokeAIDiffuserComponent:
             {"swap_cross_attn_context": cross_attn_processor_context},
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
-            down_intrablock_additional_residuals=uncond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
@@ -556,7 +536,6 @@ class InvokeAIDiffuserComponent:
             {"swap_cross_attn_context": cross_attn_processor_context},
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
-            down_intrablock_additional_residuals=cond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
