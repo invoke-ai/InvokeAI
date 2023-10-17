@@ -17,7 +17,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByQueueIDResult,
     ClearResult,
     EnqueueBatchResult,
-    EnqueueGraphResult,
     IsEmptyResult,
     IsFullResult,
     PruneResult,
@@ -28,7 +27,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     calc_session_count,
     prepare_values_to_insert,
 )
-from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 
@@ -254,32 +252,6 @@ class SqliteSessionQueue(SessionQueueBase):
             (queue_id,),
         )
         return cast(Union[int, None], self.__cursor.fetchone()[0]) or 0
-
-    def enqueue_graph(self, queue_id: str, graph: Graph, prepend: bool) -> EnqueueGraphResult:
-        enqueue_result = self.enqueue_batch(queue_id=queue_id, batch=Batch(graph=graph), prepend=prepend)
-        try:
-            self.__lock.acquire()
-            self.__cursor.execute(
-                """--sql
-                SELECT *
-                FROM session_queue
-                WHERE queue_id = ?
-                AND batch_id = ?
-                """,
-                (queue_id, enqueue_result.batch.batch_id),
-            )
-            result = cast(Union[sqlite3.Row, None], self.__cursor.fetchone())
-        except Exception:
-            self.__conn.rollback()
-            raise
-        finally:
-            self.__lock.release()
-        if result is None:
-            raise SessionQueueItemNotFoundError(f"No queue item with batch id {enqueue_result.batch.batch_id}")
-        return EnqueueGraphResult(
-            **enqueue_result.model_dump(),
-            queue_item=SessionQueueItemDTO.queue_item_dto_from_dict(dict(result)),
-        )
 
     def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
         try:
