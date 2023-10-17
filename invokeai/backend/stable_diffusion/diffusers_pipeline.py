@@ -548,8 +548,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         mid_block_additional_residual = None
         down_intrablock_additional_residuals = None
         # if control_data is not None and t2i_adapter_data is not None:
-            # TODO(ryand): This is a limitation of the UNet2DConditionModel API, not a fundamental incompatibility
-            # between ControlNets and T2I-Adapters. We will try to fix this upstream in diffusers.
+        # TODO(ryand): This is a limitation of the UNet2DConditionModel API, not a fundamental incompatibility
+        # between ControlNets and T2I-Adapters. We will try to fix this upstream in diffusers.
         #    raise Exception("ControlNet(s) and T2I-Adapter(s) cannot be used simultaneously (yet).")
         # elif control_data is not None:
         if control_data is not None:
@@ -598,8 +598,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             conditioning_data=conditioning_data,
             # extra:
             down_block_additional_residuals=down_block_additional_residuals,  # for ControlNet
-            mid_block_additional_residual=mid_block_additional_residual,      # for ControlNet
-            down_intrablock_additional_residuals=down_intrablock_additional_residuals,   # for T2I-Adapter
+            mid_block_additional_residual=mid_block_additional_residual,  # for ControlNet
+            down_intrablock_additional_residuals=down_intrablock_additional_residuals,  # for T2I-Adapter
         )
 
         guidance_scale = conditioning_data.guidance_scale
