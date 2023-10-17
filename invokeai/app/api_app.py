@@ -31,7 +31,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
-    from .api.routers import app_info, board_images, boards, images, models, sessions, session_queue, utilities
+    from .api.routers import app_info, board_images, boards, images, models, session_queue, sessions, utilities
     from .api.sockets import SocketIO
     from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
 
