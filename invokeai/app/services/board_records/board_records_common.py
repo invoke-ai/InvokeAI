@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Union
 
-from pydantic import BaseModel, Extra, Field
+from pydantic import BaseModel, Field
 
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
@@ -18,9 +18,9 @@ class BoardRecord(BaseModelExcludeNull):
     """The created timestamp of the image."""
     updated_at: Union[datetime, str] = Field(description="The updated timestamp of the board.")
     """The updated timestamp of the image."""
-    deleted_at: Union[datetime, str, None] = Field(description="The deleted timestamp of the board.")
+    deleted_at: Optional[Union[datetime, str]] = Field(default=None, description="The deleted timestamp of the board.")
     """The updated timestamp of the image."""
-    cover_image_name: Optional[str] = Field(description="The name of the cover image of the board.")
+    cover_image_name: Optional[str] = Field(default=None, description="The name of the cover image of the board.")
     """The name of the cover image of the board."""
 
 
@@ -46,9 +46,9 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
     )
 
 
-class BoardChanges(BaseModel, extra=Extra.forbid):
-    board_name: Optional[str] = Field(description="The board's new name.")
-    cover_image_name: Optional[str] = Field(description="The name of the board's new cover image.")
+class BoardChanges(BaseModel, extra="forbid"):
+    board_name: Optional[str] = Field(default=None, description="The board's new name.")
+    cover_image_name: Optional[str] = Field(default=None, description="The name of the board's new cover image.")
 
 
 class BoardRecordNotFoundException(Exception):

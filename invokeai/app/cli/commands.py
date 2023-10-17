@@ -24,8 +24,8 @@ def add_field_argument(command_parser, name: str, field, default_override=None):
         if field.default_factory is None
         else field.default_factory()
     )
-    if get_origin(field.type_) == Literal:
-        allowed_values = get_args(field.type_)
+    if get_origin(field.annotation) == Literal:
+        allowed_values = get_args(field.annotation)
         allowed_types = set()
         for val in allowed_values:
             allowed_types.add(type(val))
@@ -38,15 +38,15 @@ def add_field_argument(command_parser, name: str, field, default_override=None):
             type=field_type,
             default=default,
             choices=allowed_values,
-            help=field.field_info.description,
+            help=field.description,
         )
     else:
         command_parser.add_argument(
             f"--{name}",
             dest=name,
-            type=field.type_,
+            type=field.annotation,
             default=default,
-            help=field.field_info.description,
+            help=field.description,
         )
 
 
@@ -142,7 +142,6 @@ class BaseCommand(ABC, BaseModel):
     """A CLI command"""
 
     # All commands must include a type name like this:
-    # type: Literal['your_command_name'] = 'your_command_name'
 
     @classmethod
     def get_all_subclasses(cls):

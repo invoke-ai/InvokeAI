@@ -41,7 +41,7 @@ class ImageService(ImageServiceABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         board_id: Optional[str] = None,
-        is_intermediate: bool = False,
+        is_intermediate: Optional[bool] = False,
         metadata: Optional[dict] = None,
         workflow: Optional[str] = None,
     ) -> ImageDTO:
@@ -146,7 +146,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image DTO")
             raise e
 
-    def get_metadata(self, image_name: str) -> Optional[ImageMetadata]:
+    def get_metadata(self, image_name: str) -> ImageMetadata:
         try:
             image_record = self.__invoker.services.image_records.get(image_name)
             metadata = self.__invoker.services.image_records.get_metadata(image_name)
@@ -174,7 +174,7 @@ class ImageService(ImageServiceABC):
 
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
-            return self.__invoker.services.image_files.get_path(image_name, thumbnail)
+            return str(self.__invoker.services.image_files.get_path(image_name, thumbnail))
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image path")
             raise e

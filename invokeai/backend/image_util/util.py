@@ -9,7 +9,7 @@ class InitImageResizer:
     def __init__(self, Image):
         self.image = Image
 
-    def resize(self, width=None, height=None) -> Image:
+    def resize(self, width=None, height=None) -> Image.Image:
         """
         Return a copy of the image resized to fit within
         a box width x height. The aspect ratio is
