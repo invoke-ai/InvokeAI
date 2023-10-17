@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 
-from invokeai.app.invocations.baseinvocation import WorkflowField, type_adapter_WorkflowField
+from invokeai.app.invocations.baseinvocation import WorkflowField, WorkflowFieldValidator
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
@@ -39,7 +39,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             row = self._cursor.fetchone()
             if row is None:
                 raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
-            return type_adapter_WorkflowField.validate_json(row[0])
+            return WorkflowFieldValidator.validate_json(row[0])
         except Exception:
             self._conn.rollback()
             raise

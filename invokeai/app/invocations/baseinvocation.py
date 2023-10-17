@@ -821,7 +821,7 @@ class WorkflowField(RootModel):
     root: dict[str, Any] = Field(description="The workflow")
 
 
-type_adapter_WorkflowField = TypeAdapter(WorkflowField)
+WorkflowFieldValidator = TypeAdapter(WorkflowField)
 
 
 class WithWorkflow(BaseModel):
@@ -837,7 +837,7 @@ class MetadataField(RootModel):
     root: dict[str, Any] = Field(description="The metadata")
 
 
-type_adapter_MetadataField = TypeAdapter(MetadataField)
+MetadataFieldValidator = TypeAdapter(MetadataField)
 
 
 class WithMetadata(BaseModel):

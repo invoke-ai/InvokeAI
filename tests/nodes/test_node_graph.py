@@ -615,8 +615,8 @@ def test_graph_can_deserialize():
     g.add_edge(e)
 
     json = g.model_dump_json()
-    adapter_graph = TypeAdapter(Graph)
-    g2 = adapter_graph.validate_json(json)
+    GraphValidator = TypeAdapter(Graph)
+    g2 = GraphValidator.validate_json(json)
 
     assert g2 is not None
     assert g2.nodes["1"] is not None

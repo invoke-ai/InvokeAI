@@ -3,7 +3,7 @@ import threading
 from datetime import datetime
 from typing import Optional, Union, cast
 
-from invokeai.app.invocations.baseinvocation import MetadataField, type_adapter_MetadataField
+from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 
@@ -170,7 +170,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             as_dict = dict(result)
             metadata_raw = cast(Optional[str], as_dict.get("metadata", None))
-            return type_adapter_MetadataField.validate_json(metadata_raw) if metadata_raw is not None else None
+            return MetadataFieldValidator.validate_json(metadata_raw) if metadata_raw is not None else None
         except sqlite3.Error as e:
             self._conn.rollback()
             raise ImageRecordNotFoundException from e
