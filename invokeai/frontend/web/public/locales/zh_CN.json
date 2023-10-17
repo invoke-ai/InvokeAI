@@ -88,7 +88,9 @@
         "t2iAdapter": "T2I Adapter",
         "ipAdapter": "IP Adapter",
         "controlAdapter": "Control Adapter",
-        "controlNet": "ControlNet"
+        "controlNet": "ControlNet",
+        "on": "开",
+        "auto": "自动"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -472,7 +474,8 @@
         "vae": "VAE",
         "oliveModels": "Olive",
         "loraModels": "LoRA",
-        "alpha": "Alpha"
+        "alpha": "Alpha",
+        "vaePrecision": "VAE 精度"
     },
     "parameters": {
         "images": "图像",
@@ -595,7 +598,11 @@
             "useX2Model": "图像太大，无法使用 x4 模型，使用 x2 模型作为替代",
             "tooLarge": "图像太大无法进行放大，请选择更小的图像"
         },
-        "iterationsWithCount_other": "{{count}} 次迭代生成"
+        "iterationsWithCount_other": "{{count}} 次迭代生成",
+        "seamlessX&Y": "无缝 X & Y",
+        "aspectRatioFree": "自由",
+        "seamlessX": "无缝 X",
+        "seamlessY": "无缝 Y"
     },
     "settings": {
         "models": "模型",
@@ -628,10 +635,11 @@
         "clearIntermediates": "清除中间产物",
         "clearIntermediatesDesc3": "您图库中的图像不会被删除。",
         "clearIntermediatesDesc2": "中间产物图像是生成过程中产生的副产品，与图库中的结果图像不同。清除中间产物可释放磁盘空间。",
-        "intermediatesCleared_other": "已清除 {{number}} 个中间产物",
+        "intermediatesCleared_other": "已清除 {{count}} 个中间产物",
         "clearIntermediatesDesc1": "清除中间产物会重置您的画布和 ControlNet 状态。",
         "intermediatesClearedFailed": "清除中间产物时出现问题",
-        "noIntermediates": "没有可清除的中间产物"
+        "clearIntermediatesWithCount_other": "清除 {{count}} 个中间产物",
+        "clearIntermediatesDisabled": "队列为空才能清理中间产物"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
@@ -714,7 +722,7 @@
         "canvasSavedGallery": "画布已保存到图库",
         "imageUploadFailed": "图像上传失败",
         "problemImportingMask": "导入遮罩时出现问题",
-        "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{number}} 个不兼容的子模型"
+        "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{count}} 个不兼容的子模型"
     },
     "unifiedCanvas": {
         "layer": "图层",
@@ -1003,7 +1011,27 @@
         "booleanCollection": "布尔值合集",
         "imageCollectionDescription": "一个图像合集。",
         "loRAModelField": "LoRA",
-        "imageCollection": "图像合集"
+        "imageCollection": "图像合集",
+        "ipAdapterPolymorphicDescription": "一个 IP-Adapters Collection 合集。",
+        "ipAdapterCollection": "IP-Adapters 合集",
+        "conditioningCollection": "条件合集",
+        "ipAdapterPolymorphic": "IP-Adapters 多态",
+        "conditioningCollectionDescription": "条件可以在节点间传递。",
+        "colorPolymorphic": "颜色多态",
+        "conditioningPolymorphic": "条件多态",
+        "latentsCollection": "Latents 合集",
+        "stringPolymorphic": "字符多态",
+        "conditioningPolymorphicDescription": "条件可以在节点间传递。",
+        "imagePolymorphic": "图像多态",
+        "floatPolymorphic": "浮点多态",
+        "ipAdapterCollectionDescription": "一个 IP-Adapters Collection 合集。",
+        "ipAdapter": "IP-Adapter",
+        "booleanPolymorphic": "布尔多态",
+        "conditioningFieldDescription": "条件可以在节点间传递。",
+        "integerPolymorphic": "整数多态",
+        "latentsPolymorphic": "Latents 多态",
+        "conditioningField": "条件",
+        "latentsField": "Latents"
     },
     "controlnet": {
         "resize": "直接缩放",
@@ -1087,7 +1115,7 @@
         "depthZoe": "Depth (Zoe)",
         "colorMap": "Color",
         "openPose": "Openpose",
-        "controlAdapter": "Control Adapter",
+        "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
         "canny": "Canny"
     },
@@ -1141,7 +1169,7 @@
         "queuedCount": "{{pending}} 待处理",
         "front": "前",
         "pruneTooltip": "修剪 {{item_count}} 个已完成的项目",
-        "batchQueuedDesc": "在队列的 {{direction}} 中添加了 {{item_count}} 个会话",
+        "batchQueuedDesc_other": "在队列的 {{direction}} 中添加了 {{count}} 个会话",
         "graphQueued": "节点图已加入队列",
         "back": "后",
         "session": "会话",
@@ -1192,7 +1220,9 @@
         "steps": "步数",
         "scheduler": "调度器",
         "seamless": "无缝",
-        "fit": "图生图适应"
+        "fit": "图生图匹配",
+        "recallParameters": "召回参数",
+        "noRecallParameters": "未找到要召回的参数"
     },
     "models": {
         "noMatchingModels": "无相匹配的模型",

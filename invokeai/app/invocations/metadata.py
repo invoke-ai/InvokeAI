@@ -44,28 +44,31 @@ class CoreMetadata(BaseModelExcludeNull):
     """Core generation metadata for an image generated in InvokeAI."""
 
     app_version: str = Field(default=__version__, description="The version of InvokeAI used to generate this image")
-    generation_mode: str = Field(
+    generation_mode: Optional[str] = Field(
+        default=None,
         description="The generation mode that output this image",
     )
     created_by: Optional[str] = Field(description="The name of the creator of the image")
-    positive_prompt: str = Field(description="The positive prompt parameter")
-    negative_prompt: str = Field(description="The negative prompt parameter")
-    width: int = Field(description="The width parameter")
-    height: int = Field(description="The height parameter")
-    seed: int = Field(description="The seed used for noise generation")
-    rand_device: str = Field(description="The device used for random number generation")
-    cfg_scale: float = Field(description="The classifier-free guidance scale parameter")
-    steps: int = Field(description="The number of steps used for inference")
-    scheduler: str = Field(description="The scheduler used for inference")
+    positive_prompt: Optional[str] = Field(default=None, description="The positive prompt parameter")
+    negative_prompt: Optional[str] = Field(default=None, description="The negative prompt parameter")
+    width: Optional[int] = Field(default=None, description="The width parameter")
+    height: Optional[int] = Field(default=None, description="The height parameter")
+    seed: Optional[int] = Field(default=None, description="The seed used for noise generation")
+    rand_device: Optional[str] = Field(default=None, description="The device used for random number generation")
+    cfg_scale: Optional[float] = Field(default=None, description="The classifier-free guidance scale parameter")
+    steps: Optional[int] = Field(default=None, description="The number of steps used for inference")
+    scheduler: Optional[str] = Field(default=None, description="The scheduler used for inference")
     clip_skip: Optional[int] = Field(
         default=None,
         description="The number of skipped CLIP layers",
     )
-    model: MainModelField = Field(description="The main model used for inference")
-    controlnets: list[ControlField] = Field(description="The ControlNets used for inference")
-    ipAdapters: list[IPAdapterMetadataField] = Field(description="The IP Adapters used for inference")
-    t2iAdapters: list[T2IAdapterField] = Field(description="The IP Adapters used for inference")
-    loras: list[LoRAMetadataField] = Field(description="The LoRAs used for inference")
+    model: Optional[MainModelField] = Field(default=None, description="The main model used for inference")
+    controlnets: Optional[list[ControlField]] = Field(default=None, description="The ControlNets used for inference")
+    ipAdapters: Optional[list[IPAdapterMetadataField]] = Field(
+        default=None, description="The IP Adapters used for inference"
+    )
+    t2iAdapters: Optional[list[T2IAdapterField]] = Field(default=None, description="The IP Adapters used for inference")
+    loras: Optional[list[LoRAMetadataField]] = Field(default=None, description="The LoRAs used for inference")
     vae: Optional[VAEModelField] = Field(
         default=None,
         description="The VAE used for decoding, if the main model's default was not used",
@@ -122,27 +125,34 @@ class MetadataAccumulatorOutput(BaseInvocationOutput):
 class MetadataAccumulatorInvocation(BaseInvocation):
     """Outputs a Core Metadata Object"""
 
-    generation_mode: str = InputField(
+    generation_mode: Optional[str] = InputField(
+        default=None,
         description="The generation mode that output this image",
     )
-    positive_prompt: str = InputField(description="The positive prompt parameter")
-    negative_prompt: str = InputField(description="The negative prompt parameter")
-    width: int = InputField(description="The width parameter")
-    height: int = InputField(description="The height parameter")
-    seed: int = InputField(description="The seed used for noise generation")
-    rand_device: str = InputField(description="The device used for random number generation")
-    cfg_scale: float = InputField(description="The classifier-free guidance scale parameter")
-    steps: int = InputField(description="The number of steps used for inference")
-    scheduler: str = InputField(description="The scheduler used for inference")
-    clip_skip: Optional[int] = Field(
+    positive_prompt: Optional[str] = InputField(default=None, description="The positive prompt parameter")
+    negative_prompt: Optional[str] = InputField(default=None, description="The negative prompt parameter")
+    width: Optional[int] = InputField(default=None, description="The width parameter")
+    height: Optional[int] = InputField(default=None, description="The height parameter")
+    seed: Optional[int] = InputField(default=None, description="The seed used for noise generation")
+    rand_device: Optional[str] = InputField(default=None, description="The device used for random number generation")
+    cfg_scale: Optional[float] = InputField(default=None, description="The classifier-free guidance scale parameter")
+    steps: Optional[int] = InputField(default=None, description="The number of steps used for inference")
+    scheduler: Optional[str] = InputField(default=None, description="The scheduler used for inference")
+    clip_skip: Optional[int] = InputField(
         default=None,
         description="The number of skipped CLIP layers",
     )
-    model: MainModelField = InputField(description="The main model used for inference")
-    controlnets: list[ControlField] = InputField(description="The ControlNets used for inference")
-    ipAdapters: list[IPAdapterMetadataField] = InputField(description="The IP Adapters used for inference")
-    t2iAdapters: list[T2IAdapterField] = Field(description="The IP Adapters used for inference")
-    loras: list[LoRAMetadataField] = InputField(description="The LoRAs used for inference")
+    model: Optional[MainModelField] = InputField(default=None, description="The main model used for inference")
+    controlnets: Optional[list[ControlField]] = InputField(
+        default=None, description="The ControlNets used for inference"
+    )
+    ipAdapters: Optional[list[IPAdapterMetadataField]] = InputField(
+        default=None, description="The IP Adapters used for inference"
+    )
+    t2iAdapters: Optional[list[T2IAdapterField]] = InputField(
+        default=None, description="The IP Adapters used for inference"
+    )
+    loras: Optional[list[LoRAMetadataField]] = InputField(default=None, description="The LoRAs used for inference")
     strength: Optional[float] = InputField(
         default=None,
         description="The strength used for latents-to-latents",
@@ -154,6 +164,20 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     vae: Optional[VAEModelField] = InputField(
         default=None,
         description="The VAE used for decoding, if the main model's default was not used",
+    )
+
+    # High resolution fix metadata.
+    hrf_width: Optional[int] = InputField(
+        default=None,
+        description="The high resolution fix height and width multipler.",
+    )
+    hrf_height: Optional[int] = InputField(
+        default=None,
+        description="The high resolution fix height and width multipler.",
+    )
+    hrf_strength: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix img2img strength used in the upscale pass.",
     )
 
     # SDXL

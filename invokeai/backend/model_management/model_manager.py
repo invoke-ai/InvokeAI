@@ -986,6 +986,8 @@ class ModelManager(object):
 
                     for model_path in models_dir.iterdir():
                         if model_path not in loaded_files:  # TODO: check
+                            if model_path.name.startswith("."):
+                                continue
                             model_name = model_path.name if model_path.is_dir() else model_path.stem
                             model_key = self.create_key(model_name, cur_base_model, cur_model_type)
 
