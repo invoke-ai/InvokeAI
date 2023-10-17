@@ -439,6 +439,14 @@ class Graph(BaseModel):
         except Exception as e:
             raise UnknownGraphValidationError(f"Problem validating graph {e}") from e
 
+    def _is_destination_field_Any(self, edge: Edge) -> bool:
+        """Checks if the destination field for an edge is of type typing.Any"""
+        return get_input_field(self.get_node(edge.destination.node_id), edge.destination.field) == Any
+
+    def _is_destination_field_list_of_Any(self, edge: Edge) -> bool:
+        """Checks if the destination field for an edge is of type typing.Any"""
+        return get_input_field(self.get_node(edge.destination.node_id), edge.destination.field) == list[Any]
+
     def _validate_edge(self, edge: Edge):
         """Validates that a new edge doesn't create a cycle in the graph"""
 
@@ -491,8 +499,19 @@ class Graph(BaseModel):
                     f"Collector output type does not match collector input type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
                 )
 
-        # Validate if collector output type matches input type (if this edge results in both being set)
-        if isinstance(from_node, CollectInvocation) and edge.source.field == "collection":
+        # Validate that we are not connecting collector to iterator (currently unsupported)
+        if isinstance(from_node, CollectInvocation) and isinstance(to_node, IterateInvocation):
+            raise InvalidEdgeError(
+                f"Cannot connect collector to iterator: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
+            )
+
+        # Validate if collector output type matches input type (if this edge results in both being set) - skip if the destination field is not Any or list[Any]
+        if (
+            isinstance(from_node, CollectInvocation)
+            and edge.source.field == "collection"
+            and not self._is_destination_field_list_of_Any(edge)
+            and not self._is_destination_field_Any(edge)
+        ):
             if not self._is_collector_connection_valid(edge.source.node_id, new_output=edge.destination):
                 raise InvalidEdgeError(
                     f"Collector input type does not match collector output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
@@ -726,15 +745,14 @@ class Graph(BaseModel):
         input_root_type = next(t[0] for t in type_degrees if t[1] == 0)  # type: ignore
 
         # Verify that all outputs are lists
-        # if not all((get_origin(f) == list for f in output_fields)):
-        #     return False
-
-        # Verify that all outputs are lists
         if not all(is_list_or_contains_list(f) for f in output_fields):
             return False
 
         # Verify that all outputs match the input type (are a base class or the same class)
-        if not all((issubclass(input_root_type, get_args(f)[0]) for f in output_fields)):
+        if not all(
+            is_union_subtype(input_root_type, get_args(f)[0]) or issubclass(input_root_type, get_args(f)[0])
+            for f in output_fields
+        ):
             return False
 
         return True

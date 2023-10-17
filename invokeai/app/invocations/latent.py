@@ -23,7 +23,6 @@ from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.ip_adapter import IPAdapterField
-from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.invocations.primitives import (
     DenoiseMaskField,
     DenoiseMaskOutput,
@@ -64,6 +63,8 @@ from .baseinvocation import (
     InvocationContext,
     OutputField,
     UIType,
+    WithMetadata,
+    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -792,7 +793,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     category="latents",
     version="1.0.0",
 )
-class LatentsToImageInvocation(BaseInvocation):
+class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
@@ -805,11 +806,6 @@ class LatentsToImageInvocation(BaseInvocation):
     )
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
     fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32)
-    metadata: Optional[CoreMetadata] = InputField(
-        default=None,
-        description=FieldDescriptions.core_metadata,
-        ui_hidden=True,
-    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -878,7 +874,7 @@ class LatentsToImageInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.model_dump() if self.metadata else None,
+            metadata=self.metadata,
             workflow=self.workflow,
         )
 

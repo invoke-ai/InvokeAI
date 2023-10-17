@@ -1,6 +1,7 @@
 import { EntityState, Update } from '@reduxjs/toolkit';
 import { fetchBaseQuery } from '@reduxjs/toolkit/dist/query';
 import { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
+import { logger } from 'app/logging/logger';
 import {
   ASSETS_CATEGORIES,
   BoardId,
@@ -8,6 +9,7 @@ import {
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
 import {
+  CoreMetadata,
   ImageMetadataAndWorkflow,
   zCoreMetadata,
 } from 'features/nodes/types/types';
@@ -23,7 +25,6 @@ import {
   ListImagesArgs,
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
-  UnsafeImageMetadata,
 } from '../types';
 import {
   getCategories,
@@ -114,11 +115,24 @@ export const imagesApi = api.injectEndpoints({
       ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    getImageMetadata: build.query<UnsafeImageMetadata, string>({
+    getImageMetadata: build.query<CoreMetadata | undefined, string>({
       query: (image_name) => ({ url: `images/i/${image_name}/metadata` }),
       providesTags: (result, error, image_name) => [
         { type: 'ImageMetadata', id: image_name },
       ],
+      transformResponse: (
+        response: paths['/api/v1/images/i/{image_name}/metadata']['get']['responses']['200']['content']['application/json']
+      ) => {
+        if (response) {
+          const result = zCoreMetadata.safeParse(response);
+          if (result.success) {
+            return result.data;
+          } else {
+            logger('images').warn('Problem parsing metadata');
+          }
+        }
+        return;
+      },
       keepUnusedDataFor: 86400, // 24 hours
     }),
     getImageMetadataFromFile: build.query<

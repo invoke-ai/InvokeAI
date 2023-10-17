@@ -81,6 +81,29 @@ class PromptCollectionTestInvocation(BaseInvocation):
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
 
 
+@invocation_output("test_any_output")
+class AnyTypeTestInvocationOutput(BaseInvocationOutput):
+    value: Any = Field()
+
+
+@invocation("test_any")
+class AnyTypeTestInvocation(BaseInvocation):
+    value: Any = Field(default=None)
+
+    def invoke(self, context: InvocationContext) -> AnyTypeTestInvocationOutput:
+        return AnyTypeTestInvocationOutput(value=self.value)
+
+
+@invocation("test_polymorphic")
+class PolymorphicStringTestInvocation(BaseInvocation):
+    value: Union[str, list[str]] = Field(default="")
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        if isinstance(self.value, str):
+            return PromptCollectionTestInvocationOutput(collection=[self.value])
+        return PromptCollectionTestInvocationOutput(collection=self.value)
+
+
 # Importing these must happen after test invocations are defined or they won't register
 from invokeai.app.services.events.events_base import EventServiceBase  # noqa: E402
 from invokeai.app.services.shared.graph import Edge, EdgeConnection  # noqa: E402

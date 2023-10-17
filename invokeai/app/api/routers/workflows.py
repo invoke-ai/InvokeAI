@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Path
+from fastapi import APIRouter, Path
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField

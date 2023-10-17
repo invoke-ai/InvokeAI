@@ -55,6 +55,10 @@ export type InvocationTemplate = {
    */
   outputType: string; // TODO: generate a union of output types
   /**
+   * Whether or not this invocation supports workflows
+   */
+  withWorkflow: boolean;
+  /**
    * The invocation's version.
    */
   version?: string;
@@ -72,6 +76,7 @@ export type FieldUIConfig = {
 
 // TODO: Get this from the OpenAPI schema? may be tricky...
 export const zFieldType = z.enum([
+  'Any',
   'BoardField',
   'boolean',
   'BooleanCollection',
@@ -109,6 +114,11 @@ export const zFieldType = z.enum([
   'LatentsPolymorphic',
   'LoRAModelField',
   'MainModelField',
+  'MetadataField',
+  'MetadataCollection',
+  'MetadataItemField',
+  'MetadataItemCollection',
+  'MetadataItemPolymorphic',
   'ONNXModelField',
   'Scheduler',
   'SDXLMainModelField',
@@ -685,6 +695,57 @@ export type CollectionItemInputFieldValue = z.infer<
   typeof zCollectionItemInputFieldValue
 >;
 
+export const zMetadataItemField = z.object({
+  label: z.string(),
+  value: z.any(),
+});
+export type MetadataItemField = z.infer<typeof zMetadataItemField>;
+
+export const zMetadataItemInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('MetadataItemField'),
+  value: zMetadataItemField.optional(),
+});
+export type MetadataItemInputFieldValue = z.infer<
+  typeof zMetadataItemInputFieldValue
+>;
+
+export const zMetadataItemCollectionInputFieldValue =
+  zInputFieldValueBase.extend({
+    type: z.literal('MetadataItemCollection'),
+    value: z.array(zMetadataItemField).optional(),
+  });
+export type MetadataItemCollectionInputFieldValue = z.infer<
+  typeof zMetadataItemCollectionInputFieldValue
+>;
+
+export const zMetadataItemPolymorphicInputFieldValue =
+  zInputFieldValueBase.extend({
+    type: z.literal('MetadataItemPolymorphic'),
+    value: z
+      .union([zMetadataItemField, z.array(zMetadataItemField)])
+      .optional(),
+  });
+export type MetadataItemPolymorphicInputFieldValue = z.infer<
+  typeof zMetadataItemPolymorphicInputFieldValue
+>;
+
+export const zMetadataField = z.record(z.any());
+export type MetadataField = z.infer<typeof zMetadataField>;
+
+export const zMetadataInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('MetadataField'),
+  value: zMetadataField.optional(),
+});
+export type MetadataInputFieldValue = z.infer<typeof zMetadataInputFieldValue>;
+
+export const zMetadataCollectionInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('MetadataCollection'),
+  value: z.array(zMetadataField).optional(),
+});
+export type MetadataCollectionInputFieldValue = z.infer<
+  typeof zMetadataCollectionInputFieldValue
+>;
+
 export const zColorField = z.object({
   r: z.number().int().min(0).max(255),
   g: z.number().int().min(0).max(255),
@@ -723,7 +784,13 @@ export type SchedulerInputFieldValue = z.infer<
   typeof zSchedulerInputFieldValue
 >;
 
+export const zAnyInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('Any'),
+  value: z.any().optional(),
+});
+
 export const zInputFieldValue = z.discriminatedUnion('type', [
+  zAnyInputFieldValue,
   zBoardInputFieldValue,
   zBooleanCollectionInputFieldValue,
   zBooleanInputFieldValue,
@@ -774,6 +841,11 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zUNetInputFieldValue,
   zVaeInputFieldValue,
   zVaeModelInputFieldValue,
+  zMetadataItemInputFieldValue,
+  zMetadataItemCollectionInputFieldValue,
+  zMetadataItemPolymorphicInputFieldValue,
+  zMetadataInputFieldValue,
+  zMetadataCollectionInputFieldValue,
 ]);
 
 export type InputFieldValue = z.infer<typeof zInputFieldValue>;
@@ -785,6 +857,11 @@ export type InputFieldTemplateBase = {
   required: boolean;
   fieldKind: 'input';
 } & _InputField;
+
+export type AnyInputFieldTemplate = InputFieldTemplateBase & {
+  type: 'Any';
+  default: undefined;
+};
 
 export type IntegerInputFieldTemplate = InputFieldTemplateBase & {
   type: 'integer';
@@ -939,6 +1016,11 @@ export type UNetInputFieldTemplate = InputFieldTemplateBase & {
   type: 'UNetField';
 };
 
+export type MetadataItemFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'MetadataItemField';
+};
+
 export type ClipInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'ClipField';
@@ -1087,6 +1169,34 @@ export type WorkflowInputFieldTemplate = InputFieldTemplateBase & {
   type: 'WorkflowField';
 };
 
+export type MetadataItemInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'MetadataItemField';
+};
+
+export type MetadataItemCollectionInputFieldTemplate =
+  InputFieldTemplateBase & {
+    default: undefined;
+    type: 'MetadataItemCollection';
+  };
+
+export type MetadataItemPolymorphicInputFieldTemplate = Omit<
+  MetadataItemInputFieldTemplate,
+  'type'
+> & {
+  type: 'MetadataItemPolymorphic';
+};
+
+export type MetadataInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'MetadataField';
+};
+
+export type MetadataCollectionInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'MetadataCollection';
+};
+
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
  *
@@ -1094,6 +1204,7 @@ export type WorkflowInputFieldTemplate = InputFieldTemplateBase & {
  * maximum length, pattern to match, etc).
  */
 export type InputFieldTemplate =
+  | AnyInputFieldTemplate
   | BoardInputFieldTemplate
   | BooleanCollectionInputFieldTemplate
   | BooleanPolymorphicInputFieldTemplate
@@ -1143,7 +1254,12 @@ export type InputFieldTemplate =
   | T2IAdapterPolymorphicInputFieldTemplate
   | UNetInputFieldTemplate
   | VaeInputFieldTemplate
-  | VaeModelInputFieldTemplate;
+  | VaeModelInputFieldTemplate
+  | MetadataItemInputFieldTemplate
+  | MetadataItemCollectionInputFieldTemplate
+  | MetadataInputFieldTemplate
+  | MetadataItemPolymorphicInputFieldTemplate
+  | MetadataCollectionInputFieldTemplate;
 
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue
@@ -1264,7 +1380,7 @@ export const isInvocationFieldSchema = (
 
 export type InvocationEdgeExtra = { type: 'default' | 'collapsed' };
 
-const zLoRAMetadataItem = z.object({
+export const zLoRAMetadataItem = z.object({
   lora: zLoRAModelField.deepPartial(),
   weight: z.number(),
 });

@@ -2,10 +2,10 @@ from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.metadata import ImageMetadata
+from invokeai.app.invocations.metadata import MetadataField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.util.metadata import get_metadata_graph_from_raw_session
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField
 
 from ..image_files.image_files_common import (
     ImageFileDeleteException,
@@ -42,8 +42,8 @@ class ImageService(ImageServiceABC):
         session_id: Optional[str] = None,
         board_id: Optional[str] = None,
         is_intermediate: Optional[bool] = False,
-        metadata: Optional[dict] = None,
-        workflow: Optional[str] = None,
+        metadata: Optional[MetadataField] = None,
+        workflow: Optional[WorkflowField] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -56,6 +56,12 @@ class ImageService(ImageServiceABC):
         (width, height) = image.size
 
         try:
+            if workflow is not None:
+                created_workflow = self.__invoker.services.workflow_records.create(workflow)
+                workflow_id = created_workflow.model_dump()["id"]
+            else:
+                workflow_id = None
+
             # TODO: Consider using a transaction here to ensure consistency between storage and database
             self.__invoker.services.image_records.save(
                 # Non-nullable fields
@@ -69,6 +75,7 @@ class ImageService(ImageServiceABC):
                 # Nullable fields
                 node_id=node_id,
                 metadata=metadata,
+                workflow_id=workflow_id,
                 session_id=session_id,
             )
             if board_id is not None:
@@ -146,25 +153,9 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image DTO")
             raise e
 
-    def get_metadata(self, image_name: str) -> ImageMetadata:
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         try:
-            image_record = self.__invoker.services.image_records.get(image_name)
-            metadata = self.__invoker.services.image_records.get_metadata(image_name)
-
-            if not image_record.session_id:
-                return ImageMetadata(metadata=metadata)
-
-            session_raw = self.__invoker.services.graph_execution_manager.get_raw(image_record.session_id)
-            graph = None
-
-            if session_raw:
-                try:
-                    graph = get_metadata_graph_from_raw_session(session_raw)
-                except Exception as e:
-                    self.__invoker.services.logger.warn(f"Failed to parse session graph: {e}")
-                    graph = None
-
-            return ImageMetadata(graph=graph, metadata=metadata)
+            return self.__invoker.services.image_records.get_metadata(image_name)
         except ImageRecordNotFoundException:
             self.__invoker.services.logger.error("Image record not found")
             raise

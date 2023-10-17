@@ -100,6 +100,7 @@ IMAGE_DTO_COLS = ", ".join(
                 "width",
                 "height",
                 "session_id",
+                "workflow_id",
                 "node_id",
                 "is_intermediate",
                 "created_at",
@@ -140,6 +141,11 @@ class ImageRecord(BaseModelExcludeNull):
         description="The session ID that generated this image, if it is a generated image.",
     )
     """The session ID that generated this image, if it is a generated image."""
+    workflow_id: Optional[str] = Field(
+        default=None,
+        description="The workflow that generated this image.",
+    )
+    """The workflow that generated this image."""
     node_id: Optional[str] = Field(
         default=None,
         description="The node ID that generated this image, if it is a generated image.",
@@ -184,6 +190,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     width = image_dict.get("width", 0)
     height = image_dict.get("height", 0)
     session_id = image_dict.get("session_id", None)
+    workflow_id = image_dict.get("workflow_id", None)
     node_id = image_dict.get("node_id", None)
     created_at = image_dict.get("created_at", get_iso_timestamp())
     updated_at = image_dict.get("updated_at", get_iso_timestamp())
@@ -198,6 +205,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         width=width,
         height=height,
         session_id=session_id,
+        workflow_id=workflow_id,
         node_id=node_id,
         created_at=created_at,
         updated_at=updated_at,

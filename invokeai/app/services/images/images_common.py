@@ -25,8 +25,6 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
     )
     """The id of the board the image belongs to, if one exists."""
 
-    pass
-
 
 def image_record_to_dto(
     image_record: ImageRecord,

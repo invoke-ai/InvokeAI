@@ -15,8 +15,8 @@ from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.util.misc import uuid_string
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField
+from invokeai.app.util.misc import uuid_string
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
@@ -60,6 +60,11 @@ class FieldDescriptions:
     denoised_latents = "Denoised latents tensor"
     latents = "Latents tensor"
     strength = "Strength of denoising (proportional to steps)"
+    metadata = "Optional metadata to be saved with the image"
+    metadata_collection = "Collection of Metadata"
+    metadata_item_polymorphic = "A single metadata item or collection of metadata items"
+    metadata_item_label = "Label for this metadata item"
+    metadata_item_value = "The value for this metadata item (may be any type)"
     workflow = "Optional workflow to be saved with the image"
     interp_mode = "Interpolation mode"
     torch_antialias = "Whether or not to apply antialiasing (bilinear or bicubic only)"
@@ -167,8 +172,12 @@ class UIType(str, Enum):
     Scheduler = "Scheduler"
     WorkflowField = "WorkflowField"
     IsIntermediate = "IsIntermediate"
-    MetadataField = "MetadataField"
     BoardField = "BoardField"
+    Any = "Any"
+    MetadataItem = "MetadataItem"
+    MetadataItemCollection = "MetadataItemCollection"
+    MetadataItemPolymorphic = "MetadataItemPolymorphic"
+    MetadataDict = "MetadataDict"
     # endregion
 
 
@@ -807,3 +816,26 @@ def invocation_output(
 class WithWorkflow(BaseModel):
     workflow: Optional[WorkflowField] = InputField(default=None, description=FieldDescriptions.workflow)
 
+
+class MetadataItemField(BaseModel):
+    label: str = Field(description=FieldDescriptions.metadata_item_label)
+    value: Any = Field(description=FieldDescriptions.metadata_item_value)
+
+
+class MetadataField(RootModel):
+    """
+    Pydantic model for metadata with custom root of type dict[str, Any].
+    Metadata is stored without a strict schema.
+    """
+
+    root: dict[str, Any] = Field(description="A dictionary of metadata, shape of which is arbitrary")
+
+    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+        return super().model_dump(*args, **kwargs)["root"]
+
+
+type_adapter_MetadataField = TypeAdapter(MetadataField)
+
+
+class WithMetadata(BaseModel):
+    metadata: Optional[MetadataField] = InputField(default=None, description=FieldDescriptions.metadata)

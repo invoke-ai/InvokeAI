@@ -27,14 +27,6 @@ export type BatchConfig =
 
 export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
 
-/**
- * This is an unsafe type; the object inside is not guaranteed to be valid.
- */
-export type UnsafeImageMetadata = {
-  metadata: s['CoreMetadata'];
-  graph: NonNullable<s['Graph']>;
-};
-
 export type _InputField = s['_InputField'];
 export type _OutputField = s['_OutputField'];
 
@@ -50,7 +42,6 @@ export type ImageChanges = s['ImageRecordChanges'];
 export type ImageCategory = s['ImageCategory'];
 export type ResourceOrigin = s['ResourceOrigin'];
 export type ImageField = s['ImageField'];
-export type ImageMetadata = s['ImageMetadata'];
 export type OffsetPaginatedResults_BoardDTO_ =
   s['OffsetPaginatedResults_BoardDTO_'];
 export type OffsetPaginatedResults_ImageDTO_ =
@@ -145,13 +136,19 @@ export type ImageCollectionInvocation = s['ImageCollectionInvocation'];
 export type MainModelLoaderInvocation = s['MainModelLoaderInvocation'];
 export type OnnxModelLoaderInvocation = s['OnnxModelLoaderInvocation'];
 export type LoraLoaderInvocation = s['LoraLoaderInvocation'];
-export type MetadataAccumulatorInvocation = s['MetadataAccumulatorInvocation'];
 export type ESRGANInvocation = s['ESRGANInvocation'];
 export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
 export type SaveImageInvocation = s['SaveImageInvocation'];
+export type MetadataInvocation = s['MetadataInvocation'];
+export type CoreMetadataInvocation = s['CoreMetadataInvocation'];
+export type MetadataItemInvocation = s['MetadataItemInvocation'];
+export type MergeMetadataInvocation = s['MergeMetadataInvocation'];
+export type IPAdapterMetadataField = s['IPAdapterMetadataField'];
+export type T2IAdapterField = s['T2IAdapterField'];
+export type LoRAMetadataField = s['LoRAMetadataField'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];
