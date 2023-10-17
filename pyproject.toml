@@ -35,10 +35,10 @@ dependencies = [
   "accelerate~=0.23.0",
   "albumentations",
   "click",
-  "clip_anytorch",                         # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
+  "clip_anytorch",         # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel~=2.0.2",
   "controlnet-aux>=0.0.6",
-  "timm==0.6.13",                          # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
+  "timm==0.6.13",          # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
   # When bumping diffusers beyond 0.21, make sure to address this:
   # https://github.com/invoke-ai/InvokeAI/blob/fc09ab7e13cb7ca5389100d149b6422ace7b8ed3/invokeai/app/invocations/latent.py#L513
@@ -70,7 +70,7 @@ dependencies = [
   'pyperclip',
   "pyreadline3",
   "python-multipart",
-  "python-socketio",
+  "python-socketio~=5.10.0",
   "pytorch-lightning",
   "realesrgan",
   "requests~=2.28.2",
