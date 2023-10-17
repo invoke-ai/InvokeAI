@@ -7,7 +7,7 @@ const QueueItemCard = ({
   session_queue_item,
   label,
 }: {
-  session_queue_item?: components['schemas']['SessionQueueItem'];
+  session_queue_item?: components['schemas']['SessionQueueItem'] | null;
   label: string;
 }) => {
   return (

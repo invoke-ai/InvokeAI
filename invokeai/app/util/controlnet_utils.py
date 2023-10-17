@@ -265,7 +265,7 @@ def np_img_resize(np_img: np.ndarray, resize_mode: str, h: int, w: int, device: 
 
 
 def prepare_control_image(
-    image: Image,
+    image: Image.Image,
     width: int,
     height: int,
     num_channels: int = 3,

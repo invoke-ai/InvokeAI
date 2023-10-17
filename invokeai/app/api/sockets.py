@@ -30,8 +30,8 @@ class SocketIO:
 
     async def _handle_sub_queue(self, sid, data, *args, **kwargs):
         if "queue_id" in data:
-            self.__sio.enter_room(sid, data["queue_id"])
+            await self.__sio.enter_room(sid, data["queue_id"])
 
     async def _handle_unsub_queue(self, sid, data, *args, **kwargs):
         if "queue_id" in data:
-            self.__sio.enter_room(sid, data["queue_id"])
+            await self.__sio.enter_room(sid, data["queue_id"])

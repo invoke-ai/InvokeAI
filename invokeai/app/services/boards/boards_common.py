@@ -17,7 +17,7 @@ class BoardDTO(BoardRecord):
 def board_record_to_dto(board_record: BoardRecord, cover_image_name: Optional[str], image_count: int) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
-        **board_record.dict(exclude={"cover_image_name"}),
+        **board_record.model_dump(exclude={"cover_image_name"}),
         cover_image_name=cover_image_name,
         image_count=image_count,
     )
