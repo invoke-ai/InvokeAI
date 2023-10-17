@@ -4,8 +4,7 @@ from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.metadata import MetadataField
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField
+from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
 
 
 class ImageFileStorageBase(ABC):

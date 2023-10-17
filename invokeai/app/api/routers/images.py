@@ -7,11 +7,14 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, ValidationError
 
-from invokeai.app.invocations.baseinvocation import MetadataField, type_adapter_MetadataField
+from invokeai.app.invocations.baseinvocation import (
+    MetadataField,
+    type_adapter_MetadataField,
+    type_adapter_WorkflowField,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.workflow_records.workflow_records_common import type_adapter_WorkflowField
 
 from ..dependencies import ApiDependencies
 

@@ -9,7 +9,6 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     MetadataField,
-    MetadataItemField,
     OutputField,
     UIType,
     invocation,
@@ -22,6 +21,11 @@ from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 
 from ...version import __version__
+
+
+class MetadataItemField(BaseModel):
+    label: str = Field(description=FieldDescriptions.metadata_item_label)
+    value: Any = Field(description=FieldDescriptions.metadata_item_value)
 
 
 class LoRAMetadataField(BaseModel):

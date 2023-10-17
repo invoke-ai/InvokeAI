@@ -15,7 +15,6 @@ from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowField
 from invokeai.app.util.misc import uuid_string
 
 if TYPE_CHECKING:
@@ -813,13 +812,20 @@ def invocation_output(
     return wrapper
 
 
+class WorkflowField(RootModel):
+    """
+    Pydantic model for workflows with custom root of type dict[str, Any].
+    Workflows are stored without a strict schema.
+    """
+
+    root: dict[str, Any] = Field(description="The workflow")
+
+
+type_adapter_WorkflowField = TypeAdapter(WorkflowField)
+
+
 class WithWorkflow(BaseModel):
     workflow: Optional[WorkflowField] = InputField(default=None, description=FieldDescriptions.workflow)
-
-
-class MetadataItemField(BaseModel):
-    label: str = Field(description=FieldDescriptions.metadata_item_label)
-    value: Any = Field(description=FieldDescriptions.metadata_item_value)
 
 
 class MetadataField(RootModel):
@@ -828,7 +834,7 @@ class MetadataField(RootModel):
     Metadata is stored without a strict schema.
     """
 
-    root: dict[str, Any] = Field(description="A dictionary of metadata, shape of which is arbitrary")
+    root: dict[str, Any] = Field(description="The metadata")
 
 
 type_adapter_MetadataField = TypeAdapter(MetadataField)
