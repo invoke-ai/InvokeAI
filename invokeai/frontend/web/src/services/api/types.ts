@@ -26,7 +26,6 @@ export type BatchConfig =
   paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
 
 export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
-export type EnqueueGraphResult = components['schemas']['EnqueueGraphResult'];
 
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
