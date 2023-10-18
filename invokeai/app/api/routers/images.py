@@ -1,4 +1,5 @@
 import io
+import traceback
 from typing import Optional
 
 from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
@@ -60,6 +61,7 @@ async def upload_image(
             pil_image = pil_image.crop(bbox)
     except Exception:
         # Error opening the image
+        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
 
     # attempt to parse metadata from image
@@ -97,6 +99,7 @@ async def upload_image(
 
         return image_dto
     except Exception:
+        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Failed to create image")
 
 
