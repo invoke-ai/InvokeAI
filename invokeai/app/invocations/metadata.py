@@ -43,16 +43,10 @@ class IPAdapterMetadataField(BaseModel):
         description="The IP-Adapter model.",
     )
     weight: Union[float, list[float]] = Field(
-        default=1,
-        ge=0,
         description="The weight given to the IP-Adapter",
     )
-    begin_step_percent: float = Field(
-        default=0, ge=-1, le=2, description="When the IP-Adapter is first applied (% of total steps)"
-    )
-    end_step_percent: float = Field(
-        default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
-    )
+    begin_step_percent: float = Field(description="When the IP-Adapter is first applied (% of total steps)")
+    end_step_percent: float = Field(description="When the IP-Adapter is last applied (% of total steps)")
 
 
 @invocation_output("metadata_item_output")
