@@ -60,10 +60,10 @@ async def upload_image(
             bbox = pil_image.getbbox()
             pil_image = pil_image.crop(bbox)
     except Exception:
-        # Error opening the image
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
 
+    # TODO: retain non-invokeai metadata on upload?
     # attempt to parse metadata from image
     metadata_raw = pil_image.info.get("invokeai_metadata", None)
     if metadata_raw:
