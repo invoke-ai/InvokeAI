@@ -214,7 +214,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.3.0",
+    version="1.4.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -491,16 +491,21 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 context=context,
             )
 
-            input_image = context.services.images.get_pil_image(single_ip_adapter.image.image_name)
+            # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
+            single_ipa_images = single_ip_adapter.image
+            if not isinstance(single_ipa_images, list):
+                single_ipa_images = [single_ipa_images]
+
+            single_ipa_images = [context.services.images.get_pil_image(image.image_name) for image in single_ipa_images]
 
             # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
             # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
             with image_encoder_model_info as image_encoder_model:
                 # Get image embeddings from CLIP and ImageProjModel.
-                (
-                    image_prompt_embeds,
-                    uncond_image_prompt_embeds,
-                ) = ip_adapter_model.get_image_embeds(input_image, image_encoder_model)
+                image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
+                    single_ipa_images, image_encoder_model
+                )
+
                 conditioning_data.ip_adapter_conditioning.append(
                     IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds)
                 )
