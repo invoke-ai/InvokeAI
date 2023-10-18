@@ -17,6 +17,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import uvicorn
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
     from fastapi.openapi.utils import get_openapi
     from fastapi.staticfiles import StaticFiles
@@ -71,6 +72,8 @@ app.add_middleware(
     allow_methods=app_config.allow_methods,
     allow_headers=app_config.allow_headers,
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 # Add startup event to load dependencies
