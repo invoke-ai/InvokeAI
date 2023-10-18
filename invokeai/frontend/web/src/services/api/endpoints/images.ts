@@ -1,5 +1,4 @@
 import { EntityState, Update } from '@reduxjs/toolkit';
-import { fetchBaseQuery } from '@reduxjs/toolkit/dist/query';
 import { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
 import { logger } from 'app/logging/logger';
 import {
@@ -8,15 +7,9 @@ import {
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
-import {
-  CoreMetadata,
-  ImageMetadataAndWorkflow,
-  zCoreMetadata,
-} from 'features/nodes/types/types';
-import { getMetadataAndWorkflowFromImageBlob } from 'features/nodes/util/getMetadataAndWorkflowFromImageBlob';
+import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/types';
 import { keyBy } from 'lodash-es';
 import { ApiTagDescription, LIST_TAG, api } from '..';
-import { $authToken, $projectId } from '../client';
 import { components, paths } from '../schema';
 import {
   DeleteBoardResult,
@@ -133,68 +126,6 @@ export const imagesApi = api.injectEndpoints({
         }
         return;
       },
-      keepUnusedDataFor: 86400, // 24 hours
-    }),
-    getImageMetadataFromFile: build.query<
-      ImageMetadataAndWorkflow,
-      { image: ImageDTO; shouldFetchMetadataFromApi: boolean }
-    >({
-      queryFn: async (
-        args: { image: ImageDTO; shouldFetchMetadataFromApi: boolean },
-        api,
-        extraOptions,
-        fetchWithBaseQuery
-      ) => {
-        if (args.shouldFetchMetadataFromApi) {
-          let metadata;
-          const metadataResponse = await fetchWithBaseQuery(
-            `images/i/${args.image.image_name}/metadata`
-          );
-          if (metadataResponse.data) {
-            const metadataResult = zCoreMetadata.safeParse(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (metadataResponse.data as any)?.metadata
-            );
-            if (metadataResult.success) {
-              metadata = metadataResult.data;
-            }
-          }
-          return { data: { metadata } };
-        } else {
-          const authToken = $authToken.get();
-          const projectId = $projectId.get();
-          const customBaseQuery = fetchBaseQuery({
-            baseUrl: '',
-            prepareHeaders: (headers) => {
-              if (authToken) {
-                headers.set('Authorization', `Bearer ${authToken}`);
-              }
-              if (projectId) {
-                headers.set('project-id', projectId);
-              }
-
-              return headers;
-            },
-            responseHandler: async (res) => {
-              return await res.blob();
-            },
-          });
-
-          const response = await customBaseQuery(
-            args.image.image_url,
-            api,
-            extraOptions
-          );
-          const data = await getMetadataAndWorkflowFromImageBlob(
-            response.data as Blob
-          );
-
-          return { data };
-        }
-      },
-      providesTags: (result, error, { image }) => [
-        { type: 'ImageMetadataFromFile', id: image.image_name },
-      ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
     deleteImage: build.mutation<void, ImageDTO>({
@@ -1643,6 +1574,5 @@ export const {
   useDeleteBoardMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
-  useGetImageMetadataFromFileQuery,
   useBulkDownloadImagesMutation,
 } = imagesApi;
