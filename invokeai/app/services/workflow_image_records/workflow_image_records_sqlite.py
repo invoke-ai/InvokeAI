@@ -1,8 +1,8 @@
 import sqlite3
 import threading
 from typing import Optional, cast
-from invokeai.app.services.shared.sqlite import SqliteDatabase
 
+from invokeai.app.services.shared.sqlite import SqliteDatabase
 from invokeai.app.services.workflow_image_records.workflow_image_records_base import WorkflowImageRecordsStorageBase
 
 
