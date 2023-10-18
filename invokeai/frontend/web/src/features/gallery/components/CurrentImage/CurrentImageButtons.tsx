@@ -38,15 +38,12 @@ import {
   FaSeedling,
 } from 'react-icons/fa';
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
-import {
-  useGetImageDTOQuery,
-  useGetImageMetadataQuery,
-} from 'services/api/endpoints/images';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { menuListMotionProps } from 'theme/components/menu';
-import { useDebounce } from 'use-debounce';
 import { sentImageToImg2Img } from '../../store/actions';
 import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
-import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -105,17 +102,12 @@ const CurrentImageButtons = () => {
     lastSelectedImage?.image_name ?? skipToken
   );
 
-  const [debouncedImageName] = useDebounce(lastSelectedImage?.image_name, 300);
-  const [debouncedWorkflowId] = useDebounce(
-    lastSelectedImage?.workflow_id,
-    300
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
+    lastSelectedImage?.image_name
   );
 
-  const { data: metadata, isLoading: isLoadingMetadata } =
-    useGetImageMetadataQuery(debouncedImageName ?? skipToken);
-
-  const { data: workflow, isLoading: isLoadingWorkflow } = useGetWorkflowQuery(
-    debouncedWorkflowId ?? skipToken
+  const { workflow, isLoading: isLoadingWorkflow } = useDebouncedWorkflow(
+    lastSelectedImage?.workflow_id
   );
 
   const handleLoadWorkflow = useCallback(() => {

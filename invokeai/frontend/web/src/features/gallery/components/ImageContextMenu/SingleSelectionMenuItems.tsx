@@ -1,6 +1,5 @@
 import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -33,13 +32,12 @@ import {
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
-  useGetImageMetadataQuery,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
-import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 
 type SingleSelectionMenuItemsProps = {
@@ -57,14 +55,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const customStarUi = useStore($customStarUI);
 
-  const [debouncedImageName] = useDebounce(imageDTO?.image_name, 300);
-  const [debouncedWorkflowId] = useDebounce(imageDTO?.workflow_id, 300);
-
-  const { data: metadata, isLoading: isLoadingMetadata } =
-    useGetImageMetadataQuery(debouncedImageName ?? skipToken);
-
-  const { data: workflow, isLoading: isLoadingWorkflow } = useGetWorkflowQuery(
-    debouncedWorkflowId ?? skipToken
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
+    imageDTO?.image_name
+  );
+  const { workflow, isLoading: isLoadingWorkflow } = useDebouncedWorkflow(
+    imageDTO?.workflow_id
   );
 
   const [starImages] = useStarImagesMutation();

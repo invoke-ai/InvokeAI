@@ -9,15 +9,13 @@ import {
   Tabs,
   Text,
 } from '@chakra-ui/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
-import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
-import { useDebounce } from 'use-debounce';
 import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
 
@@ -33,16 +31,8 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // });
   const { t } = useTranslation();
 
-  const [debouncedImageName] = useDebounce(image.image_name, 300);
-  const [debouncedWorkflowId] = useDebounce(image.workflow_id, 300);
-
-  const { data: metadata } = useGetImageMetadataQuery(
-    debouncedImageName ?? skipToken
-  );
-
-  const { data: workflow } = useGetWorkflowQuery(
-    debouncedWorkflowId ?? skipToken
-  );
+  const { metadata } = useDebouncedMetadata(image.image_name);
+  const { workflow } = useDebouncedWorkflow(image.workflow_id);
 
   return (
     <Flex
