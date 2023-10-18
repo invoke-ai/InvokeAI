@@ -276,14 +276,6 @@ class EnqueueBatchResult(BaseModel):
     priority: int = Field(description="The priority of the enqueued batch")
 
 
-class EnqueueGraphResult(BaseModel):
-    enqueued: int = Field(description="The total number of queue items enqueued")
-    requested: int = Field(description="The total number of queue items requested to be enqueued")
-    batch: Batch = Field(description="The batch that was enqueued")
-    priority: int = Field(description="The priority of the enqueued batch")
-    queue_item: SessionQueueItemDTO = Field(description="The queue item that was enqueued")
-
-
 class ClearResult(BaseModel):
     """Result of clearing the session queue"""
 

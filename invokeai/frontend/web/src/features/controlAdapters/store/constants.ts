@@ -246,7 +246,7 @@ export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
   mlsd: 'mlsd_image_processor',
   depth: 'midas_depth_image_processor',
   bae: 'normalbae_image_processor',
-  sketch: 'lineart_image_processor',
+  sketch: 'pidi_image_processor',
   scribble: 'lineart_image_processor',
   lineart: 'lineart_image_processor',
   lineart_anime: 'lineart_anime_image_processor',
