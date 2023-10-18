@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { reduce } from 'lodash-es';
-import { OpenAPIV3 } from 'openapi-types';
+import { reduce, startCase } from 'lodash-es';
+import { OpenAPIV3_1 } from 'openapi-types';
 import { AnyInvocationType } from 'services/events/types';
 import {
   FieldType,
@@ -60,7 +60,7 @@ const isNotInDenylist = (schema: InvocationSchemaObject) =>
   !invocationDenylist.includes(schema.properties.type.default);
 
 export const parseSchema = (
-  openAPI: OpenAPIV3.Document,
+  openAPI: OpenAPIV3_1.Document,
   nodesAllowlistExtra: string[] | undefined = undefined,
   nodesDenylistExtra: string[] | undefined = undefined
 ): Record<string, InvocationTemplate> => {
@@ -110,7 +110,7 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
-        const fieldType = getFieldType(property);
+        const fieldType = property.ui_type ?? getFieldType(property);
 
         if (!isFieldType(fieldType)) {
           logger('nodes').warn(
@@ -209,7 +209,7 @@ export const parseSchema = (
           return outputsAccumulator;
         }
 
-        const fieldType = getFieldType(property);
+        const fieldType = property.ui_type ?? getFieldType(property);
 
         if (!isFieldType(fieldType)) {
           logger('nodes').warn(
@@ -222,7 +222,8 @@ export const parseSchema = (
         outputsAccumulator[propertyName] = {
           fieldKind: 'output',
           name: propertyName,
-          title: property.title ?? '',
+          title:
+            property.title ?? (propertyName ? startCase(propertyName) : ''),
           description: property.description ?? '',
           type: fieldType,
           ui_hidden: property.ui_hidden ?? false,

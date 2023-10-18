@@ -2,7 +2,7 @@ import os
 from builtins import float
 from typing import List, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -25,10 +25,14 @@ class IPAdapterModelField(BaseModel):
     model_name: str = Field(description="Name of the IP-Adapter model")
     base_model: BaseModelType = Field(description="Base model")
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class CLIPVisionModelField(BaseModel):
     model_name: str = Field(description="Name of the CLIP Vision image encoder model")
     base_model: BaseModelType = Field(description="Base model (usually 'Any')")
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class IPAdapterField(BaseModel):

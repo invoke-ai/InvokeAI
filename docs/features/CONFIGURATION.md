@@ -82,7 +82,7 @@ format of YAML files can be found
 [here](https://circleci.com/blog/what-is-yaml-a-beginner-s-guide/).
 
 You can fix a broken `invokeai.yaml` by deleting it and running the
-configuration script again -- option [7] in the launcher, "Re-run the
+configuration script again -- option [6] in the launcher, "Re-run the
 configure script".
 
 #### Reading Environment Variables

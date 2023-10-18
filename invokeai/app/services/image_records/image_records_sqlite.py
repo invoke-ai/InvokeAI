@@ -2,7 +2,7 @@ import json
 import sqlite3
 import threading
 from datetime import datetime
-from typing import Optional, cast
+from typing import Optional, Union, cast
 
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite import SqliteDatabase
@@ -117,7 +117,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
-    def get(self, image_name: str) -> Optional[ImageRecord]:
+    def get(self, image_name: str) -> ImageRecord:
         try:
             self._lock.acquire()
 
@@ -223,8 +223,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_many(
         self,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
+        offset: int = 0,
+        limit: int = 10,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
@@ -249,7 +249,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
 
             query_conditions = ""
-            query_params = []
+            query_params: list[Union[int, str, bool]] = []
 
             if image_origin is not None:
                 query_conditions += """--sql
@@ -387,13 +387,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_name: str,
         image_origin: ResourceOrigin,
         image_category: ImageCategory,
-        session_id: Optional[str],
         width: int,
         height: int,
-        node_id: Optional[str],
-        metadata: Optional[dict],
-        is_intermediate: bool = False,
-        starred: bool = False,
+        is_intermediate: Optional[bool] = False,
+        starred: Optional[bool] = False,
+        session_id: Optional[str] = None,
+        node_id: Optional[str] = None,
+        metadata: Optional[dict] = None,
     ) -> datetime:
         try:
             metadata_json = None if metadata is None else json.dumps(metadata)

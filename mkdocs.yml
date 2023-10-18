@@ -134,6 +134,7 @@ nav:
       - List of Default Nodes: 'nodes/defaultNodes.md'
       - Workflow Editor Usage: 'nodes/NODES.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
+      - Facetool Node: 'nodes/detailedNodes/faceTools.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
     - Features:
       - Overview: 'features/index.md'
@@ -144,7 +145,7 @@ nav:
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
       - Model Merging: 'features/MODEL_MERGING.md'
-      - Using Nodes : './nodes/overview'
+      - Using Nodes : 'nodes/overview.md'
       - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
@@ -152,15 +153,18 @@ nav:
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
       - InvokeAI Web Server: 'features/WEB.md'
       - WebUI Hotkeys: "features/WEBUIHOTKEYS.md"
+      - Maintenance Utilities: "features/UTILITIES.md"
       - Other: 'features/OTHER.md'
     - Contributing:
       - How to Contribute: 'contributing/CONTRIBUTING.md'
+      - InvokeAI Code of Conduct: 'CODE_OF_CONDUCT.md'
       - Development:
         - Overview: 'contributing/contribution_guides/development.md'
         - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
         - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
         - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
+        - Adding Tests: 'contributing/TESTS.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
       - Translation: 'contributing/contribution_guides/translation.md'
@@ -168,9 +172,12 @@ nav:
     - Changelog: 'CHANGELOG.md'
     - Deprecated:
       - Command Line Interface: 'deprecated/CLI.md'
+      - Variations: 'deprecated/VARIATIONS.md'
+      - Translations: 'deprecated/TRANSLATION.md'
       - Embiggen: 'deprecated/EMBIGGEN.md'
       - Inpainting: 'deprecated/INPAINTING.md'
       - Outpainting: 'deprecated/OUTPAINTING.md'
+      - Troubleshooting: 'help/deprecated/TROUBLESHOOT.md'
     - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
       - Diffusion Overview: 'help/diffusion.md'

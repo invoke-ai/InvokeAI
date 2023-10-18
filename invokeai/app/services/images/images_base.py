@@ -49,7 +49,7 @@ class ImageServiceABC(ABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         board_id: Optional[str] = None,
-        is_intermediate: bool = False,
+        is_intermediate: Optional[bool] = False,
         metadata: Optional[dict] = None,
         workflow: Optional[str] = None,
     ) -> ImageDTO:

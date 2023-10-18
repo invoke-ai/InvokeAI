@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import ClassVar, Dict, List, Literal, Optional, Union, get_args, get_origin, get_type_hints
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from invokeai.app.services.config.config_common import PagingArgumentParser, int_or_float_or_str
 
@@ -32,12 +32,14 @@ class InvokeAISettings(BaseSettings):
     initconf: ClassVar[Optional[DictConfig]] = None
     argparse_groups: ClassVar[Dict] = {}
 
+    model_config = SettingsConfigDict(env_file_encoding="utf-8", arbitrary_types_allowed=True, case_sensitive=True)
+
     def parse_args(self, argv: Optional[list] = sys.argv[1:]):
         parser = self.get_parser()
         opt, unknown_opts = parser.parse_known_args(argv)
         if len(unknown_opts) > 0:
             print("Unknown args:", unknown_opts)
-        for name in self.__fields__:
+        for name in self.model_fields:
             if name not in self._excluded():
                 value = getattr(opt, name)
                 if isinstance(value, ListConfig):
@@ -54,10 +56,12 @@ class InvokeAISettings(BaseSettings):
         cls = self.__class__
         type = get_args(get_type_hints(cls)["type"])[0]
         field_dict = dict({type: dict()})
-        for name, field in self.__fields__.items():
+        for name, field in self.model_fields.items():
             if name in cls._excluded_from_yaml():
                 continue
-            category = field.field_info.extra.get("category") or "Uncategorized"
+            category = (
+                field.json_schema_extra.get("category", "Uncategorized") if field.json_schema_extra else "Uncategorized"
+            )
             value = getattr(self, name)
             if category not in field_dict[type]:
                 field_dict[type][category] = dict()
@@ -73,7 +77,7 @@ class InvokeAISettings(BaseSettings):
         else:
             settings_stanza = "Uncategorized"
 
-        env_prefix = getattr(cls.Config, "env_prefix", None)
+        env_prefix = getattr(cls.model_config, "env_prefix", None)
         env_prefix = env_prefix if env_prefix is not None else settings_stanza.upper()
 
         initconf = (
@@ -89,14 +93,18 @@ class InvokeAISettings(BaseSettings):
         for key, value in os.environ.items():
             upcase_environ[key.upper()] = value
 
-        fields = cls.__fields__
+        fields = cls.model_fields
         cls.argparse_groups = {}
 
         for name, field in fields.items():
             if name not in cls._excluded():
                 current_default = field.default
 
-                category = field.field_info.extra.get("category", "Uncategorized")
+                category = (
+                    field.json_schema_extra.get("category", "Uncategorized")
+                    if field.json_schema_extra
+                    else "Uncategorized"
+                )
                 env_name = env_prefix + "_" + name
                 if category in initconf and name in initconf.get(category):
                     field.default = initconf.get(category).get(name)
@@ -146,11 +154,6 @@ class InvokeAISettings(BaseSettings):
             "tiled_decode",
         ]
 
-    class Config:
-        env_file_encoding = "utf-8"
-        arbitrary_types_allowed = True
-        case_sensitive = True
-
     @classmethod
     def add_field_argument(cls, command_parser, name: str, field, default_override=None):
         field_type = get_type_hints(cls).get(name)
@@ -161,7 +164,7 @@ class InvokeAISettings(BaseSettings):
             if field.default_factory is None
             else field.default_factory()
         )
-        if category := field.field_info.extra.get("category"):
+        if category := (field.json_schema_extra.get("category", None) if field.json_schema_extra else None):
             if category not in cls.argparse_groups:
                 cls.argparse_groups[category] = command_parser.add_argument_group(category)
             argparse_group = cls.argparse_groups[category]
@@ -169,7 +172,7 @@ class InvokeAISettings(BaseSettings):
             argparse_group = command_parser
 
         if get_origin(field_type) == Literal:
-            allowed_values = get_args(field.type_)
+            allowed_values = get_args(field.annotation)
             allowed_types = set()
             for val in allowed_values:
                 allowed_types.add(type(val))
@@ -182,7 +185,7 @@ class InvokeAISettings(BaseSettings):
                 type=field_type,
                 default=default,
                 choices=allowed_values,
-                help=field.field_info.description,
+                help=field.description,
             )
 
         elif get_origin(field_type) == Union:
@@ -191,7 +194,7 @@ class InvokeAISettings(BaseSettings):
                 dest=name,
                 type=int_or_float_or_str,
                 default=default,
-                help=field.field_info.description,
+                help=field.description,
             )
 
         elif get_origin(field_type) == list:
@@ -199,17 +202,17 @@ class InvokeAISettings(BaseSettings):
                 f"--{name}",
                 dest=name,
                 nargs="*",
-                type=field.type_,
+                type=field.annotation,
                 default=default,
-                action=argparse.BooleanOptionalAction if field.type_ == bool else "store",
-                help=field.field_info.description,
+                action=argparse.BooleanOptionalAction if field.annotation == bool else "store",
+                help=field.description,
             )
         else:
             argparse_group.add_argument(
                 f"--{name}",
                 dest=name,
-                type=field.type_,
+                type=field.annotation,
                 default=default,
-                action=argparse.BooleanOptionalAction if field.type_ == bool else "store",
-                help=field.field_info.description,
+                action=argparse.BooleanOptionalAction if field.annotation == bool else "store",
+                help=field.description,
             )

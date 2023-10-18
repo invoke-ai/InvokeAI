@@ -83,30 +83,6 @@ export const queueApi = api.injectEndpoints({
         }
       },
     }),
-    enqueueGraph: build.mutation<
-      paths['/api/v1/queue/{queue_id}/enqueue_graph']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/queue/{queue_id}/enqueue_graph']['post']['requestBody']['content']['application/json']
-    >({
-      query: (arg) => ({
-        url: `queue/${$queueId.get()}/enqueue_graph`,
-        body: arg,
-        method: 'POST',
-      }),
-      invalidatesTags: [
-        'SessionQueueStatus',
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
-      ],
-      onQueryStarted: async (arg, api) => {
-        const { dispatch, queryFulfilled } = api;
-        try {
-          await queryFulfilled;
-          resetListQueryData(dispatch);
-        } catch {
-          // no-op
-        }
-      },
-    }),
     resumeProcessor: build.mutation<
       paths['/api/v1/queue/{queue_id}/processor/resume']['put']['responses']['200']['content']['application/json'],
       void
@@ -341,7 +317,6 @@ export const queueApi = api.injectEndpoints({
 
 export const {
   useCancelByBatchIdsMutation,
-  useEnqueueGraphMutation,
   useEnqueueBatchMutation,
   usePauseProcessorMutation,
   useResumeProcessorMutation,
