@@ -63,7 +63,6 @@ export const BATCH_SEED = 'batch_seed';
 export const BATCH_PROMPT = 'batch_prompt';
 export const BATCH_STYLE_PROMPT = 'batch_style_prompt';
 export const METADATA_COLLECT = 'metadata_collect';
-export const METADATA_ACCUMULATOR = 'metadata_accumulator';
 export const MERGE_METADATA = 'merge_metadata';
 export const REALESRGAN = 'esrgan';
 export const DIVIDE = 'divide';
