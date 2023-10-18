@@ -245,7 +245,7 @@ def invoke_api():
         app=app,
         host=app_config.host,
         port=port,
-        loop=loop,
+        loop="asyncio",
         log_level=app_config.log_level,
     )
     server = uvicorn.Server(config)
