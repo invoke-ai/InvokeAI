@@ -2,13 +2,12 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { range, unset } from 'lodash-es';
+import { range } from 'lodash-es';
 import { components } from 'services/api/schema';
 import { Batch, BatchConfig } from 'services/api/types';
 import {
   CANVAS_COHERENCE_NOISE,
   METADATA,
-  METADATA_ACCUMULATOR,
   NOISE,
   POSITIVE_CONDITIONING,
 } from './constants';
@@ -149,8 +148,6 @@ export const prepareLinearUIBatch = (
     });
 
     if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
-      unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
-
       const stylePrompts = extendedPrompts.map((p) =>
         [p, positiveStylePrompt].join(' ')
       );
