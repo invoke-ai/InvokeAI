@@ -85,10 +85,9 @@ class SqliteWorkflowImageRecordsStorage(WorkflowImageRecordsStorageBase):
             self._cursor.execute(
                 """--sql
                 INSERT INTO workflow_images (workflow_id, image_name)
-                VALUES (?, ?)
-                ON CONFLICT (image_name) DO UPDATE SET workflow_id = ?;
+                VALUES (?, ?);
                 """,
-                (workflow_id, image_name, workflow_id),
+                (workflow_id, image_name),
             )
             self._conn.commit()
         except sqlite3.Error as e:
