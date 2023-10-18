@@ -11,7 +11,7 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
 } from './constants';
-import { removeMetadata } from './metadata';
+import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (
   state: RootState,
@@ -40,13 +40,15 @@ export const prepareLinearUIBatch = (
       });
     }
 
-    // add to metadata
-    removeMetadata(graph, 'seed');
-    zipped.push({
-      node_path: METADATA,
-      field_name: 'seed',
-      items: seeds,
-    });
+    if (getHasMetadata(graph)) {
+      // add to metadata
+      removeMetadata(graph, 'seed');
+      zipped.push({
+        node_path: METADATA,
+        field_name: 'seed',
+        items: seeds,
+      });
+    }
 
     if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
       zipped.push({
@@ -78,12 +80,14 @@ export const prepareLinearUIBatch = (
       }
 
       // add to metadata
-      removeMetadata(graph, 'seed');
-      firstBatchDatumList.push({
-        node_path: METADATA,
-        field_name: 'seed',
-        items: seeds,
-      });
+      if (getHasMetadata(graph)) {
+        removeMetadata(graph, 'seed');
+        firstBatchDatumList.push({
+          node_path: METADATA,
+          field_name: 'seed',
+          items: seeds,
+        });
+      }
 
       if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
         firstBatchDatumList.push({
@@ -108,12 +112,14 @@ export const prepareLinearUIBatch = (
       }
 
       // add to metadata
-      removeMetadata(graph, 'seed');
-      secondBatchDatumList.push({
-        node_path: METADATA,
-        field_name: 'seed',
-        items: seeds,
-      });
+      if (getHasMetadata(graph)) {
+        removeMetadata(graph, 'seed');
+        secondBatchDatumList.push({
+          node_path: METADATA,
+          field_name: 'seed',
+          items: seeds,
+        });
+      }
 
       if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
         secondBatchDatumList.push({
@@ -140,12 +146,14 @@ export const prepareLinearUIBatch = (
     }
 
     // add to metadata
-    removeMetadata(graph, 'positive_prompt');
-    firstBatchDatumList.push({
-      node_path: METADATA,
-      field_name: 'positive_prompt',
-      items: extendedPrompts,
-    });
+    if (getHasMetadata(graph)) {
+      removeMetadata(graph, 'positive_prompt');
+      firstBatchDatumList.push({
+        node_path: METADATA,
+        field_name: 'positive_prompt',
+        items: extendedPrompts,
+      });
+    }
 
     if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
       const stylePrompts = extendedPrompts.map((p) =>
@@ -161,12 +169,14 @@ export const prepareLinearUIBatch = (
       }
 
       // add to metadata
-      removeMetadata(graph, 'positive_style_prompt');
-      firstBatchDatumList.push({
-        node_path: METADATA,
-        field_name: 'positive_style_prompt',
-        items: extendedPrompts,
-      });
+      if (getHasMetadata(graph)) {
+        removeMetadata(graph, 'positive_style_prompt');
+        firstBatchDatumList.push({
+          node_path: METADATA,
+          field_name: 'positive_style_prompt',
+          items: extendedPrompts,
+        });
+      }
     }
 
     data.push(firstBatchDatumList);

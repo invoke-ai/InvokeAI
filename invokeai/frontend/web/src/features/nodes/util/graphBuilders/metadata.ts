@@ -56,3 +56,11 @@ export const removeMetadata = (
 
   delete metadataNode[key];
 };
+
+export const getHasMetadata = (graph: NonNullableGraph): boolean => {
+  const metadataNode = graph.nodes[METADATA] as
+    | CoreMetadataInvocation
+    | undefined;
+
+  return Boolean(metadataNode);
+};
