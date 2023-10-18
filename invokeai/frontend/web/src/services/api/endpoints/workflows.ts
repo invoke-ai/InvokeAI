@@ -19,7 +19,7 @@ export const workflowsApi = api.injectEndpoints({
           if (result.success) {
             return result.data;
           } else {
-            logger('images').warn('Problem parsing metadata');
+            logger('images').warn('Problem parsing workflow');
           }
         }
         return;
