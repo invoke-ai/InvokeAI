@@ -42,6 +42,16 @@ export const addT2IAdaptersToLinearGraph = (
       },
     });
 
+    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+      graph.edges.push({
+        source: { node_id: T2I_ADAPTER_COLLECT, field: 'collection' },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          field: 't2i_adapter',
+        },
+      });
+    }
+
     validT2IAdapters.forEach((t2iAdapter) => {
       if (!t2iAdapter.model) {
         return;
@@ -103,16 +113,6 @@ export const addT2IAdaptersToLinearGraph = (
           field: 'item',
         },
       });
-
-      if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-        graph.edges.push({
-          source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
-          destination: {
-            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-            field: 't2i_adapter',
-          },
-        });
-      }
     });
   }
 };
