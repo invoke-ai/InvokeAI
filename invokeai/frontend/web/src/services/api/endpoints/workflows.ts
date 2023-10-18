@@ -7,7 +7,6 @@ export const workflowsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getWorkflow: build.query<Workflow | undefined, string>({
       query: (workflow_id) => `workflows/i/${workflow_id}`,
-      keepUnusedDataFor: 86400, // 24 hours
       providesTags: (result, error, workflow_id) => [
         { type: 'Workflow', id: workflow_id },
       ],
