@@ -76,16 +76,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
             )
 
-        if "workflow_id" not in columns:
-            self._cursor.execute(
-                """--sql
-                ALTER TABLE images
-                ADD COLUMN workflow_id TEXT;
-                -- TODO: This requires a migration:
-                -- FOREIGN KEY (workflow_id) REFERENCES workflows (workflow_id) ON DELETE SET NULL;
-                """
-            )
-
         # Create the `images` table indices.
         self._cursor.execute(
             """--sql
@@ -423,7 +413,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         session_id: Optional[str] = None,
         node_id: Optional[str] = None,
         metadata: Optional[MetadataField] = None,
-        workflow_id: Optional[str] = None,
     ) -> datetime:
         try:
             metadata_json = metadata.model_dump_json() if metadata is not None else None
@@ -439,11 +428,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata,
-                    workflow_id,
                     is_intermediate,
                     starred
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -454,7 +442,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata_json,
-                    workflow_id,
                     is_intermediate,
                     starred,
                 ),

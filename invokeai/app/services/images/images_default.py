@@ -74,11 +74,12 @@ class ImageService(ImageServiceABC):
                 # Nullable fields
                 node_id=node_id,
                 metadata=metadata,
-                workflow_id=workflow_id,
                 session_id=session_id,
             )
             if board_id is not None:
                 self.__invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
+            if workflow_id is not None:
+                self.__invoker.services.workflow_image_records.create(workflow_id=workflow_id, image_name=image_name)
             self.__invoker.services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, workflow=workflow
             )
@@ -138,10 +139,11 @@ class ImageService(ImageServiceABC):
             image_record = self.__invoker.services.image_records.get(image_name)
 
             image_dto = image_record_to_dto(
-                image_record,
-                self.__invoker.services.urls.get_image_url(image_name),
-                self.__invoker.services.urls.get_image_url(image_name, True),
-                self.__invoker.services.board_image_records.get_board_for_image(image_name),
+                image_record=image_record,
+                image_url=self.__invoker.services.urls.get_image_url(image_name),
+                thumbnail_url=self.__invoker.services.urls.get_image_url(image_name, True),
+                board_id=self.__invoker.services.board_image_records.get_board_for_image(image_name),
+                workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(image_name),
             )
 
             return image_dto
@@ -155,6 +157,19 @@ class ImageService(ImageServiceABC):
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         try:
             return self.__invoker.services.image_records.get_metadata(image_name)
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.error("Image record not found")
+            raise
+        except Exception as e:
+            self.__invoker.services.logger.error("Problem getting image DTO")
+            raise e
+
+    def get_workflow(self, image_name: str) -> Optional[WorkflowField]:
+        try:
+            workflow_id = self.__invoker.services.workflow_image_records.get_workflow_for_image(image_name)
+            if workflow_id is None:
+                return None
+            return self.__invoker.services.workflow_records.get(workflow_id)
         except ImageRecordNotFoundException:
             self.__invoker.services.logger.error("Image record not found")
             raise
@@ -205,10 +220,11 @@ class ImageService(ImageServiceABC):
             image_dtos = list(
                 map(
                     lambda r: image_record_to_dto(
-                        r,
-                        self.__invoker.services.urls.get_image_url(r.image_name),
-                        self.__invoker.services.urls.get_image_url(r.image_name, True),
-                        self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
+                        image_record=r,
+                        image_url=self.__invoker.services.urls.get_image_url(r.image_name),
+                        thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
+                        board_id=self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
+                        workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(r.image_name),
                     ),
                     results.items,
                 )
