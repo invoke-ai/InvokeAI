@@ -193,7 +193,7 @@ class GraphInvocation(BaseInvocation):
     """Execute a graph"""
 
     # TODO: figure out how to create a default here
-    graph: Optional["Graph"] = InputField(description="The graph to run", default=None)
+    graph: "Graph" = InputField(description="The graph to run", default=None)
 
     def invoke(self, context: InvocationContext) -> GraphInvocationOutput:
         """Invoke with provided services and return outputs."""
