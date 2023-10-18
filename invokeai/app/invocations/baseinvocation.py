@@ -693,6 +693,7 @@ class BaseInvocation(ABC, BaseModel):
         validate_assignment=True,
         json_schema_extra=json_schema_extra,
         json_schema_serialization_defaults_required=True,
+        coerce_numbers_to_str=True,
     )
 
 
