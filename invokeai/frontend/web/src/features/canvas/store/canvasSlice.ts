@@ -29,6 +29,8 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
+import { appSocketQueueItemStatusChanged } from 'services/events/actions';
+import { queueApi } from 'services/api/endpoints/queue';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -786,6 +788,18 @@ export const canvasSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+      const batch_status = action.payload.data.batch_status;
+      if (!state.batchIds.includes(batch_status.batch_id)) {
+        return;
+      }
+
+      if (batch_status.in_progress === 0 && batch_status.pending === 0) {
+        state.batchIds = state.batchIds.filter(
+          (id) => id !== batch_status.batch_id
+        );
+      }
+    });
     builder.addCase(setAspectRatio, (state, action) => {
       const ratio = action.payload;
       if (ratio) {
@@ -799,6 +813,20 @@ export const canvasSlice = createSlice({
         );
       }
     });
+    builder.addMatcher(
+      queueApi.endpoints.clearQueue.matchFulfilled,
+      (state) => {
+        state.batchIds = [];
+      }
+    );
+    builder.addMatcher(
+      queueApi.endpoints.cancelByBatchIds.matchFulfilled,
+      (state, action) => {
+        state.batchIds = state.batchIds.filter(
+          (id) => !action.meta.arg.originalArgs.batch_ids.includes(id)
+        );
+      }
+    );
   },
 });
 

@@ -32,7 +32,7 @@ gaming):
 
 * **Python**
 
-    version 3.9 through 3.11
+    version 3.10 through 3.11
 
 * **CUDA Tools**
 
@@ -65,7 +65,7 @@ gaming):
 To install InvokeAI with virtual environments and the PIP package
 manager, please follow these steps:
 
-1.  Please make sure you are using Python 3.9 through 3.11. The rest of the install
+1.  Please make sure you are using Python 3.10 through 3.11. The rest of the install
     procedure depends on this and will not work with other versions:
 
     ```bash
@@ -255,6 +255,10 @@ manager, please follow these steps:
         path of the directory. As mentioned previously, this is
         *highly recommended** if your virtual environment is located outside of
         your runtime directory.
+
+    !!! tip
+
+        On linux, it is recommended to run invokeai with the following env var: `MALLOC_MMAP_THRESHOLD_=1048576`. For example: `MALLOC_MMAP_THRESHOLD_=1048576 invokeai --web`. This helps to prevent memory fragmentation that can lead to memory accumulation over time. This env var is set automatically when running via `invoke.sh`.
 
 10.  Render away!
 

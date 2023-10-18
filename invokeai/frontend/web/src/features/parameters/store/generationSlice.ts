@@ -5,6 +5,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 
+import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { clipSkipMap } from '../types/constants';
 import {
   CanvasCoherenceModeParam,
@@ -26,6 +27,10 @@ import {
 } from '../types/parameterSchemas';
 
 export interface GenerationState {
+  hrfHeight: HeightParam;
+  hrfWidth: WidthParam;
+  hrfEnabled: boolean;
+  hrfStrength: StrengthParam;
   cfgScale: CfgScaleParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
@@ -68,6 +73,10 @@ export interface GenerationState {
 }
 
 export const initialGenerationState: GenerationState = {
+  hrfHeight: 64,
+  hrfWidth: 64,
+  hrfStrength: 0.75,
+  hrfEnabled: false,
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
@@ -270,6 +279,18 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
+    setHrfHeight: (state, action: PayloadAction<number>) => {
+      state.hrfHeight = action.payload;
+    },
+    setHrfWidth: (state, action: PayloadAction<number>) => {
+      state.hrfWidth = action.payload;
+    },
+    setHrfStrength: (state, action: PayloadAction<number>) => {
+      state.hrfStrength = action.payload;
+    },
+    setHrfEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hrfEnabled = action.payload;
+    },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
@@ -300,6 +321,15 @@ export const generationSlice = createSlice({
         if (result.success) {
           state.model = result.data;
         }
+      }
+    });
+
+    // TODO: This is a temp fix to reduce issues with T2I adapter having a different downscaling
+    // factor than the UNet. Hopefully we get an upstream fix in diffusers.
+    builder.addMatcher(isAnyControlAdapterAdded, (state, action) => {
+      if (action.payload.type === 't2i_adapter') {
+        state.width = roundToMultiple(state.width, 64);
+        state.height = roundToMultiple(state.height, 64);
       }
     });
   },
@@ -345,6 +375,10 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
+  setHrfHeight,
+  setHrfWidth,
+  setHrfStrength,
+  setHrfEnabled,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
   setShouldLockAspectRatio,

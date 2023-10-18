@@ -8,9 +8,9 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.metadata import ImageMetadata
-from invokeai.app.models.image import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.image_record import ImageDTO, ImageRecordChanges, ImageUrlsDTO
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
+from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 from ..dependencies import ApiDependencies
 
@@ -42,7 +42,7 @@ async def upload_image(
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
 ) -> ImageDTO:
     """Uploads an image"""
-    if not file.content_type.startswith("image"):
+    if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
     contents = await file.read()
@@ -322,3 +322,20 @@ async def unstar_images_in_list(
         return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to unstar images")
+
+
+class ImagesDownloaded(BaseModel):
+    response: Optional[str] = Field(
+        description="If defined, the message to display to the user when images begin downloading"
+    )
+
+
+@images_router.post("/download", operation_id="download_images_from_list", response_model=ImagesDownloaded)
+async def download_images_from_list(
+    image_names: list[str] = Body(description="The list of names of images to download", embed=True),
+    board_id: Optional[str] = Body(
+        default=None, description="The board from which image should be downloaded from", embed=True
+    ),
+) -> ImagesDownloaded:
+    # return ImagesDownloaded(response="Your images are downloading")
+    raise HTTPException(status_code=501, detail="Endpoint is not yet implemented")

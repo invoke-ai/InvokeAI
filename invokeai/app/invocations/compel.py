@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import List, Union
+from typing import List, Optional, Union
 
 import torch
 from compel import Compel, ReturnedEmbeddingsType
@@ -43,7 +43,13 @@ class ConditioningFieldData:
 #    PerpNeg = "perp_neg"
 
 
-@invocation("compel", title="Prompt", tags=["prompt", "compel"], category="conditioning", version="1.0.0")
+@invocation(
+    "compel",
+    title="Prompt",
+    tags=["prompt", "compel"],
+    category="conditioning",
+    version="1.0.0",
+)
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
 
@@ -61,17 +67,19 @@ class CompelInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.dict(),
+            **self.clip.tokenizer.model_dump(),
             context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.dict(),
+            **self.clip.text_encoder.model_dump(),
             context=context,
         )
 
         def _lora_loader():
             for lora in self.clip.loras:
-                lora_info = context.services.model_manager.get_model(**lora.dict(exclude={"weight"}), context=context)
+                lora_info = context.services.model_manager.get_model(
+                    **lora.model_dump(exclude={"weight"}), context=context
+                )
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
@@ -160,11 +168,11 @@ class SDXLPromptInvocationBase:
         zero_on_empty: bool,
     ):
         tokenizer_info = context.services.model_manager.get_model(
-            **clip_field.tokenizer.dict(),
+            **clip_field.tokenizer.model_dump(),
             context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **clip_field.text_encoder.dict(),
+            **clip_field.text_encoder.model_dump(),
             context=context,
         )
 
@@ -172,7 +180,11 @@ class SDXLPromptInvocationBase:
         if prompt == "" and zero_on_empty:
             cpu_text_encoder = text_encoder_info.context.model
             c = torch.zeros(
-                (1, cpu_text_encoder.config.max_position_embeddings, cpu_text_encoder.config.hidden_size),
+                (
+                    1,
+                    cpu_text_encoder.config.max_position_embeddings,
+                    cpu_text_encoder.config.hidden_size,
+                ),
                 dtype=text_encoder_info.context.cache.precision,
             )
             if get_pooled:
@@ -186,7 +198,9 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader():
             for lora in clip_field.loras:
-                lora_info = context.services.model_manager.get_model(**lora.dict(exclude={"weight"}), context=context)
+                lora_info = context.services.model_manager.get_model(
+                    **lora.model_dump(exclude={"weight"}), context=context
+                )
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
@@ -273,8 +287,16 @@ class SDXLPromptInvocationBase:
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
 
-    prompt: str = InputField(default="", description=FieldDescriptions.compel_prompt, ui_component=UIComponent.Textarea)
-    style: str = InputField(default="", description=FieldDescriptions.compel_prompt, ui_component=UIComponent.Textarea)
+    prompt: str = InputField(
+        default="",
+        description=FieldDescriptions.compel_prompt,
+        ui_component=UIComponent.Textarea,
+    )
+    style: str = InputField(
+        default="",
+        description=FieldDescriptions.compel_prompt,
+        ui_component=UIComponent.Textarea,
+    )
     original_width: int = InputField(default=1024, description="")
     original_height: int = InputField(default=1024, description="")
     crop_top: int = InputField(default=0, description="")
@@ -310,7 +332,9 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
                 [
                     c1,
                     torch.zeros(
-                        (c1.shape[0], c2.shape[1] - c1.shape[1], c1.shape[2]), device=c1.device, dtype=c1.dtype
+                        (c1.shape[0], c2.shape[1] - c1.shape[1], c1.shape[2]),
+                        device=c1.device,
+                        dtype=c1.dtype,
                     ),
                 ],
                 dim=1,
@@ -321,7 +345,9 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
                 [
                     c2,
                     torch.zeros(
-                        (c2.shape[0], c1.shape[1] - c2.shape[1], c2.shape[2]), device=c2.device, dtype=c2.dtype
+                        (c2.shape[0], c1.shape[1] - c2.shape[1], c2.shape[2]),
+                        device=c2.device,
+                        dtype=c2.dtype,
                     ),
                 ],
                 dim=1,
@@ -359,7 +385,9 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
     """Parse prompt using compel package to conditioning."""
 
     style: str = InputField(
-        default="", description=FieldDescriptions.compel_prompt, ui_component=UIComponent.Textarea
+        default="",
+        description=FieldDescriptions.compel_prompt,
+        ui_component=UIComponent.Textarea,
     )  # TODO: ?
     original_width: int = InputField(default=1024, description="")
     original_height: int = InputField(default=1024, description="")
@@ -403,10 +431,16 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
 class ClipSkipInvocationOutput(BaseInvocationOutput):
     """Clip skip node output"""
 
-    clip: ClipField = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
+    clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("clip_skip", title="CLIP Skip", tags=["clipskip", "clip", "skip"], category="conditioning", version="1.0.0")
+@invocation(
+    "clip_skip",
+    title="CLIP Skip",
+    tags=["clipskip", "clip", "skip"],
+    category="conditioning",
+    version="1.0.0",
+)
 class ClipSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""
 
@@ -421,7 +455,9 @@ class ClipSkipInvocation(BaseInvocation):
 
 
 def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend, Conjunction], truncate_if_too_long=False
+    tokenizer,
+    prompt: Union[FlattenedPrompt, Blend, Conjunction],
+    truncate_if_too_long=False,
 ) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt

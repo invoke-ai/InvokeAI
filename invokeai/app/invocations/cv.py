@@ -6,7 +6,7 @@ import numpy
 from PIL import Image, ImageOps
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.models.image import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 

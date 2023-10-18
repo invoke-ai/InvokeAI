@@ -24,6 +24,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
 
 from ..util import auto_detect_slice_size, normalize_device
@@ -169,6 +170,16 @@ class IPAdapterData:
     # TODO: change to polymorphic so can do different weights per step (once implemented...)
     weight: Union[float, List[float]] = Field(default=1.0)
     # weight: float = Field(default=1.0)
+    begin_step_percent: float = Field(default=0.0)
+    end_step_percent: float = Field(default=1.0)
+
+
+@dataclass
+class T2IAdapterData:
+    """A structure containing the information required to apply conditioning from a single T2I-Adapter model."""
+
+    adapter_state: dict[torch.Tensor] = Field()
+    weight: Union[float, list[float]] = Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
 
@@ -326,7 +337,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
-        ip_adapter_data: Optional[IPAdapterData] = None,
+        ip_adapter_data: Optional[list[IPAdapterData]] = None,
+        t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
         seed: Optional[int] = None,
@@ -379,6 +391,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 additional_guidance=additional_guidance,
                 control_data=control_data,
                 ip_adapter_data=ip_adapter_data,
+                t2i_adapter_data=t2i_adapter_data,
                 callback=callback,
             )
         finally:
@@ -398,7 +411,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         *,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
-        ip_adapter_data: Optional[IPAdapterData] = None,
+        ip_adapter_data: Optional[list[IPAdapterData]] = None,
+        t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
     ):
         self._adjust_memory_efficient_attention(latents)
@@ -411,6 +425,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps.shape[0] == 0:
             return latents, attention_map_saver
 
+        ip_adapter_unet_patcher = None
         if conditioning_data.extra is not None and conditioning_data.extra.wants_cross_attention_control:
             attn_ctx = self.invokeai_diffuser.custom_attention_context(
                 self.invokeai_diffuser.model,
@@ -421,11 +436,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         elif ip_adapter_data is not None:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
-            weight = ip_adapter_data.weight[0] if isinstance(ip_adapter_data.weight, List) else ip_adapter_data.weight
-            attn_ctx = ip_adapter_data.ip_adapter_model.apply_ip_adapter_attention(
-                unet=self.invokeai_diffuser.model,
-                scale=weight,
-            )
+            ip_adapter_unet_patcher = UNetPatcher([ipa.ip_adapter_model for ipa in ip_adapter_data])
+            attn_ctx = ip_adapter_unet_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
             self.use_ip_adapter = True
         else:
             attn_ctx = nullcontext()
@@ -454,6 +466,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     additional_guidance=additional_guidance,
                     control_data=control_data,
                     ip_adapter_data=ip_adapter_data,
+                    t2i_adapter_data=t2i_adapter_data,
+                    ip_adapter_unet_patcher=ip_adapter_unet_patcher,
                 )
                 latents = step_output.prev_sample
 
@@ -499,7 +513,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         total_step_count: int,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
-        ip_adapter_data: Optional[IPAdapterData] = None,
+        ip_adapter_data: Optional[list[IPAdapterData]] = None,
+        t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
+        ip_adapter_unet_patcher: Optional[UNetPatcher] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
@@ -512,26 +528,30 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # handle IP-Adapter
         if self.use_ip_adapter and ip_adapter_data is not None:  # somewhat redundant but logic is clearer
-            first_adapter_step = math.floor(ip_adapter_data.begin_step_percent * total_step_count)
-            last_adapter_step = math.ceil(ip_adapter_data.end_step_percent * total_step_count)
-            weight = (
-                ip_adapter_data.weight[step_index]
-                if isinstance(ip_adapter_data.weight, List)
-                else ip_adapter_data.weight
-            )
-            if step_index >= first_adapter_step and step_index <= last_adapter_step:
-                # only apply IP-Adapter if current step is within the IP-Adapter's begin/end step range
-                # ip_adapter_data.ip_adapter_model.set_scale(ip_adapter_data.weight)
-                ip_adapter_data.ip_adapter_model.set_scale(weight)
-            else:
-                # otherwise, set IP-Adapter scale to 0, so it has no effect
-                ip_adapter_data.ip_adapter_model.set_scale(0.0)
+            for i, single_ip_adapter_data in enumerate(ip_adapter_data):
+                first_adapter_step = math.floor(single_ip_adapter_data.begin_step_percent * total_step_count)
+                last_adapter_step = math.ceil(single_ip_adapter_data.end_step_percent * total_step_count)
+                weight = (
+                    single_ip_adapter_data.weight[step_index]
+                    if isinstance(single_ip_adapter_data.weight, List)
+                    else single_ip_adapter_data.weight
+                )
+                if step_index >= first_adapter_step and step_index <= last_adapter_step:
+                    # Only apply this IP-Adapter if the current step is within the IP-Adapter's begin/end step range.
+                    ip_adapter_unet_patcher.set_scale(i, weight)
+                else:
+                    # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
+                    ip_adapter_unet_patcher.set_scale(i, 0.0)
 
-        # handle ControlNet(s)
-        # default is no controlnet, so set controlnet processing output to None
-        controlnet_down_block_samples, controlnet_mid_block_sample = None, None
-        if control_data is not None:
-            controlnet_down_block_samples, controlnet_mid_block_sample = self.invokeai_diffuser.do_controlnet_step(
+        # Handle ControlNet(s) and T2I-Adapter(s)
+        down_block_additional_residuals = None
+        mid_block_additional_residual = None
+        if control_data is not None and t2i_adapter_data is not None:
+            # TODO(ryand): This is a limitation of the UNet2DConditionModel API, not a fundamental incompatibility
+            # between ControlNets and T2I-Adapters. We will try to fix this upstream in diffusers.
+            raise Exception("ControlNet(s) and T2I-Adapter(s) cannot be used simultaneously (yet).")
+        elif control_data is not None:
+            down_block_additional_residuals, mid_block_additional_residual = self.invokeai_diffuser.do_controlnet_step(
                 control_data=control_data,
                 sample=latent_model_input,
                 timestep=timestep,
@@ -539,6 +559,32 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 total_step_count=total_step_count,
                 conditioning_data=conditioning_data,
             )
+        elif t2i_adapter_data is not None:
+            accum_adapter_state = None
+            for single_t2i_adapter_data in t2i_adapter_data:
+                # Determine the T2I-Adapter weights for the current denoising step.
+                first_t2i_adapter_step = math.floor(single_t2i_adapter_data.begin_step_percent * total_step_count)
+                last_t2i_adapter_step = math.ceil(single_t2i_adapter_data.end_step_percent * total_step_count)
+                t2i_adapter_weight = (
+                    single_t2i_adapter_data.weight[step_index]
+                    if isinstance(single_t2i_adapter_data.weight, list)
+                    else single_t2i_adapter_data.weight
+                )
+                if step_index < first_t2i_adapter_step or step_index > last_t2i_adapter_step:
+                    # If the current step is outside of the T2I-Adapter's begin/end step range, then set its weight to 0
+                    # so it has no effect.
+                    t2i_adapter_weight = 0.0
+
+                # Apply the t2i_adapter_weight, and accumulate.
+                if accum_adapter_state is None:
+                    # Handle the first T2I-Adapter.
+                    accum_adapter_state = [val * t2i_adapter_weight for val in single_t2i_adapter_data.adapter_state]
+                else:
+                    # Add to the previous adapter states.
+                    for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
+                        accum_adapter_state[idx] += value * t2i_adapter_weight
+
+            down_block_additional_residuals = accum_adapter_state
 
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
             sample=latent_model_input,
@@ -547,8 +593,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
             # extra:
-            down_block_additional_residuals=controlnet_down_block_samples,  # from controlnet(s)
-            mid_block_additional_residual=controlnet_mid_block_sample,  # from controlnet(s)
+            down_block_additional_residuals=down_block_additional_residuals,
+            mid_block_additional_residual=mid_block_additional_residual,
         )
 
         guidance_scale = conditioning_data.guidance_scale

@@ -3,7 +3,7 @@
 from typing import Literal
 
 import numpy as np
-from pydantic import validator
+from pydantic import field_validator
 
 from invokeai.app.invocations.primitives import FloatOutput, IntegerOutput
 
@@ -72,7 +72,14 @@ class RandomIntInvocation(BaseInvocation):
         return IntegerOutput(value=np.random.randint(self.low, self.high))
 
 
-@invocation("rand_float", title="Random Float", tags=["math", "float", "random"], category="math", version="1.0.0")
+@invocation(
+    "rand_float",
+    title="Random Float",
+    tags=["math", "float", "random"],
+    category="math",
+    version="1.0.1",
+    use_cache=False,
+)
 class RandomFloatInvocation(BaseInvocation):
     """Outputs a single random float"""
 
@@ -178,7 +185,7 @@ class IntegerMathInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    @validator("b")
+    @field_validator("b")
     def no_unrepresentable_results(cls, v, values):
         if values["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")
@@ -252,7 +259,7 @@ class FloatMathInvocation(BaseInvocation):
     a: float = InputField(default=0, description=FieldDescriptions.num_1)
     b: float = InputField(default=0, description=FieldDescriptions.num_2)
 
-    @validator("b")
+    @field_validator("b")
     def no_unrepresentable_results(cls, v, values):
         if values["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")

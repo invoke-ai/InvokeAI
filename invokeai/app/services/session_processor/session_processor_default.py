@@ -1,3 +1,4 @@
+import traceback
 from threading import BoundedSemaphore
 from threading import Event as ThreadEvent
 from threading import Thread
@@ -6,7 +7,7 @@ from typing import Optional
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event as FastAPIEvent
 
-from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 
 from ..invoker import Invoker
@@ -96,7 +97,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
             resume_event.set()
             self.__threadLimit.acquire()
             queue_item: Optional[SessionQueueItem] = None
-            self.__invoker.services.logger
             while not stop_event.is_set():
                 poll_now_event.clear()
                 try:
@@ -123,6 +123,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         continue
                 except Exception as e:
                     self.__invoker.services.logger.error(f"Error in session processor: {e}")
+                    if queue_item is not None:
+                        self.__invoker.services.session_queue.cancel_queue_item(
+                            queue_item.item_id, error=traceback.format_exc()
+                        )
                     poll_now_event.wait(POLLING_INTERVAL)
                     continue
         except Exception as e:

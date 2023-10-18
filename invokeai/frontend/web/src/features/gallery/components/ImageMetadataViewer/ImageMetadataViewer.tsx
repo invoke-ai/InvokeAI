@@ -18,6 +18,7 @@ import ImageMetadataActions from './ImageMetadataActions';
 import { useAppSelector } from '../../../../app/store/storeHooks';
 import { configSelector } from '../../../system/store/configSelectors';
 import { useTranslation } from 'react-i18next';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -65,19 +66,32 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         </Link>
       </Flex>
 
-      <ImageMetadataActions metadata={metadata} />
-
       <Tabs
         variant="line"
-        sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
+        sx={{
+          display: 'flex',
+          flexDir: 'column',
+          w: 'full',
+          h: 'full',
+        }}
       >
         <TabList>
+          <Tab>{t('metadata.recallParameters')}</Tab>
           <Tab>{t('metadata.metadata')}</Tab>
           <Tab>{t('metadata.imageDetails')}</Tab>
           <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
+          <TabPanel>
+            {metadata ? (
+              <ScrollableContent>
+                <ImageMetadataActions metadata={metadata} />
+              </ScrollableContent>
+            ) : (
+              <IAINoContentFallback label={t('metadata.noRecallParameters')} />
+            )}
+          </TabPanel>
           <TabPanel>
             {metadata ? (
               <DataViewer data={metadata} label={t('metadata.metadata')} />

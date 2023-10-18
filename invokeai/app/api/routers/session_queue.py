@@ -12,15 +12,13 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByBatchIDsResult,
     ClearResult,
     EnqueueBatchResult,
-    EnqueueGraphResult,
     PruneResult,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueStatus,
 )
-from invokeai.app.services.shared.models import CursorPaginatedResults
+from invokeai.app.services.shared.pagination import CursorPaginatedResults
 
-from ...services.graph import Graph
 from ..dependencies import ApiDependencies
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
@@ -31,23 +29,6 @@ class SessionQueueAndProcessorStatus(BaseModel):
 
     queue: SessionQueueStatus
     processor: SessionProcessorStatus
-
-
-@session_queue_router.post(
-    "/{queue_id}/enqueue_graph",
-    operation_id="enqueue_graph",
-    responses={
-        201: {"model": EnqueueGraphResult},
-    },
-)
-async def enqueue_graph(
-    queue_id: str = Path(description="The queue id to perform this operation on"),
-    graph: Graph = Body(description="The graph to enqueue"),
-    prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
-) -> EnqueueGraphResult:
-    """Enqueues a graph for single execution."""
-
-    return ApiDependencies.invoker.services.session_queue.enqueue_graph(queue_id=queue_id, graph=graph, prepend=prepend)
 
 
 @session_queue_router.post(

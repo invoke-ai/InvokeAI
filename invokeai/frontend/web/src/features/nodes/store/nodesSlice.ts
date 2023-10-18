@@ -55,6 +55,7 @@ import {
   SchedulerInputFieldValue,
   SDXLRefinerModelInputFieldValue,
   StringInputFieldValue,
+  T2IAdapterModelInputFieldValue,
   VaeModelInputFieldValue,
   Workflow,
 } from '../types/types';
@@ -714,6 +715,12 @@ const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action);
     },
+    fieldT2IAdapterModelValueChanged: (
+      state,
+      action: FieldValueAction<T2IAdapterModelInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
     fieldEnumModelValueChanged: (
       state,
       action: FieldValueAction<EnumInputFieldValue>
@@ -1059,7 +1066,7 @@ const nodesSlice = createSlice({
       }
     });
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
-      if (['in_progress'].includes(action.payload.data.status)) {
+      if (['in_progress'].includes(action.payload.data.queue_item.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
           nes.status = NodeStatus.PENDING;
           nes.error = null;
@@ -1091,6 +1098,7 @@ export const {
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
   fieldIPAdapterModelValueChanged,
+  fieldT2IAdapterModelValueChanged,
   fieldLabelChanged,
   fieldLoRAModelValueChanged,
   fieldMainModelValueChanged,

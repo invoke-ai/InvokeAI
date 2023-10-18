@@ -47,34 +47,9 @@ pip install ".[dev,test]"
 These are optional groups of packages which are defined within the `pyproject.toml`
 and will be required for testing the changes you make to the code.
 
-### Running Tests
+### Tests
 
-We use [pytest](https://docs.pytest.org/en/7.2.x/) for our test suite. Tests can
-be found under the `./tests` folder and can be run with a single `pytest`
-command. Optionally, to review test coverage you can append `--cov`.
-
-```zsh
-pytest --cov
-```
-
-Test outcomes and coverage will be reported in the terminal. In addition a more
-detailed report is created in both XML and HTML format in the `./coverage`
-folder. The HTML one in particular can help identify missing statements
-requiring tests to ensure coverage. This can be run by opening
-`./coverage/html/index.html`.
-
-For example.
-
-```zsh
-pytest --cov; open ./coverage/html/index.html
-```
-
-??? info "HTML coverage report output"
-
-    ![html-overview](../assets/contributing/html-overview.png)
-
-    ![html-detail](../assets/contributing/html-detail.png)
-
+See the [tests documentation](./TESTS.md) for information about running and writing tests.
 ### Reloading Changes
 
 Experimenting with changes to the Python source code is a drag if you have to re-start the server —

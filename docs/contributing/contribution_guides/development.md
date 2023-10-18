@@ -12,7 +12,7 @@ To get started, take a look at our [new contributors checklist](newContributorCh
 Once you're setup, for more information, you can review the documentation specific to your area of interest:
 
 * #### [InvokeAI Architecure](../ARCHITECTURE.md)
-* #### [Frontend Documentation](development_guides/contributingToFrontend.md)
+* #### [Frontend Documentation](./contributingToFrontend.md)
 * #### [Node Documentation](../INVOCATIONS.md)
 * #### [Local Development](../LOCAL_DEVELOPMENT.md)
 
@@ -45,5 +45,5 @@ For backend related work, please reach out to **@blessedcoolant**, **@lstein**, 
 
 ## **What does the Code of Conduct mean for me?**
 
-Our [Code of Conduct](CODE_OF_CONDUCT.md)  means that you are responsible for treating everyone on the project with respect and courtesy regardless of their identity. If you are the victim of any inappropriate behavior or comments as described in our Code of Conduct, we are here for you and will do the best to ensure that the abuser is reprimanded appropriately, per our code.
+Our [Code of Conduct](../../CODE_OF_CONDUCT.md)  means that you are responsible for treating everyone on the project with respect and courtesy regardless of their identity. If you are the victim of any inappropriate behavior or comments as described in our Code of Conduct, we are here for you and will do the best to ensure that the abuser is reprimanded appropriately, per our code.
 
