@@ -43,6 +43,16 @@ export const addControlNetToLinearGraph = (
       },
     });
 
+    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+      graph.edges.push({
+        source: { node_id: CONTROL_NET_COLLECT, field: 'collection' },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          field: 'control',
+        },
+      });
+    }
+
     validControlNets.forEach((controlNet) => {
       if (!controlNet.model) {
         return;
@@ -106,16 +116,6 @@ export const addControlNetToLinearGraph = (
           field: 'item',
         },
       });
-
-      if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-        graph.edges.push({
-          source: { node_id: controlNetNode.id, field: 'control' },
-          destination: {
-            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-            field: 'control',
-          },
-        });
-      }
     });
   }
 };
