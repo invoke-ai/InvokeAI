@@ -27,8 +27,8 @@ if TYPE_CHECKING:
     from .session_queue.session_queue_base import SessionQueueBase
     from .shared.graph import GraphExecutionState, LibraryGraph
     from .urls.urls_base import UrlServiceBase
-    from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from .workflow_image_records.workflow_image_records_base import WorkflowImageRecordsStorageBase
+    from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 
 
 class InvocationServices:

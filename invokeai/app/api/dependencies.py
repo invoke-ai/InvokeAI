@@ -1,8 +1,8 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from logging import Logger
-from invokeai.app.services.workflow_image_records.workflow_image_records_sqlite import SqliteWorkflowImageRecordsStorage
 
+from invokeai.app.services.workflow_image_records.workflow_image_records_sqlite import SqliteWorkflowImageRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 

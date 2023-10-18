@@ -1,6 +1,5 @@
 from typing import Any, Callable, Union
 
-
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
