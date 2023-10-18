@@ -716,8 +716,6 @@ class _Model(BaseModel):
 # Get all pydantic model attrs, methods, etc
 RESERVED_PYDANTIC_FIELD_NAMES = set(map(lambda m: m[0], inspect.getmembers(_Model())))
 
-print(RESERVED_PYDANTIC_FIELD_NAMES)
-
 
 def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None:
     """
