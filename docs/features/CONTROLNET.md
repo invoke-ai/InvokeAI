@@ -33,7 +33,7 @@ To install ControlNet Models:
 
 1. The easiest way to install them is
 to use the InvokeAI model installer application. Use the
-`invoke.sh`/`invoke.bat` launcher to select item [5] and then navigate
+`invoke.sh`/`invoke.bat` launcher to select item [4] and then navigate
 to the CONTROLNETS section. Select the models you wish to install and
 press "APPLY CHANGES". You may also enter additional HuggingFace
 repo_ids in the "Additional models" textbox. 
@@ -163,8 +163,8 @@ Additionally, each  section can be expanded with the "Show Advanced" button in o
 #### Installation
 There are several ways to install IP-Adapter models with an existing InvokeAI installation:
 
-1. Through the command line interface launched from the invoke.sh / invoke.bat scripts, option [5] to download models.
-2. Through the Model Manager UI with models from the *Tools* section of [www.models.invoke.ai](www.models.invoke.ai). To do this, copy the repo ID from the desired model page, and paste it in the Add Model field of the model manager. **Note** Both the IP-Adapter and the Image Encoder must be installed for IP-Adapter to work. For example, the [SD 1.5 IP-Adapter](https://models.invoke.ai/InvokeAI/ip_adapter_plus_sd15) and [SD1.5 Image Encoder](https://models.invoke.ai/InvokeAI/ip_adapter_sd_image_encoder) must be installed to use IP-Adapter with SD1.5 based models.  
+1. Through the command line interface launched from the invoke.sh / invoke.bat scripts, option [4] to download models.
+2. Through the Model Manager UI with models from the *Tools* section of [www.models.invoke.ai](https://www.models.invoke.ai). To do this, copy the repo ID from the desired model page, and paste it in the Add Model field of the model manager. **Note** Both the IP-Adapter and the Image Encoder must be installed for IP-Adapter to work. For example, the [SD 1.5 IP-Adapter](https://models.invoke.ai/InvokeAI/ip_adapter_plus_sd15) and [SD1.5 Image Encoder](https://models.invoke.ai/InvokeAI/ip_adapter_sd_image_encoder) must be installed to use IP-Adapter with SD1.5 based models.  
 3. **Advanced -- Not recommended ** Manually downloading the IP-Adapter and Image Encoder files - Image Encoder folders shouid be placed in the `models\any\clip_vision` folders. IP Adapter Model folders should be placed in the relevant `ip-adapter` folder of relevant base model folder of Invoke root directory. For example, for the SDXL IP-Adapter, files should be added to the `model/sdxl/ip_adapter/` folder. 
 
 #### Using IP-Adapter

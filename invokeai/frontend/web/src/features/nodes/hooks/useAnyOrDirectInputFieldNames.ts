@@ -9,6 +9,7 @@ import {
   POLYMORPHIC_TYPES,
   TYPES_WITH_INPUT_COMPONENTS,
 } from '../types/constants';
+import { getSortedFilteredFieldNames } from '../util/getSortedFilteredFieldNames';
 
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
@@ -24,17 +25,13 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
           if (!nodeTemplate) {
             return [];
           }
-          return map(nodeTemplate.inputs)
-            .filter(
-              (field) =>
-                (['any', 'direct'].includes(field.input) ||
-                  POLYMORPHIC_TYPES.includes(field.type)) &&
-                TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
-            )
-            .filter((field) => !field.ui_hidden)
-            .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0))
-            .map((field) => field.name)
-            .filter((fieldName) => fieldName !== 'is_intermediate');
+          const fields = map(nodeTemplate.inputs).filter(
+            (field) =>
+              (['any', 'direct'].includes(field.input) ||
+                POLYMORPHIC_TYPES.includes(field.type)) &&
+              TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
+          );
+          return getSortedFilteredFieldNames(fields);
         },
         defaultSelectorOptions
       ),
