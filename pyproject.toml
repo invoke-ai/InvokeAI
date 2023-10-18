@@ -122,9 +122,8 @@ dependencies = [
 "configure_invokeai.py" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
 "textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
 
-# shortcut commands to start cli and web
+# shortcut commands to start web ui
 # "invokeai --web" will launch the web interface
-# "invokeai" will launch the CLI
 # "invokeai" = "invokeai.frontend.legacy_launch_invokeai:main"
 
 # new shortcut to launch web interface
