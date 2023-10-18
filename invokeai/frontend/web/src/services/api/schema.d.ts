@@ -419,7 +419,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -588,7 +588,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -646,7 +646,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -894,7 +894,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -945,7 +945,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1033,7 +1033,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1079,7 +1079,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1150,7 +1150,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1207,7 +1207,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1282,7 +1282,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1349,7 +1349,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1392,7 +1392,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1443,7 +1443,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1483,7 +1483,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1545,7 +1545,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1594,7 +1594,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1694,7 +1694,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -1832,7 +1832,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2019,7 +2019,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2088,7 +2088,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2144,7 +2144,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2261,7 +2261,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2302,11 +2302,11 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
-       * @default true
+       * @default false
        */
       use_cache?: boolean;
       /**
@@ -2359,7 +2359,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2452,7 +2452,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2499,7 +2499,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2596,7 +2596,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2699,7 +2699,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2750,7 +2750,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2785,7 +2785,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2832,7 +2832,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2897,7 +2897,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -2942,7 +2942,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["InfillColorInvocation"];
+        [key: string]: components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ImageMultiplyInvocation"];
       };
       /**
        * Edges
@@ -2979,7 +2979,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["String2Output"] | components["schemas"]["ImageOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["VaeLoaderOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FaceMaskOutput"];
+        [key: string]: components["schemas"]["FaceOffOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["String2Output"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["VaeLoaderOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["FaceMaskOutput"];
       };
       /**
        * Errors
@@ -3018,7 +3018,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3067,7 +3067,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3146,7 +3146,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3281,7 +3281,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3341,7 +3341,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3383,7 +3383,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3436,7 +3436,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3479,7 +3479,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3534,7 +3534,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3576,7 +3576,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3676,11 +3676,6 @@ export type components = {
        */
       session_id?: string | null;
       /**
-       * Workflow Id
-       * @description The workflow that generated this image.
-       */
-      workflow_id?: string | null;
-      /**
        * Node Id
        * @description The node ID that generated this image, if it is a generated image.
        */
@@ -3695,6 +3690,11 @@ export type components = {
        * @description The id of the board the image belongs to, if one exists.
        */
       board_id?: string | null;
+      /**
+       * Workflow Id
+       * @description The workflow that generated this image.
+       */
+      workflow_id?: string | null;
     };
     /**
      * ImageField
@@ -3726,7 +3726,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3767,7 +3767,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3810,7 +3810,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3845,7 +3845,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3892,7 +3892,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3929,7 +3929,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -3988,7 +3988,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4075,7 +4075,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4129,7 +4129,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4173,7 +4173,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4243,7 +4243,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4300,7 +4300,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4345,7 +4345,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4393,7 +4393,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4435,7 +4435,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4486,7 +4486,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4521,7 +4521,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4614,7 +4614,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4675,7 +4675,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4706,7 +4706,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4773,7 +4773,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4832,7 +4832,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4881,7 +4881,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4946,7 +4946,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -4993,7 +4993,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5115,7 +5115,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5202,7 +5202,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5237,7 +5237,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5274,7 +5274,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5329,7 +5329,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5370,7 +5370,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5418,7 +5418,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5490,7 +5490,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5537,7 +5537,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5605,7 +5605,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5652,7 +5652,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5768,7 +5768,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5827,7 +5827,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5907,7 +5907,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -5954,7 +5954,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6016,7 +6016,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6102,7 +6102,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6231,7 +6231,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6266,7 +6266,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6319,7 +6319,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6374,7 +6374,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6441,11 +6441,11 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
-       * @default true
+       * @default false
        */
       use_cache?: boolean;
       /**
@@ -6488,11 +6488,11 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
-       * @default true
+       * @default false
        */
       use_cache?: boolean;
       /**
@@ -6529,11 +6529,11 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
-       * @default true
+       * @default false
        */
       use_cache?: boolean;
       /**
@@ -6581,7 +6581,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6628,7 +6628,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6683,7 +6683,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6747,7 +6747,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6788,7 +6788,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6869,7 +6869,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -6951,7 +6951,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7014,7 +7014,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7077,7 +7077,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7139,11 +7139,11 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
-       * @default true
+       * @default false
        */
       use_cache?: boolean;
       /** @description The image to process */
@@ -7172,7 +7172,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7221,7 +7221,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7277,7 +7277,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7354,7 +7354,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7593,7 +7593,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7780,7 +7780,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7890,7 +7890,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7941,7 +7941,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -7976,7 +7976,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8017,7 +8017,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8103,7 +8103,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8156,7 +8156,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8197,7 +8197,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8237,7 +8237,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8310,7 +8310,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8440,7 +8440,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8530,7 +8530,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8623,7 +8623,7 @@ export type components = {
        * @description Whether or not this is an intermediate invocation.
        * @default false
        */
-      is_intermediate?: boolean | null;
+      is_intermediate?: boolean;
       /**
        * Use Cache
        * @description Whether or not to use the cache
@@ -8728,11 +8728,11 @@ export type components = {
       ui_order: number | null;
     };
     /**
-     * StableDiffusionOnnxModelFormat
+     * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * CLIPVisionModelFormat
      * @description An enumeration.
@@ -8740,11 +8740,23 @@ export type components = {
      */
     CLIPVisionModelFormat: "diffusers";
     /**
-     * ControlNetModelFormat
+     * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * IPAdapterModelFormat
      * @description An enumeration.
@@ -8752,29 +8764,17 @@ export type components = {
      */
     IPAdapterModelFormat: "invokeai";
     /**
-     * StableDiffusion2ModelFormat
+     * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionXLModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * T2IAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     T2IAdapterModelFormat: "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
