@@ -23,6 +23,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
     from pydantic.json_schema import models_json_schema
+    from fastapi.responses import FileResponse
 
     # noinspection PyUnresolvedReferences
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
@@ -173,16 +174,13 @@ def custom_openapi():
 
 app.openapi = custom_openapi  # type: ignore [method-assign] # this is a valid assignment
 
-# Override API doc favicons
-app.mount("/static", StaticFiles(directory=Path(web_dir.__path__[0], "static/dream_web")), name="static")
-
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
     return get_swagger_ui_html(
         openapi_url=app.openapi_url,
         title=app.title,
-        swagger_favicon_url="/static/favicon.ico",
+        swagger_favicon_url="/static/docs/favicon.ico",
     )
 
 
@@ -191,12 +189,24 @@ def overridden_redoc():
     return get_redoc_html(
         openapi_url=app.openapi_url,
         title=app.title,
-        redoc_favicon_url="/static/favicon.ico",
+        redoc_favicon_url="/static/docs/favicon.ico",
     )
 
 
-# Must mount *after* the other routes else it borks em
-app.mount("/", StaticFiles(directory=Path(web_dir.__path__[0], "dist"), html=True), name="ui")
+web_root_path = Path(list(web_dir.__path__)[0])
+
+
+# Cannot add headers to StaticFiles, so we must serve index.html with a custom route
+# Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
+@app.get("/", include_in_schema=False, name="ui_root")
+def get_index() -> FileResponse:
+    return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
+
+
+# # Must mount *after* the other routes else it borks em
+app.mount("/static", StaticFiles(directory=Path(web_root_path, "static/")), name="static")  # docs favicon is in here
+app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
+app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 
 
 def invoke_api():
