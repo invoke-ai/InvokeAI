@@ -1,5 +1,7 @@
 from typing import Any
+
 from fastapi.responses import HTMLResponse
+
 from .services.config import InvokeAIAppConfig
 
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
@@ -21,11 +23,12 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
     from fastapi.openapi.utils import get_openapi
+    from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
     from pydantic.json_schema import models_json_schema
-    from fastapi.responses import FileResponse
+    from torch.backends.mps import is_available as is_mps_available
 
     # for PyCharm:
     # noinspection PyUnresolvedReferences
@@ -38,7 +41,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from .api.routers import app_info, board_images, boards, images, models, session_queue, sessions, utilities
     from .api.sockets import SocketIO
     from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
-    from torch.backends.mps import is_available as is_mps_available
 
     if is_mps_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
