@@ -21,7 +21,8 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '3.10'
+           # - '3.9'
+           - '3.10'
 
         pytorch:
           - linux-cuda-11_7
