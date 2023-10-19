@@ -196,7 +196,9 @@ class ModelPatcher:
 
                     if model_embeddings.weight.data[token_id].shape != embedding.shape:
                         raise ValueError(
-                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {model_embeddings.weight.data[token_id].shape[0]}."
+                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension"
+                            f" {embedding.shape[0]}, but the current model has token dimension"
+                            f" {model_embeddings.weight.data[token_id].shape[0]}."
                         )
 
                     model_embeddings.weight.data[token_id] = embedding.to(
@@ -257,7 +259,8 @@ class TextualInversionModel:
         if "string_to_param" in state_dict:
             if len(state_dict["string_to_param"]) > 1:
                 print(
-                    f'Warn: Embedding "{file_path.name}" contains multiple tokens, which is not supported. The first token will be used.'
+                    f'Warn: Embedding "{file_path.name}" contains multiple tokens, which is not supported. The first'
+                    " token will be used."
                 )
 
             result.embedding = next(iter(state_dict["string_to_param"].values()))
@@ -470,7 +473,9 @@ class ONNXModelPatcher:
 
                     if embeddings[token_id].shape != embedding.shape:
                         raise ValueError(
-                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {embeddings[token_id].shape[0]}."
+                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension"
+                            f" {embedding.shape[0]}, but the current model has token dimension"
+                            f" {embeddings[token_id].shape[0]}."
                         )
 
                     embeddings[token_id] = embedding
