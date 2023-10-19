@@ -54,24 +54,6 @@ class ModelPatcher:
 
         return (module_key, module)
 
-    @staticmethod
-    def _lora_forward_hook(
-        applied_loras: List[Tuple[LoRAModel, float]],
-        layer_name: str,
-    ):
-        def lora_forward(module, input_h, output):
-            if len(applied_loras) == 0:
-                return output
-
-            for lora, weight in applied_loras:
-                layer = lora.layers.get(layer_name, None)
-                if layer is None:
-                    continue
-                output += layer.forward(module, input_h, weight)
-            return output
-
-        return lora_forward
-
     @classmethod
     @contextmanager
     def apply_lora_unet(
