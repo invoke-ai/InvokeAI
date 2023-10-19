@@ -181,7 +181,7 @@ This includes 15 Nodes:
 
 **Output Example:** 
 
-<img src="https://github.com/helix4u/load_video_frame/blob/main/testmp4_embed_converted.gif" width="500" />
+<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/testmp4_embed_converted.gif" width="500" />
 [Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
 
 --------------------------------
