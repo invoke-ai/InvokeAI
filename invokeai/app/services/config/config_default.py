@@ -243,6 +243,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     db_dir              : Optional[Path] = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
     outdir              : Optional[Path] = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', json_schema_extra=Categories.Paths)
+    custom_nodes_dir    : Path = Field(default=Path('nodes'), description='Path to directory for custom nodes', json_schema_extra=Categories.Paths)
     from_file           : Optional[Path] = Field(default=None, description='Take command input from the indicated file (command-line client only)', json_schema_extra=Categories.Paths)
 
     # LOGGING
@@ -409,6 +410,13 @@ class InvokeAIAppConfig(InvokeAISettings):
         Path to the models directory
         """
         return self._resolve(self.models_dir)
+
+    @property
+    def custom_nodes_path(self) -> Path:
+        """
+        Path to the custom nodes directory
+        """
+        return self._resolve(self.custom_nodes_dir)
 
     # the following methods support legacy calls leftover from the Globals era
     @property
