@@ -166,6 +166,7 @@ version = { attr = "invokeai.version.__version__" }
 ]
 
 [tool.setuptools.package-data]
+"invokeai.app.assets" = ["**/*.png"]
 "invokeai.assets.fonts" = ["**/*.ttf"]
 "invokeai.backend" = ["**.png"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
