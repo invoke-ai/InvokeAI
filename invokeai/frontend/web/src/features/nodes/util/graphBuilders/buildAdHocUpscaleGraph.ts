@@ -7,7 +7,7 @@ import {
   SaveImageInvocation,
 } from 'services/api/types';
 import { REALESRGAN as ESRGAN, SAVE_IMAGE } from './constants';
-import { addCoreMetadataNode } from './metadata';
+import { addCoreMetadataNode, upsertMetadata } from './metadata';
 
 type Arg = {
   image_name: string;
@@ -56,7 +56,8 @@ export const buildAdHocUpscaleGraph = ({
     ],
   };
 
-  addCoreMetadataNode(graph, {
+  addCoreMetadataNode(graph, {});
+  upsertMetadata(graph, {
     esrgan_model: esrganModelName,
   });
 
