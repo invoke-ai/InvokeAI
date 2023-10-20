@@ -107,11 +107,16 @@ class MergeMetadataInvocation(BaseInvocation):
         return MetadataOutput(metadata=MetadataField.model_validate(data))
 
 
+GENERATION_MODES = Literal[
+    "txt2img", "img2img", "inpaint", "outpaint", "sdxl_txt2img", "sdxl_img2img", "sdxl_inpaint", "sdxl_outpaint"
+]
+
+
 @invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.0")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 
-    generation_mode: Literal["txt2img", "img2img", "inpaint", "outpaint"] = InputField(
+    generation_mode: Optional[GENERATION_MODES] = InputField(
         default=None,
         description="The generation mode that output this image",
     )
