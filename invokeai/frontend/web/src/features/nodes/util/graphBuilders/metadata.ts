@@ -5,7 +5,7 @@ import { METADATA, SAVE_IMAGE } from './constants';
 
 export const addCoreMetadataNode = (
   graph: NonNullableGraph,
-  metadata: Partial<CoreMetadataInvocation> | JsonObject
+  metadata: Partial<CoreMetadataInvocation>
 ): void => {
   graph.nodes[METADATA] = {
     id: METADATA,
