@@ -27,6 +27,8 @@ if TYPE_CHECKING:
     from .session_queue.session_queue_base import SessionQueueBase
     from .shared.graph import GraphExecutionState, LibraryGraph
     from .urls.urls_base import UrlServiceBase
+    from .workflow_image_records.workflow_image_records_base import WorkflowImageRecordsStorageBase
+    from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 
 
 class InvocationServices:
@@ -55,6 +57,8 @@ class InvocationServices:
     invocation_cache: "InvocationCacheBase"
     names: "NameServiceBase"
     urls: "UrlServiceBase"
+    workflow_image_records: "WorkflowImageRecordsStorageBase"
+    workflow_records: "WorkflowRecordsStorageBase"
 
     def __init__(
         self,
@@ -80,6 +84,8 @@ class InvocationServices:
         invocation_cache: "InvocationCacheBase",
         names: "NameServiceBase",
         urls: "UrlServiceBase",
+        workflow_image_records: "WorkflowImageRecordsStorageBase",
+        workflow_records: "WorkflowRecordsStorageBase",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -103,3 +109,5 @@ class InvocationServices:
         self.invocation_cache = invocation_cache
         self.names = names
         self.urls = urls
+        self.workflow_image_records = workflow_image_records
+        self.workflow_records = workflow_records

@@ -20,12 +20,12 @@ import {
   IMG2IMG_RESIZE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
+import { addCoreMetadataNode } from './metadata';
 
 /**
  * Builds the Canvas tab's Image to Image graph.
@@ -308,10 +308,7 @@ export const buildCanvasImageToImageGraph = (
     });
   }
 
-  // add metadata accumulator, which is only mostly populated - some fields are added later
-  graph.nodes[METADATA_ACCUMULATOR] = {
-    id: METADATA_ACCUMULATOR,
-    type: 'metadata_accumulator',
+  addCoreMetadataNode(graph, {
     generation_mode: 'img2img',
     cfg_scale,
     width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
@@ -325,15 +322,10 @@ export const buildCanvasImageToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined, // option; set in addVAEToGraph
-    controlnets: [], // populated in addControlNetToLinearGraph
-    loras: [], // populated in addLoRAsToGraph
-    ipAdapters: [], // populated in addIPAdapterToLinearGraph
-    t2iAdapters: [],
     clip_skip: clipSkip,
     strength,
     init_image: initialImage.image_name,
-  };
+  });
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

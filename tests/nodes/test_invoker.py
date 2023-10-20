@@ -80,6 +80,8 @@ def mock_services() -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
+        workflow_records=None,  # type: ignore
+        workflow_image_records=None,  # type: ignore
     )
 
 

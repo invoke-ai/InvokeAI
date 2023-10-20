@@ -106,9 +106,9 @@
         "allImagesLoaded": "Alle afbeeldingen geladen",
         "loadMore": "Laad meer",
         "noImagesInGallery": "Geen afbeeldingen om te tonen",
-        "deleteImage": "Wis afbeelding",
-        "deleteImageBin": "Gewiste afbeeldingen worden naar de prullenbak van je besturingssysteem gestuurd.",
-        "deleteImagePermanent": "Gewiste afbeeldingen kunnen niet worden hersteld.",
+        "deleteImage": "Verwijder afbeelding",
+        "deleteImageBin": "Verwijderde afbeeldingen worden naar de prullenbak van je besturingssysteem gestuurd.",
+        "deleteImagePermanent": "Verwijderde afbeeldingen kunnen niet worden hersteld.",
         "assets": "Eigen onderdelen",
         "images": "Afbeeldingen",
         "autoAssignBoardOnClick": "Ken automatisch bord toe bij klikken",
@@ -386,11 +386,11 @@
         "deleteModel": "Verwijder model",
         "deleteConfig": "Verwijder configuratie",
         "deleteMsg1": "Weet je zeker dat je dit model wilt verwijderen uit InvokeAI?",
-        "deleteMsg2": "Hiermee ZAL het model van schijf worden verwijderd als het zich bevindt in de InvokeAI-beginmap. Als je het model vanaf een eigen locatie gebruikt, dan ZAL het model NIET van schijf worden verwijderd.",
+        "deleteMsg2": "Hiermee ZAL het model van schijf worden verwijderd als het zich bevindt in de beginmap van InvokeAI. Als je het model vanaf een eigen locatie gebruikt, dan ZAL het model NIET van schijf worden verwijderd.",
         "formMessageDiffusersVAELocationDesc": "Indien niet opgegeven, dan zal InvokeAI kijken naar het VAE-bestand in de hierboven gegeven modellocatie.",
         "repoIDValidationMsg": "Online repository van je model",
         "formMessageDiffusersModelLocation": "Locatie Diffusers-model",
-        "convertToDiffusersHelpText3": "Je checkpoint-bestand op schijf ZAL worden verwijderd als het zich in de InvokeAI root map bevindt. Het zal NIET worden verwijderd als het zich in een andere locatie bevindt.",
+        "convertToDiffusersHelpText3": "Je checkpoint-bestand op de schijf ZAL worden verwijderd als het zich in de beginmap van InvokeAI bevindt. Het ZAL NIET worden verwijderd als het zich in een andere locatie bevindt.",
         "convertToDiffusersHelpText6": "Wil je dit model omzetten?",
         "allModels": "Alle modellen",
         "checkpointModels": "Checkpoints",
@@ -458,11 +458,11 @@
         "noCustomLocationProvided": "Geen Aangepaste Locatie Opgegeven",
         "syncModels": "Synchroniseer Modellen",
         "modelsSynced": "Modellen Gesynchroniseerd",
-        "modelSyncFailed": "Synchronisatie Modellen Gefaald",
+        "modelSyncFailed": "Synchronisatie modellen mislukt",
         "modelDeleteFailed": "Model kon niet verwijderd worden",
         "convertingModelBegin": "Model aan het converteren. Even geduld.",
         "importModels": "Importeer Modellen",
-        "syncModelsDesc": "Als je modellen niet meer synchroon zijn met de backend, kan je ze met deze optie verversen. Dit wordt typisch gebruikt in het geval je het models.yaml bestand met de hand bewerkt of als je modellen aan de InvokeAI root map toevoegt nadat de applicatie gestart werd.",
+        "syncModelsDesc": "Als je modellen niet meer synchroon zijn met de backend, kan je ze met deze optie vernieuwen. Dit wordt meestal gebruikt in het geval je het bestand models.yaml met de hand bewerkt of als je modellen aan de beginmap van InvokeAI toevoegt nadat de applicatie gestart is.",
         "loraModels": "LoRA's",
         "onnxModels": "Onnx",
         "oliveModels": "Olives",
@@ -615,14 +615,14 @@
         "resetWebUI": "Herstel web-UI",
         "resetWebUIDesc1": "Herstel web-UI herstelt alleen de lokale afbeeldingscache en de onthouden instellingen van je browser. Het verwijdert geen afbeeldingen van schijf.",
         "resetWebUIDesc2": "Als afbeeldingen niet getoond worden in de galerij of iets anders werkt niet, probeer dan eerst deze herstelfunctie voordat je een fout aanmeldt op GitHub.",
-        "resetComplete": "Webgebruikersinterface is hersteld.",
+        "resetComplete": "Webinterface is hersteld.",
         "useSlidersForAll": "Gebruik schuifbalken voor alle opties",
-        "consoleLogLevel": "Logboekniveau",
+        "consoleLogLevel": "Niveau logboek",
         "shouldLogToConsole": "Schrijf logboek naar console",
         "developer": "Ontwikkelaar",
         "general": "Algemeen",
         "showProgressInViewer": "Toon voortgangsafbeeldingen in viewer",
-        "generation": "Generatie",
+        "generation": "Genereren",
         "ui": "Gebruikersinterface",
         "antialiasProgressImages": "Voer anti-aliasing uit op voortgangsafbeeldingen",
         "showAdvancedOptions": "Toon uitgebreide opties",
@@ -631,16 +631,16 @@
         "beta": "Bèta",
         "experimental": "Experimenteel",
         "alternateCanvasLayout": "Omwisselen Canvas Layout",
-        "enableNodesEditor": "Knopen Editor Inschakelen",
-        "autoChangeDimensions": "Werk bij wijziging afmetingen bij naar modelstandaard",
+        "enableNodesEditor": "Schakel Knooppunteditor in",
+        "autoChangeDimensions": "Werk B/H bij naar modelstandaard bij wijziging",
         "clearIntermediates": "Wis tussentijdse afbeeldingen",
         "clearIntermediatesDesc3": "Je galerijafbeeldingen zullen niet worden verwijderd.",
         "clearIntermediatesWithCount_one": "Wis {{count}} tussentijdse afbeelding",
         "clearIntermediatesWithCount_other": "Wis {{count}} tussentijdse afbeeldingen",
-        "clearIntermediatesDesc2": "Tussentijdse afbeeldingen zijn nevenproducten bij een generatie, die afwijken van de uitvoerafbeeldingen in de galerij. Het wissen van tussentijdse afbeeldingen zal schijfruimte vrijmaken.",
+        "clearIntermediatesDesc2": "Tussentijdse afbeeldingen zijn nevenproducten bij het genereren. Deze wijken af van de uitvoerafbeeldingen in de galerij. Als je tussentijdse afbeeldingen wist, wordt schijfruimte vrijgemaakt.",
         "intermediatesCleared_one": "{{count}} tussentijdse afbeelding gewist",
         "intermediatesCleared_other": "{{count}} tussentijdse afbeeldingen gewist",
-        "clearIntermediatesDesc1": "Het wissen van tussentijdse onderdelen zet de staat van je canvas en ControlNet terug.",
+        "clearIntermediatesDesc1": "Als je tussentijdse afbeeldingen wist, dan wordt de staat hersteld van je canvas en van ControlNet.",
         "intermediatesClearedFailed": "Fout bij wissen van tussentijdse afbeeldingen"
     },
     "toast": {
@@ -881,7 +881,7 @@
         "conditioningCollectionDescription": "Conditionering kan worden doorgegeven tussen knooppunten.",
         "colorPolymorphic": "Polymorfisme kleur",
         "colorCodeEdgesHelp": "Kleurgecodeerde randen op basis van hun verbonden velden",
-        "collectionDescription": "Beschrijving",
+        "collectionDescription": "TODO",
         "float": "Zwevende-kommagetal",
         "workflowContact": "Contactpersoon",
         "skippingReservedFieldType": "Overslaan van gereserveerd veldsoort",
@@ -898,7 +898,7 @@
         "sourceNode": "Bronknooppunt",
         "nodeOpacity": "Dekking knooppunt",
         "pickOne": "Kies er een",
-        "collectionItemDescription": "Beschrijving",
+        "collectionItemDescription": "TODO",
         "integerDescription": "Gehele getallen zijn getallen zonder een decimaalteken.",
         "outputField": "Uitvoerveld",
         "unableToLoadWorkflow": "Kan werkstroom niet valideren",
@@ -944,7 +944,7 @@
         "inputNode": "Invoerknooppunt",
         "enumDescription": "Enumeraties zijn waarden die uit een aantal opties moeten worden gekozen.",
         "unkownInvocation": "Onbekende aanroepsoort",
-        "loRAModelFieldDescription": "Beschrijving",
+        "loRAModelFieldDescription": "TODO",
         "imageField": "Afbeelding",
         "skippedReservedOutput": "Overgeslagen gereserveerd uitvoerveld",
         "animatedEdgesHelp": "Animeer gekozen randen en randen verbonden met de gekozen knooppunten",
@@ -953,7 +953,7 @@
         "unknownTemplate": "Onbekend sjabloon",
         "noWorkflow": "Geen werkstroom",
         "removeLinearView": "Verwijder uit lineaire weergave",
-        "colorCollectionDescription": "Beschrijving",
+        "colorCollectionDescription": "TODO",
         "integerCollectionDescription": "Een verzameling gehele getallen.",
         "colorPolymorphicDescription": "Een verzameling kleuren.",
         "sDXLMainModelField": "SDXL-model",
@@ -1028,7 +1028,7 @@
         "loadingNodes": "Bezig met laden van knooppunten...",
         "snapToGridHelp": "Lijn knooppunten uit op raster bij verplaatsing",
         "workflowSettings": "Instellingen werkstroomeditor",
-        "mainModelFieldDescription": "Beschrijving",
+        "mainModelFieldDescription": "TODO",
         "sDXLRefinerModelField": "Verfijningsmodel",
         "loRAModelField": "LoRA",
         "unableToParseEdge": "Kan rand niet inlezen",
@@ -1039,13 +1039,13 @@
     "controlnet": {
         "amult": "a_mult",
         "resize": "Schaal",
-        "showAdvanced": "Toon uitgebreid",
+        "showAdvanced": "Toon uitgebreide opties",
         "contentShuffleDescription": "Verschuift het materiaal in de afbeelding",
         "bgth": "bg_th",
         "addT2IAdapter": "Voeg $t(common.t2iAdapter) toe",
         "pidi": "PIDI",
         "importImageFromCanvas": "Importeer afbeelding uit canvas",
-        "lineartDescription": "Zet afbeelding om naar lineart",
+        "lineartDescription": "Zet afbeelding om naar line-art",
         "normalBae": "Normale BAE",
         "importMaskFromCanvas": "Importeer masker uit canvas",
         "hed": "HED",
@@ -1053,7 +1053,7 @@
         "contentShuffle": "Verschuif materiaal",
         "controlNetEnabledT2IDisabled": "$t(common.controlNet) ingeschakeld, $t(common.t2iAdapter)s uitgeschakeld",
         "ipAdapterModel": "Adaptermodel",
-        "resetControlImage": "Zet controle-afbeelding terug",
+        "resetControlImage": "Herstel controle-afbeelding",
         "beginEndStepPercent": "Percentage begin-/eindstap",
         "mlsdDescription": "Minimalistische herkenning lijnsegmenten",
         "duplicate": "Maak kopie",
@@ -1061,8 +1061,8 @@
         "f": "F",
         "h": "H",
         "prompt": "Prompt",
-        "depthMidasDescription": "Generatie van diepteblad via Midas",
-        "controlnet": "$t(controlnet.controlAdapter) #{{number}} ($t(common.controlNet))",
+        "depthMidasDescription": "Genereer diepteblad via Midas",
+        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
         "openPoseDescription": "Menselijke pose-benadering via Openpose",
         "control": "Controle",
         "resizeMode": "Modus schaling",
@@ -1080,7 +1080,7 @@
         "enableControlnet": "Schakel ControlNet in",
         "detectResolution": "Herken resolutie",
         "controlNetT2IMutexDesc": "Gelijktijdig gebruik van $t(common.controlNet) en $t(common.t2iAdapter) wordt op dit moment niet ondersteund.",
-        "ip_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.ipAdapter))",
+        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
         "pidiDescription": "PIDI-afbeeldingsverwerking",
         "mediapipeFace": "Mediapipe - Gezicht",
         "mlsd": "M-LSD",
@@ -1088,10 +1088,10 @@
         "fill": "Vul",
         "cannyDescription": "Herkenning Canny-rand",
         "addIPAdapter": "Voeg $t(common.ipAdapter) toe",
-        "lineart": "Lineart",
+        "lineart": "Line-art",
         "colorMapDescription": "Genereert een kleurenblad van de afbeelding",
         "lineartAnimeDescription": "Lineartverwerking in anime-stijl",
-        "t2i_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.t2iAdapter))",
+        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
         "minConfidence": "Min. vertrouwensniveau",
         "imageResolution": "Resolutie afbeelding",
         "megaControl": "Zeer veel controle",
@@ -1110,15 +1110,15 @@
         "controlAdapter_other": "Control-adapters",
         "safe": "Veilig",
         "colorMapTileSize": "Grootte tegel",
-        "lineartAnime": "Lineart-anime",
+        "lineartAnime": "Line-art voor anime",
         "ipAdapterImageFallback": "Geen IP-adapterafbeelding gekozen",
         "mediapipeFaceDescription": "Gezichtsherkenning met Mediapipe",
         "canny": "Canny",
-        "depthZoeDescription": "Generatie van diepteblad via Zoe",
+        "depthZoeDescription": "Genereer diepteblad via Zoe",
         "hedDescription": "Herkenning van holistisch-geneste randen",
         "setControlImageDimensions": "Stel afmetingen controle-afbeelding in op B/H",
         "scribble": "Krabbel",
-        "resetIPAdapterImage": "Zet IP-adapterafbeelding terug",
+        "resetIPAdapterImage": "Herstel IP-adapterafbeelding",
         "handAndFace": "Hand en gezicht",
         "enableIPAdapter": "Schakel IP-adapter in",
         "maxFaces": "Max. gezichten"
@@ -1132,7 +1132,7 @@
             "label": "Gedrag seedwaarde"
         },
         "enableDynamicPrompts": "Schakel dynamische prompts in",
-        "combinatorial": "Combinatorische generatie",
+        "combinatorial": "Combinatorisch genereren",
         "maxPrompts": "Max. prompts",
         "promptsWithCount_one": "{{count}} prompt",
         "promptsWithCount_other": "{{count}} prompts",
@@ -1141,7 +1141,7 @@
     "popovers": {
         "noiseUseCPU": {
             "paragraphs": [
-                "Bestuurt of ruis wordt gegenereerd op de CPU of de GPU.",
+                "Bepaalt of ruis wordt gegenereerd op de CPU of de GPU.",
                 "Met CPU-ruis ingeschakeld zal een bepaalde seedwaarde dezelfde afbeelding opleveren op welke machine dan ook.",
                 "Er is geen prestatieverschil bij het inschakelen van CPU-ruis."
             ],
@@ -1149,7 +1149,7 @@
         },
         "paramScheduler": {
             "paragraphs": [
-                "De planner bepaalt hoe per keer ruis wordt toegevoegd aan een afbeelding of hoe een monster wordt bijgewerkt op basis van de uitvoer van een model."
+                "De planner bepaalt hoe ruis per iteratie wordt toegevoegd aan een afbeelding of hoe een monster wordt bijgewerkt op basis van de uitvoer van een model."
             ],
             "heading": "Planner"
         },
@@ -1220,8 +1220,8 @@
         },
         "paramSeed": {
             "paragraphs": [
-                "Bestuurt de startruis die gebruikt wordt bij het genereren.",
-                "Schakel \"Willekeurige seedwaarde\" uit om identieke resultaten te krijgen met dezelfde generatie-instellingen."
+                "Bepaalt de startruis die gebruikt wordt bij het genereren.",
+                "Schakel \"Willekeurige seedwaarde\" uit om identieke resultaten te krijgen met dezelfde genereer-instellingen."
             ],
             "heading": "Seedwaarde"
         },
@@ -1240,7 +1240,7 @@
         },
         "dynamicPromptsSeedBehaviour": {
             "paragraphs": [
-                "Bestuurt hoe de seedwaarde wordt gebruikt bij het genereren van prompts.",
+                "Bepaalt hoe de seedwaarde wordt gebruikt bij het genereren van prompts.",
                 "Per iteratie zal een unieke seedwaarde worden gebruikt voor elke iteratie. Gebruik dit om de promptvariaties binnen een enkele seedwaarde te verkennen.",
                 "Bijvoorbeeld: als je vijf prompts heb, dan zal voor elke afbeelding dezelfde seedwaarde gebruikt worden.",
                 "De optie Per afbeelding zal een unieke seedwaarde voor elke afbeelding gebruiken. Dit biedt meer variatie."
@@ -1259,7 +1259,7 @@
             "heading": "Model",
             "paragraphs": [
                 "Model gebruikt voor de ontruisingsstappen.",
-                "Verschillende modellen zijn meestal getraind zich te specialiseren in het maken van bepaalde esthetische resultaten en materiaal."
+                "Verschillende modellen zijn meestal getraind om zich te specialiseren in het maken van bepaalde esthetische resultaten en materiaal."
             ]
         },
         "compositingCoherencePass": {
@@ -1271,7 +1271,7 @@
         "paramDenoisingStrength": {
             "paragraphs": [
                 "Hoeveel ruis wordt toegevoegd aan de invoerafbeelding.",
-                "0 geeft een identieke afbeelding, waarbij 1 een volledig nieuwe afbeelding geeft."
+                "0 levert een identieke afbeelding op, waarbij 1 een volledig nieuwe afbeelding oplevert."
             ],
             "heading": "Ontruisingssterkte"
         },
@@ -1284,7 +1284,7 @@
         },
         "paramNegativeConditioning": {
             "paragraphs": [
-                "Het generatieproces voorkomt de gegeven begrippen in de negatieve prompt. Gebruik dit om bepaalde zaken of voorwerpen uit te sluiten van de uitvoerafbeelding.",
+                "Het genereerproces voorkomt de gegeven begrippen in de negatieve prompt. Gebruik dit om bepaalde zaken of voorwerpen uit te sluiten van de uitvoerafbeelding.",
                 "Ondersteunt Compel-syntax en -embeddingen."
             ],
             "heading": "Negatieve prompt"
@@ -1316,13 +1316,13 @@
         "controlNet": {
             "heading": "ControlNet",
             "paragraphs": [
-                "ControlNets biedt begeleiding aan het generatieproces, waarbij hulp wordt geboden bij het maken van afbeelding met aangestuurde compositie, structuur of stijl, afhankelijk van het gekozen model."
+                "ControlNets begeleidt het genereerproces, waarbij geholpen wordt bij het maken van afbeeldingen met aangestuurde compositie, structuur of stijl, afhankelijk van het gekozen model."
             ]
         },
         "paramCFGScale": {
             "heading": "CFG-schaal",
             "paragraphs": [
-                "Bestuurt hoeveel je prompt invloed heeft op het generatieproces."
+                "Bepaalt hoeveel je prompt invloed heeft op het genereerproces."
             ]
         },
         "controlNetControlMode": {
@@ -1335,7 +1335,7 @@
             "heading": "Stappen",
             "paragraphs": [
                 "Het aantal uit te voeren stappen tijdens elke generatie.",
-                "Hogere stappenaantallen geven meestal betere afbeeldingen ten koste van een grotere benodigde generatietijd."
+                "Een hoger aantal stappen geven meestal betere afbeeldingen, ten koste van een hogere benodigde tijd om te genereren."
             ]
         },
         "paramPositiveConditioning": {
@@ -1356,7 +1356,7 @@
         "seamless": "Naadloos",
         "positivePrompt": "Positieve prompt",
         "negativePrompt": "Negatieve prompt",
-        "generationMode": "Generatiemodus",
+        "generationMode": "Genereermodus",
         "Threshold": "Drempelwaarde ruis",
         "metadata": "Metagegevens",
         "strength": "Sterkte Afbeelding naar afbeelding",
@@ -1382,13 +1382,13 @@
     },
     "queue": {
         "status": "Status",
-        "pruneSucceeded": "{{item_count}} voltooide onderdelen uit wachtrij gesnoeid",
+        "pruneSucceeded": "{{item_count}} voltooide onderdelen uit wachtrij opgeruimd",
         "cancelTooltip": "Annuleer huidig onderdeel",
         "queueEmpty": "Wachtrij leeg",
         "pauseSucceeded": "Verwerker onderbroken",
         "in_progress": "Bezig",
-        "queueFront": "Voeg toe aan voorkant van wachtrij",
-        "notReady": "Kan niet in wachtrij plaatsen",
+        "queueFront": "Voeg vooraan toe in wachtrij",
+        "notReady": "Fout bij plaatsen in wachtrij",
         "batchFailedToQueue": "Fout bij reeks in wachtrij plaatsen",
         "completed": "Voltooid",
         "queueBack": "Voeg toe aan wachtrij",
@@ -1402,22 +1402,22 @@
         "front": "begin",
         "clearSucceeded": "Wachtrij gewist",
         "pause": "Onderbreek",
-        "pruneTooltip": "Snoei {{item_count}} voltooide onderdelen",
+        "pruneTooltip": "Ruim {{item_count}} voltooide onderdelen op",
         "cancelSucceeded": "Onderdeel geannuleerd",
         "batchQueuedDesc_one": "Voeg {{count}} sessie toe aan het {{direction}} van de wachtrij",
         "batchQueuedDesc_other": "Voeg {{count}} sessies toe aan het {{direction}} van de wachtrij",
         "graphQueued": "Graaf in wachtrij geplaatst",
         "queue": "Wachtrij",
         "batch": "Reeks",
-        "clearQueueAlertDialog": "Als je de wachtrij onmiddellijk wist, dan worden alle onderdelen die bezig zijn geannuleerd en wordt de gehele wachtrij gewist.",
+        "clearQueueAlertDialog": "Als je de wachtrij onmiddellijk wist, dan worden alle onderdelen die bezig zijn geannuleerd en wordt de wachtrij volledig gewist.",
         "pending": "Wachtend",
         "completedIn": "Voltooid na",
         "resumeFailed": "Fout bij hervatten verwerker",
         "clear": "Wis",
-        "prune": "Snoei",
+        "prune": "Ruim op",
         "total": "Totaal",
         "canceled": "Geannuleerd",
-        "pruneFailed": "Fout bij snoeien van wachtrij",
+        "pruneFailed": "Fout bij opruimen van wachtrij",
         "cancelBatchSucceeded": "Reeks geannuleerd",
         "clearTooltip": "Annuleer en wis alle onderdelen",
         "current": "Huidig",
@@ -1431,7 +1431,7 @@
         "session": "Sessie",
         "queueTotal": "Totaal {{total}}",
         "resumeSucceeded": "Verwerker hervat",
-        "enqueueing": "Toevoegen van reeks aan wachtrij",
+        "enqueueing": "Bezig met toevoegen van reeks aan wachtrij",
         "resumeTooltip": "Hervat verwerker",
         "queueMaxExceeded": "Max. aantal van {{max_queue_size}} overschreden, {{skip}} worden overgeslagen",
         "resume": "Hervat",
@@ -1441,18 +1441,18 @@
         "graphFailedToQueue": "Fout bij toevoegen graaf aan wachtrij"
     },
     "sdxl": {
-        "refinerStart": "Startwaarde verfijner",
+        "refinerStart": "Startwaarde verfijning",
         "selectAModel": "Kies een model",
         "scheduler": "Planner",
         "cfgScale": "CFG-schaal",
         "negStylePrompt": "Negatieve-stijlprompt",
         "noModelsAvailable": "Geen modellen beschikbaar",
-        "refiner": "Verfijner",
-        "negAestheticScore": "Negatieve aantrekkelijkheidsscore",
-        "useRefiner": "Gebruik verfijner",
+        "refiner": "Verfijning",
+        "negAestheticScore": "Negatieve esthetische score",
+        "useRefiner": "Gebruik verfijning",
         "denoisingStrength": "Sterkte ontruising",
-        "refinermodel": "Verfijnermodel",
-        "posAestheticScore": "Positieve aantrekkelijkheidsscore",
+        "refinermodel": "Verfijningsmodel",
+        "posAestheticScore": "Positieve esthetische score",
         "concatPromptStyle": "Plak prompt- en stijltekst aan elkaar",
         "loading": "Bezig met laden...",
         "steps": "Stappen",
