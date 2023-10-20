@@ -1,25 +1,25 @@
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
-  ResizeLatentsInvocation,
-  NoiseInvocation,
-  LatentsToImageInvocation,
   Edge,
+  LatentsToImageInvocation,
+  NoiseInvocation,
+  ResizeLatentsInvocation,
 } from 'services/api/types';
 import {
-  LATENTS_TO_IMAGE,
   DENOISE_LATENTS,
-  NOISE,
-  MAIN_MODEL_LOADER,
-  METADATA_ACCUMULATOR,
-  LATENTS_TO_IMAGE_HRF,
   DENOISE_LATENTS_HRF,
-  RESCALE_LATENTS,
+  LATENTS_TO_IMAGE,
+  LATENTS_TO_IMAGE_HRF,
+  MAIN_MODEL_LOADER,
+  NOISE,
   NOISE_HRF,
+  RESCALE_LATENTS,
   VAE_LOADER,
 } from './constants';
-import { logger } from 'app/logging/logger';
+import { upsertMetadata } from './metadata';
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
@@ -71,10 +71,8 @@ export const addHrfToGraph = (
   }
   const log = logger('txt2img');
 
-  const { vae } = state.generation;
+  const { vae, hrfWidth, hrfHeight, hrfStrength } = state.generation;
   const isAutoVae = !vae;
-  const hrfWidth = state.generation.hrfWidth;
-  const hrfHeight = state.generation.hrfHeight;
 
   // Pre-existing (original) graph nodes.
   const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
@@ -116,7 +114,7 @@ export const addHrfToGraph = (
     cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
     scheduler: originalDenoiseLatentsNode?.scheduler,
     steps: originalDenoiseLatentsNode?.steps,
-    denoising_start: 1 - state.generation.hrfStrength,
+    denoising_start: 1 - hrfStrength,
     denoising_end: 1,
   };
 
@@ -223,16 +221,6 @@ export const addHrfToGraph = (
     },
     {
       source: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'metadata',
-      },
-      destination: {
-        node_id: LATENTS_TO_IMAGE_HRF,
-        field: 'metadata',
-      },
-    },
-    {
-      source: {
         node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
@@ -242,6 +230,12 @@ export const addHrfToGraph = (
       },
     }
   );
+
+  upsertMetadata(graph, {
+    hrf_height: hrfHeight,
+    hrf_width: hrfWidth,
+    hrf_strength: hrfStrength,
+  });
 
   copyConnectionsToDenoiseLatentsHrf(graph);
 };

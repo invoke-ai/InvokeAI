@@ -1,14 +1,14 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { forEach, size } from 'lodash-es';
 import {
-  MetadataAccumulatorInvocation,
-  SDXLLoraLoaderInvocation,
-} from 'services/api/types';
+  LoRAMetadataItem,
+  NonNullableGraph,
+  zLoRAMetadataItem,
+} from 'features/nodes/types/types';
+import { forEach, size } from 'lodash-es';
+import { SDXLLoraLoaderInvocation } from 'services/api/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   LORA_LOADER,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
   SDXL_CANVAS_INPAINT_GRAPH,
@@ -17,6 +17,7 @@ import {
   SDXL_REFINER_INPAINT_CREATE_MASK,
   SEAMLESS,
 } from './constants';
+import { upsertMetadata } from './metadata';
 
 export const addSDXLLoRAsToGraph = (
   state: RootState,
@@ -34,9 +35,12 @@ export const addSDXLLoRAsToGraph = (
 
   const { loras } = state.lora;
   const loraCount = size(loras);
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
+
+  if (loraCount === 0) {
+    return;
+  }
+
+  const loraMetadata: LoRAMetadataItem[] = [];
 
   // Handle Seamless Plugs
   const unetLoaderId = modelLoaderNodeId;
@@ -47,22 +51,17 @@ export const addSDXLLoRAsToGraph = (
     clipLoaderId = SDXL_MODEL_LOADER;
   }
 
-  if (loraCount > 0) {
-    // Remove modelLoaderNodeId unet/clip/clip2 connections to feed it to LoRAs
-    graph.edges = graph.edges.filter(
-      (e) =>
-        !(
-          e.source.node_id === unetLoaderId && ['unet'].includes(e.source.field)
-        ) &&
-        !(
-          e.source.node_id === clipLoaderId && ['clip'].includes(e.source.field)
-        ) &&
-        !(
-          e.source.node_id === clipLoaderId &&
-          ['clip2'].includes(e.source.field)
-        )
-    );
-  }
+  // Remove modelLoaderNodeId unet/clip/clip2 connections to feed it to LoRAs
+  graph.edges = graph.edges.filter(
+    (e) =>
+      !(
+        e.source.node_id === unetLoaderId && ['unet'].includes(e.source.field)
+      ) &&
+      !(
+        e.source.node_id === clipLoaderId && ['clip'].includes(e.source.field)
+      ) &&
+      !(e.source.node_id === clipLoaderId && ['clip2'].includes(e.source.field))
+  );
 
   // we need to remember the last lora so we can chain from it
   let lastLoraNodeId = '';
@@ -80,16 +79,12 @@ export const addSDXLLoRAsToGraph = (
       weight,
     };
 
-    // add the lora to the metadata accumulator
-    if (metadataAccumulator) {
-      if (!metadataAccumulator.loras) {
-        metadataAccumulator.loras = [];
-      }
-      metadataAccumulator.loras.push({
+    loraMetadata.push(
+      zLoRAMetadataItem.parse({
         lora: { model_name, base_model },
         weight,
-      });
-    }
+      })
+    );
 
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
@@ -242,4 +237,6 @@ export const addSDXLLoRAsToGraph = (
     lastLoraNodeId = currentLoraNodeId;
     currentLoraIndex += 1;
   });
+
+  upsertMetadata(graph, { loras: loraMetadata });
 };

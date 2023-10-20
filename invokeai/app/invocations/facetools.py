@@ -16,6 +16,8 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
+    WithMetadata,
+    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -437,7 +439,7 @@ def get_faces_list(
 
 
 @invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.2")
-class FaceOffInvocation(BaseInvocation):
+class FaceOffInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Bound, extract, and mask a face from an image using MediaPipe detection"""
 
     image: ImageField = InputField(description="Image for face detection")
@@ -531,7 +533,7 @@ class FaceOffInvocation(BaseInvocation):
 
 
 @invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.2")
-class FaceMaskInvocation(BaseInvocation):
+class FaceMaskInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Face mask creation using mediapipe face detection"""
 
     image: ImageField = InputField(description="Image to face detect")
@@ -650,7 +652,7 @@ class FaceMaskInvocation(BaseInvocation):
 @invocation(
     "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.2"
 )
-class FaceIdentifierInvocation(BaseInvocation):
+class FaceIdentifierInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Outputs an image with detected face IDs printed on each face. For use with other FaceTools."""
 
     image: ImageField = InputField(description="Image to face detect")

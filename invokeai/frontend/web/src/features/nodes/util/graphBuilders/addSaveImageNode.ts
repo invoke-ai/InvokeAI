@@ -1,19 +1,15 @@
+import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { SaveImageInvocation } from 'services/api/types';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
   LATENTS_TO_IMAGE_HRF,
-  METADATA_ACCUMULATOR,
   NSFW_CHECKER,
   SAVE_IMAGE,
   WATERMARKER,
 } from './constants';
-import {
-  MetadataAccumulatorInvocation,
-  SaveImageInvocation,
-} from 'services/api/types';
-import { RootState } from 'app/store/store';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
 /**
  * Set the `use_cache` field on the linear/canvas graph's final image output node to False.
@@ -36,23 +32,6 @@ export const addSaveImageNode = (
   };
 
   graph.nodes[SAVE_IMAGE] = saveImageNode;
-
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
-
-  if (metadataAccumulator) {
-    graph.edges.push({
-      source: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'metadata',
-      },
-      destination: {
-        node_id: SAVE_IMAGE,
-        field: 'metadata',
-      },
-    });
-  }
 
   const destination = {
     node_id: SAVE_IMAGE,

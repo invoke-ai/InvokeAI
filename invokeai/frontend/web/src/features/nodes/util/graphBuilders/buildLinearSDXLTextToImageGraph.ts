@@ -11,9 +11,9 @@ import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
+import { addCoreMetadataNode } from './metadata';
 import {
   LATENTS_TO_IMAGE,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -225,10 +225,7 @@ export const buildLinearSDXLTextToImageGraph = (
     ],
   };
 
-  // add metadata accumulator, which is only mostly populated - some fields are added later
-  graph.nodes[METADATA_ACCUMULATOR] = {
-    id: METADATA_ACCUMULATOR,
-    type: 'metadata_accumulator',
+  addCoreMetadataNode(graph, {
     generation_mode: 'sdxl_txt2img',
     cfg_scale,
     height,
@@ -240,24 +237,8 @@ export const buildLinearSDXLTextToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined,
-    controlnets: [],
-    loras: [],
-    ipAdapters: [],
-    t2iAdapters: [],
     positive_style_prompt: positiveStylePrompt,
     negative_style_prompt: negativeStylePrompt,
-  };
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: LATENTS_TO_IMAGE,
-      field: 'metadata',
-    },
   });
 
   // Add Seamless To Graph
