@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 import cv2
 import numpy
-from PIL import Image, ImageChops, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageFilter, ImageOps, ImageDraw
 
 from invokeai.app.invocations.primitives import BoardField, ColorField, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -55,6 +55,131 @@ class BlankImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = Image.new(mode=self.mode, size=(self.width, self.height), color=self.color.tuple())
+
+        image_dto = context.services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata,
+            workflow=self.workflow,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+@invocation("gradient_image", title="Gradient Image", tags=["gradient", "image"], category="image", version="1.0.0")
+class GradientImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+    """Creates a variety of gradient images and forwards them to the pipeline"""
+
+    width: int = InputField(default=512, description="The width of the image")
+    height: int = InputField(default=512, description="The height of the image")
+    mode: Literal["linear", "radial", "noise", "conical", "diamond"] = InputField(default="linear", description="The type of gradient")
+    color1: ColorField = InputField(default=ColorField(r=0, g=0, b=0, a=255), description="The starting color of the gradient")
+    color2: ColorField = InputField(default=ColorField(r=255, g=255, b=255, a=255), description="The ending color of the gradient")
+    orientation_angle: float = InputField(default=0.0, description="The orientation angle of the gradient in degrees")
+
+    def _generate_linear_gradient(self) -> Image.Image:
+        image = Image.new("RGBA", (self.width, self.height), self.color1.tuple())
+        draw = ImageDraw.Draw(image)
+        for i in range(self.width):
+            blended_color = (
+                int(self.color1.r + (self.color2.r - self.color1.r) * (i / self.width)),
+                int(self.color1.g + (self.color2.g - self.color1.g) * (i / self.width)),
+                int(self.color1.b + (self.color2.b - self.color1.b) * (i / self.width)),
+                int(self.color1.a + (self.color2.a - self.color1.a) * (i / self.width))
+            )
+            draw.line([(i, 0), (i, self.height)], fill=blended_color)
+
+        image = image.rotate(self.orientation_angle, expand=True)
+
+        return image
+
+    def _generate_radial_gradient(self) -> Image.Image:
+        image = Image.new("RGBA", (self.width, self.height), self.color1.tuple())
+        draw = ImageDraw.Draw(image)
+        max_radius = int(((self.width ** 2) + (self.height ** 2)) ** 0.5 / 2)
+        center_x, center_y = self.width // 2, self.height // 2
+
+        for r in range(max_radius):
+            blended_color = (
+                int(self.color1.r + (self.color2.r - self.color1.r) * (r / max_radius)),
+                int(self.color1.g + (self.color2.g - self.color1.g) * (r / max_radius)),
+                int(self.color1.b + (self.color2.b - self.color1.b) * (r / max_radius)),
+                int(self.color1.a + (self.color2.a - self.color1.a) * (r / max_radius))
+            )
+            draw.ellipse(
+                (center_x - r, center_y - r, center_x + r, center_y + r),
+                outline=blended_color, width=1
+            )
+        return image
+
+    def _generate_noise_gradient(self) -> Image.Image:
+        img_array = numpy.zeros((self.height, self.width, 4), dtype=numpy.uint8)
+        random_factors = numpy.random.rand(self.height, self.width, 4)
+
+        for i, color in enumerate(['r', 'g', 'b', 'a']):
+            img_array[..., i] = getattr(self.color1, color) + (
+                getattr(self.color2, color) - getattr(self.color1, color)
+            ) * random_factors[..., i]
+
+        image = Image.fromarray(img_array.astype('uint8'), 'RGBA')
+        return image
+
+
+    def _generate_conical_gradient(self) -> Image.Image:
+        image = Image.new("RGBA", (self.width, self.height))
+        pixels = image.load()
+        center_x, center_y = self.width // 2, self.height // 2
+
+        for x in range(self.width):
+            for y in range(self.height):
+                angle = int((180 / numpy.pi) * numpy.arctan2(y - center_y, x - center_x)) % 360
+                blended_color = (
+                    int(self.color1.r + (self.color2.r - self.color1.r) * (angle / 360)),
+                    int(self.color1.g + (self.color2.g - self.color1.g) * (angle / 360)),
+                    int(self.color1.b + (self.color2.b - self.color1.b) * (angle / 360)),
+                    int(self.color1.a + (self.color2.a - self.color1.a) * (angle / 360))
+                )
+                pixels[x, y] = blended_color
+
+        return image
+
+    def _generate_diamond_gradient(self) -> Image.Image:
+        image = Image.new("RGBA", (self.width, self.height))
+        pixels = image.load()
+        center_x, center_y = self.width // 2, self.height // 2
+
+        for x in range(self.width):
+            for y in range(self.height):
+                distance = abs(x - center_x) + abs(y - center_y)
+                max_distance = self.width // 2 + self.height // 2
+                blended_color = (
+                    int(self.color1.r + (self.color2.r - self.color1.r) * (distance / max_distance)),
+                    int(self.color1.g + (self.color2.g - self.color1.g) * (distance / max_distance)),
+                    int(self.color1.b + (self.color2.b - self.color1.b) * (distance / max_distance)),
+                    int(self.color1.a + (self.color2.a - self.color1.a) * (distance / max_distance))
+                )
+                pixels[x, y] = blended_color
+
+        return image
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        gradient_method_map = {
+            "linear": self._generate_linear_gradient,
+            "radial": self._generate_radial_gradient,
+            "noise": self._generate_noise_gradient,
+            "conical": self._generate_conical_gradient,
+            "diamond": self._generate_diamond_gradient
+        }
+
+        image = gradient_method_map.get(self.mode)()
 
         image_dto = context.services.images.create(
             image=image,
