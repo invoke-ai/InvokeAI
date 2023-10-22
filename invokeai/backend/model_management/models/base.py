@@ -67,6 +67,7 @@ class SubModelType(str, Enum):
     VaeEncoder = "vae_encoder"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
+    FeatureExtractor = "feature_extractor"
     # MoVQ = "movq"
 
 
