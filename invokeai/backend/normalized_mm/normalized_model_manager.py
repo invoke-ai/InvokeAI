@@ -11,7 +11,7 @@ from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
-from ..model_management import BaseModelType, ModelNotFoundException, DuplicateModelException, ModelType, SubModelType
+from ..model_management import BaseModelType, DuplicateModelException, ModelNotFoundException, ModelType, SubModelType
 from ..model_management.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
 from ..model_management.model_probe import InvalidModelException, ModelProbe, ModelVariantType
 from ..util.devices import choose_torch_device, torch_dtype
@@ -34,6 +34,7 @@ BASE_SQL_ENUM = ",".join([f'"{x}"' for x in BASE_TYPES])
 @dataclass
 class ModelPart:
     """Type and path of a pipeline submodel."""
+
     type: ExtendedModelType
     path: Path
     refcount: int
@@ -42,6 +43,7 @@ class ModelPart:
 @dataclass
 class SimpleModelConfig:
     """Submodel name, description, type and path."""
+
     name: str
     description: str
     base_models: Set[BaseModelType]
@@ -52,6 +54,7 @@ class SimpleModelConfig:
 @dataclass
 class PipelineConfig:
     """Pipeline model name, description, type and parts."""
+
     name: str
     description: str
     base_models: Set[BaseModelType]
@@ -61,6 +64,7 @@ class PipelineConfig:
 @dataclass
 class ModelListing:
     """Slightly simplified object for generating listings."""
+
     name: str
     description: str
     source: str
@@ -134,7 +138,7 @@ class NormalizedModelManager:
         except sqlite3.Error as e:
             self._conn.rollback()
             if isinstance(e, sqlite3.IntegrityError):
-                raise DuplicateModelException(f'a model named {model_name} is already in the database') from e
+                raise DuplicateModelException(f"a model named {model_name} is already in the database") from e
             else:
                 raise e
 
@@ -215,7 +219,7 @@ class NormalizedModelManager:
         except sqlite3.Error as e:
             self._conn.rollback()
             if isinstance(e, sqlite3.IntegrityError):
-                raise DuplicateModelException(f'a model named {model_name} is already in the database') from e
+                raise DuplicateModelException(f"a model named {model_name} is already in the database") from e
             else:
                 raise e
 
@@ -358,7 +362,7 @@ class NormalizedModelManager:
         if destination.exists():
             raise OSError(f"{destination}: path or directory exists; won't overwrite")
 
-        if row['is_pipeline']:
+        if row["is_pipeline"]:
             # write the toc
             toc = row[0]
             destination.mkdir(parents=True)

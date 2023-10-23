@@ -453,9 +453,9 @@ class PipelineFolderProbe(FolderProbeBase):
         else:
             with open(self.folder_path / "scheduler" / "scheduler_config.json", "r") as file:
                 scheduler_conf = json.load(file)
-        if scheduler_conf.get("prediction_type", 'epsilon') == "v_prediction":
+        if scheduler_conf.get("prediction_type", "epsilon") == "v_prediction":
             return SchedulerPredictionType.VPrediction
-        elif scheduler_conf.get("prediction_type", 'epsilon') == "epsilon":
+        elif scheduler_conf.get("prediction_type", "epsilon") == "epsilon":
             return SchedulerPredictionType.Epsilon
         else:
             return None

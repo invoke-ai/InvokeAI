@@ -54,7 +54,7 @@ class FastModelHash(object):
         for root, dirs, files in os.walk(model_location):
             for file in files:
                 path = Path(root) / file
-                if path.name == 'config.json':  # don't use - varies according to diffusers version
+                if path.name == "config.json":  # don't use - varies according to diffusers version
                     continue
                 fast_hash = cls._hash_file(path.as_posix())
                 components.update({path: fast_hash})
