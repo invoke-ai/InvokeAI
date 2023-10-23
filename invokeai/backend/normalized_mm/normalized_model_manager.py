@@ -89,6 +89,7 @@ class NormalizedModelManager:
 
     def ingest(self, model_path: Path, name: Optional[str] = None) -> Union[SimpleModelConfig, PipelineConfig]:
         """Ingest a simple or pipeline model into the normalized models database."""
+        model_path = model_path.absolute()
         info = ModelProbe.probe(model_path)
         if info.model_type == ModelType.Main:
             return self.ingest_pipeline_model(model_path, name)
