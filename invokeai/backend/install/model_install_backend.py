@@ -460,6 +460,12 @@ class ModelInstall(object):
             possible_conf = path.with_suffix(".yaml")
             if possible_conf.exists():
                 legacy_conf = str(self.relative_to_root(possible_conf))
+            else:
+                legacy_conf = Path(
+                    self.config.root_path,
+                    "configs/controlnet",
+                    ("cldm_v15.yaml" if info.base_type == BaseModelType("sd-1") else "cldm_v21.yaml"),
+                )
 
         if legacy_conf:
             attributes.update(dict(config=str(legacy_conf)))
