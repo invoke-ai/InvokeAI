@@ -206,6 +206,7 @@ exclude = [
   "build",
   "dist",
   "invokeai/frontend/web/node_modules/",
+  ".venv*",
 ]
 
 [tool.black]

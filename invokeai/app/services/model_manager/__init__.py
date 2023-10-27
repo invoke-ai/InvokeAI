@@ -1,1 +1,1 @@
-from .model_manager_default import ModelManagerService
+from .model_manager_default import ModelManagerService  # noqa
