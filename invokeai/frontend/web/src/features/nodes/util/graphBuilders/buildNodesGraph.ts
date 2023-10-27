@@ -35,7 +35,6 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   const { nodes, edges } = nodesState;
 
   const filteredNodes = nodes.filter(isInvocationNode);
-  const workflowJSON = JSON.stringify(buildWorkflow(nodesState));
 
   // Reduce the node editor nodes into invocation graph nodes
   const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
@@ -68,7 +67,7 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
 
       if (embedWorkflow) {
         // add the workflow to the node
-        Object.assign(graphNode, { workflow: workflowJSON });
+        Object.assign(graphNode, { workflow: buildWorkflow(nodesState) });
       }
 
       // Add it to the nodes object

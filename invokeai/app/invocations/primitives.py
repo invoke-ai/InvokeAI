@@ -251,7 +251,9 @@ class ImageCollectionOutput(BaseInvocationOutput):
 
 
 @invocation("image", title="Image Primitive", tags=["primitives", "image"], category="primitives", version="1.0.0")
-class ImageInvocation(BaseInvocation):
+class ImageInvocation(
+    BaseInvocation,
+):
     """An image primitive value"""
 
     image: ImageField = InputField(description="The image to load")

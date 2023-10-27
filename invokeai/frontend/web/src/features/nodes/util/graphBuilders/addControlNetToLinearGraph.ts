@@ -5,14 +5,14 @@ import {
   CollectInvocation,
   ControlField,
   ControlNetInvocation,
-  MetadataAccumulatorInvocation,
+  CoreMetadataInvocation,
 } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CONTROL_NET_COLLECT,
-  METADATA_ACCUMULATOR,
 } from './constants';
+import { upsertMetadata } from './metadata';
 
 export const addControlNetToLinearGraph = (
   state: RootState,
@@ -23,9 +23,11 @@ export const addControlNetToLinearGraph = (
     (ca) => ca.model?.base_model === state.generation.model?.base_model
   );
 
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
+  // const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+  //   | MetadataAccumulatorInvocation
+  //   | undefined;
+
+  const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
 
   if (validControlNets.length) {
     // Even though denoise_latents' control input is polymorphic, keep it simple and always use a collect
@@ -42,6 +44,16 @@ export const addControlNetToLinearGraph = (
         field: 'control',
       },
     });
+
+    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+      graph.edges.push({
+        source: { node_id: CONTROL_NET_COLLECT, field: 'collection' },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          field: 'control',
+        },
+      });
+    }
 
     validControlNets.forEach((controlNet) => {
       if (!controlNet.model) {
@@ -89,15 +101,9 @@ export const addControlNetToLinearGraph = (
 
       graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
 
-      if (metadataAccumulator?.controlnets) {
-        // metadata accumulator only needs a control field - not the whole node
-        // extract what we need and add to the accumulator
-        const controlField = omit(controlNetNode, [
-          'id',
-          'type',
-        ]) as ControlField;
-        metadataAccumulator.controlnets.push(controlField);
-      }
+      controlNetMetadata.push(
+        omit(controlNetNode, ['id', 'type', 'is_intermediate']) as ControlField
+      );
 
       graph.edges.push({
         source: { node_id: controlNetNode.id, field: 'control' },
@@ -106,16 +112,7 @@ export const addControlNetToLinearGraph = (
           field: 'item',
         },
       });
-
-      if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-        graph.edges.push({
-          source: { node_id: controlNetNode.id, field: 'control' },
-          destination: {
-            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-            field: 'control',
-          },
-        });
-      }
     });
+    upsertMetadata(graph, { controlnets: controlNetMetadata });
   }
 };

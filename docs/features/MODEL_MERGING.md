@@ -16,9 +16,10 @@ Model Merging can be be done by navigating to the Model Manager and clicking the
   display all the diffusers-style models that InvokeAI knows about.
   If you do not see the model you are looking for, then it is probably
   a legacy checkpoint model and needs to be converted using the
-  `invoke` command-line client and its `!optimize` command. You
-  must select at least two models to merge. The third can be left at
-  "None" if you desire.
+  "Convert" option in the Web-based Model Manager tab.
+  
+  You must select at least two models to merge. The third can be left
+  at "None" if you desire.
 
 * Alpha: This is the ratio to use when combining models. It ranges
   from 0 to 1. The higher the value, the more weight is given to the

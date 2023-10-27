@@ -23,13 +23,13 @@ from ..dependencies import ApiDependencies
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
 UpdateModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
-update_models_response_adapter = TypeAdapter(UpdateModelResponse)
+UpdateModelResponseValidator = TypeAdapter(UpdateModelResponse)
 
 ImportModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
-import_models_response_adapter = TypeAdapter(ImportModelResponse)
+ImportModelResponseValidator = TypeAdapter(ImportModelResponse)
 
 ConvertModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
-convert_models_response_adapter = TypeAdapter(ConvertModelResponse)
+ConvertModelResponseValidator = TypeAdapter(ConvertModelResponse)
 
 MergeModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ImportModelAttributes = Union[tuple(OPENAPI_MODEL_CONFIGS)]
@@ -41,7 +41,7 @@ class ModelsList(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
-models_list_adapter = TypeAdapter(ModelsList)
+ModelsListValidator = TypeAdapter(ModelsList)
 
 
 @models_router.get(
@@ -60,7 +60,7 @@ async def list_models(
             models_raw.extend(ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type))
     else:
         models_raw = ApiDependencies.invoker.services.model_manager.list_models(None, model_type)
-    models = models_list_adapter.validate_python({"models": models_raw})
+    models = ModelsListValidator.validate_python({"models": models_raw})
     return models
 
 
@@ -131,7 +131,7 @@ async def update_model(
             base_model=base_model,
             model_type=model_type,
         )
-        model_response = update_models_response_adapter.validate_python(model_raw)
+        model_response = UpdateModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -186,7 +186,7 @@ async def import_model(
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
             model_name=info.name, base_model=info.base_model, model_type=info.model_type
         )
-        return import_models_response_adapter.validate_python(model_raw)
+        return ImportModelResponseValidator.validate_python(model_raw)
 
     except ModelNotFoundException as e:
         logger.error(str(e))
@@ -231,7 +231,7 @@ async def add_model(
             base_model=info.base_model,
             model_type=info.model_type,
         )
-        return import_models_response_adapter.validate_python(model_raw)
+        return ImportModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
@@ -302,7 +302,7 @@ async def convert_model(
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
             model_name, base_model=base_model, model_type=model_type
         )
-        response = convert_models_response_adapter.validate_python(model_raw)
+        response = ConvertModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException as e:
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found: {str(e)}")
     except ValueError as e:
@@ -417,7 +417,7 @@ async def merge_models(
             base_model=base_model,
             model_type=ModelType.Main,
         )
-        response = convert_models_response_adapter.validate_python(model_raw)
+        response = ConvertModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException:
         raise HTTPException(
             status_code=404,

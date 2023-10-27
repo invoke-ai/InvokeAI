@@ -21,13 +21,13 @@ import {
   DENOISE_LATENTS,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
+import { addCoreMetadataNode } from './metadata';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -289,10 +289,7 @@ export const buildCanvasTextToImageGraph = (
     });
   }
 
-  // add metadata accumulator, which is only mostly populated - some fields are added later
-  graph.nodes[METADATA_ACCUMULATOR] = {
-    id: METADATA_ACCUMULATOR,
-    type: 'metadata_accumulator',
+  addCoreMetadataNode(graph, {
     generation_mode: 'txt2img',
     cfg_scale,
     width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
@@ -306,23 +303,7 @@ export const buildCanvasTextToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined, // option; set in addVAEToGraph
-    controlnets: [], // populated in addControlNetToLinearGraph
-    loras: [], // populated in addLoRAsToGraph
-    ipAdapters: [], // populated in addIPAdapterToLinearGraph
-    t2iAdapters: [],
     clip_skip: clipSkip,
-  };
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: CANVAS_OUTPUT,
-      field: 'metadata',
-    },
   });
 
   // Add Seamless To Graph

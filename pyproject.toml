@@ -122,10 +122,9 @@ dependencies = [
 "configure_invokeai.py" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
 "textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
 
-# shortcut commands to start cli and web
+# shortcut commands to start web ui
 # "invokeai --web" will launch the web interface
-# "invokeai" will launch the CLI
-"invokeai" = "invokeai.frontend.legacy_launch_invokeai:main"
+# "invokeai" = "invokeai.frontend.legacy_launch_invokeai:main"
 
 # new shortcut to launch web interface
 "invokeai-web" = "invokeai.app.api_app:invoke_api"
@@ -138,7 +137,6 @@ dependencies = [
 "invokeai-migrate3" = "invokeai.backend.install.migrate_to_3:main"
 "invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
 "invokeai-metadata" = "invokeai.backend.image_util.invoke_metadata:main"
-"invokeai-node-cli" = "invokeai.app.cli_app:invoke_cli"
 "invokeai-node-web" = "invokeai.app.api_app:invoke_api"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
@@ -168,11 +166,13 @@ version = { attr = "invokeai.version.__version__" }
 ]
 
 [tool.setuptools.package-data]
+"invokeai.app.assets" = ["**/*.png"]
 "invokeai.assets.fonts" = ["**/*.ttf"]
 "invokeai.backend" = ["**.png"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]
 "invokeai.frontend.web.static" = ["**"]
+"invokeai.app.invocations" = ["**"]
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]

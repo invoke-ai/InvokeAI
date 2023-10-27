@@ -143,7 +143,6 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 <!-- seperator -->
 ### Prompt Engineering
 - [Prompt Syntax](features/PROMPTS.md)
-- [Generating Variations](features/VARIATIONS.md)
 
 ### InvokeAI Configuration
 - [Guide to InvokeAI Runtime Settings](features/CONFIGURATION.md)
@@ -166,10 +165,8 @@ still a work in progress, but coming soon.
 
 ### Command-Line Interface Retired
 
-The original "invokeai" command-line interface has been retired. The
-`invokeai` command will now launch a new command-line client that can
-be used by developers to create and test nodes. It is not intended to
-be used for routine image generation or manipulation.
+All "invokeai" command-line interfaces have been retired as of version
+3.4.
 
 To launch the Web GUI from the command-line, use the command
 `invokeai-web` rather than the traditional `invokeai --web`.

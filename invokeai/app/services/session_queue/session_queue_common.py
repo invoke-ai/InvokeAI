@@ -147,20 +147,20 @@ DEFAULT_QUEUE_ID = "default"
 
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
 
-adapter_NodeFieldValue = TypeAdapter(list[NodeFieldValue])
+NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])
 
 
 def get_field_values(queue_item_dict: dict) -> Optional[list[NodeFieldValue]]:
     field_values_raw = queue_item_dict.get("field_values", None)
-    return adapter_NodeFieldValue.validate_json(field_values_raw) if field_values_raw is not None else None
+    return NodeFieldValueValidator.validate_json(field_values_raw) if field_values_raw is not None else None
 
 
-adapter_GraphExecutionState = TypeAdapter(GraphExecutionState)
+GraphExecutionStateValidator = TypeAdapter(GraphExecutionState)
 
 
 def get_session(queue_item_dict: dict) -> GraphExecutionState:
     session_raw = queue_item_dict.get("session", "{}")
-    session = adapter_GraphExecutionState.validate_json(session_raw, strict=False)
+    session = GraphExecutionStateValidator.validate_json(session_raw, strict=False)
     return session
 
 
@@ -274,14 +274,6 @@ class EnqueueBatchResult(BaseModel):
     requested: int = Field(description="The total number of queue items requested to be enqueued")
     batch: Batch = Field(description="The batch that was enqueued")
     priority: int = Field(description="The priority of the enqueued batch")
-
-
-class EnqueueGraphResult(BaseModel):
-    enqueued: int = Field(description="The total number of queue items enqueued")
-    requested: int = Field(description="The total number of queue items requested to be enqueued")
-    batch: Batch = Field(description="The batch that was enqueued")
-    priority: int = Field(description="The priority of the enqueued batch")
-    queue_item: SessionQueueItemDTO = Field(description="The queue item that was enqueued")
 
 
 class ClearResult(BaseModel):

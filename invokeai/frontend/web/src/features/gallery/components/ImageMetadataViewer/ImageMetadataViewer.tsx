@@ -10,15 +10,14 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { memo } from 'react';
-import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
+import { useTranslation } from 'react-i18next';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
 import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
-import { useAppSelector } from '../../../../app/store/storeHooks';
-import { configSelector } from '../../../system/store/configSelectors';
-import { useTranslation } from 'react-i18next';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -32,17 +31,8 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // });
   const { t } = useTranslation();
 
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
-
-  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
-    { image, shouldFetchMetadataFromApi },
-    {
-      selectFromResult: (res) => ({
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
-  );
+  const { metadata } = useDebouncedMetadata(image.image_name);
+  const { workflow } = useDebouncedWorkflow(image.workflow_id);
 
   return (
     <Flex
