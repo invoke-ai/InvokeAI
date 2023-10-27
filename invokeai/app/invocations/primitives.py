@@ -293,7 +293,7 @@ class DenoiseMaskField(BaseModel):
     """An inpaint mask field"""
 
     mask_name: str = Field(description="The name of the mask image")
-    masked_latents_name: Optional[str] = Field(description="The name of the masked image latents")
+    masked_latents_name: Optional[str] = Field(default=None, description="The name of the masked image latents")
 
 
 @invocation_output("denoise_mask_output")
