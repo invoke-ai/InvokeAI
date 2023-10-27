@@ -9,7 +9,7 @@ import curses
 import sys
 from argparse import Namespace
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import npyscreen
 from npyscreen import widget
