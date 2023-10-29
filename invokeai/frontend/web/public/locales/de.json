@@ -379,7 +379,7 @@
         "customSaveLocation": "Benutzerdefinierter Speicherort",
         "formMessageDiffusersVAELocation": "VAE Speicherort",
         "mergedModelCustomSaveLocation": "Benutzerdefinierter Pfad",
-        "modelMergeHeaderHelp2": "Nur Diffuser sind für die Zusammenführung verfügbar. Wenn Sie ein Kontrollpunktmodell zusammenführen möchten, konvertieren Sie es bitte zuerst in Diffusoren.",
+        "modelMergeHeaderHelp2": "Nur Diffusers sind für die Zusammenführung verfügbar. Wenn Sie ein Kontrollpunktmodell zusammenführen möchten, konvertieren Sie es bitte zuerst in Diffusers.",
         "manual": "Manuell",
         "modelManager": "Modell Manager",
         "modelMergeAlphaHelp": "Alpha steuert die Überblendungsstärke für die Modelle. Niedrigere Alphawerte führen zu einem geringeren Einfluss des zweiten Modells.",
@@ -399,7 +399,10 @@
         "pickModelType": "Modell Typ auswählen",
         "sameFolder": "Gleicher Ordner",
         "modelThree": "Modell 3",
-        "v2_768": "v2 (768px)"
+        "v2_768": "v2 (768px)",
+        "none": "Nix",
+        "repoIDValidationMsg": "Online Repo Ihres Modells",
+        "vaeRepoIDValidationMsg": "Online Repo Ihrer VAE"
     },
     "parameters": {
         "images": "Bilder",
@@ -461,7 +464,10 @@
         "symmetry": "Symmetrie",
         "imageToImage": "Bild zu Bild",
         "info": "Information",
-        "general": "Allgemein"
+        "general": "Allgemein",
+        "hiresStrength": "High Res Stärke",
+        "hidePreview": "Verstecke Vorschau",
+        "showPreview": "Zeige Vorschau"
     },
     "settings": {
         "displayInProgress": "Bilder in Bearbeitung anzeigen",
@@ -472,7 +478,9 @@
         "resetWebUI": "Web-Oberfläche zurücksetzen",
         "resetWebUIDesc1": "Das Zurücksetzen der Web-Oberfläche setzt nur den lokalen Cache des Browsers mit Ihren Bildern und gespeicherten Einstellungen zurück. Es werden keine Bilder von der Festplatte gelöscht.",
         "resetWebUIDesc2": "Wenn die Bilder nicht in der Galerie angezeigt werden oder etwas anderes nicht funktioniert, versuchen Sie bitte, die Einstellungen zurückzusetzen, bevor Sie einen Fehler auf GitHub melden.",
-        "resetComplete": "Die Web-Oberfläche wurde zurückgesetzt. Aktualisieren Sie die Seite, um sie neu zu laden."
+        "resetComplete": "Die Web-Oberfläche wurde zurückgesetzt. Aktualisieren Sie die Seite, um sie neu zu laden.",
+        "models": "Modelle",
+        "useSlidersForAll": "Schieberegler für alle Optionen verwenden"
     },
     "toast": {
         "tempFoldersEmptied": "Temp-Ordner geleert",
@@ -552,7 +560,7 @@
         "autoSaveToGallery": "Automatisch in Galerie speichern",
         "saveBoxRegionOnly": "Nur Auswahlbox speichern",
         "limitStrokesToBox": "Striche auf Box beschränken",
-        "showCanvasDebugInfo": "Leinwand-Debug-Infos anzeigen",
+        "showCanvasDebugInfo": "Zusätzliche Informationen zur Leinwand anzeigen",
         "clearCanvasHistory": "Leinwand-Verlauf löschen",
         "clearHistory": "Verlauf löschen",
         "clearCanvasHistoryMessage": "Wenn Sie den Verlauf der Leinwand löschen, bleibt die aktuelle Leinwand intakt, aber der Verlauf der Rückgängig- und Wiederherstellung wird unwiderruflich gelöscht.",
