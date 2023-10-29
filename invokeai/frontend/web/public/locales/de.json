@@ -45,7 +45,7 @@
         "langDutch": "Niederländisch",
         "langFrench": "Französisch",
         "langItalian": "Italienisch",
-        "langPortuguese": "Portogisisch",
+        "langPortuguese": "Portugiesisch",
         "langRussian": "Russisch",
         "langUkranian": "Ukrainisch",
         "hotkeysLabel": "Tastenkombinationen",
@@ -81,16 +81,17 @@
         "generate": "Erstellen",
         "learnMore": "Mehr lernen",
         "darkMode": "Dunkler Modus",
-        "loading": "Laden",
+        "loading": "Lade",
         "random": "Zufall",
         "batch": "Batch-Manager",
         "advanced": "Erweitert",
-        "langBrPortuguese": "Portugiesisch (Brasilien)"
+        "langBrPortuguese": "Portugiesisch (Brasilien)",
+        "unifiedCanvas": "Einheitliche Leinwand"
     },
     "gallery": {
         "generations": "Erzeugungen",
         "showGenerations": "Zeige Erzeugnisse",
-        "uploads": "Hochgelades",
+        "uploads": "Uploads",
         "showUploads": "Zeige Uploads",
         "galleryImageSize": "Bildgröße",
         "galleryImageResetSize": "Größe zurücksetzen",
@@ -366,10 +367,10 @@
         "alpha": "Alpha",
         "addDifference": "Unterschied hinzufügen",
         "convertToDiffusersHelpText2": "Bei diesem Vorgang wird Ihr Eintrag im Modell-Manager durch die Diffusor-Version desselben Modells ersetzt.",
-        "convertToDiffusersHelpText5": "Bitte stellen Sie sicher, dass Sie über genügend Speicherplatz verfügen. Die Modelle sind in der Regel zwischen 4 GB und 7 GB groß.",
+        "convertToDiffusersHelpText5": "Bitte stellen Sie sicher, dass Sie über genügend Speicherplatz verfügen. Die Modelle sind in der Regel zwischen 2 GB und 7 GB groß.",
         "convertToDiffusersHelpText3": "Ihre Kontrollpunktdatei auf der Festplatte wird NICHT gelöscht oder in irgendeiner Weise verändert. Sie können Ihren Kontrollpunkt dem Modell-Manager wieder hinzufügen, wenn Sie dies wünschen.",
         "convertToDiffusersHelpText4": "Dies ist ein einmaliger Vorgang. Er kann je nach den Spezifikationen Ihres Computers etwa 30-60 Sekunden dauern.",
-        "convertToDiffusersHelpText6": "Möchten Sie dieses Modell umbauen?",
+        "convertToDiffusersHelpText6": "Möchten Sie dieses Modell konvertieren?",
         "custom": "Benutzerdefiniert",
         "modelConverted": "Modell umgewandelt",
         "inverseSigmoid": "Inverses Sigmoid",
@@ -384,7 +385,8 @@
         "modelMergeAlphaHelp": "Alpha steuert die Überblendungsstärke für die Modelle. Niedrigere Alphawerte führen zu einem geringeren Einfluss des zweiten Modells.",
         "modelMergeHeaderHelp1": "Sie können bis zu drei verschiedene Modelle miteinander kombinieren, um eine Mischung zu erstellen, die Ihren Bedürfnissen entspricht.",
         "ignoreMismatch": "Unstimmigkeiten zwischen ausgewählten Modellen ignorieren",
-        "model": "Modell"
+        "model": "Modell",
+        "convertToDiffusersSaveLocation": "Speicherort"
     },
     "parameters": {
         "images": "Bilder",
