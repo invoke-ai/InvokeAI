@@ -386,7 +386,20 @@
         "modelMergeHeaderHelp1": "Sie können bis zu drei verschiedene Modelle miteinander kombinieren, um eine Mischung zu erstellen, die Ihren Bedürfnissen entspricht.",
         "ignoreMismatch": "Unstimmigkeiten zwischen ausgewählten Modellen ignorieren",
         "model": "Modell",
-        "convertToDiffusersSaveLocation": "Speicherort"
+        "convertToDiffusersSaveLocation": "Speicherort",
+        "pathToCustomConfig": "Pfad zur benutzerdefinierten Konfiguration",
+        "v1": "v1",
+        "modelMergeInterpAddDifferenceHelp": "In diesem Modus wird zunächst Modell 3 von Modell 2 subtrahiert. Die resultierende Version wird mit Modell 1 mit dem oben eingestellten Alphasatz gemischt.",
+        "modelTwo": "Modell 2",
+        "modelOne": "Modell 1",
+        "v2_base": "v2 (512px)",
+        "scanForModels": "Nach Modellen suchen",
+        "name": "Name",
+        "safetensorModels": "SafeTensors",
+        "pickModelType": "Modell Typ auswählen",
+        "sameFolder": "Gleicher Ordner",
+        "modelThree": "Modell 3",
+        "v2_768": "v2 (768px)"
     },
     "parameters": {
         "images": "Bilder",
@@ -423,7 +436,7 @@
         "seamCorrectionHeader": "Nahtkorrektur",
         "infillScalingHeader": "Infill und Skalierung",
         "img2imgStrength": "Bild-zu-Bild-Stärke",
-        "toggleLoopback": "Toggle Loopback",
+        "toggleLoopback": "Loopback umschalten",
         "sendTo": "Senden an",
         "sendToImg2Img": "Senden an Bild zu Bild",
         "sendToUnifiedCanvas": "Senden an Unified Canvas",
@@ -438,8 +451,17 @@
         "initialImage": "Ursprüngliches Bild",
         "showOptionsPanel": "Optionsleiste zeigen",
         "cancel": {
-            "setType": "Abbruchart festlegen"
-        }
+            "setType": "Abbruchart festlegen",
+            "immediate": "Sofort abbrechen",
+            "schedule": "Abbrechen nach der aktuellen Iteration",
+            "isScheduled": "Abbrechen"
+        },
+        "copyImage": "Bild kopieren",
+        "denoisingStrength": "Stärke der Entrauschung",
+        "symmetry": "Symmetrie",
+        "imageToImage": "Bild zu Bild",
+        "info": "Information",
+        "general": "Allgemein"
     },
     "settings": {
         "displayInProgress": "Bilder in Bearbeitung anzeigen",
