@@ -177,12 +177,8 @@ This includes 15 Nodes:
 
 **Node Link:** https://github.com/helix4u/load_video_frame
 
-**Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
-
 **Output Example:** 
-
-<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/testmp4_embed_converted.gif" width="500" />
-[Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
+<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/_git_assets/testmp4_embed_converted.gif" width="500" />
 
 --------------------------------
 ### Make 3D
