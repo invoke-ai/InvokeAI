@@ -543,14 +543,15 @@
         "toggleAutoscroll": "Auroscroll ein/ausschalten",
         "toggleLogViewer": "Log Betrachter ein/ausschalten",
         "showOptionsPanel": "Zeige Optionen",
-        "reset": "Zurücksetzen",
+        "reset": "Zurücksetzten",
         "nextImage": "Nächstes Bild",
         "zoomOut": "Verkleinern",
         "rotateCounterClockwise": "Gegen den Uhrzeigersinn verdrehen",
         "showGalleryPanel": "Galeriefenster anzeigen",
         "exitViewer": "Betrachten beenden",
         "menu": "Menü",
-        "loadMore": "Mehr laden"
+        "loadMore": "Mehr laden",
+        "invokeProgressBar": "Invoke Fortschrittsanzeige"
     },
     "boards": {
         "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
