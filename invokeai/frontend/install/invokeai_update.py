@@ -50,7 +50,7 @@ def invokeai_is_running() -> bool:
     return False
 
 
-def welcome(versions: dict):
+def welcome(latest_release: str, latest_prerelease: str):
     @group()
     def text():
         yield f"InvokeAI Version: [bold yellow]{__version__}"
@@ -61,7 +61,8 @@ def welcome(versions: dict):
         yield "making the web frontend unusable. Please downgrade to the latest release if this happens."
         yield ""
         yield "[bold yellow]Options:"
-        yield f"""[1] Update to the latest official release ([italic]{versions[0]['tag_name']}[/italic])
+        yield f"""[1] Update to the latest [bold]official release[/bold] ([italic]{latest_release}[/italic])
+[2] Update to the latest [bold]pre-release[/bold] (may be buggy; caveat emptor!) ([italic]{latest_prerelease}[/italic])
 [2] Manually enter the [bold]tag name[/bold] for the version you wish to update to
 [3] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
 
@@ -91,13 +92,18 @@ def get_extras():
 
 
 def main():
-    versions = [x for x in get_versions() if not (x["draft"] or x["prerelease"])]
+    versions = get_versions()
+    released_versions = [x for x in versions if not (x["draft"] or x["prerelease"])]
+    prerelease_versions = [x for x in versions if not x["draft"] and x["prerelease"]]
+    latest_release = released_versions[0]["tag_name"] if len(released_versions) else None
+    latest_prerelease = prerelease_versions[0]["tag_name"] if len(prerelease_versions) else None
+
     if invokeai_is_running():
         print(":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
         input("Press any key to continue...")
         return
 
-    welcome(versions)
+    welcome(latest_release, latest_prerelease)
 
     tag = None
     branch = None
@@ -105,11 +111,13 @@ def main():
     choice = Prompt.ask("Choice:", choices=["1", "2", "3", "4"], default="1")
 
     if choice == "1":
-        release = versions[0]["tag_name"]
+        release = latest_release
     elif choice == "2":
+        release = latest_prerelease
+    elif choice == "3":
         while not tag:
             tag = Prompt.ask("Enter an InvokeAI tag name")
-    elif choice == "3":
+    elif choice == "4":
         while not branch:
             branch = Prompt.ask("Enter an InvokeAI branch name")
 
