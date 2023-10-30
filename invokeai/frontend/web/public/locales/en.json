@@ -70,8 +70,8 @@
         "langDutch": "Nederlands",
         "langEnglish": "English",
         "langFrench": "Français",
-        "langGerman": "Deutsch",
-        "langHebrew": "עברית",
+        "langGerman": "German",
+        "langHebrew": "Hebrew",
         "langItalian": "Italiano",
         "langJapanese": "日本語",
         "langKorean": "한국어",
@@ -1122,7 +1122,6 @@
         "clearIntermediates": "Clear Intermediates",
         "clearIntermediatesWithCount_one": "Clear {{count}} Intermediate",
         "clearIntermediatesWithCount_other": "Clear {{count}} Intermediates",
-        "clearIntermediatesWithCount_zero": "No Intermediates to Clear",
         "intermediatesCleared_one": "Cleared {{count}} Intermediate",
         "intermediatesCleared_other": "Cleared {{count}} Intermediates",
         "intermediatesClearedFailed": "Problem Clearing Intermediates"
@@ -1257,11 +1256,15 @@
         },
         "compositingBlur": {
             "heading": "Blur",
-            "paragraphs": ["The blur radius of the mask."]
+            "paragraphs": [
+                "The blur radius of the mask."
+            ]
         },
         "compositingBlurMethod": {
             "heading": "Blur Method",
-            "paragraphs": ["The method of blur applied to the masked area."]
+            "paragraphs": [
+                "The method of blur applied to the masked area."
+            ]
         },
         "compositingCoherencePass": {
             "heading": "Coherence Pass",
@@ -1271,7 +1274,9 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": ["The mode of the Coherence Pass."]
+            "paragraphs": [
+                "The mode of the Coherence Pass."
+            ]
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
@@ -1289,7 +1294,9 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
-            "paragraphs": ["Adjust the mask."]
+            "paragraphs": [
+                "Adjust the mask."
+            ]
         },
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
@@ -1347,7 +1354,9 @@
         },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": ["Method to infill the selected area."]
+            "paragraphs": [
+                "Method to infill the selected area."
+            ]
         },
         "lora": {
             "heading": "LoRA Weight",
