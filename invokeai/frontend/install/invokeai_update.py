@@ -91,7 +91,7 @@ def get_extras():
 
 
 def main():
-    versions = get_versions()
+    versions = [x for x in get_versions() if not (x["draft"] or x["prerelease"])]
     if invokeai_is_running():
         print(":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
         input("Press any key to continue...")

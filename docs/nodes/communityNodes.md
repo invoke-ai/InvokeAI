@@ -9,6 +9,7 @@ To download a node, simply download the `.py` node file from the link and add it
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
+    + [Average Images](#average-images)
     + [Depth Map from Wavefront OBJ](#depth-map-from-wavefront-obj)
     + [Film Grain](#film-grain)
     + [Generative Grammar-Based Prompt Nodes](#generative-grammar-based-prompt-nodes)
@@ -32,6 +33,13 @@ To use a community workflow, download the the `.json` node graph file and load i
 - [Disclaimer](#disclaimer)
 - [Help](#help)
 
+
+--------------------------------
+### Average Images
+
+**Description:** This node takes in a collection of images of the same size and averages them as output. It converts everything to RGB mode first.
+
+**Node Link:** https://github.com/JPPhoto/average-images-node
 
 --------------------------------
 ### Depth Map from Wavefront OBJ
@@ -177,12 +185,8 @@ This includes 15 Nodes:
 
 **Node Link:** https://github.com/helix4u/load_video_frame
 
-**Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
-
 **Output Example:** 
-
-<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/testmp4_embed_converted.gif" width="500" />
-[Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
+<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/_git_assets/testmp4_embed_converted.gif" width="500" />
 
 --------------------------------
 ### Make 3D
