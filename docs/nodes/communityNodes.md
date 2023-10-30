@@ -9,6 +9,7 @@ To download a node, simply download the `.py` node file from the link and add it
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
+    + [Average Images](#average-images)
     + [Depth Map from Wavefront OBJ](#depth-map-from-wavefront-obj)
     + [Film Grain](#film-grain)
     + [Generative Grammar-Based Prompt Nodes](#generative-grammar-based-prompt-nodes)
@@ -32,6 +33,13 @@ To use a community workflow, download the the `.json` node graph file and load i
 - [Disclaimer](#disclaimer)
 - [Help](#help)
 
+
+--------------------------------
+### Average Images
+
+**Description:** This node takes in a collection of images of the same size and averages them as output. It converts everything to RGB mode first.
+
+**Node Link:** https://github.com/JPPhoto/average-images-node
 
 --------------------------------
 ### Depth Map from Wavefront OBJ
