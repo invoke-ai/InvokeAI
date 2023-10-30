@@ -1116,7 +1116,8 @@
         "controlAdapter_other": "Adattatori di Controllo",
         "megaControl": "Mega ControlNet",
         "minConfidence": "Confidenza minima",
-        "scribble": "Scribble"
+        "scribble": "Scribble",
+        "amult": "Angolo di illuminazione"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
