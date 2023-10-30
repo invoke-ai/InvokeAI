@@ -9,7 +9,7 @@ export const addCoreMetadataNode = (
 ): void => {
   graph.nodes[METADATA] = {
     id: METADATA,
-    type: 'core_metadata',
+    type: 'metadata_accumulator',
     ...metadata,
   };
 
