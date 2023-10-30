@@ -99,3 +99,14 @@ If using an AMD GPU:
 Use the standard `docker compose up` command, and generally the `docker compose` [CLI](https://docs.docker.com/compose/reference/) as usual.
 
 Once the container starts up (and configures the InvokeAI root directory if this is a new installation), you can access InvokeAI at [http://localhost:9090](http://localhost:9090)
+
+## Troubleshooting / FAQ
+
+- Q: I am running on Windows under WSL2, and am seeing a "no such file or directory" error.
+- A: Your `docker-entrypoint.sh` file likely has Windows (CRLF) as opposed to Unix (LF) line endings,
+    and you may have cloned this repository before the issue was fixed. To solve this, please change
+    the line endings in the `docker-entrypoint.sh` file to `LF`. You can do this in VSCode
+    (`Ctrl+P` and search for "line endings"), or by using the `dos2unix` utility in WSL.
+    Finally, you may delete `docker-entrypoint.sh` followed by  `git pull; git checkout docker/docker-entrypoint.sh`
+    to reset the file to its most recent version.
+    For more information on this issue, please see the [Docker Desktop documentation](https://docs.docker.com/desktop/troubleshoot/topics/#avoid-unexpected-syntax-errors-use-unix-style-line-endings-for-files-in-containers)
