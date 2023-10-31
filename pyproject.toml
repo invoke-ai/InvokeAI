@@ -52,13 +52,16 @@ dependencies = [
   "invisible-watermark~=0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                 # needed for plotting of Penner easing functions
   "mediapipe",                  # needed for "mediapipeface" controlnet model
+  "mmcv>=2.0.1",
+  "mmdet>=3.1.0",
+  "mmengine",
+  "mmpose>=1.1.0",
   "numpy",
   "npyscreen",
   "omegaconf",
   "onnx",
   "onnxruntime",
   "opencv-python",
-  "openmim",
   "pydantic==1.*",
   "picklescan",
   "pillow",
