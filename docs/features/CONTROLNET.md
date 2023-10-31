@@ -150,7 +150,6 @@ Start/End  - 0 represents the start of the generation, 1 represents the end. The
 
 Additionally, each  section can be expanded with the "Show Advanced" button in order to manipulate settings for the image pre-processor that adjusts your uploaded image before using it in during the generation process.
 
-**Note:** T2I-Adapter models and ControlNet models cannot currently be used together.
 
 ## IP-Adapter
 
