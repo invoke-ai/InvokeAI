@@ -86,7 +86,10 @@
         "batch": "Batch-Manager",
         "advanced": "Erweitert",
         "langBrPortuguese": "Portugiesisch (Brasilien)",
-        "unifiedCanvas": "Einheitliche Leinwand"
+        "unifiedCanvas": "Einheitliche Leinwand",
+        "openInNewTab": "In einem neuem Tab öffnen",
+        "statusProcessing": "wird bearbeitet",
+        "linear": "Linear"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -101,7 +104,15 @@
         "singleColumnLayout": "Einspaltiges Layout",
         "allImagesLoaded": "Alle Bilder geladen",
         "loadMore": "Mehr laden",
-        "noImagesInGallery": "Keine Bilder in der Galerie"
+        "noImagesInGallery": "Keine Bilder in der Galerie",
+        "loading": "Lade",
+        "preparingDownload": "bereite Download vor",
+        "preparingDownloadFailed": "Problem beim Download vorbereiten",
+        "deleteImage": "Lösche Bild",
+        "images": "Bilder",
+        "copy": "Kopieren",
+        "download": "Runterladen",
+        "setCurrentImage": "Setze aktuelle Bild"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
@@ -110,7 +121,8 @@
         "galleryHotkeys": "Galerie Tastenkürzel",
         "unifiedCanvasHotkeys": "Unified Canvas Tastenkürzel",
         "invoke": {
-            "desc": "Ein Bild erzeugen"
+            "desc": "Ein Bild erzeugen",
+            "title": "Invoke"
         },
         "cancel": {
             "title": "Abbrechen",
@@ -307,6 +319,10 @@
         "acceptStagingImage": {
             "title": "Staging-Bild akzeptieren",
             "desc": "Akzeptieren Sie das aktuelle Bild des Staging-Bereichs"
+        },
+        "nodesHotkeys": "Knoten Tastenkürzel",
+        "addNodes": {
+            "title": "Knotenpunkt hinzufügen"
         }
     },
     "modelManager": {
@@ -356,7 +372,7 @@
         "deleteModel": "Model löschen",
         "deleteConfig": "Konfiguration löschen",
         "deleteMsg1": "Möchten Sie diesen Model-Eintrag wirklich aus InvokeAI löschen?",
-        "deleteMsg2": "Dadurch wird die Modellprüfpunktdatei nicht von Ihrer Festplatte gelöscht. Sie können sie bei Bedarf erneut hinzufügen.",
+        "deleteMsg2": "Dadurch WIRD das Modell von der Festplatte gelöscht WENN es im InvokeAI Root Ordner liegt. Wenn es in einem anderem Ordner liegt wird das Modell NICHT von der Festplatte gelöscht.",
         "customConfig": "Benutzerdefinierte Konfiguration",
         "invokeRoot": "InvokeAI Ordner",
         "formMessageDiffusersVAELocationDesc": "Falls nicht angegeben, sucht InvokeAI nach der VAE-Datei innerhalb des oben angegebenen Modell Speicherortes.",
@@ -402,7 +418,17 @@
         "v2_768": "v2 (768px)",
         "none": "Nix",
         "repoIDValidationMsg": "Online Repo Ihres Modells",
-        "vaeRepoIDValidationMsg": "Online Repo Ihrer VAE"
+        "vaeRepoIDValidationMsg": "Online Repo Ihrer VAE",
+        "importModels": "Importiere Modelle",
+        "merge": "Zusammenführen",
+        "addDiffuserModel": "Diffusers hinzufügen",
+        "advanced": "Erweitert",
+        "closeAdvanced": "Schließe Erweitert",
+        "convertingModelBegin": "Konvertiere Modell. Bitte warten.",
+        "customConfigFileLocation": "Benutzerdefinierte Konfiguration Datei Speicherort",
+        "baseModel": "Basis Modell",
+        "convertToDiffusers": "Konvertiere zu Diffusers",
+        "diffusersModels": "Diffusers"
     },
     "parameters": {
         "images": "Bilder",
@@ -422,7 +448,7 @@
         "type": "Art",
         "strength": "Stärke",
         "upscaling": "Hochskalierung",
-        "upscale": "Hochskalieren",
+        "upscale": "Hochskalieren (Shift + U)",
         "upscaleImage": "Bild hochskalieren",
         "scale": "Maßstab",
         "otherOptions": "Andere Optionen",
@@ -478,7 +504,7 @@
         "resetWebUI": "Web-Oberfläche zurücksetzen",
         "resetWebUIDesc1": "Das Zurücksetzen der Web-Oberfläche setzt nur den lokalen Cache des Browsers mit Ihren Bildern und gespeicherten Einstellungen zurück. Es werden keine Bilder von der Festplatte gelöscht.",
         "resetWebUIDesc2": "Wenn die Bilder nicht in der Galerie angezeigt werden oder etwas anderes nicht funktioniert, versuchen Sie bitte, die Einstellungen zurückzusetzen, bevor Sie einen Fehler auf GitHub melden.",
-        "resetComplete": "Die Web-Oberfläche wurde zurückgesetzt. Aktualisieren Sie die Seite, um sie neu zu laden.",
+        "resetComplete": "Die Web-Oberfläche wurde zurückgesetzt.",
         "models": "Modelle",
         "useSlidersForAll": "Schieberegler für alle Optionen verwenden"
     },
@@ -490,7 +516,7 @@
         "imageCopied": "Bild kopiert",
         "imageLinkCopied": "Bildlink kopiert",
         "imageNotLoaded": "Kein Bild geladen",
-        "imageNotLoadedDesc": "Kein Bild gefunden, das an das Bild zu Bild-Modul gesendet werden kann",
+        "imageNotLoadedDesc": "Konnte kein Bild finden",
         "imageSavedToGallery": "Bild in die Galerie gespeichert",
         "canvasMerged": "Leinwand zusammengeführt",
         "sentToImageToImage": "Gesendet an Bild zu Bild",
@@ -585,7 +611,10 @@
         "betaClear": "Löschen",
         "betaDarkenOutside": "Außen abdunkeln",
         "betaLimitToBox": "Begrenzung auf das Feld",
-        "betaPreserveMasked": "Maskiertes bewahren"
+        "betaPreserveMasked": "Maskiertes bewahren",
+        "antialiasing": "Kantenglättung",
+        "showResultsOn": "Zeige Ergebnisse (An)",
+        "showResultsOff": "Zeige Ergebnisse (Aus)"
     },
     "accessibility": {
         "modelSelect": "Model Auswahl",
@@ -627,5 +656,137 @@
         "changeBoard": "Ordner wechseln",
         "loading": "Laden...",
         "clearSearch": "Suche leeren"
+    },
+    "controlnet": {
+        "showAdvanced": "Zeige Erweitert",
+        "contentShuffleDescription": "Mischt den Inhalt von einem Bild",
+        "addT2IAdapter": "$t(common.t2iAdapter) hinzufügen",
+        "importImageFromCanvas": "Importieren Bild von Zeichenfläche",
+        "lineartDescription": "Konvertiere Bild zu Lineart",
+        "importMaskFromCanvas": "Importiere Maske von Zeichenfläche",
+        "hed": "HED",
+        "hideAdvanced": "Verstecke Erweitert",
+        "contentShuffle": "Inhalt mischen",
+        "controlNetEnabledT2IDisabled": "$t(common.controlNet) ist aktiv, $t(common.t2iAdapter) ist deaktiviert",
+        "ipAdapterModel": "Adapter Modell",
+        "beginEndStepPercent": "Start / Ende Step Prozent",
+        "duplicate": "Kopieren",
+        "f": "F",
+        "h": "H",
+        "depthMidasDescription": "Tiefenmap erstellen mit Midas",
+        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
+        "t2iEnabledControlNetDisabled": "$t(common.t2iAdapter) ist aktiv, $t(common.controlNet) ist deaktiviert",
+        "weight": "Breite",
+        "selectModel": "Wähle ein Modell",
+        "depthMidas": "Tiefe (Midas)",
+        "w": "W",
+        "addControlNet": "$t(common.controlNet) hinzufügen",
+        "none": "Kein",
+        "incompatibleBaseModel": "Inkompatibles Basismodell:",
+        "enableControlnet": "Aktiviere ControlNet",
+        "detectResolution": "Auflösung erkennen",
+        "controlNetT2IMutexDesc": "$t(common.controlNet) und $t(common.t2iAdapter) zur gleichen Zeit wird nicht unterstützt.",
+        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
+        "fill": "Füllen",
+        "addIPAdapter": "$t(common.ipAdapter) hinzufügen",
+        "colorMapDescription": "Erstelle eine Farbkarte von diesem Bild",
+        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
+        "imageResolution": "Bild Auflösung",
+        "depthZoe": "Tiefe (Zoe)",
+        "colorMap": "Farbe",
+        "lowThreshold": "Niedrige Schwelle",
+        "highThreshold": "Hohe Schwelle",
+        "toggleControlNet": "Schalten ControlNet um",
+        "delete": "Löschen",
+        "controlAdapter_one": "Control Adapter",
+        "controlAdapter_other": "Control Adapters",
+        "colorMapTileSize": "Tile Größe",
+        "depthZoeDescription": "Tiefenmap erstellen mit Zoe",
+        "setControlImageDimensions": "Setze Control Bild Auflösung auf Breite/Höhe",
+        "handAndFace": "Hand und Gesicht",
+        "enableIPAdapter": "Aktiviere IP Adapter"
+    },
+    "queue": {
+        "status": "Status",
+        "cancelTooltip": "Aktuellen Aufgabe abbrechen",
+        "queueEmpty": "Warteschlange leer",
+        "in_progress": "In Arbeit",
+        "queueFront": "An den Anfang der Warteschlange tun",
+        "completed": "Fertig",
+        "queueBack": "In die Warteschlange",
+        "clearFailed": "Probleme beim leeren der Warteschlange",
+        "clearSucceeded": "Warteschlange geleert",
+        "pause": "Pause",
+        "cancelSucceeded": "Auftrag abgebrochen",
+        "queue": "Warteschlange",
+        "batch": "Stapel",
+        "pending": "Ausstehend",
+        "clear": "Leeren",
+        "prune": "Leeren",
+        "total": "Gesamt",
+        "canceled": "Abgebrochen",
+        "clearTooltip": "Abbrechen und alle Aufträge leeren",
+        "current": "Aktuell",
+        "failed": "Fehler",
+        "cancelItem": "Abbruch Auftrag",
+        "next": "Nächste",
+        "cancel": "Abbruch",
+        "session": "Sitzung",
+        "queueTotal": "{{total}} Gesamt",
+        "resume": "Wieder aufnehmen",
+        "item": "Auftrag"
+    },
+    "metadata": {
+        "negativePrompt": "Negativ Beschreibung",
+        "metadata": "Meta-Data",
+        "strength": "Bild zu Bild stärke",
+        "imageDetails": "Bild Details",
+        "model": "Modell",
+        "noImageDetails": "Keine Bild Details gefunden",
+        "cfgScale": "CFG-Skala",
+        "fit": "Bild zu Bild passen",
+        "height": "Höhe",
+        "noMetaData": "Keine Meta-Data gefunden",
+        "width": "Breite",
+        "createdBy": "Erstellt von",
+        "steps": "Schritte"
+    },
+    "popovers": {
+        "noiseUseCPU": {
+            "heading": "Nutze Prozessor rauschen"
+        },
+        "paramModel": {
+            "heading": "Modell"
+        },
+        "paramIterations": {
+            "heading": "Iterationen"
+        },
+        "paramCFGScale": {
+            "heading": "CFG-Skala"
+        },
+        "paramSteps": {
+            "heading": "Schritte"
+        },
+        "lora": {
+            "heading": "LoRA Gewichte"
+        },
+        "infillMethod": {
+            "heading": "Füllmethode"
+        },
+        "paramVAE": {
+            "heading": "VAE"
+        }
+    },
+    "ui": {
+        "lockRatio": "Verhältnis sperren",
+        "hideProgressImages": "Verstecke Prozess Bild",
+        "showProgressImages": "Zeige Prozess Bild"
+    },
+    "invocationCache": {
+        "disable": "Deaktivieren",
+        "misses": "Cache Nötig",
+        "hits": "Cache Treffer",
+        "enable": "Aktivieren",
+        "clear": "Leeren"
     }
 }
