@@ -117,9 +117,6 @@ sd-1/embedding/EasyNegative:
    recommended: True
 sd-1/embedding/ahx-beta-453407d:
    repo_id: sd-concepts-library/ahx-beta-453407d
-sd-1/lora/LowRA:
-   path: https://civitai.com/api/download/models/63006
-   recommended: True
 sd-1/lora/Ink scenery:
    path: https://civitai.com/api/download/models/83390
 sd-1/ip_adapter/ip_adapter_sd15:
