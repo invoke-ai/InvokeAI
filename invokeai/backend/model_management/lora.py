@@ -111,6 +111,13 @@ class ModelPatcher:
                         if not layer_key.startswith(prefix):
                             continue
 
+                        # TODO(ryand): A non-negligible amount of time is currently spent resolving LoRA keys. This
+                        # should be improved in the following ways:
+                        # 1. The key mapping could be more-efficiently pre-computed. This would save time every time a
+                        #    LoRA model is applied.
+                        # 2. From an API perspective, there's no reason that the `ModelPatcher` should be aware of the
+                        #    intricacies of Stable Diffusion key resolution. It should just expect the input LoRA
+                        #    weights to have valid keys.
                         module_key, module = cls._resolve_lora_key(model, layer_key, prefix)
 
                         # All of the LoRA weight calculations will be done on the same device as the module weight.
