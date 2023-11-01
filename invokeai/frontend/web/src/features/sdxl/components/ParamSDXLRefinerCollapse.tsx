@@ -14,6 +14,7 @@ import ParamSDXLRefinerStart from './SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from './SDXLRefiner/ParamSDXLRefinerSteps';
 import ParamUseSDXLRefiner from './SDXLRefiner/ParamUseSDXLRefiner';
 import { useTranslation } from 'react-i18next';
+import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
 const selector = createSelector(
   stateSelector,
@@ -31,6 +32,11 @@ const selector = createSelector(
 const ParamSDXLRefinerCollapse = () => {
   const { activeLabel, shouldUseSliders } = useAppSelector(selector);
   const { t } = useTranslation();
+  const isRefinerAvailable = useIsRefinerAvailable();
+
+  if (!isRefinerAvailable) {
+    return null;
+  }
 
   return (
     <IAICollapse label={t('sdxl.refiner')} activeLabel={activeLabel}>
