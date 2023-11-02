@@ -722,7 +722,9 @@
         "noMatchingModels": "No matching Models",
         "noModelsAvailable": "No models available",
         "selectLoRA": "Select a LoRA",
-        "selectModel": "Select a Model"
+        "selectModel": "Select a Model",
+        "noLoRAsInstalled": "No LoRAs installed",
+        "noRefinerModelsInstalled": "No SDXL Refiner models installed"
     },
     "nodes": {
         "addNode": "Add Node",

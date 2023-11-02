@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -35,7 +35,15 @@ const ParamSDXLRefinerCollapse = () => {
   const isRefinerAvailable = useIsRefinerAvailable();
 
   if (!isRefinerAvailable) {
-    return null;
+    return (
+      <IAICollapse label={t('sdxl.refiner')} activeLabel={activeLabel}>
+        <Flex sx={{ justifyContent: 'center', p: 2 }}>
+          <Text sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}>
+            {t('models.noRefinerModelsInstalled')}
+          </Text>
+        </Flex>
+      </IAICollapse>
+    );
   }
 
   return (
