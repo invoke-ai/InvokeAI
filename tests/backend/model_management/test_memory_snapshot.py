@@ -13,10 +13,10 @@ def test_memory_snapshot_capture():
 
 
 snapshots = [
-    MemorySnapshot(process_ram=1.0, vram=2.0, malloc_info=Struct_mallinfo2()),
-    MemorySnapshot(process_ram=1.0, vram=2.0, malloc_info=None),
-    MemorySnapshot(process_ram=1.0, vram=None, malloc_info=Struct_mallinfo2()),
-    MemorySnapshot(process_ram=1.0, vram=None, malloc_info=None),
+    MemorySnapshot(process_ram=1, vram=2, malloc_info=Struct_mallinfo2()),
+    MemorySnapshot(process_ram=1, vram=2, malloc_info=None),
+    MemorySnapshot(process_ram=1, vram=None, malloc_info=Struct_mallinfo2()),
+    MemorySnapshot(process_ram=1, vram=None, malloc_info=None),
     None,
 ]
 
