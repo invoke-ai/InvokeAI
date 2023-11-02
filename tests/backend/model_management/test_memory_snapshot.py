@@ -17,6 +17,7 @@ snapshots = [
     MemorySnapshot(process_ram=1.0, vram=2.0, malloc_info=None),
     MemorySnapshot(process_ram=1.0, vram=None, malloc_info=Struct_mallinfo2()),
     MemorySnapshot(process_ram=1.0, vram=None, malloc_info=None),
+    None,
 ]
 
 
@@ -26,10 +27,12 @@ def test_get_pretty_snapshot_diff(snapshot_1, snapshot_2):
     """Test that get_pretty_snapshot_diff() works with various combinations of missing MemorySnapshot fields."""
     msg = get_pretty_snapshot_diff(snapshot_1, snapshot_2)
 
-    expected_lines = 1
-    if snapshot_1.vram is not None and snapshot_2.vram is not None:
+    expected_lines = 0
+    if snapshot_1 is not None and snapshot_2 is not None:
         expected_lines += 1
-    if snapshot_1.malloc_info is not None and snapshot_2.malloc_info is not None:
-        expected_lines += 5
+        if snapshot_1.vram is not None and snapshot_2.vram is not None:
+            expected_lines += 1
+        if snapshot_1.malloc_info is not None and snapshot_2.malloc_info is not None:
+            expected_lines += 5
 
     assert len(msg.splitlines()) == expected_lines
