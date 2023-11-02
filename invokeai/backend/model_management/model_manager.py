@@ -351,6 +351,7 @@ class ModelManager(object):
             precision=precision,
             sequential_offload=sequential_offload,
             logger=logger,
+            log_memory_usage=self.app_config.log_memory_usage,
         )
 
         self._read_models(config)
@@ -933,8 +934,7 @@ class ModelManager(object):
         """
         Returns the preamble for the config file.
         """
-        return textwrap.dedent(
-            """
+        return textwrap.dedent("""
             # This file describes the alternative machine learning models
             # available to InvokeAI script.
             #
@@ -942,8 +942,7 @@ class ModelManager(object):
             # model requires a model config file, a weights file,
             # and the width and height of the images it
             # was trained on.
-        """
-        )
+        """)
 
     def scan_models_directory(
         self,
