@@ -710,9 +710,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
             with (
                 ExitStack() as exit_stack,
-                ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),
                 set_seamless(unet_info.context.model, self.unet.seamless_axes),
                 unet_info as unet,
+                # Apply the LoRA after unet has been moved to its target device for faster patching.
+                ModelPatcher.apply_lora_unet(unet, _lora_loader()),
             ):
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:

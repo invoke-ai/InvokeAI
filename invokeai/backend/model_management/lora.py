@@ -54,24 +54,6 @@ class ModelPatcher:
 
         return (module_key, module)
 
-    @staticmethod
-    def _lora_forward_hook(
-        applied_loras: List[Tuple[LoRAModel, float]],
-        layer_name: str,
-    ):
-        def lora_forward(module, input_h, output):
-            if len(applied_loras) == 0:
-                return output
-
-            for lora, weight in applied_loras:
-                layer = lora.layers.get(layer_name, None)
-                if layer is None:
-                    continue
-                output += layer.forward(module, input_h, weight)
-            return output
-
-        return lora_forward
-
     @classmethod
     @contextmanager
     def apply_lora_unet(
@@ -129,21 +111,40 @@ class ModelPatcher:
                         if not layer_key.startswith(prefix):
                             continue
 
+                        # TODO(ryand): A non-negligible amount of time is currently spent resolving LoRA keys. This
+                        # should be improved in the following ways:
+                        # 1. The key mapping could be more-efficiently pre-computed. This would save time every time a
+                        #    LoRA model is applied.
+                        # 2. From an API perspective, there's no reason that the `ModelPatcher` should be aware of the
+                        #    intricacies of Stable Diffusion key resolution. It should just expect the input LoRA
+                        #    weights to have valid keys.
                         module_key, module = cls._resolve_lora_key(model, layer_key, prefix)
+
+                        # All of the LoRA weight calculations will be done on the same device as the module weight.
+                        # (Performance will be best if this is a CUDA device.)
+                        device = module.weight.device
+                        dtype = module.weight.dtype
+
                         if module_key not in original_weights:
                             original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
 
-                        # enable autocast to calc fp16 loras on cpu
-                        # with torch.autocast(device_type="cpu"):
-                        layer.to(dtype=torch.float32)
                         layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
-                        layer_weight = layer.get_weight(original_weights[module_key]) * lora_weight * layer_scale
+
+                        # We intentionally move to the target device first, then cast. Experimentally, this was found to
+                        # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
+                        # same thing in a single call to '.to(...)'.
+                        layer.to(device=device)
+                        layer.to(dtype=torch.float32)
+                        # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
+                        # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
+                        layer_weight = layer.get_weight(module.weight) * (lora_weight * layer_scale)
+                        layer.to(device="cpu")
 
                         if module.weight.shape != layer_weight.shape:
                             # TODO: debug on lycoris
                             layer_weight = layer_weight.reshape(module.weight.shape)
 
-                        module.weight += layer_weight.to(device=module.weight.device, dtype=module.weight.dtype)
+                        module.weight += layer_weight.to(dtype=dtype)
 
             yield  # wait for context manager exit
 
@@ -196,7 +197,9 @@ class ModelPatcher:
 
                     if model_embeddings.weight.data[token_id].shape != embedding.shape:
                         raise ValueError(
-                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {model_embeddings.weight.data[token_id].shape[0]}."
+                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension"
+                            f" {embedding.shape[0]}, but the current model has token dimension"
+                            f" {model_embeddings.weight.data[token_id].shape[0]}."
                         )
 
                     model_embeddings.weight.data[token_id] = embedding.to(
@@ -257,7 +260,8 @@ class TextualInversionModel:
         if "string_to_param" in state_dict:
             if len(state_dict["string_to_param"]) > 1:
                 print(
-                    f'Warn: Embedding "{file_path.name}" contains multiple tokens, which is not supported. The first token will be used.'
+                    f'Warn: Embedding "{file_path.name}" contains multiple tokens, which is not supported. The first'
+                    " token will be used."
                 )
 
             result.embedding = next(iter(state_dict["string_to_param"].values()))
@@ -470,7 +474,9 @@ class ONNXModelPatcher:
 
                     if embeddings[token_id].shape != embedding.shape:
                         raise ValueError(
-                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {embeddings[token_id].shape[0]}."
+                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension"
+                            f" {embedding.shape[0]}, but the current model has token dimension"
+                            f" {embeddings[token_id].shape[0]}."
                         )
 
                     embeddings[token_id] = embedding
