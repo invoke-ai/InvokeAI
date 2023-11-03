@@ -28,9 +28,7 @@ export default function ParamAdvancedCollapse() {
   const activeLabel = useMemo(() => {
     const activeLabel: string[] = [];
 
-    if (shouldUseCpuNoise) {
-      activeLabel.push(t('parameters.cpuNoise'));
-    } else {
+    if (!shouldUseCpuNoise) {
       activeLabel.push(t('parameters.gpuNoise'));
     }
 

@@ -108,13 +108,14 @@ class CompelInvocation(BaseInvocation):
                 print(f'Warn: trigger: "{trigger}" not found')
 
         with (
-            ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),
             ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
                 tokenizer,
                 ti_manager,
             ),
             ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),
             text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
         ):
             compel = Compel(
                 tokenizer=tokenizer,
@@ -229,13 +230,14 @@ class SDXLPromptInvocationBase:
                 print(f'Warn: trigger: "{trigger}" not found')
 
         with (
-            ModelPatcher.apply_lora(text_encoder_info.context.model, _lora_loader(), lora_prefix),
             ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
                 tokenizer,
                 ti_manager,
             ),
             ModelPatcher.apply_clip_skip(text_encoder_info.context.model, clip_field.skipped_layers),
             text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
         ):
             compel = Compel(
                 tokenizer=tokenizer,
