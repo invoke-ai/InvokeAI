@@ -507,7 +507,6 @@ class ModelCache(object):
                 vram_in_use = torch.cuda.memory_allocated()
                 self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB")
 
-        gc.collect()
         torch.cuda.empty_cache()
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
