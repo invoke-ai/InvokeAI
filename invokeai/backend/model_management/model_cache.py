@@ -444,6 +444,10 @@ class ModelCache(object):
 
             refs = sys.getrefcount(cache_entry.model)
 
+            # HACK: This is a workaround for a memory-management issue that we haven't tracked down yet. We are directly
+            # going against the advice in the Python docs by using `gc.get_referrers(...)` in this way:
+            # https://docs.python.org/3/library/gc.html#gc.get_referrers
+
             # manualy clear local variable references of just finished function calls
             # for some reason python don't want to collect it even by gc.collect() immidiately
             if refs > 2:
