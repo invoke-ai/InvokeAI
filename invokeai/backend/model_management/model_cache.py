@@ -493,7 +493,7 @@ class ModelCache(object):
             else:
                 pos += 1
 
-        if models_cleared < 0:
+        if models_cleared > 0:
             # There would likely be some 'garbage' to be collected regardless of whether a model was cleared or not, but
             # there is a significant time cost to calling `gc.collect()`, so we want to use it sparingly. (The time cost
             # is high even if no garbage gets collected.)
