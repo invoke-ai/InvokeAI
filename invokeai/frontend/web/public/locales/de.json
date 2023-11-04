@@ -83,13 +83,14 @@
         "darkMode": "Dunkler Modus",
         "loading": "Lade",
         "random": "Zufall",
-        "batch": "Batch-Manager",
+        "batch": "Stapel-Manager",
         "advanced": "Erweitert",
         "langBrPortuguese": "Portugiesisch (Brasilien)",
         "unifiedCanvas": "Einheitliche Leinwand",
         "openInNewTab": "In einem neuem Tab öffnen",
         "statusProcessing": "wird bearbeitet",
-        "linear": "Linear"
+        "linear": "Linear",
+        "imagePrompt": "Bild Prompt"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -655,7 +656,8 @@
         "downloadBoard": "Ordner runterladen",
         "changeBoard": "Ordner wechseln",
         "loading": "Laden...",
-        "clearSearch": "Suche leeren"
+        "clearSearch": "Suche leeren",
+        "bottomMessage": "Durch das Löschen dieses Ordners und seiner Bilder werden alle Funktionen zurückgesetzt, die sie derzeit verwenden."
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
@@ -704,7 +706,17 @@
         "depthZoeDescription": "Tiefenmap erstellen mit Zoe",
         "setControlImageDimensions": "Setze Control Bild Auflösung auf Breite/Höhe",
         "handAndFace": "Hand und Gesicht",
-        "enableIPAdapter": "Aktiviere IP Adapter"
+        "enableIPAdapter": "Aktiviere IP Adapter",
+        "resize": "Größe ändern",
+        "resetControlImage": "Zurücksetzen vom Referenz Bild",
+        "balanced": "Ausgewogen",
+        "prompt": "Prompt",
+        "resizeMode": "Größenänderungsmodus",
+        "processor": "Prozessor",
+        "saveControlImage": "Speichere Referenz Bild",
+        "safe": "Speichern",
+        "ipAdapterImageFallback": "Kein IP Adapter Bild ausgewählt",
+        "resetIPAdapterImage": "Zurücksetzen vom IP Adapter Bild"
     },
     "queue": {
         "status": "Status",
@@ -734,7 +746,19 @@
         "session": "Sitzung",
         "queueTotal": "{{total}} Gesamt",
         "resume": "Wieder aufnehmen",
-        "item": "Auftrag"
+        "item": "Auftrag",
+        "notReady": "Warteschlange noch nicht bereit",
+        "batchValues": "Stapel Werte",
+        "queueCountPrediction": "{{predicted}} zur Warteschlange hinzufügen",
+        "queuedCount": "{{pending}} wartenden Elemente",
+        "clearQueueAlertDialog": "Die Warteschlange leeren, stoppt den aktuellen Prozess und leert die Warteschlange komplett.",
+        "completedIn": "Fertig in",
+        "cancelBatchSucceeded": "Stapel abgebrochen",
+        "cancelBatch": "Stapel stoppen",
+        "enqueueing": "Stapel in der Warteschlange",
+        "queueMaxExceeded": "Maximum von  {{max_queue_size}} Elementen erreicht, würde {{skip}} Elemente überspringen",
+        "cancelBatchFailed": "Problem beim Abbruch vom Stapel",
+        "clearQueueAlertDialog2": "bist du sicher die Warteschlange zu leeren?"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -788,5 +812,10 @@
         "hits": "Cache Treffer",
         "enable": "Aktivieren",
         "clear": "Leeren"
+    },
+    "embedding": {
+        "noMatchingEmbedding": "Keine passenden Embeddings",
+        "addEmbedding": "Embedding hinzufügen",
+        "incompatibleModel": "Inkompatibles Basismodell:"
     }
 }
