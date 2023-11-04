@@ -166,8 +166,10 @@ class ModelPatcher:
         init_tokens_count = None
         new_tokens_added = None
 
-        # This is required since Transformers 4.32, see transformers/pull/25088
-        # More information: https://tinyurl.com/ycxxzdhh
+        # This is required since Transformers 4.32
+        # see https://github.com/huggingface/transformers/pull/25088
+        # More information: https://docs.nvidia.com/deeplearning/performance/dl-performance-
+        # matrix-multiplication/index.html#requirements-tc
         if "A100" in torch.cuda.get_device_name():
             pad_to_multiple_of = 64
         else:
