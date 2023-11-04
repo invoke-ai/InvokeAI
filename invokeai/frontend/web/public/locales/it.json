@@ -1192,7 +1192,9 @@
         "noLoRAsAvailable": "Nessun LoRA disponibile",
         "noModelsAvailable": "Nessun modello disponibile",
         "selectModel": "Seleziona un modello",
-        "selectLoRA": "Seleziona un LoRA"
+        "selectLoRA": "Seleziona un LoRA",
+        "noRefinerModelsInstalled": "Nessun modello SDXL Refiner installato",
+        "noLoRAsInstalled": "Nessun LoRA installato"
     },
     "invocationCache": {
         "disable": "Disabilita",
