@@ -90,6 +90,7 @@ def _parse_args() -> Namespace:
 # ------------------------- GUI HERE -------------------------
 class mergeModelsForm(npyscreen.FormMultiPageAction):
     interpolations = ["weighted_sum", "sigmoid", "inv_sigmoid"]
+    bases = ["sd-1", "sd-2", "sdxl"]
 
     def __init__(self, parentApp, name):
         self.parentApp = parentApp
@@ -274,10 +275,9 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         else:
             interp = self.interpolations[self.merge_method.value[0]]
 
-        bases = ["sd-1", "sd-2", "sdxl"]
         args = dict(
             model_names=models,
-            base_model=BaseModelType(bases[self.base_select.value[0]]),
+            base_model=BaseModelType(self.bases[self.base_select.value[0]]),
             alpha=self.alpha.value,
             interp=interp,
             force=self.force.value,
@@ -320,8 +320,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         return sorted(model_names)
 
     def _populate_models(self, value=None):
-        bases = ["sd-1", "sd-2", "sdxl"]
-        base_model = BaseModelType(bases[value[0]])
+        base_model = BaseModelType(self.bases[value[0]])
         self.model_names = self.get_model_names(base_model)
 
         models_plus_none = self.model_names.copy()
