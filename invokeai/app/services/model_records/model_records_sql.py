@@ -1,0 +1,396 @@
+# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
+"""
+SQL Implementation of the ModelRecordServiceBase API
+
+Typical usage:
+
+  from invokeai.backend.model_manager import ModelConfigStoreSQL
+  store = ModelConfigStoreSQL(sqlite_db)
+  config = dict(
+        path='/tmp/pokemon.bin',
+        name='old name',
+        base_model='sd-1',
+        type='embedding',
+        format='embedding_file',
+     )
+
+   # adding - the key becomes the model's "key" field
+   store.add_model('key1', config)
+
+   # updating
+   config.name='new name'
+   store.update_model('key1', config)
+
+   # checking for existence
+   if store.exists('key1'):
+      print("yes")
+
+   # fetching config
+   new_config = store.get_model('key1')
+   print(new_config.name, new_config.base_model)
+   assert new_config.key == 'key1'
+
+  # deleting
+  store.del_model('key1')
+
+  # searching
+  configs = store.search_by_path(path='/tmp/pokemon.bin')
+  configs = store.search_by_hash('750a499f35e43b7e1b4d15c207aa2f01')
+  configs = store.search_by_name(base_model='sd-2', model_type='main')
+"""
+
+
+import json
+import sqlite3
+import threading
+from pathlib import Path
+from typing import List, Optional, Union
+
+from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
+    BaseModelType,
+    ModelConfigBase,
+    ModelConfigFactory,
+    ModelType,
+)
+
+from ..shared.sqlite import SqliteDatabase
+from .model_records_base import (
+    CONFIG_FILE_VERSION,
+    DuplicateModelException,
+    ModelRecordServiceBase,
+    UnknownModelException,
+)
+
+
+class ModelRecordServiceSQL(ModelRecordServiceBase):
+    """Implementation of the ModelConfigStore ABC using a SQL database."""
+
+    _conn: sqlite3.Connection
+    _cursor: sqlite3.Cursor
+    _lock: threading.Lock
+
+    def __init__(self, db: SqliteDatabase):
+        """
+        Initialize a new object from preexisting sqlite3 connection and threading lock objects.
+
+        :param conn: sqlite3 connection object
+        :param lock: threading Lock object
+        """
+        super().__init__()
+        self._conn = db.conn
+        self._lock = db.lock
+        self._conn.row_factory = sqlite3.Row
+        self._cursor = self._conn.cursor()
+
+        with self._lock:
+            # Enable foreign keys
+            self._conn.execute("PRAGMA foreign_keys = ON;")
+            self._create_tables()
+            self._conn.commit()
+        assert (
+            str(self.version) == CONFIG_FILE_VERSION
+        ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
+
+    def _create_tables(self) -> None:
+        """Create sqlite3 tables."""
+        #  model_config table breaks out the fields that are common to all config objects
+        # and puts class-specific ones in a serialized json object
+        self._cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS model_config (
+                id TEXT NOT NULL PRIMARY KEY,
+                -- These 4 fields are enums in python, unrestricted string here
+                base_model TEXT NOT NULL,
+                model_type TEXT NOT NULL,
+                model_name TEXT NOT NULL,
+                model_path TEXT NOT NULL,
+                original_hash TEXT, -- could be null
+                -- Serialized JSON representation of the whole config object,
+                -- which will contain additional fields from subclasses
+                config TEXT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                -- Updated via trigger
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+            );
+            """
+        )
+
+        #  metadata table
+        self._cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS model_manager_metadata (
+                metadata_key TEXT NOT NULL PRIMARY KEY,
+                metadata_value TEXT NOT NULL
+            );
+            """
+        )
+
+        # Add trigger for `updated_at`.
+        self._cursor.execute(
+            """--sql
+            CREATE TRIGGER IF NOT EXISTS model_config_updated_at
+            AFTER UPDATE
+            ON model_config FOR EACH ROW
+            BEGIN
+                UPDATE model_config SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+                    WHERE id = old.id;
+            END;
+            """
+        )
+
+        # Add our version to the metadata table
+        self._cursor.execute(
+            """--sql
+            INSERT OR IGNORE into model_manager_metadata (
+               metadata_key,
+               metadata_value
+            )
+            VALUES (?,?);
+            """,
+            ("version", CONFIG_FILE_VERSION),
+        )
+
+    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
+        """
+        Add a model to the database.
+
+        :param key: Unique key for the model
+        :param config: Model configuration record, either a dict with the
+         required fields or a ModelConfigBase instance.
+
+        Can raise DuplicateModelException and InvalidModelConfigException exceptions.
+        """
+        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
+        json_serialized = json.dumps(record.model_dump())  # and turn it into a json string.
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    INSERT INTO model_config (
+                       id,
+                       base_model,
+                       model_type,
+                       model_name,
+                       model_path,
+                       original_hash,
+                       config
+                      )
+                    VALUES (?,?,?,?,?,?,?);
+                    """,
+                    (
+                        key,
+                        record.base_model,
+                        record.type,
+                        record.name,
+                        record.path,
+                        record.original_hash,
+                        json_serialized,
+                    ),
+                )
+                self._conn.commit()
+
+            except sqlite3.IntegrityError as e:
+                self._conn.rollback()
+                if "UNIQUE constraint failed" in str(e):
+                    raise DuplicateModelException(f"A model with key '{key}' is already installed") from e
+                else:
+                    raise e
+            except sqlite3.Error as e:
+                self._conn.rollback()
+                raise e
+
+        return self.get_model(key)
+
+    @property
+    def version(self) -> str:
+        """Return the version of the database schema."""
+        with self._lock:
+            self._cursor.execute(
+                """--sql
+                SELECT metadata_value FROM model_manager_metadata
+                WHERE metadata_key=?;
+                """,
+                ("version",),
+            )
+            rows = self._cursor.fetchone()
+            if not rows:
+                raise KeyError("Models database does not have metadata key 'version'")
+            return rows[0]
+
+    def del_model(self, key: str) -> None:
+        """
+        Delete a model.
+
+        :param key: Unique key for the model to be deleted
+
+        Can raise an UnknownModelException
+        """
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    DELETE FROM model_config
+                    WHERE id=?;
+                    """,
+                    (key,),
+                )
+                if self._cursor.rowcount == 0:
+                    raise UnknownModelException
+                self._conn.commit()
+            except sqlite3.Error as e:
+                self._conn.rollback()
+                raise e
+
+    def update_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
+        """
+        Update the model, returning the updated version.
+
+        :param key: Unique key for the model to be updated
+        :param config: Model configuration record. Either a dict with the
+         required fields, or a ModelConfigBase instance.
+        """
+        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
+        json_serialized = json.dumps(record.model_dump())  # and turn it into a json string.
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    UPDATE model_config
+                    SET base_model=?,
+                        model_type=?,
+                        model_name=?,
+                        model_path=?,
+                        config=?
+                    WHERE id=?;
+                    """,
+                    (record.base_model, record.type, record.name, record.path, json_serialized, key),
+                )
+                if self._cursor.rowcount == 0:
+                    raise UnknownModelException
+                self._conn.commit()
+            except sqlite3.Error as e:
+                self._conn.rollback()
+                raise e
+
+        return self.get_model(key)
+
+    def get_model(self, key: str) -> AnyModelConfig:
+        """
+        Retrieve the ModelConfigBase instance for the indicated model.
+
+        :param key: Key of model config to be fetched.
+
+        Exceptions: UnknownModelException
+        """
+        with self._lock:
+            self._cursor.execute(
+                """--sql
+                SELECT config FROM model_config
+                WHERE id=?;
+                """,
+                (key,),
+            )
+            rows = self._cursor.fetchone()
+            if not rows:
+                raise UnknownModelException
+            model = ModelConfigFactory.make_config(json.loads(rows[0]))
+        return model
+
+    def exists(self, key: str) -> bool:
+        """
+        Return True if a model with the indicated key exists in the databse.
+
+        :param key: Unique key for the model to be deleted
+        """
+        count = 0
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    select count(*) FROM model_config
+                    WHERE id=?;
+                    """,
+                    (key,),
+                )
+                count = self._cursor.fetchone()[0]
+            except sqlite3.Error as e:
+                raise e
+        return count > 0
+
+    def search_by_name(
+        self,
+        model_name: Optional[str] = None,
+        base_model: Optional[BaseModelType] = None,
+        model_type: Optional[ModelType] = None,
+    ) -> List[AnyModelConfig]:
+        """
+        Return models matching name, base and/or type.
+
+        :param model_name: Filter by name of model (optional)
+        :param base_model: Filter by base model (optional)
+        :param model_type: Filter by type of model (optional)
+
+        If none of the optional filters are passed, will return all
+        models in the database.
+        """
+        results = []
+        where_clause = []
+        bindings = []
+        if model_name:
+            where_clause.append("model_name=?")
+            bindings.append(model_name)
+        if base_model:
+            where_clause.append("base_model=?")
+            bindings.append(base_model)
+        if model_type:
+            where_clause.append("model_type=?")
+            bindings.append(model_type)
+        where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    f"""--sql
+                    select config FROM model_config
+                    {where};
+                    """,
+                    tuple(bindings),
+                )
+                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            except sqlite3.Error as e:
+                raise e
+        return results
+
+    def search_by_path(self, path: Union[str, Path]) -> List[ModelConfigBase]:
+        """Return models with the indicated path."""
+        results = []
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    SELECT config FROM model_config
+                    WHERE model_path=?;
+                    """,
+                    (str(path),),
+                )
+                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            except sqlite3.Error as e:
+                raise e
+        return results
+
+    def search_by_hash(self, hash: str) -> List[ModelConfigBase]:
+        """Return models with the indicated original_hash."""
+        results = []
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    SELECT config FROM model_config
+                    WHERE original_hash=?;
+                    """,
+                    (hash,),
+                )
+                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            except sqlite3.Error as e:
+                raise e
+        return results

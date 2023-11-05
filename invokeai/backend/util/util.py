@@ -5,6 +5,7 @@ import math
 import multiprocessing as mp
 import os
 import re
+import warnings
 from collections import abc
 from inspect import isfunction
 from pathlib import Path
@@ -14,8 +15,10 @@ from threading import Thread
 import numpy as np
 import requests
 import torch
+from diffusers import logging as diffusers_logging
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
+from transformers import logging as transformers_logging
 
 import invokeai.backend.util.logging as logger
 
@@ -378,3 +381,24 @@ class Chdir(object):
 
     def __exit__(self, *args):
         os.chdir(self.original)
+
+
+class SilenceWarnings(object):
+    """Context manager to temporarily lower verbosity of diffusers & transformers warning messages."""
+
+    def __init__(self):
+        """Set up context, save current transformers and diffusers verbosity settings."""
+        self.transformers_verbosity = transformers_logging.get_verbosity()
+        self.diffusers_verbosity = diffusers_logging.get_verbosity()
+
+    def __enter__(self):
+        """Set verbosity to error."""
+        transformers_logging.set_verbosity_error()
+        diffusers_logging.set_verbosity_error()
+        warnings.simplefilter("ignore")
+
+    def __exit__(self, type, value, traceback):
+        """Restore logger verbosity to state before context was entered."""
+        transformers_logging.set_verbosity(self.transformers_verbosity)
+        diffusers_logging.set_verbosity(self.diffusers_verbosity)
+        warnings.simplefilter("default")
