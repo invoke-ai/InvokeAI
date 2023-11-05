@@ -182,8 +182,8 @@ class IntegerMathInvocation(BaseInvocation):
     operation: INTEGER_OPERATIONS = InputField(
         default="ADD", description="The operation to perform", ui_choice_labels=INTEGER_OPERATIONS_LABELS
     )
-    a: int = InputField(default=0, description=FieldDescriptions.num_1)
-    b: int = InputField(default=0, description=FieldDescriptions.num_2)
+    a: int = InputField(default=1, description=FieldDescriptions.num_1)
+    b: int = InputField(default=1, description=FieldDescriptions.num_2)
 
     @field_validator("b")
     def no_unrepresentable_results(cls, v: int, info: ValidationInfo):
@@ -256,8 +256,8 @@ class FloatMathInvocation(BaseInvocation):
     operation: FLOAT_OPERATIONS = InputField(
         default="ADD", description="The operation to perform", ui_choice_labels=FLOAT_OPERATIONS_LABELS
     )
-    a: float = InputField(default=0, description=FieldDescriptions.num_1)
-    b: float = InputField(default=0, description=FieldDescriptions.num_2)
+    a: float = InputField(default=1, description=FieldDescriptions.num_1)
+    b: float = InputField(default=1, description=FieldDescriptions.num_2)
 
     @field_validator("b")
     def no_unrepresentable_results(cls, v: float, info: ValidationInfo):
