@@ -236,7 +236,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     (key,),
                 )
                 if self._cursor.rowcount == 0:
-                    raise UnknownModelException
+                    raise UnknownModelException("model not found")
                 self._conn.commit()
             except sqlite3.Error as e:
                 self._conn.rollback()
@@ -267,7 +267,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     (record.base_model, record.type, record.name, record.path, json_serialized, key),
                 )
                 if self._cursor.rowcount == 0:
-                    raise UnknownModelException
+                    raise UnknownModelException("model not found")
                 self._conn.commit()
             except sqlite3.Error as e:
                 self._conn.rollback()
@@ -293,7 +293,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             )
             rows = self._cursor.fetchone()
             if not rows:
-                raise UnknownModelException
+                raise UnknownModelException("model not found")
             model = ModelConfigFactory.make_config(json.loads(rows[0]))
         return model
 
