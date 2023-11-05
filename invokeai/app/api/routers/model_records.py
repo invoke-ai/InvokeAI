@@ -2,16 +2,16 @@
 """FastAPI route for model configuration records."""
 
 
+from hashlib import sha1
+from random import randbytes
 from typing import List, Optional
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, ConfigDict, TypeAdapter
-from random import randbytes
-from hashlib import sha1
 from starlette.exceptions import HTTPException
 
-from invokeai.app.services.model_records import UnknownModelException, DuplicateModelException, InvalidModelException
+from invokeai.app.services.model_records import DuplicateModelException, InvalidModelException, UnknownModelException
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType
 
 from ..dependencies import ApiDependencies
