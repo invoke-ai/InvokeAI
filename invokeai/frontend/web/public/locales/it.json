@@ -1025,7 +1025,8 @@
         "imageFieldDescription": "Le immagini possono essere passate tra i nodi.",
         "unableToParseEdge": "Impossibile analizzare il bordo",
         "latentsCollectionDescription": "Le immagini latenti possono essere passate tra i nodi.",
-        "imageCollection": "Raccolta Immagini"
+        "imageCollection": "Raccolta Immagini",
+        "loRAModelField": "LoRA"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
