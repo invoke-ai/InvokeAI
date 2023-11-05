@@ -8,9 +8,6 @@ import { useMemo } from 'react';
 import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
 import ParamHrfMethod from './ParamHrfMethod';
-import ParamHrfManualResToggle from './HrfResolution/ParamHrfManualResToggle';
-import ParamHrfWidth from './HrfResolution/ParamHrfWidth';
-import ParamHrfHeight from './HrfResolution/ParamHrfHeight';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const selector = createSelector(
@@ -43,25 +40,6 @@ export default function ParamHrfCollapse() {
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamHrfToggle />
         {hrfEnabled && <ParamHrfStrength />}
-        {hrfEnabled && <ParamHrfManualResToggle />}
-        {hrfEnabled && (
-          <Flex
-            sx={{
-              gap: 2,
-              p: 4,
-              borderRadius: 4,
-              flexDirection: 'column',
-              w: 'full',
-              bg: 'base.100',
-              _dark: {
-                bg: 'base.750',
-              },
-            }}
-          >
-            <ParamHrfWidth />
-            <ParamHrfHeight />
-          </Flex>
-        )}
         {hrfEnabled && <ParamHrfMethod />}
       </Flex>
     </IAICollapse>
