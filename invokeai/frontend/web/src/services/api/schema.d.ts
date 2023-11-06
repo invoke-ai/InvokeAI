@@ -8808,11 +8808,11 @@ export type components = {
       ui_order: number | null;
     };
     /**
-     * StableDiffusionOnnxModelFormat
+     * IPAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    IPAdapterModelFormat: "invokeai";
     /**
      * IPAdapterModelFormat
      * @description An enumeration.
@@ -8832,11 +8832,11 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * CLIPVisionModelFormat
+     * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    CLIPVisionModelFormat: "diffusers";
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
