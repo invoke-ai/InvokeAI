@@ -28,8 +28,6 @@ import {
 } from '../types/parameterSchemas';
 
 export interface GenerationState {
-  hrfHeight: HeightParam;
-  hrfWidth: WidthParam;
   hrfEnabled: boolean;
   hrfManualResEnabled: boolean;
   hrfStrength: StrengthParam;
@@ -76,8 +74,6 @@ export interface GenerationState {
 }
 
 export const initialGenerationState: GenerationState = {
-  hrfHeight: 64,
-  hrfWidth: 64,
   hrfStrength: 0.75,
   hrfEnabled: false,
   hrfManualResEnabled: false,
@@ -284,12 +280,6 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
-    setHrfHeight: (state, action: PayloadAction<number>) => {
-      state.hrfHeight = action.payload;
-    },
-    setHrfWidth: (state, action: PayloadAction<number>) => {
-      state.hrfWidth = action.payload;
-    },
     setHrfStrength: (state, action: PayloadAction<number>) => {
       state.hrfStrength = action.payload;
     },
@@ -386,8 +376,6 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
-  setHrfHeight,
-  setHrfWidth,
   setHrfStrength,
   setHrfEnabled,
   setHrfMethod,

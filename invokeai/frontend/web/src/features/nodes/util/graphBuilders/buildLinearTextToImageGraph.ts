@@ -48,8 +48,6 @@ export const buildLinearTextToImageGraph = (
     seamlessXAxis,
     seamlessYAxis,
     seed,
-    hrfWidth,
-    hrfHeight,
     hrfStrength,
     hrfEnabled: hrfEnabled,
   } = state.generation;
@@ -259,9 +257,6 @@ export const buildLinearTextToImageGraph = (
     ipAdapters: [], // populated in addIPAdapterToLinearGraph
     t2iAdapters: [], // populated in addT2IAdapterToLinearGraph
     clip_skip: clipSkip,
-    hrf_width: hrfEnabled ? hrfWidth : undefined,
-    hrf_height: hrfEnabled ? hrfHeight : undefined,
-    hrf_strength: hrfEnabled ? hrfStrength : undefined,
   };
 
   graph.edges.push({

@@ -1,5 +1,6 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
   DenoiseLatentsInvocation,
   NoiseInvocation,
@@ -61,6 +62,52 @@ function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
   graph.edges = graph.edges.concat(newEdges);
 }
 
+/**
+ * Calculates the new resolution for high-resolution features (HRF) based on base model type.
+ * Adjusts the width and height to maintain the aspect ratio and constrains them by the model's dimension limits,
+ * rounding down to the nearest multiple of 8.
+ *
+ * @param {string} base_model The base model type, which determines the base dimension used in calculations.
+ * @param {number} width The current width to be adjusted for HRF.
+ * @param {number} height The current height to be adjusted for HRF.
+ * @return {{newWidth: number, newHeight: number}} The new width and height, adjusted and rounded as needed.
+ */
+function calculateHrfRes(
+  base_model: string,
+  width: number,
+  height: number
+): { newWidth: number; newHeight: number } {
+  const aspect = width / height;
+  let dimension;
+  if (base_model == 'sdxl') {
+    dimension = 1024;
+  } else {
+    dimension = 512;
+  }
+
+  const min_dimension = Math.floor(dimension * 0.5);
+  const model_area = dimension * dimension; // Assuming square images for model_area
+
+  let init_width;
+  let init_height;
+
+  if (aspect > 1.0) {
+    init_height = Math.max(min_dimension, Math.sqrt(model_area / aspect));
+    init_width = init_height * aspect;
+  } else {
+    init_width = Math.max(min_dimension, Math.sqrt(model_area * aspect));
+    init_height = init_width / aspect;
+  }
+  // Cap initial height and width to final height and width.
+  init_width = Math.min(width, init_width);
+  init_height = Math.min(height, init_height);
+
+  const newWidth = roundToMultiple(Math.floor(init_width), 8);
+  const newHeight = roundToMultiple(Math.floor(init_height), 8);
+
+  return { newWidth, newHeight };
+}
+
 // Adds the high-res fix feature to the given graph.
 export const addHrfToGraph = (
   state: RootState,
@@ -78,11 +125,17 @@ export const addHrfToGraph = (
 
   const { vae } = state.generation;
   const isAutoVae = !vae;
-  const hrfWidth = state.generation.hrfWidth;
-  const hrfHeight = state.generation.hrfHeight;
   const width = state.generation.width;
   const height = state.generation.height;
   const method = state.generation.hrfMethod;
+  const base_model = state.generation.model
+    ? state.generation.model.base_model
+    : 'sd1';
+  const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(
+    base_model,
+    width,
+    height
+  );
 
   // Pre-existing (original) graph nodes.
   const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
