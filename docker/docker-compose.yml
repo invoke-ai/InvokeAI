@@ -15,6 +15,10 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    # For AMD support, comment out the deploy section above and uncomment the devices section below:
+    #devices:
+    #  - /dev/kfd:/dev/kfd
+    #  - /dev/dri:/dev/dri
     build:
       context: ..
       dockerfile: docker/Dockerfile
