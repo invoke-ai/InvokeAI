@@ -1,6 +1,5 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { MetadataAccumulatorInvocation } from 'services/api/types';
 import {
   CANVAS_COHERENCE_INPAINT_CREATE_MASK,
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
@@ -14,7 +13,6 @@ import {
   INPAINT_IMAGE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
-  METADATA_ACCUMULATOR,
   ONNX_MODEL_LOADER,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_CANVAS_INPAINT_GRAPH,
@@ -26,6 +24,7 @@ import {
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
+import { upsertMetadata } from './metadata';
 
 export const addVAEToGraph = (
   state: RootState,
@@ -41,9 +40,6 @@ export const addVAEToGraph = (
   );
 
   const isAutoVae = !vae;
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
 
   if (!isAutoVae) {
     graph.nodes[VAE_LOADER] = {
@@ -181,7 +177,7 @@ export const addVAEToGraph = (
     }
   }
 
-  if (vae && metadataAccumulator) {
-    metadataAccumulator.vae = vae;
+  if (vae) {
+    upsertMetadata(graph, { vae });
   }
 };

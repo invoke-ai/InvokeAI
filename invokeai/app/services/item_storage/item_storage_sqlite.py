@@ -2,7 +2,7 @@ import sqlite3
 import threading
 from typing import Generic, Optional, TypeVar, get_args
 
-from pydantic import BaseModel, parse_raw_as
+from pydantic import BaseModel, TypeAdapter
 
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite import SqliteDatabase
@@ -17,7 +17,8 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _id_field: str
-    _lock: threading.Lock
+    _lock: threading.RLock
+    _validator: Optional[TypeAdapter[T]]
 
     def __init__(self, db: SqliteDatabase, table_name: str, id_field: str = "id"):
         super().__init__()
@@ -27,6 +28,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
         self._cursor = self._conn.cursor()
+        self._validator: Optional[TypeAdapter[T]] = None
 
         self._create_table()
 
@@ -45,16 +47,21 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             self._lock.release()
 
     def _parse_item(self, item: str) -> T:
-        # __orig_class__ is technically an implementation detail of the typing module, not a supported API
-        item_type = get_args(self.__orig_class__)[0]  # type: ignore
-        return parse_raw_as(item_type, item)
+        if self._validator is None:
+            """
+            We don't get access to `__orig_class__` in `__init__()`, and we need this before start(), so
+            we can create it when it is first needed instead.
+            __orig_class__ is technically an implementation detail of the typing module, not a supported API
+            """
+            self._validator = TypeAdapter(get_args(self.__orig_class__)[0])  # type: ignore [attr-defined]
+        return self._validator.validate_json(item)
 
     def set(self, item: T):
         try:
             self._lock.acquire()
             self._cursor.execute(
                 f"""INSERT OR REPLACE INTO {self._table_name} (item) VALUES (?);""",
-                (item.json(),),
+                (item.model_dump_json(warnings=False, exclude_none=True),),
             )
             self._conn.commit()
         finally:

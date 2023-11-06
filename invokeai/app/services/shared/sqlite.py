@@ -9,7 +9,7 @@ sqlite_memory = ":memory:"
 
 class SqliteDatabase:
     conn: sqlite3.Connection
-    lock: threading.Lock
+    lock: threading.RLock
     _logger: Logger
     _config: InvokeAIAppConfig
 
@@ -27,7 +27,7 @@ class SqliteDatabase:
             self._logger.info(f"Using database at {location}")
 
         self.conn = sqlite3.connect(location, check_same_thread=False)
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.conn.row_factory = sqlite3.Row
 
         if self._config.log_sql:

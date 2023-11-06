@@ -19,7 +19,7 @@ from diffusers import logging as diffusers_logging
 from onnx import numpy_helper
 from onnxruntime import InferenceSession, SessionOptions, get_available_providers
 from picklescan.scanner import scan_file_path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from transformers import logging as transformers_logging
 
 
@@ -86,14 +86,21 @@ class ModelError(str, Enum):
     NotFound = "not_found"
 
 
+def model_config_json_schema_extra(schema: dict[str, Any]) -> None:
+    if "required" not in schema:
+        schema["required"] = []
+    schema["required"].append("model_type")
+
+
 class ModelConfigBase(BaseModel):
     path: str  # or Path
     description: Optional[str] = Field(None)
     model_format: Optional[str] = Field(None)
     error: Optional[ModelError] = Field(None)
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(
+        use_enum_values=True, protected_namespaces=(), json_schema_extra=model_config_json_schema_extra
+    )
 
 
 class EmptyConfigLoader(ConfigMixin):

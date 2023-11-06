@@ -79,7 +79,7 @@ title: Manual Installation, Linux
         and obtaining an access token for downloading. It will then download and
         install the weights files for you.
 
-        Please look [here](../INSTALL_MANUAL.md) for a manual process for doing
+        Please look [here](../020_INSTALL_MANUAL.md) for a manual process for doing
         the same thing.
 
 7.  Start generating images!
@@ -112,7 +112,7 @@ title: Manual Installation, Linux
         To use an alternative model you may invoke the `!switch` command in
         the CLI, or pass `--model <model_name>` during `invoke.py` launch for
         either the CLI or the Web UI. See [Command Line
-        Client](../../features/CLI.md#model-selection-and-importation). The
+        Client](../../deprecated/CLI.md#model-selection-and-importation). The
         model names are defined in `configs/models.yaml`.
 
 8. Subsequently, to relaunch the script, be sure to run "conda activate

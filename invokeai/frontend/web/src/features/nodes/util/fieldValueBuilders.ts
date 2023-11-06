@@ -3,6 +3,7 @@ import { FieldType, InputFieldTemplate, InputFieldValue } from '../types/types';
 const FIELD_VALUE_FALLBACK_MAP: {
   [key in FieldType]: InputFieldValue['value'];
 } = {
+  Any: undefined,
   enum: '',
   BoardField: undefined,
   boolean: false,
@@ -38,6 +39,11 @@ const FIELD_VALUE_FALLBACK_MAP: {
   LatentsCollection: [],
   LatentsField: undefined,
   LatentsPolymorphic: undefined,
+  MetadataItemField: undefined,
+  MetadataItemCollection: [],
+  MetadataItemPolymorphic: undefined,
+  MetadataField: undefined,
+  MetadataCollection: [],
   LoRAModelField: undefined,
   MainModelField: undefined,
   ONNXModelField: undefined,

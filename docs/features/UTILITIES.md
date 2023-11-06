@@ -8,7 +8,7 @@ title: Command-line Utilities
 
 InvokeAI comes with several scripts that are accessible via the
 command line. To access these commands, start the "developer's
-console" from the launcher (`invoke.bat` menu item [8]). Users who are
+console" from the launcher (`invoke.bat` menu item [7]). Users who are
 familiar with Python can alternatively activate InvokeAI's virtual
 environment (typically, but not necessarily `invokeai/.venv`).
 
@@ -34,7 +34,7 @@ invokeai-web --ram 7
 
 ## **invokeai-merge**
 
-This is the model merge script, the same as launcher option [4]. Call
+This is the model merge script, the same as launcher option [3]. Call
 it with the `--gui` command-line argument to start the interactive
 console-based GUI. Alternatively, you can run it non-interactively
 using command-line arguments as illustrated in the example below which
@@ -48,7 +48,7 @@ invokeai-merge --force --base-model sd-1 --models stable-diffusion-1.5 inkdiffus
 ## **invokeai-ti**
 
 This is the textual inversion training script that is run by launcher
-option [3]. Call it with `--gui` to run the interactive console-based
+option [2]. Call it with `--gui` to run the interactive console-based
 front end. It can also be run non-interactively. It has about a
 zillion arguments, but a typical training session can be launched
 with:
@@ -68,7 +68,7 @@ in Windows).
 ## **invokeai-install**
 
 This is the console-based model install script that is run by launcher
-option [5]. If called without arguments, it will launch the
+option [4]. If called without arguments, it will launch the
 interactive console-based interface. It can also be used
 non-interactively to list, add and remove models as shown by these
 examples:
@@ -148,7 +148,7 @@ launch the web server against it with `invokeai-web --root InvokeAI-New`.
 ## **invokeai-update**
 
 This is the interactive console-based script that is run by launcher
-menu item [9] to update to a new version of InvokeAI. It takes no
+menu item [8] to update to a new version of InvokeAI. It takes no
 command-line arguments.
 
 ## **invokeai-metadata**

@@ -84,7 +84,7 @@ InvokeAI root directory's `autoimport` folder.
 
 ### Installation via `invokeai-model-install`
 
-From the `invoke` launcher, choose option [5] "Download and install
+From the `invoke` launcher, choose option [4] "Download and install
 models." This will launch the same script that prompted you to select
 models at install time. You can use this to add models that you
 skipped the first time around. It is all right to specify a model that

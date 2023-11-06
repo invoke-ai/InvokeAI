@@ -3,15 +3,15 @@ import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAd
 import { omit } from 'lodash-es';
 import {
   CollectInvocation,
-  MetadataAccumulatorInvocation,
+  CoreMetadataInvocation,
   T2IAdapterInvocation,
 } from 'services/api/types';
 import { NonNullableGraph, T2IAdapterField } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
-  METADATA_ACCUMULATOR,
   T2I_ADAPTER_COLLECT,
 } from './constants';
+import { upsertMetadata } from './metadata';
 
 export const addT2IAdaptersToLinearGraph = (
   state: RootState,
@@ -21,10 +21,6 @@ export const addT2IAdaptersToLinearGraph = (
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
     (ca) => ca.model?.base_model === state.generation.model?.base_model
   );
-
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
 
   if (validT2IAdapters.length) {
     // Even though denoise_latents' control input is polymorphic, keep it simple and always use a collect
@@ -41,6 +37,17 @@ export const addT2IAdaptersToLinearGraph = (
         field: 't2i_adapter',
       },
     });
+
+    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
+      graph.edges.push({
+        source: { node_id: T2I_ADAPTER_COLLECT, field: 'collection' },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          field: 't2i_adapter',
+        },
+      });
+    }
+    const t2iAdapterMetdata: CoreMetadataInvocation['t2iAdapters'] = [];
 
     validT2IAdapters.forEach((t2iAdapter) => {
       if (!t2iAdapter.model) {
@@ -86,15 +93,13 @@ export const addT2IAdaptersToLinearGraph = (
 
       graph.nodes[t2iAdapterNode.id] = t2iAdapterNode as T2IAdapterInvocation;
 
-      if (metadataAccumulator?.ipAdapters) {
-        // metadata accumulator only needs a control field - not the whole node
-        // extract what we need and add to the accumulator
-        const t2iAdapterField = omit(t2iAdapterNode, [
+      t2iAdapterMetdata.push(
+        omit(t2iAdapterNode, [
           'id',
           'type',
-        ]) as T2IAdapterField;
-        metadataAccumulator.t2iAdapters.push(t2iAdapterField);
-      }
+          'is_intermediate',
+        ]) as T2IAdapterField
+      );
 
       graph.edges.push({
         source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
@@ -103,16 +108,8 @@ export const addT2IAdaptersToLinearGraph = (
           field: 'item',
         },
       });
-
-      if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-        graph.edges.push({
-          source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
-          destination: {
-            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-            field: 't2i_adapter',
-          },
-        });
-      }
     });
+
+    upsertMetadata(graph, { t2iAdapters: t2iAdapterMetdata });
   }
 };

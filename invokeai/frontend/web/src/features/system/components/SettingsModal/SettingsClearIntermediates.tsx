@@ -1,8 +1,9 @@
 import { Heading, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import IAIButton from '../../../../common/components/IAIButton';
 import {
   useClearIntermediatesMutation,
@@ -16,13 +17,26 @@ export default function SettingsClearIntermediates() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const { data: intermediatesCount, refetch: updateIntermediatesCount } =
-    useGetIntermediatesCountQuery();
+  const { data: intermediatesCount } = useGetIntermediatesCountQuery(
+    undefined,
+    {
+      refetchOnMountOrArgChange: true,
+    }
+  );
 
   const [clearIntermediates, { isLoading: isLoadingClearIntermediates }] =
     useClearIntermediatesMutation();
 
+  const { data: queueStatus } = useGetQueueStatusQuery();
+  const hasPendingItems =
+    queueStatus &&
+    (queueStatus.queue.in_progress > 0 || queueStatus.queue.pending > 0);
+
   const handleClickClearIntermediates = useCallback(() => {
+    if (hasPendingItems) {
+      return;
+    }
+
     clearIntermediates()
       .unwrap()
       .then((clearedCount) => {
@@ -43,21 +57,19 @@ export default function SettingsClearIntermediates() {
           })
         );
       });
-  }, [t, clearIntermediates, dispatch]);
-
-  useEffect(() => {
-    // update the count on mount
-    updateIntermediatesCount();
-  }, [updateIntermediatesCount]);
+  }, [t, clearIntermediates, dispatch, hasPendingItems]);
 
   return (
     <StyledFlex>
       <Heading size="sm">{t('settings.clearIntermediates')}</Heading>
       <IAIButton
+        tooltip={
+          hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined
+        }
         colorScheme="warning"
         onClick={handleClickClearIntermediates}
         isLoading={isLoadingClearIntermediates}
-        isDisabled={!intermediatesCount}
+        isDisabled={!intermediatesCount || hasPendingItems}
       >
         {t('settings.clearIntermediatesWithCount', {
           count: intermediatesCount ?? 0,

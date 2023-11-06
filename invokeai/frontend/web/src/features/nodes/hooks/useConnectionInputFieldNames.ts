@@ -9,6 +9,7 @@ import {
   TYPES_WITH_INPUT_COMPONENTS,
 } from '../types/constants';
 import { isInvocationNode } from '../types/types';
+import { getSortedFilteredFieldNames } from '../util/getSortedFilteredFieldNames';
 
 export const useConnectionInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
@@ -24,17 +25,16 @@ export const useConnectionInputFieldNames = (nodeId: string) => {
           if (!nodeTemplate) {
             return [];
           }
-          return map(nodeTemplate.inputs)
-            .filter(
-              (field) =>
-                (field.input === 'connection' &&
-                  !POLYMORPHIC_TYPES.includes(field.type)) ||
-                !TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
-            )
-            .filter((field) => !field.ui_hidden)
-            .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0))
-            .map((field) => field.name)
-            .filter((fieldName) => fieldName !== 'is_intermediate');
+
+          // get the visible fields
+          const fields = map(nodeTemplate.inputs).filter(
+            (field) =>
+              (field.input === 'connection' &&
+                !POLYMORPHIC_TYPES.includes(field.type)) ||
+              !TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
+          );
+
+          return getSortedFilteredFieldNames(fields);
         },
         defaultSelectorOptions
       ),

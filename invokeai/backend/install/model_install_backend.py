@@ -236,9 +236,16 @@ class ModelInstall(object):
         if not models_installed:
             models_installed = dict()
 
+        model_path_id_or_url = str(model_path_id_or_url).strip("\"' ")
+
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
         path = Path(model_path_id_or_url)
+
+        # fix relative paths
+        if path.exists() and not path.is_absolute():
+            path = path.absolute()  # make relative to current WD
+
         # checkpoint file, or similar
         if path.is_file():
             models_installed.update({str(path): self._install_path(path)})
@@ -453,6 +460,12 @@ class ModelInstall(object):
             possible_conf = path.with_suffix(".yaml")
             if possible_conf.exists():
                 legacy_conf = str(self.relative_to_root(possible_conf))
+            else:
+                legacy_conf = Path(
+                    self.config.root_path,
+                    "configs/controlnet",
+                    ("cldm_v15.yaml" if info.base_type == BaseModelType("sd-1") else "cldm_v21.yaml"),
+                )
 
         if legacy_conf:
             attributes.update(dict(config=str(legacy_conf)))

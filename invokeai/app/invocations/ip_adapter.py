@@ -2,7 +2,7 @@ import os
 from builtins import float
 from typing import List, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -25,14 +25,18 @@ class IPAdapterModelField(BaseModel):
     model_name: str = Field(description="Name of the IP-Adapter model")
     base_model: BaseModelType = Field(description="Base model")
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class CLIPVisionModelField(BaseModel):
     model_name: str = Field(description="Name of the CLIP Vision image encoder model")
     base_model: BaseModelType = Field(description="Base model (usually 'Any')")
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class IPAdapterField(BaseModel):
-    image: ImageField = Field(description="The IP-Adapter image prompt.")
+    image: Union[ImageField, List[ImageField]] = Field(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
     image_encoder_model: CLIPVisionModelField = Field(description="The name of the CLIP image encoder model.")
     weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
@@ -51,19 +55,19 @@ class IPAdapterOutput(BaseInvocationOutput):
     ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.0.0")
+@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.1.0")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
     # Inputs
-    image: ImageField = InputField(description="The IP-Adapter image prompt.")
+    image: Union[ImageField, List[ImageField]] = InputField(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: IPAdapterModelField = InputField(
         description="The IP-Adapter model.", title="IP-Adapter Model", input=Input.Direct, ui_order=-1
     )
 
     # weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
     weight: Union[float, List[float]] = InputField(
-        default=1, ge=0, description="The weight given to the IP-Adapter", ui_type=UIType.Float, title="Weight"
+        default=1, ge=-1, description="The weight given to the IP-Adapter", ui_type=UIType.Float, title="Weight"
     )
 
     begin_step_percent: float = InputField(

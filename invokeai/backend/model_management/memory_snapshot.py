@@ -55,14 +55,16 @@ class MemorySnapshot:
 
         try:
             malloc_info = LibcUtil().mallinfo2()
-        except OSError:
-            # This is expected in environments that do not have the 'libc.so.6' shared library.
+        except (OSError, AttributeError):
+            # OSError: This is expected in environments that do not have the 'libc.so.6' shared library.
+            # AttributeError: This is expected in environments that have `libc.so.6` but do not have the `mallinfo2` (e.g. glibc < 2.33)
+            # TODO: Does `mallinfo` work?
             malloc_info = None
 
         return cls(process_ram, vram, malloc_info)
 
 
-def get_pretty_snapshot_diff(snapshot_1: MemorySnapshot, snapshot_2: MemorySnapshot) -> str:
+def get_pretty_snapshot_diff(snapshot_1: Optional[MemorySnapshot], snapshot_2: Optional[MemorySnapshot]) -> str:
     """Get a pretty string describing the difference between two `MemorySnapshot`s."""
 
     def get_msg_line(prefix: str, val1: int, val2: int):
@@ -70,6 +72,9 @@ def get_pretty_snapshot_diff(snapshot_1: MemorySnapshot, snapshot_2: MemorySnaps
         return f"{prefix: <30} ({(diff/GB):+5.3f}): {(val1/GB):5.3f}GB -> {(val2/GB):5.3f}GB\n"
 
     msg = ""
+
+    if snapshot_1 is None or snapshot_2 is None:
+        return msg
 
     msg += get_msg_line("Process RAM", snapshot_1.process_ram, snapshot_2.process_ram)
 
