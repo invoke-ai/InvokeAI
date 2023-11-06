@@ -12,6 +12,8 @@ from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
 
+from invokeai.app.invocations.shared import FreeUConfig
+
 from .models.lora import LoRAModel
 
 """
@@ -239,6 +241,25 @@ class ModelPatcher:
         finally:
             while len(skipped_layers) > 0:
                 text_encoder.text_model.encoder.layers.append(skipped_layers.pop())
+
+    @classmethod
+    @contextmanager
+    def apply_freeu(
+        cls,
+        unet: UNet2DConditionModel,
+        freeu_config: Optional[FreeUConfig] = None,
+    ):
+        did_apply_freeu = False
+        try:
+            if freeu_config is not None:
+                unet.enable_freeu(b1=freeu_config.b1, b2=freeu_config.b2, s1=freeu_config.s1, s2=freeu_config.s2)
+                did_apply_freeu = True
+
+            yield
+
+        finally:
+            if did_apply_freeu:
+                unet.disable_freeu()
 
 
 class TextualInversionModel:
