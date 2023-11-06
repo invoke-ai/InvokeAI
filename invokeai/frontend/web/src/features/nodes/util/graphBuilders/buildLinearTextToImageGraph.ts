@@ -257,6 +257,8 @@ export const buildLinearTextToImageGraph = (
     ipAdapters: [], // populated in addIPAdapterToLinearGraph
     t2iAdapters: [], // populated in addT2IAdapterToLinearGraph
     clip_skip: clipSkip,
+    hrf_strength: hrfStrength,
+    hrf_enabled: hrfEnabled,
   };
 
   graph.edges.push({

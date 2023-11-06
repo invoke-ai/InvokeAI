@@ -6201,6 +6201,11 @@ export type components = {
        */
       hrf_height?: number;
       /**
+       * Hrf Enabled
+       * @description Whether high resolution fix was enabled.
+       */
+      hrf_enabled?: boolean;
+      /**
        * Hrf Strength
        * @description The high resolution fix img2img strength used in the upscale pass.
        */
