@@ -16,7 +16,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType,
 
 from ..dependencies import ApiDependencies
 
-model_records_router = APIRouter(prefix="/v1/model_records", tags=["model_records"])
+model_records_router = APIRouter(prefix="/v1/model/record", tags=["models"])
 
 ModelConfigValidator = TypeAdapter(AnyModelConfig)
 
@@ -34,7 +34,7 @@ ModelsListValidator = TypeAdapter(ModelsList)
 
 @model_records_router.get(
     "/",
-    operation_id="list_model_configs",
+    operation_id="list_model_recordss",
     responses={200: {"model": ModelsList}},
 )
 async def list_model_records(

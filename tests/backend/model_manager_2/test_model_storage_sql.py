@@ -8,7 +8,12 @@ from hashlib import sha256
 import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL, UnknownModelException
+from invokeai.app.services.model_records import (
+    DuplicateModelException,
+    ModelRecordServiceBase,
+    ModelRecordServiceSQL,
+    UnknownModelException,
+)
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     BaseModelType,
@@ -32,8 +37,8 @@ def example_config() -> TextualInversionConfig:
     return TextualInversionConfig(
         path="/tmp/pokemon.bin",
         name="old name",
-        base_model="sd-1",
-        type="embedding",
+        base=BaseModelType("sd-1"),
+        type=ModelType("embedding"),
         format="embedding_file",
         original_hash="ABC123",
     )
@@ -43,7 +48,7 @@ def test_add(store: ModelRecordServiceBase):
     raw = dict(
         path="/tmp/foo.ckpt",
         name="model1",
-        base_model="sd-1",
+        base=BaseModelType("sd-1"),
         type="main",
         config="/tmp/foo.yaml",
         variant="normal",
@@ -53,16 +58,25 @@ def test_add(store: ModelRecordServiceBase):
     store.add_model("key1", raw)
     config1 = store.get_model("key1")
     assert config1 is not None
-    raw["name"] = "model2"
-    raw["base_model"] = "sd-2"
-    raw["format"] = "diffusers"
-    raw.pop("config")
-    store.add_model("key2", raw)
-    config2 = store.get_model("key2")
+    assert config1.base == BaseModelType("sd-1")
     assert config1.name == "model1"
-    assert config2.name == "model2"
-    assert config1.base_model == "sd-1"
-    assert config2.base_model == "sd-2"
+    assert config1.original_hash == "111222333444"
+    assert config1.current_hash is None
+
+
+def test_dup(store: ModelRecordServiceBase):
+    config = example_config()
+    store.add_model("key1", example_config())
+    try:
+        store.add_model("key1", config)
+        assert False, "Duplicate model key should have been caught"
+    except DuplicateModelException:
+        assert True
+    try:
+        store.add_model("key2", config)
+        assert False, "Duplicate model path should have been caught"
+    except DuplicateModelException:
+        assert True
 
 
 def test_update(store: ModelRecordServiceBase):
@@ -115,21 +129,21 @@ def test_filter(store: ModelRecordServiceBase):
     config1 = DiffusersConfig(
         path="/tmp/config1",
         name="config1",
-        base_model=BaseModelType("sd-1"),
+        base=BaseModelType("sd-1"),
         type=ModelType("main"),
         original_hash="CONFIG1HASH",
     )
     config2 = DiffusersConfig(
         path="/tmp/config2",
         name="config2",
-        base_model=BaseModelType("sd-1"),
+        base=BaseModelType("sd-1"),
         type=ModelType("main"),
         original_hash="CONFIG2HASH",
     )
     config3 = VaeDiffusersConfig(
         path="/tmp/config3",
         name="config3",
-        base_model=BaseModelType("sd-2"),
+        base=BaseModelType("sd-2"),
         type=ModelType("vae"),
         original_hash="CONFIG3HASH",
     )

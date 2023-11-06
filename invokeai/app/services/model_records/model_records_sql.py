@@ -27,7 +27,7 @@ Typical usage:
 
    # fetching config
    new_config = store.get_model('key1')
-   print(new_config.name, new_config.base_model)
+   print(new_config.name, new_config.base)
    assert new_config.key == 'key1'
 
   # deleting
@@ -100,11 +100,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             """--sql
             CREATE TABLE IF NOT EXISTS model_config (
                 id TEXT NOT NULL PRIMARY KEY,
-                -- These 4 fields are enums in python, unrestricted string here
-                base_model TEXT NOT NULL,
-                model_type TEXT NOT NULL,
-                model_name TEXT NOT NULL,
-                model_path TEXT NOT NULL,
+                -- The next 3 fields are enums in python, unrestricted string here
+                base TEXT NOT NULL,
+                type TEXT NOT NULL,
+                name TEXT NOT NULL,
+                path TEXT NOT NULL,
                 original_hash TEXT, -- could be null
                 -- Serialized JSON representation of the whole config object,
                 -- which will contain additional fields from subclasses
@@ -139,6 +139,15 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             """
         )
 
+        # Add indexes for searchable fields
+        for stmt in [
+            "CREATE INDEX IF NOT EXISTS base_index ON model_config(base);",
+            "CREATE INDEX IF NOT EXISTS type_index ON model_config(type);",
+            "CREATE INDEX IF NOT EXISTS name_index ON model_config(name);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS path_index ON model_config(path);",
+        ]:
+            self._cursor.execute(stmt)
+
         # Add our version to the metadata table
         self._cursor.execute(
             """--sql
@@ -169,10 +178,10 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     """--sql
                     INSERT INTO model_config (
                        id,
-                       base_model,
-                       model_type,
-                       model_name,
-                       model_path,
+                       base,
+                       type,
+                       name,
+                       path,
                        original_hash,
                        config
                       )
@@ -180,7 +189,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     """,
                     (
                         key,
-                        record.base_model,
+                        record.base,
                         record.type,
                         record.name,
                         record.path,
@@ -193,7 +202,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             except sqlite3.IntegrityError as e:
                 self._conn.rollback()
                 if "UNIQUE constraint failed" in str(e):
-                    raise DuplicateModelException(f"A model with key '{key}' is already installed") from e
+                    if "model_config.path" in str(e):
+                        msg = f"A model with path '{record.path}' is already installed"
+                    else:
+                        msg = f"A model with key '{key}' is already installed"
+                    raise DuplicateModelException(msg) from e
                 else:
                     raise e
             except sqlite3.Error as e:
@@ -257,14 +270,14 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._cursor.execute(
                     """--sql
                     UPDATE model_config
-                    SET base_model=?,
-                        model_type=?,
-                        model_name=?,
-                        model_path=?,
+                    SET base=?,
+                        type=?,
+                        name=?,
+                        path=?,
                         config=?
                     WHERE id=?;
                     """,
-                    (record.base_model, record.type, record.name, record.path, json_serialized, key),
+                    (record.base, record.type, record.name, record.path, json_serialized, key),
                 )
                 if self._cursor.rowcount == 0:
                     raise UnknownModelException("model not found")
@@ -338,13 +351,13 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         where_clause = []
         bindings = []
         if model_name:
-            where_clause.append("model_name=?")
+            where_clause.append("name=?")
             bindings.append(model_name)
         if base_model:
-            where_clause.append("base_model=?")
+            where_clause.append("base=?")
             bindings.append(base_model)
         if model_type:
-            where_clause.append("model_type=?")
+            where_clause.append("type=?")
             bindings.append(model_type)
         where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
         with self._lock:

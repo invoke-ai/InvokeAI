@@ -50,7 +50,7 @@ class Migrate:
             hash = FastModelHash.hash(self.config.models_path / stanza.path)
             new_key = sha1(model_key.encode("utf-8")).hexdigest()
 
-            stanza["base_model"] = BaseModelType(base_type)
+            stanza["base"] = BaseModelType(base_type)
             stanza["type"] = ModelType(model_type)
             stanza["name"] = model_name
             stanza["original_hash"] = hash
