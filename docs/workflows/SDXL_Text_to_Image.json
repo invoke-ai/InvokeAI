@@ -26,10 +26,6 @@
     {
       "nodeId": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
       "fieldName": "style"
-    },
-    {
-      "nodeId": "87ee6243-fb0d-4f77-ad5f-56591659339e",
-      "fieldName": "steps"
     }
   ],
   "meta": {
@@ -40,7 +36,6 @@
       "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
       "type": "invocation",
       "data": {
-        "version": "1.0.0",
         "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
         "type": "sdxl_compel_prompt",
         "inputs": {
@@ -135,10 +130,12 @@
         "isOpen": true,
         "notes": "",
         "embedWorkflow": false,
-        "isIntermediate": true
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
       },
       "width": 320,
-      "height": 764,
+      "height": 793,
       "position": {
         "x": 1275,
         "y": -350
@@ -148,7 +145,6 @@
       "id": "55705012-79b9-4aac-9f26-c0b10309785b",
       "type": "invocation",
       "data": {
-        "version": "1.0.0",
         "id": "55705012-79b9-4aac-9f26-c0b10309785b",
         "type": "noise",
         "inputs": {
@@ -209,7 +205,9 @@
         "isOpen": false,
         "notes": "",
         "embedWorkflow": false,
-        "isIntermediate": true
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
       },
       "width": 320,
       "height": 32,
@@ -219,82 +217,9 @@
       }
     },
     {
-      "id": "dbcd2f98-d809-48c8-bf64-2635f88a2fe9",
-      "type": "invocation",
-      "data": {
-        "version": "1.0.0",
-        "id": "dbcd2f98-d809-48c8-bf64-2635f88a2fe9",
-        "type": "l2i",
-        "inputs": {
-          "tiled": {
-            "id": "24f5bc7b-f6a1-425d-8ab1-f50b4db5d0df",
-            "name": "tiled",
-            "type": "boolean",
-            "fieldKind": "input",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "id": "b146d873-ffb9-4767-986a-5360504841a2",
-            "name": "fp32",
-            "type": "boolean",
-            "fieldKind": "input",
-            "label": "",
-            "value": true
-          },
-          "latents": {
-            "id": "65441abd-7713-4b00-9d8d-3771404002e8",
-            "name": "latents",
-            "type": "LatentsField",
-            "fieldKind": "input",
-            "label": ""
-          },
-          "vae": {
-            "id": "a478b833-6e13-4611-9a10-842c89603c74",
-            "name": "vae",
-            "type": "VaeField",
-            "fieldKind": "input",
-            "label": ""
-          }
-        },
-        "outputs": {
-          "image": {
-            "id": "c87ae925-f858-417a-8940-8708ba9b4b53",
-            "name": "image",
-            "type": "ImageField",
-            "fieldKind": "output"
-          },
-          "width": {
-            "id": "4bcb8512-b5a1-45f1-9e52-6e92849f9d6c",
-            "name": "width",
-            "type": "integer",
-            "fieldKind": "output"
-          },
-          "height": {
-            "id": "23e41c00-a354-48e8-8f59-5875679c27ab",
-            "name": "height",
-            "type": "integer",
-            "fieldKind": "output"
-          }
-        },
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "embedWorkflow": true,
-        "isIntermediate": false
-      },
-      "width": 320,
-      "height": 224,
-      "position": {
-        "x": 2025,
-        "y": -250
-      }
-    },
-    {
       "id": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
       "type": "invocation",
       "data": {
-        "version": "1.0.0",
         "id": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
         "type": "rand_int",
         "inputs": {
@@ -327,7 +252,9 @@
         "isOpen": false,
         "notes": "",
         "embedWorkflow": false,
-        "isIntermediate": true
+        "isIntermediate": true,
+        "useCache": false,
+        "version": "1.0.0"
       },
       "width": 320,
       "height": 32,
@@ -340,7 +267,6 @@
       "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
       "type": "invocation",
       "data": {
-        "version": "1.0.0",
         "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
         "type": "sdxl_model_loader",
         "inputs": {
@@ -351,7 +277,7 @@
             "fieldKind": "input",
             "label": "",
             "value": {
-              "model_name": "stable-diffusion-xl-base-1.0",
+              "model_name": "stable-diffusion-xl-base-1-0",
               "base_model": "sdxl",
               "model_type": "main"
             }
@@ -387,10 +313,12 @@
         "isOpen": true,
         "notes": "",
         "embedWorkflow": false,
-        "isIntermediate": true
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
       },
       "width": 320,
-      "height": 234,
+      "height": 258,
       "position": {
         "x": 475,
         "y": 25
@@ -400,7 +328,6 @@
       "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
       "type": "invocation",
       "data": {
-        "version": "1.0.0",
         "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
         "type": "sdxl_compel_prompt",
         "inputs": {
@@ -495,128 +422,77 @@
         "isOpen": true,
         "notes": "",
         "embedWorkflow": false,
-        "isIntermediate": true
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
       },
       "width": 320,
-      "height": 764,
+      "height": 793,
       "position": {
         "x": 900,
         "y": -350
       }
     },
     {
-      "id": "87ee6243-fb0d-4f77-ad5f-56591659339e",
+      "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
       "type": "invocation",
       "data": {
-        "version": "1.0.0",
-        "id": "87ee6243-fb0d-4f77-ad5f-56591659339e",
-        "type": "denoise_latents",
+        "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
+        "type": "l2i",
         "inputs": {
-          "noise": {
-            "id": "4884a4b7-cc19-4fea-83c7-1f940e6edd24",
-            "name": "noise",
-            "type": "LatentsField",
-            "fieldKind": "input",
-            "label": ""
-          },
-          "steps": {
-            "id": "4c61675c-b6b9-41ac-b187-b5c13b587039",
-            "name": "steps",
-            "type": "integer",
-            "fieldKind": "input",
-            "label": "",
-            "value": 36
-          },
-          "cfg_scale": {
-            "id": "f8213f35-4637-4a1a-83f4-1f8cfb9ccd2c",
-            "name": "cfg_scale",
-            "type": "float",
-            "fieldKind": "input",
-            "label": "",
-            "value": 7.5
-          },
-          "denoising_start": {
-            "id": "01e2f30d-0acd-4e21-98b9-a9b8e24c6db2",
-            "name": "denoising_start",
-            "type": "float",
-            "fieldKind": "input",
-            "label": "",
-            "value": 0
-          },
-          "denoising_end": {
-            "id": "3db95479-a73b-4c75-9b44-08daec16b224",
-            "name": "denoising_end",
-            "type": "float",
-            "fieldKind": "input",
-            "label": "",
-            "value": 1
-          },
-          "scheduler": {
-            "id": "db8430a9-64c3-4c54-ae38-9f597cf7b6d5",
-            "name": "scheduler",
-            "type": "Scheduler",
-            "fieldKind": "input",
-            "label": "",
-            "value": "euler"
-          },
-          "control": {
-            "id": "599b49e8-6435-4576-be41-a5155f3a17e3",
-            "name": "control",
-            "type": "ControlField",
+          "metadata": {
+            "id": "88971324-3fdb-442d-b8b7-7612478a8622",
+            "name": "metadata",
+            "type": "MetadataField",
             "fieldKind": "input",
             "label": ""
           },
           "latents": {
-            "id": "226f9e91-454e-4159-9fa6-019c0cf29277",
+            "id": "da0e40cb-c49f-4fa5-9856-338b91a65f6b",
             "name": "latents",
             "type": "LatentsField",
             "fieldKind": "input",
             "label": ""
           },
-          "denoise_mask": {
-            "id": "de019cb6-7fb5-45bf-a266-22e20889893f",
-            "name": "denoise_mask",
-            "type": "DenoiseMaskField",
+          "vae": {
+            "id": "ae5164ce-1710-4ec5-a83a-6113a0d1b5c0",
+            "name": "vae",
+            "type": "VaeField",
             "fieldKind": "input",
             "label": ""
           },
-          "positive_conditioning": {
-            "id": "02fc400a-110d-470e-8411-f404f966a949",
-            "name": "positive_conditioning",
-            "type": "ConditioningField",
+          "tiled": {
+            "id": "2ccfd535-1a7b-4ecf-84db-9430a64fb3d7",
+            "name": "tiled",
+            "type": "boolean",
             "fieldKind": "input",
-            "label": ""
+            "label": "",
+            "value": false
           },
-          "negative_conditioning": {
-            "id": "4bd3bdfa-fcf4-42be-8e47-1e314255798f",
-            "name": "negative_conditioning",
-            "type": "ConditioningField",
+          "fp32": {
+            "id": "64f07d5a-54a2-429c-8c5b-0c2a3a8e5cd5",
+            "name": "fp32",
+            "type": "boolean",
             "fieldKind": "input",
-            "label": ""
-          },
-          "unet": {
-            "id": "7c2d58a8-b5f1-4e63-8ffd-8ada52c35832",
-            "name": "unet",
-            "type": "UNetField",
-            "fieldKind": "input",
-            "label": ""
+            "label": "",
+            "value": false
           }
         },
         "outputs": {
-          "latents": {
-            "id": "6a6fa492-de26-4e95-b1d9-a322fe37eb13",
-            "name": "latents",
-            "type": "LatentsField",
+          "image": {
+            "id": "9b281eaa-6504-407d-a5ca-1e5e8020a4bf",
+            "name": "image",
+            "type": "ImageField",
             "fieldKind": "output"
           },
           "width": {
-            "id": "a9790729-7d6c-4418-903d-4da961fccf56",
+            "id": "98e545f3-b53b-490d-b94d-bed9418ccc75",
             "name": "width",
             "type": "integer",
             "fieldKind": "output"
           },
           "height": {
-            "id": "fa74efe5-7330-4a3c-b256-c82a544585b4",
+            "id": "4a74bd43-d7f7-4c7f-bb3b-d09bb2992c46",
             "name": "height",
             "type": "integer",
             "fieldKind": "output"
@@ -626,13 +502,161 @@
         "isOpen": true,
         "notes": "",
         "embedWorkflow": false,
-        "isIntermediate": true
+        "isIntermediate": false,
+        "useCache": true,
+        "version": "1.0.0"
       },
       "width": 320,
-      "height": 558,
+      "height": 267,
       "position": {
-        "x": 1650,
-        "y": -250
+        "x": 2112.5626808057173,
+        "y": -174.24042139280238
+      }
+    },
+    {
+      "id": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "type": "invocation",
+      "data": {
+        "id": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+        "type": "denoise_latents",
+        "inputs": {
+          "positive_conditioning": {
+            "id": "29b73dfa-a06e-4b4a-a844-515b9eb93a81",
+            "name": "positive_conditioning",
+            "type": "ConditioningField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "negative_conditioning": {
+            "id": "a81e6f5b-f4de-4919-b483-b6e2f067465a",
+            "name": "negative_conditioning",
+            "type": "ConditioningField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "noise": {
+            "id": "4ba06bb7-eb45-4fb9-9984-31001b545587",
+            "name": "noise",
+            "type": "LatentsField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "steps": {
+            "id": "36ee8a45-ca69-44bc-9bc3-aa881e6045c0",
+            "name": "steps",
+            "type": "integer",
+            "fieldKind": "input",
+            "label": "",
+            "value": 10
+          },
+          "cfg_scale": {
+            "id": "2a2024e0-a736-46ec-933c-c1c1ebe96943",
+            "name": "cfg_scale",
+            "type": "FloatPolymorphic",
+            "fieldKind": "input",
+            "label": "",
+            "value": 7.5
+          },
+          "denoising_start": {
+            "id": "be219d5e-41b7-430a-8fb5-bc21a31ad219",
+            "name": "denoising_start",
+            "type": "float",
+            "fieldKind": "input",
+            "label": "",
+            "value": 0
+          },
+          "denoising_end": {
+            "id": "3adfb7ae-c9f7-4a40-b6e0-4c2050bd1a99",
+            "name": "denoising_end",
+            "type": "float",
+            "fieldKind": "input",
+            "label": "",
+            "value": 1
+          },
+          "scheduler": {
+            "id": "14423e0d-7215-4ee0-b065-f9e95eaa8d7d",
+            "name": "scheduler",
+            "type": "Scheduler",
+            "fieldKind": "input",
+            "label": "",
+            "value": "euler"
+          },
+          "unet": {
+            "id": "e73bbf98-6489-492b-b83c-faed215febac",
+            "name": "unet",
+            "type": "UNetField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "control": {
+            "id": "dab351b3-0c86-4ea5-9782-4e8edbfb0607",
+            "name": "control",
+            "type": "ControlPolymorphic",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "ip_adapter": {
+            "id": "192daea0-a90a-43cc-a2ee-0114a8e90318",
+            "name": "ip_adapter",
+            "type": "IPAdapterPolymorphic",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "t2i_adapter": {
+            "id": "ee386a55-d4c7-48c1-ac57-7bc4e3aada7a",
+            "name": "t2i_adapter",
+            "type": "T2IAdapterPolymorphic",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "latents": {
+            "id": "3a922c6a-3d8c-4c9e-b3ec-2f4d81cda077",
+            "name": "latents",
+            "type": "LatentsField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "denoise_mask": {
+            "id": "cd7ce032-835f-495f-8b45-d57272f33132",
+            "name": "denoise_mask",
+            "type": "DenoiseMaskField",
+            "fieldKind": "input",
+            "label": ""
+          }
+        },
+        "outputs": {
+          "latents": {
+            "id": "6260b84f-8361-470a-98d8-5b22a45c2d8c",
+            "name": "latents",
+            "type": "LatentsField",
+            "fieldKind": "output"
+          },
+          "width": {
+            "id": "aede0ecf-25b6-46be-aa30-b77f79715deb",
+            "name": "width",
+            "type": "integer",
+            "fieldKind": "output"
+          },
+          "height": {
+            "id": "519abf62-d475-48ef-ab8f-66136bc0e499",
+            "name": "height",
+            "type": "integer",
+            "fieldKind": "output"
+          }
+        },
+        "label": "",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.4.0"
+      },
+      "width": 320,
+      "height": 646,
+      "position": {
+        "x": 1642.955772577545,
+        "y": -230.2485847594651
       }
     }
   ],
@@ -686,49 +710,41 @@
     {
       "source": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
       "sourceHandle": "vae",
-      "target": "dbcd2f98-d809-48c8-bf64-2635f88a2fe9",
+      "target": "63e91020-83b2-4f35-b174-ad9692aabb48",
       "targetHandle": "vae",
-      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22vae-dbcd2f98-d809-48c8-bf64-2635f88a2fe9vae",
-      "type": "default"
-    },
-    {
-      "source": "87ee6243-fb0d-4f77-ad5f-56591659339e",
-      "sourceHandle": "latents",
-      "target": "dbcd2f98-d809-48c8-bf64-2635f88a2fe9",
-      "targetHandle": "latents",
-      "id": "reactflow__edge-87ee6243-fb0d-4f77-ad5f-56591659339elatents-dbcd2f98-d809-48c8-bf64-2635f88a2fe9latents",
-      "type": "default"
-    },
-    {
-      "source": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
-      "sourceHandle": "conditioning",
-      "target": "87ee6243-fb0d-4f77-ad5f-56591659339e",
-      "targetHandle": "positive_conditioning",
-      "id": "reactflow__edge-faf965a4-7530-427b-b1f3-4ba6505c2a08conditioning-87ee6243-fb0d-4f77-ad5f-56591659339epositive_conditioning",
-      "type": "default"
-    },
-    {
-      "source": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
-      "sourceHandle": "conditioning",
-      "target": "87ee6243-fb0d-4f77-ad5f-56591659339e",
-      "targetHandle": "negative_conditioning",
-      "id": "reactflow__edge-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204conditioning-87ee6243-fb0d-4f77-ad5f-56591659339enegative_conditioning",
+      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22vae-63e91020-83b2-4f35-b174-ad9692aabb48vae",
       "type": "default"
     },
     {
       "source": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
       "sourceHandle": "unet",
-      "target": "87ee6243-fb0d-4f77-ad5f-56591659339e",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
       "targetHandle": "unet",
-      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22unet-87ee6243-fb0d-4f77-ad5f-56591659339eunet",
+      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22unet-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbunet",
+      "type": "default"
+    },
+    {
+      "source": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "sourceHandle": "conditioning",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "targetHandle": "positive_conditioning",
+      "id": "reactflow__edge-faf965a4-7530-427b-b1f3-4ba6505c2a08conditioning-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbpositive_conditioning",
+      "type": "default"
+    },
+    {
+      "source": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "sourceHandle": "conditioning",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "targetHandle": "negative_conditioning",
+      "id": "reactflow__edge-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204conditioning-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbnegative_conditioning",
       "type": "default"
     },
     {
       "source": "55705012-79b9-4aac-9f26-c0b10309785b",
       "sourceHandle": "noise",
-      "target": "87ee6243-fb0d-4f77-ad5f-56591659339e",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
       "targetHandle": "noise",
-      "id": "reactflow__edge-55705012-79b9-4aac-9f26-c0b10309785bnoise-87ee6243-fb0d-4f77-ad5f-56591659339enoise",
+      "id": "reactflow__edge-55705012-79b9-4aac-9f26-c0b10309785bnoise-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbnoise",
       "type": "default"
     }
   ]

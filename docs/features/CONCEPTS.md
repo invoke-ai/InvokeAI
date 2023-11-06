@@ -28,8 +28,9 @@ by placing them in the designated directory for the compatible model type
 
 ### An Example
 
-Here are a few examples to illustrate how it works. All these images were
-generated using the command-line client and the Stable Diffusion 1.5 model:
+Here are a few examples to illustrate how it works. All these images
+were generated using the legacy command-line client and the Stable
+Diffusion 1.5 model:
 
 |         Japanese gardener          | Japanese gardener &lt;ghibli-face&gt; | Japanese gardener &lt;hoi4-leaders&gt; | Japanese gardener &lt;cartoona-animals&gt; |
 | :--------------------------------: | :-----------------------------------: | :------------------------------------: | :----------------------------------------: |

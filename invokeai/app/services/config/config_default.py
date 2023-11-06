@@ -45,6 +45,7 @@ InvokeAI:
     ram: 13.5
     vram: 0.25
     lazy_offload: true
+    log_memory_usage: false
   Device:
     device: auto
     precision: auto
@@ -243,6 +244,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     db_dir              : Optional[Path] = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
     outdir              : Optional[Path] = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', json_schema_extra=Categories.Paths)
+    custom_nodes_dir    : Path = Field(default=Path('nodes'), description='Path to directory for custom nodes', json_schema_extra=Categories.Paths)
     from_file           : Optional[Path] = Field(default=None, description='Take command input from the indicated file (command-line client only)', json_schema_extra=Categories.Paths)
 
     # LOGGING
@@ -260,6 +262,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     ram                 : float = Field(default=7.5, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
     vram                : float = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", json_schema_extra=Categories.ModelCache, )
+    log_memory_usage    : bool = Field(default=False, description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.", json_schema_extra=Categories.ModelCache)
 
     # DEVICE
     device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Generation device", json_schema_extra=Categories.Device)
@@ -409,6 +412,13 @@ class InvokeAIAppConfig(InvokeAISettings):
         Path to the models directory
         """
         return self._resolve(self.models_dir)
+
+    @property
+    def custom_nodes_path(self) -> Path:
+        """
+        Path to the custom nodes directory
+        """
+        return self._resolve(self.custom_nodes_dir)
 
     # the following methods support legacy calls leftover from the Globals era
     @property

@@ -1,20 +1,15 @@
 import { EntityState, Update } from '@reduxjs/toolkit';
-import { fetchBaseQuery } from '@reduxjs/toolkit/dist/query';
 import { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
+import { logger } from 'app/logging/logger';
 import {
   ASSETS_CATEGORIES,
   BoardId,
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
-import {
-  ImageMetadataAndWorkflow,
-  zCoreMetadata,
-} from 'features/nodes/types/types';
-import { getMetadataAndWorkflowFromImageBlob } from 'features/nodes/util/getMetadataAndWorkflowFromImageBlob';
+import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/types';
 import { keyBy } from 'lodash-es';
 import { ApiTagDescription, LIST_TAG, api } from '..';
-import { $authToken, $projectId } from '../client';
 import { components, paths } from '../schema';
 import {
   DeleteBoardResult,
@@ -23,7 +18,6 @@ import {
   ListImagesArgs,
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
-  UnsafeImageMetadata,
 } from '../types';
 import {
   getCategories,
@@ -100,14 +94,12 @@ export const imagesApi = api.injectEndpoints({
       keepUnusedDataFor: 86400,
     }),
     getIntermediatesCount: build.query<number, void>({
-      query: () => ({ url: getListImagesUrl({ is_intermediate: true }) }),
+      query: () => ({ url: 'images/intermediates' }),
       providesTags: ['IntermediatesCount'],
-      transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        // TODO: This is storing a primitive value in the cache. `immer` cannot track state changes, so
-        // attempts to use manual cache updates on this value will fail. This should be changed into an
-        // object.
-        return response.total;
-      },
+    }),
+    clearIntermediates: build.mutation<number, void>({
+      query: () => ({ url: `images/intermediates`, method: 'DELETE' }),
+      invalidatesTags: ['IntermediatesCount'],
     }),
     getImageDTO: build.query<ImageDTO, string>({
       query: (image_name) => ({ url: `images/i/${image_name}` }),
@@ -116,78 +108,25 @@ export const imagesApi = api.injectEndpoints({
       ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    getImageMetadata: build.query<UnsafeImageMetadata, string>({
+    getImageMetadata: build.query<CoreMetadata | undefined, string>({
       query: (image_name) => ({ url: `images/i/${image_name}/metadata` }),
       providesTags: (result, error, image_name) => [
         { type: 'ImageMetadata', id: image_name },
       ],
-      keepUnusedDataFor: 86400, // 24 hours
-    }),
-    getImageMetadataFromFile: build.query<
-      ImageMetadataAndWorkflow,
-      { image: ImageDTO; shouldFetchMetadataFromApi: boolean }
-    >({
-      queryFn: async (
-        args: { image: ImageDTO; shouldFetchMetadataFromApi: boolean },
-        api,
-        extraOptions,
-        fetchWithBaseQuery
+      transformResponse: (
+        response: paths['/api/v1/images/i/{image_name}/metadata']['get']['responses']['200']['content']['application/json']
       ) => {
-        if (args.shouldFetchMetadataFromApi) {
-          let metadata;
-          const metadataResponse = await fetchWithBaseQuery(
-            `images/i/${args.image.image_name}/metadata`
-          );
-          if (metadataResponse.data) {
-            const metadataResult = zCoreMetadata.safeParse(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (metadataResponse.data as any)?.metadata
-            );
-            if (metadataResult.success) {
-              metadata = metadataResult.data;
-            }
+        if (response) {
+          const result = zCoreMetadata.safeParse(response);
+          if (result.success) {
+            return result.data;
+          } else {
+            logger('images').warn('Problem parsing metadata');
           }
-          return { data: { metadata } };
-        } else {
-          const authToken = $authToken.get();
-          const projectId = $projectId.get();
-          const customBaseQuery = fetchBaseQuery({
-            baseUrl: '',
-            prepareHeaders: (headers) => {
-              if (authToken) {
-                headers.set('Authorization', `Bearer ${authToken}`);
-              }
-              if (projectId) {
-                headers.set('project-id', projectId);
-              }
-
-              return headers;
-            },
-            responseHandler: async (res) => {
-              return await res.blob();
-            },
-          });
-
-          const response = await customBaseQuery(
-            args.image.image_url,
-            api,
-            extraOptions
-          );
-          const data = await getMetadataAndWorkflowFromImageBlob(
-            response.data as Blob
-          );
-
-          return { data };
         }
+        return;
       },
-      providesTags: (result, error, { image }) => [
-        { type: 'ImageMetadataFromFile', id: image.image_name },
-      ],
       keepUnusedDataFor: 86400, // 24 hours
-    }),
-    clearIntermediates: build.mutation<number, void>({
-      query: () => ({ url: `images/clear-intermediates`, method: 'POST' }),
-      invalidatesTags: ['IntermediatesCount'],
     }),
     deleteImage: build.mutation<void, ImageDTO>({
       query: ({ image_name }) => ({
@@ -1635,6 +1574,5 @@ export const {
   useDeleteBoardMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
-  useGetImageMetadataFromFileQuery,
   useBulkDownloadImagesMutation,
 } = imagesApi;

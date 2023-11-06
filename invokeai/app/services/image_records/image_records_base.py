@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
 
+from invokeai.app.invocations.metadata import MetadataField
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 from .image_records_common import ImageCategory, ImageRecord, ImageRecordChanges, ResourceOrigin
@@ -18,7 +19,7 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_metadata(self, image_name: str) -> Optional[dict]:
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """Gets an image's metadata'."""
         pass
 
@@ -62,6 +63,11 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def get_intermediates_count(self) -> int:
+        """Gets a count of all intermediate images."""
+        pass
+
+    @abstractmethod
     def save(
         self,
         image_name: str,
@@ -73,7 +79,7 @@ class ImageRecordStorageBase(ABC):
         starred: Optional[bool] = False,
         session_id: Optional[str] = None,
         node_id: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        metadata: Optional[MetadataField] = None,
     ) -> datetime:
         """Saves an image record."""
         pass

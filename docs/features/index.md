@@ -28,7 +28,7 @@ Learn how to install and use ControlNet models for fine control over
 image output.
 
 ### * [Image-to-Image Guide](IMG2IMG.md)
-Use a seed image to build new creations in the CLI.
+Use a seed image to build new creations.
 
 ## Model Management
 

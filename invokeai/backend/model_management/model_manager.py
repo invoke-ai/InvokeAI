@@ -351,6 +351,7 @@ class ModelManager(object):
             precision=precision,
             sequential_offload=sequential_offload,
             logger=logger,
+            log_memory_usage=self.app_config.log_memory_usage,
         )
 
         self._read_models(config)
@@ -1011,6 +1012,8 @@ class ModelManager(object):
                                 self.logger.warning(f"Not a valid model: {model_path}. {e}")
                             except NotImplementedError as e:
                                 self.logger.warning(e)
+                            except Exception as e:
+                                self.logger.warning(f"Error loading model {model_path}. {e}")
 
         imported_models = self.scan_autoimport_directory()
         if (new_models_found or imported_models) and self.config_path:

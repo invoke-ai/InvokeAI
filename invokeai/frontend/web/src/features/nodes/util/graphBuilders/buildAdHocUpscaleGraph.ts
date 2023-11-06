@@ -1,12 +1,13 @@
+import { BoardId } from 'features/gallery/store/types';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { ESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import {
-  Graph,
   ESRGANInvocation,
+  Graph,
   SaveImageInvocation,
 } from 'services/api/types';
 import { REALESRGAN as ESRGAN, SAVE_IMAGE } from './constants';
-import { BoardId } from 'features/gallery/store/types';
+import { addCoreMetadataNode, upsertMetadata } from './metadata';
 
 type Arg = {
   image_name: string;
@@ -54,6 +55,11 @@ export const buildAdHocUpscaleGraph = ({
       },
     ],
   };
+
+  addCoreMetadataNode(graph, {});
+  upsertMetadata(graph, {
+    esrgan_model: esrganModelName,
+  });
 
   return graph;
 };

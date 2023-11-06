@@ -2,7 +2,7 @@
 
 ## Builder stage
 
-FROM library/ubuntu:22.04 AS builder
+FROM library/ubuntu:23.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && apt-get install -y \
         git \
-        python3.10-venv \
+        python3-venv \
         python3-pip \
         build-essential
 
@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.4.2"; \
     else \
-        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu118"; \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu121"; \
     fi &&\
     pip install $extra_index_url_arg \
         torch==$TORCH_VERSION \
@@ -70,7 +70,7 @@ RUN --mount=type=cache,target=/usr/lib/node_modules \
 
 #### Runtime stage ---------------------------------------
 
-FROM library/ubuntu:22.04 AS runtime
+FROM library/ubuntu:23.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -85,6 +85,7 @@ RUN apt update && apt install -y --no-install-recommends \
         iotop \
         bzip2 \
         gosu \
+        magic-wormhole \
         libglib2.0-0 \
         libgl1-mesa-glx \
         python3-venv \
@@ -94,10 +95,6 @@ RUN apt update && apt install -y --no-install-recommends \
         libstdc++-10-dev &&\
     apt-get clean && apt-get autoclean
 
-# globally add magic-wormhole
-# for ease of transferring data to and from the container
-# when running in sandboxed cloud environments; e.g. Runpod etc.
-RUN pip install magic-wormhole
 
 ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv/invokeai
@@ -120,9 +117,7 @@ WORKDIR ${INVOKEAI_SRC}
 RUN cd /usr/lib/$(uname -p)-linux-gnu/pkgconfig/ && ln -sf opencv4.pc opencv.pc
 RUN python3 -c "from patchmatch import patch_match"
 
-# Create unprivileged user and make the local dir
-RUN useradd --create-home --shell /bin/bash -u 1000 --comment "container local user" invoke
-RUN mkdir -p ${INVOKEAI_ROOT} && chown -R invoke:invoke ${INVOKEAI_ROOT}
+RUN mkdir -p ${INVOKEAI_ROOT} && chown -R 1000:1000 ${INVOKEAI_ROOT}
 
 COPY docker/docker-entrypoint.sh ./
 ENTRYPOINT ["/opt/invokeai/docker-entrypoint.sh"]

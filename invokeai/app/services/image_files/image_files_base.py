@@ -4,6 +4,8 @@ from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
+from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
+
 
 class ImageFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
@@ -30,8 +32,8 @@ class ImageFileStorageBase(ABC):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[dict] = None,
-        workflow: Optional[str] = None,
+        metadata: Optional[MetadataField] = None,
+        workflow: Optional[WorkflowField] = None,
         thumbnail_size: int = 256,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
