@@ -37,7 +37,12 @@ const useColorPicker = () => {
           1
         ).data;
 
-      if (!(a && r && g && b)) {
+      if (
+        r === undefined ||
+        g === undefined ||
+        b === undefined ||
+        a === undefined
+      ) {
         return;
       }
 

@@ -75,7 +75,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
           obtaining an access token for downloading. It will then download and install the
           weights files for you.
 
-          Please look [here](../INSTALL_MANUAL.md) for a manual process for doing the
+          Please look [here](../020_INSTALL_MANUAL.md) for a manual process for doing the
           same thing.
 
 8. Start generating images!
@@ -108,7 +108,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
         To use an alternative model you may invoke the `!switch` command in
         the CLI, or pass `--model <model_name>` during `invoke.py` launch for
         either the CLI or the Web UI. See [Command Line
-        Client](../../features/CLI.md#model-selection-and-importation). The
+        Client](../../deprecated/CLI.md#model-selection-and-importation). The
         model names are defined in `configs/models.yaml`.
 
 9. Subsequently, to relaunch the script, first activate the Anaconda

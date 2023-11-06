@@ -27,7 +27,7 @@ import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -38,10 +38,9 @@ import {
   FaSeedling,
 } from 'react-icons/fa';
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
-import {
-  useGetImageDTOQuery,
-  useGetImageMetadataFromFileQuery,
-} from 'services/api/endpoints/images';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { menuListMotionProps } from 'theme/components/menu';
 import { sentImageToImg2Img } from '../../store/actions';
 import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
@@ -89,7 +88,6 @@ const CurrentImageButtons = () => {
     shouldShowImageDetails,
     lastSelectedImage,
     shouldShowProgressInViewer,
-    shouldFetchMetadataFromApi,
   } = useAppSelector(currentImageButtonsSelector);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
@@ -104,23 +102,12 @@ const CurrentImageButtons = () => {
     lastSelectedImage?.image_name ?? skipToken
   );
 
-  const getMetadataArg = useMemo(() => {
-    if (lastSelectedImage) {
-      return { image: lastSelectedImage, shouldFetchMetadataFromApi };
-    } else {
-      return skipToken;
-    }
-  }, [lastSelectedImage, shouldFetchMetadataFromApi]);
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
+    lastSelectedImage?.image_name
+  );
 
-  const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    getMetadataArg,
-    {
-      selectFromResult: (res) => ({
-        isLoading: res.isFetching,
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
+  const { workflow, isLoading: isLoadingWorkflow } = useDebouncedWorkflow(
+    lastSelectedImage?.workflow_id
   );
 
   const handleLoadWorkflow = useCallback(() => {
@@ -257,7 +244,7 @@ const CurrentImageButtons = () => {
 
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
-            isLoading={isLoading}
+            isLoading={isLoadingWorkflow}
             icon={<FaCircleNodes />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
@@ -265,7 +252,7 @@ const CurrentImageButtons = () => {
             onClick={handleLoadWorkflow}
           />
           <IAIIconButton
-            isLoading={isLoading}
+            isLoading={isLoadingMetadata}
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
@@ -273,7 +260,7 @@ const CurrentImageButtons = () => {
             onClick={handleUsePrompt}
           />
           <IAIIconButton
-            isLoading={isLoading}
+            isLoading={isLoadingMetadata}
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
@@ -281,7 +268,7 @@ const CurrentImageButtons = () => {
             onClick={handleUseSeed}
           />
           <IAIIconButton
-            isLoading={isLoading}
+            isLoading={isLoadingMetadata}
             icon={<FaAsterisk />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}

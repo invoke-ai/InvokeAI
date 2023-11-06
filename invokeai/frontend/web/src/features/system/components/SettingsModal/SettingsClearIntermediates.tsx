@@ -1,7 +1,7 @@
 import { Heading, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import IAIButton from '../../../../common/components/IAIButton';
@@ -17,8 +17,12 @@ export default function SettingsClearIntermediates() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const { data: intermediatesCount, refetch: updateIntermediatesCount } =
-    useGetIntermediatesCountQuery();
+  const { data: intermediatesCount } = useGetIntermediatesCountQuery(
+    undefined,
+    {
+      refetchOnMountOrArgChange: true,
+    }
+  );
 
   const [clearIntermediates, { isLoading: isLoadingClearIntermediates }] =
     useClearIntermediatesMutation();
@@ -54,11 +58,6 @@ export default function SettingsClearIntermediates() {
         );
       });
   }, [t, clearIntermediates, dispatch, hasPendingItems]);
-
-  useEffect(() => {
-    // update the count on mount
-    updateIntermediatesCount();
-  }, [updateIntermediatesCount]);
 
   return (
     <StyledFlex>

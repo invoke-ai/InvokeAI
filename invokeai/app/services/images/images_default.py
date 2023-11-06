@@ -2,10 +2,9 @@ from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.metadata import ImageMetadata
+from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.util.metadata import get_metadata_graph_from_raw_session
 
 from ..image_files.image_files_common import (
     ImageFileDeleteException,
@@ -42,8 +41,8 @@ class ImageService(ImageServiceABC):
         session_id: Optional[str] = None,
         board_id: Optional[str] = None,
         is_intermediate: Optional[bool] = False,
-        metadata: Optional[dict] = None,
-        workflow: Optional[str] = None,
+        metadata: Optional[MetadataField] = None,
+        workflow: Optional[WorkflowField] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -56,6 +55,12 @@ class ImageService(ImageServiceABC):
         (width, height) = image.size
 
         try:
+            if workflow is not None:
+                created_workflow = self.__invoker.services.workflow_records.create(workflow)
+                workflow_id = created_workflow.model_dump()["id"]
+            else:
+                workflow_id = None
+
             # TODO: Consider using a transaction here to ensure consistency between storage and database
             self.__invoker.services.image_records.save(
                 # Non-nullable fields
@@ -73,6 +78,8 @@ class ImageService(ImageServiceABC):
             )
             if board_id is not None:
                 self.__invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
+            if workflow_id is not None:
+                self.__invoker.services.workflow_image_records.create(workflow_id=workflow_id, image_name=image_name)
             self.__invoker.services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, workflow=workflow
             )
@@ -132,10 +139,11 @@ class ImageService(ImageServiceABC):
             image_record = self.__invoker.services.image_records.get(image_name)
 
             image_dto = image_record_to_dto(
-                image_record,
-                self.__invoker.services.urls.get_image_url(image_name),
-                self.__invoker.services.urls.get_image_url(image_name, True),
-                self.__invoker.services.board_image_records.get_board_for_image(image_name),
+                image_record=image_record,
+                image_url=self.__invoker.services.urls.get_image_url(image_name),
+                thumbnail_url=self.__invoker.services.urls.get_image_url(image_name, True),
+                board_id=self.__invoker.services.board_image_records.get_board_for_image(image_name),
+                workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(image_name),
             )
 
             return image_dto
@@ -146,25 +154,22 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image DTO")
             raise e
 
-    def get_metadata(self, image_name: str) -> ImageMetadata:
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         try:
-            image_record = self.__invoker.services.image_records.get(image_name)
-            metadata = self.__invoker.services.image_records.get_metadata(image_name)
+            return self.__invoker.services.image_records.get_metadata(image_name)
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.error("Image record not found")
+            raise
+        except Exception as e:
+            self.__invoker.services.logger.error("Problem getting image DTO")
+            raise e
 
-            if not image_record.session_id:
-                return ImageMetadata(metadata=metadata)
-
-            session_raw = self.__invoker.services.graph_execution_manager.get_raw(image_record.session_id)
-            graph = None
-
-            if session_raw:
-                try:
-                    graph = get_metadata_graph_from_raw_session(session_raw)
-                except Exception as e:
-                    self.__invoker.services.logger.warn(f"Failed to parse session graph: {e}")
-                    graph = None
-
-            return ImageMetadata(graph=graph, metadata=metadata)
+    def get_workflow(self, image_name: str) -> Optional[WorkflowField]:
+        try:
+            workflow_id = self.__invoker.services.workflow_image_records.get_workflow_for_image(image_name)
+            if workflow_id is None:
+                return None
+            return self.__invoker.services.workflow_records.get(workflow_id)
         except ImageRecordNotFoundException:
             self.__invoker.services.logger.error("Image record not found")
             raise
@@ -215,10 +220,11 @@ class ImageService(ImageServiceABC):
             image_dtos = list(
                 map(
                     lambda r: image_record_to_dto(
-                        r,
-                        self.__invoker.services.urls.get_image_url(r.image_name),
-                        self.__invoker.services.urls.get_image_url(r.image_name, True),
-                        self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
+                        image_record=r,
+                        image_url=self.__invoker.services.urls.get_image_url(r.image_name),
+                        thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
+                        board_id=self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
+                        workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(r.image_name),
                     ),
                     results.items,
                 )
@@ -283,4 +289,11 @@ class ImageService(ImageServiceABC):
             raise
         except Exception as e:
             self.__invoker.services.logger.error("Problem deleting image records and files")
+            raise e
+
+    def get_intermediates_count(self) -> int:
+        try:
+            return self.__invoker.services.image_records.get_intermediates_count()
+        except Exception as e:
+            self.__invoker.services.logger.error("Problem getting intermediates count")
             raise e

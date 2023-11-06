@@ -1,5 +1,4 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
-import json
 from pathlib import Path
 from queue import Queue
 from typing import Dict, Optional, Union
@@ -8,6 +7,7 @@ from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
+from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
@@ -55,8 +55,8 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[dict] = None,
-        workflow: Optional[str] = None,
+        metadata: Optional[MetadataField] = None,
+        workflow: Optional[WorkflowField] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
@@ -65,20 +65,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             pnginfo = PngImagePlugin.PngInfo()
 
-            if metadata is not None or workflow is not None:
-                if metadata is not None:
-                    pnginfo.add_text("invokeai_metadata", json.dumps(metadata))
-                if workflow is not None:
-                    pnginfo.add_text("invokeai_workflow", workflow)
-            else:
-                # For uploaded images, we want to retain metadata. PIL strips it on save; manually add it back
-                # TODO: retain non-invokeai metadata on save...
-                original_metadata = image.info.get("invokeai_metadata", None)
-                if original_metadata is not None:
-                    pnginfo.add_text("invokeai_metadata", original_metadata)
-                original_workflow = image.info.get("invokeai_workflow", None)
-                if original_workflow is not None:
-                    pnginfo.add_text("invokeai_workflow", original_workflow)
+            if metadata is not None:
+                pnginfo.add_text("invokeai_metadata", metadata.model_dump_json())
+            if workflow is not None:
+                pnginfo.add_text("invokeai_workflow", workflow.model_dump_json())
 
             image.save(
                 image_path,
