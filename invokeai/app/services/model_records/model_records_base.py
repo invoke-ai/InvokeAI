@@ -5,7 +5,7 @@ Abstract base class for storing and retrieving model configuration records.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Union
 
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelConfigBase, ModelType
 
