@@ -109,8 +109,8 @@ dependencies = [
   "pytest-datadir",
 ]
 "xformers" = [
-  "xformers~=0.0.19; sys_platform!='darwin'",
-  "triton; sys_platform=='linux'",
+  "xformers==0.0.21; sys_platform!='darwin'",
+	"triton; sys_platform=='linux'",
 ]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
