@@ -21,7 +21,6 @@ from .baseinvocation import (
 # from invokeai.app.invocations.shared import FreeUConfig
 
 
-
 class FreeUConfig(BaseModel):
     """
     Configuration for the FreeU hyperparameters.
@@ -33,6 +32,7 @@ class FreeUConfig(BaseModel):
     s2: float = Field(ge=-1, le=3, description=FieldDescriptions.freeu_s2)
     b1: float = Field(ge=-1, le=3, description=FieldDescriptions.freeu_b1)
     b2: float = Field(ge=-1, le=3, description=FieldDescriptions.freeu_b2)
+
 
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load submodel")
