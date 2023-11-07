@@ -3,9 +3,6 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# TODO: Permanent fix for this
-# from invokeai.app.invocations.shared import FreeUConfig
-
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
 from .baseinvocation import (
     BaseInvocation,
@@ -19,6 +16,10 @@ from .baseinvocation import (
     invocation,
     invocation_output,
 )
+
+# TODO: Permanent fix for this
+# from invokeai.app.invocations.shared import FreeUConfig
+
 
 
 class FreeUConfig(BaseModel):
