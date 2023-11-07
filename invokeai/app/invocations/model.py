@@ -3,7 +3,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from invokeai.app.invocations.shared import FreeUConfig
+# TODO: Permanent fix for this
+# from invokeai.app.invocations.shared import FreeUConfig
 
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
 from .baseinvocation import (
@@ -19,6 +20,18 @@ from .baseinvocation import (
     invocation_output,
 )
 
+
+class FreeUConfig(BaseModel):
+    """
+    Configuration for the FreeU hyperparameters.
+    - https://huggingface.co/docs/diffusers/main/en/using-diffusers/freeu
+    - https://github.com/ChenyangSi/FreeU
+    """
+
+    s1: float = Field(ge=-1, le=3, description=FieldDescriptions.freeu_s1)
+    s2: float = Field(ge=-1, le=3, description=FieldDescriptions.freeu_s2)
+    b1: float = Field(ge=-1, le=3, description=FieldDescriptions.freeu_b1)
+    b2: float = Field(ge=-1, le=3, description=FieldDescriptions.freeu_b2)
 
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load submodel")
