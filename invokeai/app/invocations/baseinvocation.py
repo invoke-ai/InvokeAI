@@ -92,10 +92,6 @@ class FieldDescriptions:
     inclusive_low = "The inclusive low value"
     exclusive_high = "The exclusive high value"
     decimal_places = "The number of decimal places to round to"
-    freeu_s1 = 'Scaling factor for stage 1 to attenuate the contributions of the skip features. This is done to mitigate the "oversmoothing effect" in the enhanced denoising process.'
-    freeu_s2 = 'Scaling factor for stage 2 to attenuate the contributions of the skip features. This is done to mitigate the "oversmoothing effect" in the enhanced denoising process.'
-    freeu_b1 = "Scaling factor for stage 1 to amplify the contributions of backbone features."
-    freeu_b2 = "Scaling factor for stage 2 to amplify the contributions of backbone features."
 
 
 class Input(str, Enum):
