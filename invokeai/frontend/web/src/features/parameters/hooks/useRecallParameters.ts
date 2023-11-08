@@ -55,6 +55,8 @@ import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
   setHeight,
+  setHrfMethod,
+  setHrfStrength,
   setImg2imgStrength,
   setNegativePrompt,
   setPositivePrompt,
@@ -67,6 +69,7 @@ import {
   isValidCfgScale,
   isValidControlNetModel,
   isValidHeight,
+  isValidHrfMethod,
   isValidIPAdapterModel,
   isValidLoRAModel,
   isValidMainModel,
@@ -711,6 +714,8 @@ export const useRecallParameters = () => {
         steps,
         width,
         strength,
+        hrfStrength,
+        hrfMethod,
         positive_style_prompt,
         negative_style_prompt,
         refiner_model,
@@ -729,32 +734,49 @@ export const useRecallParameters = () => {
       if (isValidCfgScale(cfg_scale)) {
         dispatch(setCfgScale(cfg_scale));
       }
+
       if (isValidMainModel(model)) {
         dispatch(modelSelected(model));
       }
+
       if (isValidPositivePrompt(positive_prompt)) {
         dispatch(setPositivePrompt(positive_prompt));
       }
+
       if (isValidNegativePrompt(negative_prompt)) {
         dispatch(setNegativePrompt(negative_prompt));
       }
+
       if (isValidScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));
       }
+
       if (isValidSeed(seed)) {
         dispatch(setSeed(seed));
       }
+
       if (isValidSteps(steps)) {
         dispatch(setSteps(steps));
       }
+
       if (isValidWidth(width)) {
         dispatch(setWidth(width));
       }
+
       if (isValidHeight(height)) {
         dispatch(setHeight(height));
       }
+
       if (isValidStrength(strength)) {
         dispatch(setImg2imgStrength(strength));
+      }
+
+      if (isValidStrength(hrfStrength)) {
+        dispatch(setHrfStrength(hrfStrength));
+      }
+
+      if (isValidHrfMethod(hrfMethod)) {
+        dispatch(setHrfMethod(hrfMethod));
       }
 
       if (isValidSDXLPositiveStylePrompt(positive_style_prompt)) {
