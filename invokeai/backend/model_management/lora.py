@@ -12,7 +12,7 @@ from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from invokeai.app.invocations.shared import FreeUConfig
+from invokeai.app.shared.models import FreeUConfig
 
 from .models.lora import LoRAModel
 

@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -16,6 +15,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESIZE_VALUES
 from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.model_management.models.base import BaseModelType
 
 

@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     InputField,
     InvocationContext,
     MetadataField,
@@ -19,6 +18,7 @@ from invokeai.app.invocations.ip_adapter import IPAdapterModelField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
+from invokeai.app.shared.fields import FieldDescriptions
 
 from ...version import __version__
 
