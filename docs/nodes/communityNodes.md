@@ -4,11 +4,16 @@ These are nodes that have been developed by the community, for the community. If
 
 If you'd like to submit a node for the community, please refer to the [node creation overview](contributingNodes.md).
 
-To download a node, simply download the `.py` node file from the link and add it to the `invokeai/app/invocations` folder in your Invoke AI install location. If you used the automated installation, this can be found inside the `.venv` folder. Along with the node, an example node graph should be provided to help you get started with the node. 
+To use a node, add the node to the `nodes` folder found in your InvokeAI install location. 
+
+The suggested method is to use `git clone` to clone the repository the node is found in. This allows for easy updates of the node in the future. 
+
+If you'd prefer, you can also just download the `.py` file from the linked repository and add it to the `nodes` folder. 
 
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
+    + [Average Images](#average-images)
     + [Depth Map from Wavefront OBJ](#depth-map-from-wavefront-obj)
     + [Film Grain](#film-grain)
     + [Generative Grammar-Based Prompt Nodes](#generative-grammar-based-prompt-nodes)
@@ -32,6 +37,13 @@ To use a community workflow, download the the `.json` node graph file and load i
 - [Disclaimer](#disclaimer)
 - [Help](#help)
 
+
+--------------------------------
+### Average Images
+
+**Description:** This node takes in a collection of images of the same size and averages them as output. It converts everything to RGB mode first.
+
+**Node Link:** https://github.com/JPPhoto/average-images-node
 
 --------------------------------
 ### Depth Map from Wavefront OBJ
@@ -177,12 +189,8 @@ This includes 15 Nodes:
 
 **Node Link:** https://github.com/helix4u/load_video_frame
 
-**Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
-
 **Output Example:** 
-
-<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/testmp4_embed_converted.gif" width="500" />
-[Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
+<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/_git_assets/testmp4_embed_converted.gif" width="500" />
 
 --------------------------------
 ### Make 3D
@@ -325,9 +333,9 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 
 **Description:** This node allows you to do super cool things with InvokeAI.
 
-**Node Link:** https://github.com/invoke-ai/InvokeAI/fake_node.py
+**Node Link:** https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/app/invocations/prompt.py
 
-**Example Node Graph:**  https://github.com/invoke-ai/InvokeAI/fake_node_graph.json
+**Example Workflow:**  https://github.com/invoke-ai/InvokeAI/blob/docs/main/docs/workflows/Prompt_from_File.json
 
 **Output Examples** 
 

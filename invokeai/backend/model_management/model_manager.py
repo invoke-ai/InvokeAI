@@ -351,6 +351,7 @@ class ModelManager(object):
             precision=precision,
             sequential_offload=sequential_offload,
             logger=logger,
+            log_memory_usage=self.app_config.log_memory_usage,
         )
 
         self._read_models(config)

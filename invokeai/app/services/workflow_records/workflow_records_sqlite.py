@@ -57,7 +57,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 INSERT INTO workflows(workflow)
                 VALUES (?);
                 """,
-                (workflow.json(),),
+                (workflow.model_dump_json(),),
             )
             self._conn.commit()
         except Exception:

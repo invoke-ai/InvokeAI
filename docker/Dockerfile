@@ -18,8 +18,8 @@ ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv/invokeai
 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-ARG TORCH_VERSION=2.0.1
-ARG TORCHVISION_VERSION=0.15.2
+ARG TORCH_VERSION=2.1.0
+ARG TORCHVISION_VERSION=0.16
 ARG GPU_DRIVER=cuda
 ARG TARGETPLATFORM="linux/amd64"
 # unused but available
@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
-        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.4.2"; \
+        extra_index_url_arg="--index-url https://download.pytorch.org/whl/rocm5.6"; \
     else \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu121"; \
     fi &&\

@@ -42,7 +42,7 @@ dependencies = [
   "datasets",
   # When bumping diffusers beyond 0.21, make sure to address this:
   # https://github.com/invoke-ai/InvokeAI/blob/fc09ab7e13cb7ca5389100d149b6422ace7b8ed3/invokeai/app/invocations/latent.py#L513
-  "diffusers[torch]~=0.21.0",
+  "diffusers[torch]~=0.22.0",
   "dnspython~=2.4.0",
   "dynamicprompts",
   "easing-functions",
@@ -80,8 +80,8 @@ dependencies = [
   "semver~=3.0.1",
   "send2trash",
   "test-tube~=0.7.5",
-  "torch~=2.0.1",
-  "torchvision~=0.15.2",
+  "torch~=2.1.0",
+  "torchvision~=0.16",
   "torchmetrics~=0.11.0",
   "torchsde~=0.2.5",
   "transformers~=4.31.0",
@@ -109,8 +109,8 @@ dependencies = [
   "pytest-datadir",
 ]
 "xformers" = [
-  "xformers~=0.0.19; sys_platform!='darwin'",
-  "triton; sys_platform=='linux'",
+  "xformers==0.0.22post7; sys_platform!='darwin'",
+	"triton; sys_platform=='linux'",
 ]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
@@ -207,6 +207,7 @@ exclude = [
   "build",
   "dist",
   "invokeai/frontend/web/node_modules/",
+  ".venv*",
 ]
 
 [tool.black]

@@ -41,7 +41,7 @@ from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
 from invokeai.app.services.config import InvokeAIAppConfig, PagingArgumentParser
-from invokeai.app.services.model_manager_service import ModelManagerService
+from invokeai.app.services.model_manager import ModelManagerService
 from invokeai.backend.model_management.models import SubModelType
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
