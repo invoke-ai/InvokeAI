@@ -166,14 +166,14 @@ class ModelPatcher:
         init_tokens_count = None
         new_tokens_added = None
 
-        # This is required since Transformers 4.32
-        # see https://github.com/huggingface/transformers/pull/25088
-        # More information: https://docs.nvidia.com/deeplearning/performance/dl-performance-
-        # matrix-multiplication/index.html#requirements-tc
-        if "A100" in torch.cuda.get_device_name():
-            pad_to_multiple_of = 64
-        else:
-            pad_to_multiple_of = 8
+        # TODO: This is required since Transformers 4.32 see
+        # https://github.com/huggingface/transformers/pull/25088
+        # More information by NVIDIA:
+        # https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html#requirements-tc
+        # This value might need to be changed in the future and take the GPUs model into account as there seem
+        # to be ideal values for different GPUS. This value is temporary!
+        # For references to the current discussion please see https://github.com/invoke-ai/InvokeAI/pull/4817
+        pad_to_multiple_of = 8
 
         try:
             # HACK: The CLIPTokenizer API does not include a way to remove tokens after calling add_tokens(...). As a
