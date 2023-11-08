@@ -132,6 +132,7 @@ export const zScheduler = z.enum([
   'lms_k',
   'euler_a',
   'kdpm_2_a',
+  'lcm',
 ]);
 /**
  * Type alias for scheduler parameter, inferred from its zod schema
@@ -166,6 +167,7 @@ export const SCHEDULER_LABEL_MAP: Record<SchedulerParam, string> = {
   lms_k: 'LMS Karras',
   euler_a: 'Euler Ancestral',
   kdpm_2_a: 'KDPM 2 Ancestral',
+  lcm: 'LCM',
 };
 
 /**

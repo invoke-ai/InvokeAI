@@ -198,6 +198,7 @@ The list of schedulers has been completely revamped and brought up to date:
 | **dpmpp_2m**   | DPMSolverMultistepScheduler     | original noise scnedule     |
 | **dpmpp_2m_k** | DPMSolverMultistepScheduler     | using karras noise schedule |
 | **unipc**      | UniPCMultistepScheduler         | CPU only                    |
+| **lcm**        | LCMScheduler                    |                             |
 
 Please see [3.0.0 Release Notes](https://github.com/invoke-ai/InvokeAI/releases/tag/v3.0.0) for further details.
 
