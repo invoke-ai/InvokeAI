@@ -89,7 +89,6 @@ import {
   isValidWidth,
   isValidBoolean,
 } from '../types/parameterSchemas';
-import { boolean } from 'zod';
 
 const selector = createSelector(
   stateSelector,
