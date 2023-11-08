@@ -2,7 +2,6 @@
 Test the refactored model config classes.
 """
 
-import sys
 from hashlib import sha256
 
 import pytest
