@@ -145,7 +145,7 @@ class ModelRecordServiceBase(ABC):
                 f"More than one model matched the search criteria: base_model='{base_model}', model_type='{model_type}', model_name='{model_name}'."
             )
         if len(model_configs) == 0:
-            raise UnknownModelException("No known model with name and type: {base_model}/{model_type}/{model_name}")
+            raise UnknownModelException(f"More than one model matched the search criteria: base_model='{base_model}', model_type='{model_type}', model_name='{model_name}'.")
         return model_configs[0]
 
     def rename_model(
