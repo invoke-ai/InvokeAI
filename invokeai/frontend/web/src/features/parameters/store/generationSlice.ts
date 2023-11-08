@@ -29,7 +29,6 @@ import {
 
 export interface GenerationState {
   hrfEnabled: boolean;
-  hrfManualResEnabled: boolean;
   hrfStrength: StrengthParam;
   hrfMethod: HrfMethodParam;
   cfgScale: CfgScaleParam;
@@ -76,7 +75,6 @@ export interface GenerationState {
 export const initialGenerationState: GenerationState = {
   hrfStrength: 0.75,
   hrfEnabled: false,
-  hrfManualResEnabled: false,
   hrfMethod: 'bilinear',
   cfgScale: 7.5,
   height: 512,
@@ -286,9 +284,6 @@ export const generationSlice = createSlice({
     setHrfEnabled: (state, action: PayloadAction<boolean>) => {
       state.hrfEnabled = action.payload;
     },
-    setHrfManualResEnabled: (state, action: PayloadAction<boolean>) => {
-      state.hrfManualResEnabled = action.payload;
-    },
     setHrfMethod: (state, action: PayloadAction<HrfMethodParam>) => {
       state.hrfMethod = action.payload;
     },
@@ -376,10 +371,9 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
-  setHrfStrength,
   setHrfEnabled,
+  setHrfStrength,
   setHrfMethod,
-  setHrfManualResEnabled,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
   setShouldLockAspectRatio,

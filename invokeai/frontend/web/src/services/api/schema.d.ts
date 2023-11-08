@@ -1952,7 +1952,7 @@ export type components = {
        * Hrf Enabled
        * @description Whether high resolution fix has been enabled.
        */
-      hrf_strength?: number | null;
+      hrf_enabled?: boolean | null;
       /**
        * Positive Style Prompt
        * @description The positive style prompt parameter

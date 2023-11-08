@@ -87,7 +87,9 @@ import {
   isValidSteps,
   isValidStrength,
   isValidWidth,
+  isValidBoolean,
 } from '../types/parameterSchemas';
+import { boolean } from 'zod';
 
 const selector = createSelector(
   stateSelector,
@@ -760,8 +762,9 @@ export const useRecallParameters = () => {
         steps,
         width,
         strength,
-        hrfStrength,
-        hrfMethod,
+        hrf_enabled,
+        hrf_strength,
+        hrf_method,
         positive_style_prompt,
         negative_style_prompt,
         refiner_model,
@@ -817,12 +820,16 @@ export const useRecallParameters = () => {
         dispatch(setImg2imgStrength(strength));
       }
 
-      if (isValidStrength(hrfStrength)) {
-        dispatch(setHrfStrength(hrfStrength));
+      if (isValidBoolean(hrf_enabled)) {
+        dispatch(setHrfEnabled(hrf_enabled));
       }
 
-      if (isValidHrfMethod(hrfMethod)) {
-        dispatch(setHrfMethod(hrfMethod));
+      if (isValidStrength(hrf_strength)) {
+        dispatch(setHrfStrength(hrf_strength));
+      }
+
+      if (isValidHrfMethod(hrf_method)) {
+        dispatch(setHrfMethod(hrf_method));
       }
 
       if (isValidSDXLPositiveStylePrompt(positive_style_prompt)) {
