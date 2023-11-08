@@ -15,7 +15,6 @@ import {
   DENOISE_LATENTS,
   NOISE,
   MAIN_MODEL_LOADER,
-  METADATA_ACCUMULATOR,
   LATENTS_TO_IMAGE,
   LATENTS_TO_IMAGE_HRF_HR,
   LATENTS_TO_IMAGE_HRF_LR,
@@ -365,16 +364,6 @@ export const addHrfToGraph = (
       destination: {
         node_id: LATENTS_TO_IMAGE_HRF_HR,
         field: 'latents',
-      },
-    },
-    {
-      source: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'metadata',
-      },
-      destination: {
-        node_id: LATENTS_TO_IMAGE_HRF_HR,
-        field: 'metadata',
       },
     }
   );

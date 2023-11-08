@@ -27,7 +27,6 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
-  METADATA_ACCUMULATOR,
 } from './constants';
 
 export const buildLinearTextToImageGraph = (
@@ -252,17 +251,6 @@ export const buildLinearTextToImageGraph = (
     clip_skip: clipSkip,
     hrf_strength: hrfStrength,
     hrf_enabled: hrfEnabled,
-  });
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: LATENTS_TO_IMAGE,
-      field: 'metadata',
-    },
   });
 
   // Add Seamless To Graph
