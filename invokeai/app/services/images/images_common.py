@@ -20,10 +20,15 @@ class ImageUrlsDTO(BaseModelExcludeNull):
 class ImageDTO(ImageRecord, ImageUrlsDTO):
     """Deserialized image record, enriched for the frontend."""
 
-    board_id: Optional[str] = Field(description="The id of the board the image belongs to, if one exists.")
+    board_id: Optional[str] = Field(
+        default=None, description="The id of the board the image belongs to, if one exists."
+    )
     """The id of the board the image belongs to, if one exists."""
-
-    pass
+    workflow_id: Optional[str] = Field(
+        default=None,
+        description="The workflow that generated this image.",
+    )
+    """The workflow that generated this image."""
 
 
 def image_record_to_dto(
@@ -31,11 +36,13 @@ def image_record_to_dto(
     image_url: str,
     thumbnail_url: str,
     board_id: Optional[str],
+    workflow_id: Optional[str],
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(
-        **image_record.dict(),
+        **image_record.model_dump(),
         image_url=image_url,
         thumbnail_url=thumbnail_url,
         board_id=board_id,
+        workflow_id=workflow_id,
     )

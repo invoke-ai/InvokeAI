@@ -15,18 +15,19 @@ import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
+import { addCoreMetadataNode } from './metadata';
 import {
   CLIP_SKIP,
   DENOISE_LATENTS,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
+  METADATA_ACCUMULATOR,
 } from './constants';
 
 export const buildLinearTextToImageGraph = (
@@ -236,10 +237,7 @@ export const buildLinearTextToImageGraph = (
     ],
   };
 
-  // add metadata accumulator, which is only mostly populated - some fields are added later
-  graph.nodes[METADATA_ACCUMULATOR] = {
-    id: METADATA_ACCUMULATOR,
-    type: 'metadata_accumulator',
+  addCoreMetadataNode(graph, {
     generation_mode: 'txt2img',
     cfg_scale,
     height,
@@ -251,15 +249,10 @@ export const buildLinearTextToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined, // option; set in addVAEToGraph
-    controlnets: [], // populated in addControlNetToLinearGraph
-    loras: [], // populated in addLoRAsToGraph
-    ipAdapters: [], // populated in addIPAdapterToLinearGraph
-    t2iAdapters: [], // populated in addT2IAdapterToLinearGraph
     clip_skip: clipSkip,
     hrf_strength: hrfStrength,
     hrf_enabled: hrfEnabled,
-  };
+  });
 
   graph.edges.push({
     source: {

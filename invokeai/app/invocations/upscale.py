@@ -7,13 +7,14 @@ import numpy as np
 import torch
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from PIL import Image
+from pydantic import ConfigDict
 from realesrgan import RealESRGANer
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.backend.util.devices import choose_torch_device
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -29,7 +30,7 @@ if choose_torch_device() == torch.device("mps"):
 
 
 @invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.1.0")
-class ESRGANInvocation(BaseInvocation):
+class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Upscales an image using RealESRGAN."""
 
     image: ImageField = InputField(description="The input image")
@@ -37,6 +38,8 @@ class ESRGANInvocation(BaseInvocation):
     tile_size: int = InputField(
         default=400, ge=0, description="Tile size for tiled ESRGAN upscaling (0=tiling disabled)"
     )
+
+    model_config = ConfigDict(protected_namespaces=())
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -120,6 +123,7 @@ class ESRGANInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata,
             workflow=self.workflow,
         )
 

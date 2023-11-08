@@ -1,9 +1,9 @@
-import json
 import sqlite3
 import threading
 from datetime import datetime
-from typing import Optional, cast
+from typing import Optional, Union, cast
 
+from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 
@@ -24,7 +24,7 @@ from .image_records_common import (
 class SqliteImageRecordStorage(ImageRecordStorageBase):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
-    _lock: threading.Lock
+    _lock: threading.RLock
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
@@ -117,7 +117,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
-    def get(self, image_name: str) -> Optional[ImageRecord]:
+    def get(self, image_name: str) -> ImageRecord:
         try:
             self._lock.acquire()
 
@@ -141,22 +141,26 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
         return deserialize_image_record(dict(result))
 
-    def get_metadata(self, image_name: str) -> Optional[dict]:
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         try:
             self._lock.acquire()
 
             self._cursor.execute(
                 """--sql
-                SELECT images.metadata FROM images
+                SELECT metadata FROM images
                 WHERE image_name = ?;
                 """,
                 (image_name,),
             )
 
             result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
-            if not result or not result[0]:
-                return None
-            return json.loads(result[0])
+
+            if not result:
+                raise ImageRecordNotFoundException
+
+            as_dict = dict(result)
+            metadata_raw = cast(Optional[str], as_dict.get("metadata", None))
+            return MetadataFieldValidator.validate_json(metadata_raw) if metadata_raw is not None else None
         except sqlite3.Error as e:
             self._conn.rollback()
             raise ImageRecordNotFoundException from e
@@ -223,8 +227,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_many(
         self,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
+        offset: int = 0,
+        limit: int = 10,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
@@ -249,7 +253,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
 
             query_conditions = ""
-            query_params = []
+            query_params: list[Union[int, str, bool]] = []
 
             if image_origin is not None:
                 query_conditions += """--sql
@@ -297,11 +301,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             images_query += query_conditions + query_pagination + ";"
             # Add all the parameters
             images_params = query_params.copy()
-
-            if limit is not None:
-                images_params.append(limit)
-            if offset is not None:
-                images_params.append(offset)
+            # Add the pagination parameters
+            images_params.extend([limit, offset])
 
             # Build the list of images, deserializing each row
             self._cursor.execute(images_query, images_params)
@@ -357,6 +358,24 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
+    def get_intermediates_count(self) -> int:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT COUNT(*) FROM images
+                WHERE is_intermediate = TRUE;
+                """
+            )
+            count = cast(int, self._cursor.fetchone()[0])
+            self._conn.commit()
+            return count
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordDeleteException from e
+        finally:
+            self._lock.release()
+
     def delete_intermediates(self) -> list[str]:
         try:
             self._lock.acquire()
@@ -387,16 +406,16 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_name: str,
         image_origin: ResourceOrigin,
         image_category: ImageCategory,
-        session_id: Optional[str],
         width: int,
         height: int,
-        node_id: Optional[str],
-        metadata: Optional[dict],
-        is_intermediate: bool = False,
-        starred: bool = False,
+        is_intermediate: Optional[bool] = False,
+        starred: Optional[bool] = False,
+        session_id: Optional[str] = None,
+        node_id: Optional[str] = None,
+        metadata: Optional[MetadataField] = None,
     ) -> datetime:
         try:
-            metadata_json = None if metadata is None else json.dumps(metadata)
+            metadata_json = metadata.model_dump_json() if metadata is not None else None
             self._lock.acquire()
             self._cursor.execute(
                 """--sql

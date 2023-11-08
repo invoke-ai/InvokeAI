@@ -58,14 +58,16 @@ class IPAdapterModel(ModelBase):
 
     def get_model(
         self,
-        torch_dtype: Optional[torch.dtype],
+        torch_dtype: torch.dtype,
         child_type: Optional[SubModelType] = None,
     ) -> typing.Union[IPAdapter, IPAdapterPlus]:
         if child_type is not None:
             raise ValueError("There are no child models in an IP-Adapter model.")
 
         model = build_ip_adapter(
-            ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"), device="cpu", dtype=torch_dtype
+            ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"),
+            device=torch.device("cpu"),
+            dtype=torch_dtype,
         )
 
         self.model_size = model.calc_size()

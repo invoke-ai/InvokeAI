@@ -96,7 +96,7 @@ def set_seamless(model: Union[UNet2DConditionModel, AutoencoderKL], seamless_axe
     finally:
         for module, orig_conv_forward in to_restore:
             module._conv_forward = orig_conv_forward
-            if hasattr(m, "asymmetric_padding_mode"):
-                del m.asymmetric_padding_mode
-            if hasattr(m, "asymmetric_padding"):
-                del m.asymmetric_padding
+            if hasattr(module, "asymmetric_padding_mode"):
+                del module.asymmetric_padding_mode
+            if hasattr(module, "asymmetric_padding"):
+                del module.asymmetric_padding

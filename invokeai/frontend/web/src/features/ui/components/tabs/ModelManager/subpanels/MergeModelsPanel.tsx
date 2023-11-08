@@ -112,7 +112,7 @@ export default function MergeModelsPanel() {
       }
     });
 
-    const mergeModelsInfo: MergeModelConfig = {
+    const mergeModelsInfo: MergeModelConfig['body'] = {
       model_names: models_names,
       merged_model_name:
         mergedModelName !== '' ? mergedModelName : models_names.join('-'),
@@ -125,7 +125,7 @@ export default function MergeModelsPanel() {
 
     mergeModels({
       base_model: baseModel,
-      body: mergeModelsInfo,
+      body: { body: mergeModelsInfo },
     })
       .unwrap()
       .then((_) => {

@@ -3,7 +3,7 @@ from typing import Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.metadata import ImageMetadata
+from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
@@ -49,9 +49,9 @@ class ImageServiceABC(ABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         board_id: Optional[str] = None,
-        is_intermediate: bool = False,
-        metadata: Optional[dict] = None,
-        workflow: Optional[str] = None,
+        is_intermediate: Optional[bool] = False,
+        metadata: Optional[MetadataField] = None,
+        workflow: Optional[WorkflowField] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -81,7 +81,7 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_metadata(self, image_name: str) -> ImageMetadata:
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """Gets an image's metadata."""
         pass
 
@@ -121,6 +121,11 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def delete_intermediates(self) -> int:
         """Deletes all intermediate images."""
+        pass
+
+    @abstractmethod
+    def get_intermediates_count(self) -> int:
+        """Gets the number of intermediate images."""
         pass
 
     @abstractmethod

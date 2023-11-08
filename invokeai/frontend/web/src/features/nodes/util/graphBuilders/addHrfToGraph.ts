@@ -1,21 +1,22 @@
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
   DenoiseLatentsInvocation,
-  NoiseInvocation,
-  LatentsToImageInvocation,
   ImageResizeInvocation,
   ESRGANInvocation,
-  Edge,
   ImageToLatentsInvocation,
+  Edge,
+  LatentsToImageInvocation,
+  NoiseInvocation,
 } from 'services/api/types';
 import {
-  LATENTS_TO_IMAGE,
   DENOISE_LATENTS,
   NOISE,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
+  LATENTS_TO_IMAGE,
   LATENTS_TO_IMAGE_HRF_HR,
   LATENTS_TO_IMAGE_HRF_LR,
   IMAGE_TO_LATENTS_HRF,
@@ -25,7 +26,7 @@ import {
   NOISE_HRF,
   VAE_LOADER,
 } from './constants';
-import { logger } from 'app/logging/logger';
+import { upsertMetadata } from './metadata';
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
@@ -123,7 +124,7 @@ export const addHrfToGraph = (
   }
   const log = logger('txt2img');
 
-  const { vae } = state.generation;
+  const { vae, hrfStrength } = state.generation;
   const isAutoVae = !vae;
   const width = state.generation.width;
   const height = state.generation.height;
@@ -377,4 +378,7 @@ export const addHrfToGraph = (
       },
     }
   );
+  upsertMetadata(graph, {
+    hrf_strength: hrfStrength,
+  });
 };

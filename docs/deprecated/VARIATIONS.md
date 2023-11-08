@@ -126,6 +126,6 @@ amounts of image-to-image variation even when the seed is fixed and the
 `-v` argument is very low. Others are more deterministic. Feel free to
 experiment until you find the combination that you like.
 
-Also be aware of the [Perlin Noise](OTHER.md#thresholding-and-perlin-noise-initialization-options)
+Also be aware of the [Perlin Noise](../features/OTHER.md#thresholding-and-perlin-noise-initialization-options)
 feature, which provides another way of introducing variability into your
 image generation requests.

@@ -4,11 +4,12 @@ import { RootState, stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
 import ParamHrfMethod from './ParamHrfMethod';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
@@ -21,15 +22,14 @@ const selector = createSelector(
 );
 
 export default function ParamHrfCollapse() {
+  const { t } = useTranslation();
   const isHRFFeatureEnabled = useFeatureStatus('hrf').isFeatureEnabled;
   const { hrfEnabled } = useAppSelector(selector);
   const activeLabel = useMemo(() => {
     if (hrfEnabled) {
-      return 'On';
-    } else {
-      return 'Off';
+      return t('common.on');
     }
-  }, [hrfEnabled]);
+  }, [t, hrfEnabled]);
 
   if (!isHRFFeatureEnabled) {
     return null;

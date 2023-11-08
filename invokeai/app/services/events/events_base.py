@@ -2,7 +2,6 @@
 
 from typing import Any, Optional
 
-from invokeai.app.invocations.model import ModelInfo
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
     BatchStatus,
@@ -11,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.util.misc import get_timestamp
+from invokeai.backend.model_management.model_manager import ModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
 
 
@@ -55,7 +55,7 @@ class EventServiceBase:
                 graph_execution_state_id=graph_execution_state_id,
                 node_id=node.get("id"),
                 source_node_id=source_node_id,
-                progress_image=progress_image.dict() if progress_image is not None else None,
+                progress_image=progress_image.model_dump() if progress_image is not None else None,
                 step=step,
                 order=order,
                 total_steps=total_steps,
@@ -291,8 +291,8 @@ class EventServiceBase:
                     started_at=str(session_queue_item.started_at) if session_queue_item.started_at else None,
                     completed_at=str(session_queue_item.completed_at) if session_queue_item.completed_at else None,
                 ),
-                batch_status=batch_status.dict(),
-                queue_status=queue_status.dict(),
+                batch_status=batch_status.model_dump(),
+                queue_status=queue_status.model_dump(),
             ),
         )
 
