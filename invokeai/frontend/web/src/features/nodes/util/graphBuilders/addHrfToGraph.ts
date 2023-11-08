@@ -123,7 +123,7 @@ export const addHrfToGraph = (
   }
   const log = logger('txt2img');
 
-  const { vae, hrfStrength } = state.generation;
+  const { vae, hrfStrength, hrfEnabled } = state.generation;
   const isAutoVae = !vae;
   const width = state.generation.width;
   const height = state.generation.height;
@@ -369,5 +369,7 @@ export const addHrfToGraph = (
   );
   upsertMetadata(graph, {
     hrf_strength: hrfStrength,
+    hrf_enabled: hrfEnabled,
+    hrf_method: method,
   });
 };
