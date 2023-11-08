@@ -35,6 +35,9 @@ const ImageMetadataActions = (props: Props) => {
     recallWidth,
     recallHeight,
     recallStrength,
+    recallHrfEnabled,
+    recallHrfStrength,
+    recallHrfMethod,
     recallLoRA,
     recallControlNet,
     recallIPAdapter,
@@ -80,6 +83,18 @@ const ImageMetadataActions = (props: Props) => {
   const handleRecallStrength = useCallback(() => {
     recallStrength(metadata?.strength);
   }, [metadata?.strength, recallStrength]);
+
+  const handleRecallHrfEnabled = useCallback(() => {
+    recallHrfEnabled(metadata?.hrf_enabled);
+  }, [metadata?.hrf_enabled, recallHrfEnabled]);
+
+  const handleRecallHrfStrength = useCallback(() => {
+    recallHrfStrength(metadata?.hrf_strength);
+  }, [metadata?.hrf_strength, recallHrfStrength]);
+
+  const handleRecallHrfMethod = useCallback(() => {
+    recallHrfMethod(metadata?.hrf_method);
+  }, [metadata?.hrf_method, recallHrfMethod]);
 
   const handleRecallLoRA = useCallback(
     (lora: LoRAMetadataItem) => {
@@ -223,6 +238,27 @@ const ImageMetadataActions = (props: Props) => {
           label={t('metadata.strength')}
           value={metadata.strength}
           onClick={handleRecallStrength}
+        />
+      )}
+      {metadata.hrf_enabled && (
+        <ImageMetadataItem
+          label="High Resolution Fix Enabled"
+          value={metadata.hrf_enabled}
+          onClick={handleRecallHrfEnabled}
+        />
+      )}
+      {metadata.hrf_enabled && metadata.hrf_strength && (
+        <ImageMetadataItem
+          label="High Resolution Strength"
+          value={metadata.hrf_strength}
+          onClick={handleRecallHrfStrength}
+        />
+      )}
+      {metadata.hrf_enabled && metadata.hrf_method && (
+        <ImageMetadataItem
+          label="High Resolution Method"
+          value={metadata.hrf_method}
+          onClick={handleRecallHrfMethod}
         />
       )}
       {metadata.loras &&

@@ -123,11 +123,10 @@ export const addHrfToGraph = (
   }
   const log = logger('txt2img');
 
-  const { vae, hrfStrength, hrfEnabled } = state.generation;
+  const { vae, hrfStrength, hrfEnabled, hrfMethod } = state.generation;
   const isAutoVae = !vae;
   const width = state.generation.width;
   const height = state.generation.height;
-  const method = state.generation.hrfMethod;
   const base_model = state.generation.model
     ? state.generation.model.base_model
     : 'sd1';
@@ -201,7 +200,7 @@ export const addHrfToGraph = (
     width: width,
     height: height,
   } as ImageResizeInvocation;
-  if (method == 'ESRGAN') {
+  if (hrfMethod == 'ESRGAN') {
     let model_name = 'RealESRGAN_x2plus.pth';
     if ((width * height) / (hrfWidth * hrfHeight) > 2) {
       model_name = 'RealESRGAN_x4plus.pth';
@@ -370,6 +369,6 @@ export const addHrfToGraph = (
   upsertMetadata(graph, {
     hrf_strength: hrfStrength,
     hrf_enabled: hrfEnabled,
-    hrf_method: method,
+    hrf_method: hrfMethod,
   });
 };

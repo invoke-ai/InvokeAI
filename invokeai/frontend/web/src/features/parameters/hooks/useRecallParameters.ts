@@ -55,6 +55,7 @@ import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
   setHeight,
+  setHrfEnabled,
   setHrfMethod,
   setHrfStrength,
   setImg2imgStrength,
@@ -359,6 +360,51 @@ export const useRecallParameters = () => {
         return;
       }
       dispatch(setImg2imgStrength(strength));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall high resolution enabled with toast
+   */
+  const recallHrfEnabled = useCallback(
+    (hrfEnabled: unknown) => {
+      if (!(typeof hrfEnabled === 'boolean')) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setHrfEnabled(hrfEnabled));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall high resolution strength with toast
+   */
+  const recallHrfStrength = useCallback(
+    (hrfStrength: unknown) => {
+      if (!isValidStrength(hrfStrength)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setHrfStrength(hrfStrength));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall high resolution method with toast
+   */
+  const recallHrfMethod = useCallback(
+    (hrfMethod: unknown) => {
+      if (!isValidHrfMethod(hrfMethod)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setHrfMethod(hrfMethod));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -884,6 +930,9 @@ export const useRecallParameters = () => {
     recallWidth,
     recallHeight,
     recallStrength,
+    recallHrfEnabled,
+    recallHrfStrength,
+    recallHrfMethod,
     recallLoRA,
     recallControlNet,
     recallIPAdapter,

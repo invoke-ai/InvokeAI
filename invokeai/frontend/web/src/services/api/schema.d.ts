@@ -1944,6 +1944,16 @@ export type components = {
        */
       hrf_strength?: number | null;
       /**
+       * Hrf Method
+       * @description The high resolution fix upscale method.
+       */
+      hrf_method?: string | null;
+      /**
+       * Hrf Enabled
+       * @description Whether high resolution fix has been enabled.
+       */
+      hrf_strength?: number | null;
+      /**
        * Positive Style Prompt
        * @description The positive style prompt parameter
        */

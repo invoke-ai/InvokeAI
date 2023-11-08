@@ -49,7 +49,8 @@ export const buildLinearTextToImageGraph = (
     seamlessYAxis,
     seed,
     hrfStrength,
-    hrfEnabled: hrfEnabled,
+    hrfEnabled,
+    hrfMethod,
   } = state.generation;
 
   const use_cpu = shouldUseCpuNoise;
@@ -251,6 +252,7 @@ export const buildLinearTextToImageGraph = (
     clip_skip: clipSkip,
     hrf_strength: hrfStrength,
     hrf_enabled: hrfEnabled,
+    hrf_method: hrfMethod,
   });
 
   // Add Seamless To Graph
