@@ -66,9 +66,8 @@ from .model_records_base import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    _conn: sqlite3.Connection
+    _db: SqliteDatabase
     _cursor: sqlite3.Cursor
-    _lock: threading.Lock
 
     def __init__(self, db: SqliteDatabase):
         """
@@ -78,16 +77,15 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         :param lock: threading Lock object
         """
         super().__init__()
-        self._conn = db.conn
-        self._lock = db.lock
-        self._conn.row_factory = sqlite3.Row
-        self._cursor = self._conn.cursor()
+        self._db = db
+        self._db.conn.row_factory = sqlite3.Row
+        self._cursor = self._db.conn.cursor()
 
-        with self._lock:
+        with self._db.lock:
             # Enable foreign keys
-            self._conn.execute("PRAGMA foreign_keys = ON;")
+            self._db.conn.execute("PRAGMA foreign_keys = ON;")
             self._create_tables()
-            self._conn.commit()
+            self._db.conn.commit()
         assert (
             str(self.version) == CONFIG_FILE_VERSION
         ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
@@ -172,7 +170,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
         json_serialized = json.dumps(record.model_dump())  # and turn it into a json string.
-        with self._lock:
+        with self._db.lock:
             try:
                 self._cursor.execute(
                     """--sql
@@ -197,10 +195,10 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                         json_serialized,
                     ),
                 )
-                self._conn.commit()
+                self._db.conn.commit()
 
             except sqlite3.IntegrityError as e:
-                self._conn.rollback()
+                self._db.conn.rollback()
                 if "UNIQUE constraint failed" in str(e):
                     if "model_config.path" in str(e):
                         msg = f"A model with path '{record.path}' is already installed"
@@ -210,7 +208,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 else:
                     raise e
             except sqlite3.Error as e:
-                self._conn.rollback()
+                self._db.conn.rollback()
                 raise e
 
         return self.get_model(key)
@@ -218,7 +216,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
     @property
     def version(self) -> str:
         """Return the version of the database schema."""
-        with self._lock:
+        with self._db.lock:
             self._cursor.execute(
                 """--sql
                 SELECT metadata_value FROM model_manager_metadata
@@ -239,7 +237,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise an UnknownModelException
         """
-        with self._lock:
+        with self._db.lock:
             try:
                 self._cursor.execute(
                     """--sql
@@ -250,9 +248,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 )
                 if self._cursor.rowcount == 0:
                     raise UnknownModelException("model not found")
-                self._conn.commit()
+                self._db.conn.commit()
             except sqlite3.Error as e:
-                self._conn.rollback()
+                self._db.conn.rollback()
                 raise e
 
     def update_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
@@ -265,7 +263,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
         json_serialized = json.dumps(record.model_dump())  # and turn it into a json string.
-        with self._lock:
+        with self._db.lock:
             try:
                 self._cursor.execute(
                     """--sql
@@ -281,9 +279,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 )
                 if self._cursor.rowcount == 0:
                     raise UnknownModelException("model not found")
-                self._conn.commit()
+                self._db.conn.commit()
             except sqlite3.Error as e:
-                self._conn.rollback()
+                self._db.conn.rollback()
                 raise e
 
         return self.get_model(key)
@@ -296,7 +294,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Exceptions: UnknownModelException
         """
-        with self._lock:
+        with self._db.lock:
             self._cursor.execute(
                 """--sql
                 SELECT config FROM model_config
@@ -317,7 +315,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         :param key: Unique key for the model to be deleted
         """
         count = 0
-        with self._lock:
+        with self._db.lock:
             try:
                 self._cursor.execute(
                     """--sql
@@ -360,7 +358,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             where_clause.append("type=?")
             bindings.append(model_type)
         where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
-        with self._lock:
+        with self._db.lock:
             try:
                 self._cursor.execute(
                     f"""--sql
@@ -377,7 +375,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
     def search_by_path(self, path: Union[str, Path]) -> List[ModelConfigBase]:
         """Return models with the indicated path."""
         results = []
-        with self._lock:
+        with self._db.lock:
             try:
                 self._cursor.execute(
                     """--sql
@@ -394,7 +392,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
     def search_by_hash(self, hash: str) -> List[ModelConfigBase]:
         """Return models with the indicated original_hash."""
         results = []
-        with self._lock:
+        with self._db.lock:
             try:
                 self._cursor.execute(
                     """--sql

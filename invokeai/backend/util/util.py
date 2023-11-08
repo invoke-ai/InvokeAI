@@ -386,13 +386,10 @@ class Chdir(object):
 class SilenceWarnings(object):
     """Context manager to temporarily lower verbosity of diffusers & transformers warning messages."""
 
-    def __init__(self):
-        """Set up context, save current transformers and diffusers verbosity settings."""
-        self.transformers_verbosity = transformers_logging.get_verbosity()
-        self.diffusers_verbosity = diffusers_logging.get_verbosity()
-
     def __enter__(self):
         """Set verbosity to error."""
+        self.transformers_verbosity = transformers_logging.get_verbosity()
+        self.diffusers_verbosity = diffusers_logging.get_verbosity()
         transformers_logging.set_verbosity_error()
         diffusers_logging.set_verbosity_error()
         warnings.simplefilter("ignore")

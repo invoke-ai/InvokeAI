@@ -16,8 +16,19 @@ from invokeai.backend.util.logging import InvokeAILogger
 ModelsValidator = TypeAdapter(AnyModelConfig)
 
 
-class Migrate:
-    """Migration class."""
+class MigrateModelYamlToDb:
+    """
+    Migrate the InvokeAI models.yaml format (VERSION 3.0.0) to SQL3 database format (VERSION 3.2.0)
+
+    The class has one externally useful method, migrate(), which scans the
+    currently models.yaml file and imports all its entries into invokeai.db.
+
+    Use this way:
+
+      from invokeai.backend.model_manager/migrate_to_db import MigrateModelYamlToDb
+      MigrateModelYamlToDb().migrate()
+
+    """
 
     config: InvokeAIAppConfig
     logger: InvokeAILogger
@@ -28,14 +39,17 @@ class Migrate:
         self.logger = InvokeAILogger.get_logger()
 
     def get_db(self) -> ModelRecordServiceSQL:
+        """Fetch the sqlite3 database for this installation."""
         db = SqliteDatabase(self.config, self.logger)
         return ModelRecordServiceSQL(db)
 
     def get_yaml(self) -> DictConfig:
+        """Fetch the models.yaml DictConfig for this installation."""
         yaml_path = self.config.model_conf_path
         return OmegaConf.load(yaml_path)
 
     def migrate(self):
+        """Do the migration from models.yaml to invokeai.db."""
         db = self.get_db()
         yaml = self.get_yaml()
 
@@ -65,7 +79,7 @@ class Migrate:
 
 
 def main():
-    Migrate().migrate()
+    MigrateModelYamlToDb().migrate()
 
 
 if __name__ == "__main__":

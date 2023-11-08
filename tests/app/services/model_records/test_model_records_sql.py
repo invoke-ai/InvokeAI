@@ -67,16 +67,10 @@ def test_add(store: ModelRecordServiceBase):
 def test_dup(store: ModelRecordServiceBase):
     config = example_config()
     store.add_model("key1", example_config())
-    try:
+    with pytest.raises(DuplicateModelException):
         store.add_model("key1", config)
-        assert False, "Duplicate model key should have been caught"
-    except DuplicateModelException:
-        assert True
-    try:
+    with pytest.raises(DuplicateModelException):
         store.add_model("key2", config)
-        assert False, "Duplicate model path should have been caught"
-    except DuplicateModelException:
-        assert True
 
 
 def test_update(store: ModelRecordServiceBase):
@@ -90,11 +84,12 @@ def test_update(store: ModelRecordServiceBase):
     new_config = store.get_model("key1")
     assert new_config.name == "new name"
 
-    try:
+
+def test_unknown_key(store: ModelRecordServiceBase):
+    config = example_config()
+    store.add_model("key1", config)
+    with pytest.raises(UnknownModelException):
         store.update_model("unknown_key", config)
-        assert False, "expected UnknownModelException"
-    except UnknownModelException:
-        assert True
 
 
 def test_delete(store: ModelRecordServiceBase):
@@ -102,20 +97,8 @@ def test_delete(store: ModelRecordServiceBase):
     store.add_model("key1", config)
     config = store.get_model("key1")
     store.del_model("key1")
-    try:
+    with pytest.raises(UnknownModelException):
         config = store.get_model("key1")
-        assert False, "expected fetch of deleted model to raise exception"
-    except UnknownModelException:
-        assert True
-
-    # a bug in sqlite3 in python 3.9 prevents DEL from returning number of
-    # deleted rows!
-    if sys.version_info.major == 3 and sys.version_info.minor > 9:
-        try:
-            store.del_model("unknown")
-            assert False, "expected delete of unknown model to raise exception"
-        except UnknownModelException:
-            assert True
 
 
 def test_exists(store: ModelRecordServiceBase):
@@ -167,3 +150,62 @@ def test_filter(store: ModelRecordServiceBase):
 
     matches = store.all_models()
     assert len(matches) == 3
+
+
+def test_filter_2(store: ModelRecordServiceBase):
+    config1 = DiffusersConfig(
+        path="/tmp/config1",
+        name="config1",
+        base=BaseModelType("sd-1"),
+        type=ModelType("main"),
+        original_hash="CONFIG1HASH",
+    )
+    config2 = DiffusersConfig(
+        path="/tmp/config2",
+        name="config2",
+        base=BaseModelType("sd-1"),
+        type=ModelType("main"),
+        original_hash="CONFIG2HASH",
+    )
+    config3 = DiffusersConfig(
+        path="/tmp/config3",
+        name="dup_name1",
+        base=BaseModelType("sd-2"),
+        type=ModelType("main"),
+        original_hash="CONFIG3HASH",
+    )
+    config4 = DiffusersConfig(
+        path="/tmp/config4",
+        name="dup_name1",
+        base=BaseModelType("sd-2"),
+        type=ModelType("main"),
+        original_hash="CONFIG3HASH",
+    )
+    config5 = VaeDiffusersConfig(
+        path="/tmp/config5",
+        name="dup_name1",
+        base=BaseModelType("sd-1"),
+        type=ModelType("vae"),
+        original_hash="CONFIG3HASH",
+    )
+    for c in config1, config2, config3, config4, config5:
+        store.add_model(sha256(c.path.encode("utf-8")).hexdigest(), c)
+
+    matches = store.search_by_name(
+        model_type=ModelType("main"),
+        model_name="dup_name1",
+    )
+    assert len(matches) == 2
+
+    matches = store.search_by_name(
+        base_model=BaseModelType("sd-1"),
+        model_type=ModelType("main"),
+    )
+    assert len(matches) == 2
+
+    matches = store.search_by_name(
+        base_model=BaseModelType("sd-1"),
+        model_type=ModelType("vae"),
+        model_name="dup_name1",
+    )
+    assert len(matches) == 1
