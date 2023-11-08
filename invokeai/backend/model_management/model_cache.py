@@ -49,7 +49,7 @@ DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
 # actual size of a gig
 GIG = 1073741824
 # Size of a MB in bytes.
-MB = 2 ** 20
+MB = 2**20
 
 
 @dataclass
