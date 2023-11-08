@@ -7,7 +7,7 @@ import { ChangeEvent, useCallback } from 'react';
 export default function ParamHrfToggle() {
   const dispatch = useAppDispatch();
   const tooltip =
-    'Generate with a lower initial resolution, upscale to base resolution, process run Image-to-Image.';
+    'Generate with a lower initial resolution, upscale to the base resolution, then run Image-to-Image.';
 
   const hrfEnabled = useAppSelector(
     (state: RootState) => state.generation.hrfEnabled
