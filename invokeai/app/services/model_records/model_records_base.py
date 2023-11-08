@@ -142,7 +142,7 @@ class ModelRecordServiceBase(ABC):
         model_configs = self.search_by_name(model_name=model_name, base_model=base_model, model_type=model_type)
         if len(model_configs) > 1:
             raise DuplicateModelException(
-                "More than one model share the same name and type: {base_model}/{model_type}/{model_name}"
+                f"More than one model matched the search criteria: base_model='{base_model}', model_type='{model_type}', model_name='{model_name}'."
             )
         if len(model_configs) == 0:
             raise UnknownModelException("No known model with name and type: {base_model}/{model_type}/{model_name}")
