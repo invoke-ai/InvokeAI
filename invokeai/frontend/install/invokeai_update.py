@@ -63,8 +63,8 @@ def welcome(latest_release: str, latest_prerelease: str):
         yield "[bold yellow]Options:"
         yield f"""[1] Update to the latest [bold]official release[/bold] ([italic]{latest_release}[/italic])
 [2] Update to the latest [bold]pre-release[/bold] (may be buggy; caveat emptor!) ([italic]{latest_prerelease}[/italic])
-[2] Manually enter the [bold]tag name[/bold] for the version you wish to update to
-[3] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
+[3] Manually enter the [bold]tag name[/bold] for the version you wish to update to
+[4] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
 
     console.rule()
     print(
