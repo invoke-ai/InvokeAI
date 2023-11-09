@@ -19,7 +19,7 @@ set -e -o pipefail
 # Default UID: 1000 chosen due to popularity on Linux systems. Possibly 501 on MacOS.
 
 USER_ID=${CONTAINER_UID:-1000}
-USER=invoke
+USER=ubuntu
 usermod -u ${USER_ID} ${USER} 1>/dev/null
 
 configure() {

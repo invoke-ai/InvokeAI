@@ -1,4 +1,10 @@
-import { FieldType, FieldUIConfig } from './types';
+import {
+  FieldType,
+  FieldTypeMap,
+  FieldTypeMapWithNumber,
+  FieldUIConfig,
+} from './types';
+import { t } from 'i18next';
 
 export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
 export const COLOR_TOKEN_VALUE = 500;
@@ -9,177 +15,426 @@ export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
 export const IMAGE_FIELDS = ['ImageField', 'ImageCollection'];
 export const FOOTER_FIELDS = IMAGE_FIELDS;
 
+export const KIND_MAP = {
+  input: 'inputs' as const,
+  output: 'outputs' as const,
+};
+
 export const COLLECTION_TYPES: FieldType[] = [
   'Collection',
   'IntegerCollection',
+  'BooleanCollection',
   'FloatCollection',
   'StringCollection',
-  'BooleanCollection',
   'ImageCollection',
+  'LatentsCollection',
+  'ConditioningCollection',
+  'ControlCollection',
+  'ColorCollection',
+  'T2IAdapterCollection',
+  'IPAdapterCollection',
+  'MetadataItemCollection',
+  'MetadataCollection',
 ];
 
-export const colorTokenToCssVar = (colorToken: string) =>
-  `var(--invokeai-colors-${colorToken.split('.').join('-')}`;
+export const POLYMORPHIC_TYPES: FieldType[] = [
+  'IntegerPolymorphic',
+  'BooleanPolymorphic',
+  'FloatPolymorphic',
+  'StringPolymorphic',
+  'ImagePolymorphic',
+  'LatentsPolymorphic',
+  'ConditioningPolymorphic',
+  'ControlPolymorphic',
+  'ColorPolymorphic',
+  'T2IAdapterPolymorphic',
+  'IPAdapterPolymorphic',
+  'MetadataItemPolymorphic',
+];
+
+export const MODEL_TYPES: FieldType[] = [
+  'IPAdapterModelField',
+  'ControlNetModelField',
+  'LoRAModelField',
+  'MainModelField',
+  'ONNXModelField',
+  'SDXLMainModelField',
+  'SDXLRefinerModelField',
+  'VaeModelField',
+  'UNetField',
+  'VaeField',
+  'ClipField',
+  'T2IAdapterModelField',
+  'IPAdapterModelField',
+];
+
+export const COLLECTION_MAP: FieldTypeMapWithNumber = {
+  integer: 'IntegerCollection',
+  boolean: 'BooleanCollection',
+  number: 'FloatCollection',
+  float: 'FloatCollection',
+  string: 'StringCollection',
+  ImageField: 'ImageCollection',
+  LatentsField: 'LatentsCollection',
+  ConditioningField: 'ConditioningCollection',
+  ControlField: 'ControlCollection',
+  ColorField: 'ColorCollection',
+  T2IAdapterField: 'T2IAdapterCollection',
+  IPAdapterField: 'IPAdapterCollection',
+  MetadataItemField: 'MetadataItemCollection',
+  MetadataField: 'MetadataCollection',
+};
+export const isCollectionItemType = (
+  itemType: string | undefined
+): itemType is keyof typeof COLLECTION_MAP =>
+  Boolean(itemType && itemType in COLLECTION_MAP);
+
+export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
+  integer: 'IntegerPolymorphic',
+  boolean: 'BooleanPolymorphic',
+  number: 'FloatPolymorphic',
+  float: 'FloatPolymorphic',
+  string: 'StringPolymorphic',
+  ImageField: 'ImagePolymorphic',
+  LatentsField: 'LatentsPolymorphic',
+  ConditioningField: 'ConditioningPolymorphic',
+  ControlField: 'ControlPolymorphic',
+  ColorField: 'ColorPolymorphic',
+  T2IAdapterField: 'T2IAdapterPolymorphic',
+  IPAdapterField: 'IPAdapterPolymorphic',
+  MetadataItemField: 'MetadataItemPolymorphic',
+};
+
+export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
+  IntegerPolymorphic: 'integer',
+  BooleanPolymorphic: 'boolean',
+  FloatPolymorphic: 'float',
+  StringPolymorphic: 'string',
+  ImagePolymorphic: 'ImageField',
+  LatentsPolymorphic: 'LatentsField',
+  ConditioningPolymorphic: 'ConditioningField',
+  ControlPolymorphic: 'ControlField',
+  ColorPolymorphic: 'ColorField',
+  T2IAdapterPolymorphic: 'T2IAdapterField',
+  IPAdapterPolymorphic: 'IPAdapterField',
+  MetadataItemPolymorphic: 'MetadataItemField',
+};
+
+export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
+  'string',
+  'StringPolymorphic',
+  'boolean',
+  'BooleanPolymorphic',
+  'integer',
+  'float',
+  'FloatPolymorphic',
+  'IntegerPolymorphic',
+  'enum',
+  'ImageField',
+  'ImagePolymorphic',
+  'MainModelField',
+  'SDXLRefinerModelField',
+  'VaeModelField',
+  'LoRAModelField',
+  'ControlNetModelField',
+  'ColorField',
+  'SDXLMainModelField',
+  'Scheduler',
+  'IPAdapterModelField',
+  'BoardField',
+  'T2IAdapterModelField',
+];
+
+export const isPolymorphicItemType = (
+  itemType: string | undefined
+): itemType is keyof typeof SINGLE_TO_POLYMORPHIC_MAP =>
+  Boolean(itemType && itemType in SINGLE_TO_POLYMORPHIC_MAP);
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
-  integer: {
-    title: 'Integer',
-    description: 'Integers are whole numbers, without a decimal point.',
-    color: 'red.500',
+  Any: {
+    color: 'gray.500',
+    description: 'Any field type is accepted.',
+    title: 'Any',
   },
-  float: {
-    title: 'Float',
-    description: 'Floats are numbers with a decimal point.',
-    color: 'orange.500',
+  MetadataField: {
+    color: 'gray.500',
+    description: 'A metadata dict.',
+    title: 'Metadata Dict',
   },
-  string: {
-    title: 'String',
-    description: 'Strings are text.',
-    color: 'yellow.500',
+  MetadataCollection: {
+    color: 'gray.500',
+    description: 'A collection of metadata dicts.',
+    title: 'Metadata Dict Collection',
+  },
+  MetadataItemField: {
+    color: 'gray.500',
+    description: 'A metadata item.',
+    title: 'Metadata Item',
+  },
+  MetadataItemCollection: {
+    color: 'gray.500',
+    description: 'Any field type is accepted.',
+    title: 'Metadata Item Collection',
+  },
+  MetadataItemPolymorphic: {
+    color: 'gray.500',
+    description:
+      'MetadataItem or MetadataItemCollection field types are accepted.',
+    title: 'Metadata Item Polymorphic',
   },
   boolean: {
-    title: 'Boolean',
     color: 'green.500',
-    description: 'Booleans are true or false.',
+    description: t('nodes.booleanDescription'),
+    title: t('nodes.boolean'),
   },
-  enum: {
-    title: 'Enum',
-    description: 'Enums are values that may be one of a number of options.',
-    color: 'blue.500',
+  BooleanCollection: {
+    color: 'green.500',
+    description: t('nodes.booleanCollectionDescription'),
+    title: t('nodes.booleanCollection'),
   },
-  array: {
-    title: 'Array',
-    description: 'Enums are values that may be one of a number of options.',
-    color: 'base.500',
-  },
-  ImageField: {
-    title: 'Image',
-    description: 'Images may be passed between nodes.',
-    color: 'purple.500',
-  },
-  LatentsField: {
-    title: 'Latents',
-    description: 'Latents may be passed between nodes.',
-    color: 'pink.500',
-  },
-  LatentsCollection: {
-    title: 'Latents Collection',
-    description: 'Latents may be passed between nodes.',
-    color: 'pink.500',
-  },
-  ConditioningField: {
-    color: 'cyan.500',
-    title: 'Conditioning',
-    description: 'Conditioning may be passed between nodes.',
-  },
-  ConditioningCollection: {
-    color: 'cyan.500',
-    title: 'Conditioning Collection',
-    description: 'Conditioning may be passed between nodes.',
-  },
-  ImageCollection: {
-    title: 'Image Collection',
-    description: 'A collection of images.',
-    color: 'base.300',
-  },
-  UNetField: {
-    color: 'red.500',
-    title: 'UNet',
-    description: 'UNet submodel.',
+  BooleanPolymorphic: {
+    color: 'green.500',
+    description: t('nodes.booleanPolymorphicDescription'),
+    title: t('nodes.booleanPolymorphic'),
   },
   ClipField: {
     color: 'green.500',
-    title: 'Clip',
-    description: 'Tokenizer and text_encoder submodels.',
-  },
-  VaeField: {
-    color: 'blue.500',
-    title: 'Vae',
-    description: 'Vae submodel.',
-  },
-  ControlField: {
-    color: 'cyan.500',
-    title: 'Control',
-    description: 'Control info passed between nodes.',
-  },
-  MainModelField: {
-    color: 'teal.500',
-    title: 'Model',
-    description: 'TODO',
-  },
-  SDXLRefinerModelField: {
-    color: 'teal.500',
-    title: 'Refiner Model',
-    description: 'TODO',
-  },
-  VaeModelField: {
-    color: 'teal.500',
-    title: 'VAE',
-    description: 'TODO',
-  },
-  LoRAModelField: {
-    color: 'teal.500',
-    title: 'LoRA',
-    description: 'TODO',
-  },
-  ControlNetModelField: {
-    color: 'teal.500',
-    title: 'ControlNet',
-    description: 'TODO',
+    description: t('nodes.clipFieldDescription'),
+    title: t('nodes.clipField'),
   },
   Collection: {
     color: 'base.500',
-    title: 'Collection',
-    description: 'TODO',
+    description: t('nodes.collectionDescription'),
+    title: t('nodes.collection'),
   },
   CollectionItem: {
     color: 'base.500',
-    title: 'Collection Item',
-    description: 'TODO',
+    description: t('nodes.collectionItemDescription'),
+    title: t('nodes.collectionItem'),
+  },
+  ColorCollection: {
+    color: 'pink.300',
+    description: t('nodes.colorCollectionDescription'),
+    title: t('nodes.colorCollection'),
   },
   ColorField: {
-    title: 'Color',
-    description: 'A RGBA color.',
-    color: 'base.500',
+    color: 'pink.300',
+    description: t('nodes.colorFieldDescription'),
+    title: t('nodes.colorField'),
   },
-  BooleanCollection: {
-    title: 'Boolean Collection',
-    description: 'A collection of booleans.',
-    color: 'green.500',
+  ColorPolymorphic: {
+    color: 'pink.300',
+    description: t('nodes.colorPolymorphicDescription'),
+    title: t('nodes.colorPolymorphic'),
   },
-  IntegerCollection: {
-    title: 'Integer Collection',
-    description: 'A collection of integers.',
-    color: 'red.500',
+  ConditioningCollection: {
+    color: 'cyan.500',
+    description: t('nodes.conditioningCollectionDescription'),
+    title: t('nodes.conditioningCollection'),
+  },
+  ConditioningField: {
+    color: 'cyan.500',
+    description: t('nodes.conditioningFieldDescription'),
+    title: t('nodes.conditioningField'),
+  },
+  ConditioningPolymorphic: {
+    color: 'cyan.500',
+    description: t('nodes.conditioningPolymorphicDescription'),
+    title: t('nodes.conditioningPolymorphic'),
+  },
+  ControlCollection: {
+    color: 'teal.500',
+    description: t('nodes.controlCollectionDescription'),
+    title: t('nodes.controlCollection'),
+  },
+  ControlField: {
+    color: 'teal.500',
+    description: t('nodes.controlFieldDescription'),
+    title: t('nodes.controlField'),
+  },
+  ControlNetModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'ControlNet',
+  },
+  ControlPolymorphic: {
+    color: 'teal.500',
+    description: 'Control info passed between nodes.',
+    title: 'Control Polymorphic',
+  },
+  DenoiseMaskField: {
+    color: 'blue.300',
+    description: t('nodes.denoiseMaskFieldDescription'),
+    title: t('nodes.denoiseMaskField'),
+  },
+  enum: {
+    color: 'blue.500',
+    description: t('nodes.enumDescription'),
+    title: t('nodes.enum'),
+  },
+  float: {
+    color: 'orange.500',
+    description: t('nodes.floatDescription'),
+    title: t('nodes.float'),
   },
   FloatCollection: {
     color: 'orange.500',
-    title: 'Float Collection',
-    description: 'A collection of floats.',
+    description: t('nodes.floatCollectionDescription'),
+    title: t('nodes.floatCollection'),
   },
-  ColorCollection: {
-    color: 'base.500',
-    title: 'Color Collection',
-    description: 'A collection of colors.',
+  FloatPolymorphic: {
+    color: 'orange.500',
+    description: t('nodes.floatPolymorphicDescription'),
+    title: t('nodes.floatPolymorphic'),
   },
-  FilePath: {
-    color: 'base.500',
-    title: 'File Path',
-    description: 'A path to a file.',
+  ImageCollection: {
+    color: 'purple.500',
+    description: t('nodes.imageCollectionDescription'),
+    title: t('nodes.imageCollection'),
+  },
+  ImageField: {
+    color: 'purple.500',
+    description: t('nodes.imageFieldDescription'),
+    title: t('nodes.imageField'),
+  },
+  BoardField: {
+    color: 'purple.500',
+    description: t('nodes.imageFieldDescription'),
+    title: t('nodes.imageField'),
+  },
+  ImagePolymorphic: {
+    color: 'purple.500',
+    description: t('nodes.imagePolymorphicDescription'),
+    title: t('nodes.imagePolymorphic'),
+  },
+  integer: {
+    color: 'red.500',
+    description: t('nodes.integerDescription'),
+    title: t('nodes.integer'),
+  },
+  IntegerCollection: {
+    color: 'red.500',
+    description: t('nodes.integerCollectionDescription'),
+    title: t('nodes.integerCollection'),
+  },
+  IntegerPolymorphic: {
+    color: 'red.500',
+    description: t('nodes.integerPolymorphicDescription'),
+    title: t('nodes.integerPolymorphic'),
+  },
+  IPAdapterCollection: {
+    color: 'teal.500',
+    description: t('nodes.ipAdapterCollectionDescription'),
+    title: t('nodes.ipAdapterCollection'),
+  },
+  IPAdapterField: {
+    color: 'teal.500',
+    description: t('nodes.ipAdapterDescription'),
+    title: t('nodes.ipAdapter'),
+  },
+  IPAdapterModelField: {
+    color: 'teal.500',
+    description: t('nodes.ipAdapterModelDescription'),
+    title: t('nodes.ipAdapterModel'),
+  },
+  IPAdapterPolymorphic: {
+    color: 'teal.500',
+    description: t('nodes.ipAdapterPolymorphicDescription'),
+    title: t('nodes.ipAdapterPolymorphic'),
+  },
+  LatentsCollection: {
+    color: 'pink.500',
+    description: t('nodes.latentsCollectionDescription'),
+    title: t('nodes.latentsCollection'),
+  },
+  LatentsField: {
+    color: 'pink.500',
+    description: t('nodes.latentsFieldDescription'),
+    title: t('nodes.latentsField'),
+  },
+  LatentsPolymorphic: {
+    color: 'pink.500',
+    description: t('nodes.latentsPolymorphicDescription'),
+    title: t('nodes.latentsPolymorphic'),
+  },
+  LoRAModelField: {
+    color: 'teal.500',
+    description: t('nodes.loRAModelFieldDescription'),
+    title: t('nodes.loRAModelField'),
+  },
+  MainModelField: {
+    color: 'teal.500',
+    description: t('nodes.mainModelFieldDescription'),
+    title: t('nodes.mainModelField'),
   },
   ONNXModelField: {
+    color: 'teal.500',
+    description: t('nodes.oNNXModelFieldDescription'),
+    title: t('nodes.oNNXModelField'),
+  },
+  Scheduler: {
     color: 'base.500',
-    title: 'ONNX Model',
-    description: 'ONNX model field.',
+    description: t('nodes.schedulerDescription'),
+    title: t('nodes.scheduler'),
   },
   SDXLMainModelField: {
-    color: 'base.500',
-    title: 'SDXL Model',
-    description: 'SDXL model field.',
+    color: 'teal.500',
+    description: t('nodes.sDXLMainModelFieldDescription'),
+    title: t('nodes.sDXLMainModelField'),
+  },
+  SDXLRefinerModelField: {
+    color: 'teal.500',
+    description: t('nodes.sDXLRefinerModelFieldDescription'),
+    title: t('nodes.sDXLRefinerModelField'),
+  },
+  string: {
+    color: 'yellow.500',
+    description: t('nodes.stringDescription'),
+    title: t('nodes.string'),
   },
   StringCollection: {
     color: 'yellow.500',
-    title: 'String Collection',
-    description: 'A collection of strings.',
+    description: t('nodes.stringCollectionDescription'),
+    title: t('nodes.stringCollection'),
+  },
+  StringPolymorphic: {
+    color: 'yellow.500',
+    description: t('nodes.stringPolymorphicDescription'),
+    title: t('nodes.stringPolymorphic'),
+  },
+  T2IAdapterCollection: {
+    color: 'teal.500',
+    description: t('nodes.t2iAdapterCollectionDescription'),
+    title: t('nodes.t2iAdapterCollection'),
+  },
+  T2IAdapterField: {
+    color: 'teal.500',
+    description: t('nodes.t2iAdapterFieldDescription'),
+    title: t('nodes.t2iAdapterField'),
+  },
+  T2IAdapterModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'T2I-Adapter',
+  },
+  T2IAdapterPolymorphic: {
+    color: 'teal.500',
+    description: 'T2I-Adapter info passed between nodes.',
+    title: 'T2I-Adapter Polymorphic',
+  },
+  UNetField: {
+    color: 'red.500',
+    description: t('nodes.uNetFieldDescription'),
+    title: t('nodes.uNetField'),
+  },
+  VaeField: {
+    color: 'blue.500',
+    description: t('nodes.vaeFieldDescription'),
+    title: t('nodes.vaeField'),
+  },
+  VaeModelField: {
+    color: 'teal.500',
+    description: t('nodes.vaeModelFieldDescription'),
+    title: t('nodes.vaeModelField'),
   },
 };

@@ -3,7 +3,7 @@ import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { TypesafeDroppableData } from 'features/dnd/types';
 import { BoardId } from 'features/gallery/store/types';
-import { ReactNode } from 'react';
+import { ReactNode, memo } from 'react';
 import BoardContextMenu from '../BoardContextMenu';
 
 type GenericBoardProps = {
@@ -105,4 +105,4 @@ const GenericBoard = (props: GenericBoardProps) => {
   );
 };
 
-export default GenericBoard;
+export default memo(GenericBoard);

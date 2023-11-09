@@ -1,12 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { isInvocationNode } from 'features/nodes/types/types';
 import { some } from 'lodash-es';
 import { ImageUsage } from './types';
-import { isInvocationNode } from 'features/nodes/types/types';
+import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 
 export const getImageUsage = (state: RootState, image_name: string) => {
-  const { generation, canvas, nodes, controlNet } = state;
+  const { generation, canvas, nodes, controlAdapters } = state;
   const isInitialImage = generation.initialImage?.imageName === image_name;
 
   const isCanvasImage = canvas.layerState.objects.some(
@@ -21,17 +23,17 @@ export const getImageUsage = (state: RootState, image_name: string) => {
     );
   });
 
-  const isControlNetImage = some(
-    controlNet.controlNets,
-    (c) =>
-      c.controlImage === image_name || c.processedControlImage === image_name
+  const isControlImage = selectControlAdapterAll(controlAdapters).some(
+    (ca) =>
+      ca.controlImage === image_name ||
+      (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === image_name)
   );
 
   const imageUsage: ImageUsage = {
     isInitialImage,
     isCanvasImage,
     isNodesImage,
-    isControlNetImage,
+    isControlImage,
   };
 
   return imageUsage;

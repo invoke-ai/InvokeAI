@@ -25,6 +25,7 @@ Models are described using four attributes:
          ModelType.Lora -- a LoRA or LyCORIS fine-tune
          ModelType.TextualInversion -- a textual inversion embedding
          ModelType.ControlNet -- a ControlNet model
+         ModelType.IPAdapter -- an IPAdapter model
 
   3) BaseModelType -- an enum indicating the stable diffusion base model, one of:
          BaseModelType.StableDiffusion1
@@ -234,32 +235,33 @@ import textwrap
 import types
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import rmtree, move
-from typing import Optional, List, Literal, Tuple, Union, Dict, Set, Callable
+from shutil import move, rmtree
+from typing import Callable, Dict, List, Literal, Optional, Set, Tuple, Union, cast
 
 import torch
 import yaml
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, Chdir
+
 from .model_cache import ModelCache, ModelLocker
 from .model_search import ModelSearch
 from .models import (
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelError,
-    SchedulerPredictionType,
     MODEL_CLASSES,
-    ModelConfigBase,
-    ModelNotFoundException,
-    InvalidModelException,
+    BaseModelType,
     DuplicateModelException,
+    InvalidModelException,
     ModelBase,
+    ModelConfigBase,
+    ModelError,
+    ModelNotFoundException,
+    ModelType,
+    SchedulerPredictionType,
+    SubModelType,
 )
 
 # We are only starting to number the config file with release 3.
@@ -291,6 +293,8 @@ class AddModelResult(BaseModel):
     model_type: ModelType = Field(description="The type of model")
     base_model: BaseModelType = Field(description="The base model")
     config: ModelConfigBase = Field(description="The configuration of the model")
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 MAX_CACHE_SIZE = 6.0  # GB
@@ -341,11 +345,13 @@ class ModelManager(object):
         self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
-            max_vram_cache_size=self.app_config.max_vram_cache_size,
+            max_vram_cache_size=self.app_config.vram_cache_size,
+            lazy_offloading=self.app_config.lazy_offload,
             execution_device=device_type,
             precision=precision,
             sequential_offload=sequential_offload,
             logger=logger,
+            log_memory_usage=self.app_config.log_memory_usage,
         )
 
         self._read_models(config)
@@ -573,7 +579,7 @@ class ModelManager(object):
         """
         model_key = self.create_key(model_name, base_model, model_type)
         if model_key in self.models:
-            return self.models[model_key].dict(exclude_defaults=True)
+            return self.models[model_key].model_dump(exclude_defaults=True)
         else:
             return None  # TODO: None or empty dict on not found
 
@@ -629,7 +635,7 @@ class ModelManager(object):
                 continue
 
             model_dict = dict(
-                **model_config.dict(exclude_defaults=True),
+                **model_config.model_dump(exclude_defaults=True),
                 # OpenAPIModelInfoBase
                 model_name=cur_model_name,
                 base_model=cur_base_model,
@@ -897,14 +903,16 @@ class ModelManager(object):
         Write current configuration out to the indicated file.
         """
         data_to_save = dict()
-        data_to_save["__metadata__"] = self.config_meta.dict()
+        data_to_save["__metadata__"] = self.config_meta.model_dump()
 
         for model_key, model_config in self.models.items():
             model_name, base_model, model_type = self.parse_key(model_key)
             model_class = self._get_implementation(base_model, model_type)
             if model_class.save_to_config:
                 # TODO: or exclude_unset better fits here?
-                data_to_save[model_key] = model_config.dict(exclude_defaults=True, exclude={"error"})
+                data_to_save[model_key] = cast(BaseModel, model_config).model_dump(
+                    exclude_defaults=True, exclude={"error"}, mode="json"
+                )
                 # alias for config file
                 data_to_save[model_key]["format"] = data_to_save[model_key].pop("model_format")
 
@@ -983,6 +991,8 @@ class ModelManager(object):
 
                     for model_path in models_dir.iterdir():
                         if model_path not in loaded_files:  # TODO: check
+                            if model_path.name.startswith("."):
+                                continue
                             model_name = model_path.name if model_path.is_dir() else model_path.stem
                             model_key = self.create_key(model_name, cur_base_model, cur_model_type)
 
@@ -998,10 +1008,12 @@ class ModelManager(object):
                                 new_models_found = True
                             except DuplicateModelException as e:
                                 self.logger.warning(e)
-                            except InvalidModelException:
-                                self.logger.warning(f"Not a valid model: {model_path}")
+                            except InvalidModelException as e:
+                                self.logger.warning(f"Not a valid model: {model_path}. {e}")
                             except NotImplementedError as e:
                                 self.logger.warning(e)
+                            except Exception as e:
+                                self.logger.warning(f"Error loading model {model_path}. {e}")
 
         imported_models = self.scan_autoimport_directory()
         if (new_models_found or imported_models) and self.config_path:

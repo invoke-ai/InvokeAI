@@ -67,6 +67,7 @@ type IAIDndImageProps = FlexProps & {
   withHoverOverlay?: boolean;
   children?: JSX.Element;
   uploadElement?: ReactNode;
+  dataTestId?: string;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -94,20 +95,25 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     children,
     onMouseOver,
     onMouseOut,
+    dataTestId,
   } = props;
 
   const { colorMode } = useColorMode();
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (onMouseOver) onMouseOver(e);
+      if (onMouseOver) {
+        onMouseOver(e);
+      }
       setIsHovered(true);
     },
     [onMouseOver]
   );
   const handleMouseOut = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (onMouseOut) onMouseOut(e);
+      if (onMouseOut) {
+        onMouseOut(e);
+      }
       setIsHovered(false);
     },
     [onMouseOut]
@@ -122,7 +128,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     ? {}
     : {
         cursor: 'pointer',
-        bg: mode('base.200', 'base.800')(colorMode),
+        bg: mode('base.200', 'base.700')(colorMode),
         _hover: {
           bg: mode('base.300', 'base.650')(colorMode),
           color: mode('base.500', 'base.300')(colorMode),
@@ -179,6 +185,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   borderRadius: 'base',
                   ...imageSx,
                 }}
+                data-testid={dataTestId}
               />
               {withMetadataOverlay && (
                 <ImageMetadataOverlay imageDTO={imageDTO} />

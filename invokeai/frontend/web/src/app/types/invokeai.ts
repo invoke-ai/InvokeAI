@@ -1,4 +1,4 @@
-import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { O } from 'ts-toolbelt';
 
@@ -18,7 +18,12 @@ export type AppFeature =
   | 'dynamicPrompting'
   | 'batches'
   | 'syncModels'
-  | 'multiselect';
+  | 'multiselect'
+  | 'pauseQueue'
+  | 'resumeQueue'
+  | 'prependQueue'
+  | 'invocationCache'
+  | 'bulkDownload';
 
 /**
  * A disable-able Stable Diffusion feature
@@ -34,7 +39,8 @@ export type SDFeature =
   | 'hires'
   | 'lora'
   | 'embedding'
-  | 'vae';
+  | 'vae'
+  | 'hrf';
 
 /**
  * Configuration options for the InvokeAI UI.
@@ -45,10 +51,16 @@ export type AppConfig = {
    * Whether or not we should update image urls when image loading errors
    */
   shouldUpdateImagesOnConnect: boolean;
+  shouldFetchMetadataFromApi: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
+  nodesAllowlist: string[] | undefined;
+  nodesDenylist: string[] | undefined;
+  maxUpscalePixels?: number;
+  metadataFetchDebounce?: number;
+  workflowFetchDebounce?: number;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
@@ -94,6 +106,14 @@ export type AppConfig = {
       coarseStep: number;
     };
     img2imgStrength: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    hrfStrength: {
       initial: number;
       min: number;
       sliderMax: number;

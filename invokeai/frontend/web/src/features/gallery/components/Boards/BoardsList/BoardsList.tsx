@@ -41,7 +41,7 @@ const BoardsList = (props: Props) => {
     <>
       <Collapse in={isOpen} animateOpacity>
         <Flex
-          layerStyle={'first'}
+          layerStyle="first"
           sx={{
             flexDir: 'column',
             gap: 2,
@@ -68,17 +68,22 @@ const BoardsList = (props: Props) => {
           >
             <Grid
               className="list-container"
+              data-testid="boards-list"
               sx={{
                 gridTemplateColumns: `repeat(auto-fill, minmax(108px, 1fr));`,
                 maxH: 346,
               }}
             >
-              <GridItem sx={{ p: 1.5 }}>
+              <GridItem sx={{ p: 1.5 }} data-testid="no-board">
                 <NoBoardBoard isSelected={selectedBoardId === 'none'} />
               </GridItem>
               {filteredBoards &&
-                filteredBoards.map((board) => (
-                  <GridItem key={board.board_id} sx={{ p: 1.5 }}>
+                filteredBoards.map((board, index) => (
+                  <GridItem
+                    key={board.board_id}
+                    sx={{ p: 1.5 }}
+                    data-testid={`board-${index}`}
+                  >
                     <GalleryBoard
                       board={board}
                       isSelected={selectedBoardId === board.board_id}

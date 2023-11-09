@@ -5,6 +5,7 @@ wraps the actual patchmatch object. It respects the global
 be suppressed or deferred
 """
 import numpy as np
+
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 

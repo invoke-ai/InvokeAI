@@ -1,14 +1,12 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { ButtonGroup, Flex, Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   addEraseRect,
   addFillRect,
@@ -16,8 +14,8 @@ import {
   setBrushSize,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { clamp, isEqual } from 'lodash-es';
+import { memo } from 'react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -31,15 +29,13 @@ import {
 } from 'react-icons/fa';
 
 export const selector = createSelector(
-  [canvasSelector, isStagingSelector, systemSelector],
-  (canvas, isStaging, system) => {
-    const { isProcessing } = system;
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     const { tool, brushColor, brushSize } = canvas;
 
     return {
       tool,
       isStaging,
-      isProcessing,
       brushColor,
       brushSize,
     };
@@ -117,7 +113,11 @@ const IAICanvasToolChooserOptions = () => {
   useHotkeys(
     ['BracketLeft'],
     () => {
-      dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
+      if (brushSize - 5 <= 5) {
+        dispatch(setBrushSize(Math.max(brushSize - 1, 1)));
+      } else {
+        dispatch(setBrushSize(Math.max(brushSize - 5, 1)));
+      }
     },
     {
       enabled: () => !isStaging,
@@ -237,19 +237,22 @@ const IAICanvasToolChooserOptions = () => {
               sliderNumberInputProps={{ max: 500 }}
             />
           </Flex>
-          <IAIColorPicker
+          <Box
             sx={{
               width: '100%',
               paddingTop: 2,
               paddingBottom: 2,
             }}
-            pickerColor={brushColor}
-            onChange={(newColor) => dispatch(setBrushColor(newColor))}
-          />
+          >
+            <IAIColorPicker
+              color={brushColor}
+              onChange={(newColor) => dispatch(setBrushColor(newColor))}
+            />
+          </Box>
         </Flex>
       </IAIPopover>
     </ButtonGroup>
   );
 };
 
-export default IAICanvasToolChooserOptions;
+export default memo(IAICanvasToolChooserOptions);

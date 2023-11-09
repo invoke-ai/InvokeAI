@@ -6,19 +6,18 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 const selector = createSelector(
   [stateSelector],
-  ({ gallery, system }) => {
+  ({ gallery }) => {
     const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-    const { isProcessing } = system;
 
     return {
       autoAddBoardId,
       autoAssignBoardOnClick,
-      isProcessing,
     };
   },
   defaultSelectorOptions
@@ -26,8 +25,8 @@ const selector = createSelector(
 
 const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId, autoAssignBoardOnClick, isProcessing } =
-    useAppSelector(selector);
+  const { t } = useTranslation();
+  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
   const inputRef = useRef<HTMLInputElement>(null);
   const { boards, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -63,15 +62,15 @@ const BoardAutoAddSelect = () => {
 
   return (
     <IAIMantineSearchableSelect
-      label="Auto-Add Board"
+      label={t('boards.autoAddBoard')}
       inputRef={inputRef}
       autoFocus
-      placeholder={'Select a Board'}
+      placeholder={t('boards.selectBoard')}
       value={autoAddBoardId}
       data={boards}
-      nothingFound="No matching Boards"
+      nothingFound={t('boards.noMatching')}
       itemComponent={IAIMantineSelectItemWithTooltip}
-      disabled={!hasBoards || autoAssignBoardOnClick || isProcessing}
+      disabled={!hasBoards || autoAssignBoardOnClick}
       filter={(value, item: SelectItem) =>
         item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
         item.value.toLowerCase().includes(value.toLowerCase().trim())
@@ -81,4 +80,4 @@ const BoardAutoAddSelect = () => {
   );
 };
 
-export default BoardAutoAddSelect;
+export default memo(BoardAutoAddSelect);

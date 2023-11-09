@@ -1,6 +1,7 @@
 """
 Initialization file for invokeai.backend.util
 """
+from .attention import auto_detect_slice_size  # noqa: F401
 from .devices import (  # noqa: F401
     CPU_DEVICE,
     CUDA_DEVICE,
@@ -10,5 +11,4 @@ from .devices import (  # noqa: F401
     normalize_device,
     torch_dtype,
 )
-from .log import write_log  # noqa: F401
-from .util import ask_user, download_with_resume, instantiate_from_config, url_attachment_name, Chdir  # noqa: F401
+from .util import Chdir, ask_user, download_with_resume, instantiate_from_config, url_attachment_name  # noqa: F401

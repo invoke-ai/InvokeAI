@@ -1,19 +1,20 @@
 import typing
 from enum import Enum
+from pathlib import Path
+
 from fastapi import Body
 from fastapi.routing import APIRouter
-from pathlib import Path
 from pydantic import BaseModel, Field
 
+from invokeai.app.invocations.upscale import ESRGAN_MODELS
+from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
+from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.patchmatch import PatchMatch
 from invokeai.backend.image_util.safety_checker import SafetyChecker
-from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
-from invokeai.app.invocations.upscale import ESRGAN_MODELS
-
+from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
 
 from ..dependencies import ApiDependencies
-from invokeai.backend.util.logging import logging
 
 
 class LogLevel(int, Enum):
@@ -55,7 +56,7 @@ async def get_version() -> AppVersion:
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
 async def get_config() -> AppConfig:
-    infill_methods = ["tile"]
+    infill_methods = ["tile", "lama", "cv2"]
     if PatchMatch.patchmatch_available():
         infill_methods.append("patchmatch")
 
@@ -103,3 +104,43 @@ async def set_log_level(
     """Sets the log verbosity level"""
     ApiDependencies.invoker.services.logger.setLevel(level)
     return LogLevel(ApiDependencies.invoker.services.logger.level)
+
+
+@app_router.delete(
+    "/invocation_cache",
+    operation_id="clear_invocation_cache",
+    responses={200: {"description": "The operation was successful"}},
+)
+async def clear_invocation_cache() -> None:
+    """Clears the invocation cache"""
+    ApiDependencies.invoker.services.invocation_cache.clear()
+
+
+@app_router.put(
+    "/invocation_cache/enable",
+    operation_id="enable_invocation_cache",
+    responses={200: {"description": "The operation was successful"}},
+)
+async def enable_invocation_cache() -> None:
+    """Clears the invocation cache"""
+    ApiDependencies.invoker.services.invocation_cache.enable()
+
+
+@app_router.put(
+    "/invocation_cache/disable",
+    operation_id="disable_invocation_cache",
+    responses={200: {"description": "The operation was successful"}},
+)
+async def disable_invocation_cache() -> None:
+    """Clears the invocation cache"""
+    ApiDependencies.invoker.services.invocation_cache.disable()
+
+
+@app_router.get(
+    "/invocation_cache/status",
+    operation_id="get_invocation_cache_status",
+    responses={200: {"model": InvocationCacheStatus}},
+)
+async def get_invocation_cache_status() -> InvocationCacheStatus:
+    """Clears the invocation cache"""
+    return ApiDependencies.invoker.services.invocation_cache.get_status()

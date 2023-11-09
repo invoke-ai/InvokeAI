@@ -5,14 +5,8 @@ import {
   ImageNSFWBlurInvocation,
   ImageWatermarkInvocation,
   LatentsToImageInvocation,
-  MetadataAccumulatorInvocation,
 } from 'services/api/types';
-import {
-  LATENTS_TO_IMAGE,
-  METADATA_ACCUMULATOR,
-  NSFW_CHECKER,
-  WATERMARKER,
-} from './constants';
+import { LATENTS_TO_IMAGE, NSFW_CHECKER, WATERMARKER } from './constants';
 
 export const addWatermarkerToGraph = (
   state: RootState,
@@ -32,10 +26,6 @@ export const addWatermarkerToGraph = (
     | ImageNSFWBlurInvocation
     | undefined;
 
-  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-    | MetadataAccumulatorInvocation
-    | undefined;
-
   if (!nodeToAddTo) {
     // something has gone terribly awry
     return;
@@ -51,6 +41,7 @@ export const addWatermarkerToGraph = (
 
   // no matter the situation, we want the l2i node to be intermediate
   nodeToAddTo.is_intermediate = true;
+  nodeToAddTo.use_cache = true;
 
   if (nsfwCheckerNode) {
     // if we are using NSFW checker, we need to "disable" it output by marking it intermediate,
@@ -76,19 +67,6 @@ export const addWatermarkerToGraph = (
       destination: {
         node_id: WATERMARKER,
         field: 'image',
-      },
-    });
-  }
-
-  if (metadataAccumulator) {
-    graph.edges.push({
-      source: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'metadata',
-      },
-      destination: {
-        node_id: WATERMARKER,
-        field: 'metadata',
       },
     });
   }

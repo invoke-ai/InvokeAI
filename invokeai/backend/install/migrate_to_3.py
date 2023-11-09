@@ -3,33 +3,26 @@ Migrate the models directory and models.yaml file from an existing
 InvokeAI 2.3 installation to 3.0.0.
 """
 
-import os
 import argparse
+import os
 import shutil
-import yaml
-
-import transformers
-import diffusers
 import warnings
-
 from dataclasses import dataclass
 from pathlib import Path
-from omegaconf import OmegaConf, DictConfig
 from typing import Union
 
-from diffusers import StableDiffusionPipeline, AutoencoderKL
+import diffusers
+import transformers
+import yaml
+from diffusers import AutoencoderKL, StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-from transformers import (
-    CLIPTextModel,
-    CLIPTokenizer,
-    AutoFeatureExtractor,
-    BertTokenizerFast,
-)
+from omegaconf import DictConfig, OmegaConf
+from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel, CLIPTokenizer
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_management import ModelManager
-from invokeai.backend.model_management.model_probe import ModelProbe, ModelType, BaseModelType, ModelProbeInfo
+from invokeai.backend.model_management.model_probe import BaseModelType, ModelProbe, ModelProbeInfo, ModelType
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -492,10 +485,10 @@ def _parse_legacy_yamlfile(root: Path, initfile: Path) -> ModelPaths:
     loras = paths.get("lora_dir", "loras")
     controlnets = paths.get("controlnet_dir", "controlnets")
     return ModelPaths(
-        models=root / models,
-        embeddings=root / embeddings,
-        loras=root / loras,
-        controlnets=root / controlnets,
+        models=root / models if models else None,
+        embeddings=root / embeddings if embeddings else None,
+        loras=root / loras if loras else None,
+        controlnets=root / controlnets if controlnets else None,
     )
 
 

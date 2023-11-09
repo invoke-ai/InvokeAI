@@ -2,6 +2,7 @@ import { Flex } from '@chakra-ui/react';
 
 import IAICanvasRedoButton from 'features/canvas/components/IAICanvasToolbar/IAICanvasRedoButton';
 import IAICanvasUndoButton from 'features/canvas/components/IAICanvasToolbar/IAICanvasUndoButton';
+import { memo } from 'react';
 import UnifiedCanvasSettings from './UnifiedCanvasToolSettings/UnifiedCanvasSettings';
 import UnifiedCanvasCopyToClipboard from './UnifiedCanvasToolbar/UnifiedCanvasCopyToClipboard';
 import UnifiedCanvasDownloadImage from './UnifiedCanvasToolbar/UnifiedCanvasDownloadImage';
@@ -9,7 +10,6 @@ import UnifiedCanvasFileUploader from './UnifiedCanvasToolbar/UnifiedCanvasFileU
 import UnifiedCanvasLayerSelect from './UnifiedCanvasToolbar/UnifiedCanvasLayerSelect';
 import UnifiedCanvasMergeVisible from './UnifiedCanvasToolbar/UnifiedCanvasMergeVisible';
 import UnifiedCanvasMoveTool from './UnifiedCanvasToolbar/UnifiedCanvasMoveTool';
-import UnifiedCanvasProcessingButtons from './UnifiedCanvasToolbar/UnifiedCanvasProcessingButtons';
 import UnifiedCanvasResetCanvas from './UnifiedCanvasToolbar/UnifiedCanvasResetCanvas';
 import UnifiedCanvasResetView from './UnifiedCanvasToolbar/UnifiedCanvasResetView';
 import UnifiedCanvasSaveToGallery from './UnifiedCanvasToolbar/UnifiedCanvasSaveToGallery';
@@ -46,9 +46,8 @@ const UnifiedCanvasToolbarBeta = () => {
       </Flex>
 
       <UnifiedCanvasSettings />
-      <UnifiedCanvasProcessingButtons />
     </Flex>
   );
 };
 
-export default UnifiedCanvasToolbarBeta;
+export default memo(UnifiedCanvasToolbarBeta);

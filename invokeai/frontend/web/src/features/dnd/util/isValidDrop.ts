@@ -22,7 +22,7 @@ export const isValidDrop = (
       return payloadType === 'IMAGE_DTO';
     case 'SET_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'SET_CONTROLNET_IMAGE':
+    case 'SET_CONTROL_ADAPTER_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_CANVAS_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';
@@ -51,8 +51,12 @@ export const isValidDrop = (
       }
 
       if (payloadType === 'IMAGE_DTOS') {
-        // TODO (multi-select)
-        return true;
+        // Assume all images are on the same board - this is true for the moment
+        const { imageDTOs } = active.data.current.payload;
+        const currentBoard = imageDTOs[0]?.board_id ?? 'none';
+        const destinationBoard = overData.context.boardId;
+
+        return currentBoard !== destinationBoard;
       }
 
       return false;
@@ -69,14 +73,17 @@ export const isValidDrop = (
       // Check if the image's board is the board we are dragging onto
       if (payloadType === 'IMAGE_DTO') {
         const { imageDTO } = active.data.current.payload;
-        const currentBoard = imageDTO.board_id;
+        const currentBoard = imageDTO.board_id ?? 'none';
 
         return currentBoard !== 'none';
       }
 
       if (payloadType === 'IMAGE_DTOS') {
-        // TODO (multi-select)
-        return true;
+        // Assume all images are on the same board - this is true for the moment
+        const { imageDTOs } = active.data.current.payload;
+        const currentBoard = imageDTOs[0]?.board_id ?? 'none';
+
+        return currentBoard !== 'none';
       }
 
       return false;

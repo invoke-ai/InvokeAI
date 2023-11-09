@@ -9,7 +9,8 @@ import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectI
 import { loraAdded } from 'features/lora/store/loraSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
 const selector = createSelector(
@@ -24,7 +25,7 @@ const ParamLoRASelect = () => {
   const dispatch = useAppDispatch();
   const { loras } = useAppSelector(selector);
   const { data: loraModels } = useGetLoRAModelsQuery();
-
+  const { t } = useTranslation();
   const currentMainModel = useAppSelector(
     (state: RootState) => state.generation.model
   );
@@ -79,7 +80,7 @@ const ParamLoRASelect = () => {
     return (
       <Flex sx={{ justifyContent: 'center', p: 2 }}>
         <Text sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}>
-          No LoRAs Loaded
+          {t('models.noLoRAsInstalled')}
         </Text>
       </Flex>
     );
@@ -98,8 +99,9 @@ const ParamLoRASelect = () => {
         item.value.toLowerCase().includes(value.toLowerCase().trim())
       }
       onChange={handleChange}
+      data-testid="add-lora"
     />
   );
 };
 
-export default ParamLoRASelect;
+export default memo(ParamLoRASelect);

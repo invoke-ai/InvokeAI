@@ -1,88 +1,112 @@
-from typing import Any, Callable, Literal, Union
-from pydantic import Field
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from typing import Any, Callable, Union
+
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    InputField,
+    InvocationContext,
+    OutputField,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.image import ImageField
 
 
 # Define test invocations before importing anything that uses invocations
+@invocation_output("test_list_output")
 class ListPassThroughInvocationOutput(BaseInvocationOutput):
-    type: Literal["test_list_output"] = "test_list_output"
-
-    collection: list[ImageField] = Field(default_factory=list)
+    collection: list[ImageField] = OutputField(default_factory=list)
 
 
+@invocation("test_list")
 class ListPassThroughInvocation(BaseInvocation):
-    type: Literal["test_list"] = "test_list"
-
-    collection: list[ImageField] = Field(default_factory=list)
+    collection: list[ImageField] = InputField(default_factory=list)
 
     def invoke(self, context: InvocationContext) -> ListPassThroughInvocationOutput:
         return ListPassThroughInvocationOutput(collection=self.collection)
 
 
+@invocation_output("test_prompt_output")
 class PromptTestInvocationOutput(BaseInvocationOutput):
-    type: Literal["test_prompt_output"] = "test_prompt_output"
-
-    prompt: str = Field(default="")
+    prompt: str = OutputField(default="")
 
 
+@invocation("test_prompt")
 class PromptTestInvocation(BaseInvocation):
-    type: Literal["test_prompt"] = "test_prompt"
-
-    prompt: str = Field(default="")
+    prompt: str = InputField(default="")
 
     def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
         return PromptTestInvocationOutput(prompt=self.prompt)
 
 
+@invocation("test_error")
 class ErrorInvocation(BaseInvocation):
-    type: Literal["test_error"] = "test_error"
-
     def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
         raise Exception("This invocation is supposed to fail")
 
 
+@invocation_output("test_image_output")
 class ImageTestInvocationOutput(BaseInvocationOutput):
-    type: Literal["test_image_output"] = "test_image_output"
-
-    image: ImageField = Field()
+    image: ImageField = OutputField()
 
 
+@invocation("test_text_to_image")
 class TextToImageTestInvocation(BaseInvocation):
-    type: Literal["test_text_to_image"] = "test_text_to_image"
-
-    prompt: str = Field(default="")
+    prompt: str = InputField(default="")
+    prompt2: str = InputField(default="")
 
     def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
 
 
+@invocation("test_image_to_image")
 class ImageToImageTestInvocation(BaseInvocation):
-    type: Literal["test_image_to_image"] = "test_image_to_image"
-
-    prompt: str = Field(default="")
-    image: Union[ImageField, None] = Field(default=None)
+    prompt: str = InputField(default="")
+    image: Union[ImageField, None] = InputField(default=None)
 
     def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
 
 
+@invocation_output("test_prompt_collection_output")
 class PromptCollectionTestInvocationOutput(BaseInvocationOutput):
-    type: Literal["test_prompt_collection_output"] = "test_prompt_collection_output"
-    collection: list[str] = Field(default_factory=list)
+    collection: list[str] = OutputField(default_factory=list)
 
 
+@invocation("test_prompt_collection")
 class PromptCollectionTestInvocation(BaseInvocation):
-    type: Literal["test_prompt_collection"] = "test_prompt_collection"
-    collection: list[str] = Field()
+    collection: list[str] = InputField()
 
     def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
 
 
-# Importing these at the top breaks previous tests
-from invokeai.app.services.events import EventServiceBase  # noqa: E402
-from invokeai.app.services.graph import Edge, EdgeConnection  # noqa: E402
+@invocation_output("test_any_output")
+class AnyTypeTestInvocationOutput(BaseInvocationOutput):
+    value: Any = OutputField()
+
+
+@invocation("test_any")
+class AnyTypeTestInvocation(BaseInvocation):
+    value: Any = InputField(default=None)
+
+    def invoke(self, context: InvocationContext) -> AnyTypeTestInvocationOutput:
+        return AnyTypeTestInvocationOutput(value=self.value)
+
+
+@invocation("test_polymorphic")
+class PolymorphicStringTestInvocation(BaseInvocation):
+    value: Union[str, list[str]] = InputField(default="")
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        if isinstance(self.value, str):
+            return PromptCollectionTestInvocationOutput(collection=[self.value])
+        return PromptCollectionTestInvocationOutput(collection=self.value)
+
+
+# Importing these must happen after test invocations are defined or they won't register
+from invokeai.app.services.events.events_base import EventServiceBase  # noqa: E402
+from invokeai.app.services.shared.graph import Edge, EdgeConnection  # noqa: E402
 
 
 def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edge:

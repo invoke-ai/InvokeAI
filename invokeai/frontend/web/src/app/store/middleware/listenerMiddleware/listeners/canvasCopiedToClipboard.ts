@@ -3,7 +3,8 @@ import { startAppListening } from '..';
 import { $logger } from 'app/logging/logger';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
-import { copyBlobToClipboard } from 'features/canvas/util/copyBlobToClipboard';
+import { copyBlobToClipboard } from 'features/system/util/copyBlobToClipboard';
+import { t } from 'i18next';
 
 export const addCanvasCopiedToClipboardListener = () => {
   startAppListening({
@@ -14,25 +15,25 @@ export const addCanvasCopiedToClipboardListener = () => {
         .child({ namespace: 'canvasCopiedToClipboardListener' });
       const state = getState();
 
-      const blob = await getBaseLayerBlob(state);
+      try {
+        const blob = getBaseLayerBlob(state);
 
-      if (!blob) {
-        moduleLog.error('Problem getting base layer blob');
+        copyBlobToClipboard(blob);
+      } catch (err) {
+        moduleLog.error(String(err));
         dispatch(
           addToast({
-            title: 'Problem Copying Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemCopyingCanvas'),
+            description: t('toast.problemCopyingCanvasDesc'),
             status: 'error',
           })
         );
         return;
       }
 
-      copyBlobToClipboard(blob);
-
       dispatch(
         addToast({
-          title: 'Canvas Copied to Clipboard',
+          title: t('toast.canvasCopiedClipboard'),
           status: 'success',
         })
       );

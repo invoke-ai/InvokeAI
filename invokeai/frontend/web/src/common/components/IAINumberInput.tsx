@@ -13,6 +13,7 @@ import {
   NumberInputStepperProps,
   Tooltip,
   TooltipProps,
+  forwardRef,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPastePropagation } from 'common/util/stopPastePropagation';
@@ -50,7 +51,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
 /**
  * Customized Chakra FormControl + NumberInput multi-part component.
  */
-const IAINumberInput = (props: Props) => {
+const IAINumberInput = forwardRef((props: Props, ref) => {
   const {
     label,
     isDisabled = false,
@@ -141,6 +142,7 @@ const IAINumberInput = (props: Props) => {
   return (
     <Tooltip {...tooltipProps}>
       <FormControl
+        ref={ref}
         isDisabled={isDisabled}
         isInvalid={isInvalid}
         {...formControlProps}
@@ -172,6 +174,8 @@ const IAINumberInput = (props: Props) => {
       </FormControl>
     </Tooltip>
   );
-};
+});
+
+IAINumberInput.displayName = 'IAINumberInput';
 
 export default memo(IAINumberInput);

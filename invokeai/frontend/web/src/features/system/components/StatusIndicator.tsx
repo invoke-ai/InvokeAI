@@ -1,34 +1,25 @@
 import { Flex, Icon, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ResourceKey } from 'i18next';
-import { useMemo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCircle } from 'react-icons/fa';
 import { useHoverDirty } from 'react-use';
-import { systemSelector } from '../store/systemSelectors';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { STATUS_TRANSLATION_KEYS } from '../store/types';
 
 const statusIndicatorSelector = createSelector(
-  systemSelector,
-  (system) => {
-    const {
-      isConnected,
-      isProcessing,
-      statusTranslationKey,
-      currentIteration,
-      totalIterations,
-      currentStatusHasSteps,
-    } = system;
+  stateSelector,
+  ({ system }) => {
+    const { isConnected, status } = system;
 
     return {
       isConnected,
-      isProcessing,
-      currentIteration,
-      totalIterations,
-      statusTranslationKey,
-      currentStatusHasSteps,
+      statusTranslationKey: STATUS_TRANSLATION_KEYS[status],
     };
   },
   defaultSelectorOptions
@@ -47,35 +38,24 @@ const LIGHT_COLOR_MAP = {
 };
 
 const StatusIndicator = () => {
-  const {
-    isConnected,
-    isProcessing,
-    currentIteration,
-    totalIterations,
-    statusTranslationKey,
-  } = useAppSelector(statusIndicatorSelector);
+  const { isConnected, statusTranslationKey } = useAppSelector(
+    statusIndicatorSelector
+  );
   const { t } = useTranslation();
   const ref = useRef(null);
+  const { data: queueStatus } = useGetQueueStatusQuery();
 
-  const statusString = useMemo(() => {
-    if (isProcessing) {
+  const statusColor = useMemo(() => {
+    if (!isConnected) {
+      return 'error';
+    }
+
+    if (queueStatus?.queue.in_progress) {
       return 'working';
     }
 
-    if (isConnected) {
-      return 'ok';
-    }
-
-    return 'error';
-  }, [isProcessing, isConnected]);
-
-  const iterationsText = useMemo(() => {
-    if (!(currentIteration && totalIterations)) {
-      return;
-    }
-
-    return ` (${currentIteration}/${totalIterations})`;
-  }, [currentIteration, totalIterations]);
+    return 'ok';
+  }, [queueStatus?.queue.in_progress, isConnected]);
 
   const isHovered = useHoverDirty(ref);
 
@@ -103,12 +83,11 @@ const StatusIndicator = () => {
                 fontWeight: '600',
                 pb: '1px',
                 userSelect: 'none',
-                color: LIGHT_COLOR_MAP[statusString],
-                _dark: { color: DARK_COLOR_MAP[statusString] },
+                color: LIGHT_COLOR_MAP[statusColor],
+                _dark: { color: DARK_COLOR_MAP[statusColor] },
               }}
             >
               {t(statusTranslationKey as ResourceKey)}
-              {iterationsText}
             </Text>
           </motion.div>
         )}
@@ -117,12 +96,12 @@ const StatusIndicator = () => {
         as={FaCircle}
         sx={{
           boxSize: '0.5rem',
-          color: LIGHT_COLOR_MAP[statusString],
-          _dark: { color: DARK_COLOR_MAP[statusString] },
+          color: LIGHT_COLOR_MAP[statusColor],
+          _dark: { color: DARK_COLOR_MAP[statusColor] },
         }}
       />
     </Flex>
   );
 };
 
-export default StatusIndicator;
+export default memo(StatusIndicator);

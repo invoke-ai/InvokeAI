@@ -9,9 +9,8 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { shouldUseNoiseSettings, threshold } = state.generation;
+    const { threshold } = state.generation;
     return {
-      isDisabled: !shouldUseNoiseSettings,
       threshold,
     };
   },
@@ -20,12 +19,11 @@ const selector = createSelector(
 
 export default function ParamNoiseThreshold() {
   const dispatch = useAppDispatch();
-  const { threshold, isDisabled } = useAppSelector(selector);
+  const { threshold } = useAppSelector(selector);
   const { t } = useTranslation();
 
   return (
     <IAISlider
-      isDisabled={isDisabled}
       label={t('parameters.noiseThreshold')}
       min={0}
       max={20}

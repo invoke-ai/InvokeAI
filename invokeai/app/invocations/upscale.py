@@ -4,14 +4,17 @@ from typing import Literal
 
 import cv2 as cv
 import numpy as np
+import torch
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from PIL import Image
+from pydantic import ConfigDict
 from realesrgan import RealESRGANer
+
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.backend.util.devices import choose_torch_device
 
-from invokeai.app.models.image import ImageCategory, ResourceOrigin
-
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, title, tags
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -22,17 +25,21 @@ ESRGAN_MODELS = Literal[
     "RealESRGAN_x2plus.pth",
 ]
 
+if choose_torch_device() == torch.device("mps"):
+    from torch import mps
 
-@title("Upscale (RealESRGAN)")
-@tags("esrgan", "upscale")
-class ESRGANInvocation(BaseInvocation):
+
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.1.0")
+class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Upscales an image using RealESRGAN."""
 
-    type: Literal["esrgan"] = "esrgan"
-
-    # Inputs
     image: ImageField = InputField(description="The input image")
     model_name: ESRGAN_MODELS = InputField(default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use")
+    tile_size: int = InputField(
+        default=400, ge=0, description="Tile size for tiled ESRGAN upscaling (0=tiling disabled)"
+    )
+
+    model_config = ConfigDict(protected_namespaces=())
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -90,9 +97,11 @@ class ESRGANInvocation(BaseInvocation):
             model_path=str(models_path / esrgan_model_path),
             model=rrdbnet_model,
             half=False,
+            tile=self.tile_size,
         )
 
         # prepare image - Real-ESRGAN uses cv2 internally, and cv2 uses BGR vs RGB for PIL
+        # TODO: This strips the alpha... is that okay?
         cv_image = cv.cvtColor(np.array(image.convert("RGB")), cv.COLOR_RGB2BGR)
 
         # We can pass an `outscale` value here, but it just resizes the image by that factor after
@@ -103,6 +112,10 @@ class ESRGANInvocation(BaseInvocation):
         # back to PIL
         pil_image = Image.fromarray(cv.cvtColor(upscaled_image, cv.COLOR_BGR2RGB)).convert("RGBA")
 
+        torch.cuda.empty_cache()
+        if choose_torch_device() == torch.device("mps"):
+            mps.empty_cache()
+
         image_dto = context.services.images.create(
             image=pil_image,
             image_origin=ResourceOrigin.INTERNAL,
@@ -110,6 +123,8 @@ class ESRGANInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata,
+            workflow=self.workflow,
         )
 
         return ImageOutput(

@@ -3,7 +3,6 @@ from typing import Literal, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 import PIL.Image
 from easing_functions import (
     BackEaseIn,
@@ -42,20 +41,25 @@ from matplotlib.ticker import MaxNLocator
 
 from invokeai.app.invocations.primitives import FloatCollectionOutput
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
-@title("Float Range")
-@tags("math", "range")
+@invocation(
+    "float_range",
+    title="Float Range",
+    tags=["math", "range"],
+    category="math",
+    version="1.0.0",
+)
 class FloatLinearRangeInvocation(BaseInvocation):
     """Creates a range"""
 
-    type: Literal["float_range"] = "float_range"
-
-    # Inputs
     start: float = InputField(default=5, description="The first value of the range")
     stop: float = InputField(default=10, description="The last value of the range")
-    steps: int = InputField(default=30, description="number of values to interpolate over (including start and stop)")
+    steps: int = InputField(
+        default=30,
+        description="number of values to interpolate over (including start and stop)",
+    )
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         param_list = list(np.linspace(self.start, self.stop, self.steps))
@@ -100,14 +104,16 @@ EASING_FUNCTION_KEYS = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
 
 
 # actually I think for now could just use CollectionOutput (which is list[Any]
-@title("Step Param Easing")
-@tags("step", "easing")
+@invocation(
+    "step_param_easing",
+    title="Step Param Easing",
+    tags=["step", "easing"],
+    category="step",
+    version="1.0.0",
+)
 class StepParamEasingInvocation(BaseInvocation):
     """Experimental per-step parameter easing for denoising steps"""
 
-    type: Literal["step_param_easing"] = "step_param_easing"
-
-    # Inputs
     easing: EASING_FUNCTION_KEYS = InputField(default="Linear", description="The easing function to use")
     num_steps: int = InputField(default=20, description="number of denoising steps")
     start_value: float = InputField(default=0.0, description="easing starting value")
@@ -168,7 +174,9 @@ class StepParamEasingInvocation(BaseInvocation):
                 context.services.logger.debug("base easing duration: " + str(base_easing_duration))
             even_num_steps = num_easing_steps % 2 == 0  # even number of steps
             easing_function = easing_class(
-                start=self.start_value, end=self.end_value, duration=base_easing_duration - 1
+                start=self.start_value,
+                end=self.end_value,
+                duration=base_easing_duration - 1,
             )
             base_easing_vals = list()
             for step_index in range(base_easing_duration):
@@ -208,7 +216,11 @@ class StepParamEasingInvocation(BaseInvocation):
         #
 
         else:  # no mirroring (default)
-            easing_function = easing_class(start=self.start_value, end=self.end_value, duration=num_easing_steps - 1)
+            easing_function = easing_class(
+                start=self.start_value,
+                end=self.end_value,
+                duration=num_easing_steps - 1,
+            )
             for step_index in range(num_easing_steps):
                 step_val = easing_function.ease(step_index)
                 easing_list.append(step_val)

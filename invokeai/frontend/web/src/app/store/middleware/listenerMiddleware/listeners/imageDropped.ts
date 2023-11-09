@@ -1,7 +1,11 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlAdapterImageChanged,
+  controlAdapterIsEnabledChanged,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -14,7 +18,6 @@ import {
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '../';
-import { parseify } from 'common/util/serialize';
 
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;
@@ -85,15 +88,21 @@ export const addImageDroppedListener = () => {
        * Image dropped on ControlNet
        */
       if (
-        overData.actionType === 'SET_CONTROLNET_IMAGE' &&
+        overData.actionType === 'SET_CONTROL_ADAPTER_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { controlNetId } = overData.context;
+        const { id } = overData.context;
         dispatch(
-          controlNetImageChanged({
+          controlAdapterImageChanged({
+            id,
             controlImage: activeData.payload.imageDTO.image_name,
-            controlNetId,
+          })
+        );
+        dispatch(
+          controlAdapterIsEnabledChanged({
+            id,
+            isEnabled: true,
           })
         );
         return;

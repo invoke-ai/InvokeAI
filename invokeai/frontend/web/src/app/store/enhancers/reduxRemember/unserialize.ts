@@ -1,9 +1,11 @@
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
-import { initialControlNetState } from 'features/controlNet/store/controlNetSlice';
+import { initialControlAdapterState } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { initialDynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
 import { initialNodesState } from 'features/nodes/store/nodesSlice';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { initialPostprocessingState } from 'features/parameters/store/postprocessingSlice';
+import { initialSDXLState } from 'features/sdxl/store/sdxlSlice';
 import { initialConfigState } from 'features/system/store/configSlice';
 import { initialSystemState } from 'features/system/store/systemSlice';
 import { initialHotkeysState } from 'features/ui/store/hotkeysSlice';
@@ -23,7 +25,9 @@ const initialStates: {
   config: initialConfigState,
   ui: initialUIState,
   hotkeys: initialHotkeysState,
-  controlNet: initialControlNetState,
+  controlAdapters: initialControlAdapterState,
+  dynamicPrompts: initialDynamicPromptsState,
+  sdxl: initialSDXLState,
 };
 
 export const unserialize: UnserializeFunction = (data, key) => {

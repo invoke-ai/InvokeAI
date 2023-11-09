@@ -5,8 +5,10 @@ import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 
+import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { clipSkipMap } from '../types/constants';
 import {
+  CanvasCoherenceModeParam,
   CfgScaleParam,
   HeightParam,
   MainModelParam,
@@ -25,6 +27,10 @@ import {
 } from '../types/parameterSchemas';
 
 export interface GenerationState {
+  hrfHeight: HeightParam;
+  hrfWidth: WidthParam;
+  hrfEnabled: boolean;
+  hrfStrength: StrengthParam;
   cfgScale: CfgScaleParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
@@ -37,21 +43,18 @@ export interface GenerationState {
   scheduler: SchedulerParam;
   maskBlur: number;
   maskBlurMethod: MaskBlurMethodParam;
-  seamSize: number;
-  seamBlur: number;
-  seamSteps: number;
-  seamStrength: StrengthParam;
-  seamLowThreshold: number;
-  seamHighThreshold: number;
+  canvasCoherenceMode: CanvasCoherenceModeParam;
+  canvasCoherenceSteps: number;
+  canvasCoherenceStrength: StrengthParam;
   seed: SeedParam;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   shouldRandomizeSeed: boolean;
-  shouldUseNoiseSettings: boolean;
   steps: StepsParam;
   threshold: number;
-  tileSize: number;
+  infillTileSize: number;
+  infillPatchmatchDownscaleSize: number;
   variationAmount: number;
   width: WidthParam;
   shouldUseSymmetry: boolean;
@@ -66,9 +69,14 @@ export interface GenerationState {
   shouldUseCpuNoise: boolean;
   shouldShowAdvancedOptions: boolean;
   aspectRatio: number | null;
+  shouldLockAspectRatio: boolean;
 }
 
 export const initialGenerationState: GenerationState = {
+  hrfHeight: 64,
+  hrfWidth: 64,
+  hrfStrength: 0.75,
+  hrfEnabled: false,
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
@@ -80,21 +88,18 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
-  seamSize: 16,
-  seamBlur: 8,
-  seamSteps: 20,
-  seamStrength: 0.7,
-  seamLowThreshold: 100,
-  seamHighThreshold: 200,
+  canvasCoherenceMode: 'unmasked',
+  canvasCoherenceSteps: 20,
+  canvasCoherenceStrength: 0.3,
   seed: 0,
   seedWeights: '',
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
   shouldRandomizeSeed: true,
-  shouldUseNoiseSettings: false,
   steps: 50,
   threshold: 0,
-  tileSize: 32,
+  infillTileSize: 32,
+  infillPatchmatchDownscaleSize: 1,
   variationAmount: 0.1,
   width: 512,
   shouldUseSymmetry: false,
@@ -109,6 +114,7 @@ export const initialGenerationState: GenerationState = {
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
   aspectRatio: null,
+  shouldLockAspectRatio: false,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -212,29 +218,29 @@ export const generationSlice = createSlice({
     setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
       state.maskBlurMethod = action.payload;
     },
-    setSeamSize: (state, action: PayloadAction<number>) => {
-      state.seamSize = action.payload;
+    setCanvasCoherenceMode: (
+      state,
+      action: PayloadAction<CanvasCoherenceModeParam>
+    ) => {
+      state.canvasCoherenceMode = action.payload;
     },
-    setSeamBlur: (state, action: PayloadAction<number>) => {
-      state.seamBlur = action.payload;
+    setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceSteps = action.payload;
     },
-    setSeamSteps: (state, action: PayloadAction<number>) => {
-      state.seamSteps = action.payload;
-    },
-    setSeamStrength: (state, action: PayloadAction<number>) => {
-      state.seamStrength = action.payload;
-    },
-    setSeamLowThreshold: (state, action: PayloadAction<number>) => {
-      state.seamLowThreshold = action.payload;
-    },
-    setSeamHighThreshold: (state, action: PayloadAction<number>) => {
-      state.seamHighThreshold = action.payload;
-    },
-    setTileSize: (state, action: PayloadAction<number>) => {
-      state.tileSize = action.payload;
+    setCanvasCoherenceStrength: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceStrength = action.payload;
     },
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
+    },
+    setInfillTileSize: (state, action: PayloadAction<number>) => {
+      state.infillTileSize = action.payload;
+    },
+    setInfillPatchmatchDownscaleSize: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.infillPatchmatchDownscaleSize = action.payload;
     },
     setShouldUseSymmetry: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSymmetry = action.payload;
@@ -244,9 +250,6 @@ export const generationSlice = createSlice({
     },
     setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
       state.verticalSymmetrySteps = action.payload;
-    },
-    setShouldUseNoiseSettings: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseNoiseSettings = action.payload;
     },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
       const { image_name, width, height } = action.payload;
@@ -276,14 +279,20 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
+    setHrfHeight: (state, action: PayloadAction<number>) => {
+      state.hrfHeight = action.payload;
+    },
+    setHrfWidth: (state, action: PayloadAction<number>) => {
+      state.hrfWidth = action.payload;
+    },
+    setHrfStrength: (state, action: PayloadAction<number>) => {
+      state.hrfStrength = action.payload;
+    },
+    setHrfEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hrfEnabled = action.payload;
+    },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
-    },
-    setShouldShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowAdvancedOptions = action.payload;
-      if (!action.payload) {
-        state.clipSkip = 0;
-      }
     },
     setAspectRatio: (state, action: PayloadAction<number | null>) => {
       const newAspectRatio = action.payload;
@@ -291,6 +300,9 @@ export const generationSlice = createSlice({
       if (newAspectRatio) {
         state.height = roundToMultiple(state.width / newAspectRatio, 8);
       }
+    },
+    setShouldLockAspectRatio: (state, action: PayloadAction<boolean>) => {
+      state.shouldLockAspectRatio = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -311,9 +323,14 @@ export const generationSlice = createSlice({
         }
       }
     });
-    builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
-      const advancedOptionsStatus = action.payload;
-      if (!advancedOptionsStatus) state.clipSkip = 0;
+
+    // TODO: This is a temp fix to reduce issues with T2I adapter having a different downscaling
+    // factor than the UNet. Hopefully we get an upstream fix in diffusers.
+    builder.addMatcher(isAnyControlAdapterAdded, (state, action) => {
+      if (action.payload.type === 't2i_adapter') {
+        state.width = roundToMultiple(state.width, 64);
+        state.height = roundToMultiple(state.height, 64);
+      }
     });
   },
 });
@@ -336,12 +353,9 @@ export const {
   setScheduler,
   setMaskBlur,
   setMaskBlurMethod,
-  setSeamSize,
-  setSeamBlur,
-  setSeamSteps,
-  setSeamStrength,
-  setSeamLowThreshold,
-  setSeamHighThreshold,
+  setCanvasCoherenceMode,
+  setCanvasCoherenceSteps,
+  setCanvasCoherenceStrength,
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,
@@ -349,7 +363,8 @@ export const {
   setShouldRandomizeSeed,
   setSteps,
   setThreshold,
-  setTileSize,
+  setInfillTileSize,
+  setInfillPatchmatchDownscaleSize,
   setVariationAmount,
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,
@@ -357,13 +372,16 @@ export const {
   initialImageChanged,
   modelChanged,
   vaeSelected,
-  setShouldUseNoiseSettings,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
+  setHrfHeight,
+  setHrfWidth,
+  setHrfStrength,
+  setHrfEnabled,
   shouldUseCpuNoiseChanged,
-  setShouldShowAdvancedOptions,
   setAspectRatio,
+  setShouldLockAspectRatio,
   vaePrecisionChanged,
 } = generationSlice.actions;
 

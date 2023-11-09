@@ -1,9 +1,10 @@
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
 from omegaconf import OmegaConf
-from pathlib import Path
+from pydantic import ValidationError
 
 
 @pytest.fixture
@@ -34,6 +35,21 @@ InvokeAI:
 """
 )
 
+init3 = OmegaConf.create(
+    """
+InvokeAI:
+  Generation:
+    sequential_guidance: true
+    attention_type: xformers
+    attention_slice_size: 7
+    forced_tiled_decode: True
+  Device:
+    device: cpu
+  Model Cache:
+    ram: 1.25
+"""
+)
+
 
 def test_use_init(patch_rootdir):
     # note that we explicitly set omegaconf dict and argv here
@@ -56,7 +72,20 @@ def test_use_init(patch_rootdir):
     assert not hasattr(conf2, "invalid_attribute")
 
 
-def test_argv_override(patch_rootdir):
+def test_legacy():
+    from invokeai.app.services.config import InvokeAIAppConfig
+
+    conf = InvokeAIAppConfig.get_config()
+    assert conf
+    conf.parse_args(conf=init3, argv=[])
+    assert conf.xformers_enabled
+    assert conf.device == "cpu"
+    assert conf.use_cpu
+    assert conf.ram == 1.25
+    assert conf.ram_cache_size == 1.25
+
+
+def test_argv_override():
     from invokeai.app.services.config import InvokeAIAppConfig
 
     conf = InvokeAIAppConfig.get_config()
@@ -92,6 +121,12 @@ def test_env_override(patch_rootdir):
     conf.parse_args(conf=init1, argv=[])
     assert conf.max_cache_size == 20
 
+    # make sure that prefix is respected
+    del os.environ["INVOKEAI_always_use_cpu"]
+    os.environ["always_use_cpu"] = "True"
+    conf.parse_args(conf=init1, argv=[])
+    assert conf.always_use_cpu is False
+
 
 def test_root_resists_cwd(patch_rootdir):
     from invokeai.app.services.config import InvokeAIAppConfig
@@ -121,3 +156,60 @@ def test_type_coercion(patch_rootdir):
     conf.parse_args(argv=["--root=/tmp/foobar"])
     assert conf.root == Path("/tmp/different")
     assert isinstance(conf.root, Path)
+
+
+@pytest.mark.xfail(
+    reason="""
+    This test fails when run as part of the full test suite.
+
+    This test needs to deny nodes from being included in the InvocationsUnion by providing
+    an app configuration as a test fixture. Pytest executes all test files before running
+    tests, so the app configuration is already initialized by the time this test runs, and
+    the InvocationUnion is already created and the denied nodes are not omitted from it.
+
+    This test passes when `test_config.py` is tested in isolation.
+
+    Perhaps a solution would be to call `InvokeAIAppConfig.get_config().parse_args()` in
+    other test files?
+    """
+)
+def test_deny_nodes(patch_rootdir):
+    from invokeai.app.services.config import InvokeAIAppConfig
+
+    # Allow integer, string and float, but explicitly deny float
+    allow_deny_nodes_conf = OmegaConf.create(
+        """
+        InvokeAI:
+          Nodes:
+            allow_nodes:
+              - integer
+              - string
+              - float
+            deny_nodes:
+              - float
+        """
+    )
+    # must parse config before importing Graph, so its nodes union uses the config
+    conf = InvokeAIAppConfig().get_config()
+    conf.parse_args(conf=allow_deny_nodes_conf, argv=[])
+    from invokeai.app.services.shared.graph import Graph
+
+    # confirm graph validation fails when using denied node
+    Graph(nodes={"1": {"id": "1", "type": "integer"}})
+    Graph(nodes={"1": {"id": "1", "type": "string"}})
+
+    with pytest.raises(ValidationError):
+        Graph(nodes={"1": {"id": "1", "type": "float"}})
+
+    from invokeai.app.invocations.baseinvocation import BaseInvocation
+
+    # confirm invocations union will not have denied nodes
+    all_invocations = BaseInvocation.get_invocations()
+
+    has_integer = len([i for i in all_invocations if i.__fields__.get("type").default == "integer"]) == 1
+    has_string = len([i for i in all_invocations if i.__fields__.get("type").default == "string"]) == 1
+    has_float = len([i for i in all_invocations if i.__fields__.get("type").default == "float"]) == 1
+
+    assert has_integer
+    assert has_string
+    assert not has_float

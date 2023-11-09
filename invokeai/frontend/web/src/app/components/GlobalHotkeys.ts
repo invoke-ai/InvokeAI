@@ -1,30 +1,23 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { useQueueBack } from 'features/queue/hooks/useQueueBack';
+import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import {
   ctrlKeyPressed,
   metaKeyPressed,
   shiftKeyPressed,
 } from 'features/ui/store/hotkeysSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import {
-  setActiveTab,
-  toggleGalleryPanel,
-  toggleParametersPanel,
-  togglePinGalleryPanel,
-  togglePinParametersPanel,
-} from 'features/ui/store/uiSlice';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
 import React, { memo } from 'react';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
 const globalHotkeysSelector = createSelector(
   [stateSelector],
-  ({ hotkeys, ui }) => {
+  ({ hotkeys }) => {
     const { shift, ctrl, meta } = hotkeys;
-    const { shouldPinParametersPanel, shouldPinGallery } = ui;
-    return { shift, ctrl, meta, shouldPinGallery, shouldPinParametersPanel };
+    return { shift, ctrl, meta };
   },
   {
     memoizeOptions: {
@@ -41,9 +34,40 @@ const globalHotkeysSelector = createSelector(
  */
 const GlobalHotkeys: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { shift, ctrl, meta, shouldPinParametersPanel, shouldPinGallery } =
-    useAppSelector(globalHotkeysSelector);
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const { shift, ctrl, meta } = useAppSelector(globalHotkeysSelector);
+  const {
+    queueBack,
+    isDisabled: isDisabledQueueBack,
+    isLoading: isLoadingQueueBack,
+  } = useQueueBack();
+
+  useHotkeys(
+    ['ctrl+enter', 'meta+enter'],
+    queueBack,
+    {
+      enabled: () => !isDisabledQueueBack && !isLoadingQueueBack,
+      preventDefault: true,
+      enableOnFormTags: ['input', 'textarea', 'select'],
+    },
+    [queueBack, isDisabledQueueBack, isLoadingQueueBack]
+  );
+
+  const {
+    queueFront,
+    isDisabled: isDisabledQueueFront,
+    isLoading: isLoadingQueueFront,
+  } = useQueueFront();
+
+  useHotkeys(
+    ['ctrl+shift+enter', 'meta+shift+enter'],
+    queueFront,
+    {
+      enabled: () => !isDisabledQueueFront && !isLoadingQueueFront,
+      preventDefault: true,
+      enableOnFormTags: ['input', 'textarea', 'select'],
+    },
+    [queueFront, isDisabledQueueFront, isLoadingQueueFront]
+  );
 
   useHotkeys(
     '*',
@@ -68,34 +92,6 @@ const GlobalHotkeys: React.FC = () => {
     [shift, ctrl, meta]
   );
 
-  useHotkeys('o', () => {
-    dispatch(toggleParametersPanel());
-    if (activeTabName === 'unifiedCanvas' && shouldPinParametersPanel) {
-      dispatch(requestCanvasRescale());
-    }
-  });
-
-  useHotkeys(['shift+o'], () => {
-    dispatch(togglePinParametersPanel());
-    if (activeTabName === 'unifiedCanvas') {
-      dispatch(requestCanvasRescale());
-    }
-  });
-
-  useHotkeys('g', () => {
-    dispatch(toggleGalleryPanel());
-    if (activeTabName === 'unifiedCanvas' && shouldPinGallery) {
-      dispatch(requestCanvasRescale());
-    }
-  });
-
-  useHotkeys(['shift+g'], () => {
-    dispatch(togglePinGalleryPanel());
-    if (activeTabName === 'unifiedCanvas') {
-      dispatch(requestCanvasRescale());
-    }
-  });
-
   useHotkeys('1', () => {
     dispatch(setActiveTab('txt2img'));
   });
@@ -110,6 +106,10 @@ const GlobalHotkeys: React.FC = () => {
 
   useHotkeys('4', () => {
     dispatch(setActiveTab('nodes'));
+  });
+
+  useHotkeys('5', () => {
+    dispatch(setActiveTab('modelManager'));
   });
 
   return null;

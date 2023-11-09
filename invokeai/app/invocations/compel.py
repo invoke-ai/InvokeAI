@@ -1,33 +1,32 @@
 import re
 from dataclasses import dataclass
-from typing import List, Literal, Union
+from typing import List, Optional, Union
 
 import torch
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
-from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
 
-from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import (
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
+from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
+    ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
 
-from ...backend.model_management.models import ModelType
 from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.models import ModelNotFoundException
-from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
+from ...backend.model_management.models import ModelNotFoundException, ModelType
 from ...backend.util.devices import torch_dtype
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
     OutputField,
     UIComponent,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 from .model import ClipField
 
@@ -44,12 +43,15 @@ class ConditioningFieldData:
 #    PerpNeg = "perp_neg"
 
 
-@title("Compel Prompt")
-@tags("prompt", "compel")
+@invocation(
+    "compel",
+    title="Prompt",
+    tags=["prompt", "compel"],
+    category="conditioning",
+    version="1.0.0",
+)
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
-
-    type: Literal["compel"] = "compel"
 
     prompt: str = InputField(
         default="",
@@ -65,17 +67,19 @@ class CompelInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.dict(),
+            **self.clip.tokenizer.model_dump(),
             context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.dict(),
+            **self.clip.text_encoder.model_dump(),
             context=context,
         )
 
         def _lora_loader():
             for lora in self.clip.loras:
-                lora_info = context.services.model_manager.get_model(**lora.dict(exclude={"weight"}), context=context)
+                lora_info = context.services.model_manager.get_model(
+                    **lora.model_dump(exclude={"weight"}), context=context
+                )
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
@@ -103,31 +107,32 @@ class CompelInvocation(BaseInvocation):
                 # print(traceback.format_exc())
                 print(f'Warn: trigger: "{trigger}" not found')
 
-        with ModelPatcher.apply_lora_text_encoder(
-            text_encoder_info.context.model, _lora_loader()
-        ), ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
-            tokenizer,
-            ti_manager,
-        ), ModelPatcher.apply_clip_skip(
-            text_encoder_info.context.model, self.clip.skipped_layers
-        ), text_encoder_info as text_encoder:
+        with (
+            ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
+                tokenizer,
+                ti_manager,
+            ),
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),
+            text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+        ):
             compel = Compel(
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=True,
+                truncate_long_prompts=False,
             )
 
             conjunction = Compel.parse_prompt_string(self.prompt)
-            prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
 
             if context.services.configuration.log_tokenization:
-                log_tokenization_for_prompt_object(prompt, tokenizer)
+                log_tokenization_for_conjunction(conjunction, tokenizer)
 
-            c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
+            c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
-            ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+            ec = ExtraConditioningInfo(
                 tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
                 cross_attention_control_args=options.get("cross_attention_control", None),
             )
@@ -164,11 +169,11 @@ class SDXLPromptInvocationBase:
         zero_on_empty: bool,
     ):
         tokenizer_info = context.services.model_manager.get_model(
-            **clip_field.tokenizer.dict(),
+            **clip_field.tokenizer.model_dump(),
             context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **clip_field.text_encoder.dict(),
+            **clip_field.text_encoder.model_dump(),
             context=context,
         )
 
@@ -176,7 +181,11 @@ class SDXLPromptInvocationBase:
         if prompt == "" and zero_on_empty:
             cpu_text_encoder = text_encoder_info.context.model
             c = torch.zeros(
-                (1, cpu_text_encoder.config.max_position_embeddings, cpu_text_encoder.config.hidden_size),
+                (
+                    1,
+                    cpu_text_encoder.config.max_position_embeddings,
+                    cpu_text_encoder.config.hidden_size,
+                ),
                 dtype=text_encoder_info.context.cache.precision,
             )
             if get_pooled:
@@ -190,7 +199,9 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader():
             for lora in clip_field.loras:
-                lora_info = context.services.model_manager.get_model(**lora.dict(exclude={"weight"}), context=context)
+                lora_info = context.services.model_manager.get_model(
+                    **lora.model_dump(exclude={"weight"}), context=context
+                )
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
@@ -218,30 +229,31 @@ class SDXLPromptInvocationBase:
                 # print(traceback.format_exc())
                 print(f'Warn: trigger: "{trigger}" not found')
 
-        with ModelPatcher.apply_lora(
-            text_encoder_info.context.model, _lora_loader(), lora_prefix
-        ), ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
-            tokenizer,
-            ti_manager,
-        ), ModelPatcher.apply_clip_skip(
-            text_encoder_info.context.model, clip_field.skipped_layers
-        ), text_encoder_info as text_encoder:
+        with (
+            ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
+                tokenizer,
+                ti_manager,
+            ),
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, clip_field.skipped_layers),
+            text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+        ):
             compel = Compel(
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=True,  # TODO:
+                truncate_long_prompts=False,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
-                requires_pooled=True,
+                requires_pooled=get_pooled,
             )
 
             conjunction = Compel.parse_prompt_string(prompt)
 
             if context.services.configuration.log_tokenization:
                 # TODO: better logging for and syntax
-                for prompt_obj in conjunction.prompts:
-                    log_tokenization_for_prompt_object(prompt_obj, tokenizer)
+                log_tokenization_for_conjunction(conjunction, tokenizer)
 
             # TODO: ask for optimizations? to not run text_encoder twice
             c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
@@ -250,7 +262,7 @@ class SDXLPromptInvocationBase:
             else:
                 c_pooled = None
 
-            ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+            ec = ExtraConditioningInfo(
                 tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
                 cross_attention_control_args=options.get("cross_attention_control", None),
             )
@@ -267,23 +279,34 @@ class SDXLPromptInvocationBase:
         return c, c_pooled, ec
 
 
-@title("SDXL Compel Prompt")
-@tags("sdxl", "compel", "prompt")
+@invocation(
+    "sdxl_compel_prompt",
+    title="SDXL Prompt",
+    tags=["sdxl", "compel", "prompt"],
+    category="conditioning",
+    version="1.0.0",
+)
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
 
-    type: Literal["sdxl_compel_prompt"] = "sdxl_compel_prompt"
-
-    prompt: str = InputField(default="", description=FieldDescriptions.compel_prompt, ui_component=UIComponent.Textarea)
-    style: str = InputField(default="", description=FieldDescriptions.compel_prompt, ui_component=UIComponent.Textarea)
+    prompt: str = InputField(
+        default="",
+        description=FieldDescriptions.compel_prompt,
+        ui_component=UIComponent.Textarea,
+    )
+    style: str = InputField(
+        default="",
+        description=FieldDescriptions.compel_prompt,
+        ui_component=UIComponent.Textarea,
+    )
     original_width: int = InputField(default=1024, description="")
     original_height: int = InputField(default=1024, description="")
     crop_top: int = InputField(default=0, description="")
     crop_left: int = InputField(default=0, description="")
     target_width: int = InputField(default=1024, description="")
     target_height: int = InputField(default=1024, description="")
-    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
-    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
+    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1")
+    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -304,6 +327,33 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         target_size = (self.target_height, self.target_width)
 
         add_time_ids = torch.tensor([original_size + crop_coords + target_size])
+
+        # [1, 77, 768], [1, 154, 1280]
+        if c1.shape[1] < c2.shape[1]:
+            c1 = torch.cat(
+                [
+                    c1,
+                    torch.zeros(
+                        (c1.shape[0], c2.shape[1] - c1.shape[1], c1.shape[2]),
+                        device=c1.device,
+                        dtype=c1.dtype,
+                    ),
+                ],
+                dim=1,
+            )
+
+        elif c1.shape[1] > c2.shape[1]:
+            c2 = torch.cat(
+                [
+                    c2,
+                    torch.zeros(
+                        (c2.shape[0], c1.shape[1] - c2.shape[1], c2.shape[2]),
+                        device=c2.device,
+                        dtype=c2.dtype,
+                    ),
+                ],
+                dim=1,
+            )
 
         conditioning_data = ConditioningFieldData(
             conditionings=[
@@ -326,15 +376,20 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         )
 
 
-@title("SDXL Refiner Compel Prompt")
-@tags("sdxl", "compel", "prompt")
+@invocation(
+    "sdxl_refiner_compel_prompt",
+    title="SDXL Refiner Prompt",
+    tags=["sdxl", "compel", "prompt"],
+    category="conditioning",
+    version="1.0.0",
+)
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
 
-    type: Literal["sdxl_refiner_compel_prompt"] = "sdxl_refiner_compel_prompt"
-
     style: str = InputField(
-        default="", description=FieldDescriptions.compel_prompt, ui_component=UIComponent.Textarea
+        default="",
+        description=FieldDescriptions.compel_prompt,
+        ui_component=UIComponent.Textarea,
     )  # TODO: ?
     original_width: int = InputField(default=1024, description="")
     original_height: int = InputField(default=1024, description="")
@@ -374,19 +429,22 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
         )
 
 
+@invocation_output("clip_skip_output")
 class ClipSkipInvocationOutput(BaseInvocationOutput):
     """Clip skip node output"""
 
-    type: Literal["clip_skip_output"] = "clip_skip_output"
-    clip: ClipField = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
+    clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@title("CLIP Skip")
-@tags("clipskip", "clip", "skip")
+@invocation(
+    "clip_skip",
+    title="CLIP Skip",
+    tags=["clipskip", "clip", "skip"],
+    category="conditioning",
+    version="1.0.0",
+)
 class ClipSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""
-
-    type: Literal["clip_skip"] = "clip_skip"
 
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP")
     skipped_layers: int = InputField(default=0, description=FieldDescriptions.skipped_layers)
@@ -399,7 +457,9 @@ class ClipSkipInvocation(BaseInvocation):
 
 
 def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend, Conjunction], truncate_if_too_long=False
+    tokenizer,
+    prompt: Union[FlattenedPrompt, Blend, Conjunction],
+    truncate_if_too_long=False,
 ) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
@@ -416,9 +476,11 @@ def get_tokens_for_prompt_object(tokenizer, parsed_prompt: FlattenedPrompt, trun
         raise ValueError("Blend is not supported here - you need to get tokens for each of its .children")
 
     text_fragments = [
-        x.text
-        if type(x) is Fragment
-        else (" ".join([f.text for f in x.original]) if type(x) is CrossAttentionControlSubstitute else str(x))
+        (
+            x.text
+            if type(x) is Fragment
+            else (" ".join([f.text for f in x.original]) if type(x) is CrossAttentionControlSubstitute else str(x))
+        )
         for x in parsed_prompt.children
     ]
     text = " ".join(text_fragments)

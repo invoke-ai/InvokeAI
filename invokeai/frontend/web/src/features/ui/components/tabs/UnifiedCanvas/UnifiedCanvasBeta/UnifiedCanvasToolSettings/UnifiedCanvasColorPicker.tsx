@@ -35,10 +35,12 @@ export default function UnifiedCanvasColorPicker() {
   const { brushColor, maskColor, layer, isStaging } = useAppSelector(selector);
 
   const currentColorDisplay = () => {
-    if (layer === 'base')
+    if (layer === 'base') {
       return `rgba(${brushColor.r},${brushColor.g},${brushColor.b},${brushColor.a})`;
-    if (layer === 'mask')
+    }
+    if (layer === 'mask') {
       return `rgba(${maskColor.r},${maskColor.g},${maskColor.b},${maskColor.a})`;
+    }
   };
 
   useHotkeys(
@@ -93,26 +95,32 @@ export default function UnifiedCanvasColorPicker() {
     >
       <Flex minWidth={60} direction="column" gap={4} width="100%">
         {layer === 'base' && (
-          <IAIColorPicker
+          <Box
             sx={{
               width: '100%',
               paddingTop: 2,
               paddingBottom: 2,
             }}
-            pickerColor={brushColor}
-            onChange={(newColor) => dispatch(setBrushColor(newColor))}
-          />
+          >
+            <IAIColorPicker
+              color={brushColor}
+              onChange={(newColor) => dispatch(setBrushColor(newColor))}
+            />
+          </Box>
         )}
         {layer === 'mask' && (
-          <IAIColorPicker
+          <Box
             sx={{
               width: '100%',
               paddingTop: 2,
               paddingBottom: 2,
             }}
-            pickerColor={maskColor}
-            onChange={(newColor) => dispatch(setMaskColor(newColor))}
-          />
+          >
+            <IAIColorPicker
+              color={maskColor}
+              onChange={(newColor) => dispatch(setMaskColor(newColor))}
+            />
+          </Box>
         )}
       </Flex>
     </IAIPopover>

@@ -2,35 +2,46 @@
 
 
 import pathlib
-from typing import Literal, List, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, parse_obj_as
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from starlette.exceptions import HTTPException
 
 from invokeai.backend import BaseModelType, ModelType
+from invokeai.backend.model_management import MergeInterpolationMethod
 from invokeai.backend.model_management.models import (
     OPENAPI_MODEL_CONFIGS,
-    SchedulerPredictionType,
-    ModelNotFoundException,
     InvalidModelException,
+    ModelNotFoundException,
+    SchedulerPredictionType,
 )
-from invokeai.backend.model_management import MergeInterpolationMethod
 
 from ..dependencies import ApiDependencies
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
 UpdateModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
+UpdateModelResponseValidator = TypeAdapter(UpdateModelResponse)
+
 ImportModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
+ImportModelResponseValidator = TypeAdapter(ImportModelResponse)
+
 ConvertModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
+ConvertModelResponseValidator = TypeAdapter(ConvertModelResponse)
+
 MergeModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ImportModelAttributes = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
 
 class ModelsList(BaseModel):
     models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+ModelsListValidator = TypeAdapter(ModelsList)
 
 
 @models_router.get(
@@ -49,7 +60,7 @@ async def list_models(
             models_raw.extend(ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type))
     else:
         models_raw = ApiDependencies.invoker.services.model_manager.list_models(None, model_type)
-    models = parse_obj_as(ModelsList, {"models": models_raw})
+    models = ModelsListValidator.validate_python({"models": models_raw})
     return models
 
 
@@ -105,11 +116,14 @@ async def update_model(
                 info.path = new_info.get("path")
 
         # replace empty string values with None/null to avoid phenomenon of vae: ''
-        info_dict = info.dict()
+        info_dict = info.model_dump()
         info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
 
         ApiDependencies.invoker.services.model_manager.update_model(
-            model_name=model_name, base_model=base_model, model_type=model_type, model_attributes=info_dict
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+            model_attributes=info_dict,
         )
 
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
@@ -117,7 +131,7 @@ async def update_model(
             base_model=base_model,
             model_type=model_type,
         )
-        model_response = parse_obj_as(UpdateModelResponse, model_raw)
+        model_response = UpdateModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -146,18 +160,21 @@ async def update_model(
 async def import_model(
     location: str = Body(description="A model path, repo_id or URL to import"),
     prediction_type: Optional[Literal["v_prediction", "epsilon", "sample"]] = Body(
-        description="Prediction type for SDv2 checkpoint files", default="v_prediction"
+        description="Prediction type for SDv2 checkpoints and rare SDv1 checkpoints",
+        default=None,
     ),
 ) -> ImportModelResponse:
     """Add a model using its local path, repo_id, or remote URL. Model characteristics will be probed and configured automatically"""
 
+    location = location.strip("\"' ")
     items_to_import = {location}
     prediction_types = {x.value: x for x in SchedulerPredictionType}
     logger = ApiDependencies.invoker.services.logger
 
     try:
         installed_models = ApiDependencies.invoker.services.model_manager.heuristic_import(
-            items_to_import=items_to_import, prediction_type_helper=lambda x: prediction_types.get(prediction_type)
+            items_to_import=items_to_import,
+            prediction_type_helper=lambda x: prediction_types.get(prediction_type),
         )
         info = installed_models.get(location)
 
@@ -169,7 +186,7 @@ async def import_model(
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
             model_name=info.name, base_model=info.base_model, model_type=info.model_type
         )
-        return parse_obj_as(ImportModelResponse, model_raw)
+        return ImportModelResponseValidator.validate_python(model_raw)
 
     except ModelNotFoundException as e:
         logger.error(str(e))
@@ -203,13 +220,18 @@ async def add_model(
 
     try:
         ApiDependencies.invoker.services.model_manager.add_model(
-            info.model_name, info.base_model, info.model_type, model_attributes=info.dict()
+            info.model_name,
+            info.base_model,
+            info.model_type,
+            model_attributes=info.model_dump(),
         )
         logger.info(f"Successfully added {info.model_name}")
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-            model_name=info.model_name, base_model=info.base_model, model_type=info.model_type
+            model_name=info.model_name,
+            base_model=info.base_model,
+            model_type=info.model_type,
         )
-        return parse_obj_as(ImportModelResponse, model_raw)
+        return ImportModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
@@ -221,7 +243,10 @@ async def add_model(
 @models_router.delete(
     "/{base_model}/{model_type}/{model_name}",
     operation_id="del_model",
-    responses={204: {"description": "Model deleted successfully"}, 404: {"description": "Model not found"}},
+    responses={
+        204: {"description": "Model deleted successfully"},
+        404: {"description": "Model not found"},
+    },
     status_code=204,
     response_model=None,
 )
@@ -277,7 +302,7 @@ async def convert_model(
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
             model_name, base_model=base_model, model_type=model_type
         )
-        response = parse_obj_as(ConvertModelResponse, model_raw)
+        response = ConvertModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException as e:
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found: {str(e)}")
     except ValueError as e:
@@ -300,7 +325,8 @@ async def search_for_models(
 ) -> List[pathlib.Path]:
     if not search_path.is_dir():
         raise HTTPException(
-            status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory"
+            status_code=404,
+            detail=f"The search path '{search_path}' does not exist or is not directory",
         )
     return ApiDependencies.invoker.services.model_manager.search_for_models(search_path)
 
@@ -335,6 +361,26 @@ async def sync_to_config() -> bool:
     return True
 
 
+# There's some weird pydantic-fastapi behaviour that requires this to be a separate class
+# TODO: After a few updates, see if it works inside the route operation handler?
+class MergeModelsBody(BaseModel):
+    model_names: List[str] = Field(description="model name", min_length=2, max_length=3)
+    merged_model_name: Optional[str] = Field(description="Name of destination model")
+    alpha: Optional[float] = Field(description="Alpha weighting strength to apply to 2d and 3d models", default=0.5)
+    interp: Optional[MergeInterpolationMethod] = Field(description="Interpolation method")
+    force: Optional[bool] = Field(
+        description="Force merging of models created with different versions of diffusers",
+        default=False,
+    )
+
+    merge_dest_directory: Optional[str] = Field(
+        description="Save the merged model to the designated directory (with 'merged_model_name' appended)",
+        default=None,
+    )
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
 @models_router.put(
     "/merge/{base_model}",
     operation_id="merge_models",
@@ -347,31 +393,23 @@ async def sync_to_config() -> bool:
     response_model=MergeModelResponse,
 )
 async def merge_models(
+    body: Annotated[MergeModelsBody, Body(description="Model configuration", embed=True)],
     base_model: BaseModelType = Path(description="Base model"),
-    model_names: List[str] = Body(description="model name", min_items=2, max_items=3),
-    merged_model_name: Optional[str] = Body(description="Name of destination model"),
-    alpha: Optional[float] = Body(description="Alpha weighting strength to apply to 2d and 3d models", default=0.5),
-    interp: Optional[MergeInterpolationMethod] = Body(description="Interpolation method"),
-    force: Optional[bool] = Body(
-        description="Force merging of models created with different versions of diffusers", default=False
-    ),
-    merge_dest_directory: Optional[str] = Body(
-        description="Save the merged model to the designated directory (with 'merged_model_name' appended)",
-        default=None,
-    ),
 ) -> MergeModelResponse:
     """Convert a checkpoint model into a diffusers model"""
     logger = ApiDependencies.invoker.services.logger
     try:
-        logger.info(f"Merging models: {model_names} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
-        dest = pathlib.Path(merge_dest_directory) if merge_dest_directory else None
+        logger.info(
+            f"Merging models: {body.model_names} into {body.merge_dest_directory or '<MODELS>'}/{body.merged_model_name}"
+        )
+        dest = pathlib.Path(body.merge_dest_directory) if body.merge_dest_directory else None
         result = ApiDependencies.invoker.services.model_manager.merge_models(
-            model_names,
-            base_model,
-            merged_model_name=merged_model_name or "+".join(model_names),
-            alpha=alpha,
-            interp=interp,
-            force=force,
+            model_names=body.model_names,
+            base_model=base_model,
+            merged_model_name=body.merged_model_name or "+".join(body.model_names),
+            alpha=body.alpha,
+            interp=body.interp,
+            force=body.force,
             merge_dest_directory=dest,
         )
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
@@ -379,9 +417,12 @@ async def merge_models(
             base_model=base_model,
             model_type=ModelType.Main,
         )
-        response = parse_obj_as(ConvertModelResponse, model_raw)
+        response = ConvertModelResponseValidator.validate_python(model_raw)
     except ModelNotFoundException:
-        raise HTTPException(status_code=404, detail=f"One or more of the models '{model_names}' not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"One or more of the models '{body.model_names}' not found",
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response

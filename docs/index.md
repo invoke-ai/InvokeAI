@@ -15,7 +15,8 @@ title: Home
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.1/css/fontawesome.min.css">
 <style>
     .button {
-      width: 300px;
+      width: 100%;
+      max-width: 100%;
       height: 50px;
       background-color: #448AFF;
       color: #fff;
@@ -27,8 +28,9 @@ title: Home
 
     .button-container {
       display: grid;
-      grid-template-columns: repeat(3, 300px);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 20px;
+      justify-content: center;
     }
 
     .button:hover {
@@ -49,9 +51,9 @@ title: Home
 [![github stars badge]][github stars link]
 [![github forks badge]][github forks link]
 
-[![CI checks on main badge]][ci checks on main link]
+<!-- [![CI checks on main badge]][ci checks on main link]
 [![CI checks on dev badge]][ci checks on dev link]
-<!-- [![latest commit to dev badge]][latest commit to dev link] -->
+[![latest commit to dev badge]][latest commit to dev link] -->
 
 [![github open issues badge]][github open issues link]
 [![github open prs badge]][github open prs link]
@@ -141,10 +143,10 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 <!-- seperator -->
 ### Prompt Engineering
 - [Prompt Syntax](features/PROMPTS.md)
-- [Generating Variations](features/VARIATIONS.md)
 
 ### InvokeAI Configuration
 - [Guide to InvokeAI Runtime Settings](features/CONFIGURATION.md)
+- [Database Maintenance and other Command Line Utilities](features/UTILITIES.md)
 
 ## :octicons-log-16: Important Changes Since Version 2.3
 
@@ -163,10 +165,8 @@ still a work in progress, but coming soon.
 
 ### Command-Line Interface Retired
 
-The original "invokeai" command-line interface has been retired. The
-`invokeai` command will now launch a new command-line client that can
-be used by developers to create and test nodes. It is not intended to
-be used for routine image generation or manipulation.
+All "invokeai" command-line interfaces have been retired as of version
+3.4.
 
 To launch the Web GUI from the command-line, use the command
 `invokeai-web` rather than the traditional `invokeai --web`.

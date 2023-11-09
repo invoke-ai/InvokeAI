@@ -1,6 +1,13 @@
-import { OpenAPIV3 } from 'openapi-types';
-import { Edge, Node, OnConnectStartParams, Viewport } from 'reactflow';
 import {
+  Edge,
+  Node,
+  OnConnectStartParams,
+  SelectionMode,
+  Viewport,
+  XYPosition,
+} from 'reactflow';
+import {
+  FieldIdentifier,
   FieldType,
   InvocationEdgeExtra,
   InvocationTemplate,
@@ -12,10 +19,11 @@ import {
 export type NodesState = {
   nodes: Node<NodeData>[];
   edges: Edge<InvocationEdgeExtra>[];
-  schema: OpenAPIV3.Document | null;
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   currentConnectionFieldType: FieldType | null;
+  connectionMade: boolean;
+  modifyingEdge: boolean;
   shouldShowFieldTypeLegend: boolean;
   shouldShowMinimapPanel: boolean;
   shouldValidateGraph: boolean;
@@ -29,4 +37,11 @@ export type NodesState = {
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
   isReady: boolean;
+  mouseOverField: FieldIdentifier | null;
+  mouseOverNode: string | null;
+  nodesToCopy: Node<NodeData>[];
+  edgesToCopy: Edge<InvocationEdgeExtra>[];
+  isAddNodePopoverOpen: boolean;
+  addNewNodePosition: XYPosition | null;
+  selectionMode: SelectionMode;
 };

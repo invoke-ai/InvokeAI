@@ -1,23 +1,30 @@
-from .test_nodes import (
-    TestEventService,
+import logging
+
+import pytest
+
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.backend.util.logging import InvokeAILogger
+
+# This import must happen before other invoke imports or test in other files(!!) break
+from .test_nodes import (  # isort: split
     ErrorInvocation,
-    TextToImageTestInvocation,
     PromptTestInvocation,
+    TestEventService,
+    TextToImageTestInvocation,
     create_edge,
     wait_until,
 )
-from invokeai.app.services.invocation_queue import MemoryInvocationQueue
-from invokeai.app.services.processor import DefaultInvocationProcessor
-from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
-from invokeai.app.services.invoker import Invoker
+
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+from invokeai.app.services.invocation_processor.invocation_processor_default import DefaultInvocationProcessor
+from invokeai.app.services.invocation_queue.invocation_queue_memory import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.invocation_stats import InvocationStatsService
-from invokeai.app.services.graph import (
-    Graph,
-    GraphExecutionState,
-    LibraryGraph,
-)
-import pytest
+from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
+from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
+from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation, LibraryGraph
+from invokeai.app.services.shared.sqlite import SqliteDatabase
 
 
 @pytest.fixture
@@ -29,29 +36,52 @@ def simple_graph():
     return g
 
 
+@pytest.fixture
+def graph_with_subgraph():
+    sub_g = Graph()
+    sub_g.add_node(PromptTestInvocation(id="1", prompt="Banana sushi"))
+    sub_g.add_node(TextToImageTestInvocation(id="2"))
+    sub_g.add_edge(create_edge("1", "prompt", "2", "prompt"))
+    g = Graph()
+    g.add_node(GraphInvocation(id="1", graph=sub_g))
+    return g
+
+
 # This must be defined here to avoid issues with the dynamic creation of the union of all invocation types
 # Defining it in a separate module will cause the union to be incomplete, and pydantic will not validate
 # the test invocations.
 @pytest.fixture
 def mock_services() -> InvocationServices:
+    db = SqliteDatabase(InvokeAIAppConfig(use_memory_db=True), InvokeAILogger.get_logger())
+    configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
+
     # NOTE: none of these are actually called by the test invocations
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        filename=sqlite_memory, table_name="graph_executions"
-    )
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
     return InvocationServices(
-        model_manager=None,  # type: ignore
-        events=TestEventService(),
-        logger=None,  # type: ignore
-        images=None,  # type: ignore
-        latents=None,  # type: ignore
-        boards=None,  # type: ignore
+        board_image_records=None,  # type: ignore
         board_images=None,  # type: ignore
-        queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),
+        board_records=None,  # type: ignore
+        boards=None,  # type: ignore
+        configuration=configuration,
+        events=TestEventService(),
         graph_execution_manager=graph_execution_manager,
+        graph_library=SqliteItemStorage[LibraryGraph](db=db, table_name="graphs"),
+        image_files=None,  # type: ignore
+        image_records=None,  # type: ignore
+        images=None,  # type: ignore
+        invocation_cache=MemoryInvocationCache(max_cache_size=0),
+        latents=None,  # type: ignore
+        logger=logging,  # type: ignore
+        model_manager=None,  # type: ignore
+        names=None,  # type: ignore
+        performance_statistics=InvocationStatsService(),
         processor=DefaultInvocationProcessor(),
-        performance_statistics=InvocationStatsService(graph_execution_manager),
-        configuration=None,  # type: ignore
+        queue=MemoryInvocationQueue(),
+        session_processor=None,  # type: ignore
+        session_queue=None,  # type: ignore
+        urls=None,  # type: ignore
+        workflow_records=None,  # type: ignore
+        workflow_image_records=None,  # type: ignore
     )
 
 
@@ -80,7 +110,12 @@ def test_can_create_graph_state_from_graph(mock_invoker: Invoker, simple_graph):
 # @pytest.mark.xfail(reason = "Requires fixing following the model manager refactor")
 def test_can_invoke(mock_invoker: Invoker, simple_graph):
     g = mock_invoker.create_execution_state(graph=simple_graph)
-    invocation_id = mock_invoker.invoke(g)
+    invocation_id = mock_invoker.invoke(
+        session_queue_batch_id="1",
+        session_queue_item_id=1,
+        session_queue_id=DEFAULT_QUEUE_ID,
+        graph_execution_state=g,
+    )
     assert invocation_id is not None
 
     def has_executed_any(g: GraphExecutionState):
@@ -97,7 +132,13 @@ def test_can_invoke(mock_invoker: Invoker, simple_graph):
 # @pytest.mark.xfail(reason = "Requires fixing following the model manager refactor")
 def test_can_invoke_all(mock_invoker: Invoker, simple_graph):
     g = mock_invoker.create_execution_state(graph=simple_graph)
-    invocation_id = mock_invoker.invoke(g, invoke_all=True)
+    invocation_id = mock_invoker.invoke(
+        session_queue_batch_id="1",
+        session_queue_item_id=1,
+        session_queue_id=DEFAULT_QUEUE_ID,
+        graph_execution_state=g,
+        invoke_all=True,
+    )
     assert invocation_id is not None
 
     def has_executed_all(g: GraphExecutionState):
@@ -116,7 +157,13 @@ def test_handles_errors(mock_invoker: Invoker):
     g = mock_invoker.create_execution_state()
     g.graph.add_node(ErrorInvocation(id="1"))
 
-    mock_invoker.invoke(g, invoke_all=True)
+    mock_invoker.invoke(
+        session_queue_batch_id="1",
+        session_queue_item_id=1,
+        session_queue_id=DEFAULT_QUEUE_ID,
+        graph_execution_state=g,
+        invoke_all=True,
+    )
 
     def has_executed_all(g: GraphExecutionState):
         g = mock_invoker.services.graph_execution_manager.get(g.id)

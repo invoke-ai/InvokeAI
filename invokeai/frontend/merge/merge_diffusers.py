@@ -9,20 +9,15 @@ import curses
 import sys
 from argparse import Namespace
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import npyscreen
 from npyscreen import widget
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management import (
-    ModelMerger,
-    ModelManager,
-    ModelType,
-    BaseModelType,
-)
-from invokeai.frontend.install.widgets import FloatTitleSlider, TextBox, SingleSelectColumns
+from invokeai.backend.model_management import BaseModelType, ModelManager, ModelMerger, ModelType
+from invokeai.frontend.install.widgets import FloatTitleSlider, SingleSelectColumns, TextBox
 
 config = InvokeAIAppConfig.get_config()
 
@@ -136,6 +131,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
             values=[
                 "Models Built on SD-1.x",
                 "Models Built on SD-2.x",
+                "Models Built on SDXL",
             ],
             value=[self.current_base],
             columns=4,
@@ -278,9 +274,10 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         else:
             interp = self.interpolations[self.merge_method.value[0]]
 
+        bases = ["sd-1", "sd-2", "sdxl"]
         args = dict(
             model_names=models,
-            base_model=tuple(BaseModelType)[self.base_select.value[0]],
+            base_model=BaseModelType(bases[self.base_select.value[0]]),
             alpha=self.alpha.value,
             interp=interp,
             force=self.force.value,
@@ -314,7 +311,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         else:
             return True
 
-    def get_model_names(self, base_model: Optional[BaseModelType] = None) -> List[str]:
+    def get_model_names(self, base_model: BaseModelType = BaseModelType.StableDiffusion1) -> List[str]:
         model_names = [
             info["model_name"]
             for info in self.model_manager.list_models(model_type=ModelType.Main, base_model=base_model)
@@ -323,7 +320,8 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         return sorted(model_names)
 
     def _populate_models(self, value=None):
-        base_model = tuple(BaseModelType)[value[0]]
+        bases = ["sd-1", "sd-2", "sdxl"]
+        base_model = BaseModelType(bases[value[0]])
         self.model_names = self.get_model_names(base_model)
 
         models_plus_none = self.model_names.copy()

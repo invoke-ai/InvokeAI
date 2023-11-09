@@ -4,35 +4,36 @@ import inspect
 import re
 
 # from contextlib import ExitStack
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Union
 
 import numpy as np
 import torch
 from diffusers.image_processor import VaeImageProcessor
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from tqdm import tqdm
 
-from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 
 from ...backend.model_management import ONNXModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import choose_torch_device
-from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
-    InputField,
     Input,
+    InputField,
     InvocationContext,
     OutputField,
     UIComponent,
     UIType,
-    tags,
-    title,
+    WithMetadata,
+    WithWorkflow,
+    invocation,
+    invocation_output,
 )
 from .controlnet_image_processors import ControlField
 from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
@@ -56,24 +57,24 @@ ORT_TO_NP_TYPE = {
 PRECISION_VALUES = Literal[tuple(list(ORT_TO_NP_TYPE.keys()))]
 
 
-@title("ONNX Prompt (Raw)")
-@tags("onnx", "prompt")
+@invocation("prompt_onnx", title="ONNX Prompt (Raw)", tags=["prompt", "onnx"], category="conditioning", version="1.0.0")
 class ONNXPromptInvocation(BaseInvocation):
-    type: Literal["prompt_onnx"] = "prompt_onnx"
-
     prompt: str = InputField(default="", description=FieldDescriptions.raw_prompt, ui_component=UIComponent.Textarea)
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.dict(),
+            **self.clip.tokenizer.model_dump(),
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.dict(),
+            **self.clip.text_encoder.model_dump(),
         )
         with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder:  # , ExitStack() as stack:
             loras = [
-                (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
+                (
+                    context.services.model_manager.get_model(**lora.model_dump(exclude={"weight"})).context.model,
+                    lora.weight,
+                )
                 for lora in self.clip.loras
             ]
 
@@ -98,9 +99,10 @@ class ONNXPromptInvocation(BaseInvocation):
                     print(f'Warn: trigger: "{trigger}" not found')
             if loras or ti_list:
                 text_encoder.release_session()
-            with ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras), ONNXModelPatcher.apply_ti(
-                orig_tokenizer, text_encoder, ti_list
-            ) as (tokenizer, ti_manager):
+            with (
+                ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras),
+                ONNXModelPatcher.apply_ti(orig_tokenizer, text_encoder, ti_list) as (tokenizer, ti_manager),
+            ):
                 text_encoder.create_session()
 
                 # copy from
@@ -141,14 +143,16 @@ class ONNXPromptInvocation(BaseInvocation):
 
 
 # Text to image
-@title("ONNX Text to Latents")
-@tags("latents", "inference", "txt2img", "onnx")
+@invocation(
+    "t2l_onnx",
+    title="ONNX Text to Latents",
+    tags=["latents", "inference", "txt2img", "onnx"],
+    category="latents",
+    version="1.0.0",
+)
 class ONNXTextToLatentsInvocation(BaseInvocation):
     """Generates latents from conditionings."""
 
-    type: Literal["t2l_onnx"] = "t2l_onnx"
-
-    # Inputs
     positive_conditioning: ConditioningField = InputField(
         description=FieldDescriptions.positive_cond,
         input=Input.Connection,
@@ -166,25 +170,23 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
         default=7.5,
         ge=1,
         description=FieldDescriptions.cfg_scale,
-        ui_type=UIType.Float,
     )
     scheduler: SAMPLER_NAME_VALUES = InputField(
-        default="euler", description=FieldDescriptions.scheduler, input=Input.Direct
+        default="euler", description=FieldDescriptions.scheduler, input=Input.Direct, ui_type=UIType.Scheduler
     )
     precision: PRECISION_VALUES = InputField(default="tensor(float16)", description=FieldDescriptions.precision)
     unet: UNetField = InputField(
         description=FieldDescriptions.unet,
         input=Input.Connection,
     )
-    control: Optional[Union[ControlField, list[ControlField]]] = InputField(
+    control: Union[ControlField, list[ControlField]] = InputField(
         default=None,
         description=FieldDescriptions.control,
-        ui_type=UIType.Control,
     )
     # seamless:   bool = InputField(default=False, description="Whether or not to generate an image that can tile without seams", )
     # seamless_axes: str = InputField(default="", description="The axes to tile the image on, 'x' and/or 'y'")
 
-    @validator("cfg_scale")
+    @field_validator("cfg_scale")
     def ge_one(cls, v):
         """validate that all cfg_scale values are >= 1"""
         if isinstance(v, list):
@@ -243,7 +245,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             stable_diffusion_step_callback(
                 context=context,
                 intermediate_state=intermediate_state,
-                node=self.dict(),
+                node=self.model_dump(),
                 source_node_id=source_node_id,
             )
 
@@ -256,12 +258,15 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 eta=0.0,
             )
 
-        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
+        unet_info = context.services.model_manager.get_model(**self.unet.unet.model_dump())
 
         with unet_info as unet:  # , ExitStack() as stack:
             # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
             loras = [
-                (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
+                (
+                    context.services.model_manager.get_model(**lora.model_dump(exclude={"weight"})).context.model,
+                    lora.weight,
+                )
                 for lora in self.unet.loras
             ]
 
@@ -316,14 +321,16 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
 
 # Latent to image
-@title("ONNX Latents to Image")
-@tags("latents", "image", "vae", "onnx")
-class ONNXLatentsToImageInvocation(BaseInvocation):
+@invocation(
+    "l2i_onnx",
+    title="ONNX Latents to Image",
+    tags=["latents", "image", "vae", "onnx"],
+    category="image",
+    version="1.0.0",
+)
+class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Generates an image from latents."""
 
-    type: Literal["l2i_onnx"] = "l2i_onnx"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.denoised_latents,
         input=Input.Connection,
@@ -331,11 +338,6 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
     vae: VaeField = InputField(
         description=FieldDescriptions.vae,
         input=Input.Connection,
-    )
-    metadata: Optional[CoreMetadata] = InputField(
-        default=None,
-        description=FieldDescriptions.core_metadata,
-        ui_hidden=True,
     )
     # tiled: bool = InputField(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
 
@@ -346,7 +348,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             raise Exception(f"Expected vae_decoder, found: {self.vae.vae.model_type}")
 
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.model_dump(),
         )
 
         # clear memory as vae decode can request a lot
@@ -375,7 +377,8 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.dict() if self.metadata else None,
+            metadata=self.metadata,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -385,17 +388,14 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
         )
 
 
+@invocation_output("model_loader_output_onnx")
 class ONNXModelLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
-
-    # fmt: off
-    type: Literal["model_loader_output_onnx"] = "model_loader_output_onnx"
 
     unet: UNetField = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
     clip: ClipField = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
     vae_decoder: VaeField = OutputField(default=None, description=FieldDescriptions.vae, title="VAE Decoder")
     vae_encoder: VaeField = OutputField(default=None, description=FieldDescriptions.vae, title="VAE Encoder")
-    # fmt: on
 
 
 class OnnxModelField(BaseModel):
@@ -405,15 +405,13 @@ class OnnxModelField(BaseModel):
     base_model: BaseModelType = Field(description="Base model")
     model_type: ModelType = Field(description="Model Type")
 
+    model_config = ConfigDict(protected_namespaces=())
 
-@title("ONNX Model Loader")
-@tags("onnx", "model")
+
+@invocation("onnx_model_loader", title="ONNX Main Model", tags=["onnx", "model"], category="model", version="1.0.0")
 class OnnxModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    type: Literal["onnx_model_loader"] = "onnx_model_loader"
-
-    # Inputs
     model: OnnxModelField = InputField(
         description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type=UIType.ONNXModel
     )

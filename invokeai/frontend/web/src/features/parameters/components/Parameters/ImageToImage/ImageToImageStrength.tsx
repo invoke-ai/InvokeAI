@@ -6,6 +6,8 @@ import IAISlider from 'common/components/IAISlider';
 import { setImg2imgStrength } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import SubParametersWrapper from '../SubParametersWrapper';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 const selector = createSelector(
   [stateSelector],
@@ -44,20 +46,24 @@ const ImageToImageStrength = () => {
   }, [dispatch, initial]);
 
   return (
-    <IAISlider
-      label={`${t('parameters.denoisingStrength')}`}
-      step={step}
-      min={min}
-      max={sliderMax}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={img2imgStrength}
-      isInteger={false}
-      withInput
-      withSliderMarks
-      withReset
-      sliderNumberInputProps={{ max: inputMax }}
-    />
+    <IAIInformationalPopover feature="paramDenoisingStrength">
+      <SubParametersWrapper>
+        <IAISlider
+          label={`${t('parameters.denoisingStrength')}`}
+          step={step}
+          min={min}
+          max={sliderMax}
+          onChange={handleChange}
+          handleReset={handleReset}
+          value={img2imgStrength}
+          isInteger={false}
+          withInput
+          withSliderMarks
+          withReset
+          sliderNumberInputProps={{ max: inputMax }}
+        />
+      </SubParametersWrapper>
+    </IAIInformationalPopover>
   );
 };
 

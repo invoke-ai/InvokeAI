@@ -53,7 +53,7 @@ const ParamSDXLRefinerScheduler = () => {
   return (
     <IAIMantineSearchableSelect
       w="100%"
-      label={t('parameters.scheduler')}
+      label={t('sdxl.scheduler')}
       value={refinerScheduler}
       data={data}
       onChange={handleChange}

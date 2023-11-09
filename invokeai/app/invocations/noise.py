@@ -1,23 +1,22 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) & the InvokeAI Team
 
-from typing import Literal
 
 import torch
-from pydantic import validator
+from pydantic import field_validator
 
 from invokeai.app.invocations.latent import LatentsField
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     InputField,
     InvocationContext,
     OutputField,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 
 """
@@ -62,13 +61,11 @@ Nodes
 """
 
 
+@invocation_output("noise_output")
 class NoiseOutput(BaseInvocationOutput):
     """Invocation noise output"""
 
-    type: Literal["noise_output"] = "noise_output"
-
-    # Inputs
-    noise: LatentsField = OutputField(default=None, description=FieldDescriptions.noise)
+    noise: LatentsField = OutputField(description=FieldDescriptions.noise)
     width: int = OutputField(description=FieldDescriptions.width)
     height: int = OutputField(description=FieldDescriptions.height)
 
@@ -81,14 +78,16 @@ def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
     )
 
 
-@title("Noise")
-@tags("latents", "noise")
+@invocation(
+    "noise",
+    title="Noise",
+    tags=["latents", "noise"],
+    category="latents",
+    version="1.0.0",
+)
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 
-    type: Literal["noise"] = "noise"
-
-    # Inputs
     seed: int = InputField(
         ge=0,
         le=SEED_MAX,
@@ -112,7 +111,7 @@ class NoiseInvocation(BaseInvocation):
         description="Use CPU for noise generation (for reproducible results across platforms)",
     )
 
-    @validator("seed", pre=True)
+    @field_validator("seed", mode="before")
     def modulo_seed(cls, v):
         """Returns the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
         return v % (SEED_MAX + 1)

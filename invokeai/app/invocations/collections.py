@@ -1,31 +1,28 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
-from typing import Literal
 
 import numpy as np
-from pydantic import validator
+from pydantic import ValidationInfo, field_validator
 
 from invokeai.app.invocations.primitives import IntegerCollectionOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
-@title("Integer Range")
-@tags("collection", "integer", "range")
+@invocation(
+    "range", title="Integer Range", tags=["collection", "integer", "range"], category="collections", version="1.0.0"
+)
 class RangeInvocation(BaseInvocation):
     """Creates a range of numbers from start to stop with step"""
 
-    type: Literal["range"] = "range"
-
-    # Inputs
     start: int = InputField(default=0, description="The start of the range")
     stop: int = InputField(default=10, description="The stop of the range")
     step: int = InputField(default=1, description="The step of the range")
 
-    @validator("stop")
-    def stop_gt_start(cls, v, values):
-        if "start" in values and v <= values["start"]:
+    @field_validator("stop")
+    def stop_gt_start(cls, v: int, info: ValidationInfo):
+        if "start" in info.data and v <= info.data["start"]:
             raise ValueError("stop must be greater than start")
         return v
 
@@ -33,30 +30,37 @@ class RangeInvocation(BaseInvocation):
         return IntegerCollectionOutput(collection=list(range(self.start, self.stop, self.step)))
 
 
-@title("Integer Range of Size")
-@tags("range", "integer", "size", "collection")
+@invocation(
+    "range_of_size",
+    title="Integer Range of Size",
+    tags=["collection", "integer", "size", "range"],
+    category="collections",
+    version="1.0.0",
+)
 class RangeOfSizeInvocation(BaseInvocation):
-    """Creates a range from start to start + size with step"""
+    """Creates a range from start to start + (size * step) incremented by step"""
 
-    type: Literal["range_of_size"] = "range_of_size"
-
-    # Inputs
     start: int = InputField(default=0, description="The start of the range")
-    size: int = InputField(default=1, description="The number of values")
+    size: int = InputField(default=1, gt=0, description="The number of values")
     step: int = InputField(default=1, description="The step of the range")
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
-        return IntegerCollectionOutput(collection=list(range(self.start, self.start + self.size, self.step)))
+        return IntegerCollectionOutput(
+            collection=list(range(self.start, self.start + (self.step * self.size), self.step))
+        )
 
 
-@title("Random Range")
-@tags("range", "integer", "random", "collection")
+@invocation(
+    "random_range",
+    title="Random Range",
+    tags=["range", "integer", "random", "collection"],
+    category="collections",
+    version="1.0.0",
+    use_cache=False,
+)
 class RandomRangeInvocation(BaseInvocation):
     """Creates a collection of random numbers"""
 
-    type: Literal["random_range"] = "random_range"
-
-    # Inputs
     low: int = InputField(default=0, description="The inclusive low value")
     high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
     size: int = InputField(default=1, description="The number of values to generate")

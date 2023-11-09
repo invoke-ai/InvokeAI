@@ -19,6 +19,7 @@ import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import ImageMetadataViewer from '../ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from '../NextPrevImageButtons';
+import { useTranslation } from 'react-i18next';
 
 export const imagesSelector = createSelector(
   [stateSelector, selectLastSelectedImage],
@@ -28,12 +29,12 @@ export const imagesSelector = createSelector(
       shouldHidePreview,
       shouldShowProgressInViewer,
     } = ui;
-    const { progressImage, shouldAntialiasProgressImage } = system;
+    const { denoiseProgress, shouldAntialiasProgressImage } = system;
     return {
       shouldShowImageDetails,
       shouldHidePreview,
       imageName: lastSelectedImage?.image_name,
-      progressImage,
+      denoiseProgress,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
     };
@@ -49,7 +50,7 @@ const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
     imageName,
-    progressImage,
+    denoiseProgress,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
@@ -117,6 +118,8 @@ const CurrentImagePreview = () => {
 
   const timeoutId = useRef(0);
 
+  const { t } = useTranslation();
+
   const handleMouseOver = useCallback(() => {
     setShouldShowNextPrevButtons(true);
     window.clearTimeout(timeoutId.current);
@@ -140,12 +143,13 @@ const CurrentImagePreview = () => {
         position: 'relative',
       }}
     >
-      {progressImage && shouldShowProgressInViewer ? (
+      {denoiseProgress?.progress_image && shouldShowProgressInViewer ? (
         <Image
-          src={progressImage.dataURL}
-          width={progressImage.width}
-          height={progressImage.height}
+          src={denoiseProgress.progress_image.dataURL}
+          width={denoiseProgress.progress_image.width}
+          height={denoiseProgress.progress_image.height}
           draggable={false}
+          data-testid="progress-image"
           sx={{
             objectFit: 'contain',
             maxWidth: 'full',
@@ -164,10 +168,11 @@ const CurrentImagePreview = () => {
           isUploadDisabled={true}
           fitContainer
           useThumbailFallback
-          dropLabel="Set as Current Image"
+          dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={
             <IAINoContentFallback icon={FaImage} label="No image selected" />
           }
+          dataTestId="image-preview"
         />
       )}
       {shouldShowImageDetails && imageDTO && (

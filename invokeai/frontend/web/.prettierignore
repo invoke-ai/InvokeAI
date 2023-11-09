@@ -1,4 +1,5 @@
 dist/
+public/locales/*.json
 .husky/
 node_modules/
 patches/
@@ -7,8 +8,7 @@ index.html
 .yarn/
 .yalc/
 *.scss
-src/services/api/
-src/services/fixtures/*
+src/services/api/schema.d.ts
 docs/
 static/
 src/theme/css/overlayscrollbars.css

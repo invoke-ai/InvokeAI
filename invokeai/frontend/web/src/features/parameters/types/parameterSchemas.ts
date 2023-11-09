@@ -210,7 +210,22 @@ export type HeightParam = z.infer<typeof zHeight>;
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
-const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+/**
+ * Zod schema for resolution parameter
+ */
+export const zResolution = z.tuple([zWidth, zHeight]);
+/**
+ * Type alias for resolution parameter, inferred from its zod schema
+ */
+export type ResolutionParam = z.infer<typeof zResolution>;
+
+export const zBaseModel = z.enum([
+  'any',
+  'sd-1',
+  'sd-2',
+  'sdxl',
+  'sdxl-refiner',
+]);
 
 export type BaseModelParam = z.infer<typeof zBaseModel>;
 
@@ -323,10 +338,41 @@ export type ControlNetModelParam = z.infer<typeof zLoRAModel>;
 export const isValidControlNetModel = (
   val: unknown
 ): val is ControlNetModelParam => zControlNetModel.safeParse(val).success;
+/**
+ * Zod schema for IP-Adapter models
+ */
+export const zIPAdapterModel = z.object({
+  model_name: z.string().min(1),
+  base_model: zBaseModel,
+});
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type IPAdapterModelParam = z.infer<typeof zIPAdapterModel>;
+/**
+ * Zod schema for T2I-Adapter models
+ */
+export const zT2IAdapterModel = z.object({
+  model_name: z.string().min(1),
+  base_model: zBaseModel,
+});
+export const isValidT2IAdapterModel = (
+  val: unknown
+): val is T2IAdapterModelParam => zT2IAdapterModel.safeParse(val).success;
 
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type T2IAdapterModelParam = z.infer<typeof zT2IAdapterModel>;
 /**
  * Zod schema for l2l strength parameter
  */
+/**
+ * Validates/type-guards a value as a model parameter
+ */
+export const isValidIPAdapterModel = (
+  val: unknown
+): val is IPAdapterModelParam => zIPAdapterModel.safeParse(val).success;
 export const zStrength = z.number().min(0).max(1);
 /**
  * Type alias for l2l strength parameter, inferred from its zod schema
@@ -417,6 +463,22 @@ export type MaskBlurMethodParam = z.infer<typeof zMaskBlurMethod>;
 export const isValidMaskBlurMethod = (
   val: unknown
 ): val is MaskBlurMethodParam => zMaskBlurMethod.safeParse(val).success;
+
+/**
+ * Zod schema for a Canvas Coherence Mode method parameter
+ */
+export const zCanvasCoherenceMode = z.enum(['unmasked', 'mask', 'edge']);
+/**
+ * Type alias for Canvas Coherence Mode parameter, inferred from its zod schema
+ */
+export type CanvasCoherenceModeParam = z.infer<typeof zCanvasCoherenceMode>;
+/**
+ * Validates/type-guards a value as a mask blur method parameter
+ */
+export const isValidCoherenceModeParam = (
+  val: unknown
+): val is CanvasCoherenceModeParam =>
+  zCanvasCoherenceMode.safeParse(val).success;
 
 // /**
 //  * Zod schema for BaseModelType

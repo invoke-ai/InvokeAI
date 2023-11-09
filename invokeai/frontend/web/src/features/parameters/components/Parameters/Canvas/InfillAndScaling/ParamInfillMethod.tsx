@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setInfillMethod } from 'features/parameters/store/generationSlice';
 
@@ -39,14 +40,16 @@ const ParamInfillMethod = () => {
   );
 
   return (
-    <IAIMantineSelect
-      disabled={infill_methods?.length === 0}
-      placeholder={isLoading ? 'Loading...' : undefined}
-      label={t('parameters.infillMethod')}
-      value={infillMethod}
-      data={infill_methods ?? []}
-      onChange={handleChange}
-    />
+    <IAIInformationalPopover feature="infillMethod">
+      <IAIMantineSelect
+        disabled={infill_methods?.length === 0}
+        placeholder={isLoading ? 'Loading...' : undefined}
+        label={t('parameters.infillMethod')}
+        value={infillMethod}
+        data={infill_methods ?? []}
+        onChange={handleChange}
+      />
+    </IAIInformationalPopover>
   );
 };
 

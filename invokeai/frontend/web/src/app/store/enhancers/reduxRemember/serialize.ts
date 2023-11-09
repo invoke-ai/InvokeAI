@@ -1,5 +1,6 @@
 import { canvasPersistDenylist } from 'features/canvas/store/canvasPersistDenylist';
-import { controlNetDenylist } from 'features/controlNet/store/controlNetDenylist';
+import { controlAdaptersPersistDenylist } from 'features/controlAdapters/store/controlAdaptersPersistDenylist';
+import { dynamicPromptsPersistDenylist } from 'features/dynamicPrompts/store/dynamicPromptsPersistDenylist';
 import { galleryPersistDenylist } from 'features/gallery/store/galleryPersistDenylist';
 import { nodesPersistDenylist } from 'features/nodes/store/nodesPersistDenylist';
 import { generationPersistDenylist } from 'features/parameters/store/generationPersistDenylist';
@@ -19,7 +20,8 @@ const serializationDenylist: {
   postprocessing: postprocessingPersistDenylist,
   system: systemPersistDenylist,
   ui: uiPersistDenylist,
-  controlNet: controlNetDenylist,
+  controlNet: controlAdaptersPersistDenylist,
+  dynamicPrompts: dynamicPromptsPersistDenylist,
 };
 
 export const serialize: SerializeFunction = (data, key) => {

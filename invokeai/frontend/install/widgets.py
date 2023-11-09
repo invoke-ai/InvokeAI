@@ -5,20 +5,21 @@ import curses
 import math
 import os
 import platform
-import pyperclip
 import struct
 import subprocess
 import sys
-import npyscreen
 import textwrap
-import npyscreen.wgmultiline as wgmultiline
-from npyscreen import fmPopup
-from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED, BUTTON3_CLICKED
+from shutil import get_terminal_size
+
+import npyscreen
+import npyscreen.wgmultiline as wgmultiline
+import pyperclip
+from npyscreen import fmPopup
 
 # minimum size for UIs
-MIN_COLS = 130
-MIN_LINES = 38
+MIN_COLS = 150
+MIN_LINES = 40
 
 
 class WindowTooSmallException(Exception):
@@ -177,6 +178,8 @@ class FloatTitleSlider(npyscreen.TitleText):
 
 
 class SelectColumnBase:
+    """Base class for selection widget arranged in columns."""
+
     def make_contained_widgets(self):
         self._my_widgets = []
         column_width = self.width // self.columns
@@ -253,6 +256,7 @@ class MultiSelectColumns(SelectColumnBase, npyscreen.MultiSelect):
 class SingleSelectWithChanged(npyscreen.SelectOne):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.on_changed = None
 
     def h_select(self, ch):
         super().h_select(ch)
@@ -260,7 +264,9 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
             self.on_changed(self.value)
 
 
-class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
+class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
+    """Row of radio buttons. Spacebar to select."""
+
     def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
         self.columns = columns
         self.value_cnt = len(values)
@@ -268,14 +274,18 @@ class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
         self.on_changed = None
         super().__init__(screen, values=values, **keywords)
 
-    def when_value_edited(self):
-        self.h_select(self.cursor_line)
+    def h_cursor_line_right(self, ch):
+        self.h_exit_down("bye bye")
+
+    def h_cursor_line_left(self, ch):
+        self.h_exit_up("bye bye")
+
+
+class SingleSelectColumns(SingleSelectColumnsSimple):
+    """Row of radio buttons. When tabbing over a selection, it is auto selected."""
 
     def when_cursor_moved(self):
         self.h_select(self.cursor_line)
-
-    def h_cursor_line_right(self, ch):
-        self.h_exit_down("bye bye")
 
 
 class TextBoxInner(npyscreen.MultiLineEdit):
@@ -324,55 +334,6 @@ class TextBoxInner(npyscreen.MultiLineEdit):
         if bstate & (BUTTON2_CLICKED | BUTTON3_CLICKED):
             self.h_paste()
 
-    # def update(self, clear=True):
-    #     if clear:
-    #         self.clear()
-
-    #     HEIGHT = self.height
-    #     WIDTH = self.width
-    #     # draw box.
-    #     self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
-    #     self.parent.curses_pad.hline(
-    #         self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx, curses.ACS_VLINE, self.height
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
-    #     )
-
-    # # draw corners
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx,
-    #     curses.ACS_ULCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx + WIDTH,
-    #     curses.ACS_URCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx,
-    #     curses.ACS_LLCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx + WIDTH,
-    #     curses.ACS_LRCORNER,
-    # )
-
-    # # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
-    # (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
-    # self.relx += 1
-    # self.rely += 1
-    # self.height -= 1
-    # self.width -= 1
-    # super().update(clear=False)
-    # (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
-
 
 class TextBox(npyscreen.BoxTitle):
     _contained_widget = TextBoxInner
@@ -420,12 +381,12 @@ def select_stable_diffusion_config_file(
     wrap: bool = True,
     model_name: str = "Unknown",
 ):
-    message = f"Please select the correct base model for the V2 checkpoint named '{model_name}'. Press <CANCEL> to skip installation."
+    message = f"Please select the correct prediction type for the checkpoint named '{model_name}'. Press <CANCEL> to skip installation."
     title = "CONFIG FILE SELECTION"
     options = [
-        "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",
-        "An SD v2.x v-predictive model (768 pixels; 'parameterization: \"v\"' line in its yaml file)",
-        "Skip installation for now and come back later",
+        "'epsilon' - most v1.5 models and v2 models trained on 512 pixel images",
+        "'vprediction' - v2 models trained on 768 pixel images and a few v1.5 models)",
+        "Accept the best guess; you can fix it in the Web UI later",
     ]
 
     F = ConfirmCancelPopup(
@@ -449,7 +410,7 @@ def select_stable_diffusion_config_file(
     choice = F.add(
         npyscreen.SelectOne,
         values=options,
-        value=[0],
+        value=[2],
         max_height=len(options) + 1,
         scroll_exit=True,
     )
@@ -459,5 +420,5 @@ def select_stable_diffusion_config_file(
     if not F.value:
         return None
     assert choice.value[0] in range(0, 3), "invalid choice"
-    choices = ["epsilon", "v", "abort"]
+    choices = ["epsilon", "v", "guess"]
     return choices[choice.value[0]]

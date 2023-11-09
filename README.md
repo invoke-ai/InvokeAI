@@ -43,16 +43,16 @@ Web Interface, interactive Command Line Interface, and also serves as
 the foundation for multiple commercial products.
 
 **Quick links**: [[How to
-  Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a
+  Install](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)] [<a
   href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a
   href="https://invoke-ai.github.io/InvokeAI/">Documentation and
-  Tutorials</a>] [<a
-  href="https://github.com/invoke-ai/InvokeAI/">Code and
-  Downloads</a>] [<a
-  href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>]
+  Tutorials</a>]
+  [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>]
   [<a
   href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion,
-  Ideas & Q&A</a>]
+  Ideas & Q&A</a>] 
+   [<a
+  href="https://invoke-ai.github.io/InvokeAI/contributing/CONTRIBUTING/">Contributing</a>] 
 
 <div align="center">
 
@@ -81,7 +81,7 @@ Table of Contents 📝
 ## Quick Start
 
 For full installation and upgrade instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)
 
 If upgrading from version 2.3, please read [Migrating a 2.3 root
 directory to 3.0](#migrating-to-3) first.
@@ -123,7 +123,7 @@ and go to http://localhost:9090.
 
 ### Command-Line Installation (for developers and users familiar with Terminals)
 
-You must have Python 3.9 through 3.11 installed on your machine. Earlier or
+You must have Python 3.10 through 3.11 installed on your machine. Earlier or
 later versions are not supported.
 Node.js also needs to be installed along with yarn (can be installed with
 the command `npm install -g yarn` if needed)
@@ -368,9 +368,9 @@ InvokeAI offers a locally hosted Web Server & React Frontend, with an industry l
 
 The Unified Canvas is a fully integrated canvas implementation with support for all core generation capabilities, in/outpainting, brush tools, and more. This creative tool unlocks the capability for artists to create with AI as a creative collaborator, and can be used to augment AI-generated imagery, sketches, photography, renders, and more.
 
-### *Node Architecture & Editor (Beta)*
+### *Workflows & Nodes*
 
-Invoke AI's backend is built on a graph-based execution architecture. This allows for customizable generation pipelines to be developed by professional users looking to create specific workflows to support their production use-cases, and will be extended in the future with additional capabilities.
+InvokeAI offers a fully featured workflow management solution, enabling users to combine the power of nodes based workflows with the easy of a UI. This allows for customizable generation pipelines to be developed and shared by users looking to create specific workflows to support their production use-cases.
 
 ### *Board & Gallery Management*
 
@@ -383,8 +383,9 @@ Invoke AI provides an organized gallery system for easily storing, accessing, an
 - *Upscaling Tools*
 - *Embedding Manager & Support*
 - *Model Manager & Support*
+- *Workflow creation & management*
 - *Node-Based Architecture*
-- *Node-Based Plug-&-Play UI (Beta)*
+
 
 ### Latest Changes
 
@@ -395,20 +396,18 @@ Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 ### Troubleshooting
 
 Please check out our **[Q&A](https://invoke-ai.github.io/InvokeAI/help/TROUBLESHOOT/#faq)** to get solutions for common installation
-problems and other issues.
+problems and other issues. For more help, please join our [Discord][discord link]
 
 ## Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
 cleanup, testing, or code reviews, is very much encouraged to do so.
 
-To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board.
-
-If you'd like to help with translation, please see our [translation guide](docs/other/TRANSLATION.md).
+Get started with contributing by reading our [Contribution documentation](https://invoke-ai.github.io/InvokeAI/contributing/CONTRIBUTING/), joining the [#dev-chat](https://discord.com/channels/1020123559063990373/1049495067846524939) or the GitHub discussion board.
 
 If you are unfamiliar with how
-to contribute to GitHub projects, here is a
-[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress. You can **make your pull request against the "main" branch**.
+to contribute to GitHub projects, we have a new contributor checklist you can follow to get started contributing: 
+[New Contributor Checklist](https://invoke-ai.github.io/InvokeAI/contributing/contribution_guides/newContributorChecklist/).
 
 We hope you enjoy using our software as much as we enjoy creating it,
 and we hope that some of those of you who are reading this will elect
@@ -424,7 +423,7 @@ their time, hard work and effort.
 
 ### Support
 
-For support, please use this repository's GitHub Issues tracking service, or join the Discord.
+For support, please use this repository's GitHub Issues tracking service, or join the [Discord][discord link].
 
 Original portions of the software are Copyright (c) 2023 by respective contributors.
 

@@ -4,6 +4,7 @@ pip install <path_to_git_source>.
 """
 import os
 import platform
+
 import pkg_resources
 import psutil
 import requests
@@ -49,16 +50,19 @@ def invokeai_is_running() -> bool:
     return False
 
 
-def welcome(versions: dict):
+def welcome(latest_release: str, latest_prerelease: str):
     @group()
     def text():
         yield f"InvokeAI Version: [bold yellow]{__version__}"
         yield ""
-        yield "This script will update InvokeAI to the latest release, or to a development version of your choice."
+        yield "This script will update InvokeAI to the latest release, or to the development version of your choice."
+        yield ""
+        yield "When updating to an arbitrary tag or branch, be aware that the front end may be mismatched to the backend,"
+        yield "making the web frontend unusable. Please downgrade to the latest release if this happens."
         yield ""
         yield "[bold yellow]Options:"
-        yield f"""[1] Update to the latest official release ([italic]{versions[0]['tag_name']}[/italic])
-[2] Update to the bleeding-edge development version ([italic]main[/italic])
+        yield f"""[1] Update to the latest [bold]official release[/bold] ([italic]{latest_release}[/italic])
+[2] Update to the latest [bold]pre-release[/bold] (may be buggy; caveat emptor!) ([italic]{latest_prerelease}[/italic])
 [3] Manually enter the [bold]tag name[/bold] for the version you wish to update to
 [4] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
 
@@ -89,12 +93,17 @@ def get_extras():
 
 def main():
     versions = get_versions()
+    released_versions = [x for x in versions if not (x["draft"] or x["prerelease"])]
+    prerelease_versions = [x for x in versions if not x["draft"] and x["prerelease"]]
+    latest_release = released_versions[0]["tag_name"] if len(released_versions) else None
+    latest_prerelease = prerelease_versions[0]["tag_name"] if len(prerelease_versions) else None
+
     if invokeai_is_running():
         print(":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
         input("Press any key to continue...")
         return
 
-    welcome(versions)
+    welcome(latest_release, latest_prerelease)
 
     tag = None
     branch = None
@@ -102,13 +111,15 @@ def main():
     choice = Prompt.ask("Choice:", choices=["1", "2", "3", "4"], default="1")
 
     if choice == "1":
-        release = versions[0]["tag_name"]
+        release = latest_release
     elif choice == "2":
-        release = "main"
+        release = latest_prerelease
     elif choice == "3":
-        tag = Prompt.ask("Enter an InvokeAI tag name")
+        while not tag:
+            tag = Prompt.ask("Enter an InvokeAI tag name")
     elif choice == "4":
-        branch = Prompt.ask("Enter an InvokeAI branch name")
+        while not branch:
+            branch = Prompt.ask("Enter an InvokeAI branch name")
 
     extras = get_extras()
 

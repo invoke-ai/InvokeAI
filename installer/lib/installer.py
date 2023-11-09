@@ -13,7 +13,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Union
 
-SUPPORTED_PYTHON = ">=3.9.0,<=3.11.100"
+SUPPORTED_PYTHON = ">=3.10.0,<=3.11.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 
@@ -67,7 +67,6 @@ class Installer:
         # Cleaning up temporary directories on Windows results in a race condition
         # and a stack trace.
         # `ignore_cleanup_errors` was only added in Python 3.10
-        # users of Python 3.9 will see a gnarly stack trace on installer exit
         if OS == "Windows" and int(platform.python_version_tuple()[1]) >= 10:
             venv_dir = TemporaryDirectory(prefix=BOOTSTRAP_VENV_PREFIX, ignore_cleanup_errors=True)
         else:
@@ -138,13 +137,6 @@ class Installer:
         # the executables will fail to copy. Keep symlinks in that case
         except shutil.SameFileError:
             venv.create(venv_dir, with_pip=True, symlinks=True)
-
-        # upgrade pip in Python 3.9 environments
-        if int(platform.python_version_tuple()[1]) == 9:
-            from plumbum import FG, local
-
-            pip = local[get_pip_from_venv(venv_dir)]
-            pip["install", "--upgrade", "pip"] & FG
 
         return venv_dir
 
@@ -332,6 +324,7 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
+        auto_install = False
         # set sys.argv to a consistent state
         new_argv = [sys.argv[0]]
         for i in range(1, len(sys.argv)):
@@ -340,13 +333,17 @@ class InvokeAiInstance:
                 new_argv.append(el)
                 new_argv.append(sys.argv[i + 1])
             elif el in ["-y", "--yes", "--yes-to-all"]:
-                new_argv.append(el)
+                auto_install = True
         sys.argv = new_argv
 
+        import messages
         import requests  # to catch download exceptions
-        from messages import introduction
 
-        introduction()
+        auto_install = auto_install or messages.user_wants_auto_configuration()
+        if auto_install:
+            sys.argv.append("--yes")
+        else:
+            messages.introduction()
 
         from invokeai.frontend.install.invokeai_configure import invokeai_configure
 
@@ -463,10 +460,10 @@ def get_torch_source() -> (Union[str, None], str):
             url = "https://download.pytorch.org/whl/cpu"
 
     if device == "cuda":
-        url = "https://download.pytorch.org/whl/cu118"
+        url = "https://download.pytorch.org/whl/cu121"
         optional_modules = "[xformers,onnx-cuda]"
     if device == "cuda_and_dml":
-        url = "https://download.pytorch.org/whl/cu118"
+        url = "https://download.pytorch.org/whl/cu121"
         optional_modules = "[xformers,onnx-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13

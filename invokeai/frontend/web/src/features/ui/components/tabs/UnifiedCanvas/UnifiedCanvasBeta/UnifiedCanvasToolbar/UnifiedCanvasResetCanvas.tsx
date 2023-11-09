@@ -1,10 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  resetCanvas,
-  resizeAndScaleCanvas,
-} from 'features/canvas/store/canvasSlice';
+import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
@@ -15,7 +12,6 @@ export default function UnifiedCanvasResetCanvas() {
 
   const handleResetCanvas = () => {
     dispatch(resetCanvas());
-    dispatch(resizeAndScaleCanvas());
   };
   return (
     <IAIIconButton

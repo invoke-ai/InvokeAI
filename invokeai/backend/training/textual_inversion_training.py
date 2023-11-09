@@ -24,13 +24,8 @@ import torch.utils.checkpoint
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.utils import set_seed, ProjectConfiguration
-from diffusers import (
-    AutoencoderKL,
-    DDPMScheduler,
-    StableDiffusionPipeline,
-    UNet2DConditionModel,
-)
+from accelerate.utils import ProjectConfiguration, set_seed
+from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version
 from diffusers.utils.import_utils import is_xformers_available
@@ -46,7 +41,7 @@ from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
 from invokeai.app.services.config import InvokeAIAppConfig, PagingArgumentParser
-from invokeai.app.services.model_manager_service import ModelManagerService
+from invokeai.app.services.model_manager import ModelManagerService
 from invokeai.backend.model_management.models import SubModelType
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):

@@ -18,7 +18,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { isEqual } from 'lodash-es';
 
-import { ChangeEvent } from 'react';
+import { ChangeEvent, memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
@@ -163,4 +163,4 @@ const IAICanvasSettingsButtonPopover = () => {
   );
 };
 
-export default IAICanvasSettingsButtonPopover;
+export default memo(IAICanvasSettingsButtonPopover);

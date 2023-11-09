@@ -1,17 +1,23 @@
 import { logger } from 'app/logging/logger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlAdapterImageChanged,
+  controlAdapterProcessedImageChanged,
+  selectControlAdapterAll,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { isInvocationNode } from 'features/nodes/types/types';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { clamp } from 'lodash-es';
+import { clamp, forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
 import { startAppListening } from '..';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 
 export const addRequestedSingleImageDeletionListener = () => {
   startAppListening({
@@ -73,22 +79,62 @@ export const addRequestedSingleImageDeletionListener = () => {
       }
 
       // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
-
       if (imageUsage.isCanvasImage) {
         dispatch(resetCanvas());
       }
 
-      if (imageUsage.isControlNetImage) {
-        dispatch(controlNetReset());
-      }
+      imageDTOs.forEach((imageDTO) => {
+        // reset init image if we deleted it
+        if (
+          getState().generation.initialImage?.imageName === imageDTO.image_name
+        ) {
+          dispatch(clearInitialImage());
+        }
 
-      if (imageUsage.isInitialImage) {
-        dispatch(clearInitialImage());
-      }
+        // reset control adapters that use the deleted images
+        forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
+          if (
+            ca.controlImage === imageDTO.image_name ||
+            (isControlNetOrT2IAdapter(ca) &&
+              ca.processedControlImage === imageDTO.image_name)
+          ) {
+            dispatch(
+              controlAdapterImageChanged({
+                id: ca.id,
+                controlImage: null,
+              })
+            );
+            dispatch(
+              controlAdapterProcessedImageChanged({
+                id: ca.id,
+                processedControlImage: null,
+              })
+            );
+          }
+        });
 
-      if (imageUsage.isNodesImage) {
-        dispatch(nodeEditorReset());
-      }
+        // reset nodes that use the deleted images
+        getState().nodes.nodes.forEach((node) => {
+          if (!isInvocationNode(node)) {
+            return;
+          }
+
+          forEach(node.data.inputs, (input) => {
+            if (
+              input.type === 'ImageField' &&
+              input.value?.image_name === imageDTO.image_name
+            ) {
+              dispatch(
+                fieldImageValueChanged({
+                  nodeId: node.data.id,
+                  fieldName: input.name,
+                  value: undefined,
+                })
+              );
+            }
+          });
+        });
+      });
 
       // Delete from server
       const { requestId } = dispatch(
@@ -105,7 +151,9 @@ export const addRequestedSingleImageDeletionListener = () => {
 
       if (wasImageDeleted) {
         dispatch(
-          api.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id }])
+          api.util.invalidateTags([
+            { type: 'Board', id: imageDTO.board_id ?? 'none' },
+          ])
         );
       }
     },
@@ -154,17 +202,59 @@ export const addRequestedMultipleImageDeletionListener = () => {
           dispatch(resetCanvas());
         }
 
-        if (imagesUsage.some((i) => i.isControlNetImage)) {
-          dispatch(controlNetReset());
-        }
+        imageDTOs.forEach((imageDTO) => {
+          // reset init image if we deleted it
+          if (
+            getState().generation.initialImage?.imageName ===
+            imageDTO.image_name
+          ) {
+            dispatch(clearInitialImage());
+          }
 
-        if (imagesUsage.some((i) => i.isInitialImage)) {
-          dispatch(clearInitialImage());
-        }
+          // reset control adapters that use the deleted images
+          forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
+            if (
+              ca.controlImage === imageDTO.image_name ||
+              (isControlNetOrT2IAdapter(ca) &&
+                ca.processedControlImage === imageDTO.image_name)
+            ) {
+              dispatch(
+                controlAdapterImageChanged({
+                  id: ca.id,
+                  controlImage: null,
+                })
+              );
+              dispatch(
+                controlAdapterProcessedImageChanged({
+                  id: ca.id,
+                  processedControlImage: null,
+                })
+              );
+            }
+          });
 
-        if (imagesUsage.some((i) => i.isNodesImage)) {
-          dispatch(nodeEditorReset());
-        }
+          // reset nodes that use the deleted images
+          getState().nodes.nodes.forEach((node) => {
+            if (!isInvocationNode(node)) {
+              return;
+            }
+
+            forEach(node.data.inputs, (input) => {
+              if (
+                input.type === 'ImageField' &&
+                input.value?.image_name === imageDTO.image_name
+              ) {
+                dispatch(
+                  fieldImageValueChanged({
+                    nodeId: node.data.id,
+                    fieldName: input.name,
+                    value: undefined,
+                  })
+                );
+              }
+            });
+          });
+        });
       } catch {
         // no-op
       }

@@ -1,11 +1,10 @@
+import base64
 import importlib
+import io
 import math
 import multiprocessing as mp
 import os
 import re
-import io
-import base64
-
 from collections import abc
 from inspect import isfunction
 from pathlib import Path
@@ -19,6 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 
 import invokeai.backend.util.logging as logger
+
 from .devices import torch_dtype
 
 

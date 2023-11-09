@@ -21,15 +21,16 @@ TI files that you'll encounter are `.pt` and `.bin` files, which are produced by
 different TI training packages. InvokeAI supports both formats, but its
 [built-in TI training system](TRAINING.md) produces `.pt`.
 
-The [Hugging Face company](https://huggingface.co/sd-concepts-library) has
-amassed a large ligrary of &gt;800 community-contributed TI files covering a
+[Hugging Face](https://huggingface.co/sd-concepts-library) has
+amassed a large library of &gt;800 community-contributed TI files covering a
 broad range of subjects and styles. You can also install your own or others' TI files 
 by placing them in the designated directory for the compatible model type
 
 ### An Example
 
-Here are a few examples to illustrate how it works. All these images were
-generated using the command-line client and the Stable Diffusion 1.5 model:
+Here are a few examples to illustrate how it works. All these images
+were generated using the legacy command-line client and the Stable
+Diffusion 1.5 model:
 
 |         Japanese gardener          | Japanese gardener &lt;ghibli-face&gt; | Japanese gardener &lt;hoi4-leaders&gt; | Japanese gardener &lt;cartoona-animals&gt; |
 | :--------------------------------: | :-----------------------------------: | :------------------------------------: | :----------------------------------------: |

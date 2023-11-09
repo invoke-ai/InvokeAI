@@ -6,6 +6,7 @@ import { isEqual } from 'lodash-es';
 
 import { Group, Line } from 'react-konva';
 import { isCanvasMaskLine } from '../store/canvasTypes';
+import { memo } from 'react';
 
 export const canvasLinesSelector = createSelector(
   [canvasSelector],
@@ -52,4 +53,4 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
   );
 };
 
-export default IAICanvasLines;
+export default memo(IAICanvasLines);

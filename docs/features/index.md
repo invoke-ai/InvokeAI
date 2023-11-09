@@ -28,11 +28,7 @@ Learn how to install and use ControlNet models for fine control over
 image output.
 
 ### * [Image-to-Image Guide](IMG2IMG.md)
-Use a seed image to build new creations in the CLI.
-
-### * [Generating Variations](VARIATIONS.md)
-Have an image you like and want to generate many more like it? Variations
-are the ticket.
+Use a seed image to build new creations.
 
 ## Model Management
 
@@ -54,6 +50,9 @@ Prevent InvokeAI from displaying unwanted racy images.
 
 ### * [Controlling Logging](LOGGING.md)
 Control how InvokeAI logs status messages.
+
+### * [Command-line Utilities](UTILITIES.md)
+A list of the command-line utilities available with InvokeAI.
 
 <!-- OUT OF DATE
 ### * [Miscellaneous](OTHER.md)

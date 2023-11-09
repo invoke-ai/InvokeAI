@@ -3,6 +3,8 @@ export type InvokeAIThemeColors = {
   baseAlpha: Partial<InvokeAIPaletteSteps>;
   accent: Partial<InvokeAIPaletteSteps>;
   accentAlpha: Partial<InvokeAIPaletteSteps>;
+  gold: Partial<InvokeAIPaletteSteps>;
+  goldAlpha: Partial<InvokeAIPaletteSteps>;
   working: Partial<InvokeAIPaletteSteps>;
   workingAlpha: Partial<InvokeAIPaletteSteps>;
   warning: Partial<InvokeAIPaletteSteps>;

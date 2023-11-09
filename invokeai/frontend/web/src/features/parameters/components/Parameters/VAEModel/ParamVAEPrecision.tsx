@@ -2,10 +2,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
 import { PrecisionParam } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -19,6 +21,7 @@ const selector = createSelector(
 const DATA = ['fp16', 'fp32'];
 
 const ParamVAEModelSelect = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { vaePrecision } = useAppSelector(selector);
 
@@ -34,12 +37,14 @@ const ParamVAEModelSelect = () => {
   );
 
   return (
-    <IAIMantineSelect
-      label="VAE Precision"
-      value={vaePrecision}
-      data={DATA}
-      onChange={handleChange}
-    />
+    <IAIInformationalPopover feature="paramVAEPrecision">
+      <IAIMantineSelect
+        label={t('modelManager.vaePrecision')}
+        value={vaePrecision}
+        data={DATA}
+        onChange={handleChange}
+      />
+    </IAIInformationalPopover>
   );
 };
 

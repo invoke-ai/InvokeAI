@@ -1,33 +1,24 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
-
-import { createSelector } from '@reduxjs/toolkit';
-import {
-  clampSymmetrySteps,
-  setPositivePrompt,
-} from 'features/parameters/store/generationSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-
-import { userInvoked } from 'app/store/actions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAITextarea from 'common/components/IAITextarea';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
+import { setPositivePrompt } from 'features/parameters/store/generationSlice';
 import { isEqual } from 'lodash-es';
+import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const promptInputSelector = createSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ generation, ui }, activeTabName) => {
+  [stateSelector],
+  ({ generation }) => {
     return {
-      shouldPinParametersPanel: ui.shouldPinParametersPanel,
       prompt: generation.positivePrompt,
-      activeTabName,
     };
   },
   {
@@ -42,9 +33,7 @@ const promptInputSelector = createSelector(
  */
 const ParamPositiveConditioning = () => {
   const dispatch = useAppDispatch();
-  const { prompt, shouldPinParametersPanel, activeTabName } =
-    useAppSelector(promptInputSelector);
-  const isReady = useIsReadyToInvoke();
+  const { prompt } = useAppSelector(promptInputSelector);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { t } = useTranslation();
@@ -106,22 +95,12 @@ const ParamPositiveConditioning = () => {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && e.shiftKey === false && isReady) {
-        e.preventDefault();
-        dispatch(clampSymmetrySteps());
-        dispatch(userInvoked(activeTabName));
-      }
       if (isEmbeddingEnabled && e.key === '<') {
         onOpen();
       }
     },
-    [isReady, dispatch, activeTabName, onOpen, isEmbeddingEnabled]
+    [onOpen, isEmbeddingEnabled]
   );
-
-  // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
-  //   const target = e.target as HTMLTextAreaElement;
-  // setCaret({ start: target.selectionStart, end: target.selectionEnd });
-  // };
 
   return (
     <Box position="relative">
@@ -131,24 +110,29 @@ const ParamPositiveConditioning = () => {
           onClose={onClose}
           onSelect={handleSelectEmbedding}
         >
-          <IAITextarea
-            id="prompt"
-            name="prompt"
-            ref={promptRef}
-            value={prompt}
-            placeholder={t('parameters.positivePromptPlaceholder')}
-            onChange={handleChangePrompt}
-            onKeyDown={handleKeyDown}
-            resize="vertical"
-            minH={32}
-          />
+          <IAIInformationalPopover
+            feature="paramPositiveConditioning"
+            placement="right"
+          >
+            <IAITextarea
+              id="prompt"
+              name="prompt"
+              ref={promptRef}
+              value={prompt}
+              placeholder={t('parameters.positivePromptPlaceholder')}
+              onChange={handleChangePrompt}
+              onKeyDown={handleKeyDown}
+              resize="vertical"
+              minH={32}
+            />
+          </IAIInformationalPopover>
         </ParamEmbeddingPopover>
       </FormControl>
       {!isOpen && isEmbeddingEnabled && (
         <Box
           sx={{
             position: 'absolute',
-            top: shouldPinParametersPanel ? 5 : 0,
+            top: 0,
             insetInlineEnd: 0,
           }}
         >
@@ -159,4 +143,4 @@ const ParamPositiveConditioning = () => {
   );
 };
 
-export default ParamPositiveConditioning;
+export default memo(ParamPositiveConditioning);

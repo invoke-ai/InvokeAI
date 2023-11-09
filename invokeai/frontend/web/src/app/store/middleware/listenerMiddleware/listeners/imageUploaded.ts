@@ -1,19 +1,18 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlAdapterImageChanged,
+  controlAdapterIsEnabledChanged,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
-
-const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
-  title: 'Image Uploaded',
-  status: 'success',
-};
 
 export const addImageUploadedFulfilledListener = () => {
   startAppListening({
@@ -37,6 +36,11 @@ export const addImageUploadedFulfilledListener = () => {
         return;
       }
 
+      const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
+        title: t('toast.imageUploaded'),
+        status: 'success',
+      };
+
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
         const { toastOptions } = postUploadAction;
@@ -57,8 +61,8 @@ export const addImageUploadedFulfilledListener = () => {
           // Fall back to just the board id if we can't find the board for some reason
           const board = data?.find((b) => b.board_id === autoAddBoardId);
           const description = board
-            ? `Added to board ${board.board_name}`
-            : `Added to board ${autoAddBoardId}`;
+            ? `${t('toast.addedToBoard')} ${board.board_name}`
+            : `${t('toast.addedToBoard')} ${autoAddBoardId}`;
 
           dispatch(
             addToast({
@@ -75,24 +79,30 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as canvas initial image',
+            description: t('toast.setCanvasInitialImage'),
           })
         );
         return;
       }
 
-      if (postUploadAction?.type === 'SET_CONTROLNET_IMAGE') {
-        const { controlNetId } = postUploadAction;
+      if (postUploadAction?.type === 'SET_CONTROL_ADAPTER_IMAGE') {
+        const { id } = postUploadAction;
         dispatch(
-          controlNetImageChanged({
-            controlNetId,
+          controlAdapterIsEnabledChanged({
+            id,
+            isEnabled: true,
+          })
+        );
+        dispatch(
+          controlAdapterImageChanged({
+            id,
             controlImage: imageDTO.image_name,
           })
         );
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as control image',
+            description: t('toast.setControlImage'),
           })
         );
         return;
@@ -103,7 +113,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as initial image',
+            description: t('toast.setInitialImage'),
           })
         );
         return;
@@ -117,7 +127,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: `Set as node field ${fieldName}`,
+            description: `${t('toast.setNodeField')} ${fieldName}`,
           })
         );
         return;
@@ -140,7 +150,7 @@ export const addImageUploadedRejectedListener = () => {
       log.error({ ...sanitizedData }, 'Image upload failed');
       dispatch(
         addToast({
-          title: 'Image Upload Failed',
+          title: t('toast.imageUploadFailed'),
           description: action.error.message,
           status: 'error',
         })

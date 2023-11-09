@@ -3,9 +3,9 @@ import {
   createLocalStorageManager,
   extendTheme,
 } from '@chakra-ui/react';
-import { ReactNode, useEffect, useMemo } from 'react';
+import { ReactNode, memo, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { theme as invokeAITheme } from 'theme/theme';
+import { TOAST_OPTIONS, theme as invokeAITheme } from 'theme/theme';
 
 import '@fontsource-variable/inter';
 import { MantineProvider } from '@mantine/core';
@@ -39,11 +39,15 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
 
   return (
     <MantineProvider theme={mantineTheme}>
-      <ChakraProvider theme={theme} colorModeManager={manager}>
+      <ChakraProvider
+        theme={theme}
+        colorModeManager={manager}
+        toastOptions={TOAST_OPTIONS}
+      >
         {children}
       </ChakraProvider>
     </MantineProvider>
   );
 }
 
-export default ThemeLocaleProvider;
+export default memo(ThemeLocaleProvider);

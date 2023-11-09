@@ -9,7 +9,7 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selector = createSelector(
@@ -60,8 +60,9 @@ const InitialImage = () => {
       noContentFallback={
         <IAINoContentFallback label="No initial image selected" />
       }
+      dataTestId="initial-image"
     />
   );
 };
 
-export default InitialImage;
+export default memo(InitialImage);

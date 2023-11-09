@@ -8,10 +8,9 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graphBuilders/constants';
-import { progressImageSet } from 'features/system/store/systemSlice';
+import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
-import { sessionCanceled } from 'services/api/thunks/session';
 import { imagesAdapter } from 'services/api/util';
 import {
   appSocketInvocationComplete,
@@ -19,7 +18,8 @@ import {
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const nodeDenylist = ['load_image'];
+// These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
+const nodeDenylist = ['load_image', 'image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
@@ -31,30 +31,22 @@ export const addInvocationCompleteEventListener = () => {
         { data: parseify(data) },
         `Invocation complete (${action.payload.data.node.type})`
       );
-      const session_id = action.payload.data.graph_execution_state_id;
 
-      const { cancelType, isCancelScheduled } = getState().system;
-
-      // Handle scheduled cancelation
-      if (cancelType === 'scheduled' && isCancelScheduled) {
-        dispatch(sessionCanceled({ session_id }));
-      }
-
-      const { result, node, graph_execution_state_id } = data;
+      const { result, node, queue_batch_id } = data;
 
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
         const { image_name } = result.image;
         const { canvas, gallery } = getState();
 
+        // This populates the `getImageDTO` cache
         const imageDTO = await dispatch(
           imagesApi.endpoints.getImageDTO.initiate(image_name)
         ).unwrap();
 
         // Add canvas images to the staging area
         if (
-          graph_execution_state_id ===
-            canvas.layerState.stagingArea.sessionId &&
+          canvas.batchIds.includes(queue_batch_id) &&
           [CANVAS_OUTPUT].includes(data.source_node_id)
         ) {
           dispatch(addImageToStagingArea(imageDTO));
@@ -63,59 +55,73 @@ export const addInvocationCompleteEventListener = () => {
         if (!imageDTO.is_intermediate) {
           /**
            * Cache updates for when an image result is received
-           * - *add* to getImageDTO
-           * - IF `autoAddBoardId` is set:
-           *    - THEN add it to the board_id/images
-           * - ELSE (`autoAddBoardId` is not set):
-           *    - THEN add it to the no_board/images
+           * - add it to the no_board/images
            */
 
-          const { autoAddBoardId } = gallery;
-          if (autoAddBoardId && autoAddBoardId !== 'none') {
-            dispatch(
-              imagesApi.endpoints.addImageToBoard.initiate({
-                board_id: autoAddBoardId,
-                imageDTO,
-              })
-            );
-          } else {
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                {
-                  board_id: 'none',
-                  categories: IMAGE_CATEGORIES,
-                },
-                (draft) => {
-                  imagesAdapter.addOne(draft, imageDTO);
-                }
-              )
-            );
-          }
+          dispatch(
+            imagesApi.util.updateQueryData(
+              'listImages',
+              {
+                board_id: imageDTO.board_id ?? 'none',
+                categories: IMAGE_CATEGORIES,
+              },
+              (draft) => {
+                imagesAdapter.addOne(draft, imageDTO);
+              }
+            )
+          );
+
+          // update the total images for the board
+          dispatch(
+            boardsApi.util.updateQueryData(
+              'getBoardImagesTotal',
+              imageDTO.board_id ?? 'none',
+              (draft) => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                draft.total += 1;
+              }
+            )
+          );
 
           dispatch(
             imagesApi.util.invalidateTags([
-              { type: 'BoardImagesTotal', id: autoAddBoardId },
-              { type: 'BoardAssetsTotal', id: autoAddBoardId },
+              { type: 'Board', id: imageDTO.board_id ?? 'none' },
             ])
           );
 
-          const { selectedBoardId, shouldAutoSwitch } = gallery;
+          const { shouldAutoSwitch } = gallery;
 
           // If auto-switch is enabled, select the new image
           if (shouldAutoSwitch) {
-            // if auto-add is enabled, switch the board as the image comes in
-            if (autoAddBoardId && autoAddBoardId !== selectedBoardId) {
-              dispatch(boardIdSelected(autoAddBoardId));
-              dispatch(galleryViewChanged('images'));
-            } else if (!autoAddBoardId) {
+            // if auto-add is enabled, switch the gallery view and board if needed as the image comes in
+            if (gallery.galleryView !== 'images') {
               dispatch(galleryViewChanged('images'));
             }
+
+            if (
+              imageDTO.board_id &&
+              imageDTO.board_id !== gallery.selectedBoardId
+            ) {
+              dispatch(
+                boardIdSelected({
+                  boardId: imageDTO.board_id,
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
+            if (!imageDTO.board_id && gallery.selectedBoardId !== 'none') {
+              dispatch(
+                boardIdSelected({
+                  boardId: 'none',
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
             dispatch(imageSelected(imageDTO));
           }
         }
-
-        dispatch(progressImageSet(null));
       }
       // pass along the socket event as an application action
       dispatch(appSocketInvocationComplete(action.payload));

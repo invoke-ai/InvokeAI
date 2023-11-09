@@ -18,9 +18,9 @@ import { FaImages, FaServer } from 'react-icons/fa';
 import { galleryViewChanged } from '../store/gallerySlice';
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
-import GalleryPinButton from './GalleryPinButton';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -35,12 +35,13 @@ const selector = createSelector(
 );
 
 const ImageGalleryContent = () => {
+  const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const galleryGridRef = useRef<HTMLDivElement>(null);
   const { galleryView } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } =
-    useDisclosure();
+    useDisclosure({ defaultIsOpen: true });
 
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -75,7 +76,6 @@ const ImageGalleryContent = () => {
             onToggle={onToggleBoardList}
           />
           <GallerySettingsPopover />
-          <GalleryPinButton />
         </Flex>
         <Box>
           <BoardsList isOpen={isBoardListOpen} />
@@ -111,8 +111,9 @@ const ImageGalleryContent = () => {
                     w: 'full',
                   }}
                   leftIcon={<FaImages />}
+                  data-testid="images-tab"
                 >
-                  Images
+                  {t('gallery.images')}
                 </Tab>
                 <Tab
                   as={IAIButton}
@@ -123,8 +124,9 @@ const ImageGalleryContent = () => {
                     w: 'full',
                   }}
                   leftIcon={<FaServer />}
+                  data-testid="assets-tab"
                 >
-                  Assets
+                  {t('gallery.assets')}
                 </Tab>
               </ButtonGroup>
             </TabList>

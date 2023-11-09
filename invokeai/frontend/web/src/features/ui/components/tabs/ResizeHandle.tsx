@@ -5,16 +5,27 @@ import { PanelResizeHandle } from 'react-resizable-panels';
 type ResizeHandleProps = Omit<FlexProps, 'direction'> & {
   direction?: 'horizontal' | 'vertical';
   collapsedDirection?: 'top' | 'bottom' | 'left' | 'right';
+  isCollapsed?: boolean;
 };
 
 const ResizeHandle = (props: ResizeHandleProps) => {
-  const { direction = 'horizontal', collapsedDirection, ...rest } = props;
+  const {
+    direction = 'horizontal',
+    collapsedDirection,
+    isCollapsed = false,
+    ...rest
+  } = props;
   const bg = useColorModeValue('base.100', 'base.850');
   const hoverBg = useColorModeValue('base.300', 'base.700');
 
   if (direction === 'horizontal') {
     return (
-      <PanelResizeHandle>
+      <PanelResizeHandle
+        style={{
+          visibility: isCollapsed ? 'hidden' : 'visible',
+          width: isCollapsed ? 0 : 'auto',
+        }}
+      >
         <Flex
           className="resize-handle-horizontal"
           sx={{
@@ -50,7 +61,12 @@ const ResizeHandle = (props: ResizeHandleProps) => {
   }
 
   return (
-    <PanelResizeHandle>
+    <PanelResizeHandle
+      style={{
+        visibility: isCollapsed ? 'hidden' : 'visible',
+        width: isCollapsed ? 0 : 'auto',
+      }}
+    >
       <Flex
         className="resize-handle-vertical"
         sx={{

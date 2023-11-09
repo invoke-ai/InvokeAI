@@ -5,8 +5,9 @@ This script is used at release time to generate a markdown table describing the
 starter models. This text is then manually copied into 050_INSTALL_MODELS.md.
 """
 
-from omegaconf import OmegaConf
 from pathlib import Path
+
+from omegaconf import OmegaConf
 
 
 def main():

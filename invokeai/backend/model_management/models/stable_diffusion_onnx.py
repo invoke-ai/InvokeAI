@@ -2,15 +2,16 @@ from enum import Enum
 from typing import Literal
 
 from diffusers import OnnxRuntimeModel
+
 from .base import (
-    ModelConfigBase,
     BaseModelType,
+    DiffusersModel,
+    IAIOnnxRuntimeModel,
+    ModelConfigBase,
     ModelType,
     ModelVariantType,
-    DiffusersModel,
     SchedulerPredictionType,
     classproperty,
-    IAIOnnxRuntimeModel,
 )
 
 

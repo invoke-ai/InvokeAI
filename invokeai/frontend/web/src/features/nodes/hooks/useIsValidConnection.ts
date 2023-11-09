@@ -1,10 +1,15 @@
 // TODO: enable this at some point
-import graphlib from '@dagrejs/graphlib';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
-import { Connection, Edge, Node, useReactFlow } from 'reactflow';
-import { COLLECTION_TYPES } from '../types/constants';
+import { Connection, Node, useReactFlow } from 'reactflow';
+import { validateSourceAndTargetTypes } from '../store/util/validateSourceAndTargetTypes';
+import { getIsGraphAcyclic } from '../store/util/getIsGraphAcyclic';
 import { InvocationNodeData } from '../types/types';
+
+/**
+ * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
+ * TODO: Figure out how to do this without duplicating all the logic
+ */
 
 export const useIsValidConnection = () => {
   const flow = useReactFlow();
@@ -13,11 +18,6 @@ export const useIsValidConnection = () => {
   );
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
-      if (!shouldValidateGraph) {
-        // manual override!
-        return true;
-      }
-
       const edges = flow.getEdges();
       const nodes = flow.getNodes();
       // Connection must have valid targets
@@ -42,6 +42,28 @@ export const useIsValidConnection = () => {
         return false;
       }
 
+      if (source === target) {
+        // Don't allow nodes to connect to themselves, even if validation is disabled
+        return false;
+      }
+
+      if (!shouldValidateGraph) {
+        // manual override!
+        return true;
+      }
+
+      if (
+        edges.find((edge) => {
+          edge.target === target &&
+            edge.targetHandle === targetHandle &&
+            edge.source === source &&
+            edge.sourceHandle === sourceHandle;
+        })
+      ) {
+        // We already have a connection from this source to this target
+        return false;
+      }
+
       // Connection is invalid if target already has a connection
       if (
         edges.find((edge) => {
@@ -53,21 +75,10 @@ export const useIsValidConnection = () => {
         return false;
       }
 
-      // Connection types must be the same for a connection
-      if (
-        sourceType !== targetType &&
-        sourceType !== 'CollectionItem' &&
-        targetType !== 'CollectionItem'
-      ) {
-        if (
-          !(
-            COLLECTION_TYPES.includes(targetType) &&
-            COLLECTION_TYPES.includes(sourceType)
-          )
-        ) {
-          return false;
-        }
+      if (!validateSourceAndTargetTypes(sourceType, targetType)) {
+        return false;
       }
+
       // Graphs much be acyclic (no loops!)
       return getIsGraphAcyclic(source, target, nodes, edges);
     },
@@ -75,28 +86,4 @@ export const useIsValidConnection = () => {
   );
 
   return isValidConnection;
-};
-
-export const getIsGraphAcyclic = (
-  source: string,
-  target: string,
-  nodes: Node[],
-  edges: Edge[]
-) => {
-  // construct graphlib graph from editor state
-  const g = new graphlib.Graph();
-
-  nodes.forEach((n) => {
-    g.setNode(n.id);
-  });
-
-  edges.forEach((e) => {
-    g.setEdge(e.source, e.target);
-  });
-
-  // add the candidate edge
-  g.setEdge(source, target);
-
-  // check if the graph is acyclic
-  return graphlib.alg.isAcyclic(g);
 };

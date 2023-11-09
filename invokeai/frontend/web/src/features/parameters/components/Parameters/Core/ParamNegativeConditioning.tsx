@@ -1,11 +1,12 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAITextarea from 'common/components/IAITextarea';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { setNegativePrompt } from 'features/parameters/store/generationSlice';
-import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
+import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
@@ -81,18 +82,23 @@ const ParamNegativeConditioning = () => {
         onClose={onClose}
         onSelect={handleSelectEmbedding}
       >
-        <IAITextarea
-          id="negativePrompt"
-          name="negativePrompt"
-          ref={promptRef}
-          value={negativePrompt}
-          placeholder={t('parameters.negativePromptPlaceholder')}
-          onChange={handleChangePrompt}
-          resize="vertical"
-          fontSize="sm"
-          minH={16}
-          {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
-        />
+        <IAIInformationalPopover
+          feature="paramNegativeConditioning"
+          placement="right"
+        >
+          <IAITextarea
+            id="negativePrompt"
+            name="negativePrompt"
+            ref={promptRef}
+            value={negativePrompt}
+            placeholder={t('parameters.negativePromptPlaceholder')}
+            onChange={handleChangePrompt}
+            resize="vertical"
+            fontSize="sm"
+            minH={16}
+            {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
+          />
+        </IAIInformationalPopover>
       </ParamEmbeddingPopover>
       {!isOpen && isEmbeddingEnabled && (
         <Box
@@ -109,4 +115,4 @@ const ParamNegativeConditioning = () => {
   );
 };
 
-export default ParamNegativeConditioning;
+export default memo(ParamNegativeConditioning);

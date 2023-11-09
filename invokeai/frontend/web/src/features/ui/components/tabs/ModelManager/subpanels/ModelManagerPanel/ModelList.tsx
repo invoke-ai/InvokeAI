@@ -3,7 +3,7 @@ import { EntityState } from '@reduxjs/toolkit';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import { forEach } from 'lodash-es';
-import type { ChangeEvent, PropsWithChildren } from 'react';
+import { ChangeEvent, PropsWithChildren, memo } from 'react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
@@ -232,7 +232,7 @@ const ModelList = (props: ModelListProps) => {
   );
 };
 
-export default ModelList;
+export default memo(ModelList);
 
 const modelsFilter = <
   T extends
@@ -266,7 +266,7 @@ const modelsFilter = <
   return filteredModels;
 };
 
-const StyledModelContainer = (props: PropsWithChildren) => {
+const StyledModelContainer = memo((props: PropsWithChildren) => {
   return (
     <Flex
       flexDirection="column"
@@ -283,7 +283,9 @@ const StyledModelContainer = (props: PropsWithChildren) => {
       {props.children}
     </Flex>
   );
-};
+});
+
+StyledModelContainer.displayName = 'StyledModelContainer';
 
 type ModelListWrapperProps = {
   title: string;
@@ -294,7 +296,7 @@ type ModelListWrapperProps = {
   selected: ModelListProps;
 };
 
-function ModelListWrapper(props: ModelListWrapperProps) {
+const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList, selected } = props;
   return (
     <StyledModelContainer>
@@ -313,23 +315,29 @@ function ModelListWrapper(props: ModelListWrapperProps) {
       </Flex>
     </StyledModelContainer>
   );
-}
+});
 
-function FetchingModelsLoader({ loadingMessage }: { loadingMessage?: string }) {
-  return (
-    <StyledModelContainer>
-      <Flex
-        justifyContent="center"
-        alignItems="center"
-        flexDirection="column"
-        p={4}
-        gap={8}
-      >
-        <Spinner />
-        <Text variant="subtext">
-          {loadingMessage ? loadingMessage : 'Fetching...'}
-        </Text>
-      </Flex>
-    </StyledModelContainer>
-  );
-}
+ModelListWrapper.displayName = 'ModelListWrapper';
+
+const FetchingModelsLoader = memo(
+  ({ loadingMessage }: { loadingMessage?: string }) => {
+    return (
+      <StyledModelContainer>
+        <Flex
+          justifyContent="center"
+          alignItems="center"
+          flexDirection="column"
+          p={4}
+          gap={8}
+        >
+          <Spinner />
+          <Text variant="subtext">
+            {loadingMessage ? loadingMessage : 'Fetching...'}
+          </Text>
+        </Flex>
+      </StyledModelContainer>
+    );
+  }
+);
+
+FetchingModelsLoader.displayName = 'FetchingModelsLoader';

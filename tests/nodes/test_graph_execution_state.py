@@ -1,30 +1,37 @@
-from .test_invoker import create_edge
-from .test_nodes import (
+import logging
+
+import pytest
+
+# This import must happen before other invoke imports or test in other files(!!) break
+from .test_nodes import (  # isort: split
+    PromptCollectionTestInvocation,
+    PromptTestInvocation,
     TestEventService,
     TextToImageTestInvocation,
-    PromptTestInvocation,
-    PromptCollectionTestInvocation,
 )
-from invokeai.app.services.invocation_queue import MemoryInvocationQueue
-from invokeai.app.services.processor import DefaultInvocationProcessor
-from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    InvocationContext,
-)
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+from invokeai.app.services.invocation_processor.invocation_processor_default import DefaultInvocationProcessor
+from invokeai.app.services.invocation_queue.invocation_queue_memory import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.invocation_stats import InvocationStatsService
-from invokeai.app.services.graph import (
-    Graph,
+from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
+from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
+from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
+from invokeai.app.services.shared.graph import (
     CollectInvocation,
-    IterateInvocation,
+    Graph,
     GraphExecutionState,
+    IterateInvocation,
     LibraryGraph,
 )
-import pytest
+from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.backend.util.logging import InvokeAILogger
+
+from .test_invoker import create_edge
 
 
 @pytest.fixture
@@ -41,24 +48,35 @@ def simple_graph():
 # the test invocations.
 @pytest.fixture
 def mock_services() -> InvocationServices:
+    configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
+    db = SqliteDatabase(configuration, InvokeAILogger.get_logger())
     # NOTE: none of these are actually called by the test invocations
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        filename=sqlite_memory, table_name="graph_executions"
-    )
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
     return InvocationServices(
-        model_manager=None,  # type: ignore
-        events=TestEventService(),
-        logger=None,  # type: ignore
-        images=None,  # type: ignore
-        latents=None,  # type: ignore
-        boards=None,  # type: ignore
+        board_image_records=None,  # type: ignore
         board_images=None,  # type: ignore
-        queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),
+        board_records=None,  # type: ignore
+        boards=None,  # type: ignore
+        configuration=configuration,
+        events=TestEventService(),
         graph_execution_manager=graph_execution_manager,
-        performance_statistics=InvocationStatsService(graph_execution_manager),
+        graph_library=SqliteItemStorage[LibraryGraph](db=db, table_name="graphs"),
+        image_files=None,  # type: ignore
+        image_records=None,  # type: ignore
+        images=None,  # type: ignore
+        invocation_cache=MemoryInvocationCache(max_cache_size=0),
+        latents=None,  # type: ignore
+        logger=logging,  # type: ignore
+        model_manager=None,  # type: ignore
+        names=None,  # type: ignore
+        performance_statistics=InvocationStatsService(),
         processor=DefaultInvocationProcessor(),
-        configuration=None,  # type: ignore
+        queue=MemoryInvocationQueue(),
+        session_processor=None,  # type: ignore
+        session_queue=None,  # type: ignore
+        urls=None,  # type: ignore
+        workflow_records=None,  # type: ignore
+        workflow_image_records=None,  # type: ignore
     )
 
 
@@ -68,7 +86,15 @@ def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[B
         return (None, None)
 
     print(f"invoking {n.id}: {type(n)}")
-    o = n.invoke(InvocationContext(services, "1"))
+    o = n.invoke(
+        InvocationContext(
+            queue_batch_id="1",
+            queue_item_id=1,
+            queue_id=DEFAULT_QUEUE_ID,
+            services=services,
+            graph_execution_state_id="1",
+        )
+    )
     g.complete(n.id, o)
 
     return (n, o)
@@ -116,14 +142,14 @@ def test_graph_state_expands_iterator(mock_services):
     graph.add_node(AddInvocation(id="3", b=1))
     graph.add_edge(create_edge("0", "collection", "1", "collection"))
     graph.add_edge(create_edge("1", "item", "2", "a"))
-    graph.add_edge(create_edge("2", "a", "3", "a"))
+    graph.add_edge(create_edge("2", "value", "3", "a"))
 
     g = GraphExecutionState(graph=graph)
     while not g.is_complete():
         invoke_next(g, mock_services)
 
     prepared_add_nodes = g.source_prepared_mapping["3"]
-    results = set([g.results[n].a for n in prepared_add_nodes])
+    results = set([g.results[n].value for n in prepared_add_nodes])
     expected = set([1, 11, 21])
     assert results == expected
 

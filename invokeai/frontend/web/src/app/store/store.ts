@@ -6,11 +6,11 @@ import {
   configureStore,
 } from '@reduxjs/toolkit';
 import canvasReducer from 'features/canvas/store/canvasSlice';
-import controlNetReducer from 'features/controlNet/store/controlNetSlice';
+import changeBoardModalReducer from 'features/changeBoardModal/store/slice';
+import controlAdaptersReducer from 'features/controlAdapters/store/controlAdaptersSlice';
+import deleteImageModalReducer from 'features/deleteImageModal/store/slice';
 import dynamicPromptsReducer from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
-import deleteImageModalReducer from 'features/deleteImageModal/store/slice';
-import changeBoardModalReducer from 'features/changeBoardModal/store/slice';
 import loraReducer from 'features/lora/store/loraSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
@@ -18,6 +18,7 @@ import postprocessingReducer from 'features/parameters/store/postprocessingSlice
 import sdxlReducer from 'features/sdxl/store/sdxlSlice';
 import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
+import queueReducer from 'features/queue/store/queueSlice';
 import modelmanagerReducer from 'features/ui/components/tabs/ModelManager/store/modelManagerSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
@@ -31,6 +32,7 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
+import { $store } from './nanostores/store';
 
 const allReducers = {
   canvas: canvasReducer,
@@ -42,13 +44,14 @@ const allReducers = {
   config: configReducer,
   ui: uiReducer,
   hotkeys: hotkeysReducer,
-  controlNet: controlNetReducer,
+  controlAdapters: controlAdaptersReducer,
   dynamicPrompts: dynamicPromptsReducer,
   deleteImageModal: deleteImageModalReducer,
   changeBoardModal: changeBoardModalReducer,
   lora: loraReducer,
   modelmanager: modelmanagerReducer,
   sdxl: sdxlReducer,
+  queue: queueReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -65,7 +68,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'postprocessing',
   'system',
   'ui',
-  'controlNet',
+  'controlAdapters',
   'dynamicPrompts',
   'lora',
   'modelmanager',
@@ -87,8 +90,8 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      immutableCheck: false,
       serializableCheck: false,
+      immutableCheck: false,
     })
       .concat(api.middleware)
       .concat(dynamicMiddlewares)
@@ -124,3 +127,4 @@ export type RootState = ReturnType<typeof store.getState>;
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
 export type AppDispatch = typeof store.dispatch;
 export const stateSelector = (state: RootState) => state;
+$store.set(store);
