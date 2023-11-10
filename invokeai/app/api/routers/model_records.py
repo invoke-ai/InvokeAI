@@ -46,10 +46,10 @@ async def list_model_records(
         models_raw = list()
         for base_model in base_models:
             models_raw.extend(
-                [x.model_dump() for x in record_store.search_by_name(base_model=base_model, model_type=model_type)]
+                [x.model_dump() for x in record_store.search_by_attr(base_model=base_model, model_type=model_type)]
             )
     else:
-        models_raw = [x.model_dump() for x in record_store.search_by_name(model_type=model_type)]
+        models_raw = [x.model_dump() for x in record_store.search_by_attr(model_type=model_type)]
     models = ModelsListValidator.validate_python({"models": models_raw})
     return models
 
@@ -108,7 +108,6 @@ async def update_model_record(
     operation_id="del_model_record",
     responses={204: {"description": "Model deleted successfully"}, 404: {"description": "Model not found"}},
     status_code=204,
-    response_model=None,
 )
 async def del_model_record(
     key: str = Path(description="Unique key of model to remove from model registry."),
@@ -131,12 +130,10 @@ async def del_model_record(
     operation_id="add_model_record",
     responses={
         201: {"description": "The model added successfully"},
-        404: {"description": "The model could not be found"},
         409: {"description": "There is already a model corresponding to this path or repo_id"},
         415: {"description": "Unrecognized file/folder format"},
     },
     status_code=201,
-    response_model=AnyModelConfig,
 )
 async def add_model_record(
     config: AnyModelConfig = Body(description="Model configuration"),

@@ -314,17 +314,14 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         """
         count = 0
         with self._db.lock:
-            try:
-                self._cursor.execute(
-                    """--sql
-                    select count(*) FROM model_config
-                    WHERE id=?;
-                    """,
-                    (key,),
-                )
-                count = self._cursor.fetchone()[0]
-            except sqlite3.Error as e:
-                raise e
+            self._cursor.execute(
+                """--sql
+                select count(*) FROM model_config
+                WHERE id=?;
+                """,
+                (key,),
+            )
+            count = self._cursor.fetchone()[0]
         return count > 0
 
     def search_by_attr(
@@ -357,49 +354,40 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             bindings.append(model_type)
         where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
         with self._db.lock:
-            try:
-                self._cursor.execute(
-                    f"""--sql
-                    select config FROM model_config
-                    {where};
-                    """,
-                    tuple(bindings),
-                )
-                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
-            except sqlite3.Error as e:
-                raise e
+            self._cursor.execute(
+                f"""--sql
+                select config FROM model_config
+                {where};
+                """,
+                tuple(bindings),
+            )
+            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> List[ModelConfigBase]:
         """Return models with the indicated path."""
         results = []
         with self._db.lock:
-            try:
-                self._cursor.execute(
-                    """--sql
-                    SELECT config FROM model_config
-                    WHERE model_path=?;
-                    """,
-                    (str(path),),
-                )
-                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
-            except sqlite3.Error as e:
-                raise e
+            self._cursor.execute(
+                """--sql
+                SELECT config FROM model_config
+                WHERE model_path=?;
+                """,
+                (str(path),),
+            )
+            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
 
     def search_by_hash(self, hash: str) -> List[ModelConfigBase]:
         """Return models with the indicated original_hash."""
         results = []
         with self._db.lock:
-            try:
-                self._cursor.execute(
-                    """--sql
-                    SELECT config FROM model_config
-                    WHERE original_hash=?;
-                    """,
-                    (hash,),
-                )
-                results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
-            except sqlite3.Error as e:
-                raise e
+            self._cursor.execute(
+                """--sql
+                SELECT config FROM model_config
+                WHERE original_hash=?;
+                """,
+                (hash,),
+            )
+            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
