@@ -65,6 +65,7 @@ import {
   setSeed,
   setSteps,
   setWidth,
+  vaeSelected,
 } from '../store/generationSlice';
 import {
   isValidCfgScale,
@@ -87,6 +88,7 @@ import {
   isValidSteps,
   isValidStrength,
   isValidWidth,
+  isValidVaeModel,
   isValidBoolean,
 } from '../types/parameterSchemas';
 
@@ -301,6 +303,21 @@ export const useRecallParameters = () => {
         return;
       }
       dispatch(setScheduler(scheduler));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall vae model
+   */
+  const recallVaeModel = useCallback(
+    (vaeModel: unknown) => {
+      if (!isValidVaeModel(vaeModel)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(vaeSelected(vaeModel));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -757,6 +774,7 @@ export const useRecallParameters = () => {
         positive_prompt,
         negative_prompt,
         scheduler,
+        vae,
         seed,
         steps,
         width,
@@ -797,6 +815,9 @@ export const useRecallParameters = () => {
 
       if (isValidScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));
+      }
+      if (isValidVaeModel(vae)) {
+        dispatch(vaeSelected(vae));
       }
 
       if (isValidSeed(seed)) {
@@ -932,6 +953,7 @@ export const useRecallParameters = () => {
     recallCfgScale,
     recallModel,
     recallScheduler,
+    recallVaeModel,
     recallSteps,
     recallWidth,
     recallHeight,
