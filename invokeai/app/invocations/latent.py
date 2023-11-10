@@ -1105,7 +1105,7 @@ class BlendLatentsInvocation(BaseInvocation):
         latents_b = context.services.latents.get(self.latents_b.latents_name)
 
         if latents_a.shape != latents_b.shape:
-            raise "Latents to blend must be the same size."
+            raise Exception("Latents to blend must be the same size.")
 
         # TODO:
         device = choose_torch_device()

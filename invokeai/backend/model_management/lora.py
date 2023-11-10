@@ -242,7 +242,7 @@ class ModelPatcher:
     ):
         skipped_layers = []
         try:
-            for i in range(clip_skip):
+            for _i in range(clip_skip):
                 skipped_layers.append(text_encoder.text_model.encoder.layers.pop(-1))
 
             yield

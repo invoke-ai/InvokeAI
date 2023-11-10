@@ -123,8 +123,6 @@ class MigrateTo3(object):
                     logger.error(str(e))
                 except KeyboardInterrupt:
                     raise
-                except Exception as e:
-                    logger.error(str(e))
             for f in files:
                 # don't copy raw learned_embeds.bin or pytorch_lora_weights.bin
                 # let them be copied as part of a tree copy operation
@@ -143,8 +141,6 @@ class MigrateTo3(object):
                     logger.error(str(e))
                 except KeyboardInterrupt:
                     raise
-                except Exception as e:
-                    logger.error(str(e))
 
     def migrate_support_models(self):
         """

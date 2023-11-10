@@ -153,7 +153,7 @@ class ModelBase(metaclass=ABCMeta):
 
         else:
             res_type = sys.modules["diffusers"]
-            res_type = getattr(res_type, "pipelines")
+            res_type = res_type.pipelines
 
         for subtype in subtypes:
             res_type = getattr(res_type, subtype)

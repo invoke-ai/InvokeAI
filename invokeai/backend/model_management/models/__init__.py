@@ -109,7 +109,7 @@ class OpenAPIModelInfoBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-for base_model, models in MODEL_CLASSES.items():
+for _base_model, models in MODEL_CLASSES.items():
     for model_type, model_class in models.items():
         model_configs = set(model_class._get_configs().values())
         model_configs.discard(None)

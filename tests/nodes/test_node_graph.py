@@ -471,7 +471,6 @@ def test_graph_gets_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)
@@ -544,7 +543,6 @@ def test_graph_fails_to_get_missing_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)
@@ -559,7 +557,6 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)

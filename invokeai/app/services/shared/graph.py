@@ -1119,7 +1119,7 @@ class GraphExecutionState(BaseModel):
                 for edge in input_edges
                 if edge.destination.field == "item"
             ]
-            setattr(node, "collection", output_collection)
+            node.collection = output_collection
         else:
             for edge in input_edges:
                 output_value = getattr(self.results[edge.source.node_id], edge.source.field)

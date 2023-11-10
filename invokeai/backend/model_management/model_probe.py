@@ -237,7 +237,7 @@ class ModelProbe(object):
         # scan model
         scan_result = scan_file_path(checkpoint)
         if scan_result.infected_files != 0:
-            raise "The model {model_name} is potentially infected by malware. Aborting import."
+            raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
 
 
 # ##################################################3

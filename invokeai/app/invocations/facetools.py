@@ -210,7 +210,7 @@ def generate_face_box_mask(
     # Check if any face is detected.
     if results.multi_face_landmarks:  # type: ignore # this are via protobuf and not typed
         # Search for the face_id in the detected faces.
-        for face_id, face_landmarks in enumerate(results.multi_face_landmarks):  # type: ignore #this are via protobuf and not typed
+        for _face_id, face_landmarks in enumerate(results.multi_face_landmarks):  # type: ignore #this are via protobuf and not typed
             # Get the bounding box of the face mesh.
             x_coordinates = [landmark.x for landmark in face_landmarks.landmark]
             y_coordinates = [landmark.y for landmark in face_landmarks.landmark]

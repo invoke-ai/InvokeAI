@@ -6,5 +6,5 @@ import warnings
 from invokeai.frontend.install.invokeai_configure import invokeai_configure as configure
 
 if __name__ == "__main__":
-    warnings.warn("configure_invokeai.py is deprecated, running 'invokeai-configure'...", DeprecationWarning)
+    warnings.warn("configure_invokeai.py is deprecated, running 'invokeai-configure'...", DeprecationWarning, stacklevel=2)
     configure()

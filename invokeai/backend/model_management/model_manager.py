@@ -655,7 +655,7 @@ class ModelManager(object):
         """
         # TODO: redo
         for model_dict in self.list_models():
-            for model_name, model_info in model_dict.items():
+            for _model_name, model_info in model_dict.items():
                 line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
 

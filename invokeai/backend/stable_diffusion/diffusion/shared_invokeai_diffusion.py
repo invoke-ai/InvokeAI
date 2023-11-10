@@ -123,7 +123,7 @@ class InvokeAIDiffuserComponent:
         # control_data should be type List[ControlNetData]
         # this loop covers both ControlNet (one ControlNetData in list)
         #      and MultiControlNet (multiple ControlNetData in list)
-        for i, control_datum in enumerate(control_data):
+        for _i, control_datum in enumerate(control_data):
             control_mode = control_datum.control_mode
             # soft_injection and cfg_injection are the two ControlNet control_mode booleans
             #     that are combined at higher level to make control_mode enum
@@ -214,7 +214,7 @@ class InvokeAIDiffuserComponent:
                     # add controlnet outputs together if have multiple controlnets
                     down_block_res_samples = [
                         samples_prev + samples_curr
-                        for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
+                        for samples_prev, samples_curr in zip(down_block_res_samples, down_samples, strict=True)
                     ]
                     mid_block_res_sample += mid_sample
 

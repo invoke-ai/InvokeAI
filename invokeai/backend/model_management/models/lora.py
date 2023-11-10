@@ -462,7 +462,7 @@ class LoRAModelRaw:  # (torch.nn.Module):
         dtype: Optional[torch.dtype] = None,
     ):
         # TODO: try revert if exception?
-        for key, layer in self.layers.items():
+        for _key, layer in self.layers.items():
             layer.to(device=device, dtype=dtype)
 
     def calc_size(self) -> int:

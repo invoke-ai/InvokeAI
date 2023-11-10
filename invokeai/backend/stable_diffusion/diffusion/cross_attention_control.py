@@ -54,13 +54,13 @@ class Context:
         self.clear_requests(cleanup=True)
 
     def register_cross_attention_modules(self, model):
-        for name, module in get_cross_attention_modules(model, CrossAttentionType.SELF):
+        for name, _module in get_cross_attention_modules(model, CrossAttentionType.SELF):
             if name in self.self_cross_attention_module_identifiers:
-                assert False, f"name {name} cannot appear more than once"
+                raise AssertionError(f"name {name} cannot appear more than once")
             self.self_cross_attention_module_identifiers.append(name)
-        for name, module in get_cross_attention_modules(model, CrossAttentionType.TOKENS):
+        for name, _module in get_cross_attention_modules(model, CrossAttentionType.TOKENS):
             if name in self.tokens_cross_attention_module_identifiers:
-                assert False, f"name {name} cannot appear more than once"
+                raise AssertionError(f"name {name} cannot appear more than once")
             self.tokens_cross_attention_module_identifiers.append(name)
 
     def request_save_attention_maps(self, cross_attention_type: CrossAttentionType):
@@ -170,7 +170,7 @@ class Context:
             self.saved_cross_attention_maps = {}
 
     def offload_saved_attention_slices_to_cpu(self):
-        for key, map_dict in self.saved_cross_attention_maps.items():
+        for _key, map_dict in self.saved_cross_attention_maps.items():
             for offset, slice in map_dict["slices"].items():
                 map_dict[offset] = slice.to("cpu")
 
@@ -433,7 +433,7 @@ def inject_attention_function(unet, context: Context):
         module.identifier = identifier
         try:
             module.set_attention_slice_wrangler(attention_slice_wrangler)
-            module.set_slicing_strategy_getter(lambda module: context.get_slicing_strategy(identifier))
+            module.set_slicing_strategy_getter(lambda module: context.get_slicing_strategy(identifier)) # noqa: B023
         except AttributeError as e:
             if is_attribute_error_about(e, "set_attention_slice_wrangler"):
                 print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")  # TODO
@@ -445,7 +445,7 @@ def remove_attention_function(unet):
     cross_attention_modules = get_cross_attention_modules(
         unet, CrossAttentionType.TOKENS
     ) + get_cross_attention_modules(unet, CrossAttentionType.SELF)
-    for identifier, module in cross_attention_modules:
+    for _identifier, module in cross_attention_modules:
         try:
             # clear wrangler callback
             module.set_attention_slice_wrangler(None)

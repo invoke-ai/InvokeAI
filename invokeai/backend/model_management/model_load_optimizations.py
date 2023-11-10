@@ -26,5 +26,5 @@ def skip_torch_weight_init():
 
         yield None
     finally:
-        for torch_module, saved_function in zip(torch_modules, saved_functions):
+        for torch_module, saved_function in zip(torch_modules, saved_functions, strict=True):
             torch_module.reset_parameters = saved_function

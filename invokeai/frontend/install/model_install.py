@@ -72,7 +72,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
         self.subprocess = None
-        super().__init__(parentApp=parentApp, name=name, *args, **keywords)
+        super().__init__(parentApp=parentApp, name=name, *args, **keywords) # noqa: B026 # TODO: maybe this is bad?
 
     def create(self):
         self.keypress_timeout = 10
@@ -203,7 +203,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         )
 
         # This restores the selected page on return from an installation
-        for i in range(1, self.current_tab + 1):
+        for _i in range(1, self.current_tab + 1):
             self.tabs.h_cursor_line_down(1)
         self._toggle_tables([self.current_tab])
 
@@ -258,9 +258,11 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         model_type: ModelType,
         window_width: int = 120,
         install_prompt: str = None,
-        exclude: set = set(),
+        exclude: set = None,
     ) -> dict[str, npyscreen.widget]:
         """Generic code to create model selection widgets"""
+        if exclude is None:
+            exclude = set()
         widgets = {}
         model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and x not in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
@@ -366,13 +368,13 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         ]
 
         for group in widgets:
-            for k, v in group.items():
+            for _k, v in group.items():
                 try:
                     v.hidden = True
                     v.editable = False
                 except Exception:
                     pass
-        for k, v in widgets[selected_tab].items():
+        for _k, v in widgets[selected_tab].items():
             try:
                 v.hidden = False
                 if not isinstance(v, (npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):

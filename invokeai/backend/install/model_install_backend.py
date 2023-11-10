@@ -176,7 +176,7 @@ class ModelInstall(object):
     # logic here a little reversed to maintain backward compatibility
     def starter_models(self, all_models: bool = False) -> Set[str]:
         models = set()
-        for key, value in self.datasets.items():
+        for key, _value in self.datasets.items():
             name, base, model_type = ModelManager.parse_key(key)
             if all_models or model_type in [ModelType.Main, ModelType.Vae]:
                 models.add(key)

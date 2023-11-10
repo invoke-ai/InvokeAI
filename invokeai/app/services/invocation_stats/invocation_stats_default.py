@@ -122,7 +122,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
     def log_stats(self):
         completed = set()
         errored = set()
-        for graph_id, node_log in self._stats.items():
+        for graph_id, _node_log in self._stats.items():
             try:
                 current_graph_state = self._invoker.services.graph_execution_manager.get(graph_id)
             except Exception:

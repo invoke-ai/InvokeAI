@@ -130,7 +130,7 @@ class IPAttnProcessor2_0(torch.nn.Module):
             assert ip_adapter_image_prompt_embeds is not None
             assert len(ip_adapter_image_prompt_embeds) == len(self._weights)
 
-            for ipa_embed, ipa_weights, scale in zip(ip_adapter_image_prompt_embeds, self._weights, self._scales):
+            for ipa_embed, ipa_weights, scale in zip(ip_adapter_image_prompt_embeds, self._weights, self._scales, strict=True):
                 # The batch dimensions should match.
                 assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
                 # The token_len dimensions should match.
