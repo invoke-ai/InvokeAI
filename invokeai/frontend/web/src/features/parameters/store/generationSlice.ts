@@ -73,7 +73,7 @@ export interface GenerationState {
 }
 
 export const initialGenerationState: GenerationState = {
-  hrfStrength: 0.35,
+  hrfStrength: 0.45,
   hrfEnabled: false,
   hrfMethod: 'ESRGAN',
   cfgScale: 7.5,
