@@ -97,6 +97,7 @@ dependencies = [
 "dev" = ["jurigged", "pudb"]
 "test" = [
   "ruff",
+  "ruff-lsp",
   "mypy",
   "pre-commit",
   "pytest>6.0.0",
