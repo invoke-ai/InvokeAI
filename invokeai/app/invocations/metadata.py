@@ -160,13 +160,14 @@ class CoreMetadataInvocation(BaseInvocation):
     )
 
     # High resolution fix metadata.
-    hrf_width: Optional[int] = InputField(
+    hrf_enabled: Optional[float] = InputField(
         default=None,
-        description="The high resolution fix height and width multipler.",
+        description="Whether or not high resolution fix was enabled.",
     )
-    hrf_height: Optional[int] = InputField(
+    # TODO: should this be stricter or do we just let the UI handle it?
+    hrf_method: Optional[str] = InputField(
         default=None,
-        description="The high resolution fix height and width multipler.",
+        description="The high resolution fix upscale method.",
     )
     hrf_strength: Optional[float] = InputField(
         default=None,
