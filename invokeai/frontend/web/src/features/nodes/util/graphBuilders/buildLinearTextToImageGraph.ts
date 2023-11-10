@@ -250,9 +250,6 @@ export const buildLinearTextToImageGraph = (
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
     clip_skip: clipSkip,
-    hrf_strength: hrfStrength,
-    hrf_enabled: hrfEnabled,
-    hrf_method: hrfMethod,
   });
 
   // Add Seamless To Graph
