@@ -39,7 +39,7 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> ModelConfigBase:
+    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
         """
         Add a model to the database.
 
@@ -110,7 +110,7 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def search_by_name(
+    def search_by_attr(
         self,
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
@@ -130,16 +130,16 @@ class ModelRecordServiceBase(ABC):
 
     def all_models(self) -> List[AnyModelConfig]:
         """Return all the model configs in the database."""
-        return self.search_by_name()
+        return self.search_by_attr()
 
-    def model_info_by_name(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> ModelConfigBase:
+    def model_info_by_name(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> AnyModelConfig:
         """
         Return information about a single model using its name, base type and model type.
 
         If there are more than one model that match, raises a DuplicateModelException.
         If no model matches, raises an UnknownModelException
         """
-        model_configs = self.search_by_name(model_name=model_name, base_model=base_model, model_type=model_type)
+        model_configs = self.search_by_attr(model_name=model_name, base_model=base_model, model_type=model_type)
         if len(model_configs) > 1:
             raise DuplicateModelException(
                 f"More than one model matched the search criteria: base_model='{base_model}', model_type='{model_type}', model_name='{model_name}'."
@@ -154,7 +154,7 @@ class ModelRecordServiceBase(ABC):
         self,
         key: str,
         new_name: str,
-    ) -> ModelConfigBase:
+    ) -> AnyModelConfig:
         """
         Rename the indicated model. Just a special case of update_model().
 
@@ -164,4 +164,6 @@ class ModelRecordServiceBase(ABC):
         :param key: Model key
         :param new_name: New name for model
         """
-        return self.update_model(key, {"name": new_name})
+        config = self.get_model(key)
+        config.name = new_name
+        return self.update_model(key, config)

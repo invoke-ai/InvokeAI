@@ -36,7 +36,7 @@ Typical usage:
   # searching
   configs = store.search_by_path(path='/tmp/pokemon.bin')
   configs = store.search_by_hash('750a499f35e43b7e1b4d15c207aa2f01')
-  configs = store.search_by_name(base_model='sd-2', model_type='main')
+  configs = store.search_by_attr(base_model='sd-2', model_type='main')
 """
 
 
@@ -77,7 +77,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         """
         super().__init__()
         self._db = db
-        self._db.conn.row_factory = sqlite3.Row
         self._cursor = self._db.conn.cursor()
 
         with self._db.lock:
@@ -157,7 +156,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             ("version", CONFIG_FILE_VERSION),
         )
 
-    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
+    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> AnyModelConfig:
         """
         Add a model to the database.
 
@@ -168,7 +167,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
-        json_serialized = json.dumps(record.model_dump())  # and turn it into a json string.
+        json_serialized = record.model_dump_json()  # and turn it into a json string.
         with self._db.lock:
             try:
                 self._cursor.execute(
@@ -252,7 +251,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 raise e
 
-    def update_model(self, key: str, config: Union[dict, ModelConfigBase]) -> ModelConfigBase:
+    def update_model(self, key: str, config: ModelConfigBase) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
@@ -261,7 +260,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
          required fields, or a ModelConfigBase instance.
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
-        json_serialized = json.dumps(record.model_dump())  # and turn it into a json string.
+        json_serialized = record.model_dump_json()  # and turn it into a json string.
         with self._db.lock:
             try:
                 self._cursor.execute(
@@ -328,7 +327,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 raise e
         return count > 0
 
-    def search_by_name(
+    def search_by_attr(
         self,
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
