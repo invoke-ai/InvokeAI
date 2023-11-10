@@ -73,9 +73,9 @@ export interface GenerationState {
 }
 
 export const initialGenerationState: GenerationState = {
-  hrfStrength: 0.75,
+  hrfStrength: 0.35,
   hrfEnabled: false,
-  hrfMethod: 'bilinear',
+  hrfMethod: 'ESRGAN',
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
