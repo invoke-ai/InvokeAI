@@ -34,8 +34,7 @@ ModelsListValidator = TypeAdapter(ModelsList)
 
 @model_records_router.get(
     "/",
-    operation_id="list_model_recordss",
-    responses={200: {"model": ModelsList}},
+    operation_id="list_model_records",
 )
 async def list_model_records(
     base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
