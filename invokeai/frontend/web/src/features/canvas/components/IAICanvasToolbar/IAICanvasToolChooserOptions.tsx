@@ -245,6 +245,7 @@ const IAICanvasToolChooserOptions = () => {
             }}
           >
             <IAIColorPicker
+              withNumberInput={true}
               color={brushColor}
               onChange={(newColor) => dispatch(setBrushColor(newColor))}
             />

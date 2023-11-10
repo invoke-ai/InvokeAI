@@ -1,9 +1,13 @@
 import { Box, ChakraProps } from '@chakra-ui/react';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
 
-type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor>;
+import IAINumberInput from './IAINumberInput';
+
+type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
+  withNumberInput?: boolean;
+};
 
 const colorPickerStyles: NonNullable<ChakraProps['sx']> = {
   width: 6,
@@ -18,9 +22,62 @@ const sx = {
 };
 
 const IAIColorPicker = (props: IAIColorPickerProps) => {
+  const { color, onChange, withNumberInput, ...rest } = props;
+  const handleChangeR = useCallback(
+    (r: number) => onChange({ ...color, r }),
+    [color, onChange]
+  );
+  const handleChangeG = useCallback(
+    (g: number) => onChange({ ...color, g }),
+    [color, onChange]
+  );
+  const handleChangeB = useCallback(
+    (b: number) => onChange({ ...color, b }),
+    [color, onChange]
+  );
+  const handleChangeA = useCallback(
+    (a: number) => onChange({ ...color, a }),
+    [color, onChange]
+  );
   return (
     <Box sx={sx}>
-      <RgbaColorPicker {...props} />
+      <RgbaColorPicker color={color} onChange={onChange} {...rest} />
+      {withNumberInput && (
+        <IAINumberInput
+          value={color.r}
+          onChange={handleChangeR}
+          min={0}
+          max={255}
+          step={1}
+        />
+      )}
+      {withNumberInput && (
+        <IAINumberInput
+          value={color.g}
+          onChange={handleChangeG}
+          min={0}
+          max={255}
+          step={1}
+        />
+      )}
+      {withNumberInput && (
+        <IAINumberInput
+          value={color.b}
+          onChange={handleChangeB}
+          min={0}
+          max={255}
+          step={1}
+        />
+      )}
+      {withNumberInput && (
+        <IAINumberInput
+          value={color.a}
+          onChange={handleChangeA}
+          min={0}
+          max={1}
+          step={1}
+        />
+      )}
     </Box>
   );
 };
