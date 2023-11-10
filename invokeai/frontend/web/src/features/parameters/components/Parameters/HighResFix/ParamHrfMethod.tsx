@@ -10,8 +10,8 @@ import { memo, useCallback } from 'react';
 const selector = createSelector(
   stateSelector,
   ({ generation }) => {
-    const { hrfMethod } = generation;
-    return { hrfMethod };
+    const { hrfMethod, hrfEnabled } = generation;
+    return { hrfMethod, hrfEnabled };
   },
   defaultSelectorOptions
 );
@@ -21,7 +21,7 @@ const DATA = ['ESRGAN', 'bilinear'];
 // Dropdown selection for the type of high resolution fix method to use.
 const ParamHrfMethodSelect = () => {
   const dispatch = useAppDispatch();
-  const { hrfMethod } = useAppSelector(selector);
+  const { hrfMethod, hrfEnabled } = useAppSelector(selector);
 
   const handleChange = useCallback(
     (v: HrfMethodParam | null) => {
@@ -39,6 +39,7 @@ const ParamHrfMethodSelect = () => {
       value={hrfMethod}
       data={DATA}
       onChange={handleChange}
+      disabled={!hrfEnabled}
     />
   );
 };
