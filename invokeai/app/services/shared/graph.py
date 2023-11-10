@@ -728,9 +728,9 @@ class Graph(BaseModel):
         # Validate that all inputs are derived from or match a single type
         input_field_types = {
             t
-                for input_field in input_fields
-                for t in ([input_field] if get_origin(input_field) is None else get_args(input_field))
-                if t != NoneType
+            for input_field in input_fields
+            for t in ([input_field] if get_origin(input_field) is None else get_args(input_field))
+            if t != NoneType
         }  # Get unique types
         type_tree = nx.DiGraph()
         type_tree.add_nodes_from(input_field_types)
@@ -1053,7 +1053,10 @@ class GraphExecutionState(BaseModel):
             # For every iterator, the parent must either not be a child of that iterator, or must match the prepared iteration for that iterator
             # TODO: Handle a node mapping to none
             eg = self.execution_graph.nx_graph_flat()
-            prepared_parent_mappings = [[(n, self._get_iteration_node(n, g, eg, it)) for n in next_node_parents] for it in iterator_node_prepared_combinations]  # type: ignore
+            prepared_parent_mappings = [
+                [(n, self._get_iteration_node(n, g, eg, it)) for n in next_node_parents]
+                for it in iterator_node_prepared_combinations
+            ]  # type: ignore
 
             # Create execution node for each iteration
             for iteration_mappings in prepared_parent_mappings:

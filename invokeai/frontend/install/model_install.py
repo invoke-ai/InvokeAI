@@ -72,7 +72,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
         self.subprocess = None
-        super().__init__(parentApp=parentApp, name=name, *args, **keywords) # noqa: B026 # TODO: maybe this is bad?
+        super().__init__(parentApp=parentApp, name=name, *args, **keywords)  # noqa: B026 # TODO: maybe this is bad?
 
     def create(self):
         self.keypress_timeout = 10

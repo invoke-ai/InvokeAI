@@ -433,7 +433,7 @@ def inject_attention_function(unet, context: Context):
         module.identifier = identifier
         try:
             module.set_attention_slice_wrangler(attention_slice_wrangler)
-            module.set_slicing_strategy_getter(lambda module: context.get_slicing_strategy(identifier)) # noqa: B023
+            module.set_slicing_strategy_getter(lambda module: context.get_slicing_strategy(identifier))  # noqa: B023
         except AttributeError as e:
             if is_attribute_error_about(e, "set_attention_slice_wrangler"):
                 print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")  # TODO

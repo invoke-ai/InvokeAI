@@ -642,7 +642,9 @@ class InvokeAIDiffuserComponent:
 
         deltas = None
         uncond_latents = None
-        weighted_cond_list = c_or_weighted_c_list if isinstance(c_or_weighted_c_list, list) else [(c_or_weighted_c_list, 1)]
+        weighted_cond_list = (
+            c_or_weighted_c_list if isinstance(c_or_weighted_c_list, list) else [(c_or_weighted_c_list, 1)]
+        )
 
         # below is fugly omg
         conditionings = [uc] + [c for c, weight in weighted_cond_list]

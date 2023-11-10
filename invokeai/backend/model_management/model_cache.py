@@ -66,11 +66,13 @@ class CacheStats(object):
 
 class ModelLocker(object):
     "Forward declaration"
+
     pass
 
 
 class ModelCache(object):
     "Forward declaration"
+
     pass
 
 

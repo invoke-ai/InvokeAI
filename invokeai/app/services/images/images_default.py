@@ -217,13 +217,16 @@ class ImageService(ImageServiceABC):
                 board_id,
             )
 
-            image_dtos = [image_record_to_dto(
-                        image_record=r,
-                        image_url=self.__invoker.services.urls.get_image_url(r.image_name),
-                        thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
-                        board_id=self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
-                        workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(r.image_name),
-                    ) for r in results.items]
+            image_dtos = [
+                image_record_to_dto(
+                    image_record=r,
+                    image_url=self.__invoker.services.urls.get_image_url(r.image_name),
+                    thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
+                    board_id=self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
+                    workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(r.image_name),
+                )
+                for r in results.items
+            ]
 
             return OffsetPaginatedResults[ImageDTO](
                 items=image_dtos,

@@ -90,20 +90,23 @@ class ImageRecordDeleteException(Exception):
 
 
 IMAGE_DTO_COLS = ", ".join(
-    ["images." + c for c in [
-                "image_name",
-                "image_origin",
-                "image_category",
-                "width",
-                "height",
-                "session_id",
-                "node_id",
-                "is_intermediate",
-                "created_at",
-                "updated_at",
-                "deleted_at",
-                "starred",
-            ]]
+    [
+        "images." + c
+        for c in [
+            "image_name",
+            "image_origin",
+            "image_category",
+            "width",
+            "height",
+            "session_id",
+            "node_id",
+            "is_intermediate",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+            "starred",
+        ]
+    ]
 )
 
 

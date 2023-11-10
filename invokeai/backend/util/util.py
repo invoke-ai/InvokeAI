@@ -229,7 +229,11 @@ def rand_perlin_2d(shape, res, device, fade=lambda t: 6 * t**5 - 15 * t**4 + 10 
     gradients = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1).to(device)
 
     def tile_grads(slice1, slice2):
-        return gradients[slice1[0]:slice1[1], slice2[0]:slice2[1]].repeat_interleave(d[0], 0).repeat_interleave(d[1], 1)
+        return (
+            gradients[slice1[0] : slice1[1], slice2[0] : slice2[1]]
+            .repeat_interleave(d[0], 0)
+            .repeat_interleave(d[1], 1)
+        )
 
     def dot(grad, shift):
         return (

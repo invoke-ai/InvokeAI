@@ -34,7 +34,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
             name="session_processor",
             target=self.__process,
             kwargs={
-                "stop_event": self.__stop_event, "poll_now_event": self.__poll_now_event, "resume_event": self.__resume_event
+                "stop_event": self.__stop_event,
+                "poll_now_event": self.__poll_now_event,
+                "resume_event": self.__resume_event,
             },
         )
         self.__thread.start()

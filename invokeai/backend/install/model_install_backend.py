@@ -253,13 +253,13 @@ class ModelInstall(object):
         # folders style or similar
         elif path.is_dir() and any(
             (path / x).exists()
-                for x in {
-                    "config.json",
-                    "model_index.json",
-                    "learned_embeds.bin",
-                    "pytorch_lora_weights.bin",
-                    "pytorch_lora_weights.safetensors",
-                }
+            for x in {
+                "config.json",
+                "model_index.json",
+                "learned_embeds.bin",
+                "pytorch_lora_weights.bin",
+                "pytorch_lora_weights.safetensors",
+            }
         ):
             models_installed.update({str(model_path_id_or_url): self._install_path(path)})
 

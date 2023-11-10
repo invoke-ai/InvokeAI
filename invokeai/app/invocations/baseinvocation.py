@@ -661,9 +661,7 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
 
         field_kind = (
             # _field_kind is defined via InputField(), OutputField() or by one of the internal fields defined in this file
-            field.json_schema_extra.get("_field_kind", None)
-            if field.json_schema_extra
-            else None
+            field.json_schema_extra.get("_field_kind", None) if field.json_schema_extra else None
         )
 
         # must have a field_kind
