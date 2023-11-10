@@ -5,10 +5,11 @@ from typing import Optional, Tuple
 import torch
 from pydantic import BaseModel, Field
 
+from invokeai.app.shared.fields import FieldDescriptions
+
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,

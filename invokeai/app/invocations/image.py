@@ -9,19 +9,11 @@ from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.primitives import BoardField, ColorField, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
-from .baseinvocation import (
-    BaseInvocation,
-    FieldDescriptions,
-    Input,
-    InputField,
-    InvocationContext,
-    WithMetadata,
-    WithWorkflow,
-    invocation,
-)
+from .baseinvocation import BaseInvocation, Input, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.0")

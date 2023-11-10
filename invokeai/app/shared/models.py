@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.baseinvocation import FieldDescriptions
+from invokeai.app.shared.fields import FieldDescriptions
 
 
 class FreeUConfig(BaseModel):
