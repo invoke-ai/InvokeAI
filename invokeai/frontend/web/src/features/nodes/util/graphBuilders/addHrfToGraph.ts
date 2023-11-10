@@ -169,7 +169,7 @@ export const addHrfToGraph = (
     id: LATENTS_TO_IMAGE_HRF_LR,
     fp32: originalLatentsToImageNode?.fp32,
     is_intermediate: true,
-  } as LatentsToImageInvocation;
+  };
   graph.edges.push(
     {
       source: {
@@ -199,18 +199,18 @@ export const addHrfToGraph = (
     is_intermediate: true,
     width: width,
     height: height,
-  } as ImageResizeInvocation;
+  };
   if (hrfMethod == 'ESRGAN') {
-    let model_name = 'RealESRGAN_x2plus.pth';
+    let model_name: ESRGANInvocation['model_name'] = 'RealESRGAN_x2plus.pth';
     if ((width * height) / (hrfWidth * hrfHeight) > 2) {
       model_name = 'RealESRGAN_x4plus.pth';
     }
     graph.nodes[ESRGAN_HRF] = {
       id: ESRGAN_HRF,
       type: 'esrgan',
-      model_name: model_name,
+      model_name,
       is_intermediate: true,
-    } as ESRGANInvocation;
+    };
     graph.edges.push(
       {
         source: {
@@ -252,7 +252,7 @@ export const addHrfToGraph = (
     seed: originalNoiseNode?.seed,
     use_cpu: originalNoiseNode?.use_cpu,
     is_intermediate: true,
-  } as NoiseInvocation;
+  };
   graph.edges.push(
     {
       source: {
@@ -280,7 +280,7 @@ export const addHrfToGraph = (
     type: 'i2l',
     id: IMAGE_TO_LATENTS_HRF,
     is_intermediate: true,
-  } as ImageToLatentsInvocation;
+  };
   graph.edges.push(
     {
       source: {
@@ -313,7 +313,7 @@ export const addHrfToGraph = (
     steps: originalDenoiseLatentsNode?.steps,
     denoising_start: 1 - state.generation.hrfStrength,
     denoising_end: 1,
-  } as DenoiseLatentsInvocation;
+  };
   graph.edges.push(
     {
       source: {
@@ -343,7 +343,7 @@ export const addHrfToGraph = (
     id: LATENTS_TO_IMAGE_HRF_HR,
     fp32: originalLatentsToImageNode?.fp32,
     is_intermediate: true,
-  } as LatentsToImageInvocation;
+  };
   graph.edges.push(
     {
       source: {
