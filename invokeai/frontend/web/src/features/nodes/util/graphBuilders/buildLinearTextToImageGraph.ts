@@ -48,9 +48,6 @@ export const buildLinearTextToImageGraph = (
     seamlessXAxis,
     seamlessYAxis,
     seed,
-    hrfStrength,
-    hrfEnabled,
-    hrfMethod,
   } = state.generation;
 
   const use_cpu = shouldUseCpuNoise;
