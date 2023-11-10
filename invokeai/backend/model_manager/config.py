@@ -179,7 +179,12 @@ class TextualInversionConfig(ModelConfigBase):
 class MainConfig(ModelConfigBase):
     """Model config for main models."""
 
-    vae: Optional[str] = Field(None)
+class MainConfig(ModelConfigBase):
+    """Model config for main models."""
+
+    vae: Optional[str] = Field(default=None)
+    variant: ModelVariantType = ModelVariantType.Normal
+    ztsnr_training: bool = False
     variant: ModelVariantType = ModelVariantType.Normal
     ztsnr_training: bool = False
 
