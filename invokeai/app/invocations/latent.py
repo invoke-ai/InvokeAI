@@ -77,7 +77,7 @@ if choose_torch_device() == torch.device("mps"):
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
-SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
+SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
 
 
 @invocation_output("scheduler_output")

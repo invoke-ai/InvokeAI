@@ -503,8 +503,8 @@ def test_graph_expands_subgraph():
     g.add_edge(create_edge("1.2", "value", "2", "a"))
 
     dg = g.nx_graph_flat()
-    assert set(dg.nodes) == set(["1.1", "1.2", "2"])
-    assert set(dg.edges) == set([("1.1", "1.2"), ("1.2", "2")])
+    assert set(dg.nodes) == {"1.1", "1.2", "2"}
+    assert set(dg.edges) == {("1.1", "1.2"), ("1.2", "2")}
 
 
 def test_graph_subgraph_t2i():
@@ -532,9 +532,7 @@ def test_graph_subgraph_t2i():
 
     # Validate
     dg = g.nx_graph_flat()
-    assert set(dg.nodes) == set(
-        ["1.width", "1.height", "1.seed", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "2", "3", "4"]
-    )
+    assert set(dg.nodes) == {"1.width", "1.height", "1.seed", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "2", "3", "4"}
     expected_edges = [(f"1.{e.source.node_id}", f"1.{e.destination.node_id}") for e in lg.graph.edges]
     expected_edges.extend([("2", "1.width"), ("3", "1.height"), ("1.8", "4")])
     print(expected_edges)

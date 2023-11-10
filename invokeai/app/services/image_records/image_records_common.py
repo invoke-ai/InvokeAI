@@ -90,10 +90,7 @@ class ImageRecordDeleteException(Exception):
 
 
 IMAGE_DTO_COLS = ", ".join(
-    list(
-        map(
-            lambda c: "images." + c,
-            [
+    ["images." + c for c in [
                 "image_name",
                 "image_origin",
                 "image_category",
@@ -106,9 +103,7 @@ IMAGE_DTO_COLS = ", ".join(
                 "updated_at",
                 "deleted_at",
                 "starred",
-            ],
-        )
-    )
+            ]]
 )
 
 

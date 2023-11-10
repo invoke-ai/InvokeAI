@@ -78,7 +78,7 @@ def create_system_graphs(graph_library: ItemStorageABC[LibraryGraph]) -> list[Li
     """Creates the default system graphs, or adds new versions if the old ones don't match"""
 
     # TODO: Uncomment this when we are ready to fix this up to prevent breaking changes
-    graphs: list[LibraryGraph] = list()
+    graphs: list[LibraryGraph] = []
 
     text_to_image = graph_library.get(default_text_to_image_graph_id)
 

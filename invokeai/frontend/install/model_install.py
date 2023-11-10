@@ -210,7 +210,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     ############# diffusers tab ##########
     def add_starter_pipelines(self) -> dict[str, npyscreen.widget]:
         """Add widgets responsible for selecting diffusers models"""
-        widgets = dict()
+        widgets = {}
         models = self.all_models
         starters = self.starter_models
         starter_model_labels = self.model_labels
@@ -261,7 +261,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         exclude: set = set(),
     ) -> dict[str, npyscreen.widget]:
         """Generic code to create model selection widgets"""
-        widgets = dict()
+        widgets = {}
         model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and x not in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
 
@@ -391,7 +391,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         label_width = max([len(models[x].name) for x in models])
         description_width = window_width - label_width - checkbox_width - spacing_width
 
-        result = dict()
+        result = {}
         for x in models.keys():
             description = models[x].description
             description = (
@@ -433,11 +433,11 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         parent_conn, child_conn = Pipe()
         p = Process(
             target=process_and_execute,
-            kwargs=dict(
-                opt=app.program_opts,
-                selections=app.install_selections,
-                conn_out=child_conn,
-            ),
+            kwargs={
+                "opt": app.program_opts,
+                "selections": app.install_selections,
+                "conn_out": child_conn,
+            },
         )
         p.start()
         child_conn.close()
@@ -558,7 +558,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         for section in ui_sections:
             if "models_selected" not in section:
                 continue
-            selected = set([section["models"][x] for x in section["models_selected"].value])
+            selected = {section["models"][x] for x in section["models_selected"].value}
             models_to_install = [x for x in selected if not self.all_models[x].installed]
             models_to_remove = [x for x in section["models"] if x not in selected and self.all_models[x].installed]
             selections.remove_models.extend(models_to_remove)

@@ -26,7 +26,7 @@ def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
     # xc a list of captions to plot
     b = len(xc)
-    txts = list()
+    txts = []
     for bi in range(b):
         txt = Image.new("RGB", wh, color="white")
         draw = ImageDraw.Draw(txt)
@@ -90,7 +90,7 @@ def instantiate_from_config(config, **kwargs):
         elif config == "__is_unconditional__":
             return None
         raise KeyError("Expected key `target` to instantiate.")
-    return get_obj_from_str(config["target"])(**config.get("params", dict()), **kwargs)
+    return get_obj_from_str(config["target"])(**config.get("params", {}), **kwargs)
 
 
 def get_obj_from_str(string, reload=False):

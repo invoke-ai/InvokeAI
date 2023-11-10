@@ -145,17 +145,17 @@ INTEGER_OPERATIONS = Literal[
 ]
 
 
-INTEGER_OPERATIONS_LABELS = dict(
-    ADD="Add A+B",
-    SUB="Subtract A-B",
-    MUL="Multiply A*B",
-    DIV="Divide A/B",
-    EXP="Exponentiate A^B",
-    MOD="Modulus A%B",
-    ABS="Absolute Value of A",
-    MIN="Minimum(A,B)",
-    MAX="Maximum(A,B)",
-)
+INTEGER_OPERATIONS_LABELS = {
+    "ADD": "Add A+B",
+    "SUB": "Subtract A-B",
+    "MUL": "Multiply A*B",
+    "DIV": "Divide A/B",
+    "EXP": "Exponentiate A^B",
+    "MOD": "Modulus A%B",
+    "ABS": "Absolute Value of A",
+    "MIN": "Minimum(A,B)",
+    "MAX": "Maximum(A,B)",
+}
 
 
 @invocation(
@@ -231,17 +231,17 @@ FLOAT_OPERATIONS = Literal[
 ]
 
 
-FLOAT_OPERATIONS_LABELS = dict(
-    ADD="Add A+B",
-    SUB="Subtract A-B",
-    MUL="Multiply A*B",
-    DIV="Divide A/B",
-    EXP="Exponentiate A^B",
-    ABS="Absolute Value of A",
-    SQRT="Square Root of A",
-    MIN="Minimum(A,B)",
-    MAX="Maximum(A,B)",
-)
+FLOAT_OPERATIONS_LABELS = {
+    "ADD": "Add A+B",
+    "SUB": "Subtract A-B",
+    "MUL": "Multiply A*B",
+    "DIV": "Divide A/B",
+    "EXP": "Exponentiate A^B",
+    "ABS": "Absolute Value of A",
+    "SQRT": "Square Root of A",
+    "MIN": "Minimum(A,B)",
+    "MAX": "Maximum(A,B)",
+}
 
 
 @invocation(

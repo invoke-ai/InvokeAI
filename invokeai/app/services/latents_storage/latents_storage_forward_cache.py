@@ -19,7 +19,7 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
     def __init__(self, underlying_storage: LatentsStorageBase, max_cache_size: int = 20):
         super().__init__()
         self.__underlying_storage = underlying_storage
-        self.__cache = dict()
+        self.__cache = {}
         self.__cache_ids = Queue()
         self.__max_cache_size = max_cache_size
 

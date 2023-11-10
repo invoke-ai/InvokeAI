@@ -131,7 +131,7 @@ def prepare_faces_list(
     deduped_faces: list[FaceResultData] = []
 
     if len(face_result_list) == 0:
-        return list()
+        return []
 
     for candidate in face_result_list:
         should_add = True

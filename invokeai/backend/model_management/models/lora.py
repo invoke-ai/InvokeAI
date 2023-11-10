@@ -73,7 +73,7 @@ class LoRAModel(ModelBase):
                     return LoRAModelFormat.Diffusers
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]):
                 return LoRAModelFormat.LyCORIS
 
         raise InvalidModelException(f"Not a valid model: {path}")
@@ -499,7 +499,7 @@ class LoRAModelRaw:  # (torch.nn.Module):
         stability_unet_keys = list(SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP)
         stability_unet_keys.sort()
 
-        new_state_dict = dict()
+        new_state_dict = {}
         for full_key, value in state_dict.items():
             if full_key.startswith("lora_unet_"):
                 search_key = full_key.replace("lora_unet_", "")
@@ -545,7 +545,7 @@ class LoRAModelRaw:  # (torch.nn.Module):
 
         model = cls(
             name=file_path.stem,  # TODO:
-            layers=dict(),
+            layers={},
         )
 
         if file_path.suffix == ".safetensors":
@@ -593,12 +593,12 @@ class LoRAModelRaw:  # (torch.nn.Module):
 
     @staticmethod
     def _group_state(state_dict: dict):
-        state_dict_groupped = dict()
+        state_dict_groupped = {}
 
         for key, value in state_dict.items():
             stem, leaf = key.split(".", 1)
             if stem not in state_dict_groupped:
-                state_dict_groupped[stem] = dict()
+                state_dict_groupped[stem] = {}
             state_dict_groupped[stem][leaf] = value
 
         return state_dict_groupped

@@ -129,12 +129,12 @@ class Batch(BaseModel):
         return v
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "graph",
                 "runs",
             ]
-        )
+        }
     )
 
 
@@ -191,8 +191,8 @@ class SessionQueueItemWithoutGraph(BaseModel):
         return SessionQueueItemDTO(**queue_item_dict)
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "item_id",
                 "status",
                 "batch_id",
@@ -203,7 +203,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
                 "created_at",
                 "updated_at",
             ]
-        )
+        }
     )
 
 
@@ -222,8 +222,8 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
         return SessionQueueItem(**queue_item_dict)
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "item_id",
                 "status",
                 "batch_id",
@@ -235,7 +235,7 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
                 "created_at",
                 "updated_at",
             ]
-        )
+        }
     )
 
 

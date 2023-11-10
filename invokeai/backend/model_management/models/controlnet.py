@@ -104,7 +104,7 @@ class ControlNetModel(ModelBase):
                 return ControlNetModelFormat.Diffusers
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "pth"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "pth"]):
                 return ControlNetModelFormat.Checkpoint
 
         raise InvalidModelException(f"Not a valid model: {path}")

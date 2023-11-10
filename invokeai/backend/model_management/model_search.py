@@ -59,7 +59,7 @@ class ModelSearch(ABC):
         for root, dirs, files in os.walk(path, followlinks=True):
             if str(Path(root).name).startswith("."):
                 self._pruned_paths.add(root)
-            if any([Path(root).is_relative_to(x) for x in self._pruned_paths]):
+            if any(Path(root).is_relative_to(x) for x in self._pruned_paths):
                 continue
 
             self._items_scanned += len(dirs) + len(files)
@@ -69,8 +69,7 @@ class ModelSearch(ABC):
                     self._scanned_dirs.add(path)
                     continue
                 if any(
-                    [
-                        (path / x).exists()
+                    (path / x).exists()
                         for x in {
                             "config.json",
                             "model_index.json",
@@ -78,7 +77,6 @@ class ModelSearch(ABC):
                             "pytorch_lora_weights.bin",
                             "image_encoder.txt",
                         }
-                    ]
                 ):
                     try:
                         self.on_model_found(path)

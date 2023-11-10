@@ -132,7 +132,7 @@ class ModelCache(object):
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
             behaviour.
         """
-        self.model_infos: Dict[str, ModelBase] = dict()
+        self.model_infos: Dict[str, ModelBase] = {}
         # allow lazy offloading only when vram cache enabled
         self.lazy_offloading = lazy_offloading and max_vram_cache_size > 0
         self.precision: torch.dtype = precision
@@ -147,8 +147,8 @@ class ModelCache(object):
         # used for stats collection
         self.stats = None
 
-        self._cached_models = dict()
-        self._cache_stack = list()
+        self._cached_models = {}
+        self._cache_stack = []
 
     def _capture_memory_snapshot(self) -> Optional[MemorySnapshot]:
         if self._log_memory_usage:

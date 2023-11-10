@@ -142,7 +142,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             cache_stats = self._cache_stats[graph_id]
             hwm = cache_stats.high_watermark / GIG
             tot = cache_stats.cache_size / GIG
-            loaded = sum([v for v in cache_stats.loaded_model_sizes.values()]) / GIG
+            loaded = sum(list(cache_stats.loaded_model_sizes.values())) / GIG
 
             logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
             logger.info("RAM used by InvokeAI process: " + "%4.2fG" % self.ram_used + f" ({self.ram_changed:+5.3f}G)")

@@ -26,7 +26,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
         self.__invoker_thread = Thread(
             name="invoker_processor",
             target=self.__process,
-            kwargs=dict(stop_event=self.__stop_event),
+            kwargs={"stop_event": self.__stop_event},
         )
         self.__invoker_thread.daemon = True  # TODO: make async and do not use threads
         self.__invoker_thread.start()
