@@ -1,28 +1,26 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
-  ImageResizeInvocation,
   ESRGANInvocation,
-  ImageToLatentsInvocation,
   Edge,
   LatentsToImageInvocation,
   NoiseInvocation,
 } from 'services/api/types';
 import {
   DENOISE_LATENTS,
-  NOISE,
-  MAIN_MODEL_LOADER,
+  DENOISE_LATENTS_HRF,
+  ESRGAN_HRF,
+  IMAGE_TO_LATENTS_HRF,
   LATENTS_TO_IMAGE,
   LATENTS_TO_IMAGE_HRF_HR,
   LATENTS_TO_IMAGE_HRF_LR,
-  IMAGE_TO_LATENTS_HRF,
-  DENOISE_LATENTS_HRF,
-  RESIZE_HRF,
-  ESRGAN_HRF,
+  MAIN_MODEL_LOADER,
+  NOISE,
   NOISE_HRF,
+  RESIZE_HRF,
   VAE_LOADER,
 } from './constants';
 import { upsertMetadata } from './metadata';
