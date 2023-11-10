@@ -36,7 +36,7 @@ export default function ParamHrfCollapse() {
   }
 
   return (
-    <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>
+    <IAICollapse label={t('hrf.hrf')} activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamHrfToggle />
         <ParamHrfStrength />

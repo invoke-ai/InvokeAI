@@ -3,11 +3,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setHrfEnabled } from 'features/parameters/store/generationSlice';
 import { ChangeEvent, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function ParamHrfToggle() {
   const dispatch = useAppDispatch();
-  const tooltip =
-    'Generate with a lower initial resolution, upscale to the base resolution, then run Image-to-Image.';
+  const { t } = useTranslation();
 
   const hrfEnabled = useAppSelector(
     (state: RootState) => state.generation.hrfEnabled
@@ -19,14 +19,12 @@ export default function ParamHrfToggle() {
     [dispatch]
   );
 
-  const label = `Enable High Resolution Fix`;
-
   return (
     <IAISwitch
-      label={label}
+      label={t('hrf.enableHrf')}
       isChecked={hrfEnabled}
       onChange={handleHrfEnabled}
-      tooltip={tooltip}
+      tooltip={t('hrf.enableHrfTooltip')}
     />
   );
 }

@@ -242,21 +242,21 @@ const ImageMetadataActions = (props: Props) => {
       )}
       {metadata.hrf_enabled && (
         <ImageMetadataItem
-          label="High Resolution Fix Enabled"
+          label={t('hrf.metadata.enabled')}
           value={metadata.hrf_enabled}
           onClick={handleRecallHrfEnabled}
         />
       )}
       {metadata.hrf_enabled && metadata.hrf_strength && (
         <ImageMetadataItem
-          label="High Resolution Strength"
+          label={t('hrf.metadata.strength')}
           value={metadata.hrf_strength}
           onClick={handleRecallHrfStrength}
         />
       )}
       {metadata.hrf_enabled && metadata.hrf_method && (
         <ImageMetadataItem
-          label="High Resolution Method"
+          label={t('hrf.metadata.method')}
           value={metadata.hrf_method}
           onClick={handleRecallHrfMethod}
         />

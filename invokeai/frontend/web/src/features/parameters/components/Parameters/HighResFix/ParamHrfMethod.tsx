@@ -6,6 +6,7 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setHrfMethod } from 'features/parameters/store/generationSlice';
 import { HrfMethodParam } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -21,6 +22,7 @@ const DATA = ['ESRGAN', 'bilinear'];
 // Dropdown selection for the type of high resolution fix method to use.
 const ParamHrfMethodSelect = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const { hrfMethod, hrfEnabled } = useAppSelector(selector);
 
   const handleChange = useCallback(
@@ -35,7 +37,7 @@ const ParamHrfMethodSelect = () => {
 
   return (
     <IAIMantineSelect
-      label="Upscale Method"
+      label={t('hrf.upscaleMethod')}
       value={hrfMethod}
       data={DATA}
       onChange={handleChange}
