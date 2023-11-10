@@ -261,7 +261,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
          required fields, or a ModelConfigBase instance.
         """
         record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
-        json_serialized = json.dumps(record.model_dump())  # and turn it into a json string.
+        json_serialized = record.model_dump_json()  # and turn it into a json string.
         with self._db.lock:
             try:
                 self._cursor.execute(
