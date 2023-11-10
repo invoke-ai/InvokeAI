@@ -10,6 +10,7 @@ from diffusers import (
     HeunDiscreteScheduler,
     KDPM2AncestralDiscreteScheduler,
     KDPM2DiscreteScheduler,
+    LCMScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
     UniPCMultistepScheduler,
@@ -38,4 +39,5 @@ SCHEDULER_MAP = dict(
     dpmpp_sde=(DPMSolverSDEScheduler, dict(use_karras_sigmas=False, noise_sampler_seed=0)),
     dpmpp_sde_k=(DPMSolverSDEScheduler, dict(use_karras_sigmas=True, noise_sampler_seed=0)),
     unipc=(UniPCMultistepScheduler, dict(cpu_only=True)),
+    lcm=(LCMScheduler, dict()),
 )
