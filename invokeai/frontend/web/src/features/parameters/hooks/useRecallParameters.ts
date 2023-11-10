@@ -371,7 +371,7 @@ export const useRecallParameters = () => {
    */
   const recallHrfEnabled = useCallback(
     (hrfEnabled: unknown) => {
-      if (!(typeof hrfEnabled === 'boolean')) {
+      if (!isValidBoolean(hrfEnabled)) {
         parameterNotSetToast();
         return;
       }
