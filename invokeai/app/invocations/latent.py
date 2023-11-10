@@ -10,7 +10,7 @@ import torch
 import torchvision.transforms as T
 from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.models.adapter import FullAdapterXL, T2IAdapter
+from diffusers.models.adapter import T2IAdapter
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -562,10 +562,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapter_model: T2IAdapter
             with t2i_adapter_model_info as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
-                if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
-                    # HACK(ryand): Work around a bug in FullAdapterXL. This is being addressed upstream in diffusers by
-                    # this PR: https://github.com/huggingface/diffusers/pull/5134.
-                    total_downscale_factor = total_downscale_factor // 2
 
                 # Resize the T2I-Adapter input image.
                 # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
