@@ -175,10 +175,7 @@ class InvokeAIDiffuserComponent:
                                 dim=0,
                             ),
                         }
-                    (
-                        encoder_hidden_states,
-                        encoder_attention_mask,
-                    ) = self._concat_conditionings_for_batch(
+                    (encoder_hidden_states, encoder_attention_mask,) = self._concat_conditionings_for_batch(
                         conditioning_data.unconditioned_embeddings.embeds,
                         conditioning_data.text_embeddings.embeds,
                     )
@@ -240,10 +237,7 @@ class InvokeAIDiffuserComponent:
         wants_cross_attention_control = len(cross_attention_control_types_to_do) > 0
 
         if wants_cross_attention_control:
-            (
-                unconditioned_next_x,
-                conditioned_next_x,
-            ) = self._apply_cross_attention_controlled_conditioning(
+            (unconditioned_next_x, conditioned_next_x,) = self._apply_cross_attention_controlled_conditioning(
                 sample,
                 timestep,
                 conditioning_data,
@@ -251,20 +245,14 @@ class InvokeAIDiffuserComponent:
                 **kwargs,
             )
         elif self.sequential_guidance:
-            (
-                unconditioned_next_x,
-                conditioned_next_x,
-            ) = self._apply_standard_conditioning_sequentially(
+            (unconditioned_next_x, conditioned_next_x,) = self._apply_standard_conditioning_sequentially(
                 sample,
                 timestep,
                 conditioning_data,
                 **kwargs,
             )
         else:
-            (
-                unconditioned_next_x,
-                conditioned_next_x,
-            ) = self._apply_standard_conditioning(
+            (unconditioned_next_x, conditioned_next_x,) = self._apply_standard_conditioning(
                 sample,
                 timestep,
                 conditioning_data,

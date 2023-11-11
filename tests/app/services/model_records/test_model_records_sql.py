@@ -16,6 +16,7 @@ from invokeai.app.services.model_records import (
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     BaseModelType,
+    MainCheckpointConfig,
     MainDiffusersConfig,
     ModelType,
     TextualInversionConfig,
@@ -57,6 +58,7 @@ def test_add(store: ModelRecordServiceBase):
     store.add_model("key1", raw)
     config1 = store.get_model("key1")
     assert config1 is not None
+    assert type(config1) == MainCheckpointConfig
     assert config1.base == BaseModelType("sd-1")
     assert config1.name == "model1"
     assert config1.original_hash == "111222333444"

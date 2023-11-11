@@ -207,7 +207,7 @@ class IntegerMathInvocation(BaseInvocation):
         elif self.operation == "DIV":
             return IntegerOutput(value=int(self.a / self.b))
         elif self.operation == "EXP":
-            return IntegerOutput(value=self.a**self.b)
+            return IntegerOutput(value=self.a ** self.b)
         elif self.operation == "MOD":
             return IntegerOutput(value=self.a % self.b)
         elif self.operation == "ABS":
@@ -281,7 +281,7 @@ class FloatMathInvocation(BaseInvocation):
         elif self.operation == "DIV":
             return FloatOutput(value=self.a / self.b)
         elif self.operation == "EXP":
-            return FloatOutput(value=self.a**self.b)
+            return FloatOutput(value=self.a ** self.b)
         elif self.operation == "SQRT":
             return FloatOutput(value=np.sqrt(self.a))
         elif self.operation == "ABS":

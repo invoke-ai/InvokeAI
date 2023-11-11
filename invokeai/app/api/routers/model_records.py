@@ -2,14 +2,13 @@
 """FastAPI route for model configuration records."""
 
 
-from hashlib import sha1
-from random import randbytes
 from typing import List, Optional
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 from starlette.exceptions import HTTPException
+from typing_extensions import Annotated
 
 from invokeai.app.services.model_records import DuplicateModelException, InvalidModelException, UnknownModelException
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType
@@ -85,8 +84,9 @@ async def get_model_record(
     response_model=AnyModelConfig,
 )
 async def update_model_record(
-    key: str = Path(description="Unique key of model"),
-    info: AnyModelConfig = Body(description="Model configuration"),
+    key: Annotated[str, Path(description="Unique key of model")],
+    # info: Annotated[AnyModelConfig, Body(description="Model configuration")],
+    info: AnyModelConfig,
 ) -> AnyModelConfig:
     """Update model contents with a new config. If the model name or base fields are changed, then the model is renamed."""
     logger = ApiDependencies.invoker.services.logger
@@ -134,7 +134,7 @@ async def del_model_record(
     status_code=201,
 )
 async def add_model_record(
-    config: AnyModelConfig = Body(description="Model configuration"),
+    config: AnyModelConfig,
 ) -> AnyModelConfig:
     """
     Add a model using the configuration information appropriate for its type.
