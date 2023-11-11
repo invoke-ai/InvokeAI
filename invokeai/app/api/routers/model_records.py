@@ -2,9 +2,9 @@
 """FastAPI route for model configuration records."""
 
 
-from typing import List, Optional
 from hashlib import sha1
 from random import randbytes
+from typing import List, Optional
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
