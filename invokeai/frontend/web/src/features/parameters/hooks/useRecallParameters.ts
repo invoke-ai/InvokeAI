@@ -91,6 +91,7 @@ import {
   isValidVaeModel,
   isValidBoolean,
 } from '../types/parameterSchemas';
+import _ from 'lodash';
 
 const selector = createSelector(
   stateSelector,
@@ -312,12 +313,16 @@ export const useRecallParameters = () => {
    * Recall vae model
    */
   const recallVaeModel = useCallback(
-    (vaeModel: unknown) => {
-      if (!isValidVaeModel(vaeModel)) {
+    (vae: unknown) => {
+      if (!isValidVaeModel(vae) && !_.isNil(vae)) {
         parameterNotSetToast();
         return;
       }
-      dispatch(vaeSelected(vaeModel));
+      if (_.isNil(vae)) {
+        dispatch(vaeSelected(null));
+      } else {
+        dispatch(vaeSelected(vae));
+      }
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -816,8 +821,12 @@ export const useRecallParameters = () => {
       if (isValidScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));
       }
-      if (isValidVaeModel(vae)) {
-        dispatch(vaeSelected(vae));
+      if (isValidVaeModel(vae) || _.isNil(vae)) {
+        if (_.isNil(vae)) {
+          dispatch(vaeSelected(null));
+        } else {
+          dispatch(vaeSelected(vae));
+        }
       }
 
       if (isValidSeed(seed)) {
