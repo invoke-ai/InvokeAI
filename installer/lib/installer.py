@@ -460,10 +460,10 @@ def get_torch_source() -> (Union[str, None], str):
             url = "https://download.pytorch.org/whl/cpu"
 
     if device == "cuda":
-        url = "https://download.pytorch.org/whl/cu121"
+        url = "https://download.pytorch.org/whl/cu118"
         optional_modules = "[xformers,onnx-cuda]"
     if device == "cuda_and_dml":
-        url = "https://download.pytorch.org/whl/cu121"
+        url = "https://download.pytorch.org/whl/cu118"
         optional_modules = "[xformers,onnx-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13

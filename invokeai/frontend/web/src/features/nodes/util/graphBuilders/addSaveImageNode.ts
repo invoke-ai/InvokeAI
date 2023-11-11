@@ -5,7 +5,7 @@ import { SaveImageInvocation } from 'services/api/types';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
-  LATENTS_TO_IMAGE_HRF,
+  LATENTS_TO_IMAGE_HRF_HR,
   NSFW_CHECKER,
   SAVE_IMAGE,
   WATERMARKER,
@@ -62,10 +62,10 @@ export const addSaveImageNode = (
       },
       destination,
     });
-  } else if (LATENTS_TO_IMAGE_HRF in graph.nodes) {
+  } else if (LATENTS_TO_IMAGE_HRF_HR in graph.nodes) {
     graph.edges.push({
       source: {
-        node_id: LATENTS_TO_IMAGE_HRF,
+        node_id: LATENTS_TO_IMAGE_HRF_HR,
         field: 'image',
       },
       destination,
