@@ -3,6 +3,8 @@
 
 
 from typing import List, Optional
+from hashlib import sha1
+from random import randbytes
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
@@ -34,8 +36,8 @@ ModelsListValidator = TypeAdapter(ModelsList)
     operation_id="list_model_records",
 )
 async def list_model_records(
-    base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
-    model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
+        base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
+        model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
 ) -> ModelsList:
     """Get a list of models."""
     record_store = ApiDependencies.invoker.services.model_records
@@ -61,7 +63,7 @@ async def list_model_records(
     },
 )
 async def get_model_record(
-    key: str = Path(description="Key of the model record to fetch."),
+        key: str = Path(description="Key of the model record to fetch."),
 ) -> AnyModelConfig:
     """Get a model record"""
     record_store = ApiDependencies.invoker.services.model_records
@@ -84,9 +86,8 @@ async def get_model_record(
     response_model=AnyModelConfig,
 )
 async def update_model_record(
-    key: Annotated[str, Path(description="Unique key of model")],
-    # info: Annotated[AnyModelConfig, Body(description="Model configuration")],
-    info: AnyModelConfig,
+        key: Annotated[str, Path(description="Unique key of model")],
+        info: Annotated[AnyModelConfig, Body(description="Model config", discriminator="type")]
 ) -> AnyModelConfig:
     """Update model contents with a new config. If the model name or base fields are changed, then the model is renamed."""
     logger = ApiDependencies.invoker.services.logger
@@ -134,7 +135,7 @@ async def del_model_record(
     status_code=201,
 )
 async def add_model_record(
-    config: AnyModelConfig,
+    config: Annotated[AnyModelConfig,  Body(description="Model config", discriminator="type")]
 ) -> AnyModelConfig:
     """
     Add a model using the configuration information appropriate for its type.

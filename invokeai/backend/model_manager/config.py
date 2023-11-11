@@ -257,20 +257,33 @@ _ControlNetConfig = Annotated[
 _VaeConfig = Annotated[Union[VaeDiffusersConfig, VaeCheckpointConfig], Field(discriminator="format")]
 _MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], Field(discriminator="format")]
 
-AnyModelConfig = Annotated[
-    Union[
-        _MainModelConfig,
-        _ONNXConfig,
-        _VaeConfig,
-        _ControlNetConfig,
-        LoRAConfig,
-        TextualInversionConfig,
-        IPAdapterConfig,
-        CLIPVisionDiffusersConfig,
-        T2IConfig,
-    ],
-    Body(discriminator="type"),
+AnyModelConfig = Union[
+    _MainModelConfig,
+    _ONNXConfig,
+    _VaeConfig,
+    _ControlNetConfig,
+    LoRAConfig,
+    TextualInversionConfig,
+    IPAdapterConfig,
+    CLIPVisionDiffusersConfig,
+    T2IConfig,
 ]
+
+# Preferred alternative is a discriminated Union, but it breaks FastAPI when applied to a route.
+# AnyModelConfig = Annotated[
+#     Union[
+#         _MainModelConfig,
+#         _ONNXConfig,
+#         _VaeConfig,
+#         _ControlNetConfig,
+#         LoRAConfig,
+#         TextualInversionConfig,
+#         IPAdapterConfig,
+#         CLIPVisionDiffusersConfig,
+#         T2IConfig,
+#     ],
+#     Field(discriminator="type"),
+# ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
 
@@ -295,11 +308,11 @@ class ModelConfigFactory(object):
         be selected automatically.
         """
         if isinstance(model_data, ModelConfigBase):
-            if key:
-                model_data.key = key
-            return model_data
+            model = model_data
+        elif dest_class:
+            model = dest_class.validate_python(model_data)
         else:
             model = AnyModelConfigValidator.validate_python(model_data)
-            if key:
-                model.key = key
-            return model
+        if key:
+            model.key = key
+        return model
