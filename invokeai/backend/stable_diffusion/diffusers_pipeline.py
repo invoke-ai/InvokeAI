@@ -638,6 +638,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     @staticmethod
     def _rescale_cfg(total_noise_pred, pos_noise_pred, multiplier=0.7):
+        """Implementation of Algorithm 2 from https://arxiv.org/pdf/2305.08891.pdf."""
         ro_pos = torch.std(pos_noise_pred, dim=(1, 2, 3), keepdim=True)
         ro_cfg = torch.std(total_noise_pred, dim=(1, 2, 3), keepdim=True)
 
