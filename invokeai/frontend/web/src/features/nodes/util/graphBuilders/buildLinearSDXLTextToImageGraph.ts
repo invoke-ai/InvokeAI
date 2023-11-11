@@ -34,6 +34,7 @@ export const buildLinearSDXLTextToImageGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     seed,
     steps,
@@ -228,6 +229,7 @@ export const buildLinearSDXLTextToImageGraph = (
   addCoreMetadataNode(graph, {
     generation_mode: 'sdxl_txt2img',
     cfg_scale,
+    cfg_rescale_multiplier,
     height,
     width,
     positive_prompt: positivePrompt,

@@ -41,6 +41,7 @@ export const buildLinearImageToImageGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     seed,
     steps,
@@ -314,6 +315,7 @@ export const buildLinearImageToImageGraph = (
   addCoreMetadataNode(graph, {
     generation_mode: 'img2img',
     cfg_scale,
+    cfg_rescale_multiplier,
     height,
     width,
     positive_prompt: positivePrompt,

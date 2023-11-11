@@ -41,6 +41,7 @@ export const buildCanvasTextToImageGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     seed,
     steps,
@@ -292,6 +293,7 @@ export const buildCanvasTextToImageGraph = (
   addCoreMetadataNode(graph, {
     generation_mode: 'txt2img',
     cfg_scale,
+    cfg_rescale_multiplier,
     width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
     height: !isUsingScaledDimensions
       ? height

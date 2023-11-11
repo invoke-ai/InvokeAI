@@ -107,6 +107,22 @@ export const isValidCfgScale = (val: unknown): val is CfgScaleParam =>
   zCfgScale.safeParse(val).success;
 
 /**
+ * Zod schema for CFG rescale mutliplier parameter
+ */
+export const zCfgRescaleMultiplier = z.number().gte(0).lt(1);
+/**
+ * Type alias for CFG rescale mutliplier parameter, inferred from its zod schema
+ */
+export type CfgRescaleMultiplierParam = z.infer<typeof zCfgScale>;
+/**
+ * Validates/type-guards a value as a CFG rescale mutliplier parameter
+ */
+export const isValidCfgRescaleMultiplier = (
+  val: unknown
+): val is CfgRescaleMultiplierParam =>
+  zCfgRescaleMultiplier.safeParse(val).success;
+
+/**
  * Zod schema for scheduler parameter
  */
 export const zScheduler = z.enum([

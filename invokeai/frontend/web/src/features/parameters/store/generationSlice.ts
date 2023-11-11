@@ -9,6 +9,7 @@ import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/control
 import { clipSkipMap } from '../types/constants';
 import {
   CanvasCoherenceModeParam,
+  CfgRescaleMultiplierParam,
   CfgScaleParam,
   HeightParam,
   HrfMethodParam,
@@ -32,6 +33,7 @@ export interface GenerationState {
   hrfStrength: StrengthParam;
   hrfMethod: HrfMethodParam;
   cfgScale: CfgScaleParam;
+  cfgRescaleMultiplier: CfgRescaleMultiplierParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
   infillMethod: string;
@@ -77,6 +79,7 @@ export const initialGenerationState: GenerationState = {
   hrfEnabled: false,
   hrfMethod: 'ESRGAN',
   cfgScale: 7.5,
+  cfgRescaleMultiplier: 0,
   height: 512,
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
@@ -146,8 +149,14 @@ export const generationSlice = createSlice({
         state.steps
       );
     },
-    setCfgScale: (state, action: PayloadAction<number>) => {
+    setCfgScale: (state, action: PayloadAction<CfgScaleParam>) => {
       state.cfgScale = action.payload;
+    },
+    setCfgRescaleMultiplier: (
+      state,
+      action: PayloadAction<CfgRescaleMultiplierParam>
+    ) => {
+      state.cfgRescaleMultiplier = action.payload;
     },
     setThreshold: (state, action: PayloadAction<number>) => {
       state.threshold = action.payload;
@@ -337,6 +346,7 @@ export const {
   resetParametersState,
   resetSeed,
   setCfgScale,
+  setCfgRescaleMultiplier,
   setWidth,
   setHeight,
   toggleSize,

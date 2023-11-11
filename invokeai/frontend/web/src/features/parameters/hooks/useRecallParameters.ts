@@ -53,6 +53,7 @@ import {
 import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
+  setCfgRescaleMultiplier,
   setCfgScale,
   setHeight,
   setHrfEnabled,
@@ -88,6 +89,7 @@ import {
   isValidStrength,
   isValidWidth,
   isValidBoolean,
+  isValidCfgRescaleMultiplier,
 } from '../types/parameterSchemas';
 
 const selector = createSelector(
@@ -271,6 +273,21 @@ export const useRecallParameters = () => {
         return;
       }
       dispatch(setCfgScale(cfgScale));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall CFG rescale multiplier with toast
+   */
+  const recallCfgRescaleMultiplier = useCallback(
+    (cfgScale: unknown) => {
+      if (!isValidCfgRescaleMultiplier(cfgScale)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setCfgRescaleMultiplier(cfgScale));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -752,6 +769,7 @@ export const useRecallParameters = () => {
 
       const {
         cfg_scale,
+        cfg_rescale_multiplier,
         height,
         model,
         positive_prompt,
@@ -781,6 +799,10 @@ export const useRecallParameters = () => {
 
       if (isValidCfgScale(cfg_scale)) {
         dispatch(setCfgScale(cfg_scale));
+      }
+
+      if (isValidCfgRescaleMultiplier(cfg_rescale_multiplier)) {
+        dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
       }
 
       if (isValidMainModel(model)) {
@@ -930,6 +952,7 @@ export const useRecallParameters = () => {
     recallSDXLNegativeStylePrompt,
     recallSeed,
     recallCfgScale,
+    recallCfgRescaleMultiplier,
     recallModel,
     recallScheduler,
     recallSteps,
