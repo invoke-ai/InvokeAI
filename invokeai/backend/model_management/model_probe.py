@@ -55,6 +55,7 @@ class ModelProbe(object):
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "AutoencoderTiny": ModelType.Vae,
+        "ConsistencyDecoderVAE": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
         "T2IAdapter": ModelType.T2IAdapter,

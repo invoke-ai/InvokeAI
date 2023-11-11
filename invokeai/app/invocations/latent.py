@@ -8,7 +8,7 @@ import einops
 import numpy as np
 import torch
 import torchvision.transforms as T
-from diffusers import AutoencoderKL, AutoencoderTiny
+from diffusers import AutoencoderKL, AutoencoderTiny, ConsistencyDecoderVAE
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models.adapter import T2IAdapter
 from diffusers.models.attention_processor import (
@@ -1077,6 +1077,11 @@ class ImageToLatentsInvocation(BaseInvocation):
     @_encode_to_tensor.register
     @staticmethod
     def _(vae: AutoencoderTiny, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
+        return vae.encode(image_tensor).latents
+
+    @_encode_to_tensor.register
+    @staticmethod
+    def _(vae: ConsistencyDecoderVAE, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
         return vae.encode(image_tensor).latents
 
 
