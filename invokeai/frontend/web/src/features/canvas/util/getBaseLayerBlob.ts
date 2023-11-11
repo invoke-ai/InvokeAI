@@ -7,7 +7,7 @@ import { konvaNodeToBlob } from './konvaNodeToBlob';
  */
 export const getBaseLayerBlob = async (
   state: RootState,
-  alwaysUseBoundingBox = false
+  alwaysUseBoundingBox: boolean = false
 ) => {
   const canvasBaseLayer = getCanvasBaseLayer();
 

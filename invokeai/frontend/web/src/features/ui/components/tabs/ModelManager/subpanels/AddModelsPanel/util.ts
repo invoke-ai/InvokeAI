@@ -1,4 +1,4 @@
-export function getModelName(filepath: string, isCheckpoint = true) {
+export function getModelName(filepath: string, isCheckpoint: boolean = true) {
   let regex;
   if (isCheckpoint) {
     regex = new RegExp('[^\\\\/]+(?=\\.)');
