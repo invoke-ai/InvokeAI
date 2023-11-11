@@ -18,8 +18,6 @@ from ..dependencies import ApiDependencies
 
 model_records_router = APIRouter(prefix="/v1/model/record", tags=["models"])
 
-ModelConfigValidator = TypeAdapter(AnyModelConfig)
-
 
 class ModelsList(BaseModel):
     """Return list of configs."""
