@@ -609,7 +609,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise_pred = self.invokeai_diffuser._combine(uc_noise_pred, c_noise_pred, guidance_scale)
         guidance_rescale_multiplier = conditioning_data.guidance_rescale_multiplier
         if guidance_rescale_multiplier > 0:
-            noise_pred = type(self)._rescale_cfg(
+            noise_pred = self._rescale_cfg(
                 noise_pred,
                 c_noise_pred,
                 guidance_rescale_multiplier,
@@ -636,8 +636,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         return step_output
 
-    @classmethod
-    def _rescale_cfg(cls, total_noise_pred, pos_noise_pred, multiplier=0.7):
+    @staticmethod
+    def _rescale_cfg(total_noise_pred, pos_noise_pred, multiplier=0.7):
         ro_pos = torch.std(pos_noise_pred, dim=(1, 2, 3), keepdim=True)
         ro_cfg = torch.std(total_noise_pred, dim=(1, 2, 3), keepdim=True)
 
