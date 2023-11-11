@@ -83,6 +83,7 @@ def test_update(store: ModelRecordServiceBase):
     new_config = store.get_model("key1")
     assert new_config.name == "new name"
 
+
 def test_rename(store: ModelRecordServiceBase):
     config = example_config()
     store.add_model("key1", config)

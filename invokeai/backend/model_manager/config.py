@@ -249,10 +249,12 @@ class T2IConfig(ModelConfigBase):
     format: Literal[ModelFormat.Diffusers]
 
 
-_ONNXConfig = Annotated[Union[ONNXSD1Config, ONNXSD2Config], Field(discriminator='base')]
-_ControlNetConfig = Annotated[Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig], Field(discriminator='format')]
-_VaeConfig = Annotated[Union[VaeDiffusersConfig, VaeCheckpointConfig], Field(discriminator='format')]
-_MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], Field(discriminator='format')]
+_ONNXConfig = Annotated[Union[ONNXSD1Config, ONNXSD2Config], Field(discriminator="base")]
+_ControlNetConfig = Annotated[
+    Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig], Field(discriminator="format")
+]
+_VaeConfig = Annotated[Union[VaeDiffusersConfig, VaeCheckpointConfig], Field(discriminator="format")]
+_MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], Field(discriminator="format")]
 
 AnyModelConfig = Annotated[
     Union[
@@ -266,10 +268,11 @@ AnyModelConfig = Annotated[
         CLIPVisionDiffusersConfig,
         T2IConfig,
     ],
-    Field(discriminator='type')
+    Field(discriminator="type"),
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
+
 
 class ModelConfigFactory(object):
     """Class for parsing config dicts into StableDiffusion Config obects."""
