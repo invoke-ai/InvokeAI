@@ -22,7 +22,6 @@ Validation errors will raise an InvalidModelConfigException error.
 from enum import Enum
 from typing import Literal, Optional, Type, Union
 
-from fastapi import Body
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from typing_extensions import Annotated
 
