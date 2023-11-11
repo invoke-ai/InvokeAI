@@ -1231,7 +1231,9 @@
         "noLoRAsAvailable": "无可用 LoRA",
         "noModelsAvailable": "无可用模型",
         "selectModel": "选择一个模型",
-        "selectLoRA": "选择一个 LoRA"
+        "selectLoRA": "选择一个 LoRA",
+        "noRefinerModelsInstalled": "无已安装的 SDXL Refiner 模型",
+        "noLoRAsInstalled": "无已安装的 LoRA"
     },
     "boards": {
         "autoAddBoard": "自动添加面板",

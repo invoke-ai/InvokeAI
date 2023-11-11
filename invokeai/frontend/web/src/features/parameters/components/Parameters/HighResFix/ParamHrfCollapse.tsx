@@ -7,10 +7,9 @@ import IAICollapse from 'common/components/IAICollapse';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import ParamHrfHeight from './ParamHrfHeight';
 import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
-import ParamHrfWidth from './ParamHrfWidth';
+import ParamHrfMethod from './ParamHrfMethod';
 
 const selector = createSelector(
   stateSelector,
@@ -37,28 +36,11 @@ export default function ParamHrfCollapse() {
   }
 
   return (
-    <IAICollapse label="High Resolution Fix" activeLabel={activeLabel}>
+    <IAICollapse label={t('hrf.hrf')} activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamHrfToggle />
-        {hrfEnabled && (
-          <Flex
-            sx={{
-              gap: 2,
-              p: 4,
-              borderRadius: 4,
-              flexDirection: 'column',
-              w: 'full',
-              bg: 'base.100',
-              _dark: {
-                bg: 'base.750',
-              },
-            }}
-          >
-            <ParamHrfWidth />
-            <ParamHrfHeight />
-          </Flex>
-        )}
-        {hrfEnabled && <ParamHrfStrength />}
+        <ParamHrfStrength />
+        <ParamHrfMethod />
       </Flex>
     </IAICollapse>
   );

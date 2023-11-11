@@ -68,8 +68,9 @@ class LoRAModel(ModelBase):
             raise ModelNotFoundException()
 
         if os.path.isdir(path):
-            if os.path.exists(os.path.join(path, "pytorch_lora_weights.bin")):
-                return LoRAModelFormat.Diffusers
+            for ext in ["safetensors", "bin"]:
+                if os.path.exists(os.path.join(path, f"pytorch_lora_weights.{ext}")):
+                    return LoRAModelFormat.Diffusers
 
         if os.path.isfile(path):
             if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
@@ -86,8 +87,10 @@ class LoRAModel(ModelBase):
         base_model: BaseModelType,
     ) -> str:
         if cls.detect_format(model_path) == LoRAModelFormat.Diffusers:
-            # TODO: add diffusers lora when it stabilizes a bit
-            raise NotImplementedError("Diffusers lora not supported")
+            for ext in ["safetensors", "bin"]:  # return path to the safetensors file inside the folder
+                path = Path(model_path, f"pytorch_lora_weights.{ext}")
+                if path.exists():
+                    return path
         else:
             return model_path
 

@@ -55,6 +55,9 @@ import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
   setHeight,
+  setHrfEnabled,
+  setHrfMethod,
+  setHrfStrength,
   setImg2imgStrength,
   setNegativePrompt,
   setPositivePrompt,
@@ -67,6 +70,7 @@ import {
   isValidCfgScale,
   isValidControlNetModel,
   isValidHeight,
+  isValidHrfMethod,
   isValidIPAdapterModel,
   isValidLoRAModel,
   isValidMainModel,
@@ -83,6 +87,7 @@ import {
   isValidSteps,
   isValidStrength,
   isValidWidth,
+  isValidBoolean,
 } from '../types/parameterSchemas';
 
 const selector = createSelector(
@@ -356,6 +361,51 @@ export const useRecallParameters = () => {
         return;
       }
       dispatch(setImg2imgStrength(strength));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall high resolution enabled with toast
+   */
+  const recallHrfEnabled = useCallback(
+    (hrfEnabled: unknown) => {
+      if (!isValidBoolean(hrfEnabled)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setHrfEnabled(hrfEnabled));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall high resolution strength with toast
+   */
+  const recallHrfStrength = useCallback(
+    (hrfStrength: unknown) => {
+      if (!isValidStrength(hrfStrength)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setHrfStrength(hrfStrength));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall high resolution method with toast
+   */
+  const recallHrfMethod = useCallback(
+    (hrfMethod: unknown) => {
+      if (!isValidHrfMethod(hrfMethod)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setHrfMethod(hrfMethod));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -711,6 +761,9 @@ export const useRecallParameters = () => {
         steps,
         width,
         strength,
+        hrf_enabled,
+        hrf_strength,
+        hrf_method,
         positive_style_prompt,
         negative_style_prompt,
         refiner_model,
@@ -729,32 +782,53 @@ export const useRecallParameters = () => {
       if (isValidCfgScale(cfg_scale)) {
         dispatch(setCfgScale(cfg_scale));
       }
+
       if (isValidMainModel(model)) {
         dispatch(modelSelected(model));
       }
+
       if (isValidPositivePrompt(positive_prompt)) {
         dispatch(setPositivePrompt(positive_prompt));
       }
+
       if (isValidNegativePrompt(negative_prompt)) {
         dispatch(setNegativePrompt(negative_prompt));
       }
+
       if (isValidScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));
       }
+
       if (isValidSeed(seed)) {
         dispatch(setSeed(seed));
       }
+
       if (isValidSteps(steps)) {
         dispatch(setSteps(steps));
       }
+
       if (isValidWidth(width)) {
         dispatch(setWidth(width));
       }
+
       if (isValidHeight(height)) {
         dispatch(setHeight(height));
       }
+
       if (isValidStrength(strength)) {
         dispatch(setImg2imgStrength(strength));
+      }
+
+      if (isValidBoolean(hrf_enabled)) {
+        dispatch(setHrfEnabled(hrf_enabled));
+      }
+
+      if (isValidStrength(hrf_strength)) {
+        dispatch(setHrfStrength(hrf_strength));
+      }
+
+      if (isValidHrfMethod(hrf_method)) {
+        dispatch(setHrfMethod(hrf_method));
       }
 
       if (isValidSDXLPositiveStylePrompt(positive_style_prompt)) {
@@ -862,6 +936,9 @@ export const useRecallParameters = () => {
     recallWidth,
     recallHeight,
     recallStrength,
+    recallHrfEnabled,
+    recallHrfStrength,
+    recallHrfMethod,
     recallLoRA,
     recallControlNet,
     recallIPAdapter,
