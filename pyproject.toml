@@ -83,7 +83,7 @@ dependencies = [
   "torchvision~=0.16",
   "torchmetrics~=0.11.0",
   "torchsde~=0.2.5",
-  "transformers~=4.31.0",
+  "transformers~=4.35.0",
   "uvicorn[standard]~=0.21.1",
   "windows-curses; sys_platform=='win32'",
 ]

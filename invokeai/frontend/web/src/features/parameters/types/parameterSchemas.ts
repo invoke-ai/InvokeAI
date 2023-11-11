@@ -401,6 +401,20 @@ export const isValidPrecision = (val: unknown): val is PrecisionParam =>
   zPrecision.safeParse(val).success;
 
 /**
+ * Zod schema for a high resolution fix method parameter.
+ */
+export const zHrfMethod = z.enum(['ESRGAN', 'bilinear']);
+/**
+ * Type alias for high resolution fix method parameter, inferred from its zod schema
+ */
+export type HrfMethodParam = z.infer<typeof zHrfMethod>;
+/**
+ * Validates/type-guards a value as a high resolution fix method parameter
+ */
+export const isValidHrfMethod = (val: unknown): val is HrfMethodParam =>
+  zHrfMethod.safeParse(val).success;
+
+/**
  * Zod schema for SDXL refiner positive aesthetic score parameter
  */
 export const zSDXLRefinerPositiveAestheticScore = z.number().min(1).max(10);
@@ -481,6 +495,17 @@ export const isValidCoherenceModeParam = (
   val: unknown
 ): val is CanvasCoherenceModeParam =>
   zCanvasCoherenceMode.safeParse(val).success;
+
+/**
+ * Zod schema for a boolean.
+ */
+export const zBoolean = z.boolean();
+
+/**
+ * Validates/type-guards a value as a boolean parameter
+ */
+export const isValidBoolean = (val: unknown): val is boolean =>
+  zBoolean.safeParse(val).success && val !== null && val !== undefined;
 
 // /**
 //  * Zod schema for BaseModelType
