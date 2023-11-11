@@ -1,4 +1,4 @@
-import { Box, ChakraProps, Flex } from '@chakra-ui/react';
+import { ChakraProps, Flex } from '@chakra-ui/react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
@@ -14,11 +14,15 @@ const colorPickerStyles: NonNullable<ChakraProps['sx']> = {
   borderColor: 'base.100',
 };
 
-const sx = {
+const sx: ChakraProps['sx'] = {
   '.react-colorful__hue-pointer': colorPickerStyles,
   '.react-colorful__saturation-pointer': colorPickerStyles,
   '.react-colorful__alpha-pointer': colorPickerStyles,
+  gap: 2,
+  flexDir: 'column',
 };
+
+const numberInputWidth: ChakraProps['w'] = '4.2rem';
 
 const IAIColorPicker = (props: IAIColorPickerProps) => {
   const { color, onChange, withNumberInput, ...rest } = props;
@@ -39,10 +43,15 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
     [color, onChange]
   );
   return (
-    <Box sx={sx}>
-      <RgbaColorPicker color={color} onChange={onChange} {...rest} />
-      <Box>
-        {withNumberInput && (
+    <Flex sx={sx}>
+      <RgbaColorPicker
+        color={color}
+        onChange={onChange}
+        style={{ width: '100%' }}
+        {...rest}
+      />
+      {withNumberInput && (
+        <Flex>
           <IAINumberInput
             value={color.r}
             onChange={handleChangeR}
@@ -50,9 +59,8 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             max={255}
             step={1}
             label="Red"
+            w={numberInputWidth}
           />
-        )}
-        {withNumberInput && (
           <IAINumberInput
             value={color.g}
             onChange={handleChangeG}
@@ -60,9 +68,8 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             max={255}
             step={1}
             label="Green"
+            w={numberInputWidth}
           />
-        )}
-        {withNumberInput && (
           <IAINumberInput
             value={color.b}
             onChange={handleChangeB}
@@ -70,9 +77,8 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             max={255}
             step={1}
             label="Blue"
+            w={numberInputWidth}
           />
-        )}
-        {withNumberInput && (
           <IAINumberInput
             value={color.a}
             onChange={handleChangeA}
@@ -80,11 +86,12 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             min={0}
             max={1}
             label="Alpha"
+            w={numberInputWidth}
             isInteger={false}
           />
-        )}
-      </Box>
-    </Box>
+        </Flex>
+      )}
+    </Flex>
   );
 };
 
