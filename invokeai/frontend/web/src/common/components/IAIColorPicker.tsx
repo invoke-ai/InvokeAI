@@ -1,8 +1,7 @@
-import { Box, ChakraProps } from '@chakra-ui/react';
+import { Box, ChakraProps, Flex } from '@chakra-ui/react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
-
 import IAINumberInput from './IAINumberInput';
 
 type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
@@ -42,42 +41,49 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
   return (
     <Box sx={sx}>
       <RgbaColorPicker color={color} onChange={onChange} {...rest} />
-      {withNumberInput && (
-        <IAINumberInput
-          value={color.r}
-          onChange={handleChangeR}
-          min={0}
-          max={255}
-          step={1}
-        />
-      )}
-      {withNumberInput && (
-        <IAINumberInput
-          value={color.g}
-          onChange={handleChangeG}
-          min={0}
-          max={255}
-          step={1}
-        />
-      )}
-      {withNumberInput && (
-        <IAINumberInput
-          value={color.b}
-          onChange={handleChangeB}
-          min={0}
-          max={255}
-          step={1}
-        />
-      )}
-      {withNumberInput && (
-        <IAINumberInput
-          value={color.a}
-          onChange={handleChangeA}
-          min={0}
-          max={1}
-          step={1}
-        />
-      )}
+      <Box>
+        {withNumberInput && (
+          <IAINumberInput
+            value={color.r}
+            onChange={handleChangeR}
+            min={0}
+            max={255}
+            step={1}
+            label="Red"
+          />
+        )}
+        {withNumberInput && (
+          <IAINumberInput
+            value={color.g}
+            onChange={handleChangeG}
+            min={0}
+            max={255}
+            step={1}
+            label="Green"
+          />
+        )}
+        {withNumberInput && (
+          <IAINumberInput
+            value={color.b}
+            onChange={handleChangeB}
+            min={0}
+            max={255}
+            step={1}
+            label="Blue"
+          />
+        )}
+        {withNumberInput && (
+          <IAINumberInput
+            value={color.a}
+            onChange={handleChangeA}
+            step={0.1}
+            min={0}
+            max={1}
+            label="Alpha"
+            isInteger={false}
+          />
+        )}
+      </Box>
     </Box>
   );
 };
