@@ -31,6 +31,7 @@ const ImageMetadataActions = (props: Props) => {
     recallCfgScale,
     recallModel,
     recallScheduler,
+    recallVaeModel,
     recallSteps,
     recallWidth,
     recallHeight,
@@ -71,6 +72,10 @@ const ImageMetadataActions = (props: Props) => {
   const handleRecallScheduler = useCallback(() => {
     recallScheduler(metadata?.scheduler);
   }, [metadata?.scheduler, recallScheduler]);
+
+  const handleRecallVaeModel = useCallback(() => {
+    recallVaeModel(metadata?.vae);
+  }, [metadata?.vae, recallVaeModel]);
 
   const handleRecallSteps = useCallback(() => {
     recallSteps(metadata?.steps);
@@ -217,6 +222,13 @@ const ImageMetadataActions = (props: Props) => {
           label={t('metadata.scheduler')}
           value={metadata.scheduler}
           onClick={handleRecallScheduler}
+        />
+      )}
+      {metadata.vae && (
+        <ImageMetadataItem
+          label={t('metadata.vae')}
+          value={metadata.vae.model_name}
+          onClick={handleRecallVaeModel}
         />
       )}
       {metadata.steps && (
