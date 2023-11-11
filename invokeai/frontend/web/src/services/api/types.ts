@@ -127,7 +127,6 @@ export type CompelInvocation = s['CompelInvocation'];
 export type DynamicPromptInvocation = s['DynamicPromptInvocation'];
 export type NoiseInvocation = s['NoiseInvocation'];
 export type DenoiseLatentsInvocation = s['DenoiseLatentsInvocation'];
-export type ResizeLatentsInvocation = s['ResizeLatentsInvocation'];
 export type ONNXTextToLatentsInvocation = s['ONNXTextToLatentsInvocation'];
 export type SDXLLoraLoaderInvocation = s['SDXLLoraLoaderInvocation'];
 export type ImageToLatentsInvocation = s['ImageToLatentsInvocation'];
