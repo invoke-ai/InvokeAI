@@ -221,6 +221,19 @@
         "resetIPAdapterImage": "Reset IP Adapter Image",
         "ipAdapterImageFallback": "No IP Adapter Image Selected"
     },
+    "hrf": {
+        "hrf": "High Resolution Fix",
+        "enableHrf": "Enable High Resolution Fix",
+        "enableHrfTooltip": "Generate with a lower initial resolution, upscale to the base resolution, then run Image-to-Image.",
+        "upscaleMethod": "Upscale Method",
+        "hrfStrength": "High Resolution Fix Strength",
+        "strengthTooltip": "Lower values result in fewer details, which may reduce potential artifacts.",
+        "metadata": {
+            "enabled": "High Resolution Fix Enabled",
+            "strength": "High Resolution Fix Strength",
+            "method": "High Resolution Fix Method"
+        }
+    },
     "embedding": {
         "addEmbedding": "Add Embedding",
         "incompatibleModel": "Incompatible base model:",
@@ -1258,15 +1271,11 @@
         },
         "compositingBlur": {
             "heading": "Blur",
-            "paragraphs": [
-                "The blur radius of the mask."
-            ]
+            "paragraphs": ["The blur radius of the mask."]
         },
         "compositingBlurMethod": {
             "heading": "Blur Method",
-            "paragraphs": [
-                "The method of blur applied to the masked area."
-            ]
+            "paragraphs": ["The method of blur applied to the masked area."]
         },
         "compositingCoherencePass": {
             "heading": "Coherence Pass",
@@ -1276,9 +1285,7 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": [
-                "The mode of the Coherence Pass."
-            ]
+            "paragraphs": ["The mode of the Coherence Pass."]
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
@@ -1296,9 +1303,7 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
-            "paragraphs": [
-                "Adjust the mask."
-            ]
+            "paragraphs": ["Adjust the mask."]
         },
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
@@ -1356,9 +1361,7 @@
         },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": [
-                "Method to infill the selected area."
-            ]
+            "paragraphs": ["Method to infill the selected area."]
         },
         "lora": {
             "heading": "LoRA Weight",
