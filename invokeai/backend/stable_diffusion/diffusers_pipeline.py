@@ -606,11 +606,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[step_index]
 
-        noise_pred = self.invokeai_diffuser._combine(
-            uc_noise_pred,
-            c_noise_pred,
-            guidance_scale
-        )
+        noise_pred = self.invokeai_diffuser._combine(uc_noise_pred, c_noise_pred, guidance_scale)
         guidance_rescale_multiplier = conditioning_data.guidance_rescale_multiplier
         if guidance_rescale_multiplier > 0:
             noise_pred = type(self)._rescale_cfg(
