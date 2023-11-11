@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Union
 
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelConfigBase, ModelType
+from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType
 
 # should match the InvokeAI version when this is first released.
 CONFIG_FILE_VERSION = "3.2.0"
