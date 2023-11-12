@@ -36,6 +36,7 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
+import { isNil } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageDTO } from 'services/api/types';
@@ -65,8 +66,10 @@ import {
   setSeed,
   setSteps,
   setWidth,
+  vaeSelected,
 } from '../store/generationSlice';
 import {
+  isValidBoolean,
   isValidCfgScale,
   isValidControlNetModel,
   isValidHeight,
@@ -86,8 +89,8 @@ import {
   isValidSeed,
   isValidSteps,
   isValidStrength,
+  isValidVaeModel,
   isValidWidth,
-  isValidBoolean,
 } from '../types/parameterSchemas';
 
 const selector = createSelector(
@@ -301,6 +304,25 @@ export const useRecallParameters = () => {
         return;
       }
       dispatch(setScheduler(scheduler));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall vae model
+   */
+  const recallVaeModel = useCallback(
+    (vae: unknown) => {
+      if (!isValidVaeModel(vae) && !isNil(vae)) {
+        parameterNotSetToast();
+        return;
+      }
+      if (isNil(vae)) {
+        dispatch(vaeSelected(null));
+      } else {
+        dispatch(vaeSelected(vae));
+      }
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -757,6 +779,7 @@ export const useRecallParameters = () => {
         positive_prompt,
         negative_prompt,
         scheduler,
+        vae,
         seed,
         steps,
         width,
@@ -797,6 +820,13 @@ export const useRecallParameters = () => {
 
       if (isValidScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));
+      }
+      if (isValidVaeModel(vae) || isNil(vae)) {
+        if (isNil(vae)) {
+          dispatch(vaeSelected(null));
+        } else {
+          dispatch(vaeSelected(vae));
+        }
       }
 
       if (isValidSeed(seed)) {
@@ -932,6 +962,7 @@ export const useRecallParameters = () => {
     recallCfgScale,
     recallModel,
     recallScheduler,
+    recallVaeModel,
     recallSteps,
     recallWidth,
     recallHeight,
