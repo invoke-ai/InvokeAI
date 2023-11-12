@@ -12,6 +12,7 @@ import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import BaseModelSelect from '../shared/BaseModelSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
 import { getModelName } from './util';
+import { FocusEventHandler, useCallback } from 'react';
 
 type AdvancedAddDiffusersProps = {
   model_path?: string;
@@ -74,6 +75,22 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
       });
   };
 
+  const handleBlurModelLocation: FocusEventHandler<HTMLInputElement> =
+    useCallback(
+      (e) => {
+        if (advancedAddDiffusersForm.values['model_name'] === '') {
+          const modelName = getModelName(e.currentTarget.value, false);
+          if (modelName) {
+            advancedAddDiffusersForm.setFieldValue(
+              'model_name',
+              modelName as string
+            );
+          }
+        }
+      },
+      [advancedAddDiffusersForm]
+    );
+
   return (
     <form
       onSubmit={advancedAddDiffusersForm.onSubmit((v) =>
@@ -96,17 +113,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
           label={t('modelManager.modelLocation')}
           placeholder={t('modelManager.modelLocationValidationMsg')}
           {...advancedAddDiffusersForm.getInputProps('path')}
-          onBlur={(e) => {
-            if (advancedAddDiffusersForm.values['model_name'] === '') {
-              const modelName = getModelName(e.currentTarget.value, false);
-              if (modelName) {
-                advancedAddDiffusersForm.setFieldValue(
-                  'model_name',
-                  modelName as string
-                );
-              }
-            }
-          }}
+          onBlur={handleBlurModelLocation}
         />
         <IAIMantineTextInput
           label={t('modelManager.description')}

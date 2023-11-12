@@ -4,6 +4,7 @@ import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSync } from 'react-icons/fa';
 import { useSyncModelsMutation } from 'services/api/endpoints/models';
@@ -19,7 +20,7 @@ export default function SyncModelsButton(props: SyncModelsButtonProps) {
 
   const [syncModels, { isLoading }] = useSyncModelsMutation();
 
-  const syncModelsHandler = () => {
+  const syncModelsHandler = useCallback(() => {
     syncModels()
       .unwrap()
       .then((_) => {
@@ -44,7 +45,7 @@ export default function SyncModelsButton(props: SyncModelsButtonProps) {
           );
         }
       });
-  };
+  }, [dispatch, syncModels, t]);
 
   return !iconMode ? (
     <IAIButton

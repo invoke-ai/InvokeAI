@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
@@ -34,6 +34,23 @@ export default function ScanAdvancedAddModels() {
   }, [advancedAddScanModel, setAdvancedAddMode, isCheckpoint]);
 
   const dispatch = useAppDispatch();
+
+  const handleClickSetAdvanced = useCallback(
+    () => dispatch(setAdvancedAddScanModel(null)),
+    [dispatch]
+  );
+
+  const handleChangeAddMode = useCallback((v: string | null) => {
+    if (!v) {
+      return;
+    }
+    setAdvancedAddMode(v as ManualAddMode);
+    if (v === 'checkpoint') {
+      setIsCheckpoint(true);
+    } else {
+      setIsCheckpoint(false);
+    }
+  }, []);
 
   if (!advancedAddScanModel) {
     return null;
@@ -68,7 +85,7 @@ export default function ScanAdvancedAddModels() {
         <IAIIconButton
           icon={<FaTimes />}
           aria-label={t('modelManager.closeAdvanced')}
-          onClick={() => dispatch(setAdvancedAddScanModel(null))}
+          onClick={handleClickSetAdvanced}
           size="sm"
         />
       </Flex>
@@ -76,17 +93,7 @@ export default function ScanAdvancedAddModels() {
         label={t('modelManager.modelType')}
         value={advancedAddMode}
         data={advancedAddModeData}
-        onChange={(v) => {
-          if (!v) {
-            return;
-          }
-          setAdvancedAddMode(v as ManualAddMode);
-          if (v === 'checkpoint') {
-            setIsCheckpoint(true);
-          } else {
-            setIsCheckpoint(false);
-          }
-        }}
+        onChange={handleChangeAddMode}
       />
       {isCheckpoint ? (
         <AdvancedAddCheckpoint

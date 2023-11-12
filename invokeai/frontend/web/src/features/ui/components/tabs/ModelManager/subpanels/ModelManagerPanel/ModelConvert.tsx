@@ -14,7 +14,7 @@ import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import { addToast } from 'features/system/store/systemSlice';
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useConvertMainModelsMutation } from 'services/api/endpoints/models';
@@ -42,11 +42,21 @@ export default function ModelConvert(props: ModelConvertProps) {
     setSaveLocation('InvokeAIRoot');
   }, [model]);
 
-  const modelConvertCancelHandler = () => {
+  const modelConvertCancelHandler = useCallback(() => {
     setSaveLocation('InvokeAIRoot');
-  };
+  }, []);
 
-  const modelConvertHandler = () => {
+  const handleChangeSaveLocation = useCallback((v: string) => {
+    setSaveLocation(v as SaveLocation);
+  }, []);
+  const handleChangeCustomSaveLocation = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setCustomSaveLocation(e.target.value);
+    },
+    []
+  );
+
+  const modelConvertHandler = useCallback(() => {
     const queryArg = {
       base_model: model.base_model,
       model_name: model.model_name,
@@ -101,7 +111,15 @@ export default function ModelConvert(props: ModelConvertProps) {
           )
         );
       });
-  };
+  }, [
+    convertModel,
+    customSaveLocation,
+    dispatch,
+    model.base_model,
+    model.model_name,
+    saveLocation,
+    t,
+  ]);
 
   return (
     <IAIAlertDialog
@@ -137,10 +155,7 @@ export default function ModelConvert(props: ModelConvertProps) {
           <Text fontWeight="600">
             {t('modelManager.convertToDiffusersSaveLocation')}
           </Text>
-          <RadioGroup
-            value={saveLocation}
-            onChange={(v) => setSaveLocation(v as SaveLocation)}
-          >
+          <RadioGroup value={saveLocation} onChange={handleChangeSaveLocation}>
             <Flex gap={4}>
               <Radio value="InvokeAIRoot">
                 <Tooltip label="Save converted model in the InvokeAI root folder">
@@ -162,9 +177,7 @@ export default function ModelConvert(props: ModelConvertProps) {
             </Text>
             <IAIInput
               value={customSaveLocation}
-              onChange={(e) => {
-                setCustomSaveLocation(e.target.value);
-              }}
+              onChange={handleChangeCustomSaveLocation}
               width="full"
             />
           </Flex>

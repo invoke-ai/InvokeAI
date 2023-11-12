@@ -9,7 +9,7 @@ import IAISlider from 'common/components/IAISlider';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { pickBy } from 'lodash-es';
-import { useMemo, useState } from 'react';
+import { ChangeEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 import {
@@ -94,13 +94,58 @@ export default function MergeModelsPanel() {
     modelsMap[baseModel as keyof typeof modelsMap]
   ).filter((model) => model !== modelOne && model !== modelTwo);
 
-  const handleBaseModelChange = (v: string) => {
+  const handleBaseModelChange = useCallback((v: string) => {
     setBaseModel(v as BaseModelType);
     setModelOne(null);
     setModelTwo(null);
-  };
+  }, []);
 
-  const mergeModelsHandler = () => {
+  const handleChangeModelOne = useCallback((v: string) => {
+    setModelOne(v);
+  }, []);
+  const handleChangeModelTwo = useCallback((v: string) => {
+    setModelTwo(v);
+  }, []);
+  const handleChangeModelThree = useCallback((v: string) => {
+    if (!v) {
+      setModelThree(null);
+      setModelMergeInterp('add_difference');
+    } else {
+      setModelThree(v);
+      setModelMergeInterp('weighted_sum');
+    }
+  }, []);
+  const handleChangeMergedModelName = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => setMergedModelName(e.target.value),
+    []
+  );
+  const handleChangeModelMergeAlpha = useCallback(
+    (v: number) => setModelMergeAlpha(v),
+    []
+  );
+  const handleResetModelMergeAlpha = useCallback(
+    () => setModelMergeAlpha(0.5),
+    []
+  );
+  const handleChangeMergeInterp = useCallback(
+    (v: MergeInterpolationMethods) => setModelMergeInterp(v),
+    []
+  );
+  const handleChangeMergeSaveLocType = useCallback(
+    (v: 'root' | 'custom') => setModelMergeSaveLocType(v),
+    []
+  );
+  const handleChangeMergeCustomSaveLoc = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      setModelMergeCustomSaveLoc(e.target.value),
+    []
+  );
+  const handleChangeModelMergeForce = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => setModelMergeForce(e.target.checked),
+    []
+  );
+
+  const mergeModelsHandler = useCallback(() => {
     const models_names: string[] = [];
 
     let modelsToMerge: (string | null)[] = [modelOne, modelTwo, modelThree];
@@ -150,7 +195,21 @@ export default function MergeModelsPanel() {
           );
         }
       });
-  };
+  }, [
+    baseModel,
+    dispatch,
+    mergeModels,
+    mergedModelName,
+    modelMergeAlpha,
+    modelMergeCustomSaveLoc,
+    modelMergeForce,
+    modelMergeInterp,
+    modelMergeSaveLocType,
+    modelOne,
+    modelThree,
+    modelTwo,
+    t,
+  ]);
 
   return (
     <Flex flexDirection="column" rowGap={4}>
@@ -180,7 +239,7 @@ export default function MergeModelsPanel() {
           value={modelOne}
           placeholder={t('modelManager.selectModel')}
           data={modelOneList}
-          onChange={(v) => setModelOne(v)}
+          onChange={handleChangeModelOne}
         />
         <IAIMantineSearchableSelect
           label={t('modelManager.modelTwo')}
@@ -188,7 +247,7 @@ export default function MergeModelsPanel() {
           placeholder={t('modelManager.selectModel')}
           value={modelTwo}
           data={modelTwoList}
-          onChange={(v) => setModelTwo(v)}
+          onChange={handleChangeModelTwo}
         />
         <IAIMantineSearchableSelect
           label={t('modelManager.modelThree')}
@@ -196,22 +255,14 @@ export default function MergeModelsPanel() {
           w="100%"
           placeholder={t('modelManager.selectModel')}
           clearable
-          onChange={(v) => {
-            if (!v) {
-              setModelThree(null);
-              setModelMergeInterp('add_difference');
-            } else {
-              setModelThree(v);
-              setModelMergeInterp('weighted_sum');
-            }
-          }}
+          onChange={handleChangeModelThree}
         />
       </Flex>
 
       <IAIInput
         label={t('modelManager.mergedModelName')}
         value={mergedModelName}
-        onChange={(e) => setMergedModelName(e.target.value)}
+        onChange={handleChangeMergedModelName}
       />
 
       <Flex
@@ -232,10 +283,10 @@ export default function MergeModelsPanel() {
           max={0.99}
           step={0.01}
           value={modelMergeAlpha}
-          onChange={(v) => setModelMergeAlpha(v)}
+          onChange={handleChangeModelMergeAlpha}
           withInput
           withReset
-          handleReset={() => setModelMergeAlpha(0.5)}
+          handleReset={handleResetModelMergeAlpha}
           withSliderMarks
         />
         <Text variant="subtext" fontSize="sm">
@@ -257,10 +308,7 @@ export default function MergeModelsPanel() {
         <Text fontWeight={500} fontSize="sm" variant="subtext">
           {t('modelManager.interpolationType')}
         </Text>
-        <RadioGroup
-          value={modelMergeInterp}
-          onChange={(v: MergeInterpolationMethods) => setModelMergeInterp(v)}
-        >
+        <RadioGroup value={modelMergeInterp} onChange={handleChangeMergeInterp}>
           <Flex columnGap={4}>
             {modelThree === null ? (
               <>
@@ -305,7 +353,7 @@ export default function MergeModelsPanel() {
           </Text>
           <RadioGroup
             value={modelMergeSaveLocType}
-            onChange={(v: 'root' | 'custom') => setModelMergeSaveLocType(v)}
+            onChange={handleChangeMergeSaveLocType}
           >
             <Flex columnGap={4}>
               <Radio value="root">
@@ -323,7 +371,7 @@ export default function MergeModelsPanel() {
           <IAIInput
             label={t('modelManager.mergedModelCustomSaveLocation')}
             value={modelMergeCustomSaveLoc}
-            onChange={(e) => setModelMergeCustomSaveLoc(e.target.value)}
+            onChange={handleChangeMergeCustomSaveLoc}
           />
         )}
       </Flex>
@@ -331,7 +379,7 @@ export default function MergeModelsPanel() {
       <IAISimpleCheckbox
         label={t('modelManager.ignoreMismatch')}
         isChecked={modelMergeForce}
-        onChange={(e) => setModelMergeForce(e.target.checked)}
+        onChange={handleChangeModelMergeForce}
         fontWeight="500"
       />
 

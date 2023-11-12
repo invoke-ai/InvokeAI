@@ -42,9 +42,14 @@ function SearchFolderForm() {
     [dispatch]
   );
 
-  const scanAgainHandler = () => {
+  const scanAgainHandler = useCallback(() => {
     refetchFoundModels();
-  };
+  }, [refetchFoundModels]);
+
+  const handleClickClearCheckpointFolder = useCallback(() => {
+    dispatch(setSearchFolder(null));
+    dispatch(setAdvancedAddScanModel(null));
+  }, [dispatch]);
 
   return (
     <form
@@ -123,10 +128,7 @@ function SearchFolderForm() {
             tooltip={t('modelManager.clearCheckpointFolder')}
             icon={<FaTrash />}
             size="sm"
-            onClick={() => {
-              dispatch(setSearchFolder(null));
-              dispatch(setAdvancedAddScanModel(null));
-            }}
+            onClick={handleClickClearCheckpointFolder}
             isDisabled={!searchFolder}
             colorScheme="red"
           />

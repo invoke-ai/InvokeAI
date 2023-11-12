@@ -6,7 +6,7 @@ import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useState } from 'react';
+import { FocusEventHandler, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import { CheckpointModelConfig } from 'services/api/types';
@@ -83,6 +83,27 @@ export default function AdvancedAddCheckpoint(
       });
   };
 
+  const handleBlurModelLocation: FocusEventHandler<HTMLInputElement> =
+    useCallback(
+      (e) => {
+        if (advancedAddCheckpointForm.values['model_name'] === '') {
+          const modelName = getModelName(e.currentTarget.value);
+          if (modelName) {
+            advancedAddCheckpointForm.setFieldValue(
+              'model_name',
+              modelName as string
+            );
+          }
+        }
+      },
+      [advancedAddCheckpointForm]
+    );
+
+  const handleChangeUseCustomConfig = useCallback(
+    () => setUseCustomConfig((prev) => !prev),
+    []
+  );
+
   return (
     <form
       onSubmit={advancedAddCheckpointForm.onSubmit((v) =>
@@ -104,17 +125,7 @@ export default function AdvancedAddCheckpoint(
           label={t('modelManager.modelLocation')}
           required
           {...advancedAddCheckpointForm.getInputProps('path')}
-          onBlur={(e) => {
-            if (advancedAddCheckpointForm.values['model_name'] === '') {
-              const modelName = getModelName(e.currentTarget.value);
-              if (modelName) {
-                advancedAddCheckpointForm.setFieldValue(
-                  'model_name',
-                  modelName as string
-                );
-              }
-            }
-          }}
+          onBlur={handleBlurModelLocation}
         />
         <IAIMantineTextInput
           label={t('modelManager.description')}
@@ -144,7 +155,7 @@ export default function AdvancedAddCheckpoint(
           )}
           <IAISimpleCheckbox
             isChecked={useCustomConfig}
-            onChange={() => setUseCustomConfig(!useCustomConfig)}
+            onChange={handleChangeUseCustomConfig}
             label={t('modelManager.useCustomConfig')}
           />
           <IAIButton mt={2} type="submit">

@@ -186,6 +186,13 @@ const IAISlider = forwardRef((props: IAIFullSliderProps, ref) => {
     [dispatch]
   );
 
+  const handleMouseEnter = useCallback(() => setShowTooltip(true), []);
+  const handleMouseLeave = useCallback(() => setShowTooltip(false), []);
+  const handleStepperClick = useCallback(
+    () => onChange(Number(localInputValue)),
+    [localInputValue, onChange]
+  );
+
   return (
     <FormControl
       ref={ref}
@@ -219,8 +226,8 @@ const IAISlider = forwardRef((props: IAIFullSliderProps, ref) => {
           max={max}
           step={step}
           onChange={handleSliderChange}
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
           focusThumbOnChange={false}
           isDisabled={isDisabled}
           {...rest}
@@ -332,12 +339,8 @@ const IAISlider = forwardRef((props: IAIFullSliderProps, ref) => {
               {...sliderNumberInputFieldProps}
             />
             <NumberInputStepper {...sliderNumberInputStepperProps}>
-              <NumberIncrementStepper
-                onClick={() => onChange(Number(localInputValue))}
-              />
-              <NumberDecrementStepper
-                onClick={() => onChange(Number(localInputValue))}
-              />
+              <NumberIncrementStepper onClick={handleStepperClick} />
+              <NumberDecrementStepper onClick={handleStepperClick} />
             </NumberInputStepper>
           </NumberInput>
         )}

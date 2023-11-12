@@ -100,7 +100,7 @@ const ModelList = (props: ModelListProps) => {
       <Flex flexDirection="column" gap={4} paddingInlineEnd={4}>
         <ButtonGroup isAttached>
           <IAIButton
-            onClick={() => setModelFormatFilter('all')}
+            onClick={setModelFormatFilter.bind(null, 'all')}
             isChecked={modelFormatFilter === 'all'}
             size="sm"
           >
@@ -108,35 +108,35 @@ const ModelList = (props: ModelListProps) => {
           </IAIButton>
           <IAIButton
             size="sm"
-            onClick={() => setModelFormatFilter('diffusers')}
+            onClick={setModelFormatFilter.bind(null, 'diffusers')}
             isChecked={modelFormatFilter === 'diffusers'}
           >
             {t('modelManager.diffusersModels')}
           </IAIButton>
           <IAIButton
             size="sm"
-            onClick={() => setModelFormatFilter('checkpoint')}
+            onClick={setModelFormatFilter.bind(null, 'checkpoint')}
             isChecked={modelFormatFilter === 'checkpoint'}
           >
             {t('modelManager.checkpointModels')}
           </IAIButton>
           <IAIButton
             size="sm"
-            onClick={() => setModelFormatFilter('onnx')}
+            onClick={setModelFormatFilter.bind(null, 'onnx')}
             isChecked={modelFormatFilter === 'onnx'}
           >
             {t('modelManager.onnxModels')}
           </IAIButton>
           <IAIButton
             size="sm"
-            onClick={() => setModelFormatFilter('olive')}
+            onClick={setModelFormatFilter.bind(null, 'olive')}
             isChecked={modelFormatFilter === 'olive'}
           >
             {t('modelManager.oliveModels')}
           </IAIButton>
           <IAIButton
             size="sm"
-            onClick={() => setModelFormatFilter('lora')}
+            onClick={setModelFormatFilter.bind(null, 'lora')}
             isChecked={modelFormatFilter === 'lora'}
           >
             {t('modelManager.loraModels')}

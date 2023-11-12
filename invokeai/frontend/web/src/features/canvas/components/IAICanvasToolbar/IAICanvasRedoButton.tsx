@@ -10,6 +10,7 @@ import { redo } from 'features/canvas/store/canvasSlice';
 import { stateSelector } from 'app/store/store';
 import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
+import { useCallback } from 'react';
 
 const canvasRedoSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -34,9 +35,9 @@ export default function IAICanvasRedoButton() {
 
   const { t } = useTranslation();
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     dispatch(redo());
-  };
+  }, [dispatch]);
 
   useHotkeys(
     ['meta+shift+z', 'ctrl+shift+z', 'control+y', 'meta+y'],

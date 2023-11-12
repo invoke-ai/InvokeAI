@@ -1,12 +1,17 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import AdvancedAddModels from './AdvancedAddModels';
 import SimpleAddModels from './SimpleAddModels';
 
 export default function AddModels() {
   const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>(
     'simple'
+  );
+  const handleAddModelSimple = useCallback(() => setAddModelMode('simple'), []);
+  const handleAddModelAdvanced = useCallback(
+    () => setAddModelMode('advanced'),
+    []
   );
   return (
     <Flex
@@ -20,14 +25,14 @@ export default function AddModels() {
         <IAIButton
           size="sm"
           isChecked={addModelMode == 'simple'}
-          onClick={() => setAddModelMode('simple')}
+          onClick={handleAddModelSimple}
         >
           Simple
         </IAIButton>
         <IAIButton
           size="sm"
           isChecked={addModelMode == 'advanced'}
-          onClick={() => setAddModelMode('advanced')}
+          onClick={handleAddModelAdvanced}
         >
           Advanced
         </IAIButton>

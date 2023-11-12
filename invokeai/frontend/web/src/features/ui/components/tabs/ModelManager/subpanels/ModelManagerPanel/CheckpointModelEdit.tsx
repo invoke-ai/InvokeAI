@@ -59,6 +59,11 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
     },
   });
 
+  const handleChangeUseCustomConfig = useCallback(
+    () => setUseCustomConfig((prev) => !prev),
+    []
+  );
+
   const editModelFormSubmitHandler = useCallback(
     (values: CheckpointModelConfig) => {
       const responseBody = {
@@ -181,7 +186,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               )}
               <IAISimpleCheckbox
                 isChecked={useCustomConfig}
-                onChange={() => setUseCustomConfig(!useCustomConfig)}
+                onChange={handleChangeUseCustomConfig}
                 label="Use Custom Config"
               />
             </Flex>

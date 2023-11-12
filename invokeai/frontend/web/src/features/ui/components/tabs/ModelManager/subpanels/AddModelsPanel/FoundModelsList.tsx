@@ -92,6 +92,11 @@ export default function FoundModelsList() {
     setNameFilter(e.target.value);
   }, []);
 
+  const handleClickSetAdvanced = useCallback(
+    (model: string) => dispatch(setAdvancedAddScanModel(model)),
+    [dispatch]
+  );
+
   const renderModels = ({
     models,
     showActions = true,
@@ -140,7 +145,7 @@ export default function FoundModelsList() {
                 {t('modelManager.quickAdd')}
               </IAIButton>
               <IAIButton
-                onClick={() => dispatch(setAdvancedAddScanModel(model))}
+                onClick={handleClickSetAdvanced.bind(null, model)}
                 isLoading={isLoading}
               >
                 {t('modelManager.advanced')}

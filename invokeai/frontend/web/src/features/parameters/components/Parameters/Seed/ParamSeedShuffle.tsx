@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import randomInt from 'common/util/randomInt';
 import { setSeed } from 'features/parameters/store/generationSlice';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaRandom } from 'react-icons/fa';
 
@@ -14,8 +15,10 @@ export default function ParamSeedShuffle() {
   );
   const { t } = useTranslation();
 
-  const handleClickRandomizeSeed = () =>
-    dispatch(setSeed(randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)));
+  const handleClickRandomizeSeed = useCallback(
+    () => dispatch(setSeed(randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX))),
+    [dispatch]
+  );
 
   return (
     <IAIIconButton

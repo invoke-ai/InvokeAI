@@ -15,7 +15,8 @@ import {
   setTool,
 } from 'features/canvas/store/canvasSlice';
 import { clamp, isEqual } from 'lodash-es';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import { RgbaColor } from 'react-colorful';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -172,11 +173,33 @@ const IAICanvasToolChooserOptions = () => {
     [brushColor]
   );
 
-  const handleSelectBrushTool = () => dispatch(setTool('brush'));
-  const handleSelectEraserTool = () => dispatch(setTool('eraser'));
-  const handleSelectColorPickerTool = () => dispatch(setTool('colorPicker'));
-  const handleFillRect = () => dispatch(addFillRect());
-  const handleEraseBoundingBox = () => dispatch(addEraseRect());
+  const handleSelectBrushTool = useCallback(() => {
+    dispatch(setTool('brush'));
+  }, [dispatch]);
+  const handleSelectEraserTool = useCallback(() => {
+    dispatch(setTool('eraser'));
+  }, [dispatch]);
+  const handleSelectColorPickerTool = useCallback(() => {
+    dispatch(setTool('colorPicker'));
+  }, [dispatch]);
+  const handleFillRect = useCallback(() => {
+    dispatch(addFillRect());
+  }, [dispatch]);
+  const handleEraseBoundingBox = useCallback(() => {
+    dispatch(addEraseRect());
+  }, [dispatch]);
+  const handleChangeBrushSize = useCallback(
+    (newSize: number) => {
+      dispatch(setBrushSize(newSize));
+    },
+    [dispatch]
+  );
+  const handleChangeBrushColor = useCallback(
+    (newColor: RgbaColor) => {
+      dispatch(setBrushColor(newColor));
+    },
+    [dispatch]
+  );
 
   return (
     <ButtonGroup isAttached>
@@ -233,7 +256,7 @@ const IAICanvasToolChooserOptions = () => {
               label={t('unifiedCanvas.brushSize')}
               value={brushSize}
               withInput
-              onChange={(newSize) => dispatch(setBrushSize(newSize))}
+              onChange={handleChangeBrushSize}
               sliderNumberInputProps={{ max: 500 }}
             />
           </Flex>
@@ -247,7 +270,7 @@ const IAICanvasToolChooserOptions = () => {
             <IAIColorPicker
               withNumberInput={true}
               color={brushColor}
-              onChange={(newColor) => dispatch(setBrushColor(newColor))}
+              onChange={handleChangeBrushColor}
             />
           </Box>
         </Flex>
