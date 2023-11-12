@@ -49,7 +49,8 @@ def test_type(store: ModelRecordServiceBase):
     store.add_model("key1", config)
     config1 = store.get_model("key1")
     assert type(config1) == TextualInversionConfig
-    
+
+
 def test_add(store: ModelRecordServiceBase):
     raw = dict(
         path="/tmp/foo.ckpt",
