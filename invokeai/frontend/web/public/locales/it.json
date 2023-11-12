@@ -1487,5 +1487,18 @@
         "scheduler": "Campionatore",
         "recallParameters": "Richiama i parametri",
         "noRecallParameters": "Nessun parametro da richiamare trovato"
+    },
+    "hrf": {
+        "enableHrf": "Abilita Correzione Alta Risoluzione",
+        "upscaleMethod": "Metodo di ampliamento",
+        "enableHrfTooltip": "Genera con una risoluzione iniziale inferiore, esegue l'ampliamento alla risoluzione di base, quindi esegue Immagine a Immagine.",
+        "metadata": {
+            "strength": "Forza della Correzione Alta Risoluzione",
+            "enabled": "Correzione Alta Risoluzione Abilitata",
+            "method": "Metodo della Correzione Alta Risoluzione"
+        },
+        "hrf": "Correzione Alta Risoluzione",
+        "hrfStrength": "Forza della Correzione Alta Risoluzione",
+        "strengthTooltip": "Valori più bassi comportano meno dettagli, il che può ridurre potenziali artefatti."
     }
 }

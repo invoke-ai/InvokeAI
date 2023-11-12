@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     InputField,
     InvocationContext,
     MetadataField,
@@ -19,6 +18,7 @@ from invokeai.app.invocations.ip_adapter import IPAdapterModelField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
+from invokeai.app.shared.fields import FieldDescriptions
 
 from ...version import __version__
 
@@ -160,13 +160,14 @@ class CoreMetadataInvocation(BaseInvocation):
     )
 
     # High resolution fix metadata.
-    hrf_width: Optional[int] = InputField(
+    hrf_enabled: Optional[float] = InputField(
         default=None,
-        description="The high resolution fix height and width multipler.",
+        description="Whether or not high resolution fix was enabled.",
     )
-    hrf_height: Optional[int] = InputField(
+    # TODO: should this be stricter or do we just let the UI handle it?
+    hrf_method: Optional[str] = InputField(
         default=None,
-        description="The high resolution fix height and width multipler.",
+        description="The high resolution fix upscale method.",
     )
     hrf_strength: Optional[float] = InputField(
         default=None,

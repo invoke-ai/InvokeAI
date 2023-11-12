@@ -10,7 +10,7 @@ import torch
 import torchvision.transforms as T
 from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.models.adapter import FullAdapterXL, T2IAdapter
+from diffusers.models.adapter import T2IAdapter
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -34,6 +34,7 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
@@ -57,7 +58,6 @@ from ...backend.util.devices import choose_precision, choose_torch_device
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -562,10 +562,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapter_model: T2IAdapter
             with t2i_adapter_model_info as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
-                if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
-                    # HACK(ryand): Work around a bug in FullAdapterXL. This is being addressed upstream in diffusers by
-                    # this PR: https://github.com/huggingface/diffusers/pull/5134.
-                    total_downscale_factor = total_downscale_factor // 2
 
                 # Resize the T2I-Adapter input image.
                 # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the

@@ -11,6 +11,7 @@ import {
   CanvasCoherenceModeParam,
   CfgScaleParam,
   HeightParam,
+  HrfMethodParam,
   MainModelParam,
   MaskBlurMethodParam,
   NegativePromptParam,
@@ -27,10 +28,9 @@ import {
 } from '../types/parameterSchemas';
 
 export interface GenerationState {
-  hrfHeight: HeightParam;
-  hrfWidth: WidthParam;
   hrfEnabled: boolean;
   hrfStrength: StrengthParam;
+  hrfMethod: HrfMethodParam;
   cfgScale: CfgScaleParam;
   height: HeightParam;
   img2imgStrength: StrengthParam;
@@ -73,10 +73,9 @@ export interface GenerationState {
 }
 
 export const initialGenerationState: GenerationState = {
-  hrfHeight: 64,
-  hrfWidth: 64,
-  hrfStrength: 0.75,
+  hrfStrength: 0.45,
   hrfEnabled: false,
+  hrfMethod: 'ESRGAN',
   cfgScale: 7.5,
   height: 512,
   img2imgStrength: 0.75,
@@ -279,17 +278,14 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
-    setHrfHeight: (state, action: PayloadAction<number>) => {
-      state.hrfHeight = action.payload;
-    },
-    setHrfWidth: (state, action: PayloadAction<number>) => {
-      state.hrfWidth = action.payload;
-    },
     setHrfStrength: (state, action: PayloadAction<number>) => {
       state.hrfStrength = action.payload;
     },
     setHrfEnabled: (state, action: PayloadAction<boolean>) => {
       state.hrfEnabled = action.payload;
+    },
+    setHrfMethod: (state, action: PayloadAction<HrfMethodParam>) => {
+      state.hrfMethod = action.payload;
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
@@ -375,10 +371,9 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
-  setHrfHeight,
-  setHrfWidth,
-  setHrfStrength,
   setHrfEnabled,
+  setHrfStrength,
+  setHrfMethod,
   shouldUseCpuNoiseChanged,
   setAspectRatio,
   setShouldLockAspectRatio,

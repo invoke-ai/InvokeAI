@@ -70,7 +70,7 @@ export const initialConfigState: AppConfig = {
       coarseStep: 0.05,
     },
     hrfStrength: {
-      initial: 0.7,
+      initial: 0.45,
       min: 0,
       sliderMax: 1,
       inputMax: 1,
