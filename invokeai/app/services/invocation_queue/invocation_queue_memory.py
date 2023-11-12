@@ -14,7 +14,7 @@ class MemoryInvocationQueue(InvocationQueueABC):
 
     def __init__(self):
         self.__queue = Queue()
-        self.__cancellations = dict()
+        self.__cancellations = {}
 
     def get(self) -> InvocationQueueItem:
         item = self.__queue.get()

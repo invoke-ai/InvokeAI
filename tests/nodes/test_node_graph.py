@@ -471,7 +471,6 @@ def test_graph_gets_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)
@@ -503,8 +502,8 @@ def test_graph_expands_subgraph():
     g.add_edge(create_edge("1.2", "value", "2", "a"))
 
     dg = g.nx_graph_flat()
-    assert set(dg.nodes) == set(["1.1", "1.2", "2"])
-    assert set(dg.edges) == set([("1.1", "1.2"), ("1.2", "2")])
+    assert set(dg.nodes) == {"1.1", "1.2", "2"}
+    assert set(dg.edges) == {("1.1", "1.2"), ("1.2", "2")}
 
 
 def test_graph_subgraph_t2i():
@@ -532,9 +531,7 @@ def test_graph_subgraph_t2i():
 
     # Validate
     dg = g.nx_graph_flat()
-    assert set(dg.nodes) == set(
-        ["1.width", "1.height", "1.seed", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "2", "3", "4"]
-    )
+    assert set(dg.nodes) == {"1.width", "1.height", "1.seed", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "2", "3", "4"}
     expected_edges = [(f"1.{e.source.node_id}", f"1.{e.destination.node_id}") for e in lg.graph.edges]
     expected_edges.extend([("2", "1.width"), ("3", "1.height"), ("1.8", "4")])
     print(expected_edges)
@@ -546,7 +543,6 @@ def test_graph_fails_to_get_missing_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)
@@ -561,7 +557,6 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)

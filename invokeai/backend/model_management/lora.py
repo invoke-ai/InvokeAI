@@ -104,7 +104,7 @@ class ModelPatcher:
         loras: List[Tuple[LoRAModel, float]],
         prefix: str,
     ):
-        original_weights = dict()
+        original_weights = {}
         try:
             with torch.no_grad():
                 for lora, lora_weight in loras:
@@ -242,7 +242,7 @@ class ModelPatcher:
     ):
         skipped_layers = []
         try:
-            for i in range(clip_skip):
+            for _i in range(clip_skip):
                 skipped_layers.append(text_encoder.text_model.encoder.layers.pop(-1))
 
             yield
@@ -324,7 +324,7 @@ class TextualInversionManager(BaseTextualInversionManager):
     tokenizer: CLIPTokenizer
 
     def __init__(self, tokenizer: CLIPTokenizer):
-        self.pad_tokens = dict()
+        self.pad_tokens = {}
         self.tokenizer = tokenizer
 
     def expand_textual_inversion_token_ids_if_necessary(self, token_ids: list[int]) -> list[int]:
@@ -385,10 +385,10 @@ class ONNXModelPatcher:
         if not isinstance(model, IAIOnnxRuntimeModel):
             raise Exception("Only IAIOnnxRuntimeModel models supported")
 
-        orig_weights = dict()
+        orig_weights = {}
 
         try:
-            blended_loras = dict()
+            blended_loras = {}
 
             for lora, lora_weight in loras:
                 for layer_key, layer in lora.layers.items():
@@ -404,7 +404,7 @@ class ONNXModelPatcher:
                     else:
                         blended_loras[layer_key] = layer_weight
 
-            node_names = dict()
+            node_names = {}
             for node in model.nodes.values():
                 node_names[node.name.replace("/", "_").replace(".", "_").lstrip("_")] = node.name
 

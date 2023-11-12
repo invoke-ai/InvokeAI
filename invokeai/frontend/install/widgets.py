@@ -11,6 +11,7 @@ import sys
 import textwrap
 from curses import BUTTON2_CLICKED, BUTTON3_CLICKED
 from shutil import get_terminal_size
+from typing import Optional
 
 import npyscreen
 import npyscreen.wgmultiline as wgmultiline
@@ -243,7 +244,9 @@ class SelectColumnBase:
 
 
 class MultiSelectColumns(SelectColumnBase, npyscreen.MultiSelect):
-    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
+    def __init__(self, screen, columns: int = 1, values: Optional[list] = None, **keywords):
+        if values is None:
+            values = []
         self.columns = columns
         self.value_cnt = len(values)
         self.rows = math.ceil(self.value_cnt / self.columns)
@@ -267,7 +270,9 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
 class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
     """Row of radio buttons. Spacebar to select."""
 
-    def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
+    def __init__(self, screen, columns: int = 1, values: list = None, **keywords):
+        if values is None:
+            values = []
         self.columns = columns
         self.value_cnt = len(values)
         self.rows = math.ceil(self.value_cnt / self.columns)

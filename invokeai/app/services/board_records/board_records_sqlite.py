@@ -199,7 +199,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             )
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            boards = list(map(lambda r: deserialize_board_record(dict(r)), result))
+            boards = [deserialize_board_record(dict(r)) for r in result]
 
             # Get the total number of boards
             self._cursor.execute(
@@ -236,7 +236,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             )
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            boards = list(map(lambda r: deserialize_board_record(dict(r)), result))
+            boards = [deserialize_board_record(dict(r)) for r in result]
 
             return boards
 

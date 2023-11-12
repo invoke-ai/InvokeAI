@@ -100,7 +100,7 @@ EASING_FUNCTIONS_MAP = {
     "BounceInOut": BounceEaseInOut,
 }
 
-EASING_FUNCTION_KEYS = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
+EASING_FUNCTION_KEYS = Literal[tuple(EASING_FUNCTIONS_MAP.keys())]
 
 
 # actually I think for now could just use CollectionOutput (which is list[Any]
@@ -161,7 +161,7 @@ class StepParamEasingInvocation(BaseInvocation):
         easing_class = EASING_FUNCTIONS_MAP[self.easing]
         if log_diagnostics:
             context.services.logger.debug("easing class: " + str(easing_class))
-        easing_list = list()
+        easing_list = []
         if self.mirror:  # "expected" mirroring
             # if number of steps is even, squeeze duration down to (number_of_steps)/2
             # and create reverse copy of list to append
@@ -178,7 +178,7 @@ class StepParamEasingInvocation(BaseInvocation):
                 end=self.end_value,
                 duration=base_easing_duration - 1,
             )
-            base_easing_vals = list()
+            base_easing_vals = []
             for step_index in range(base_easing_duration):
                 easing_val = easing_function.ease(step_index)
                 base_easing_vals.append(easing_val)
