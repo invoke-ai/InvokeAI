@@ -36,6 +36,7 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
+import { isNil } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImageDTO } from 'services/api/types';
@@ -68,6 +69,7 @@ import {
   vaeSelected,
 } from '../store/generationSlice';
 import {
+  isValidBoolean,
   isValidCfgScale,
   isValidControlNetModel,
   isValidHeight,
@@ -87,11 +89,9 @@ import {
   isValidSeed,
   isValidSteps,
   isValidStrength,
-  isValidWidth,
   isValidVaeModel,
-  isValidBoolean,
+  isValidWidth,
 } from '../types/parameterSchemas';
-import _ from 'lodash';
 
 const selector = createSelector(
   stateSelector,
@@ -314,11 +314,11 @@ export const useRecallParameters = () => {
    */
   const recallVaeModel = useCallback(
     (vae: unknown) => {
-      if (!isValidVaeModel(vae) && !_.isNil(vae)) {
+      if (!isValidVaeModel(vae) && !isNil(vae)) {
         parameterNotSetToast();
         return;
       }
-      if (_.isNil(vae)) {
+      if (isNil(vae)) {
         dispatch(vaeSelected(null));
       } else {
         dispatch(vaeSelected(vae));
@@ -821,8 +821,8 @@ export const useRecallParameters = () => {
       if (isValidScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));
       }
-      if (isValidVaeModel(vae) || _.isNil(vae)) {
-        if (_.isNil(vae)) {
+      if (isValidVaeModel(vae) || isNil(vae)) {
+        if (isNil(vae)) {
           dispatch(vaeSelected(null));
         } else {
           dispatch(vaeSelected(vae));
