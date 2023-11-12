@@ -18,8 +18,7 @@ jobs:
 
       - name: Install dependencies with pip
         run: |
-          pip install black flake8 Flake8-pyproject isort
+          pip install ruff
 
-      - run: isort --check-only .
-      - run: black --check .
-      - run: flake8
+      - run: ruff check --output-format=github .
+      - run: ruff format --check .

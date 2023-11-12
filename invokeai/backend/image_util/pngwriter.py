@@ -88,7 +88,7 @@ class PromptFormatter:
         t2i = self.t2i
         opt = self.opt
 
-        switches = list()
+        switches = []
         switches.append(f'"{opt.prompt}"')
         switches.append(f"-s{opt.steps        or t2i.steps}")
         switches.append(f"-W{opt.width        or t2i.width}")

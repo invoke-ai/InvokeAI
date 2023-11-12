@@ -25,7 +25,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
     __invoker: Invoker
 
     def __init__(self, output_folder: Union[str, Path]):
-        self.__cache = dict()
+        self.__cache = {}
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
 

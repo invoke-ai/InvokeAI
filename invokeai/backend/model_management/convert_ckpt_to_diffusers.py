@@ -269,7 +269,7 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
             resolution *= 2
 
     up_block_types = []
-    for i in range(len(block_out_channels)):
+    for _i in range(len(block_out_channels)):
         block_type = "CrossAttnUpBlock2D" if resolution in unet_params.attention_resolutions else "UpBlock2D"
         up_block_types.append(block_type)
         resolution //= 2
@@ -1223,7 +1223,7 @@ def download_from_original_stable_diffusion_ckpt(
             # scan model
             scan_result = scan_file_path(checkpoint_path)
             if scan_result.infected_files != 0:
-                raise "The model {checkpoint_path} is potentially infected by malware. Aborting import."
+                raise Exception("The model {checkpoint_path} is potentially infected by malware. Aborting import.")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -1664,7 +1664,7 @@ def download_controlnet_from_original_ckpt(
             # scan model
             scan_result = scan_file_path(checkpoint_path)
             if scan_result.infected_files != 0:
-                raise "The model {checkpoint_path} is potentially infected by malware. Aborting import."
+                raise Exception("The model {checkpoint_path} is potentially infected by malware. Aborting import.")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             checkpoint = torch.load(checkpoint_path, map_location=device)

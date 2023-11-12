@@ -615,7 +615,7 @@ def do_textual_inversion_training(
     vae_info = model_manager.get_model(*model_meta, submodel=SubModelType.Vae)
     unet_info = model_manager.get_model(*model_meta, submodel=SubModelType.UNet)
 
-    pipeline_args = dict(local_files_only=True)
+    pipeline_args = {"local_files_only": True}
     if tokenizer_name:
         tokenizer = CLIPTokenizer.from_pretrained(tokenizer_name, **pipeline_args)
     else:
