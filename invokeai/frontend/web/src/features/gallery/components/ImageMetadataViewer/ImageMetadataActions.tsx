@@ -224,13 +224,11 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallScheduler}
         />
       )}
-      {metadata.vae && (
-        <ImageMetadataItem
-          label={t('metadata.vae')}
-          value={metadata.vae.model_name}
-          onClick={handleRecallVaeModel}
-        />
-      )}
+      <ImageMetadataItem
+        label={t('metadata.vae')}
+        value={metadata.vae?.model_name ?? 'Default'}
+        onClick={handleRecallVaeModel}
+      />
       {metadata.steps && (
         <ImageMetadataItem
           label={t('metadata.steps')}
