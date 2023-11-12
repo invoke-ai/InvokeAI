@@ -6,7 +6,7 @@ import torch
 
 from invokeai.backend.model_management.libc_util import LibcUtil, Struct_mallinfo2
 
-GB = 2 ** 30  # 1 GB
+GB = 2**30  # 1 GB
 
 
 class MemorySnapshot:

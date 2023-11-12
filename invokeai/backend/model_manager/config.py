@@ -268,7 +268,14 @@ AnyModelConfig = Union[
     T2IConfig,
 ]
 
-# Preferred alternative is a discriminated Union, but it breaks FastAPI when applied to a route.
+AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
+
+# IMPLEMENTATION NOTE:
+# The preferred alternative to the above is a discriminated Union as shown
+# below. However, it breaks FastAPI when used as the input Body parameter in a route.
+# This is a known issue. Please see:
+#   https://github.com/tiangolo/fastapi/discussions/9761 and
+#   https://github.com/tiangolo/fastapi/discussions/9287
 # AnyModelConfig = Annotated[
 #     Union[
 #         _MainModelConfig,
@@ -283,8 +290,6 @@ AnyModelConfig = Union[
 #     ],
 #     Field(discriminator="type"),
 # ]
-
-AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
 
 
 class ModelConfigFactory(object):
