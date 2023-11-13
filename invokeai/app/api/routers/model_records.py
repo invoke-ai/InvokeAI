@@ -8,7 +8,7 @@ from typing import List, Optional
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, ConfigDict, TypeAdapter
+from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
@@ -26,9 +26,6 @@ class ModelsList(BaseModel):
     models: list[AnyModelConfig]
 
     model_config = ConfigDict(use_enum_values=True)
-
-
-ModelsListValidator = TypeAdapter(ModelsList)
 
 
 @model_records_router.get(
