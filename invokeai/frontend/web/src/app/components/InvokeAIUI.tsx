@@ -9,6 +9,9 @@ import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { store } from 'app/store/store';
 import { PartialAppConfig } from 'app/types/invokeai';
+import Loading from 'common/components/Loading/Loading';
+import AppDndContext from 'features/dnd/components/AppDndContext';
+import 'i18n';
 import React, {
   PropsWithChildren,
   ReactNode,
@@ -19,9 +22,6 @@ import React, {
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { ManagerOptions, SocketOptions } from 'socket.io-client';
-import Loading from 'common/components/Loading/Loading';
-import AppDndContext from 'features/dnd/components/AppDndContext';
-import 'i18n';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
