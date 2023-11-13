@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/layout';
 import { Portal } from '@chakra-ui/portal';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { RefObject, memo } from 'react';
+import { RefObject, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { ImperativePanelHandle } from 'react-resizable-panels';
@@ -17,9 +17,9 @@ const FloatingGalleryButton = ({
 }: Props) => {
   const { t } = useTranslation();
 
-  const handleShowGallery = () => {
+  const handleShowGallery = useCallback(() => {
     galleryPanelRef.current?.expand();
-  };
+  }, [galleryPanelRef]);
 
   if (!isGalleryCollapsed) {
     return null;

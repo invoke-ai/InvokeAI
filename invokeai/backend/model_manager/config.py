@@ -114,8 +114,10 @@ class ModelConfigBase(BaseModel):
     current_hash: Optional[str] = Field(
         description="current fasthash of model contents", default=None
     )  # if model is converted or otherwise modified, this will hold updated hash
-    description: Optional[str] = Field(None)
-    source: Optional[str] = Field(description="Model download source (URL or repo_id)", default=None)
+    description: Optional[str] = Field(default=None)
+    source: Optional[str] = Field(
+        description="Model download source (URL or repo_id)", default=None
+    )
 
     model_config = ConfigDict(
         use_enum_values=False,
@@ -249,12 +251,19 @@ class T2IConfig(ModelConfigBase):
     format: Literal[ModelFormat.Diffusers]
 
 
-_ONNXConfig = Annotated[Union[ONNXSD1Config, ONNXSD2Config], Field(discriminator="base")]
-_ControlNetConfig = Annotated[
-    Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig], Field(discriminator="format")
+_ONNXConfig = Annotated[
+    Union[ONNXSD1Config, ONNXSD2Config], Field(discriminator="base")
 ]
-_VaeConfig = Annotated[Union[VaeDiffusersConfig, VaeCheckpointConfig], Field(discriminator="format")]
-_MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], Field(discriminator="format")]
+_ControlNetConfig = Annotated[
+    Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig],
+    Field(discriminator="format"),
+]
+_VaeConfig = Annotated[
+    Union[VaeDiffusersConfig, VaeCheckpointConfig], Field(discriminator="format")
+]
+_MainModelConfig = Annotated[
+    Union[MainDiffusersConfig, MainCheckpointConfig], Field(discriminator="format")
+]
 
 AnyModelConfig = Union[
     _MainModelConfig,

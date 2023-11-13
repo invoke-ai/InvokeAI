@@ -88,7 +88,7 @@ class Txt2Mask(object):
         provided image and returns a SegmentedGrayscale object in which the brighter
         pixels indicate where the object is inferred to be.
         """
-        if type(image) is str:
+        if isinstance(image, str):
             image = Image.open(image).convert("RGB")
 
         image = ImageOps.exif_transpose(image)

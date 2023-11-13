@@ -7,9 +7,16 @@ from omegaconf import DictConfig, OmegaConf
 from pydantic import TypeAdapter
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceSQL
+from invokeai.app.services.model_records import (
+    DuplicateModelException,
+    ModelRecordServiceSQL,
+)
 from invokeai.app.services.shared.sqlite import SqliteDatabase
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType
+from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
+    BaseModelType,
+    ModelType,
+)
 from invokeai.backend.model_manager.hash import FastModelHash
 from invokeai.backend.util.logging import InvokeAILogger
 

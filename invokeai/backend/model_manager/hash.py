@@ -49,7 +49,7 @@ class FastModelHash(object):
     def _hash_dir(cls, model_location: Union[str, Path]) -> str:
         components: Dict[str, str] = {}
 
-        for root, dirs, files in os.walk(model_location):
+        for root, _dirs, files in os.walk(model_location):
             for file in files:
                 # only tally tensor files because diffusers config files change slightly
                 # depending on how the model was downloaded/converted.
@@ -61,6 +61,6 @@ class FastModelHash(object):
 
         # hash all the model hashes together, using alphabetic file order
         md5 = hashlib.md5()
-        for path, fast_hash in sorted(components.items()):
+        for _path, fast_hash in sorted(components.items()):
             md5.update(fast_hash.encode("utf-8"))
         return md5.hexdigest()

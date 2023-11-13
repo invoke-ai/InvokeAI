@@ -146,16 +146,15 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [inputRef]);
 
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Bail out if user hits spacebar - do not open the uploader
+    if (e.key === ' ') {
+      return;
+    }
+  }, []);
+
   return (
-    <Box
-      {...getRootProps({ style: {} })}
-      onKeyDown={(e: KeyboardEvent) => {
-        // Bail out if user hits spacebar - do not open the uploader
-        if (e.key === ' ') {
-          return;
-        }
-      }}
-    >
+    <Box {...getRootProps({ style: {} })} onKeyDown={handleKeyDown}>
       <input {...getInputProps()} />
       {children}
       <AnimatePresence>

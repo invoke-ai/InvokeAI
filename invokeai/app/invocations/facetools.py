@@ -131,7 +131,7 @@ def prepare_faces_list(
     deduped_faces: list[FaceResultData] = []
 
     if len(face_result_list) == 0:
-        return list()
+        return []
 
     for candidate in face_result_list:
         should_add = True
@@ -210,7 +210,7 @@ def generate_face_box_mask(
     # Check if any face is detected.
     if results.multi_face_landmarks:  # type: ignore # this are via protobuf and not typed
         # Search for the face_id in the detected faces.
-        for face_id, face_landmarks in enumerate(results.multi_face_landmarks):  # type: ignore #this are via protobuf and not typed
+        for _face_id, face_landmarks in enumerate(results.multi_face_landmarks):  # type: ignore #this are via protobuf and not typed
             # Get the bounding box of the face mesh.
             x_coordinates = [landmark.x for landmark in face_landmarks.landmark]
             y_coordinates = [landmark.y for landmark in face_landmarks.landmark]

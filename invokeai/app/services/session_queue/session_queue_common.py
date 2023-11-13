@@ -129,12 +129,12 @@ class Batch(BaseModel):
         return v
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "graph",
                 "runs",
             ]
-        )
+        }
     )
 
 
@@ -191,8 +191,8 @@ class SessionQueueItemWithoutGraph(BaseModel):
         return SessionQueueItemDTO(**queue_item_dict)
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "item_id",
                 "status",
                 "batch_id",
@@ -203,7 +203,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
                 "created_at",
                 "updated_at",
             ]
-        )
+        }
     )
 
 
@@ -222,8 +222,8 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
         return SessionQueueItem(**queue_item_dict)
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "item_id",
                 "status",
                 "batch_id",
@@ -235,7 +235,7 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
                 "created_at",
                 "updated_at",
             ]
-        )
+        }
     )
 
 
@@ -355,7 +355,7 @@ def create_session_nfv_tuples(
                 for item in batch_datum.items
             ]
             node_field_values_to_zip.append(node_field_values)
-        data.append(list(zip(*node_field_values_to_zip)))  # type: ignore [arg-type]
+        data.append(list(zip(*node_field_values_to_zip, strict=True)))  # type: ignore [arg-type]
 
     # create generator to yield session,nfv tuples
     count = 0
@@ -383,7 +383,7 @@ def calc_session_count(batch: Batch) -> int:
         for batch_datum in batch_datum_list:
             batch_data_items = range(len(batch_datum.items))
             to_zip.append(batch_data_items)
-        data.append(list(zip(*to_zip)))
+        data.append(list(zip(*to_zip, strict=True)))
     data_product = list(product(*data))
     return len(data_product) * batch.runs
 

@@ -52,16 +52,16 @@ def test_type(store: ModelRecordServiceBase):
 
 
 def test_add(store: ModelRecordServiceBase):
-    raw = dict(
-        path="/tmp/foo.ckpt",
-        name="model1",
-        base=BaseModelType("sd-1"),
-        type="main",
-        config="/tmp/foo.yaml",
-        variant="normal",
-        format="checkpoint",
-        original_hash="111222333444",
-    )
+    raw = {
+        "path": "/tmp/foo.ckpt",
+        "name": "model1",
+        "base": BaseModelType("sd-1"),
+        "type": "main",
+        "config": "/tmp/foo.yaml",
+        "variant": "normal",
+        "format": "checkpoint",
+        "original_hash": "111222333444",
+    }
     store.add_model("key1", raw)
     config1 = store.get_model("key1")
     assert config1 is not None
@@ -159,9 +159,9 @@ def test_filter(store: ModelRecordServiceBase):
     assert len(matches) == 1
     assert matches[0].name == "config3"
     assert matches[0].key == sha256("config3".encode("utf-8")).hexdigest()
-    assert isinstance(matches[0].type, ModelType)  # This tests that we get proper enums back
-
-    matches = store.search_by_attr(model_type=BaseModelType("sd-2"))
+    assert isinstance(
+        matches[0].type, ModelType
+    )  # This tests that we get proper enums back
 
     matches = store.search_by_hash("CONFIG1HASH")
     assert len(matches) == 1
@@ -170,7 +170,8 @@ def test_filter(store: ModelRecordServiceBase):
     matches = store.all_models()
     assert len(matches) == 3
 
-def test_unique(store:  ModelRecordServiceBase):
+
+def test_unique(store: ModelRecordServiceBase):
     config1 = MainDiffusersConfig(
         path="/tmp/config1",
         base=BaseModelType("sd-1"),

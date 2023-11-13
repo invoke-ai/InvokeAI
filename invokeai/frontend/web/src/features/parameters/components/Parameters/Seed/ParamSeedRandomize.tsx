@@ -1,4 +1,4 @@
-import { ChangeEvent, memo } from 'react';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setShouldRandomizeSeed } from 'features/parameters/store/generationSlice';
@@ -13,8 +13,11 @@ const ParamSeedRandomize = () => {
     (state: RootState) => state.generation.shouldRandomizeSeed
   );
 
-  const handleChangeShouldRandomizeSeed = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldRandomizeSeed(e.target.checked));
+  const handleChangeShouldRandomizeSeed = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldRandomizeSeed(e.target.checked)),
+    [dispatch]
+  );
 
   return (
     <IAISwitch

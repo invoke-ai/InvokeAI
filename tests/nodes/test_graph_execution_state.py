@@ -150,8 +150,8 @@ def test_graph_state_expands_iterator(mock_services):
         invoke_next(g, mock_services)
 
     prepared_add_nodes = g.source_prepared_mapping["3"]
-    results = set([g.results[n].value for n in prepared_add_nodes])
-    expected = set([1, 11, 21])
+    results = {g.results[n].value for n in prepared_add_nodes}
+    expected = {1, 11, 21}
     assert results == expected
 
 
@@ -230,7 +230,7 @@ def test_graph_executes_depth_first(mock_services):
     # Because ordering is not guaranteed, we cannot compare results directly.
     # Instead, we must count the number of results.
     def get_completed_count(g, id):
-        ids = [i for i in g.source_prepared_mapping[id]]
+        ids = list(g.source_prepared_mapping[id])
         completed_ids = [i for i in g.executed if i in ids]
         return len(completed_ids)
 

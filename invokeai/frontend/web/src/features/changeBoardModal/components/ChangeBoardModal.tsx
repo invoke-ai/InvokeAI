@@ -87,6 +87,11 @@ const ChangeBoardModal = () => {
     selectedBoard,
   ]);
 
+  const handleSetSelectedBoard = useCallback(
+    (v: string | null) => setSelectedBoard(v),
+    []
+  );
+
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   return (
@@ -113,7 +118,7 @@ const ChangeBoardModal = () => {
                   isFetching ? t('boards.loading') : t('boards.selectBoard')
                 }
                 disabled={isFetching}
-                onChange={(v) => setSelectedBoard(v)}
+                onChange={handleSetSelectedBoard}
                 value={selectedBoard}
                 data={data}
               />

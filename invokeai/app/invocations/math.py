@@ -145,17 +145,17 @@ INTEGER_OPERATIONS = Literal[
 ]
 
 
-INTEGER_OPERATIONS_LABELS = dict(
-    ADD="Add A+B",
-    SUB="Subtract A-B",
-    MUL="Multiply A*B",
-    DIV="Divide A/B",
-    EXP="Exponentiate A^B",
-    MOD="Modulus A%B",
-    ABS="Absolute Value of A",
-    MIN="Minimum(A,B)",
-    MAX="Maximum(A,B)",
-)
+INTEGER_OPERATIONS_LABELS = {
+    "ADD": "Add A+B",
+    "SUB": "Subtract A-B",
+    "MUL": "Multiply A*B",
+    "DIV": "Divide A/B",
+    "EXP": "Exponentiate A^B",
+    "MOD": "Modulus A%B",
+    "ABS": "Absolute Value of A",
+    "MIN": "Minimum(A,B)",
+    "MAX": "Maximum(A,B)",
+}
 
 
 @invocation(
@@ -231,17 +231,17 @@ FLOAT_OPERATIONS = Literal[
 ]
 
 
-FLOAT_OPERATIONS_LABELS = dict(
-    ADD="Add A+B",
-    SUB="Subtract A-B",
-    MUL="Multiply A*B",
-    DIV="Divide A/B",
-    EXP="Exponentiate A^B",
-    ABS="Absolute Value of A",
-    SQRT="Square Root of A",
-    MIN="Minimum(A,B)",
-    MAX="Maximum(A,B)",
-)
+FLOAT_OPERATIONS_LABELS = {
+    "ADD": "Add A+B",
+    "SUB": "Subtract A-B",
+    "MUL": "Multiply A*B",
+    "DIV": "Divide A/B",
+    "EXP": "Exponentiate A^B",
+    "ABS": "Absolute Value of A",
+    "SQRT": "Square Root of A",
+    "MIN": "Minimum(A,B)",
+    "MAX": "Maximum(A,B)",
+}
 
 
 @invocation(
@@ -266,7 +266,7 @@ class FloatMathInvocation(BaseInvocation):
             raise ValueError("Cannot divide by zero")
         elif info.data["operation"] == "EXP" and info.data["a"] == 0 and v < 0:
             raise ValueError("Cannot raise zero to a negative power")
-        elif info.data["operation"] == "EXP" and type(info.data["a"] ** v) is complex:
+        elif info.data["operation"] == "EXP" and isinstance(info.data["a"] ** v, complex):
             raise ValueError("Root operation resulted in a complex number")
         return v
 

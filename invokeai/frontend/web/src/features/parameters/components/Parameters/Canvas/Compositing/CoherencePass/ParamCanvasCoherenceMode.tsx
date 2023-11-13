@@ -6,7 +6,7 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
 import { CanvasCoherenceModeParam } from 'features/parameters/types/parameterSchemas';
 
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const coherenceModeSelectData: IAISelectDataType[] = [
@@ -22,13 +22,16 @@ const ParamCanvasCoherenceMode = () => {
   );
   const { t } = useTranslation();
 
-  const handleCoherenceModeChange = (v: string | null) => {
-    if (!v) {
-      return;
-    }
+  const handleCoherenceModeChange = useCallback(
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
 
-    dispatch(setCanvasCoherenceMode(v as CanvasCoherenceModeParam));
-  };
+      dispatch(setCanvasCoherenceMode(v as CanvasCoherenceModeParam));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIInformationalPopover feature="compositingCoherenceMode">

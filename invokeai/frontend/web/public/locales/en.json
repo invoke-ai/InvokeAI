@@ -583,6 +583,7 @@
         "strength": "Image to image strength",
         "Threshold": "Noise Threshold",
         "variations": "Seed-weight pairs",
+        "vae": "VAE", 
         "width": "Width",
         "workflow": "Workflow"
     },
