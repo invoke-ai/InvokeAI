@@ -8,7 +8,6 @@ from invokeai.app.services.shared.pagination import PaginatedResults
 T = TypeVar("T", bound=BaseModel)
 
 
-
 class ItemStorageABC(ABC, Generic[T]):
     """Provides storage for a single type of item. The type must be a Pydantic model."""
 
