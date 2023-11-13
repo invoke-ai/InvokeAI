@@ -114,7 +114,7 @@ class ModelConfigBase(BaseModel):
     current_hash: Optional[str] = Field(
         description="current fasthash of model contents", default=None
     )  # if model is converted or otherwise modified, this will hold updated hash
-    description: Optional[str] = Field(None)
+    description: Optional[str] = Field(default=None)
     source: Optional[str] = Field(description="Model download source (URL or repo_id)", default=None)
 
     model_config = ConfigDict(
