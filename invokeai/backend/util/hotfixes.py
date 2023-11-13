@@ -748,7 +748,7 @@ class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalControlnetMixin):
 
             scales = scales * conditioning_scale
             down_block_res_samples = [
-                sample * scale for sample, scale in zip(down_block_res_samples, scales, strict=True)
+                sample * scale for sample, scale in zip(down_block_res_samples, scales, strict=False)
             ]
             mid_block_res_sample = mid_block_res_sample * scales[-1]  # last one
         else:
