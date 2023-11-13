@@ -8,7 +8,14 @@ import {
   forwardRef,
   useDisclosure,
 } from '@chakra-ui/react';
-import { cloneElement, memo, ReactElement, ReactNode, useRef } from 'react';
+import {
+  cloneElement,
+  memo,
+  ReactElement,
+  ReactNode,
+  useCallback,
+  useRef,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import IAIButton from './IAIButton';
 
@@ -38,15 +45,15 @@ const IAIAlertDialog = forwardRef((props: Props, ref) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleAccept = () => {
+  const handleAccept = useCallback(() => {
     acceptCallback();
     onClose();
-  };
+  }, [acceptCallback, onClose]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     cancelCallback && cancelCallback();
     onClose();
-  };
+  }, [cancelCallback, onClose]);
 
   return (
     <>

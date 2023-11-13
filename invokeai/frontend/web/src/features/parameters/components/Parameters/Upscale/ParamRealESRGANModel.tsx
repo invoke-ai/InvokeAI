@@ -7,6 +7,7 @@ import {
   ESRGANModelName,
   esrganModelNameChanged,
 } from 'features/parameters/store/postprocessingSlice';
+import { useCallback } from 'react';
 
 export const ESRGAN_MODEL_NAMES: SelectItem[] = [
   {
@@ -42,8 +43,10 @@ export default function ParamESRGANModel() {
 
   const dispatch = useAppDispatch();
 
-  const handleChange = (v: string) =>
-    dispatch(esrganModelNameChanged(v as ESRGANModelName));
+  const handleChange = useCallback(
+    (v: string) => dispatch(esrganModelNameChanged(v as ESRGANModelName)),
+    [dispatch]
+  );
 
   return (
     <IAIMantineSelect

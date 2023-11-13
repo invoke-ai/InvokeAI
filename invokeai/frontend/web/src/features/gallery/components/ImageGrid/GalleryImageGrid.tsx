@@ -20,6 +20,7 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
+import { EntityId } from '@reduxjs/toolkit';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -70,6 +71,13 @@ const GalleryImageGrid = () => {
       limit: IMAGE_LIMIT,
     });
   }, [areMoreAvailable, listImages, queryArgs, currentData?.ids.length]);
+
+  const itemContentFunc = useCallback(
+    (index: number, imageName: EntityId) => (
+      <GalleryImage key={imageName} imageName={imageName as string} />
+    ),
+    []
+  );
 
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
@@ -131,9 +139,7 @@ const GalleryImageGrid = () => {
               List: ImageGridListContainer,
             }}
             scrollerRef={setScroller}
-            itemContent={(index, imageName) => (
-              <GalleryImage key={imageName} imageName={imageName as string} />
-            )}
+            itemContent={itemContentFunc}
           />
         </Box>
         <IAIButton

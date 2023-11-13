@@ -20,7 +20,8 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { isEqual } from 'lodash-es';
-import { memo } from 'react';
+import { ChangeEvent, memo, useCallback } from 'react';
+import { RgbaColor } from 'react-colorful';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -95,18 +96,35 @@ const IAICanvasMaskOptions = () => {
     [isMaskEnabled]
   );
 
-  const handleToggleMaskLayer = () => {
+  const handleToggleMaskLayer = useCallback(() => {
     dispatch(setLayer(layer === 'mask' ? 'base' : 'mask'));
-  };
+  }, [dispatch, layer]);
 
-  const handleClearMask = () => dispatch(clearMask());
+  const handleClearMask = useCallback(() => {
+    dispatch(clearMask());
+  }, [dispatch]);
 
-  const handleToggleEnableMask = () =>
+  const handleToggleEnableMask = useCallback(() => {
     dispatch(setIsMaskEnabled(!isMaskEnabled));
+  }, [dispatch, isMaskEnabled]);
 
-  const handleSaveMask = async () => {
+  const handleSaveMask = useCallback(async () => {
     dispatch(canvasMaskSavedToGallery());
-  };
+  }, [dispatch]);
+
+  const handleChangePreserveMaskedArea = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldPreserveMaskedArea(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangeMaskColor = useCallback(
+    (newColor: RgbaColor) => {
+      dispatch(setMaskColor(newColor));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIPopover
@@ -131,15 +149,10 @@ const IAICanvasMaskOptions = () => {
         <IAISimpleCheckbox
           label={t('unifiedCanvas.preserveMaskedArea')}
           isChecked={shouldPreserveMaskedArea}
-          onChange={(e) =>
-            dispatch(setShouldPreserveMaskedArea(e.target.checked))
-          }
+          onChange={handleChangePreserveMaskedArea}
         />
         <Box sx={{ paddingTop: 2, paddingBottom: 2 }}>
-          <IAIColorPicker
-            color={maskColor}
-            onChange={(newColor) => dispatch(setMaskColor(newColor))}
-          />
+          <IAIColorPicker color={maskColor} onChange={handleChangeMaskColor} />
         </Box>
         <IAIButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
           Save Mask

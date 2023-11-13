@@ -35,6 +35,34 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
     e.preventDefault();
   }, []);
 
+  const renderMenuFunc = useCallback(() => {
+    if (!imageDTO) {
+      return null;
+    }
+
+    if (selectionCount > 1) {
+      return (
+        <MenuList
+          sx={{ visibility: 'visible !important' }}
+          motionProps={menuListMotionProps}
+          onContextMenu={skipEvent}
+        >
+          <MultipleSelectionMenuItems />
+        </MenuList>
+      );
+    }
+
+    return (
+      <MenuList
+        sx={{ visibility: 'visible !important' }}
+        motionProps={menuListMotionProps}
+        onContextMenu={skipEvent}
+      >
+        <SingleSelectionMenuItems imageDTO={imageDTO} />
+      </MenuList>
+    );
+  }, [imageDTO, selectionCount, skipEvent]);
+
   return (
     <IAIContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
@@ -42,33 +70,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
         bg: 'transparent',
         _hover: { bg: 'transparent' },
       }}
-      renderMenu={() => {
-        if (!imageDTO) {
-          return null;
-        }
-
-        if (selectionCount > 1) {
-          return (
-            <MenuList
-              sx={{ visibility: 'visible !important' }}
-              motionProps={menuListMotionProps}
-              onContextMenu={skipEvent}
-            >
-              <MultipleSelectionMenuItems />
-            </MenuList>
-          );
-        }
-
-        return (
-          <MenuList
-            sx={{ visibility: 'visible !important' }}
-            motionProps={menuListMotionProps}
-            onContextMenu={skipEvent}
-          >
-            <SingleSelectionMenuItems imageDTO={imageDTO} />
-          </MenuList>
-        );
-      }}
+      renderMenu={renderMenuFunc}
     >
       {children}
     </IAIContextMenu>

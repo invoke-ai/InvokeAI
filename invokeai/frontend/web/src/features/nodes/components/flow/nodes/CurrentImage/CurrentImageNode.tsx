@@ -1,4 +1,4 @@
-import { useState, PropsWithChildren, memo } from 'react';
+import { useState, PropsWithChildren, memo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { Flex, Image, Text } from '@chakra-ui/react';
@@ -59,13 +59,13 @@ export default memo(CurrentImageNode);
 const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
   const [isHovering, setIsHovering] = useState(false);
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = useCallback(() => {
     setIsHovering(true);
-  };
+  }, []);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setIsHovering(false);
-  };
+  }, []);
 
   return (
     <NodeWrapper
