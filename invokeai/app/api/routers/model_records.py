@@ -42,15 +42,12 @@ async def list_model_records(
     """Get a list of models."""
     record_store = ApiDependencies.invoker.services.model_records
     if base_models and len(base_models) > 0:
-        models_raw = []
+        found_models: list[AnyModelConfig] = []
         for base_model in base_models:
-            models_raw.extend(
-                [x.model_dump() for x in record_store.search_by_attr(base_model=base_model, model_type=model_type)]
-            )
+            found_models.extend(record_store.search_by_attr(base_model=base_model, model_type=model_type))
     else:
-        models_raw = [x.model_dump() for x in record_store.search_by_attr(model_type=model_type)]
-    models = ModelsListValidator.validate_python({"models": models_raw})
-    return models
+        found_models = record_store.search_by_attr(model_type=model_type)
+    return ModelsList(models=found_models)
 
 
 @model_records_router.get(
