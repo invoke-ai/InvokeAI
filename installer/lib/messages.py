@@ -137,7 +137,7 @@ def dest_path(dest=None) -> Path:
         path_completer = PathCompleter(
             only_directories=True,
             expanduser=True,
-            get_paths=lambda: [browse_start],  # noqa: B023
+            get_paths=lambda: [browse_start],
             # get_paths=lambda: [".."].extend(list(browse_start.iterdir()))
         )
 
