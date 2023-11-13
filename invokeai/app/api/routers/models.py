@@ -1,6 +1,5 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654), 2023 Kent Keirsey (https://github.com/hipsterusername), 2023 Lincoln D. Stein
 
-
 import pathlib
 from typing import Annotated, List, Literal, Optional, Union
 
