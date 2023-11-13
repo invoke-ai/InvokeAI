@@ -25,7 +25,7 @@ import {
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
+import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { isEqual } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
