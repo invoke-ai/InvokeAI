@@ -88,6 +88,7 @@ async def update_model_record(
     record_store = ApiDependencies.invoker.services.model_records
     try:
         model_response = record_store.update_model(key, config=info)
+        logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
