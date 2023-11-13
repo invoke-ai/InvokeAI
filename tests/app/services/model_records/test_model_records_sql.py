@@ -52,16 +52,16 @@ def test_type(store: ModelRecordServiceBase):
 
 
 def test_add(store: ModelRecordServiceBase):
-    raw = dict(
-        path="/tmp/foo.ckpt",
-        name="model1",
-        base=BaseModelType("sd-1"),
-        type="main",
-        config="/tmp/foo.yaml",
-        variant="normal",
-        format="checkpoint",
-        original_hash="111222333444",
-    )
+    raw = {
+        "path": "/tmp/foo.ckpt",
+        "name": "model1",
+        "base": BaseModelType("sd-1"),
+        "type": "main",
+        "config": "/tmp/foo.yaml",
+        "variant": "normal",
+        "format": "checkpoint",
+        "original_hash": "111222333444",
+    }
     store.add_model("key1", raw)
     config1 = store.get_model("key1")
     assert config1 is not None
