@@ -60,6 +60,13 @@ const BoardAutoAddSelect = () => {
     [dispatch]
   );
 
+  const filterFunc = useCallback(
+    (value: string, item: SelectItem) =>
+      item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
+      item.value.toLowerCase().includes(value.toLowerCase().trim()),
+    []
+  );
+
   return (
     <IAIMantineSearchableSelect
       label={t('boards.autoAddBoard')}
@@ -71,10 +78,7 @@ const BoardAutoAddSelect = () => {
       nothingFound={t('boards.noMatching')}
       itemComponent={IAIMantineSelectItemWithTooltip}
       disabled={!hasBoards || autoAssignBoardOnClick}
-      filter={(value, item: SelectItem) =>
-        item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
-        item.value.toLowerCase().includes(value.toLowerCase().trim())
-      }
+      filter={filterFunc}
       onChange={handleChange}
     />
   );

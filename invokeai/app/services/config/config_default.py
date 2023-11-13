@@ -188,18 +188,18 @@ DEFAULT_MAX_VRAM = 0.5
 
 
 class Categories(object):
-    WebServer = dict(category="Web Server")
-    Features = dict(category="Features")
-    Paths = dict(category="Paths")
-    Logging = dict(category="Logging")
-    Development = dict(category="Development")
-    Other = dict(category="Other")
-    ModelCache = dict(category="Model Cache")
-    Device = dict(category="Device")
-    Generation = dict(category="Generation")
-    Queue = dict(category="Queue")
-    Nodes = dict(category="Nodes")
-    MemoryPerformance = dict(category="Memory/Performance")
+    WebServer = {"category": "Web Server"}
+    Features = {"category": "Features"}
+    Paths = {"category": "Paths"}
+    Logging = {"category": "Logging"}
+    Development = {"category": "Development"}
+    Other = {"category": "Other"}
+    ModelCache = {"category": "Model Cache"}
+    Device = {"category": "Device"}
+    Generation = {"category": "Generation"}
+    Queue = {"category": "Queue"}
+    Nodes = {"category": "Nodes"}
+    MemoryPerformance = {"category": "Memory/Performance"}
 
 
 class InvokeAIAppConfig(InvokeAISettings):
@@ -482,7 +482,7 @@ def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ["INVOKEAI_ROOT"])
-    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
+    elif any((venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]):
         root = (venv.parent).resolve()
     else:
         root = Path("~/invokeai").expanduser().resolve()

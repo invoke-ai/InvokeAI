@@ -112,7 +112,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             )
             result = self._cursor.fetchall()
 
-            items = list(map(lambda r: self._parse_item(r[0]), result))
+            items = [self._parse_item(r[0]) for r in result]
 
             self._cursor.execute(f"""SELECT count(*) FROM {self._table_name};""")
             count = self._cursor.fetchone()[0]
@@ -132,7 +132,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             )
             result = self._cursor.fetchall()
 
-            items = list(map(lambda r: self._parse_item(r[0]), result))
+            items = [self._parse_item(r[0]) for r in result]
 
             self._cursor.execute(
                 f"""SELECT count(*) FROM {self._table_name} WHERE item LIKE ?;""",

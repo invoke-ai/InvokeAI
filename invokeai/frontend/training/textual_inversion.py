@@ -276,13 +276,13 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
     def get_model_names(self) -> Tuple[List[str], int]:
         conf = OmegaConf.load(config.root_dir / "configs/models.yaml")
-        model_names = [idx for idx in sorted(list(conf.keys())) if conf[idx].get("format", None) == "diffusers"]
+        model_names = [idx for idx in sorted(conf.keys()) if conf[idx].get("format", None) == "diffusers"]
         defaults = [idx for idx in range(len(model_names)) if "default" in conf[model_names[idx]]]
         default = defaults[0] if len(defaults) > 0 else 0
         return (model_names, default)
 
     def marshall_arguments(self) -> dict:
-        args = dict()
+        args = {}
 
         # the choices
         args.update(

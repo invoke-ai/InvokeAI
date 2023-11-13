@@ -6,7 +6,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { memo, MouseEvent } from 'react';
+import { memo, MouseEvent, useCallback } from 'react';
 import IAIOption from './IAIOption';
 
 type IAISelectProps = SelectProps & {
@@ -33,15 +33,16 @@ const IAISelect = (props: IAISelectProps) => {
     spaceEvenly,
     ...rest
   } = props;
+  const handleClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    e.nativeEvent.stopPropagation();
+    e.nativeEvent.cancelBubble = true;
+  }, []);
   return (
     <FormControl
       isDisabled={isDisabled}
-      onClick={(e: MouseEvent<HTMLDivElement>) => {
-        e.stopPropagation();
-        e.nativeEvent.stopImmediatePropagation();
-        e.nativeEvent.stopPropagation();
-        e.nativeEvent.cancelBubble = true;
-      }}
+      onClick={handleClick}
       sx={
         horizontal
           ? {

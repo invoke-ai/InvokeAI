@@ -6,7 +6,7 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -36,23 +36,26 @@ const ParamScaledWidth = () => {
 
   const { t } = useTranslation();
 
-  const handleChangeScaledWidth = (v: number) => {
-    const newWidth = Math.floor(v);
-    let newHeight = scaledBoundingBoxDimensions.height;
+  const handleChangeScaledWidth = useCallback(
+    (v: number) => {
+      const newWidth = Math.floor(v);
+      let newHeight = scaledBoundingBoxDimensions.height;
 
-    if (aspectRatio) {
-      newHeight = roundToMultiple(newWidth / aspectRatio, 64);
-    }
+      if (aspectRatio) {
+        newHeight = roundToMultiple(newWidth / aspectRatio, 64);
+      }
 
-    dispatch(
-      setScaledBoundingBoxDimensions({
-        width: newWidth,
-        height: newHeight,
-      })
-    );
-  };
+      dispatch(
+        setScaledBoundingBoxDimensions({
+          width: newWidth,
+          height: newHeight,
+        })
+      );
+    },
+    [aspectRatio, dispatch, scaledBoundingBoxDimensions.height]
+  );
 
-  const handleResetScaledWidth = () => {
+  const handleResetScaledWidth = useCallback(() => {
     const resetWidth = Math.floor(initial);
     let resetHeight = scaledBoundingBoxDimensions.height;
 
@@ -66,7 +69,7 @@ const ParamScaledWidth = () => {
         height: resetHeight,
       })
     );
-  };
+  }, [aspectRatio, dispatch, initial, scaledBoundingBoxDimensions.height]);
 
   return (
     <IAISlider

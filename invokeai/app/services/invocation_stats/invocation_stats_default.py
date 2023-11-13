@@ -122,7 +122,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
     def log_stats(self):
         completed = set()
         errored = set()
-        for graph_id, node_log in self._stats.items():
+        for graph_id, _node_log in self._stats.items():
             try:
                 current_graph_state = self._invoker.services.graph_execution_manager.get(graph_id)
             except Exception:
@@ -142,7 +142,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             cache_stats = self._cache_stats[graph_id]
             hwm = cache_stats.high_watermark / GIG
             tot = cache_stats.cache_size / GIG
-            loaded = sum([v for v in cache_stats.loaded_model_sizes.values()]) / GIG
+            loaded = sum(list(cache_stats.loaded_model_sizes.values())) / GIG
 
             logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
             logger.info("RAM used by InvokeAI process: " + "%4.2fG" % self.ram_used + f" ({self.ram_changed:+5.3f}G)")

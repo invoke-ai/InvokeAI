@@ -6,7 +6,7 @@ import IAISlider from 'common/components/IAISlider';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
@@ -36,25 +36,28 @@ const ParamBoundingBoxWidth = () => {
     ? 1024
     : 512;
 
-  const handleChangeHeight = (v: number) => {
-    dispatch(
-      setBoundingBoxDimensions({
-        ...boundingBoxDimensions,
-        height: Math.floor(v),
-      })
-    );
-    if (aspectRatio) {
-      const newWidth = roundToMultiple(v * aspectRatio, 64);
+  const handleChangeHeight = useCallback(
+    (v: number) => {
       dispatch(
         setBoundingBoxDimensions({
-          width: newWidth,
+          ...boundingBoxDimensions,
           height: Math.floor(v),
         })
       );
-    }
-  };
+      if (aspectRatio) {
+        const newWidth = roundToMultiple(v * aspectRatio, 64);
+        dispatch(
+          setBoundingBoxDimensions({
+            width: newWidth,
+            height: Math.floor(v),
+          })
+        );
+      }
+    },
+    [aspectRatio, boundingBoxDimensions, dispatch]
+  );
 
-  const handleResetHeight = () => {
+  const handleResetHeight = useCallback(() => {
     dispatch(
       setBoundingBoxDimensions({
         ...boundingBoxDimensions,
@@ -70,7 +73,7 @@ const ParamBoundingBoxWidth = () => {
         })
       );
     }
-  };
+  }, [aspectRatio, boundingBoxDimensions, dispatch, initial]);
 
   return (
     <IAISlider

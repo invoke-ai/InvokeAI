@@ -3,6 +3,7 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { setSeed } from 'features/parameters/store/generationSlice';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function ParamSeed() {
@@ -18,7 +19,10 @@ export default function ParamSeed() {
 
   const dispatch = useAppDispatch();
 
-  const handleChangeSeed = (v: number) => dispatch(setSeed(v));
+  const handleChangeSeed = useCallback(
+    (v: number) => dispatch(setSeed(v)),
+    [dispatch]
+  );
 
   return (
     <IAINumberInput

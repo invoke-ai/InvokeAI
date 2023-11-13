@@ -29,7 +29,7 @@ def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
     # xc a list of captions to plot
     b = len(xc)
-    txts = list()
+    txts = []
     for bi in range(b):
         txt = Image.new("RGB", wh, color="white")
         draw = ImageDraw.Draw(txt)
@@ -93,7 +93,7 @@ def instantiate_from_config(config, **kwargs):
         elif config == "__is_unconditional__":
             return None
         raise KeyError("Expected key `target` to instantiate.")
-    return get_obj_from_str(config["target"])(**config.get("params", dict()), **kwargs)
+    return get_obj_from_str(config["target"])(**config.get("params", {}), **kwargs)
 
 
 def get_obj_from_str(string, reload=False):
@@ -231,11 +231,12 @@ def rand_perlin_2d(shape, res, device, fade=lambda t: 6 * t**5 - 15 * t**4 + 10 
     angles = 2 * math.pi * rand_val
     gradients = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1).to(device)
 
-    tile_grads = (
-        lambda slice1, slice2: gradients[slice1[0] : slice1[1], slice2[0] : slice2[1]]
-        .repeat_interleave(d[0], 0)
-        .repeat_interleave(d[1], 1)
-    )
+    def tile_grads(slice1, slice2):
+        return (
+            gradients[slice1[0] : slice1[1], slice2[0] : slice2[1]]
+            .repeat_interleave(d[0], 0)
+            .repeat_interleave(d[1], 1)
+        )
 
     def dot(grad, shift):
         return (
