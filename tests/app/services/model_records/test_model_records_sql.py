@@ -159,9 +159,7 @@ def test_filter(store: ModelRecordServiceBase):
     assert len(matches) == 1
     assert matches[0].name == "config3"
     assert matches[0].key == sha256("config3".encode("utf-8")).hexdigest()
-    assert isinstance(
-        matches[0].type, ModelType
-    )  # This tests that we get proper enums back
+    assert isinstance(matches[0].type, ModelType)  # This tests that we get proper enums back
 
     matches = store.search_by_hash("CONFIG1HASH")
     assert len(matches) == 1
