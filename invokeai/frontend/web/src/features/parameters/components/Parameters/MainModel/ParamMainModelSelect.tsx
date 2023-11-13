@@ -12,7 +12,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { modelSelected } from 'features/parameters/store/actions';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
-import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
+import SyncModelsButton from 'features/modelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach } from 'lodash-es';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
