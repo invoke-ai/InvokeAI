@@ -40,7 +40,7 @@ class InitImageResizer:
         (rw, rh) = (int(scale * im.width), int(scale * im.height))
 
         # round everything to multiples of 64
-        width, height, rw, rh = map(lambda x: x - x % 64, (width, height, rw, rh))
+        width, height, rw, rh = (x - x % 64 for x in (width, height, rw, rh))
 
         # no resize necessary, but return a copy
         if im.width == width and im.height == height:

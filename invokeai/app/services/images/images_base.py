@@ -21,8 +21,8 @@ class ImageServiceABC(ABC):
     _on_deleted_callbacks: list[Callable[[str], None]]
 
     def __init__(self) -> None:
-        self._on_changed_callbacks = list()
-        self._on_deleted_callbacks = list()
+        self._on_changed_callbacks = []
+        self._on_deleted_callbacks = []
 
     def on_changed(self, on_changed: Callable[[ImageDTO], None]) -> None:
         """Register a callback for when an image is changed"""

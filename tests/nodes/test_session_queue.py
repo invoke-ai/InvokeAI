@@ -169,7 +169,7 @@ def test_prepare_values_to_insert(batch_data_collection, batch_graph):
 
     NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])
     # should have 3 node field values
-    assert type(values[0].field_values) is str
+    assert isinstance(values[0].field_values, str)
     assert len(NodeFieldValueValidator.validate_json(values[0].field_values)) == 3
 
     # should have batch id and priority

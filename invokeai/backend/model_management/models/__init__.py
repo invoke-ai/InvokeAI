@@ -97,8 +97,8 @@ MODEL_CLASSES = {
     # },
 }
 
-MODEL_CONFIGS = list()
-OPENAPI_MODEL_CONFIGS = list()
+MODEL_CONFIGS = []
+OPENAPI_MODEL_CONFIGS = []
 
 
 class OpenAPIModelInfoBase(BaseModel):
@@ -109,7 +109,7 @@ class OpenAPIModelInfoBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-for base_model, models in MODEL_CLASSES.items():
+for _base_model, models in MODEL_CLASSES.items():
     for model_type, model_class in models.items():
         model_configs = set(model_class._get_configs().values())
         model_configs.discard(None)
@@ -133,7 +133,7 @@ for base_model, models in MODEL_CLASSES.items():
 
 
 def get_model_config_enums():
-    enums = list()
+    enums = []
 
     for model_config in MODEL_CONFIGS:
         if hasattr(inspect, "get_annotations"):

@@ -55,7 +55,7 @@ class InvokeAISettings(BaseSettings):
         """
         cls = self.__class__
         type = get_args(get_type_hints(cls)["type"])[0]
-        field_dict = dict({type: dict()})
+        field_dict = {type: {}}
         for name, field in self.model_fields.items():
             if name in cls._excluded_from_yaml():
                 continue
@@ -64,7 +64,7 @@ class InvokeAISettings(BaseSettings):
             )
             value = getattr(self, name)
             if category not in field_dict[type]:
-                field_dict[type][category] = dict()
+                field_dict[type][category] = {}
             # keep paths as strings to make it easier to read
             field_dict[type][category][name] = str(value) if isinstance(value, Path) else value
         conf = OmegaConf.create(field_dict)
@@ -89,7 +89,7 @@ class InvokeAISettings(BaseSettings):
         # create an upcase version of the environment in
         # order to achieve case-insensitive environment
         # variables (the way Windows does)
-        upcase_environ = dict()
+        upcase_environ = {}
         for key, value in os.environ.items():
             upcase_environ[key.upper()] = value
 

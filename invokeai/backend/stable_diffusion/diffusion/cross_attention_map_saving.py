@@ -56,7 +56,7 @@ class AttentionMapSaver:
 
         merged = None
 
-        for key, maps in self.collated_maps.items():
+        for _key, maps in self.collated_maps.items():
             # maps has shape [(H*W), N] for N tokens
             # but we want [N, H, W]
             this_scale_factor = math.sqrt(maps.shape[0] / (latents_width * latents_height))
