@@ -107,7 +107,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 config TEXT NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                -- unique constraint on combo of name, base and type
+                UNIQUE(name, base, type)
             );
             """
         )
@@ -200,6 +202,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 if "UNIQUE constraint failed" in str(e):
                     if "model_config.path" in str(e):
                         msg = f"A model with path '{record.path}' is already installed"
+                    elif "model_config.name" in str(e):
+                        msg = f"A model with name='{record.name}', type='{record.type}', base='{record.base}' is already installed"
                     else:
                         msg = f"A model with key '{key}' is already installed"
                     raise DuplicateModelException(msg) from e

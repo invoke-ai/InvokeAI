@@ -170,6 +170,44 @@ def test_filter(store: ModelRecordServiceBase):
     matches = store.all_models()
     assert len(matches) == 3
 
+def test_unique(store:  ModelRecordServiceBase):
+    config1 = MainDiffusersConfig(
+        path="/tmp/config1",
+        base=BaseModelType("sd-1"),
+        type=ModelType("main"),
+        name="nonuniquename",
+        original_hash="CONFIG1HASH",
+    )
+    config2 = MainDiffusersConfig(
+        path="/tmp/config2",
+        base=BaseModelType("sd-2"),
+        type=ModelType("main"),
+        name="nonuniquename",
+        original_hash="CONFIG1HASH",
+    )
+    config3 = VaeDiffusersConfig(
+        path="/tmp/config3",
+        base=BaseModelType("sd-2"),
+        type=ModelType("vae"),
+        name="nonuniquename",
+        original_hash="CONFIG1HASH",
+    )
+    config4 = MainDiffusersConfig(
+        path="/tmp/config4",
+        base=BaseModelType("sd-1"),
+        type=ModelType("main"),
+        name="nonuniquename",
+        original_hash="CONFIG1HASH",
+    )
+    # config1, config2 and config3 are compatible because they have unique combos
+    # of name, type and base
+    for c in config1, config2, config3:
+        store.add_model(sha256(c.path.encode("utf-8")).hexdigest(), c)
+
+    # config4 clashes with config1 and should raise an integrity error
+    with pytest.raises(DuplicateModelException):
+        store.add_model(sha256(c.path.encode("utf-8")).hexdigest(), config4)
+
 
 def test_filter_2(store: ModelRecordServiceBase):
     config1 = MainDiffusersConfig(
@@ -196,7 +234,7 @@ def test_filter_2(store: ModelRecordServiceBase):
     config4 = MainDiffusersConfig(
         path="/tmp/config4",
         name="dup_name1",
-        base=BaseModelType("sd-2"),
+        base=BaseModelType("sdxl"),
         type=ModelType("main"),
         original_hash="CONFIG3HASH",
     )

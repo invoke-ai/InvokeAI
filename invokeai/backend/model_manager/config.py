@@ -298,7 +298,7 @@ class ModelConfigFactory(object):
     @classmethod
     def make_config(
         cls,
-        model_data: Union[dict, ModelConfigBase],
+        model_data: Union[dict, AnyModelConfig],
         key: Optional[str] = None,
         dest_class: Optional[Type] = None,
     ) -> AnyModelConfig:
