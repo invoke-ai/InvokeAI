@@ -23,9 +23,9 @@ import modelmanagerReducer from 'features/modelManager/store/modelManagerSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
-import { rememberEnhancer, rememberReducer } from 'redux-remember';
+import { Driver, rememberEnhancer, rememberReducer } from 'redux-remember';
 import { api } from 'services/api';
-import { LOCALSTORAGE_PREFIX } from './constants';
+import { STORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
@@ -33,6 +33,7 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 import { $store } from './nanostores/store';
+import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 
 const allReducers = {
   canvas: canvasReducer,
@@ -74,16 +75,25 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'modelmanager',
 ];
 
+// Create a custom idb-keyval store (just needed to customize the name)
+export const idbKeyValStore = createIDBKeyValStore('invoke', 'invoke-store');
+
+// Create redux-remember driver, wrapping idb-keyval
+const idbKeyValDriver: Driver = {
+  getItem: (key) => get(key, idbKeyValStore),
+  setItem: (key, value) => set(key, value, idbKeyValStore),
+};
+
 export const store = configureStore({
   reducer: rememberedRootReducer,
   enhancers: (existingEnhancers) => {
     return existingEnhancers
       .concat(
-        rememberEnhancer(window.localStorage, rememberedKeys, {
+        rememberEnhancer(idbKeyValDriver, rememberedKeys, {
           persistDebounce: 300,
           serialize,
           unserialize,
-          prefix: LOCALSTORAGE_PREFIX,
+          prefix: STORAGE_PREFIX,
         })
       )
       .concat(autoBatchEnhancer());

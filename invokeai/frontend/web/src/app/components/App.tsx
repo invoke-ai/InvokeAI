@@ -20,6 +20,7 @@ import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
+import { useClearStorage } from 'common/hooks/useClearStorage';
 
 const DEFAULT_CONFIG = {};
 
@@ -36,12 +37,13 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
 
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
+  const clearStorage = useClearStorage();
 
   const handleReset = useCallback(() => {
-    localStorage.clear();
+    clearStorage();
     location.reload();
     return false;
-  }, []);
+  }, [clearStorage]);
 
   useEffect(() => {
     i18n.changeLanguage(language);

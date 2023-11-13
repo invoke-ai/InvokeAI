@@ -76,6 +76,7 @@
     "framer-motion": "^10.16.4",
     "i18next": "^23.6.0",
     "i18next-http-backend": "^2.3.1",
+    "idb-keyval": "^6.2.1",
     "konva": "^9.2.3",
     "lodash-es": "^4.17.21",
     "nanostores": "^0.9.4",
