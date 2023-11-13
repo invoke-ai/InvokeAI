@@ -225,34 +225,34 @@ def basicConfig(**kwargs):
 
 
 _FACILITY_MAP = (
-    dict(
-        LOG_KERN=syslog.LOG_KERN,
-        LOG_USER=syslog.LOG_USER,
-        LOG_MAIL=syslog.LOG_MAIL,
-        LOG_DAEMON=syslog.LOG_DAEMON,
-        LOG_AUTH=syslog.LOG_AUTH,
-        LOG_LPR=syslog.LOG_LPR,
-        LOG_NEWS=syslog.LOG_NEWS,
-        LOG_UUCP=syslog.LOG_UUCP,
-        LOG_CRON=syslog.LOG_CRON,
-        LOG_SYSLOG=syslog.LOG_SYSLOG,
-        LOG_LOCAL0=syslog.LOG_LOCAL0,
-        LOG_LOCAL1=syslog.LOG_LOCAL1,
-        LOG_LOCAL2=syslog.LOG_LOCAL2,
-        LOG_LOCAL3=syslog.LOG_LOCAL3,
-        LOG_LOCAL4=syslog.LOG_LOCAL4,
-        LOG_LOCAL5=syslog.LOG_LOCAL5,
-        LOG_LOCAL6=syslog.LOG_LOCAL6,
-        LOG_LOCAL7=syslog.LOG_LOCAL7,
-    )
+    {
+        "LOG_KERN": syslog.LOG_KERN,
+        "LOG_USER": syslog.LOG_USER,
+        "LOG_MAIL": syslog.LOG_MAIL,
+        "LOG_DAEMON": syslog.LOG_DAEMON,
+        "LOG_AUTH": syslog.LOG_AUTH,
+        "LOG_LPR": syslog.LOG_LPR,
+        "LOG_NEWS": syslog.LOG_NEWS,
+        "LOG_UUCP": syslog.LOG_UUCP,
+        "LOG_CRON": syslog.LOG_CRON,
+        "LOG_SYSLOG": syslog.LOG_SYSLOG,
+        "LOG_LOCAL0": syslog.LOG_LOCAL0,
+        "LOG_LOCAL1": syslog.LOG_LOCAL1,
+        "LOG_LOCAL2": syslog.LOG_LOCAL2,
+        "LOG_LOCAL3": syslog.LOG_LOCAL3,
+        "LOG_LOCAL4": syslog.LOG_LOCAL4,
+        "LOG_LOCAL5": syslog.LOG_LOCAL5,
+        "LOG_LOCAL6": syslog.LOG_LOCAL6,
+        "LOG_LOCAL7": syslog.LOG_LOCAL7,
+    }
     if SYSLOG_AVAILABLE
-    else dict()
+    else {}
 )
 
-_SOCK_MAP = dict(
-    SOCK_STREAM=socket.SOCK_STREAM,
-    SOCK_DGRAM=socket.SOCK_DGRAM,
-)
+_SOCK_MAP = {
+    "SOCK_STREAM": socket.SOCK_STREAM,
+    "SOCK_DGRAM": socket.SOCK_DGRAM,
+}
 
 
 class InvokeAIFormatter(logging.Formatter):
@@ -344,7 +344,7 @@ LOG_FORMATTERS = {
 
 
 class InvokeAILogger(object):
-    loggers = dict()
+    loggers = {}
 
     @classmethod
     def get_logger(
@@ -364,7 +364,7 @@ class InvokeAILogger(object):
     @classmethod
     def get_loggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
         handler_strs = config.log_handlers
-        handlers = list()
+        handlers = []
         for handler in handler_strs:
             handler_name, *args = handler.split("=", 2)
             args = args[0] if len(args) > 0 else None
@@ -398,7 +398,7 @@ class InvokeAILogger(object):
             raise ValueError("syslog is not available on this system")
         if not args:
             args = "/dev/log" if Path("/dev/log").exists() else "address:localhost:514"
-        syslog_args = dict()
+        syslog_args = {}
         try:
             for a in args.split(","):
                 arg_name, *arg_value = a.split(":", 2)
@@ -434,7 +434,7 @@ class InvokeAILogger(object):
         path = url.path
         port = url.port or 80
 
-        syslog_args = dict()
+        syslog_args = {}
         for a in arg_list:
             arg_name, *arg_value = a.split(":", 2)
             if arg_name == "method":

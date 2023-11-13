@@ -35,10 +35,10 @@ dependencies = [
   "accelerate~=0.24.0",
   "albumentations",
   "click",
-  "clip_anytorch",         # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
+  "clip_anytorch",                         # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel~=2.0.2",
   "controlnet-aux>=0.0.6",
-  "timm==0.6.13",          # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
+  "timm==0.6.13",                          # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
   "diffusers[torch]~=0.23.0",
   "dnspython~=2.4.0",
@@ -96,10 +96,8 @@ dependencies = [
 ]
 "dev" = ["jurigged", "pudb"]
 "test" = [
-  "black",
-  "flake8",
-  "Flake8-pyproject",
-  "isort",
+  "ruff",
+  "ruff-lsp",
   "mypy",
   "pre-commit",
   "pytest>6.0.0",
@@ -108,7 +106,7 @@ dependencies = [
 ]
 "xformers" = [
   "xformers==0.0.22post7; sys_platform!='darwin'",
-	"triton; sys_platform=='linux'",
+  "triton; sys_platform=='linux'",
 ]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
@@ -194,10 +192,16 @@ directory = "coverage/html"
 output = "coverage/index.xml"
 #=== End: PyTest and Coverage
 
-[tool.flake8]
-max-line-length = 120
-ignore = ["E203", "E266", "E501", "W503"]
-select = ["B", "C", "E", "F", "W", "T4"]
+#=== Begin: Ruff
+[tool.ruff]
+line-length = 120
+ignore = [
+  "E501", # https://docs.astral.sh/ruff/rules/line-too-long/
+  "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
+  "B008", # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
+  "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
+]
+select = ["B", "C", "E", "F", "W"]
 exclude = [
   ".git",
   "__pycache__",
@@ -206,14 +210,9 @@ exclude = [
   "invokeai/frontend/web/node_modules/",
   ".venv*",
 ]
+#=== End: Ruff
 
-[tool.black]
-line-length = 120
-
-[tool.isort]
-profile = "black"
-line_length = 120
-
+#=== Begin: MyPy
 [tool.mypy]
 ignore_missing_imports = true # ignores missing types in third-party libraries
 
@@ -263,3 +262,4 @@ module = [
   "invokeai.backend.util.util",
   "invokeai.frontend.install.model_install",
 ]
+#=== End: MyPy
