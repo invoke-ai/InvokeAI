@@ -161,8 +161,6 @@ def test_filter(store: ModelRecordServiceBase):
     assert matches[0].key == sha256("config3".encode("utf-8")).hexdigest()
     assert isinstance(matches[0].type, ModelType)  # This tests that we get proper enums back
 
-    matches = store.search_by_attr(model_type=BaseModelType("sd-2"))
-
     matches = store.search_by_hash("CONFIG1HASH")
     assert len(matches) == 1
     assert matches[0].original_hash == "CONFIG1HASH"
