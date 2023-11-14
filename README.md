@@ -175,7 +175,7 @@ the command `npm install -g yarn` if needed)
     pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
     ``` 
 
-    _For Macintoshes, either Intel or M1/M2:_
+    _For Macintoshes, either Intel or M1/M2/M3:_
 
     ```sh
     pip install InvokeAI --use-pep517
