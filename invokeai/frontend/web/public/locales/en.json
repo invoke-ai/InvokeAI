@@ -1115,6 +1115,7 @@
         "displayInProgress": "Display Progress Images",
         "enableImageDebugging": "Enable Image Debugging",
         "enableNodesEditor": "Enable Nodes Editor",
+        "enableNSFWChecker":"Enable NSFW Checker",
         "experimental": "Experimental",
         "favoriteSchedulers": "Favorite Schedulers",
         "favoriteSchedulersPlaceholder": "No schedulers favorited",

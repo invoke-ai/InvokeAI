@@ -298,7 +298,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
                 <SettingSwitch
-                  label="Enable NSFW Checker"
+                  label={t('settings.enableNSFWChecker')}
                   isDisabled={!isNSFWCheckerAvailable}
                   isChecked={shouldUseNSFWChecker}
                   onChange={handleChangeShouldUseNSFWChecker}
