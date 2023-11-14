@@ -70,8 +70,8 @@
         "langDutch": "Nederlands",
         "langEnglish": "English",
         "langFrench": "Français",
-        "langGerman": "Deutsch",
-        "langHebrew": "עברית",
+        "langGerman": "German",
+        "langHebrew": "Hebrew",
         "langItalian": "Italiano",
         "langJapanese": "日本語",
         "langKorean": "한국어",
@@ -137,9 +137,9 @@
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
         "controlAdapter_other": "Control Adapters",
-        "controlnet": "$t(controlnet.controlAdapter) #{{number}} ($t(common.controlNet))",
-        "ip_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.ipAdapter))",
-        "t2i_adapter": "$t(controlnet.controlAdapter) #{{number}} ($t(common.t2iAdapter))",
+        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
+        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
+        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
         "addControlNet": "Add $t(common.controlNet)",
         "addIPAdapter": "Add $t(common.ipAdapter)",
         "addT2IAdapter": "Add $t(common.t2iAdapter)",
@@ -220,6 +220,19 @@
         "ipAdapterModel": "Adapter Model",
         "resetIPAdapterImage": "Reset IP Adapter Image",
         "ipAdapterImageFallback": "No IP Adapter Image Selected"
+    },
+    "hrf": {
+        "hrf": "High Resolution Fix",
+        "enableHrf": "Enable High Resolution Fix",
+        "enableHrfTooltip": "Generate with a lower initial resolution, upscale to the base resolution, then run Image-to-Image.",
+        "upscaleMethod": "Upscale Method",
+        "hrfStrength": "High Resolution Fix Strength",
+        "strengthTooltip": "Lower values result in fewer details, which may reduce potential artifacts.",
+        "metadata": {
+            "enabled": "High Resolution Fix Enabled",
+            "strength": "High Resolution Fix Strength",
+            "method": "High Resolution Fix Method"
+        }
     },
     "embedding": {
         "addEmbedding": "Add Embedding",
@@ -559,8 +572,10 @@
         "negativePrompt": "Negative Prompt",
         "noImageDetails": "No image details found",
         "noMetaData": "No metadata found",
+        "noRecallParameters": "No parameters to recall found",
         "perlin": "Perlin Noise",
         "positivePrompt": "Positive Prompt",
+        "recallParameters": "Recall Parameters",
         "scheduler": "Scheduler",
         "seamless": "Seamless",
         "seed": "Seed",
@@ -568,6 +583,7 @@
         "strength": "Image to image strength",
         "Threshold": "Noise Threshold",
         "variations": "Seed-weight pairs",
+        "vae": "VAE", 
         "width": "Width",
         "workflow": "Workflow"
     },
@@ -720,7 +736,9 @@
         "noMatchingModels": "No matching Models",
         "noModelsAvailable": "No models available",
         "selectLoRA": "Select a LoRA",
-        "selectModel": "Select a Model"
+        "selectModel": "Select a Model",
+        "noLoRAsInstalled": "No LoRAs installed",
+        "noRefinerModelsInstalled": "No SDXL Refiner models installed"
     },
     "nodes": {
         "addNode": "Add Node",
@@ -1113,13 +1131,13 @@
         "showProgressInViewer": "Show Progress Images in Viewer",
         "ui": "User Interface",
         "useSlidersForAll": "Use Sliders For All Options",
+        "clearIntermediatesDisabled": "Queue must be empty to clear intermediates",
         "clearIntermediatesDesc1": "Clearing intermediates will reset your Canvas and ControlNet state.",
         "clearIntermediatesDesc2": "Intermediate images are byproducts of generation, different from the result images in the gallery. Clearing intermediates will free disk space.",
         "clearIntermediatesDesc3": "Your gallery images will not be deleted.",
         "clearIntermediates": "Clear Intermediates",
         "clearIntermediatesWithCount_one": "Clear {{count}} Intermediate",
         "clearIntermediatesWithCount_other": "Clear {{count}} Intermediates",
-        "clearIntermediatesWithCount_zero": "No Intermediates to Clear",
         "intermediatesCleared_one": "Cleared {{count}} Intermediate",
         "intermediatesCleared_other": "Cleared {{count}} Intermediates",
         "intermediatesClearedFailed": "Problem Clearing Intermediates"
