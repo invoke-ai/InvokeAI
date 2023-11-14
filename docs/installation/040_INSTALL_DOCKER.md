@@ -30,7 +30,7 @@ methodology for details on why running applications in such a stateless fashion 
 The container is configured for CUDA by default, but can be built to support AMD GPUs
 by setting the `GPU_DRIVER=rocm` environment variable at Docker image build time.
 
-Developers on Apple silicon (M1/M2): You
+Developers on Apple silicon (M1/M2/M3): You
 [can't access your GPU cores from Docker containers](https://github.com/pytorch/pytorch/issues/81224)
 and performance is reduced compared with running it directly on macOS but for
 development purposes it's fine. Once you're done with development tasks on your
