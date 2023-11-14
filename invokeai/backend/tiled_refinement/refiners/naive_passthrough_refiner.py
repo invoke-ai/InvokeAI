@@ -1,7 +1,6 @@
 import torch
 
 from invokeai.backend.tiled_refinement.refiners.base_refiner import BaseRefiner
-from invokeai.backend.tiled_refinement.tile import Tile
 
 
 class NaivePassthroughRefiner(BaseRefiner):
@@ -10,5 +9,5 @@ class NaivePassthroughRefiner(BaseRefiner):
     def __init__(self):
         super().__init__()
 
-    def refine(self, image_tile: Tile) -> torch.Tensor:
-        return image_tile.image
+    def refine(self, image_tile: torch.Tensor) -> torch.Tensor:
+        return image_tile

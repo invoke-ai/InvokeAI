@@ -2,27 +2,54 @@ from abc import ABC, abstractmethod
 
 import torch
 
-from invokeai.backend.tiled_refinement.tile import Tile
-
 
 class BaseTiler(ABC):
+    """A base class to be implemented by all tilers.
+
+    Usage:
+    ```
+    tiler = ConcreteTiler(...)
+
+    tiler.initialize(image)
+
+    for i in range(tiler.get_num_tiles()):
+        tile = tiler.read_tile(i)
+        # Refine tile ...
+        tiler.write_tile(refined_tile, i)
+
+    result = tiler.get_output()
+    ```
+    """
+
     @abstractmethod
-    def get_num_tiles(self, image: torch.Tensor) -> int:
+    def initialize(self, image: torch.Tensor):
+        """Perform any pre-processing necessary to initialize the tiler. For example, some tilers will use this method
+        to pre-compute the tile coordinates.
+        """
+        ...
+
+    @abstractmethod
+    def get_num_tiles(self) -> int:
         """The number of tiles that will be produced by this Tiler for 'image'."""
         ...
 
     @abstractmethod
-    def get_tile(self, image: torch.Tensor, i: int) -> Tile:
+    def read_tile(self, i: int) -> torch.Tensor:
         """Return the 'i'th tile from 'image'."""
         ...
 
     @abstractmethod
-    def expects_overwrite(self) -> bool:
-        """Whether this Tiler expects refined tiles to be written back to the original image before calling
-        get_tile(...) again.
-
-        This is a property of the Tiler, because it typically has implications in the tile masking logic. In other
-        words, it would not make sense to overwrite the original image when using a Tiler that has not been designed for
-        this.
-        """
+    def write_tile(self, tile_image: torch.Tensor, i: int):
+        """Write the refined i'th tile to the output image."""
         ...
+
+    @abstractmethod
+    def get_output(self) -> torch.Tensor:
+        """Return the tiled output image."""
+        ...
+
+
+class TilerNotInitializedError(Exception):
+    """An exception thrown when a Tiler method is called before calling initialize(...)."""
+
+    pass

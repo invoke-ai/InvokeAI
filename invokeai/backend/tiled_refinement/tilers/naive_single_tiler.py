@@ -1,7 +1,6 @@
 import torch
 
-from invokeai.backend.tiled_refinement.tile import Tile, XYCoords
-from invokeai.backend.tiled_refinement.tilers.base_tiler import BaseTiler
+from invokeai.backend.tiled_refinement.tilers.base_tiler import BaseTiler, TilerNotInitializedError
 
 
 class NaiveSingleTiler(BaseTiler):
@@ -12,18 +11,23 @@ class NaiveSingleTiler(BaseTiler):
     def __init__(self):
         super().__init__()
 
-    def get_num_tiles(self, image: torch.Tensor) -> int:
+        self._image = None
+        self._out_image = None
+
+    def initialize(self, image: torch.Tensor):
+        self._image = image
+        self._out_image = image.clone()
+
+    def get_num_tiles(self) -> int:
+        if self._image is None:
+            raise TilerNotInitializedError("Called get_num_tiles() before calling initialize(...).")
         return 1
 
-    def get_tile(self, image: torch.Tensor, i: int) -> Tile:
-        # TODO(ryand): Revisit this masking format.
-        mask = torch.ones_like(image, dtype=torch.uint8)
-        return Tile(
-            image=image,
-            coords=XYCoords(x=0, y=0),
-            refinement_mask=mask,
-            write_mask=mask,
-        )
+    def read_tile(self, i: int) -> torch.Tensor:
+        return self._image.clone()
 
-    def expects_overwrite(self) -> bool:
-        return False
+    def write_tile(self, tile_image: torch.Tensor, i: int):
+        self._out_image = tile_image
+
+    def get_output(self) -> torch.Tensor:
+        return self._out_image
