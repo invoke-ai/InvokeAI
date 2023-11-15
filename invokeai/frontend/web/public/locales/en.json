@@ -30,6 +30,10 @@
         "cancel": "Cancel",
         "changeBoard": "Change Board",
         "clearSearch": "Clear Search",
+        "deleteBoard": "Delete Board",
+        "deleteBoardAndImages": "Delete Board and Images",
+        "deleteBoardOnly": "Delete Board Only",
+        "deletedBoardsCannotbeRestored": "Deleted boards cannot be restored",
         "loading": "Loading...",
         "menuItemAutoAdd": "Auto-add to this Board",
         "move": "Move",
@@ -731,6 +735,7 @@
         "widthValidationMsg": "Default width of your model."
     },
     "models": {
+        "addLora": "Add LoRA",
         "esrganModel":"ESRGAN Model",
         "loading": "loading",
         "noLoRAsAvailable": "No LoRAs available",
@@ -1077,6 +1082,7 @@
         "dynamicPrompts": "Dynamic Prompts",
         "enableDynamicPrompts": "Enable Dynamic Prompts",
         "maxPrompts": "Max Prompts",
+        "promptsPreview": "Prompts Preview",
         "promptsWithCount_one": "{{count}} Prompt",
         "promptsWithCount_other": "{{count}} Prompts",
         "seedBehaviour": {
