@@ -79,11 +79,11 @@ dependencies = [
   "semver~=3.0.1",
   "send2trash",
   "test-tube~=0.7.5",
-  "torch~=2.1.0",
+  "torch==2.1.0",
   "torchvision~=0.16",
   "torchmetrics~=0.11.0",
   "torchsde~=0.2.5",
-  "transformers~=4.35.0",
+  "transformers==4.35.0",
   "uvicorn[standard]~=0.21.1",
   "windows-curses; sys_platform=='win32'",
 ]
