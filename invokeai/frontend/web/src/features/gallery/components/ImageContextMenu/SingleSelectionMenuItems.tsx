@@ -224,7 +224,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
-        Change Board
+        {t('boards.changeBoard')}
       </MenuItem>
       {imageDTO.starred ? (
         <MenuItem

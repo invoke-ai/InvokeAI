@@ -304,7 +304,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   onChange={handleChangeShouldUseNSFWChecker}
                 />
                 <SettingSwitch
-                  label="Enable Invisible Watermark"
+                  label={t('settings.enableInvisibleWatermark')}
                   isDisabled={!isWatermarkerAvailable}
                   isChecked={shouldUseWatermarker}
                   onChange={handleChangeShouldUseWatermarker}
@@ -351,7 +351,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   />
                 )}
                 <SettingSwitch
-                  label="Enable informational popovers"
+                  label={t('settings.enableInformationalPopovers')}
                   isChecked={shouldEnableInformationalPopovers}
                   onChange={handleChangeShouldEnableInformationalPopovers}
                 />

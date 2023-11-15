@@ -335,6 +335,7 @@
         "loading": "Loading",
         "loadMore": "Load More",
         "maintainAspectRatio": "Maintain Aspect Ratio",
+        "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
         "setCurrentImage": "Set as Current Image",
         "showGenerations": "Show Generations",
@@ -730,6 +731,7 @@
         "widthValidationMsg": "Default width of your model."
     },
     "models": {
+        "esrganModel":"ESRGAN Model",
         "loading": "loading",
         "noLoRAsAvailable": "No LoRAs available",
         "noMatchingLoRAs": "No matching LoRAs",
@@ -1114,6 +1116,8 @@
         "displayHelpIcons": "Display Help Icons",
         "displayInProgress": "Display Progress Images",
         "enableImageDebugging": "Enable Image Debugging",
+        "enableInformationalPopovers": "Enable Informational Popovers",
+        "enableInvisibleWatermark": "Enable Invisible Watermark",
         "enableNodesEditor": "Enable Nodes Editor",
         "enableNSFWChecker":"Enable NSFW Checker",
         "experimental": "Experimental",
