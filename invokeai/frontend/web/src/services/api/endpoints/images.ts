@@ -1543,7 +1543,7 @@ export const imagesApi = api.injectEndpoints({
       components['schemas']['Body_download_images_from_list']
     >({
       query: ({ image_names, board_id }) => ({
-        url: `images/download`,
+        url: `images/export`,
         method: 'POST',
         body: {
           image_names,

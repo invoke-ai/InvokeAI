@@ -366,7 +366,7 @@ class ImagesDownloaded(BaseModel):
     )
 
 
-@images_router.post("/download", operation_id="download_images_from_list", response_model=ImagesDownloaded)
+@images_router.post("/export", operation_id="download_images_from_list", response_model=ImagesDownloaded)
 async def download_images_from_list(
     image_names: list[str] = Body(description="The list of names of images to download", embed=True),
     board_id: Optional[str] = Body(
