@@ -90,6 +90,14 @@ def get_extras():
         pass
     return extras
 
+def get_extra_index() -> str:
+    # parsed_version.local for torch is the platform + version, eg 'cu121' or 'rocm5.6'
+    local = pkg_resources.get_distribution("torch").parsed_version.local
+    if local and 'cu' in local:
+        return "--extra-index-url https://download.pytorch.org/whl/cu121"
+    if local and 'rocm' in local:
+        return "--extra-index-url https://download.pytorch.org/whl/rocm5.6"
+    return ""
 
 def main():
     versions = get_versions()
@@ -122,14 +130,15 @@ def main():
             branch = Prompt.ask("Enter an InvokeAI branch name")
 
     extras = get_extras()
+    extra_index_url = get_extra_index()
 
     print(f":crossed_fingers: Upgrading to [yellow]{tag or release or branch}[/yellow]")
     if release:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_SRC}/{release}.zip" --use-pep517 --upgrade'
+        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_SRC}/{release}.zip" --use-pep517 --upgrade {extra_index_url}'
     elif tag:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_TAG}/{tag}.zip" --use-pep517 --upgrade'
+        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_TAG}/{tag}.zip" --use-pep517 --upgrade {extra_index_url}'
     else:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_BRANCH}/{branch}.zip" --use-pep517 --upgrade'
+        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_BRANCH}/{branch}.zip" --use-pep517 --upgrade {extra_index_url}'
     print("")
     print("")
     if os.system(cmd) == 0:
