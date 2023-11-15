@@ -4,16 +4,19 @@ from PIL.Image import Image
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
+    Input,
     InputField,
     InvocationContext,
     WithMetadata,
     WithWorkflow,
     invocation,
 )
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
+from invokeai.app.invocations.model import UNetField, VaeField
+from invokeai.app.invocations.primitives import ConditioningField, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-from invokeai.backend.tiled_refinement.refiners.naive_passthrough_refiner import NaivePassthroughRefiner
+from invokeai.backend.tiled_refinement.refiners.image_to_image_refiner import ImageToImageRefiner
 from invokeai.backend.tiled_refinement.tiled_refiner import TiledRefiner
 from invokeai.backend.tiled_refinement.tilers.linear_overlap_tiler import LinearOverlapTiler
 
@@ -32,6 +35,16 @@ class TiledRefinementInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """
 
     image: ImageField = InputField(description="The image to refine.")
+    positive_conditioning: ConditioningField = InputField(
+        description=FieldDescriptions.positive_cond, input=Input.Connection, ui_order=0
+    )
+    negative_conditioning: ConditioningField = InputField(
+        description=FieldDescriptions.negative_cond, input=Input.Connection, ui_order=1
+    )
+    vae: VaeField = InputField(description=FieldDescriptions.vae, input=Input.Connection, title="VAE")
+    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet")
+    denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+    denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -44,7 +57,15 @@ class TiledRefinementInvocation(BaseInvocation, WithMetadata, WithWorkflow):
                 write_blend_x=64,
                 write_blend_y=64,
             ),
-            refiner=NaivePassthroughRefiner(),
+            refiner=ImageToImageRefiner(
+                context=context,
+                positive_conditioning=self.positive_conditioning,
+                negative_conditioning=self.negative_conditioning,
+                vae=self.vae,
+                unet=self.unet,
+                denoising_start=self.denoising_start,
+                denoising_end=self.denoising_end,
+            ),
         )
 
         in_pil_image = context.services.images.get_pil_image(self.image.image_name)

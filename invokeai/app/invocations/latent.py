@@ -2,7 +2,7 @@
 
 from contextlib import ExitStack
 from functools import singledispatchmethod
-from typing import List, Literal, Optional, Union
+from typing import Callable, List, Literal, Optional, Union
 
 import einops
 import numpy as np
@@ -648,30 +648,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return 1 - mask, masked_latents
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def denoise(
+        self,
+        context: InvocationContext,
+        latents: torch.Tensor,
+        noise: Optional[torch.Tensor],
+        seed: int,
+        step_callback: Callable[[PipelineIntermediateState], None],
+    ) -> torch.Tensor:
         with SilenceWarnings():  # this quenches NSFW nag from diffusers
-            seed = None
-            noise = None
-            if self.noise is not None:
-                noise = context.services.latents.get(self.noise.latents_name)
-                seed = self.noise.seed
-
-            if self.latents is not None:
-                latents = context.services.latents.get(self.latents.latents_name)
-                if seed is None:
-                    seed = self.latents.seed
-
-                if noise is not None and noise.shape[1:] != latents.shape[1:]:
-                    raise Exception(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
-
-            elif noise is not None:
-                latents = torch.zeros_like(noise)
-            else:
-                raise Exception("'latents' or 'noise' must be provided!")
-
-            if seed is None:
-                seed = 0
-
             mask, masked_latents = self.prep_inpaint_mask(context, latents)
 
             # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
@@ -682,13 +667,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latents.shape,
                 do_classifier_free_guidance=True,
             )
-
-            # Get the source node id (we are invoking the prepared node)
-            graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-            source_node_id = graph_execution_state.prepared_source_mapping[self.id]
-
-            def step_callback(state: PipelineIntermediateState):
-                self.dispatch_progress(context, source_node_id, state, self.unet.unet.base_model)
 
             def _lora_loader():
                 for lora in self.unet.loras:
@@ -780,8 +758,45 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if choose_torch_device() == torch.device("mps"):
                 mps.empty_cache()
 
-            name = f"{context.graph_execution_state_id}__{self.id}"
-            context.services.latents.save(name, result_latents)
+            return result_latents
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        # Prep latents and noise.
+        seed = None
+        noise = None
+        if self.noise is not None:
+            noise = context.services.latents.get(self.noise.latents_name)
+            seed = self.noise.seed
+
+        if self.latents is not None:
+            latents = context.services.latents.get(self.latents.latents_name)
+            if seed is None:
+                seed = self.latents.seed
+
+            if noise is not None and noise.shape[1:] != latents.shape[1:]:
+                raise Exception(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
+        elif noise is not None:
+            latents = torch.zeros_like(noise)
+        else:
+            raise Exception("'latents' or 'noise' must be provided!")
+
+        if seed is None:
+            seed = 0
+
+        # Get the source node id (we are invoking the prepared node)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+
+        def step_callback(state: PipelineIntermediateState):
+            self.dispatch_progress(context, source_node_id, state, self.unet.unet.base_model)
+
+        result_latents = self.denoise(
+            context=context, latents=latents, noise=noise, seed=seed, step_callback=step_callback
+        )
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.save(name, result_latents)
+
         return build_latents_output(latents_name=name, latents=result_latents, seed=seed)
 
 
@@ -806,10 +821,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
     fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32)
 
-    @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        latents = context.services.latents.get(self.latents.latents_name)
-
+    def vae_decode(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor:
         vae_info = context.services.model_manager.get_model(
             **self.vae.vae.model_dump(),
             context=context,
@@ -856,15 +868,23 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
                 # copied from diffusers pipeline
                 latents = latents / vae.config.scaling_factor
                 image = vae.decode(latents, return_dict=False)[0]
-                image = (image / 2 + 0.5).clamp(0, 1)  # denormalize
-                # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
-                np_image = image.cpu().permute(0, 2, 3, 1).float().numpy()
-
-                image = VaeImageProcessor.numpy_to_pil(np_image)[0]
 
         torch.cuda.empty_cache()
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
+
+        return image
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        latents = context.services.latents.get(self.latents.latents_name)
+
+        image = self.vae_decode(context, latents)
+
+        image = (image / 2 + 0.5).clamp(0, 1)  # denormalize
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+        np_image = image.cpu().permute(0, 2, 3, 1).float().numpy()
+        image = VaeImageProcessor.numpy_to_pil(np_image)[0]
 
         image_dto = context.services.images.create(
             image=image,
