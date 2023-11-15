@@ -16,15 +16,13 @@ const ParamDynamicPromptsCollapse = () => {
     () =>
       createSelector(stateSelector, ({ dynamicPrompts }) => {
         const count = dynamicPrompts.prompts.length;
-        if (count === 1) {
-          return t('dynamicPrompts.promptsWithCount_one', {
-            count,
-          });
-        } else {
+        if (count > 1) {
           return t('dynamicPrompts.promptsWithCount_other', {
             count,
           });
         }
+
+        return;
       }),
     [t]
   );

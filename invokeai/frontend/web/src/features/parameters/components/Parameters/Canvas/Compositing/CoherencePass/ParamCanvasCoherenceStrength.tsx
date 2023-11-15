@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setCanvasCoherenceStrength } from 'features/parameters/store/generationSlice';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamCanvasCoherenceStrength = () => {
@@ -12,6 +12,16 @@ const ParamCanvasCoherenceStrength = () => {
     (state: RootState) => state.generation.canvasCoherenceStrength
   );
   const { t } = useTranslation();
+
+  const handleChange = useCallback(
+    (v: number) => {
+      dispatch(setCanvasCoherenceStrength(v));
+    },
+    [dispatch]
+  );
+  const handleReset = useCallback(() => {
+    dispatch(setCanvasCoherenceStrength(0.3));
+  }, [dispatch]);
 
   return (
     <IAIInformationalPopover feature="compositingStrength">
@@ -22,15 +32,11 @@ const ParamCanvasCoherenceStrength = () => {
         step={0.01}
         sliderNumberInputProps={{ max: 999 }}
         value={canvasCoherenceStrength}
-        onChange={(v) => {
-          dispatch(setCanvasCoherenceStrength(v));
-        }}
+        onChange={handleChange}
         withInput
         withSliderMarks
         withReset
-        handleReset={() => {
-          dispatch(setCanvasCoherenceStrength(0.3));
-        }}
+        handleReset={handleReset}
       />
     </IAIInformationalPopover>
   );

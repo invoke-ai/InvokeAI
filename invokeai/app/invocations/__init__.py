@@ -25,4 +25,4 @@ spec.loader.exec_module(module)
 
 # add core nodes to __all__
 python_files = filter(lambda f: not f.name.startswith("_"), Path(__file__).parent.glob("*.py"))
-__all__ = list(f.stem for f in python_files)  # type: ignore
+__all__ = [f.stem for f in python_files]  # type: ignore

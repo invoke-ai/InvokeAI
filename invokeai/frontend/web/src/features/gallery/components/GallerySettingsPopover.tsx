@@ -61,6 +61,12 @@ const GallerySettingsPopover = () => {
     [dispatch]
   );
 
+  const handleChangeAutoAssignBoardOnClick = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(autoAssignBoardOnClickChanged(e.target.checked)),
+    [dispatch]
+  );
+
   return (
     <IAIPopover
       triggerComponent={
@@ -91,9 +97,7 @@ const GallerySettingsPopover = () => {
         <IAISimpleCheckbox
           label={t('gallery.autoAssignBoardOnClick')}
           isChecked={autoAssignBoardOnClick}
-          onChange={(e: ChangeEvent<HTMLInputElement>) =>
-            dispatch(autoAssignBoardOnClickChanged(e.target.checked))
-          }
+          onChange={handleChangeAutoAssignBoardOnClick}
         />
         <BoardAutoAddSelect />
       </Flex>

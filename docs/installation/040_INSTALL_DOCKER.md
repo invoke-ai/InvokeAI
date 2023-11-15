@@ -30,7 +30,7 @@ methodology for details on why running applications in such a stateless fashion 
 The container is configured for CUDA by default, but can be built to support AMD GPUs
 by setting the `GPU_DRIVER=rocm` environment variable at Docker image build time.
 
-Developers on Apple silicon (M1/M2): You
+Developers on Apple silicon (M1/M2/M3): You
 [can't access your GPU cores from Docker containers](https://github.com/pytorch/pytorch/issues/81224)
 and performance is reduced compared with running it directly on macOS but for
 development purposes it's fine. Once you're done with development tasks on your
@@ -99,3 +99,14 @@ If using an AMD GPU:
 Use the standard `docker compose up` command, and generally the `docker compose` [CLI](https://docs.docker.com/compose/reference/) as usual.
 
 Once the container starts up (and configures the InvokeAI root directory if this is a new installation), you can access InvokeAI at [http://localhost:9090](http://localhost:9090)
+
+## Troubleshooting / FAQ
+
+- Q: I am running on Windows under WSL2, and am seeing a "no such file or directory" error.
+- A: Your `docker-entrypoint.sh` file likely has Windows (CRLF) as opposed to Unix (LF) line endings,
+    and you may have cloned this repository before the issue was fixed. To solve this, please change
+    the line endings in the `docker-entrypoint.sh` file to `LF`. You can do this in VSCode
+    (`Ctrl+P` and search for "line endings"), or by using the `dos2unix` utility in WSL.
+    Finally, you may delete `docker-entrypoint.sh` followed by  `git pull; git checkout docker/docker-entrypoint.sh`
+    to reset the file to its most recent version.
+    For more information on this issue, please see the [Docker Desktop documentation](https://docs.docker.com/desktop/troubleshoot/topics/#avoid-unexpected-syntax-errors-use-unix-style-line-endings-for-files-in-containers)

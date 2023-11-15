@@ -16,6 +16,7 @@ from pydantic.fields import FieldInfo, _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.misc import uuid_string
 
 if TYPE_CHECKING:
@@ -28,70 +29,6 @@ class InvalidVersionError(ValueError):
 
 class InvalidFieldError(TypeError):
     pass
-
-
-class FieldDescriptions:
-    denoising_start = "When to start denoising, expressed a percentage of total steps"
-    denoising_end = "When to stop denoising, expressed a percentage of total steps"
-    cfg_scale = "Classifier-Free Guidance scale"
-    scheduler = "Scheduler to use during inference"
-    positive_cond = "Positive conditioning tensor"
-    negative_cond = "Negative conditioning tensor"
-    noise = "Noise tensor"
-    clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
-    unet = "UNet (scheduler, LoRAs)"
-    vae = "VAE"
-    cond = "Conditioning tensor"
-    controlnet_model = "ControlNet model to load"
-    vae_model = "VAE model to load"
-    lora_model = "LoRA model to load"
-    main_model = "Main model (UNet, VAE, CLIP) to load"
-    sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
-    sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
-    onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
-    lora_weight = "The weight at which the LoRA is applied to each model"
-    compel_prompt = "Prompt to be parsed by Compel to create a conditioning tensor"
-    raw_prompt = "Raw prompt text (no parsing)"
-    sdxl_aesthetic = "The aesthetic score to apply to the conditioning tensor"
-    skipped_layers = "Number of layers to skip in text encoder"
-    seed = "Seed for random number generation"
-    steps = "Number of steps to run"
-    width = "Width of output (px)"
-    height = "Height of output (px)"
-    control = "ControlNet(s) to apply"
-    ip_adapter = "IP-Adapter to apply"
-    t2i_adapter = "T2I-Adapter(s) to apply"
-    denoised_latents = "Denoised latents tensor"
-    latents = "Latents tensor"
-    strength = "Strength of denoising (proportional to steps)"
-    metadata = "Optional metadata to be saved with the image"
-    metadata_collection = "Collection of Metadata"
-    metadata_item_polymorphic = "A single metadata item or collection of metadata items"
-    metadata_item_label = "Label for this metadata item"
-    metadata_item_value = "The value for this metadata item (may be any type)"
-    workflow = "Optional workflow to be saved with the image"
-    interp_mode = "Interpolation mode"
-    torch_antialias = "Whether or not to apply antialiasing (bilinear or bicubic only)"
-    fp32 = "Whether or not to use full float32 precision"
-    precision = "Precision to use"
-    tiled = "Processing using overlapping tiles (reduce memory consumption)"
-    detect_res = "Pixel resolution for detection"
-    image_res = "Pixel resolution for output image"
-    safe_mode = "Whether or not to use safe mode"
-    scribble_mode = "Whether or not to use scribble mode"
-    scale_factor = "The factor by which to scale"
-    blend_alpha = (
-        "Blending factor. 0.0 = use input A only, 1.0 = use input B only, 0.5 = 50% mix of input A and input B."
-    )
-    num_1 = "The first number"
-    num_2 = "The second number"
-    mask = "The mask to use for the operation"
-    board = "The board to save the image to"
-    image = "The image to process"
-    tile_size = "Tile size"
-    inclusive_low = "The inclusive low value"
-    exclusive_high = "The exclusive high value"
-    decimal_places = "The number of decimal places to round to"
 
 
 class Input(str, Enum):
@@ -299,35 +236,35 @@ def InputField(
       Ignored for non-collection fields.
     """
 
-    json_schema_extra_: dict[str, Any] = dict(
-        input=input,
-        ui_type=ui_type,
-        ui_component=ui_component,
-        ui_hidden=ui_hidden,
-        ui_order=ui_order,
-        item_default=item_default,
-        ui_choice_labels=ui_choice_labels,
-        _field_kind="input",
-    )
+    json_schema_extra_: dict[str, Any] = {
+        "input": input,
+        "ui_type": ui_type,
+        "ui_component": ui_component,
+        "ui_hidden": ui_hidden,
+        "ui_order": ui_order,
+        "item_default": item_default,
+        "ui_choice_labels": ui_choice_labels,
+        "_field_kind": "input",
+    }
 
-    field_args = dict(
-        default=default,
-        default_factory=default_factory,
-        title=title,
-        description=description,
-        pattern=pattern,
-        strict=strict,
-        gt=gt,
-        ge=ge,
-        lt=lt,
-        le=le,
-        multiple_of=multiple_of,
-        allow_inf_nan=allow_inf_nan,
-        max_digits=max_digits,
-        decimal_places=decimal_places,
-        min_length=min_length,
-        max_length=max_length,
-    )
+    field_args = {
+        "default": default,
+        "default_factory": default_factory,
+        "title": title,
+        "description": description,
+        "pattern": pattern,
+        "strict": strict,
+        "gt": gt,
+        "ge": ge,
+        "lt": lt,
+        "le": le,
+        "multiple_of": multiple_of,
+        "allow_inf_nan": allow_inf_nan,
+        "max_digits": max_digits,
+        "decimal_places": decimal_places,
+        "min_length": min_length,
+        "max_length": max_length,
+    }
 
     """
     Invocation definitions have their fields typed correctly for their `invoke()` functions.
@@ -362,24 +299,24 @@ def InputField(
 
     # because we are manually making fields optional, we need to store the original required bool for reference later
     if default is PydanticUndefined and default_factory is PydanticUndefined:
-        json_schema_extra_.update(dict(orig_required=True))
+        json_schema_extra_.update({"orig_required": True})
     else:
-        json_schema_extra_.update(dict(orig_required=False))
+        json_schema_extra_.update({"orig_required": False})
 
     # make Input.Any and Input.Connection fields optional, providing None as a default if the field doesn't already have one
     if (input is Input.Any or input is Input.Connection) and default_factory is PydanticUndefined:
         default_ = None if default is PydanticUndefined else default
-        provided_args.update(dict(default=default_))
+        provided_args.update({"default": default_})
         if default is not PydanticUndefined:
             # before invoking, we'll grab the original default value and set it on the field if the field wasn't provided a value
-            json_schema_extra_.update(dict(default=default))
-            json_schema_extra_.update(dict(orig_default=default))
+            json_schema_extra_.update({"default": default})
+            json_schema_extra_.update({"orig_default": default})
     elif default is not PydanticUndefined and default_factory is PydanticUndefined:
         default_ = default
-        provided_args.update(dict(default=default_))
-        json_schema_extra_.update(dict(orig_default=default_))
+        provided_args.update({"default": default_})
+        json_schema_extra_.update({"orig_default": default_})
     elif default_factory is not PydanticUndefined:
-        provided_args.update(dict(default_factory=default_factory))
+        provided_args.update({"default_factory": default_factory})
         # TODO: cannot serialize default_factory...
         # json_schema_extra_.update(dict(orig_default_factory=default_factory))
 
@@ -446,12 +383,12 @@ def OutputField(
         decimal_places=decimal_places,
         min_length=min_length,
         max_length=max_length,
-        json_schema_extra=dict(
-            ui_type=ui_type,
-            ui_hidden=ui_hidden,
-            ui_order=ui_order,
-            _field_kind="output",
-        ),
+        json_schema_extra={
+            "ui_type": ui_type,
+            "ui_hidden": ui_hidden,
+            "ui_order": ui_order,
+            "_field_kind": "output",
+        },
     )
 
 
@@ -523,14 +460,14 @@ class BaseInvocationOutput(BaseModel):
 
     @classmethod
     def get_output_types(cls) -> Iterable[str]:
-        return map(lambda i: get_type(i), BaseInvocationOutput.get_outputs())
+        return (get_type(i) for i in BaseInvocationOutput.get_outputs())
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
         # Because we use a pydantic Literal field with default value for the invocation type,
         # it will be typed as optional in the OpenAPI schema. Make it required manually.
         if "required" not in schema or not isinstance(schema["required"], list):
-            schema["required"] = list()
+            schema["required"] = []
         schema["required"].extend(["type"])
 
     model_config = ConfigDict(
@@ -590,16 +527,11 @@ class BaseInvocation(ABC, BaseModel):
     @classmethod
     def get_invocations_map(cls) -> dict[str, BaseInvocation]:
         # Get the type strings out of the literals and into a dictionary
-        return dict(
-            map(
-                lambda i: (get_type(i), i),
-                BaseInvocation.get_invocations(),
-            )
-        )
+        return {get_type(i): i for i in BaseInvocation.get_invocations()}
 
     @classmethod
     def get_invocation_types(cls) -> Iterable[str]:
-        return map(lambda i: get_type(i), BaseInvocation.get_invocations())
+        return (get_type(i) for i in BaseInvocation.get_invocations())
 
     @classmethod
     def get_output_type(cls) -> BaseInvocationOutput:
@@ -618,7 +550,7 @@ class BaseInvocation(ABC, BaseModel):
         if uiconfig and hasattr(uiconfig, "version"):
             schema["version"] = uiconfig.version
         if "required" not in schema or not isinstance(schema["required"], list):
-            schema["required"] = list()
+            schema["required"] = []
         schema["required"].extend(["type", "id"])
 
     @abstractmethod
@@ -672,15 +604,15 @@ class BaseInvocation(ABC, BaseModel):
     id: str = Field(
         default_factory=uuid_string,
         description="The id of this instance of an invocation. Must be unique among all instances of invocations.",
-        json_schema_extra=dict(_field_kind="internal"),
+        json_schema_extra={"_field_kind": "internal"},
     )
     is_intermediate: bool = Field(
         default=False,
         description="Whether or not this is an intermediate invocation.",
-        json_schema_extra=dict(ui_type=UIType.IsIntermediate, _field_kind="internal"),
+        json_schema_extra={"ui_type": UIType.IsIntermediate, "_field_kind": "internal"},
     )
     use_cache: bool = Field(
-        default=True, description="Whether or not to use the cache", json_schema_extra=dict(_field_kind="internal")
+        default=True, description="Whether or not to use the cache", json_schema_extra={"_field_kind": "internal"}
     )
 
     UIConfig: ClassVar[Type[UIConfigBase]]
@@ -714,7 +646,7 @@ class _Model(BaseModel):
 
 
 # Get all pydantic model attrs, methods, etc
-RESERVED_PYDANTIC_FIELD_NAMES = set(map(lambda m: m[0], inspect.getmembers(_Model())))
+RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
 
 
 def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None:
@@ -729,9 +661,7 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
 
         field_kind = (
             # _field_kind is defined via InputField(), OutputField() or by one of the internal fields defined in this file
-            field.json_schema_extra.get("_field_kind", None)
-            if field.json_schema_extra
-            else None
+            field.json_schema_extra.get("_field_kind", None) if field.json_schema_extra else None
         )
 
         # must have a field_kind
@@ -792,7 +722,7 @@ def invocation(
         # Add OpenAPI schema extras
         uiconf_name = cls.__qualname__ + ".UIConfig"
         if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
-            cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
+            cls.UIConfig = type(uiconf_name, (UIConfigBase,), {})
         if title is not None:
             cls.UIConfig.title = title
         if tags is not None:
@@ -819,7 +749,7 @@ def invocation(
 
         invocation_type_annotation = Literal[invocation_type]  # type: ignore
         invocation_type_field = Field(
-            title="type", default=invocation_type, json_schema_extra=dict(_field_kind="internal")
+            title="type", default=invocation_type, json_schema_extra={"_field_kind": "internal"}
         )
 
         docstring = cls.__doc__
@@ -865,7 +795,7 @@ def invocation_output(
         # Add the output type to the model.
 
         output_type_annotation = Literal[output_type]  # type: ignore
-        output_type_field = Field(title="type", default=output_type, json_schema_extra=dict(_field_kind="internal"))
+        output_type_field = Field(title="type", default=output_type, json_schema_extra={"_field_kind": "internal"})
 
         docstring = cls.__doc__
         cls = create_model(
@@ -897,7 +827,7 @@ WorkflowFieldValidator = TypeAdapter(WorkflowField)
 
 class WithWorkflow(BaseModel):
     workflow: Optional[WorkflowField] = Field(
-        default=None, description=FieldDescriptions.workflow, json_schema_extra=dict(_field_kind="internal")
+        default=None, description=FieldDescriptions.workflow, json_schema_extra={"_field_kind": "internal"}
     )
 
 
@@ -915,5 +845,5 @@ MetadataFieldValidator = TypeAdapter(MetadataField)
 
 class WithMetadata(BaseModel):
     metadata: Optional[MetadataField] = Field(
-        default=None, description=FieldDescriptions.metadata, json_schema_extra=dict(_field_kind="internal")
+        default=None, description=FieldDescriptions.metadata, json_schema_extra={"_field_kind": "internal"}
     )

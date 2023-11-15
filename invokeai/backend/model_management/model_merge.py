@@ -92,7 +92,7 @@ class ModelMerger(object):
         **kwargs - the default DiffusionPipeline.get_config_dict kwargs:
              cache_dir, resume_download, force_download, proxies, local_files_only, use_auth_token, revision, torch_dtype, device_map
         """
-        model_paths = list()
+        model_paths = []
         config = self.manager.app_config
         base_model = BaseModelType(base_model)
         vae = None
@@ -124,13 +124,13 @@ class ModelMerger(object):
         dump_path = (dump_path / merged_model_name).as_posix()
 
         merged_pipe.save_pretrained(dump_path, safe_serialization=True)
-        attributes = dict(
-            path=dump_path,
-            description=f"Merge of models {', '.join(model_names)}",
-            model_format="diffusers",
-            variant=ModelVariantType.Normal.value,
-            vae=vae,
-        )
+        attributes = {
+            "path": dump_path,
+            "description": f"Merge of models {', '.join(model_names)}",
+            "model_format": "diffusers",
+            "variant": ModelVariantType.Normal.value,
+            "vae": vae,
+        }
         return self.manager.add_model(
             merged_model_name,
             base_model=base_model,

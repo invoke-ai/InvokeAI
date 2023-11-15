@@ -139,7 +139,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 (board_id,),
             )
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            images = list(map(lambda r: deserialize_image_record(dict(r)), result))
+            images = [deserialize_image_record(dict(r)) for r in result]
 
             self._cursor.execute(
                 """--sql
@@ -167,7 +167,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 (board_id,),
             )
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            image_names = list(map(lambda r: r[0], result))
+            image_names = [r[0] for r in result]
             return image_names
         except sqlite3.Error as e:
             self._conn.rollback()

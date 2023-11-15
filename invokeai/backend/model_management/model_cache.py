@@ -66,11 +66,13 @@ class CacheStats(object):
 
 class ModelLocker(object):
     "Forward declaration"
+
     pass
 
 
 class ModelCache(object):
     "Forward declaration"
+
     pass
 
 
@@ -117,6 +119,7 @@ class ModelCache(object):
         lazy_offloading: bool = True,
         sha_chunksize: int = 16777216,
         logger: types.ModuleType = logger,
+        log_memory_usage: bool = False,
     ):
         """
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
@@ -126,8 +129,12 @@ class ModelCache(object):
         :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
         :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
+        :param log_memory_usage: If True, a memory snapshot will be captured before and after every model cache
+            operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
+            snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
+            behaviour.
         """
-        self.model_infos: Dict[str, ModelBase] = dict()
+        self.model_infos: Dict[str, ModelBase] = {}
         # allow lazy offloading only when vram cache enabled
         self.lazy_offloading = lazy_offloading and max_vram_cache_size > 0
         self.precision: torch.dtype = precision
@@ -137,12 +144,18 @@ class ModelCache(object):
         self.storage_device: torch.device = storage_device
         self.sha_chunksize = sha_chunksize
         self.logger = logger
+        self._log_memory_usage = log_memory_usage
 
         # used for stats collection
         self.stats = None
 
-        self._cached_models = dict()
-        self._cache_stack = list()
+        self._cached_models = {}
+        self._cache_stack = []
+
+    def _capture_memory_snapshot(self) -> Optional[MemorySnapshot]:
+        if self._log_memory_usage:
+            return MemorySnapshot.capture()
+        return None
 
     def get_key(
         self,
@@ -223,10 +236,10 @@ class ModelCache(object):
 
             # Load the model from disk and capture a memory snapshot before/after.
             start_load_time = time.time()
-            snapshot_before = MemorySnapshot.capture()
+            snapshot_before = self._capture_memory_snapshot()
             with skip_torch_weight_init():
                 model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
-            snapshot_after = MemorySnapshot.capture()
+            snapshot_after = self._capture_memory_snapshot()
             end_load_time = time.time()
 
             self_reported_model_size_after_load = model_info.get_size(submodel)
@@ -275,9 +288,9 @@ class ModelCache(object):
             return
 
         start_model_to_time = time.time()
-        snapshot_before = MemorySnapshot.capture()
+        snapshot_before = self._capture_memory_snapshot()
         cache_entry.model.to(target_device)
-        snapshot_after = MemorySnapshot.capture()
+        snapshot_after = self._capture_memory_snapshot()
         end_model_to_time = time.time()
         self.logger.debug(
             f"Moved model '{key}' from {source_device} to"
@@ -286,7 +299,12 @@ class ModelCache(object):
             f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
         )
 
-        if snapshot_before.vram is not None and snapshot_after.vram is not None:
+        if (
+            snapshot_before is not None
+            and snapshot_after is not None
+            and snapshot_before.vram is not None
+            and snapshot_after.vram is not None
+        ):
             vram_change = abs(snapshot_before.vram - snapshot_after.vram)
 
             # If the estimated model size does not match the change in VRAM, log a warning.
@@ -422,11 +440,16 @@ class ModelCache(object):
         self.logger.debug(f"Before unloading: cached_models={len(self._cached_models)}")
 
         pos = 0
+        models_cleared = 0
         while current_size + bytes_needed > maximum_size and pos < len(self._cache_stack):
             model_key = self._cache_stack[pos]
             cache_entry = self._cached_models[model_key]
 
             refs = sys.getrefcount(cache_entry.model)
+
+            # HACK: This is a workaround for a memory-management issue that we haven't tracked down yet. We are directly
+            # going against the advice in the Python docs by using `gc.get_referrers(...)` in this way:
+            # https://docs.python.org/3/library/gc.html#gc.get_referrers
 
             # manualy clear local variable references of just finished function calls
             # for some reason python don't want to collect it even by gc.collect() immidiately
@@ -453,15 +476,16 @@ class ModelCache(object):
                 f" refs: {refs}"
             )
 
-            # 2 refs:
+            # Expected refs:
             # 1 from cache_entry
             # 1 from getrefcount function
             # 1 from onnx runtime object
-            if not cache_entry.locked and refs <= 3 if "onnx" in model_key else 2:
+            if not cache_entry.locked and refs <= (3 if "onnx" in model_key else 2):
                 self.logger.debug(
                     f"Unloading model {model_key} to free {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
                 current_size -= cache_entry.size
+                models_cleared += 1
                 if self.stats:
                     self.stats.cleared += 1
                 del self._cache_stack[pos]
@@ -471,7 +495,20 @@ class ModelCache(object):
             else:
                 pos += 1
 
-        gc.collect()
+        if models_cleared > 0:
+            # There would likely be some 'garbage' to be collected regardless of whether a model was cleared or not, but
+            # there is a significant time cost to calling `gc.collect()`, so we want to use it sparingly. (The time cost
+            # is high even if no garbage gets collected.)
+            #
+            # Calling gc.collect(...) when a model is cleared seems like a good middle-ground:
+            # - If models had to be cleared, it's a signal that we are close to our memory limit.
+            # - If models were cleared, there's a good chance that there's a significant amount of garbage to be
+            #   collected.
+            #
+            # Keep in mind that gc is only responsible for handling reference cycles. Most objects should be cleaned up
+            # immediately when their reference count hits 0.
+            gc.collect()
+
         torch.cuda.empty_cache()
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
@@ -491,7 +528,6 @@ class ModelCache(object):
                 vram_in_use = torch.cuda.memory_allocated()
                 self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB")
 
-        gc.collect()
         torch.cuda.empty_cache()
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()

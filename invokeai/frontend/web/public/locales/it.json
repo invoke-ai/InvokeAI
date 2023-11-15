@@ -1025,7 +1025,8 @@
         "imageFieldDescription": "Le immagini possono essere passate tra i nodi.",
         "unableToParseEdge": "Impossibile analizzare il bordo",
         "latentsCollectionDescription": "Le immagini latenti possono essere passate tra i nodi.",
-        "imageCollection": "Raccolta Immagini"
+        "imageCollection": "Raccolta Immagini",
+        "loRAModelField": "LoRA"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1192,7 +1193,9 @@
         "noLoRAsAvailable": "Nessun LoRA disponibile",
         "noModelsAvailable": "Nessun modello disponibile",
         "selectModel": "Seleziona un modello",
-        "selectLoRA": "Seleziona un LoRA"
+        "selectLoRA": "Seleziona un LoRA",
+        "noRefinerModelsInstalled": "Nessun modello SDXL Refiner installato",
+        "noLoRAsInstalled": "Nessun LoRA installato"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1484,5 +1487,18 @@
         "scheduler": "Campionatore",
         "recallParameters": "Richiama i parametri",
         "noRecallParameters": "Nessun parametro da richiamare trovato"
+    },
+    "hrf": {
+        "enableHrf": "Abilita Correzione Alta Risoluzione",
+        "upscaleMethod": "Metodo di ampliamento",
+        "enableHrfTooltip": "Genera con una risoluzione iniziale inferiore, esegue l'ampliamento alla risoluzione di base, quindi esegue Immagine a Immagine.",
+        "metadata": {
+            "strength": "Forza della Correzione Alta Risoluzione",
+            "enabled": "Correzione Alta Risoluzione Abilitata",
+            "method": "Metodo della Correzione Alta Risoluzione"
+        },
+        "hrf": "Correzione Alta Risoluzione",
+        "hrfStrength": "Forza della Correzione Alta Risoluzione",
+        "strengthTooltip": "Valori più bassi comportano meno dettagli, il che può ridurre potenziali artefatti."
     }
 }

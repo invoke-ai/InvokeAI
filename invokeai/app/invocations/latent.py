@@ -10,7 +10,7 @@ import torch
 import torchvision.transforms as T
 from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.models.adapter import FullAdapterXL, T2IAdapter
+from diffusers.models.adapter import T2IAdapter
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -34,6 +34,7 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
@@ -57,7 +58,6 @@ from ...backend.util.devices import choose_precision, choose_torch_device
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -77,7 +77,7 @@ if choose_torch_device() == torch.device("mps"):
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
-SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
+SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
 
 
 @invocation_output("scheduler_output")
@@ -562,10 +562,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapter_model: T2IAdapter
             with t2i_adapter_model_info as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
-                if isinstance(t2i_adapter_model.adapter, FullAdapterXL):
-                    # HACK(ryand): Work around a bug in FullAdapterXL. This is being addressed upstream in diffusers by
-                    # this PR: https://github.com/huggingface/diffusers/pull/5134.
-                    total_downscale_factor = total_downscale_factor // 2
 
                 # Resize the T2I-Adapter input image.
                 # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
@@ -711,8 +707,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
             with (
                 ExitStack() as exit_stack,
                 ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),
+                ModelPatcher.apply_freeu(unet_info.context.model, self.unet.freeu_config),
                 set_seamless(unet_info.context.model, self.unet.seamless_axes),
                 unet_info as unet,
+                # Apply the LoRA after unet has been moved to its target device for faster patching.
+                ModelPatcher.apply_lora_unet(unet, _lora_loader()),
             ):
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
@@ -1106,7 +1105,7 @@ class BlendLatentsInvocation(BaseInvocation):
         latents_b = context.services.latents.get(self.latents_b.latents_name)
 
         if latents_a.shape != latents_b.shape:
-            raise "Latents to blend must be the same size."
+            raise Exception("Latents to blend must be the same size.")
 
         # TODO:
         device = choose_torch_device()

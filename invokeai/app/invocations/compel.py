@@ -7,6 +7,7 @@ from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ExtraConditioningInfo,
@@ -19,7 +20,6 @@ from ...backend.util.devices import torch_dtype
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -108,13 +108,15 @@ class CompelInvocation(BaseInvocation):
                 print(f'Warn: trigger: "{trigger}" not found')
 
         with (
-            ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),
             ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
                 tokenizer,
                 ti_manager,
             ),
-            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),
             text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+            # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),
         ):
             compel = Compel(
                 tokenizer=tokenizer,
@@ -229,13 +231,15 @@ class SDXLPromptInvocationBase:
                 print(f'Warn: trigger: "{trigger}" not found')
 
         with (
-            ModelPatcher.apply_lora(text_encoder_info.context.model, _lora_loader(), lora_prefix),
             ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
                 tokenizer,
                 ti_manager,
             ),
-            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, clip_field.skipped_layers),
             text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+            # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, clip_field.skipped_layers),
         ):
             compel = Compel(
                 tokenizer=tokenizer,

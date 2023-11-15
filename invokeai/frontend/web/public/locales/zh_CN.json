@@ -866,7 +866,7 @@
         "version": "版本",
         "validateConnections": "验证连接和节点图",
         "inputMayOnlyHaveOneConnection": "输入仅能有一个连接",
-        "notes": "节点",
+        "notes": "注释",
         "nodeOutputs": "节点输出",
         "currentImageDescription": "在节点编辑器中显示当前图像",
         "validateConnectionsHelp": "防止建立无效连接和调用无效节点图",
@@ -892,11 +892,11 @@
         "currentImage": "当前图像",
         "workflowName": "名称",
         "cannotConnectInputToInput": "无法将输入连接到输入",
-        "workflowNotes": "节点",
+        "workflowNotes": "注释",
         "cannotConnectOutputToOutput": "无法将输出连接到输出",
         "connectionWouldCreateCycle": "连接将创建一个循环",
         "cannotConnectToSelf": "无法连接自己",
-        "notesDescription": "添加有关您的工作流的节点",
+        "notesDescription": "添加有关您的工作流的注释",
         "unknownField": "未知",
         "colorCodeEdges": "边缘颜色编码",
         "unknownNode": "未知节点",
@@ -1231,7 +1231,9 @@
         "noLoRAsAvailable": "无可用 LoRA",
         "noModelsAvailable": "无可用模型",
         "selectModel": "选择一个模型",
-        "selectLoRA": "选择一个 LoRA"
+        "selectLoRA": "选择一个 LoRA",
+        "noRefinerModelsInstalled": "无已安装的 SDXL Refiner 模型",
+        "noLoRAsInstalled": "无已安装的 LoRA"
     },
     "boards": {
         "autoAddBoard": "自动添加面板",

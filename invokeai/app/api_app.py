@@ -43,6 +43,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         board_images,
         boards,
         images,
+        model_records,
         models,
         session_queue,
         sessions,
@@ -106,6 +107,7 @@ app.include_router(sessions.session_router, prefix="/api")
 
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(models.models_router, prefix="/api")
+app.include_router(model_records.model_records_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
@@ -130,7 +132,7 @@ def custom_openapi() -> dict[str, Any]:
     # Add all outputs
     all_invocations = BaseInvocation.get_invocations()
     output_types = set()
-    output_type_titles = dict()
+    output_type_titles = {}
     for invoker in all_invocations:
         output_type = signature(invoker.invoke).return_annotation
         output_types.add(output_type)
@@ -171,12 +173,12 @@ def custom_openapi() -> dict[str, Any]:
             # print(f"Config with name {name} already defined")
             continue
 
-        openapi_schema["components"]["schemas"][name] = dict(
-            title=name,
-            description="An enumeration.",
-            type="string",
-            enum=list(v.value for v in model_config_format_enum),
-        )
+        openapi_schema["components"]["schemas"][name] = {
+            "title": name,
+            "description": "An enumeration.",
+            "type": "string",
+            "enum": [v.value for v in model_config_format_enum],
+        }
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

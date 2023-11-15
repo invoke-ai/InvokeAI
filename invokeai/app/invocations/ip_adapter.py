@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -17,6 +16,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType
 from invokeai.backend.model_management.models.ip_adapter import get_ip_adapter_image_encoder_model_id
 
@@ -67,7 +67,7 @@ class IPAdapterInvocation(BaseInvocation):
 
     # weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
     weight: Union[float, List[float]] = InputField(
-        default=1, ge=0, description="The weight given to the IP-Adapter", ui_type=UIType.Float, title="Weight"
+        default=1, ge=-1, description="The weight given to the IP-Adapter", ui_type=UIType.Float, title="Weight"
     )
 
     begin_step_percent: float = InputField(

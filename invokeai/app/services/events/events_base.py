@@ -27,7 +27,7 @@ class EventServiceBase:
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.queue_event,
-            payload=dict(event=event_name, data=payload),
+            payload={"event": event_name, "data": payload},
         )
 
     # Define events here for every event in the system.
@@ -48,18 +48,18 @@ class EventServiceBase:
         """Emitted when there is generation progress"""
         self.__emit_queue_event(
             event_name="generator_progress",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                node_id=node.get("id"),
-                source_node_id=source_node_id,
-                progress_image=progress_image.model_dump() if progress_image is not None else None,
-                step=step,
-                order=order,
-                total_steps=total_steps,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "node_id": node.get("id"),
+                "source_node_id": source_node_id,
+                "progress_image": progress_image.model_dump() if progress_image is not None else None,
+                "step": step,
+                "order": order,
+                "total_steps": total_steps,
+            },
         )
 
     def emit_invocation_complete(
@@ -75,15 +75,15 @@ class EventServiceBase:
         """Emitted when an invocation has completed"""
         self.__emit_queue_event(
             event_name="invocation_complete",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                node=node,
-                source_node_id=source_node_id,
-                result=result,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "node": node,
+                "source_node_id": source_node_id,
+                "result": result,
+            },
         )
 
     def emit_invocation_error(
@@ -100,16 +100,16 @@ class EventServiceBase:
         """Emitted when an invocation has completed"""
         self.__emit_queue_event(
             event_name="invocation_error",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                node=node,
-                source_node_id=source_node_id,
-                error_type=error_type,
-                error=error,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "node": node,
+                "source_node_id": source_node_id,
+                "error_type": error_type,
+                "error": error,
+            },
         )
 
     def emit_invocation_started(
@@ -124,14 +124,14 @@ class EventServiceBase:
         """Emitted when an invocation has started"""
         self.__emit_queue_event(
             event_name="invocation_started",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                node=node,
-                source_node_id=source_node_id,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "node": node,
+                "source_node_id": source_node_id,
+            },
         )
 
     def emit_graph_execution_complete(
@@ -140,12 +140,12 @@ class EventServiceBase:
         """Emitted when a session has completed all invocations"""
         self.__emit_queue_event(
             event_name="graph_execution_state_complete",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+            },
         )
 
     def emit_model_load_started(
@@ -162,16 +162,16 @@ class EventServiceBase:
         """Emitted when a model is requested"""
         self.__emit_queue_event(
             event_name="model_load_started",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
-                submodel=submodel,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "model_name": model_name,
+                "base_model": base_model,
+                "model_type": model_type,
+                "submodel": submodel,
+            },
         )
 
     def emit_model_load_completed(
@@ -189,19 +189,19 @@ class EventServiceBase:
         """Emitted when a model is correctly loaded (returns model info)"""
         self.__emit_queue_event(
             event_name="model_load_completed",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
-                submodel=submodel,
-                hash=model_info.hash,
-                location=str(model_info.location),
-                precision=str(model_info.precision),
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "model_name": model_name,
+                "base_model": base_model,
+                "model_type": model_type,
+                "submodel": submodel,
+                "hash": model_info.hash,
+                "location": str(model_info.location),
+                "precision": str(model_info.precision),
+            },
         )
 
     def emit_session_retrieval_error(
@@ -216,14 +216,14 @@ class EventServiceBase:
         """Emitted when session retrieval fails"""
         self.__emit_queue_event(
             event_name="session_retrieval_error",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                error_type=error_type,
-                error=error,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "error_type": error_type,
+                "error": error,
+            },
         )
 
     def emit_invocation_retrieval_error(
@@ -239,15 +239,15 @@ class EventServiceBase:
         """Emitted when invocation retrieval fails"""
         self.__emit_queue_event(
             event_name="invocation_retrieval_error",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-                node_id=node_id,
-                error_type=error_type,
-                error=error,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+                "node_id": node_id,
+                "error_type": error_type,
+                "error": error,
+            },
         )
 
     def emit_session_canceled(
@@ -260,12 +260,12 @@ class EventServiceBase:
         """Emitted when a session is canceled"""
         self.__emit_queue_event(
             event_name="session_canceled",
-            payload=dict(
-                queue_id=queue_id,
-                queue_item_id=queue_item_id,
-                queue_batch_id=queue_batch_id,
-                graph_execution_state_id=graph_execution_state_id,
-            ),
+            payload={
+                "queue_id": queue_id,
+                "queue_item_id": queue_item_id,
+                "queue_batch_id": queue_batch_id,
+                "graph_execution_state_id": graph_execution_state_id,
+            },
         )
 
     def emit_queue_item_status_changed(
@@ -277,39 +277,39 @@ class EventServiceBase:
         """Emitted when a queue item's status changes"""
         self.__emit_queue_event(
             event_name="queue_item_status_changed",
-            payload=dict(
-                queue_id=queue_status.queue_id,
-                queue_item=dict(
-                    queue_id=session_queue_item.queue_id,
-                    item_id=session_queue_item.item_id,
-                    status=session_queue_item.status,
-                    batch_id=session_queue_item.batch_id,
-                    session_id=session_queue_item.session_id,
-                    error=session_queue_item.error,
-                    created_at=str(session_queue_item.created_at) if session_queue_item.created_at else None,
-                    updated_at=str(session_queue_item.updated_at) if session_queue_item.updated_at else None,
-                    started_at=str(session_queue_item.started_at) if session_queue_item.started_at else None,
-                    completed_at=str(session_queue_item.completed_at) if session_queue_item.completed_at else None,
-                ),
-                batch_status=batch_status.model_dump(),
-                queue_status=queue_status.model_dump(),
-            ),
+            payload={
+                "queue_id": queue_status.queue_id,
+                "queue_item": {
+                    "queue_id": session_queue_item.queue_id,
+                    "item_id": session_queue_item.item_id,
+                    "status": session_queue_item.status,
+                    "batch_id": session_queue_item.batch_id,
+                    "session_id": session_queue_item.session_id,
+                    "error": session_queue_item.error,
+                    "created_at": str(session_queue_item.created_at) if session_queue_item.created_at else None,
+                    "updated_at": str(session_queue_item.updated_at) if session_queue_item.updated_at else None,
+                    "started_at": str(session_queue_item.started_at) if session_queue_item.started_at else None,
+                    "completed_at": str(session_queue_item.completed_at) if session_queue_item.completed_at else None,
+                },
+                "batch_status": batch_status.model_dump(),
+                "queue_status": queue_status.model_dump(),
+            },
         )
 
     def emit_batch_enqueued(self, enqueue_result: EnqueueBatchResult) -> None:
         """Emitted when a batch is enqueued"""
         self.__emit_queue_event(
             event_name="batch_enqueued",
-            payload=dict(
-                queue_id=enqueue_result.queue_id,
-                batch_id=enqueue_result.batch.batch_id,
-                enqueued=enqueue_result.enqueued,
-            ),
+            payload={
+                "queue_id": enqueue_result.queue_id,
+                "batch_id": enqueue_result.batch.batch_id,
+                "enqueued": enqueue_result.enqueued,
+            },
         )
 
     def emit_queue_cleared(self, queue_id: str) -> None:
         """Emitted when the queue is cleared"""
         self.__emit_queue_event(
             event_name="queue_cleared",
-            payload=dict(queue_id=queue_id),
+            payload={"queue_id": queue_id},
         )

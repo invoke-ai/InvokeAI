@@ -351,6 +351,7 @@ class ModelManager(object):
             precision=precision,
             sequential_offload=sequential_offload,
             logger=logger,
+            log_memory_usage=self.app_config.log_memory_usage,
         )
 
         self._read_models(config)
@@ -362,7 +363,7 @@ class ModelManager(object):
             else:
                 return
 
-        self.models = dict()
+        self.models = {}
         for model_key, model_config in config.items():
             if model_key.startswith("_"):
                 continue
@@ -373,7 +374,7 @@ class ModelManager(object):
             self.models[model_key] = model_class.create_config(**model_config)
 
         # check config version number and update on disk/RAM if necessary
-        self.cache_keys = dict()
+        self.cache_keys = {}
 
         # add controlnet, lora and textual_inversion models from disk
         self.scan_models_directory()
@@ -654,7 +655,7 @@ class ModelManager(object):
         """
         # TODO: redo
         for model_dict in self.list_models():
-            for model_name, model_info in model_dict.items():
+            for _model_name, model_info in model_dict.items():
                 line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
 
@@ -901,7 +902,7 @@ class ModelManager(object):
         """
         Write current configuration out to the indicated file.
         """
-        data_to_save = dict()
+        data_to_save = {}
         data_to_save["__metadata__"] = self.config_meta.model_dump()
 
         for model_key, model_config in self.models.items():
@@ -1033,7 +1034,7 @@ class ModelManager(object):
                 self.ignore = ignore
 
             def on_search_started(self):
-                self.new_models_found = dict()
+                self.new_models_found = {}
 
             def on_model_found(self, model: Path):
                 if model not in self.ignore:
@@ -1105,7 +1106,7 @@ class ModelManager(object):
         # avoid circular import here
         from invokeai.backend.install.model_install_backend import ModelInstall
 
-        successfully_installed = dict()
+        successfully_installed = {}
 
         installer = ModelInstall(
             config=self.app_config, prediction_type_helper=prediction_type_helper, model_manager=self

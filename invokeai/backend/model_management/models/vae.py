@@ -89,7 +89,7 @@ class VaeModel(ModelBase):
                 return VaeModelFormat.Diffusers
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]):
                 return VaeModelFormat.Checkpoint
 
         raise InvalidModelException(f"Not a valid model: {path}")

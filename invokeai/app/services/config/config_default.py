@@ -45,6 +45,7 @@ InvokeAI:
     ram: 13.5
     vram: 0.25
     lazy_offload: true
+    log_memory_usage: false
   Device:
     device: auto
     precision: auto
@@ -187,18 +188,18 @@ DEFAULT_MAX_VRAM = 0.5
 
 
 class Categories(object):
-    WebServer = dict(category="Web Server")
-    Features = dict(category="Features")
-    Paths = dict(category="Paths")
-    Logging = dict(category="Logging")
-    Development = dict(category="Development")
-    Other = dict(category="Other")
-    ModelCache = dict(category="Model Cache")
-    Device = dict(category="Device")
-    Generation = dict(category="Generation")
-    Queue = dict(category="Queue")
-    Nodes = dict(category="Nodes")
-    MemoryPerformance = dict(category="Memory/Performance")
+    WebServer = {"category": "Web Server"}
+    Features = {"category": "Features"}
+    Paths = {"category": "Paths"}
+    Logging = {"category": "Logging"}
+    Development = {"category": "Development"}
+    Other = {"category": "Other"}
+    ModelCache = {"category": "Model Cache"}
+    Device = {"category": "Device"}
+    Generation = {"category": "Generation"}
+    Queue = {"category": "Queue"}
+    Nodes = {"category": "Nodes"}
+    MemoryPerformance = {"category": "Memory/Performance"}
 
 
 class InvokeAIAppConfig(InvokeAISettings):
@@ -261,6 +262,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     ram                 : float = Field(default=7.5, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
     vram                : float = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", json_schema_extra=Categories.ModelCache, )
+    log_memory_usage    : bool = Field(default=False, description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.", json_schema_extra=Categories.ModelCache)
 
     # DEVICE
     device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Generation device", json_schema_extra=Categories.Device)
@@ -480,7 +482,7 @@ def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ["INVOKEAI_ROOT"])
-    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
+    elif any((venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]):
         root = (venv.parent).resolve()
     else:
         root = Path("~/invokeai").expanduser().resolve()
