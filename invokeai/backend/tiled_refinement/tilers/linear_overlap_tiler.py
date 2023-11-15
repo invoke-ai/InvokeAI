@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 
 from invokeai.backend.tiled_refinement.tilers.base_tiler import BaseTiler, TilerNotInitializedError
-from invokeai.backend.tiled_refinement.tilers.utils import TBLR, crop
+from invokeai.backend.tiled_refinement.tilers.utils import TBLR, crop, paste
 
 
 @dataclass
@@ -108,16 +108,24 @@ class LinearOverlapTiler(BaseTiler):
     def get_num_tiles(self) -> int:
         if self._tile_props is None:
             raise TilerNotInitializedError("Called get_num_tiles() before calling initialize(...).")
+
         return len(self._tile_props)
 
     def read_tile(self, i: int) -> torch.Tensor:
         if self._tile_props is None or self._image is None:
-            raise TilerNotInitializedError("Called read_tile() before calling initialize(...).")
+            raise TilerNotInitializedError("Called read_tile(...) before calling initialize(...).")
 
         return crop(self._image, self._tile_props[i].coords)
 
     def write_tile(self, tile_image: torch.Tensor, i: int):
-        raise NotImplementedError()
+        if self._tile_props is None or self._image is None or self._out_image is None:
+            raise TilerNotInitializedError("Called write_tile(...) before calling initialize(...).")
+
+        tile = self._tile_props[i]
+        paste(dst_image=self._out_image, src_image=tile_image, box=tile.coords, mask=None)
 
     def get_output(self) -> torch.Tensor:
-        raise NotImplementedError()
+        if self._out_image is None:
+            raise TilerNotInitializedError("Called get_output() before calling initialize(...).")
+
+        return self._out_image

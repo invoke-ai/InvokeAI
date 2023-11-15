@@ -15,7 +15,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.tiled_refinement.refiners.naive_passthrough_refiner import NaivePassthroughRefiner
 from invokeai.backend.tiled_refinement.tiled_refiner import TiledRefiner
-from invokeai.backend.tiled_refinement.tilers.naive_single_tiler import NaiveSingleTiler
+from invokeai.backend.tiled_refinement.tilers.linear_overlap_tiler import LinearOverlapTiler
 
 
 @invocation(
@@ -35,7 +35,17 @@ class TiledRefinementInvocation(BaseInvocation, WithMetadata, WithWorkflow):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        tiled_refiner = TiledRefiner(tiler=NaiveSingleTiler(), refiner=NaivePassthroughRefiner())
+        tiled_refiner = TiledRefiner(
+            tiler=LinearOverlapTiler(
+                tile_dimension_x=512,
+                tile_dimension_y=512,
+                read_overlap_x=64,
+                read_overlap_y=64,
+                write_blend_x=64,
+                write_blend_y=64,
+            ),
+            refiner=NaivePassthroughRefiner(),
+        )
 
         in_pil_image = context.services.images.get_pil_image(self.image.image_name)
         in_torch_image = self._pil_to_torch_image(in_pil_image)
