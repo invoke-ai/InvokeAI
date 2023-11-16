@@ -8,7 +8,7 @@ import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.primitives import BoardField, ColorField, ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
@@ -1014,6 +1014,38 @@ class SaveImageInvocation(BaseInvocation, WithWorkflow, WithMetadata):
 
         return ImageOutput(
             image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+@invocation(
+    "linear_ui_output",
+    title="Linear UI Image Output",
+    tags=["primitives", "image"],
+    category="primitives",
+    version="1.0.1",
+    use_cache=False,
+)
+class LinearUIOutputInvocation(BaseInvocation, WithWorkflow, WithMetadata):
+    """Handles Linear UI Image Outputting tasks."""
+
+    image: ImageField = InputField(description=FieldDescriptions.image)
+    board: Optional[BoardField] = InputField(default=None, description=FieldDescriptions.board, input=Input.Direct)
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image_dto = context.services.images.get_dto(self.image.image_name)
+
+        if self.board:
+            context.services.board_images.add_image_to_board(self.board.board_id, self.image.image_name)
+
+        if image_dto.is_intermediate != self.is_intermediate:
+            context.services.images.update(
+                self.image.image_name, changes=ImageRecordChanges(is_intermediate=self.is_intermediate)
+            )
+
+        return ImageOutput(
+            image=ImageField(image_name=self.image.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )

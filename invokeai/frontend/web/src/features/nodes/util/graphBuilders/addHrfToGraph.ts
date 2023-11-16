@@ -23,7 +23,7 @@ import {
   RESIZE_HRF,
   VAE_LOADER,
 } from './constants';
-import { upsertMetadata } from './metadata';
+import { setMetadataReceivingNode, upsertMetadata } from './metadata';
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
@@ -369,4 +369,5 @@ export const addHrfToGraph = (
     hrf_enabled: hrfEnabled,
     hrf_method: hrfMethod,
   });
+  setMetadataReceivingNode(graph, LATENTS_TO_IMAGE_HRF_HR);
 };

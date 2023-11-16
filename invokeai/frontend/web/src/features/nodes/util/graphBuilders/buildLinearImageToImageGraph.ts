@@ -9,7 +9,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -311,22 +311,26 @@ export const buildLinearImageToImageGraph = (
     });
   }
 
-  addCoreMetadataNode(graph, {
-    generation_mode: 'img2img',
-    cfg_scale,
-    height,
-    width,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
-    model,
-    seed,
-    steps,
-    rand_device: use_cpu ? 'cpu' : 'cuda',
-    scheduler,
-    clip_skip: clipSkip,
-    strength,
-    init_image: initialImage.imageName,
-  });
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'img2img',
+      cfg_scale,
+      height,
+      width,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      model,
+      seed,
+      steps,
+      rand_device: use_cpu ? 'cpu' : 'cuda',
+      scheduler,
+      clip_skip: clipSkip,
+      strength,
+      init_image: initialImage.imageName,
+    },
+    IMAGE_TO_LATENTS
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -358,7 +362,7 @@ export const buildLinearImageToImageGraph = (
     addWatermarkerToGraph(state, graph);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };
