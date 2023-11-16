@@ -107,7 +107,7 @@ const Content = (props: {
                   {props.node.data.version}
                 </Text>
               </FormControl>
-              {mayUpdate && (
+              {needsUpdate && (
                 <IAIIconButton
                   aria-label={t('nodes.updateNode')}
                   tooltip={t('nodes.updateNode')}

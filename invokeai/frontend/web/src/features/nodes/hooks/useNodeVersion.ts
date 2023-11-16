@@ -3,20 +3,80 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { satisfies } from 'compare-versions';
+import { cloneDeep, defaultsDeep } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
+import { Node } from 'reactflow';
+import { AnyInvocationType } from 'services/events/types';
+import { nodeReplaced } from '../store/nodesSlice';
+import { buildNodeData } from '../store/util/buildNodeData';
 import {
   InvocationNodeData,
+  InvocationTemplate,
+  NodeData,
   isInvocationNode,
   zParsedSemver,
 } from '../types/types';
-import { cloneDeep, defaultsDeep } from 'lodash-es';
-import { buildNodeData } from '../store/util/buildNodeData';
-import { AnyInvocationType } from 'services/events/types';
-import { Node } from 'reactflow';
-import { nodeReplaced } from '../store/nodesSlice';
+import { useAppToaster } from 'app/components/Toaster';
+import { useTranslation } from 'react-i18next';
+
+export const getNeedsUpdate = (
+  node?: Node<NodeData>,
+  template?: InvocationTemplate
+) => {
+  if (!isInvocationNode(node) || !template) {
+    return false;
+  }
+  return node.data.version !== template.version;
+};
+
+export const getMayUpdateNode = (
+  node?: Node<NodeData>,
+  template?: InvocationTemplate
+) => {
+  const needsUpdate = getNeedsUpdate(node, template);
+  if (
+    !needsUpdate ||
+    !isInvocationNode(node) ||
+    !template ||
+    !node.data.version
+  ) {
+    return false;
+  }
+  const templateMajor = zParsedSemver.parse(template.version).major;
+
+  return satisfies(node.data.version, `^${templateMajor}`);
+};
+
+export const updateNode = (
+  node?: Node<NodeData>,
+  template?: InvocationTemplate
+) => {
+  const mayUpdate = getMayUpdateNode(node, template);
+  if (
+    !mayUpdate ||
+    !isInvocationNode(node) ||
+    !template ||
+    !node.data.version
+  ) {
+    return;
+  }
+
+  const defaults = buildNodeData(
+    node.data.type as AnyInvocationType,
+    node.position,
+    template
+  ) as Node<InvocationNodeData>;
+
+  const clone = cloneDeep(node);
+  clone.data.version = template.version;
+  defaultsDeep(clone, defaults);
+  return clone;
+};
 
 export const useNodeVersion = (nodeId: string) => {
   const dispatch = useAppDispatch();
+  const toast = useAppToaster();
+  const { t } = useTranslation();
   const selector = useMemo(
     () =>
       createSelector(
@@ -33,48 +93,27 @@ export const useNodeVersion = (nodeId: string) => {
 
   const { node, nodeTemplate } = useAppSelector(selector);
 
-  const needsUpdate = useMemo(() => {
-    if (!isInvocationNode(node) || !nodeTemplate) {
-      return false;
-    }
-    return node.data.version !== nodeTemplate.version;
-  }, [node, nodeTemplate]);
+  const needsUpdate = useMemo(
+    () => getNeedsUpdate(node, nodeTemplate),
+    [node, nodeTemplate]
+  );
 
-  const mayUpdate = useMemo(() => {
-    if (
-      !needsUpdate ||
-      !isInvocationNode(node) ||
-      !nodeTemplate ||
-      !node.data.version
-    ) {
-      return false;
-    }
-    const templateMajor = zParsedSemver.parse(nodeTemplate.version).major;
+  const mayUpdate = useMemo(
+    () => getMayUpdateNode(node, nodeTemplate),
+    [node, nodeTemplate]
+  );
 
-    return satisfies(node.data.version, `^${templateMajor}`);
-  }, [needsUpdate, node, nodeTemplate]);
-
-  const updateNode = useCallback(() => {
-    if (
-      !mayUpdate ||
-      !isInvocationNode(node) ||
-      !nodeTemplate ||
-      !node.data.version
-    ) {
+  const _updateNode = useCallback(() => {
+    const needsUpdate = getNeedsUpdate(node, nodeTemplate);
+    const updatedNode = updateNode(node, nodeTemplate);
+    if (!updatedNode) {
+      if (needsUpdate) {
+        toast({ title: t('nodes.unableToUpdateNodes', { count: 1 }) });
+      }
       return;
     }
+    dispatch(nodeReplaced({ nodeId: updatedNode.id, node: updatedNode }));
+  }, [dispatch, node, nodeTemplate, t, toast]);
 
-    const defaults = buildNodeData(
-      node.data.type as AnyInvocationType,
-      node.position,
-      nodeTemplate
-    ) as Node<InvocationNodeData>;
-
-    const clone = cloneDeep(node);
-    clone.data.version = nodeTemplate.version;
-    defaultsDeep(clone, defaults);
-    dispatch(nodeReplaced({ nodeId: clone.id, node: clone }));
-  }, [dispatch, mayUpdate, node, nodeTemplate]);
-
-  return { needsUpdate, mayUpdate, updateNode };
+  return { needsUpdate, mayUpdate, updateNode: _updateNode };
 };
