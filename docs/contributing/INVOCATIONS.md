@@ -15,7 +15,6 @@ New nodes should be added to a subfolder in `nodes` direction found at the root 
 
 Example `nodes`  subfolder structure:
 ```py
-.
 ├── __init__.py # Invoke-managed custom node loader
 │
 ├── cool_node
