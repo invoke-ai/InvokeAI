@@ -107,6 +107,7 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
     <a href="installation/INSTALLATION"> <button class="button">Installation</button> </a>
     <a href="features/"> <button class="button">Features</button> </a>
     <a href="help/gettingStartedWithAI/"> <button class="button">Getting Started</button> </a>
+    <a href="help/FAQ/"> <button class="button">FAQ</button> </a>
     <a href="contributing/CONTRIBUTING/"> <button class="button">Contributing</button> </a>
     <a href="https://github.com/invoke-ai/InvokeAI/"> <button class="button">Code and Downloads</button> </a>
     <a href="https://github.com/invoke-ai/InvokeAI/issues"> <button class="button">Bug Reports </button> </a>

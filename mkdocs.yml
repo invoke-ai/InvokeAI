@@ -180,6 +180,7 @@ nav:
       - Troubleshooting: 'help/deprecated/TROUBLESHOOT.md'
     - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
+      - FAQs: 'help/FAQ.md'
       - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:
