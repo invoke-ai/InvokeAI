@@ -6,7 +6,7 @@ import {
   Graph,
   LinearUIOutputInvocation,
 } from 'services/api/types';
-import { REALESRGAN as ESRGAN, LINEAR_UI_OUTPUT } from './constants';
+import { ESRGAN, LINEAR_UI_OUTPUT } from './constants';
 import { addCoreMetadataNode, upsertMetadata } from './metadata';
 
 type Arg = {

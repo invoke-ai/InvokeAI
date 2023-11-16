@@ -67,7 +67,7 @@ export const BATCH_PROMPT = 'batch_prompt';
 export const BATCH_STYLE_PROMPT = 'batch_style_prompt';
 export const METADATA_COLLECT = 'metadata_collect';
 export const MERGE_METADATA = 'merge_metadata';
-export const REALESRGAN = 'esrgan';
+export const ESRGAN = 'esrgan';
 export const DIVIDE = 'divide';
 export const SCALE = 'scale_image';
 export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
@@ -81,6 +81,32 @@ export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
 export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
 export const SEAMLESS = 'seamless';
 export const SDXL_REFINER_SEAMLESS = 'refiner_seamless';
+
+// these image-outputting nodes are from the linear UI and we should not handle the gallery logic on them
+// instead, we wait for LINEAR_UI_OUTPUT node, and handle it like any other image-outputting node
+export const nodeIDDenyList = [
+  CANVAS_OUTPUT,
+  LATENTS_TO_IMAGE,
+  LATENTS_TO_IMAGE_HRF_HR,
+  NSFW_CHECKER,
+  WATERMARKER,
+  ESRGAN,
+  ESRGAN_HRF,
+  RESIZE_HRF,
+  LATENTS_TO_IMAGE_HRF_LR,
+  IMG2IMG_RESIZE,
+  INPAINT_IMAGE,
+  SCALED_INPAINT_IMAGE,
+  INPAINT_IMAGE_RESIZE_UP,
+  INPAINT_IMAGE_RESIZE_DOWN,
+  INPAINT_INFILL,
+  INPAINT_INFILL_RESIZE_DOWN,
+  INPAINT_FINAL_IMAGE,
+  INPAINT_CREATE_MASK,
+  INPAINT_MASK,
+  PASTE_IMAGE,
+  SCALE,
+];
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
