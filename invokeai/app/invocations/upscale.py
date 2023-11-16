@@ -29,7 +29,7 @@ if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
 
-@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.1.0")
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.2.0")
 class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Upscales an image using RealESRGAN."""
 
