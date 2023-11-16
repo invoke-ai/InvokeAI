@@ -1,12 +1,13 @@
 import { Box } from '@chakra-ui/react';
 import { useCanvasGenerationMode } from 'features/canvas/hooks/useCanvasGenerationMode';
 import { memo } from 'react';
+import { t } from 'i18next';
 
 const GENERATION_MODE_NAME_MAP = {
-  txt2img: 'Text to Image',
-  img2img: 'Image to Image',
-  inpaint: 'Inpaint',
-  outpaint: 'Inpaint',
+  txt2img: t('common.txt2img'),
+  img2img: t('common.img2img'),
+  inpaint: t('common.inpaint'),
+  outpaint: t('common.outpaint'),
 };
 
 const GenerationModeStatusText = () => {
@@ -14,7 +15,8 @@ const GenerationModeStatusText = () => {
 
   return (
     <Box>
-      Mode: {generationMode ? GENERATION_MODE_NAME_MAP[generationMode] : '...'}
+      {t('accessibility.mode')}:{' '}
+      {generationMode ? GENERATION_MODE_NAME_MAP[generationMode] : '...'}
     </Box>
   );
 };

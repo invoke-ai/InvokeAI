@@ -11,8 +11,10 @@ import InspectorDataTab from './InspectorDataTab';
 import InspectorOutputsTab from './InspectorOutputsTab';
 import InspectorTemplateTab from './InspectorTemplateTab';
 // import InspectorDetailsTab from './InspectorDetailsTab';
+import { useTranslation } from 'react-i18next';
 
 const InspectorPanel = () => {
+  const { t } = useTranslation();
   return (
     <Flex
       layerStyle="first"
@@ -31,9 +33,9 @@ const InspectorPanel = () => {
       >
         <TabList>
           {/* <Tab>Details</Tab> */}
-          <Tab>Outputs</Tab>
-          <Tab>Data</Tab>
-          <Tab>Template</Tab>
+          <Tab>{t('common.outputs')}</Tab>
+          <Tab>{t('common.data')}</Tab>
+          <Tab>{t('common.template')}</Tab>
         </TabList>
 
         <TabPanels>
