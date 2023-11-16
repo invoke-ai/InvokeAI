@@ -11,7 +11,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
 
 
-@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.0.0")
+@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.1.0")
 class CvInpaintInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Simple inpaint using opencv."""
 

@@ -790,7 +790,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
 )
 class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Generates an image from latents."""

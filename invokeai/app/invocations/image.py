@@ -36,7 +36,7 @@ class ShowImageInvocation(BaseInvocation):
         )
 
 
-@invocation("blank_image", title="Blank Image", tags=["image"], category="image", version="1.0.0")
+@invocation("blank_image", title="Blank Image", tags=["image"], category="image", version="1.1.0")
 class BlankImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Creates a blank image and forwards it to the pipeline"""
 
@@ -66,7 +66,7 @@ class BlankImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
         )
 
 
-@invocation("img_crop", title="Crop Image", tags=["image", "crop"], category="image", version="1.0.0")
+@invocation("img_crop", title="Crop Image", tags=["image", "crop"], category="image", version="1.1.0")
 class ImageCropInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Crops an image to a specified box. The box can be outside of the image."""
 
@@ -100,7 +100,7 @@ class ImageCropInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image", version="1.0.1")
+@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image", version="1.1.0")
 class ImagePasteInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Pastes an image into another image."""
 
@@ -154,7 +154,7 @@ class ImagePasteInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("tomask", title="Mask from Alpha", tags=["image", "mask"], category="image", version="1.0.0")
+@invocation("tomask", title="Mask from Alpha", tags=["image", "mask"], category="image", version="1.1.0")
 class MaskFromAlphaInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Extracts the alpha channel of an image as a mask."""
 
@@ -186,7 +186,7 @@ class MaskFromAlphaInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("img_mul", title="Multiply Images", tags=["image", "multiply"], category="image", version="1.0.0")
+@invocation("img_mul", title="Multiply Images", tags=["image", "multiply"], category="image", version="1.1.0")
 class ImageMultiplyInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Multiplies two images together using `PIL.ImageChops.multiply()`."""
 
@@ -220,7 +220,7 @@ class ImageMultiplyInvocation(BaseInvocation, WithWorkflow, WithMetadata):
 IMAGE_CHANNELS = Literal["A", "R", "G", "B"]
 
 
-@invocation("img_chan", title="Extract Image Channel", tags=["image", "channel"], category="image", version="1.0.0")
+@invocation("img_chan", title="Extract Image Channel", tags=["image", "channel"], category="image", version="1.1.0")
 class ImageChannelInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Gets a channel from an image."""
 
@@ -253,7 +253,7 @@ class ImageChannelInvocation(BaseInvocation, WithWorkflow, WithMetadata):
 IMAGE_MODES = Literal["L", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"]
 
 
-@invocation("img_conv", title="Convert Image Mode", tags=["image", "convert"], category="image", version="1.0.0")
+@invocation("img_conv", title="Convert Image Mode", tags=["image", "convert"], category="image", version="1.1.0")
 class ImageConvertInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Converts an image to a different mode."""
 
@@ -283,7 +283,7 @@ class ImageConvertInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("img_blur", title="Blur Image", tags=["image", "blur"], category="image", version="1.0.0")
+@invocation("img_blur", title="Blur Image", tags=["image", "blur"], category="image", version="1.1.0")
 class ImageBlurInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Blurs an image"""
 
@@ -338,7 +338,7 @@ PIL_RESAMPLING_MAP = {
 }
 
 
-@invocation("img_resize", title="Resize Image", tags=["image", "resize"], category="image", version="1.0.0")
+@invocation("img_resize", title="Resize Image", tags=["image", "resize"], category="image", version="1.1.0")
 class ImageResizeInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Resizes an image to specific dimensions"""
 
@@ -375,7 +375,7 @@ class ImageResizeInvocation(BaseInvocation, WithMetadata, WithWorkflow):
         )
 
 
-@invocation("img_scale", title="Scale Image", tags=["image", "scale"], category="image", version="1.0.0")
+@invocation("img_scale", title="Scale Image", tags=["image", "scale"], category="image", version="1.1.0")
 class ImageScaleInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Scales an image by a factor"""
 
@@ -417,7 +417,7 @@ class ImageScaleInvocation(BaseInvocation, WithMetadata, WithWorkflow):
         )
 
 
-@invocation("img_lerp", title="Lerp Image", tags=["image", "lerp"], category="image", version="1.0.0")
+@invocation("img_lerp", title="Lerp Image", tags=["image", "lerp"], category="image", version="1.1.0")
 class ImageLerpInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Linear interpolation of all pixels of an image"""
 
@@ -451,7 +451,7 @@ class ImageLerpInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("img_ilerp", title="Inverse Lerp Image", tags=["image", "ilerp"], category="image", version="1.0.0")
+@invocation("img_ilerp", title="Inverse Lerp Image", tags=["image", "ilerp"], category="image", version="1.1.0")
 class ImageInverseLerpInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Inverse linear interpolation of all pixels of an image"""
 
@@ -485,7 +485,7 @@ class ImageInverseLerpInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("img_nsfw", title="Blur NSFW Image", tags=["image", "nsfw"], category="image", version="1.0.0")
+@invocation("img_nsfw", title="Blur NSFW Image", tags=["image", "nsfw"], category="image", version="1.1.0")
 class ImageNSFWBlurInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Add blur to NSFW-flagged images"""
 
@@ -532,7 +532,7 @@ class ImageNSFWBlurInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     title="Add Invisible Watermark",
     tags=["image", "watermark"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
 )
 class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Add an invisible watermark to an image"""
@@ -561,7 +561,7 @@ class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithWorkflow):
         )
 
 
-@invocation("mask_edge", title="Mask Edge", tags=["image", "mask", "inpaint"], category="image", version="1.0.0")
+@invocation("mask_edge", title="Mask Edge", tags=["image", "mask", "inpaint"], category="image", version="1.1.0")
 class MaskEdgeInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Applies an edge mask to an image"""
 
@@ -612,7 +612,7 @@ class MaskEdgeInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     title="Combine Masks",
     tags=["image", "mask", "multiply"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
 )
 class MaskCombineInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`."""
@@ -644,7 +644,7 @@ class MaskCombineInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("color_correct", title="Color Correct", tags=["image", "color"], category="image", version="1.0.0")
+@invocation("color_correct", title="Color Correct", tags=["image", "color"], category="image", version="1.1.0")
 class ColorCorrectInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """
     Shifts the colors of a target image to match the reference image, optionally
@@ -755,7 +755,7 @@ class ColorCorrectInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("img_hue_adjust", title="Adjust Image Hue", tags=["image", "hue"], category="image", version="1.0.0")
+@invocation("img_hue_adjust", title="Adjust Image Hue", tags=["image", "hue"], category="image", version="1.1.0")
 class ImageHueAdjustmentInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Adjusts the Hue of an image."""
 
@@ -858,7 +858,7 @@ CHANNEL_FORMATS = {
         "value",
     ],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
 )
 class ImageChannelOffsetInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Add or subtract a value from a specific color channel of an image."""
@@ -929,7 +929,7 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         "value",
     ],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
 )
 class ImageChannelMultiplyInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Scale a specific color channel of an image."""
@@ -988,7 +988,7 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithWorkflow, WithMetadata)
     title="Save Image",
     tags=["primitives", "image"],
     category="primitives",
-    version="1.0.1",
+    version="1.1.0",
     use_cache=False,
 )
 class SaveImageInvocation(BaseInvocation, WithWorkflow, WithMetadata):
