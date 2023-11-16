@@ -139,7 +139,6 @@ nav:
     - Features:
       - Overview: 'features/index.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
-      - Concepts: 'features/CONCEPTS.md'
       - Configuration: 'features/CONFIGURATION.md'
       - Control Adapters: 'features/CONTROLNET.md'
       - Image-to-Image: 'features/IMG2IMG.md'
