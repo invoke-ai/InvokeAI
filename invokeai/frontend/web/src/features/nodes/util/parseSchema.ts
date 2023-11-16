@@ -19,7 +19,7 @@ const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
 const RESERVED_FIELD_TYPES = ['IsIntermediate'];
 
-const invocationDenylist: AnyInvocationType[] = ['graph'];
+const invocationDenylist: AnyInvocationType[] = ['graph', 'linear_ui_output'];
 
 const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {

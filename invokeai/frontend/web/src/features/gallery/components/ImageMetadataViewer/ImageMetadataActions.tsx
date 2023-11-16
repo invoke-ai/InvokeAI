@@ -157,6 +157,8 @@ const ImageMetadataActions = (props: Props) => {
     return null;
   }
 
+  console.log(metadata);
+
   return (
     <>
       {metadata.created_by && (
