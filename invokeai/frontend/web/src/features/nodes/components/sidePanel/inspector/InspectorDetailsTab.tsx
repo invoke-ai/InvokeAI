@@ -68,7 +68,7 @@ const Content = (props: {
   template: InvocationTemplate;
 }) => {
   const { t } = useTranslation();
-  const { needsUpdate, mayUpdate, updateNode } = useNodeVersion(props.node.id);
+  const { needsUpdate, updateNode } = useNodeVersion(props.node.id);
   return (
     <Box
       sx={{
