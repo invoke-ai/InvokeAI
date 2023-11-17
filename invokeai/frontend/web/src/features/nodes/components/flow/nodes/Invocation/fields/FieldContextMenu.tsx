@@ -56,7 +56,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   );
 
   const mayExpose = useMemo(
-    () => ['any', 'direct'].includes(input ?? '__UNKNOWN_INPUT__'),
+    () => input && ['any', 'direct'].includes(input),
     [input]
   );
 

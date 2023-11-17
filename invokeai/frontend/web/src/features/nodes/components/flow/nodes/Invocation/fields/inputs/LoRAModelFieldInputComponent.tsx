@@ -5,10 +5,10 @@ import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSe
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { fieldLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  LoRAModelInputFieldTemplate,
-  LoRAModelInputFieldValue,
-  FieldComponentProps,
-} from 'features/nodes/types/types';
+  LoRAModelFieldInputTemplate,
+  LoRAModelFieldInputInstance,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToLoRAModelParam } from 'features/parameters/util/modelIdToLoRAModelParam';
 import { forEach } from 'lodash-es';
@@ -16,10 +16,10 @@ import { memo, useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 import { useTranslation } from 'react-i18next';
 
-const LoRAModelInputFieldComponent = (
+const LoRAModelFieldInputComponent = (
   props: FieldComponentProps<
-    LoRAModelInputFieldValue,
-    LoRAModelInputFieldTemplate
+    LoRAModelFieldInputInstance,
+    LoRAModelFieldInputTemplate
   >
 ) => {
   const { nodeId, field } = props;
@@ -121,4 +121,4 @@ const LoRAModelInputFieldComponent = (
   );
 };
 
-export default memo(LoRAModelInputFieldComponent);
+export default memo(LoRAModelFieldInputComponent);

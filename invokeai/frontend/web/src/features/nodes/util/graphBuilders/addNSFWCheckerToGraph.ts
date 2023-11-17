@@ -1,8 +1,8 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   ImageNSFWBlurInvocation,
   LatentsToImageInvocation,
+  NonNullableGraph,
 } from 'services/api/types';
 import { LATENTS_TO_IMAGE, NSFW_CHECKER } from './constants';
 

@@ -1,11 +1,11 @@
 import { logger } from 'app/logging/logger';
-import { Workflow, zWorkflow } from 'features/nodes/types/types';
+import { WorkflowV2, zWorkflowV2 } from 'features/nodes/types/workflow';
 import { api } from '..';
 import { paths } from '../schema';
 
 export const workflowsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getWorkflow: build.query<Workflow | undefined, string>({
+    getWorkflow: build.query<WorkflowV2 | undefined, string>({
       query: (workflow_id) => `workflows/i/${workflow_id}`,
       providesTags: (result, error, workflow_id) => [
         { type: 'Workflow', id: workflow_id },
@@ -14,7 +14,7 @@ export const workflowsApi = api.injectEndpoints({
         response: paths['/api/v1/workflows/i/{workflow_id}']['get']['responses']['200']['content']['application/json']
       ) => {
         if (response) {
-          const result = zWorkflow.safeParse(response);
+          const result = zWorkflowV2.safeParse(response);
           if (result.success) {
             return result.data;
           } else {

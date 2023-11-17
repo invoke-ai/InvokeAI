@@ -1,123 +1,159 @@
-import { compareVersions } from 'compare-versions';
-import { cloneDeep, keyBy } from 'lodash-es';
-import {
-  InvocationTemplate,
-  Workflow,
-  WorkflowWarning,
-  isWorkflowInvocationNode,
-} from '../types/types';
 import { parseify } from 'common/util/serialize';
-import i18n from 'i18next';
+import { t } from 'i18next';
+import { keyBy } from 'lodash-es';
+import { JsonObject } from 'type-fest';
+import { getNeedsUpdate } from '../store/util/nodeUpdate';
+import { InvocationTemplate } from '../types/invocation';
+import { parseAndMigrateWorkflow } from '../types/migration/migrations';
+import { WorkflowV2, isWorkflowInvocationNode } from '../types/workflow';
 
+type WorkflowWarning = {
+  message: string;
+  issues?: string[];
+  data: JsonObject;
+};
+
+type ValidateWorkflowResult = {
+  workflow: WorkflowV2;
+  warnings: WorkflowWarning[];
+};
+
+/**
+ * Parses and validates a workflow:
+ * - Parses the workflow schema, and migrates it to the latest version if necessary.
+ * - Validates the workflow against the node templates, warning if the template is not known.
+ * - Attempts to update nodes which have a mismatched version.
+ * - Removes edges which are invalid.
+ * @param workflow The raw workflow object (e.g. JSON.parse(stringifiedWorklow))
+ * @param invocationTemplates The node templates to validate against.
+ * @throws {WorkflowVersionError} If the workflow version is not recognized.
+ * @throws {z.ZodError} If there is a validation error.
+ */
 export const validateWorkflow = (
-  workflow: Workflow,
-  nodeTemplates: Record<string, InvocationTemplate>
-) => {
-  const clone = cloneDeep(workflow);
-  const { nodes, edges } = clone;
-  const errors: WorkflowWarning[] = [];
+  workflow: unknown,
+  invocationTemplates: Record<string, InvocationTemplate>
+): ValidateWorkflowResult => {
+  // Parse the raw workflow data & migrate it to the latest version
+  const _workflow = parseAndMigrateWorkflow(workflow);
+
+  // Now we can validate the graph
+  const { nodes, edges } = _workflow;
+  const warnings: WorkflowWarning[] = [];
+
+  // We don't need to validate Note nodes or CurrentImage nodes - only Invocation nodes
   const invocationNodes = nodes.filter(isWorkflowInvocationNode);
   const keyedNodes = keyBy(invocationNodes, 'id');
-  nodes.forEach((node) => {
-    if (!isWorkflowInvocationNode(node)) {
-      return;
-    }
 
-    const nodeTemplate = nodeTemplates[node.data.type];
-    if (!nodeTemplate) {
-      errors.push({
-        message: `${i18n.t('nodes.node')} "${node.data.type}" ${i18n.t(
-          'nodes.skipped'
-        )}`,
-        issues: [
-          `${i18n.t('nodes.nodeType')}"${node.data.type}" ${i18n.t(
-            'nodes.doesNotExist'
-          )}`,
-        ],
-        data: node,
+  invocationNodes.forEach((node) => {
+    const template = invocationTemplates[node.data.type];
+    if (!template) {
+      // This node's type template does not exist
+      const message = t('nodes.missingTemplate', {
+        node: node.id,
+        type: node.data.type,
+      });
+      warnings.push({
+        message,
+        data: parseify(node),
       });
       return;
     }
 
-    if (
-      nodeTemplate.version &&
-      node.data.version &&
-      compareVersions(nodeTemplate.version, node.data.version) !== 0
-    ) {
-      errors.push({
-        message: `${i18n.t('nodes.node')} "${node.data.type}" ${i18n.t(
-          'nodes.mismatchedVersion'
-        )}`,
-        issues: [
-          `${i18n.t('nodes.node')} "${node.data.type}" v${
-            node.data.version
-          } ${i18n.t('nodes.maybeIncompatible')} v${nodeTemplate.version}`,
-        ],
-        data: { node, nodeTemplate: parseify(nodeTemplate) },
+    if (getNeedsUpdate(node, template)) {
+      // This node needs to be updated, based on comparison of its version to the template version
+      const message = t('nodes.mismatchedVersion', {
+        node: node.id,
+        type: node.data.type,
+      });
+      warnings.push({
+        message,
+        data: parseify({ node, nodeTemplate: template }),
       });
       return;
     }
   });
   edges.forEach((edge, i) => {
+    // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
     const sourceNode = keyedNodes[edge.source];
     const targetNode = keyedNodes[edge.target];
     const issues: string[] = [];
+
     if (!sourceNode) {
+      // The edge's source/output node does not exist
       issues.push(
-        `${i18n.t('nodes.outputNode')} ${edge.source} ${i18n.t(
-          'nodes.doesNotExist'
-        )}`
+        t('nodes.sourceNodeDoesNotExist', {
+          node: edge.source,
+        })
       );
     } else if (
       edge.type === 'default' &&
       !(edge.sourceHandle in sourceNode.data.outputs)
     ) {
+      // The edge's source/output node field does not exist
       issues.push(
-        `${i18n.t('nodes.outputNode')} "${edge.source}.${
-          edge.sourceHandle
-        }" ${i18n.t('nodes.doesNotExist')}`
+        t('nodes.sourceNodeFieldDoesNotExist', {
+          node: edge.source,
+          field: edge.sourceHandle,
+        })
       );
     }
+
     if (!targetNode) {
+      // The edge's target/input node does not exist
       issues.push(
-        `${i18n.t('nodes.inputNode')} ${edge.target} ${i18n.t(
-          'nodes.doesNotExist'
-        )}`
+        t('nodes.targetNodeDoesNotExist', {
+          node: edge.target,
+        })
       );
     } else if (
       edge.type === 'default' &&
       !(edge.targetHandle in targetNode.data.inputs)
     ) {
+      // The edge's target/input node field does not exist
       issues.push(
-        `${i18n.t('nodes.inputField')} "${edge.target}.${
-          edge.targetHandle
-        }" ${i18n.t('nodes.doesNotExist')}`
+        t('nodes.targetNodeFieldDoesNotExist', {
+          node: edge.target,
+          field: edge.targetHandle,
+        })
       );
     }
-    if (!nodeTemplates[sourceNode?.data.type ?? '__UNKNOWN_NODE_TYPE__']) {
+
+    if (!sourceNode?.data.type || !invocationTemplates[sourceNode.data.type]) {
+      // The edge's source/output node template does not exist
       issues.push(
-        `${i18n.t('nodes.sourceNode')} "${edge.source}" ${i18n.t(
-          'nodes.missingTemplate'
-        )} "${sourceNode?.data.type}"`
+        t('nodes.missingTemplate', {
+          node: edge.source,
+          type: sourceNode?.data.type,
+        })
       );
     }
-    if (!nodeTemplates[targetNode?.data.type ?? '__UNKNOWN_NODE_TYPE__']) {
+    if (!targetNode?.data.type || !invocationTemplates[targetNode?.data.type]) {
+      // The edge's target/input node template does not exist
       issues.push(
-        `${i18n.t('nodes.sourceNode')}"${edge.target}" ${i18n.t(
-          'nodes.missingTemplate'
-        )} "${targetNode?.data.type}"`
+        t('nodes.missingTemplate', {
+          node: edge.target,
+          type: targetNode?.data.type,
+        })
       );
     }
+
     if (issues.length) {
+      // This edge has some issues. Remove it.
       delete edges[i];
-      const src = edge.type === 'default' ? edge.sourceHandle : edge.source;
-      const tgt = edge.type === 'default' ? edge.targetHandle : edge.target;
-      errors.push({
-        message: `Edge "${src} -> ${tgt}" skipped`,
+      const source =
+        edge.type === 'default'
+          ? `${edge.source}.${edge.sourceHandle}`
+          : edge.source;
+      const target =
+        edge.type === 'default'
+          ? `${edge.source}.${edge.targetHandle}`
+          : edge.target;
+      warnings.push({
+        message: t('nodes.deletedInvalidEdge', { source, target }),
         issues,
         data: edge,
       });
     }
   });
-  return { workflow: clone, errors };
+  return { workflow: _workflow, warnings };
 };

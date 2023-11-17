@@ -6,8 +6,8 @@ import {
   CoreMetadataInvocation,
   IPAdapterInvocation,
   IPAdapterMetadataField,
+  NonNullableGraph,
 } from 'services/api/types';
-import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   IP_ADAPTER_COLLECT,

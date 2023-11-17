@@ -1,11 +1,10 @@
 import { RootState } from 'app/store/store';
 import {
   LoRAMetadataItem,
-  NonNullableGraph,
   zLoRAMetadataItem,
-} from 'features/nodes/types/types';
+} from 'features/nodes/types/metadata';
 import { forEach, size } from 'lodash-es';
-import { SDXLLoraLoaderInvocation } from 'services/api/types';
+import { NonNullableGraph, SDXLLoraLoaderInvocation } from 'services/api/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   LORA_LOADER,

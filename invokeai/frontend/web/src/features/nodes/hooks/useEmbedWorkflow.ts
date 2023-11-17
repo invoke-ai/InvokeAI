@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
-import { isInvocationNode } from '../types/types';
+import { isInvocationNode } from '../types/invocation';
 
 export const useEmbedWorkflow = (nodeId: string) => {
   const selector = useMemo(

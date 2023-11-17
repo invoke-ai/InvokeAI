@@ -5,14 +5,12 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { fieldSchedulerValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  SchedulerInputFieldTemplate,
-  SchedulerInputFieldValue,
-  FieldComponentProps,
-} from 'features/nodes/types/types';
-import {
-  SCHEDULER_LABEL_MAP,
-  SchedulerParam,
-} from 'features/parameters/types/parameterSchemas';
+  SchedulerFieldInputTemplate,
+  SchedulerFieldInputInstance,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { SCHEDULER_LABEL_MAP } from 'features/parameters/types/constants';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 
@@ -24,7 +22,7 @@ const selector = createSelector(
     const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
       value: name,
       label: label,
-      group: enabledSchedulers.includes(name as SchedulerParam)
+      group: enabledSchedulers.includes(name as ParameterScheduler)
         ? 'Favorites'
         : undefined,
     })).sort((a, b) => a.label.localeCompare(b.label));
@@ -36,10 +34,10 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const SchedulerInputField = (
+const SchedulerFieldInputComponent = (
   props: FieldComponentProps<
-    SchedulerInputFieldValue,
-    SchedulerInputFieldTemplate
+    SchedulerFieldInputInstance,
+    SchedulerFieldInputTemplate
   >
 ) => {
   const { nodeId, field } = props;
@@ -55,7 +53,7 @@ const SchedulerInputField = (
         fieldSchedulerValueChanged({
           nodeId,
           fieldName: field.name,
-          value: value as SchedulerParam,
+          value: value as ParameterScheduler,
         })
       );
     },
@@ -72,4 +70,4 @@ const SchedulerInputField = (
   );
 };
 
-export default memo(SchedulerInputField);
+export default memo(SchedulerFieldInputComponent);

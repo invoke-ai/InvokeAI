@@ -1,5 +1,4 @@
 import { components } from 'services/api/schema';
-import { O } from 'ts-toolbelt';
 import {
   BaseModelType,
   Graph,
@@ -16,11 +15,6 @@ export type ProgressImage = {
   width: number;
   height: number;
 };
-
-export type AnyInvocationType = O.Required<
-  NonNullable<NonNullable<Graph['nodes']>[string]>,
-  'type'
->['type'];
 
 export type AnyInvocation = NonNullable<NonNullable<Graph['nodes']>[string]>;
 

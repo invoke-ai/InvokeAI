@@ -9,23 +9,18 @@ import {
 } from 'features/dnd/types';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  FieldComponentProps,
-  ImageInputFieldTemplate,
-  ImageInputFieldValue,
-  ImagePolymorphicInputFieldTemplate,
-  ImagePolymorphicInputFieldValue,
-} from 'features/nodes/types/types';
+  ImageFieldInputInstance,
+  ImageFieldInputTemplate,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 
-const ImageInputFieldComponent = (
-  props: FieldComponentProps<
-    ImageInputFieldValue | ImagePolymorphicInputFieldValue,
-    ImageInputFieldTemplate | ImagePolymorphicInputFieldTemplate
-  >
+const ImageFieldInputComponent = (
+  props: FieldComponentProps<ImageFieldInputInstance, ImageFieldInputTemplate>
 ) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
@@ -102,7 +97,7 @@ const ImageInputFieldComponent = (
   );
 };
 
-export default memo(ImageInputFieldComponent);
+export default memo(ImageFieldInputComponent);
 
 const UploadElement = memo(() => {
   const { t } = useTranslation();

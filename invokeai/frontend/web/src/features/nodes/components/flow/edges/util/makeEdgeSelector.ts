@@ -2,8 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
-import { FIELDS } from 'features/nodes/types/constants';
-import { isInvocationNode } from 'features/nodes/types/types';
+import { isInvocationNode } from 'features/nodes/types/invocation';
+import { getFieldColor } from './getEdgeColor';
 
 export const makeEdgeSelector = (
   source: string,
@@ -29,7 +29,7 @@ export const makeEdgeSelector = (
 
       const stroke =
         sourceType && nodes.shouldColorEdges
-          ? colorTokenToCssVar(FIELDS[sourceType].color)
+          ? getFieldColor(sourceType)
           : colorTokenToCssVar('base.500');
 
       return {

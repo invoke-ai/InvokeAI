@@ -1,10 +1,10 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   ImageNSFWBlurInvocation,
   ImageWatermarkInvocation,
   LatentsToImageInvocation,
+  NonNullableGraph,
 } from 'services/api/types';
 import { LATENTS_TO_IMAGE, NSFW_CHECKER, WATERMARKER } from './constants';
 

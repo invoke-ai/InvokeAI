@@ -1,17 +1,15 @@
 import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { parseify } from 'common/util/serialize';
-import { zWorkflow } from 'features/nodes/types/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { memo, useCallback } from 'react';
-import { ZodError } from 'zod';
-import { fromZodError, fromZodIssue } from 'zod-validation-error';
-import { workflowLoadRequested } from '../store/actions';
+import { RefObject, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ZodError } from 'zod';
+import { fromZodIssue } from 'zod-validation-error';
+import { workflowLoadRequested } from '../store/actions';
 
-export const useLoadWorkflowFromFile = () => {
+export const useLoadWorkflowFromFile = (resetRef: RefObject<() => void>) => {
   const dispatch = useAppDispatch();
   const logger = useLogger('nodes');
   const { t } = useTranslation();
@@ -26,33 +24,10 @@ export const useLoadWorkflowFromFile = () => {
 
         try {
           const parsedJSON = JSON.parse(String(rawJSON));
-          const result = zWorkflow.safeParse(parsedJSON);
-
-          if (!result.success) {
-            const { message } = fromZodError(result.error, {
-              prefix: t('nodes.workflowValidation'),
-            });
-
-            logger.error({ error: parseify(result.error) }, message);
-
-            dispatch(
-              addToast(
-                makeToast({
-                  title: t('nodes.unableToValidateWorkflow'),
-                  status: 'error',
-                  duration: 5000,
-                })
-              )
-            );
-            reader.abort();
-            return;
-          }
-
-          dispatch(workflowLoadRequested(result.data));
-
-          reader.abort();
-        } catch {
-          // file reader error
+          dispatch(workflowLoadRequested(parsedJSON));
+        } catch (e) {
+          // There was a problem reading the file
+          logger.error(t('nodes.unableToLoadWorkflow'));
           dispatch(
             addToast(
               makeToast({
@@ -61,12 +36,15 @@ export const useLoadWorkflowFromFile = () => {
               })
             )
           );
+          reader.abort();
         }
       };
 
       reader.readAsText(file);
+      // Reset the file picker internal state so that the same file can be loaded again
+      resetRef.current?.();
     },
-    [dispatch, logger, t]
+    [dispatch, logger, resetRef, t]
   );
 
   return loadWorkflowFromFile;

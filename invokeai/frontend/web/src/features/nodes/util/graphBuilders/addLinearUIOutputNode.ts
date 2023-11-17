@@ -1,7 +1,6 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { LinearUIOutputInvocation } from 'services/api/types';
+import { LinearUIOutputInvocation, NonNullableGraph } from 'services/api/types';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,

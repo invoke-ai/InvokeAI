@@ -77,10 +77,10 @@ const InputField = ({ nodeId, fieldName }: Props) => {
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                h: 'full',
                 mb: 0,
                 px: 1,
                 gap: 2,
+                h: 'full',
               }}
             >
               <EditableFieldTitle

@@ -13,13 +13,13 @@ import {
 } from 'features/nodes/util/graphBuilders/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
-import { isImageOutput } from 'services/api/guards';
 import { imagesAdapter } from 'services/api/util';
 import {
   appSocketInvocationComplete,
   socketInvocationComplete,
 } from 'services/events/actions';
 import { startAppListening } from '../..';
+import { isImageOutput } from 'features/nodes/types/common';
 
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
 const nodeTypeDenylist = ['load_image', 'image'];

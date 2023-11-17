@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
 import { KIND_MAP } from '../types/constants';
-import { isInvocationNode } from '../types/types';
+import { isInvocationNode } from '../types/invocation';
 
 export const useFieldType = (
   nodeId: string,
@@ -20,7 +20,8 @@ export const useFieldType = (
           if (!isInvocationNode(node)) {
             return;
           }
-          return node?.data[KIND_MAP[kind]][fieldName]?.type;
+          const field = node.data[KIND_MAP[kind]][fieldName];
+          return field?.type;
         },
         defaultSelectorOptions
       ),

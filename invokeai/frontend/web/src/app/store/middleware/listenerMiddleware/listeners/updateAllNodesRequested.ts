@@ -1,14 +1,16 @@
+import { logger } from 'app/logging/logger';
+import { updateAllNodesRequested } from 'features/nodes/store/actions';
+import { nodeReplaced } from 'features/nodes/store/nodesSlice';
 import {
   getNeedsUpdate,
   updateNode,
-} from 'features/nodes/hooks/useNodeVersion';
-import { updateAllNodesRequested } from 'features/nodes/store/actions';
-import { nodeReplaced } from 'features/nodes/store/nodesSlice';
-import { startAppListening } from '..';
-import { logger } from 'app/logging/logger';
+} from 'features/nodes/store/util/nodeUpdate';
+import { NodeUpdateError } from 'features/nodes/types/error';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
+import { startAppListening } from '..';
 
 export const addUpdateAllNodesRequestedListener = () => {
   startAppListening({
@@ -20,22 +22,31 @@ export const addUpdateAllNodesRequestedListener = () => {
 
       let unableToUpdateCount = 0;
 
-      nodes.forEach((node) => {
+      nodes.filter(isInvocationNode).forEach((node) => {
         const template = templates[node.data.type];
-        const needsUpdate = getNeedsUpdate(node, template);
-        const updatedNode = updateNode(node, template);
-        if (!updatedNode) {
-          if (needsUpdate) {
-            unableToUpdateCount++;
-          }
+        if (!template) {
+          unableToUpdateCount++;
           return;
         }
-        dispatch(nodeReplaced({ nodeId: updatedNode.id, node: updatedNode }));
+        if (!getNeedsUpdate(node, template)) {
+          // No need to increment the count here, since we're not actually updating
+          return;
+        }
+        try {
+          const updatedNode = updateNode(node, template);
+          dispatch(nodeReplaced({ nodeId: updatedNode.id, node: updatedNode }));
+        } catch (e) {
+          if (e instanceof NodeUpdateError) {
+            unableToUpdateCount++;
+          }
+        }
       });
 
       if (unableToUpdateCount) {
         log.warn(
-          `Unable to update ${unableToUpdateCount} nodes. Please report this issue.`
+          t('nodes.unableToUpdateNodes', {
+            count: unableToUpdateCount,
+          })
         );
         dispatch(
           addToast(
@@ -43,6 +54,15 @@ export const addUpdateAllNodesRequestedListener = () => {
               title: t('nodes.unableToUpdateNodes', {
                 count: unableToUpdateCount,
               }),
+            })
+          )
+        );
+      } else {
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('nodes.allNodesUpdated'),
+              status: 'success',
             })
           )
         );

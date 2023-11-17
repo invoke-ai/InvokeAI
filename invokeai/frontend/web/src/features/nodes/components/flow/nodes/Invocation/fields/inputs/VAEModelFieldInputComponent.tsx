@@ -4,20 +4,20 @@ import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSe
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  FieldComponentProps,
-  VaeModelInputFieldTemplate,
-  VaeModelInputFieldValue,
-} from 'features/nodes/types/types';
+  VAEModelFieldInputTemplate,
+  VAEModelFieldInputInstance,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToVAEModelParam } from 'features/parameters/util/modelIdToVAEModelParam';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 
-const VaeModelInputFieldComponent = (
+const VAEModelFieldInputComponent = (
   props: FieldComponentProps<
-    VaeModelInputFieldValue,
-    VaeModelInputFieldTemplate
+    VAEModelFieldInputInstance,
+    VAEModelFieldInputTemplate
   >
 ) => {
   const { nodeId, field } = props;
@@ -105,4 +105,4 @@ const VaeModelInputFieldComponent = (
   );
 };
 
-export default memo(VaeModelInputFieldComponent);
+export default memo(VAEModelFieldInputComponent);

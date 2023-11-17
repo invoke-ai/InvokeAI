@@ -1,16 +1,20 @@
 import { NodesState } from 'features/nodes/store/types';
-import { InputFieldValue, isInvocationNode } from 'features/nodes/types/types';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { cloneDeep, omit, reduce } from 'lodash-es';
 import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
 import { buildWorkflow } from '../buildWorkflow';
+import {
+  FieldInputInstance,
+  isColorFieldInputInstance,
+} from 'features/nodes/types/field';
 
 /**
  * We need to do special handling for some fields
  */
-export const parseFieldValue = (field: InputFieldValue) => {
-  if (field.type === 'ColorField') {
+export const parseFieldValue = (field: FieldInputInstance) => {
+  if (isColorFieldInputInstance(field)) {
     if (field.value) {
       const clonedValue = cloneDeep(field.value);
 

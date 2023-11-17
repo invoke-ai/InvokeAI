@@ -274,7 +274,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ui_order=7,
     )
     latents: Optional[LatentsField] = InputField(
-        default=None, description=FieldDescriptions.latents, input=Input.Connection
+        default=None,
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+        ui_order=4,
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
         default=None,

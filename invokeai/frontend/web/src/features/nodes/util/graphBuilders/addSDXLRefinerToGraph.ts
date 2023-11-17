@@ -2,9 +2,9 @@ import { RootState } from 'app/store/store';
 import {
   CreateDenoiseMaskInvocation,
   ImageDTO,
+  NonNullableGraph,
   SeamlessModeInvocation,
 } from 'services/api/types';
-import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_OUTPUT,
   INPAINT_IMAGE_RESIZE_UP,
