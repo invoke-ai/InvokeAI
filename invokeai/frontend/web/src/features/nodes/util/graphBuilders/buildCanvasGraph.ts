@@ -1,6 +1,5 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { ImageDTO } from 'services/api/types';
+import { ImageDTO, NonNullableGraph } from 'services/api/types';
 import { buildCanvasImageToImageGraph } from './buildCanvasImageToImageGraph';
 import { buildCanvasInpaintGraph } from './buildCanvasInpaintGraph';
 import { buildCanvasOutpaintGraph } from './buildCanvasOutpaintGraph';

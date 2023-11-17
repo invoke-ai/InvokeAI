@@ -1,10 +1,10 @@
 import { BoardId } from 'features/gallery/store/types';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import { ESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import {
   ESRGANInvocation,
   Graph,
   LinearUIOutputInvocation,
+  NonNullableGraph,
 } from 'services/api/types';
 import { ESRGAN, LINEAR_UI_OUTPUT } from './constants';
 import { addCoreMetadataNode, upsertMetadata } from './metadata';

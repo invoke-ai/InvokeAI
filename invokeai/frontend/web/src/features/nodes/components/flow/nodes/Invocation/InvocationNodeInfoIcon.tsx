@@ -2,8 +2,8 @@ import { Flex, Icon, Text, Tooltip } from '@chakra-ui/react';
 import { compare } from 'compare-versions';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
-import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
-import { isInvocationNodeData } from 'features/nodes/types/types';
+import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
+import { isInvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaInfoCircle } from 'react-icons/fa';
@@ -13,7 +13,7 @@ interface Props {
 }
 
 const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
-  const { needsUpdate } = useNodeVersion(nodeId);
+  const needsUpdate = useNodeNeedsUpdate(nodeId);
 
   return (
     <Tooltip

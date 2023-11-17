@@ -6,9 +6,9 @@ import {
   isAnyOf,
 } from '@reduxjs/toolkit';
 import {
-  ControlNetModelParam,
-  IPAdapterModelParam,
-  T2IAdapterModelParam,
+  ParameterControlNetModel,
+  ParameterIPAdapterModel,
+  ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, merge, uniq } from 'lodash-es';
 import { appSocketInvocationError } from 'services/events/actions';
@@ -243,9 +243,9 @@ export const controlAdaptersSlice = createSlice({
       action: PayloadAction<{
         id: string;
         model:
-          | ControlNetModelParam
-          | T2IAdapterModelParam
-          | IPAdapterModelParam;
+          | ParameterControlNetModel
+          | ParameterT2IAdapterModel
+          | ParameterIPAdapterModel;
       }>
     ) => {
       const { id, model } = action.payload;

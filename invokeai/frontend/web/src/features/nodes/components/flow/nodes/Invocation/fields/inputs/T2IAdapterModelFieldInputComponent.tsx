@@ -1,51 +1,51 @@
 import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { fieldIPAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldT2IAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  IPAdapterModelInputFieldTemplate,
-  IPAdapterModelInputFieldValue,
-  FieldComponentProps,
-} from 'features/nodes/types/types';
+  T2IAdapterModelFieldInputInstance,
+  T2IAdapterModelFieldInputTemplate,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { modelIdToIPAdapterModelParam } from 'features/parameters/util/modelIdToIPAdapterModelParams';
+import { modelIdToT2IAdapterModelParam } from 'features/parameters/util/modelIdToT2IAdapterModelParam';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useGetIPAdapterModelsQuery } from 'services/api/endpoints/models';
+import { useGetT2IAdapterModelsQuery } from 'services/api/endpoints/models';
 
-const IPAdapterModelInputFieldComponent = (
+const T2IAdapterModelFieldInputComponent = (
   props: FieldComponentProps<
-    IPAdapterModelInputFieldValue,
-    IPAdapterModelInputFieldTemplate
+    T2IAdapterModelFieldInputInstance,
+    T2IAdapterModelFieldInputTemplate
   >
 ) => {
   const { nodeId, field } = props;
-  const ipAdapterModel = field.value;
+  const t2iAdapterModel = field.value;
   const dispatch = useAppDispatch();
 
-  const { data: ipAdapterModels } = useGetIPAdapterModelsQuery();
+  const { data: t2iAdapterModels } = useGetT2IAdapterModelsQuery();
 
   // grab the full model entity from the RTK Query cache
   const selectedModel = useMemo(
     () =>
-      ipAdapterModels?.entities[
-        `${ipAdapterModel?.base_model}/ip_adapter/${ipAdapterModel?.model_name}`
+      t2iAdapterModels?.entities[
+        `${t2iAdapterModel?.base_model}/t2i_adapter/${t2iAdapterModel?.model_name}`
       ] ?? null,
     [
-      ipAdapterModel?.base_model,
-      ipAdapterModel?.model_name,
-      ipAdapterModels?.entities,
+      t2iAdapterModel?.base_model,
+      t2iAdapterModel?.model_name,
+      t2iAdapterModels?.entities,
     ]
   );
 
   const data = useMemo(() => {
-    if (!ipAdapterModels) {
+    if (!t2iAdapterModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(ipAdapterModels.entities, (model, id) => {
+    forEach(t2iAdapterModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -58,7 +58,7 @@ const IPAdapterModelInputFieldComponent = (
     });
 
     return data;
-  }, [ipAdapterModels]);
+  }, [t2iAdapterModels]);
 
   const handleValueChanged = useCallback(
     (v: string | null) => {
@@ -66,17 +66,17 @@ const IPAdapterModelInputFieldComponent = (
         return;
       }
 
-      const newIPAdapterModel = modelIdToIPAdapterModelParam(v);
+      const newT2IAdapterModel = modelIdToT2IAdapterModelParam(v);
 
-      if (!newIPAdapterModel) {
+      if (!newT2IAdapterModel) {
         return;
       }
 
       dispatch(
-        fieldIPAdapterModelValueChanged({
+        fieldT2IAdapterModelValueChanged({
           nodeId,
           fieldName: field.name,
-          value: newIPAdapterModel,
+          value: newT2IAdapterModel,
         })
       );
     },
@@ -97,4 +97,4 @@ const IPAdapterModelInputFieldComponent = (
   );
 };
 
-export default memo(IPAdapterModelInputFieldComponent);
+export default memo(T2IAdapterModelFieldInputComponent);

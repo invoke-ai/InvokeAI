@@ -1,10 +1,9 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import { range } from 'lodash-es';
 import { components } from 'services/api/schema';
-import { Batch, BatchConfig } from 'services/api/types';
+import { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
 import {
   CANVAS_COHERENCE_NOISE,
   METADATA,

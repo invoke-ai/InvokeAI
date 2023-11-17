@@ -1,51 +1,51 @@
 import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { fieldT2IAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldControlNetModelValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  T2IAdapterModelInputFieldTemplate,
-  T2IAdapterModelInputFieldValue,
-  FieldComponentProps,
-} from 'features/nodes/types/types';
+  ControlNetModelFieldInputTemplate,
+  ControlNetModelFieldInputInstance,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { modelIdToT2IAdapterModelParam } from 'features/parameters/util/modelIdToT2IAdapterModelParam';
+import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useGetT2IAdapterModelsQuery } from 'services/api/endpoints/models';
+import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
-const T2IAdapterModelInputFieldComponent = (
+const ControlNetModelFieldInputComponent = (
   props: FieldComponentProps<
-    T2IAdapterModelInputFieldValue,
-    T2IAdapterModelInputFieldTemplate
+    ControlNetModelFieldInputInstance,
+    ControlNetModelFieldInputTemplate
   >
 ) => {
   const { nodeId, field } = props;
-  const t2iAdapterModel = field.value;
+  const controlNetModel = field.value;
   const dispatch = useAppDispatch();
 
-  const { data: t2iAdapterModels } = useGetT2IAdapterModelsQuery();
+  const { data: controlNetModels } = useGetControlNetModelsQuery();
 
   // grab the full model entity from the RTK Query cache
   const selectedModel = useMemo(
     () =>
-      t2iAdapterModels?.entities[
-        `${t2iAdapterModel?.base_model}/t2i_adapter/${t2iAdapterModel?.model_name}`
+      controlNetModels?.entities[
+        `${controlNetModel?.base_model}/controlnet/${controlNetModel?.model_name}`
       ] ?? null,
     [
-      t2iAdapterModel?.base_model,
-      t2iAdapterModel?.model_name,
-      t2iAdapterModels?.entities,
+      controlNetModel?.base_model,
+      controlNetModel?.model_name,
+      controlNetModels?.entities,
     ]
   );
 
   const data = useMemo(() => {
-    if (!t2iAdapterModels) {
+    if (!controlNetModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(t2iAdapterModels.entities, (model, id) => {
+    forEach(controlNetModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -58,7 +58,7 @@ const T2IAdapterModelInputFieldComponent = (
     });
 
     return data;
-  }, [t2iAdapterModels]);
+  }, [controlNetModels]);
 
   const handleValueChanged = useCallback(
     (v: string | null) => {
@@ -66,17 +66,17 @@ const T2IAdapterModelInputFieldComponent = (
         return;
       }
 
-      const newT2IAdapterModel = modelIdToT2IAdapterModelParam(v);
+      const newControlNetModel = modelIdToControlNetModelParam(v);
 
-      if (!newT2IAdapterModel) {
+      if (!newControlNetModel) {
         return;
       }
 
       dispatch(
-        fieldT2IAdapterModelValueChanged({
+        fieldControlNetModelValueChanged({
           nodeId,
           fieldName: field.name,
-          value: newT2IAdapterModel,
+          value: newControlNetModel,
         })
       );
     },
@@ -97,4 +97,4 @@ const T2IAdapterModelInputFieldComponent = (
   );
 };
 
-export default memo(T2IAdapterModelInputFieldComponent);
+export default memo(ControlNetModelFieldInputComponent);

@@ -1,9 +1,9 @@
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import { forEach, size } from 'lodash-es';
 import {
   CoreMetadataInvocation,
   LoraLoaderInvocation,
+  NonNullableGraph,
 } from 'services/api/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,

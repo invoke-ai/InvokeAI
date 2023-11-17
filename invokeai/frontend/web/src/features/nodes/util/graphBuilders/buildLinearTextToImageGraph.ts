@@ -1,21 +1,20 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
+  NonNullableGraph,
   ONNXTextToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addHrfToGraph } from './addHrfToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
-import { addCoreMetadataNode } from './metadata';
 import {
   CLIP_SKIP,
   DENOISE_LATENTS,
@@ -28,6 +27,7 @@ import {
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
 } from './constants';
+import { addCoreMetadataNode } from './metadata';
 
 export const buildLinearTextToImageGraph = (
   state: RootState

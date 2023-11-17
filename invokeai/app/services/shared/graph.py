@@ -205,7 +205,7 @@ class IterateInvocationOutput(BaseInvocationOutput):
     """Used to connect iteration outputs. Will be expanded to a specific output."""
 
     item: Any = OutputField(
-        description="The item being iterated over", title="Collection Item", ui_type=UIType.CollectionItem
+        description="The item being iterated over", title="Collection Item", ui_type=UIType._CollectionItem
     )
 
 
@@ -215,7 +215,7 @@ class IterateInvocation(BaseInvocation):
     """Iterates over a list of items"""
 
     collection: list[Any] = InputField(
-        description="The list of items to iterate over", default_factory=list, ui_type=UIType.Collection
+        description="The list of items to iterate over", default=[], ui_type=UIType._Collection
     )
     index: int = InputField(description="The index, will be provided on executed iterators", default=0, ui_hidden=True)
 
@@ -227,7 +227,7 @@ class IterateInvocation(BaseInvocation):
 @invocation_output("collect_output")
 class CollectInvocationOutput(BaseInvocationOutput):
     collection: list[Any] = OutputField(
-        description="The collection of input items", title="Collection", ui_type=UIType.Collection
+        description="The collection of input items", title="Collection", ui_type=UIType._Collection
     )
 
 
@@ -238,12 +238,12 @@ class CollectInvocation(BaseInvocation):
     item: Optional[Any] = InputField(
         default=None,
         description="The item to collect (all inputs must be of the same type)",
-        ui_type=UIType.CollectionItem,
+        ui_type=UIType._CollectionItem,
         title="Collection Item",
         input=Input.Connection,
     )
     collection: list[Any] = InputField(
-        description="The collection, will be provided on execution", default_factory=list, ui_hidden=True
+        description="The collection, will be provided on execution", default=[], ui_hidden=True
     )
 
     def invoke(self, context: InvocationContext) -> CollectInvocationOutput:

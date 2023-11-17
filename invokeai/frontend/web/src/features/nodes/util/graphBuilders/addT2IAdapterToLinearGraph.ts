@@ -4,9 +4,10 @@ import { omit } from 'lodash-es';
 import {
   CollectInvocation,
   CoreMetadataInvocation,
+  NonNullableGraph,
+  T2IAdapterField,
   T2IAdapterInvocation,
 } from 'services/api/types';
-import { NonNullableGraph, T2IAdapterField } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   T2I_ADAPTER_COLLECT,

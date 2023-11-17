@@ -15,6 +15,7 @@ export const addReceivedOpenAPISchemaListener = () => {
 
       log.debug({ schemaJSON }, 'Received OpenAPI schema');
       const { nodesAllowlist, nodesDenylist } = getState().config;
+
       const nodeTemplates = parseSchema(
         schemaJSON,
         nodesAllowlist,

@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { InvokeTabName } from './tabMap';
 import { UIState } from './uiTypes';
 
@@ -50,7 +50,7 @@ export const uiSlice = createSlice({
     },
     favoriteSchedulersChanged: (
       state,
-      action: PayloadAction<SchedulerParam[]>
+      action: PayloadAction<ParameterScheduler[]>
     ) => {
       state.favoriteSchedulers = action.payload;
     },

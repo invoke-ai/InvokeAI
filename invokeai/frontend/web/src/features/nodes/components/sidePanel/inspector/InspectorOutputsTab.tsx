@@ -5,7 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { isInvocationNode } from 'features/nodes/types/types';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
 import { ImageOutput } from 'services/api/types';
 import { AnyResult } from 'services/events/types';

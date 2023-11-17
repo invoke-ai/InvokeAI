@@ -1,12 +1,15 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
+import {
+  ImageDTO,
+  ImageToLatentsInvocation,
+  NonNullableGraph,
+} from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';

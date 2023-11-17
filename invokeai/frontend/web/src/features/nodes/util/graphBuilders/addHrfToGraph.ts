@@ -1,13 +1,13 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   DenoiseLatentsInvocation,
   ESRGANInvocation,
   Edge,
   LatentsToImageInvocation,
   NoiseInvocation,
+  NonNullableGraph,
 } from 'services/api/types';
 import {
   DENOISE_LATENTS,

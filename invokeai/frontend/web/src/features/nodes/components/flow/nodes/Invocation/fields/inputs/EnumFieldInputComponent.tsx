@@ -2,14 +2,14 @@ import { Select } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldEnumModelValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  EnumInputFieldTemplate,
-  EnumInputFieldValue,
-  FieldComponentProps,
-} from 'features/nodes/types/types';
+  EnumFieldInputInstance,
+  EnumFieldInputTemplate,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { ChangeEvent, memo, useCallback } from 'react';
 
-const EnumInputFieldComponent = (
-  props: FieldComponentProps<EnumInputFieldValue, EnumInputFieldTemplate>
+const EnumFieldInputComponent = (
+  props: FieldComponentProps<EnumFieldInputInstance, EnumFieldInputTemplate>
 ) => {
   const { nodeId, field, fieldTemplate } = props;
 
@@ -45,4 +45,4 @@ const EnumInputFieldComponent = (
   );
 };
 
-export default memo(EnumInputFieldComponent);
+export default memo(EnumFieldInputComponent);

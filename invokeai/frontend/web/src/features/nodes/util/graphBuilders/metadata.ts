@@ -1,5 +1,4 @@
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { CoreMetadataInvocation } from 'services/api/types';
+import { CoreMetadataInvocation, NonNullableGraph } from 'services/api/types';
 import { JsonObject } from 'type-fest';
 import { METADATA } from './constants';
 

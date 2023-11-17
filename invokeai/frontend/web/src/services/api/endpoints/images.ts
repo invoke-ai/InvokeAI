@@ -7,7 +7,7 @@ import {
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
-import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/types';
+import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/metadata';
 import { keyBy } from 'lodash-es';
 import { ApiTagDescription, LIST_TAG, api } from '..';
 import { components, paths } from '../schema';

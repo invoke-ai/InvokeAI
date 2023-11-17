@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
-import { clipSkipMap } from 'features/parameters/types/constants';
+import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,16 +30,16 @@ export default function ParamClipSkip() {
 
   const max = useMemo(() => {
     if (!model) {
-      return clipSkipMap['sd-1'].maxClip;
+      return CLIP_SKIP_MAP['sd-1'].maxClip;
     }
-    return clipSkipMap[model.base_model].maxClip;
+    return CLIP_SKIP_MAP[model.base_model].maxClip;
   }, [model]);
 
   const sliderMarks = useMemo(() => {
     if (!model) {
-      return clipSkipMap['sd-1'].markers;
+      return CLIP_SKIP_MAP['sd-1'].markers;
     }
-    return clipSkipMap[model.base_model].markers;
+    return CLIP_SKIP_MAP[model.base_model].markers;
   }, [model]);
 
   if (model?.base_model === 'sdxl') {
