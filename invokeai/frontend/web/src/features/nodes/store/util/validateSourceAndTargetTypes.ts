@@ -7,8 +7,8 @@ import {
 import { FieldType } from 'features/nodes/types/types';
 
 export const validateSourceAndTargetTypes = (
-  sourceType: FieldType,
-  targetType: FieldType
+  sourceType: FieldType | string,
+  targetType: FieldType | string
 ) => {
   // TODO: There's a bug with Collect -> Iterate nodes:
   // https://github.com/invoke-ai/InvokeAI/issues/3956
@@ -31,17 +31,18 @@ export const validateSourceAndTargetTypes = (
    */
 
   const isCollectionItemToNonCollection =
-    sourceType === 'CollectionItem' && !COLLECTION_TYPES.includes(targetType);
+    sourceType === 'CollectionItem' &&
+    !COLLECTION_TYPES.some((t) => t === targetType);
 
   const isNonCollectionToCollectionItem =
     targetType === 'CollectionItem' &&
-    !COLLECTION_TYPES.includes(sourceType) &&
-    !POLYMORPHIC_TYPES.includes(sourceType);
+    !COLLECTION_TYPES.some((t) => t === sourceType) &&
+    !POLYMORPHIC_TYPES.some((t) => t === sourceType);
 
   const isAnythingToPolymorphicOfSameBaseType =
-    POLYMORPHIC_TYPES.includes(targetType) &&
+    POLYMORPHIC_TYPES.some((t) => t === targetType) &&
     (() => {
-      if (!POLYMORPHIC_TYPES.includes(targetType)) {
+      if (!POLYMORPHIC_TYPES.some((t) => t === targetType)) {
         return false;
       }
       const baseType =
@@ -57,11 +58,12 @@ export const validateSourceAndTargetTypes = (
 
   const isGenericCollectionToAnyCollectionOrPolymorphic =
     sourceType === 'Collection' &&
-    (COLLECTION_TYPES.includes(targetType) ||
-      POLYMORPHIC_TYPES.includes(targetType));
+    (COLLECTION_TYPES.some((t) => t === targetType) ||
+      POLYMORPHIC_TYPES.some((t) => t === targetType));
 
   const isCollectionToGenericCollection =
-    targetType === 'Collection' && COLLECTION_TYPES.includes(sourceType);
+    targetType === 'Collection' &&
+    COLLECTION_TYPES.some((t) => t === sourceType);
 
   const isIntToFloat = sourceType === 'integer' && targetType === 'float';
 

@@ -94,6 +94,7 @@ export const buildNodeData = (
         name: outputName,
         type: outputTemplate.type,
         fieldKind: 'output',
+        originalType: outputTemplate.originalType,
       };
 
       outputsAccumulator[outputName] = outputFieldValue;

@@ -1,8 +1,6 @@
 import { Tooltip } from '@chakra-ui/react';
-import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import {
   COLLECTION_TYPES,
-  FIELDS,
   HANDLE_TOOLTIP_OPEN_DELAY,
   MODEL_TYPES,
   POLYMORPHIC_TYPES,
@@ -13,6 +11,7 @@ import {
 } from 'features/nodes/types/types';
 import { CSSProperties, memo, useMemo } from 'react';
 import { Handle, HandleType, Position } from 'reactflow';
+import { getFieldColor } from '../../../edges/util/getEdgeColor';
 
 export const handleBaseStyles: CSSProperties = {
   position: 'absolute',
@@ -47,14 +46,14 @@ const FieldHandle = (props: FieldHandleProps) => {
     isConnectionStartField,
     connectionError,
   } = props;
-  const { name, type, originalType } = fieldTemplate;
-  const { color: typeColor } = FIELDS[type];
+  const { name } = fieldTemplate;
+  const type = fieldTemplate.originalType ?? fieldTemplate.type;
 
   const styles: CSSProperties = useMemo(() => {
-    const isCollectionType = COLLECTION_TYPES.includes(type);
-    const isPolymorphicType = POLYMORPHIC_TYPES.includes(type);
-    const isModelType = MODEL_TYPES.includes(type);
-    const color = colorTokenToCssVar(typeColor);
+    const isCollectionType = COLLECTION_TYPES.some((t) => t === type);
+    const isPolymorphicType = POLYMORPHIC_TYPES.some((t) => t === type);
+    const isModelType = MODEL_TYPES.some((t) => t === type);
+    const color = getFieldColor(type);
     const s: CSSProperties = {
       backgroundColor:
         isCollectionType || isPolymorphicType
@@ -97,23 +96,14 @@ const FieldHandle = (props: FieldHandleProps) => {
     isConnectionInProgress,
     isConnectionStartField,
     type,
-    typeColor,
   ]);
 
   const tooltip = useMemo(() => {
-    if (isConnectionInProgress && isConnectionStartField) {
-      return originalType;
-    }
     if (isConnectionInProgress && connectionError) {
-      return connectionError ?? originalType;
+      return connectionError;
     }
-    return originalType;
-  }, [
-    connectionError,
-    isConnectionInProgress,
-    isConnectionStartField,
-    originalType,
-  ]);
+    return type;
+  }, [connectionError, isConnectionInProgress, type]);
 
   return (
     <Tooltip

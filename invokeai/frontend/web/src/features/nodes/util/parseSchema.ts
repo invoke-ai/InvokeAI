@@ -4,7 +4,6 @@ import { reduce, startCase } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
 import { AnyInvocationType } from 'services/events/types';
 import {
-  FieldType,
   InputFieldTemplate,
   InvocationSchemaObject,
   InvocationTemplate,
@@ -150,14 +149,18 @@ export const parseSchema = (
             },
             `Fallback handling for unknown input field type: ${fieldType}`
           );
-          fieldType = 'Unknown';
+          fieldType = 'Custom';
+          if (!isFieldType(fieldType)) {
+            // satisfy TS gods
+            return inputsAccumulator;
+          }
         }
 
         const field = buildInputFieldTemplate(
           schema,
           property,
           propertyName,
-          fieldType as FieldType, // we have already checked that fieldType is a valid FieldType, and forced it to be Unknown if not
+          fieldType,
           originalType
         );
 
@@ -248,7 +251,11 @@ export const parseSchema = (
             { fieldName: propertyName, fieldType, field: parseify(property) },
             `Fallback handling for unknown input field type: ${fieldType}`
           );
-          fieldType = 'Unknown';
+          fieldType = 'Custom';
+          if (!isFieldType(fieldType)) {
+            // satisfy TS gods
+            return outputsAccumulator;
+          }
         }
 
         outputsAccumulator[propertyName] = {
@@ -257,7 +264,7 @@ export const parseSchema = (
           title:
             property.title ?? (propertyName ? startCase(propertyName) : ''),
           description: property.description ?? '',
-          type: fieldType as FieldType,
+          type: fieldType,
           ui_hidden: property.ui_hidden ?? false,
           ui_type: property.ui_type,
           ui_order: property.ui_order,

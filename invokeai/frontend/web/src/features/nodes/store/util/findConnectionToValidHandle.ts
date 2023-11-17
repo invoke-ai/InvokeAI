@@ -12,7 +12,7 @@ import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 const isValidConnection = (
   edges: Edge[],
   handleCurrentType: HandleType,
-  handleCurrentFieldType: FieldType,
+  handleCurrentFieldType: FieldType | string,
   node: Node,
   handle: InputFieldValue | OutputFieldValue
 ) => {
@@ -35,7 +35,12 @@ const isValidConnection = (
     }
   }
 
-  if (!validateSourceAndTargetTypes(handleCurrentFieldType, handle.type)) {
+  if (
+    !validateSourceAndTargetTypes(
+      handleCurrentFieldType,
+      handle.originalType ?? handle.type
+    )
+  ) {
     isValidConnection = false;
   }
 
@@ -49,7 +54,7 @@ export const findConnectionToValidHandle = (
   handleCurrentNodeId: string,
   handleCurrentName: string,
   handleCurrentType: HandleType,
-  handleCurrentFieldType: FieldType
+  handleCurrentFieldType: FieldType | string
 ): Connection | null => {
   if (node.id === handleCurrentNodeId) {
     return null;

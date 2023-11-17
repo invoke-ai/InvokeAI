@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
-import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { FieldType } from 'features/nodes/types/types';
 import i18n from 'i18next';
 import { HandleType } from 'reactflow';
+import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
 /**
@@ -15,7 +15,7 @@ export const makeConnectionErrorSelector = (
   nodeId: string,
   fieldName: string,
   handleType: HandleType,
-  fieldType?: FieldType
+  fieldType?: FieldType | string
 ) => {
   return createSelector(stateSelector, (state) => {
     if (!fieldType) {

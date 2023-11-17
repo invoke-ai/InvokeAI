@@ -150,16 +150,16 @@ export const isPolymorphicItemType = (
 ): itemType is keyof typeof SINGLE_TO_POLYMORPHIC_MAP =>
   Boolean(itemType && itemType in SINGLE_TO_POLYMORPHIC_MAP);
 
-export const FIELDS: Record<FieldType, FieldUIConfig> = {
+export const FIELDS: Record<FieldType | string, FieldUIConfig> = {
   Any: {
     color: 'gray.500',
     description: 'Any field type is accepted.',
     title: 'Any',
   },
-  Unknown: {
+  Custom: {
     color: 'gray.500',
-    description: 'Unknown field type is accepted.',
-    title: 'Unknown',
+    description: 'A custom field, provided by an external node.',
+    title: 'Custom',
   },
   MetadataField: {
     color: 'gray.500',

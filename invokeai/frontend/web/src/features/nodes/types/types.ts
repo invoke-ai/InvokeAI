@@ -133,7 +133,7 @@ export const zFieldType = z.enum([
   'UNetField',
   'VaeField',
   'VaeModelField',
-  'Unknown',
+  'Custom',
 ]);
 
 export type FieldType = z.infer<typeof zFieldType>;
@@ -164,6 +164,7 @@ export const zFieldValueBase = z.object({
   id: z.string().trim().min(1),
   name: z.string().trim().min(1),
   type: zFieldType,
+  originalType: z.string().optional(),
 });
 export type FieldValueBase = z.infer<typeof zFieldValueBase>;
 
@@ -191,7 +192,7 @@ export type OutputFieldTemplate = {
   type: FieldType;
   title: string;
   description: string;
-  originalType: string; // used for custom types
+  originalType?: string; // used for custom types
 } & _OutputField;
 
 export const zInputFieldValueBase = zFieldValueBase.extend({
@@ -791,8 +792,8 @@ export const zAnyInputFieldValue = zInputFieldValueBase.extend({
   value: z.any().optional(),
 });
 
-export const zUnknownInputFieldValue = zInputFieldValueBase.extend({
-  type: z.literal('Unknown'),
+export const zCustomInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('Custom'),
   value: z.any().optional(),
 });
 
@@ -853,7 +854,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zMetadataItemPolymorphicInputFieldValue,
   zMetadataInputFieldValue,
   zMetadataCollectionInputFieldValue,
-  zUnknownInputFieldValue,
+  zCustomInputFieldValue,
 ]);
 
 export type InputFieldValue = z.infer<typeof zInputFieldValue>;
@@ -864,7 +865,7 @@ export type InputFieldTemplateBase = {
   description: string;
   required: boolean;
   fieldKind: 'input';
-  originalType: string; // used for custom types
+  originalType?: string; // used for custom types
 } & _InputField;
 
 export type AnyInputFieldTemplate = InputFieldTemplateBase & {
@@ -872,8 +873,8 @@ export type AnyInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
 };
 
-export type UnknownInputFieldTemplate = InputFieldTemplateBase & {
-  type: 'Unknown';
+export type CustomInputFieldTemplate = InputFieldTemplateBase & {
+  type: 'Custom';
   default: undefined;
 };
 
@@ -1274,7 +1275,7 @@ export type InputFieldTemplate =
   | MetadataInputFieldTemplate
   | MetadataItemPolymorphicInputFieldTemplate
   | MetadataCollectionInputFieldTemplate
-  | UnknownInputFieldTemplate;
+  | CustomInputFieldTemplate;
 
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue

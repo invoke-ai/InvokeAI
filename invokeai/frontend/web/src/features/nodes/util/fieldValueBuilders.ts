@@ -60,7 +60,7 @@ const FIELD_VALUE_FALLBACK_MAP: {
   UNetField: undefined,
   VaeField: undefined,
   VaeModelField: undefined,
-  Unknown: undefined,
+  Custom: undefined,
 };
 
 export const buildInputFieldValue = (
@@ -77,10 +77,9 @@ export const buildInputFieldValue = (
     type: template.type,
     label: '',
     fieldKind: 'input',
+    originalType: template.originalType,
+    value: template.default ?? FIELD_VALUE_FALLBACK_MAP[template.type],
   } as InputFieldValue;
-
-  fieldValue.value =
-    template.default ?? FIELD_VALUE_FALLBACK_MAP[template.type];
 
   return fieldValue;
 };

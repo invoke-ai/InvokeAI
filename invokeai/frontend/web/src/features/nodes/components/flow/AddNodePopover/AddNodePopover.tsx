@@ -74,9 +74,13 @@ const AddNodePopover = () => {
 
             return some(handles, (handle) => {
               const sourceType =
-                handleFilter == 'source' ? fieldFilter : handle.type;
+                handleFilter == 'source'
+                  ? fieldFilter
+                  : handle.originalType ?? handle.type;
               const targetType =
-                handleFilter == 'target' ? fieldFilter : handle.type;
+                handleFilter == 'target'
+                  ? fieldFilter
+                  : handle.originalType ?? handle.type;
 
               return validateSourceAndTargetTypes(sourceType, targetType);
             });
@@ -111,7 +115,7 @@ const AddNodePopover = () => {
 
       data.sort((a, b) => a.label.localeCompare(b.label));
 
-      return { data, t };
+      return { data };
     },
     defaultSelectorOptions
   );

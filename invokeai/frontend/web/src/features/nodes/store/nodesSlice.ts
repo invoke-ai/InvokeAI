@@ -258,7 +258,8 @@ const nodesSlice = createSlice({
         handleType === 'source'
           ? node.data.outputs[handleId]
           : node.data.inputs[handleId];
-      state.currentConnectionFieldType = field?.type ?? null;
+      state.currentConnectionFieldType =
+        field?.originalType ?? field?.type ?? null;
     },
     connectionMade: (state, action: PayloadAction<Connection>) => {
       const fieldType = state.currentConnectionFieldType;

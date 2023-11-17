@@ -81,7 +81,7 @@ import {
   T2IAdapterModelInputFieldTemplate,
   T2IAdapterPolymorphicInputFieldTemplate,
   UNetInputFieldTemplate,
-  UnknownInputFieldTemplate,
+  CustomInputFieldTemplate,
   VaeInputFieldTemplate,
   VaeModelInputFieldTemplate,
   isArraySchemaObject,
@@ -982,12 +982,12 @@ const buildSchedulerInputFieldTemplate = ({
   return template;
 };
 
-const buildUnknownInputFieldTemplate = ({
+const buildCustomInputFieldTemplate = ({
   baseField,
-}: BuildInputFieldArg): UnknownInputFieldTemplate => {
-  const template: UnknownInputFieldTemplate = {
+}: BuildInputFieldArg): CustomInputFieldTemplate => {
+  const template: CustomInputFieldTemplate = {
     ...baseField,
-    type: 'Unknown',
+    type: 'Custom',
     default: undefined,
   };
 
@@ -1158,7 +1158,7 @@ const TEMPLATE_BUILDER_MAP: {
   UNetField: buildUNetInputFieldTemplate,
   VaeField: buildVaeInputFieldTemplate,
   VaeModelField: buildVaeModelInputFieldTemplate,
-  Unknown: buildUnknownInputFieldTemplate,
+  Custom: buildCustomInputFieldTemplate,
 };
 
 /**
