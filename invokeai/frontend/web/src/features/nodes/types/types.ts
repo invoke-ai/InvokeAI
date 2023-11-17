@@ -191,6 +191,7 @@ export type OutputFieldTemplate = {
   type: FieldType;
   title: string;
   description: string;
+  originalType: string; // used for custom types
 } & _OutputField;
 
 export const zInputFieldValueBase = zFieldValueBase.extend({
@@ -863,6 +864,7 @@ export type InputFieldTemplateBase = {
   description: string;
   required: boolean;
   fieldKind: 'input';
+  originalType: string; // used for custom types
 } & _InputField;
 
 export type AnyInputFieldTemplate = InputFieldTemplateBase & {

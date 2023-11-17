@@ -119,6 +119,9 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
+        // stash this for custom types
+        const originalType = fieldType;
+
         if (fieldType === 'WorkflowField') {
           withWorkflow = true;
           return inputsAccumulator;
@@ -154,7 +157,8 @@ export const parseSchema = (
           schema,
           property,
           propertyName,
-          fieldType as FieldType // we have already checked that fieldType is a valid FieldType, and forced it to be Unknown if not
+          fieldType as FieldType, // we have already checked that fieldType is a valid FieldType, and forced it to be Unknown if not
+          originalType
         );
 
         if (!field) {
@@ -223,6 +227,22 @@ export const parseSchema = (
 
         let fieldType = property.ui_type ?? getFieldType(property);
 
+        if (!fieldType) {
+          logger('nodes').warn(
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              field: parseify(property),
+            },
+            'Missing output field type'
+          );
+          return outputsAccumulator;
+        }
+
+        // stash for custom types
+        const originalType = fieldType;
+
         if (!isFieldType(fieldType)) {
           logger('nodes').debug(
             { fieldName: propertyName, fieldType, field: parseify(property) },
@@ -241,6 +261,7 @@ export const parseSchema = (
           ui_hidden: property.ui_hidden ?? false,
           ui_type: property.ui_type,
           ui_order: property.ui_order,
+          originalType,
         };
 
         return outputsAccumulator;

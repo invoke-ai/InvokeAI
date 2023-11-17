@@ -47,8 +47,8 @@ const FieldHandle = (props: FieldHandleProps) => {
     isConnectionStartField,
     connectionError,
   } = props;
-  const { name, type } = fieldTemplate;
-  const { color: typeColor, title } = FIELDS[type];
+  const { name, type, originalType } = fieldTemplate;
+  const { color: typeColor } = FIELDS[type];
 
   const styles: CSSProperties = useMemo(() => {
     const isCollectionType = COLLECTION_TYPES.includes(type);
@@ -102,13 +102,18 @@ const FieldHandle = (props: FieldHandleProps) => {
 
   const tooltip = useMemo(() => {
     if (isConnectionInProgress && isConnectionStartField) {
-      return title;
+      return originalType;
     }
     if (isConnectionInProgress && connectionError) {
-      return connectionError ?? title;
+      return connectionError ?? originalType;
     }
-    return title;
-  }, [connectionError, isConnectionInProgress, isConnectionStartField, title]);
+    return originalType;
+  }, [
+    connectionError,
+    isConnectionInProgress,
+    isConnectionStartField,
+    originalType,
+  ]);
 
   return (
     <Tooltip

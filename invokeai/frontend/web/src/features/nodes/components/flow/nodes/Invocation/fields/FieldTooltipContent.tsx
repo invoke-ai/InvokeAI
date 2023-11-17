@@ -1,7 +1,6 @@
 import { Flex, Text } from '@chakra-ui/react';
 import { useFieldData } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
-import { FIELDS } from 'features/nodes/types/constants';
 import {
   isInputFieldTemplate,
   isInputFieldValue,
@@ -9,7 +8,6 @@ import {
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
 interface Props {
   nodeId: string;
   fieldName: string;
@@ -49,7 +47,7 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
           {fieldTemplate.description}
         </Text>
       )}
-      {fieldTemplate && <Text>Type: {FIELDS[fieldTemplate.type].title}</Text>}
+      {fieldTemplate && <Text>Type: {fieldTemplate.originalType}</Text>}
       {isInputTemplate && <Text>Input: {startCase(fieldTemplate.input)}</Text>}
     </Flex>
   );

@@ -1170,7 +1170,8 @@ export const buildInputFieldTemplate = (
   nodeSchema: InvocationSchemaObject,
   fieldSchema: InvocationFieldSchema,
   name: string,
-  fieldType: FieldType
+  fieldType: FieldType,
+  originalType: string
 ) => {
   const {
     input,
@@ -1192,6 +1193,7 @@ export const buildInputFieldTemplate = (
     ui_order,
     ui_choice_labels,
     item_default,
+    originalType,
   };
 
   const baseField = {
