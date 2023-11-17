@@ -2,18 +2,16 @@ import { Switch } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldBooleanValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  BooleanInputFieldTemplate,
-  BooleanInputFieldValue,
-  BooleanPolymorphicInputFieldTemplate,
-  BooleanPolymorphicInputFieldValue,
-  FieldComponentProps,
-} from 'features/nodes/types/types';
+  BooleanFieldInputInstance,
+  BooleanFieldInputTemplate,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { ChangeEvent, memo, useCallback } from 'react';
 
-const BooleanInputFieldComponent = (
+const BooleanFieldInputComponent = (
   props: FieldComponentProps<
-    BooleanInputFieldValue | BooleanPolymorphicInputFieldValue,
-    BooleanInputFieldTemplate | BooleanPolymorphicInputFieldTemplate
+    BooleanFieldInputInstance,
+    BooleanFieldInputTemplate
   >
 ) => {
   const { nodeId, field } = props;
@@ -42,4 +40,4 @@ const BooleanInputFieldComponent = (
   );
 };
 
-export default memo(BooleanInputFieldComponent);
+export default memo(BooleanFieldInputComponent);

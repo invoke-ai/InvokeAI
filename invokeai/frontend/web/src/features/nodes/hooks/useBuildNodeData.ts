@@ -3,10 +3,13 @@ import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { Node, useReactFlow } from 'reactflow';
-import { AnyInvocationType } from 'services/events/types';
-import { buildNodeData } from '../store/util/buildNodeData';
+import {
+  buildCurrentImageNode,
+  buildInvocationNode,
+  buildNotesNode,
+} from '../store/util/buildNodeData';
 import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from '../types/constants';
-
+import { AnyNodeData, InvocationTemplate } from '../types/invocation';
 const templatesSelector = createSelector(
   [(state: RootState) => state.nodes],
   (nodes) => nodes.nodeTemplates
@@ -22,7 +25,8 @@ export const useBuildNodeData = () => {
   const flow = useReactFlow();
 
   return useCallback(
-    (type: AnyInvocationType | 'current_image' | 'notes') => {
+    // string here is "any invocation type"
+    (type: string | 'current_image' | 'notes'): Node<AnyNodeData> => {
       let _x = window.innerWidth / 2;
       let _y = window.innerHeight / 2;
 
@@ -41,9 +45,19 @@ export const useBuildNodeData = () => {
         y: _y,
       });
 
-      const template = nodeTemplates[type];
+      if (type === 'current_image') {
+        return buildCurrentImageNode(position);
+      }
 
-      return buildNodeData(type, position, template);
+      if (type === 'notes') {
+        return buildNotesNode(position);
+      }
+
+      // TODO: Keep track of invocation types so we do not need to cast this
+      // We know it is safe because the caller of this function gets the `type` arg from the list of invocation templates.
+      const template = nodeTemplates[type] as InvocationTemplate;
+
+      return buildInvocationNode(position, template);
     },
     [nodeTemplates, flow]
   );

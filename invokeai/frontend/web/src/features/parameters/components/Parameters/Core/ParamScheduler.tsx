@@ -5,10 +5,8 @@ import IAIInformationalPopover from 'common/components/IAIInformationalPopover/I
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
-import {
-  SCHEDULER_LABEL_MAP,
-  SchedulerParam,
-} from 'features/parameters/types/parameterSchemas';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { SCHEDULER_LABEL_MAP } from 'features/parameters/types/constants';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
@@ -23,7 +21,7 @@ const selector = createSelector(
     const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
       value: name,
       label: label,
-      group: enabledSchedulers.includes(name as SchedulerParam)
+      group: enabledSchedulers.includes(name as ParameterScheduler)
         ? 'Favorites'
         : undefined,
     })).sort((a, b) => a.label.localeCompare(b.label));
@@ -46,7 +44,7 @@ const ParamScheduler = () => {
       if (!v) {
         return;
       }
-      dispatch(setScheduler(v as SchedulerParam));
+      dispatch(setScheduler(v as ParameterScheduler));
     },
     [dispatch]
   );

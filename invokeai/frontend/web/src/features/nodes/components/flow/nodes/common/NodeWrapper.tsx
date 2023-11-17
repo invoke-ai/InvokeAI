@@ -14,7 +14,7 @@ import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,
 } from 'features/nodes/types/constants';
-import { NodeStatus } from 'features/nodes/types/types';
+import { zNodeStatus } from 'features/nodes/types/invocation';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
 import {
   MouseEvent,
@@ -40,7 +40,8 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       createSelector(
         stateSelector,
         ({ nodes }) =>
-          nodes.nodeExecutionStates[nodeId]?.status === NodeStatus.IN_PROGRESS
+          nodes.nodeExecutionStates[nodeId]?.status ===
+          zNodeStatus.enum.IN_PROGRESS
       ),
     [nodeId]
   );

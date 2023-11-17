@@ -1,14 +1,18 @@
 import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
+import {
+  ImageDTO,
+  ImageToLatentsInvocation,
+  NonNullableGraph,
+} from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
+import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -26,7 +30,6 @@ import {
   SEAMLESS,
 } from './constants';
 import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
-import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addCoreMetadataNode } from './metadata';
 
 /**

@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
 import { KIND_MAP } from '../types/constants';
-import { isInvocationNode } from '../types/types';
+import { isInvocationNode } from '../types/invocation';
 
 export const useFieldTemplate = (
   nodeId: string,

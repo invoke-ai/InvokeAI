@@ -9,28 +9,18 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { numberStringRegex } from 'common/components/IAINumberInput';
 import { fieldNumberValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  FieldComponentProps,
-  FloatInputFieldTemplate,
-  FloatInputFieldValue,
-  FloatPolymorphicInputFieldTemplate,
-  FloatPolymorphicInputFieldValue,
-  IntegerInputFieldTemplate,
-  IntegerInputFieldValue,
-  IntegerPolymorphicInputFieldTemplate,
-  IntegerPolymorphicInputFieldValue,
-} from 'features/nodes/types/types';
+  FloatFieldInputInstance,
+  FloatFieldInputTemplate,
+  IntegerFieldInputInstance,
+  IntegerFieldInputTemplate,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
-const NumberInputFieldComponent = (
+const NumberFieldInputComponent = (
   props: FieldComponentProps<
-    | IntegerInputFieldValue
-    | IntegerPolymorphicInputFieldValue
-    | FloatInputFieldValue
-    | FloatPolymorphicInputFieldValue,
-    | IntegerInputFieldTemplate
-    | IntegerPolymorphicInputFieldTemplate
-    | FloatInputFieldTemplate
-    | FloatPolymorphicInputFieldTemplate
+    IntegerFieldInputInstance | FloatFieldInputInstance,
+    IntegerFieldInputTemplate | FloatFieldInputTemplate
   >
 ) => {
   const { nodeId, field, fieldTemplate } = props;
@@ -39,7 +29,7 @@ const NumberInputFieldComponent = (
     String(field.value)
   );
   const isIntegerField = useMemo(
-    () => fieldTemplate.type === 'integer',
+    () => fieldTemplate.type.name === 'IntegerField',
     [fieldTemplate.type]
   );
 
@@ -86,4 +76,4 @@ const NumberInputFieldComponent = (
   );
 };
 
-export default memo(NumberInputFieldComponent);
+export default memo(NumberFieldInputComponent);

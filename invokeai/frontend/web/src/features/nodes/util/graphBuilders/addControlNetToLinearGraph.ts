@@ -6,8 +6,8 @@ import {
   ControlField,
   ControlNetInvocation,
   CoreMetadataInvocation,
+  NonNullableGraph,
 } from 'services/api/types';
-import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CONTROL_NET_COLLECT,

@@ -10,17 +10,15 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIIconButton from 'common/components/IAIIconButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
+import { getNeedsUpdate } from 'features/nodes/store/util/nodeUpdate';
 import {
   InvocationNodeData,
   InvocationTemplate,
   isInvocationNode,
-} from 'features/nodes/types/types';
-import { memo } from 'react';
+} from 'features/nodes/types/invocation';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSync } from 'react-icons/fa';
 import { Node } from 'reactflow';
 import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
 import ScrollableContent from '../ScrollableContent';
@@ -63,12 +61,17 @@ const InspectorDetailsTab = () => {
 
 export default memo(InspectorDetailsTab);
 
-const Content = (props: {
+type ContentProps = {
   node: Node<InvocationNodeData>;
   template: InvocationTemplate;
-}) => {
+};
+
+const Content = memo(({ node, template }: ContentProps) => {
   const { t } = useTranslation();
-  const { needsUpdate, updateNode } = useNodeVersion(props.node.id);
+  const needsUpdate = useMemo(
+    () => getNeedsUpdate(node, template),
+    [node, template]
+  );
   return (
     <Box
       sx={{
@@ -87,12 +90,12 @@ const Content = (props: {
             w: 'full',
           }}
         >
-          <EditableNodeTitle nodeId={props.node.data.id} />
+          <EditableNodeTitle nodeId={node.data.id} />
           <HStack>
             <FormControl>
               <FormLabel>{t('nodes.nodeType')}</FormLabel>
               <Text fontSize="sm" fontWeight={600}>
-                {props.template.title}
+                {template.title}
               </Text>
             </FormControl>
             <Flex
@@ -104,22 +107,16 @@ const Content = (props: {
               <FormControl isInvalid={needsUpdate}>
                 <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
                 <Text fontSize="sm" fontWeight={600}>
-                  {props.node.data.version}
+                  {node.data.version}
                 </Text>
               </FormControl>
-              {needsUpdate && (
-                <IAIIconButton
-                  aria-label={t('nodes.updateNode')}
-                  tooltip={t('nodes.updateNode')}
-                  icon={<FaSync />}
-                  onClick={updateNode}
-                />
-              )}
             </Flex>
           </HStack>
-          <NotesTextarea nodeId={props.node.data.id} />
+          <NotesTextarea nodeId={node.data.id} />
         </Flex>
       </ScrollableContent>
     </Box>
   );
-};
+});
+
+Content.displayName = 'Content';

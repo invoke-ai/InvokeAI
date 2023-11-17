@@ -2,24 +2,24 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { reduce, startCase } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
-import { AnyInvocationType } from 'services/events/types';
+import { FieldInputTemplate, FieldOutputTemplate } from '../types/field';
+import { InvocationTemplate } from '../types/invocation';
 import {
-  InputFieldTemplate,
   InvocationSchemaObject,
-  InvocationTemplate,
-  OutputFieldTemplate,
-  isFieldType,
   isInvocationFieldSchema,
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
-} from '../types/types';
-import { buildInputFieldTemplate, getFieldType } from './fieldTemplateBuilders';
+} from '../types/openapi';
+import { buildFieldInputTemplate } from './buildFieldInputTemplate';
+import { parseFieldType } from './parseFieldType';
+import { FieldTypeParseError, UnsupportedFieldTypeError } from '../types/error';
+import { t } from 'i18next';
 
 const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
 const RESERVED_FIELD_TYPES = ['IsIntermediate'];
 
-const invocationDenylist: AnyInvocationType[] = ['graph', 'linear_ui_output'];
+const invocationDenylist: string[] = ['graph', 'linear_ui_output'];
 
 const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {
@@ -83,13 +83,13 @@ export const parseSchema = (
     const inputs = reduce(
       schema.properties,
       (
-        inputsAccumulator: Record<string, InputFieldTemplate>,
+        inputsAccumulator: Record<string, FieldInputTemplate>,
         property,
         propertyName
       ) => {
         if (isReservedInputField(type, propertyName)) {
           logger('nodes').trace(
-            { node: type, fieldName: propertyName, field: parseify(property) },
+            { node: type, field: propertyName, schema: parseify(property) },
             'Skipped reserved input field'
           );
           return inputsAccumulator;
@@ -97,79 +97,53 @@ export const parseSchema = (
 
         if (!isInvocationFieldSchema(property)) {
           logger('nodes').warn(
-            { node: type, propertyName, property: parseify(property) },
+            { node: type, field: propertyName, schema: parseify(property) },
             'Unhandled input property'
           );
           return inputsAccumulator;
         }
 
-        const fieldType = property.ui_type ?? getFieldType(property);
+        try {
+          const fieldType = parseFieldType(property);
 
-        if (!fieldType) {
-          logger('nodes').warn(
-            {
-              node: type,
-              fieldName: propertyName,
-              fieldType,
-              field: parseify(property),
-            },
-            'Missing input field type'
+          if (fieldType.name === 'WorkflowField') {
+            // This supports workflows, set the flag and skip to next field
+            withWorkflow = true;
+            return inputsAccumulator;
+          }
+
+          if (isReservedFieldType(fieldType.name)) {
+            // Skip processing this reserved field
+            return inputsAccumulator;
+          }
+
+          const fieldInputTemplate = buildFieldInputTemplate(
+            property,
+            propertyName,
+            fieldType
           );
-          return inputsAccumulator;
+
+          inputsAccumulator[propertyName] = fieldInputTemplate;
+        } catch (e) {
+          if (
+            e instanceof FieldTypeParseError ||
+            e instanceof UnsupportedFieldTypeError
+          ) {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+              },
+              t('nodes.inputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: e.message,
+              })
+            );
+          }
         }
 
-        if (fieldType === 'WorkflowField') {
-          withWorkflow = true;
-          return inputsAccumulator;
-        }
-
-        if (isReservedFieldType(fieldType)) {
-          logger('nodes').trace(
-            {
-              node: type,
-              fieldName: propertyName,
-              fieldType,
-              field: parseify(property),
-            },
-            `Skipping reserved input field type: ${fieldType}`
-          );
-          return inputsAccumulator;
-        }
-
-        if (!isFieldType(fieldType)) {
-          logger('nodes').warn(
-            {
-              node: type,
-              fieldName: propertyName,
-              fieldType,
-              field: parseify(property),
-            },
-            `Skipping unknown input field type: ${fieldType}`
-          );
-          return inputsAccumulator;
-        }
-
-        const field = buildInputFieldTemplate(
-          schema,
-          property,
-          propertyName,
-          fieldType
-        );
-
-        if (!field) {
-          logger('nodes').warn(
-            {
-              node: type,
-              fieldName: propertyName,
-              fieldType,
-              field: parseify(property),
-            },
-            'Skipping input field with no template'
-          );
-          return inputsAccumulator;
-        }
-
-        inputsAccumulator[propertyName] = field;
         return inputsAccumulator;
       },
       {}
@@ -206,7 +180,7 @@ export const parseSchema = (
       (outputsAccumulator, property, propertyName) => {
         if (!isAllowedOutputField(type, propertyName)) {
           logger('nodes').trace(
-            { type, propertyName, property: parseify(property) },
+            { node: type, field: propertyName, schema: parseify(property) },
             'Skipped reserved output field'
           );
           return outputsAccumulator;
@@ -214,37 +188,62 @@ export const parseSchema = (
 
         if (!isInvocationFieldSchema(property)) {
           logger('nodes').warn(
-            { type, propertyName, property: parseify(property) },
+            { node: type, field: propertyName, schema: parseify(property) },
             'Unhandled output property'
           );
           return outputsAccumulator;
         }
 
-        const fieldType = property.ui_type ?? getFieldType(property);
+        try {
+          const fieldType = parseFieldType(property);
 
-        if (!isFieldType(fieldType)) {
-          logger('nodes').warn(
-            { fieldName: propertyName, fieldType, field: parseify(property) },
-            'Skipping unknown output field type'
-          );
-          return outputsAccumulator;
+          if (!fieldType) {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+              },
+              'Missing output field type'
+            );
+            return outputsAccumulator;
+          }
+
+          const fieldOutputTemplate: FieldOutputTemplate = {
+            fieldKind: 'output',
+            name: propertyName,
+            title:
+              property.title ?? (propertyName ? startCase(propertyName) : ''),
+            description: property.description ?? '',
+            type: fieldType,
+            ui_hidden: property.ui_hidden ?? false,
+            ui_type: property.ui_type,
+            ui_order: property.ui_order,
+          };
+
+          outputsAccumulator[propertyName] = fieldOutputTemplate;
+        } catch (e) {
+          if (
+            e instanceof FieldTypeParseError ||
+            e instanceof UnsupportedFieldTypeError
+          ) {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+              },
+              t('nodes.outputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: e.message,
+              })
+            );
+          }
         }
-
-        outputsAccumulator[propertyName] = {
-          fieldKind: 'output',
-          name: propertyName,
-          title:
-            property.title ?? (propertyName ? startCase(propertyName) : ''),
-          description: property.description ?? '',
-          type: fieldType,
-          ui_hidden: property.ui_hidden ?? false,
-          ui_type: property.ui_type,
-          ui_order: property.ui_order,
-        };
-
         return outputsAccumulator;
       },
-      {} as Record<string, OutputFieldTemplate>
+      {} as Record<string, FieldOutputTemplate>
     );
 
     const useCache = schema.properties.use_cache.default;

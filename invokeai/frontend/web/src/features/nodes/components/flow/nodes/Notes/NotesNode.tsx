@@ -2,7 +2,7 @@ import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAITextarea from 'common/components/IAITextarea';
 import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
-import { NotesNodeData } from 'features/nodes/types/types';
+import { NotesNodeData } from 'features/nodes/types/invocation';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { NodeProps } from 'reactflow';
 import NodeWrapper from '../common/NodeWrapper';

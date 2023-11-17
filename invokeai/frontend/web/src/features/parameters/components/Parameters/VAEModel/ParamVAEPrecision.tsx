@@ -5,7 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
-import { PrecisionParam } from 'features/parameters/types/parameterSchemas';
+import { ParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -31,7 +31,7 @@ const ParamVAEModelSelect = () => {
         return;
       }
 
-      dispatch(vaePrecisionChanged(v as PrecisionParam));
+      dispatch(vaePrecisionChanged(v as ParameterPrecision));
     },
     [dispatch]
   );

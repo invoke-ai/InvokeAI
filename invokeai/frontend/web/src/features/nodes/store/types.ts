@@ -6,25 +6,23 @@ import {
   Viewport,
   XYPosition,
 } from 'reactflow';
+import { FieldIdentifier, FieldType } from '../types/field';
 import {
-  FieldIdentifier,
-  FieldType,
+  AnyNodeData,
   InvocationEdgeExtra,
   InvocationTemplate,
-  NodeData,
   NodeExecutionState,
-  Workflow,
-} from '../types/types';
+} from '../types/invocation';
+import { WorkflowV2 } from '../types/workflow';
 
 export type NodesState = {
-  nodes: Node<NodeData>[];
+  nodes: Node<AnyNodeData>[];
   edges: Edge<InvocationEdgeExtra>[];
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
-  currentConnectionFieldType: FieldType | null;
+  connectionStartFieldType: FieldType | null;
   connectionMade: boolean;
   modifyingEdge: boolean;
-  shouldShowFieldTypeLegend: boolean;
   shouldShowMinimapPanel: boolean;
   shouldValidateGraph: boolean;
   shouldAnimateEdges: boolean;
@@ -33,13 +31,13 @@ export type NodesState = {
   shouldColorEdges: boolean;
   selectedNodes: string[];
   selectedEdges: string[];
-  workflow: Omit<Workflow, 'nodes' | 'edges'>;
+  workflow: Omit<WorkflowV2, 'nodes' | 'edges'>;
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
   isReady: boolean;
   mouseOverField: FieldIdentifier | null;
   mouseOverNode: string | null;
-  nodesToCopy: Node<NodeData>[];
+  nodesToCopy: Node<AnyNodeData>[];
   edgesToCopy: Edge<InvocationEdgeExtra>[];
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;

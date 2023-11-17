@@ -3,19 +3,14 @@ import IAIInput from 'common/components/IAIInput';
 import IAITextarea from 'common/components/IAITextarea';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  StringInputFieldTemplate,
-  StringInputFieldValue,
-  FieldComponentProps,
-  StringPolymorphicInputFieldValue,
-  StringPolymorphicInputFieldTemplate,
-} from 'features/nodes/types/types';
+  StringFieldInputInstance,
+  StringFieldInputTemplate,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { ChangeEvent, memo, useCallback } from 'react';
 
-const StringInputFieldComponent = (
-  props: FieldComponentProps<
-    StringInputFieldValue | StringPolymorphicInputFieldValue,
-    StringInputFieldTemplate | StringPolymorphicInputFieldTemplate
-  >
+const StringFieldInputComponent = (
+  props: FieldComponentProps<StringFieldInputInstance, StringFieldInputTemplate>
 ) => {
   const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
@@ -48,4 +43,4 @@ const StringInputFieldComponent = (
   return <IAIInput onChange={handleValueChanged} value={field.value} />;
 };
 
-export default memo(StringInputFieldComponent);
+export default memo(StringFieldInputComponent);

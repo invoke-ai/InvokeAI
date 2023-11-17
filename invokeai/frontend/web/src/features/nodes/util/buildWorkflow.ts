@@ -1,13 +1,13 @@
 import { logger } from 'app/logging/logger';
 import { NodesState } from '../store/types';
-import { Workflow, zWorkflowEdge, zWorkflowNode } from '../types/types';
+import { WorkflowV2, zWorkflowEdge, zWorkflowNode } from '../types/workflow';
 import { fromZodError } from 'zod-validation-error';
 import { parseify } from 'common/util/serialize';
 import i18n from 'i18next';
 
-export const buildWorkflow = (nodesState: NodesState): Workflow => {
+export const buildWorkflow = (nodesState: NodesState): WorkflowV2 => {
   const { workflow: workflowMeta, nodes, edges } = nodesState;
-  const workflow: Workflow = {
+  const workflow: WorkflowV2 = {
     ...workflowMeta,
     nodes: [],
     edges: [],

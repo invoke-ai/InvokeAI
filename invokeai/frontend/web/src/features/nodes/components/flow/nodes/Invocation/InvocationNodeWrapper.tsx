@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvocationNodeData } from 'features/nodes/types/types';
+import { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { NodeProps } from 'reactflow';
 import InvocationNode from '../Invocation/InvocationNode';

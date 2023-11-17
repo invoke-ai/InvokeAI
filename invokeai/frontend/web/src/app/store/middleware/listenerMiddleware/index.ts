@@ -71,7 +71,7 @@ import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } f
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
-import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
+import { addWorkflowLoadRequestedListener } from './listeners/workflowLoadRequested';
 import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 
 export const listenerMiddleware = createListenerMiddleware();
@@ -178,7 +178,7 @@ addBoardIdSelectedListener();
 addReceivedOpenAPISchemaListener();
 
 // Workflows
-addWorkflowLoadedListener();
+addWorkflowLoadRequestedListener();
 addUpdateAllNodesRequestedListener();
 
 // DND

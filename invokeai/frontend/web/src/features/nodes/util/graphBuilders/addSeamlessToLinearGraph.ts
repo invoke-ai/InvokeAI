@@ -1,7 +1,5 @@
 import { RootState } from 'app/store/store';
-import { SeamlessModeInvocation } from 'services/api/types';
-import { NonNullableGraph } from '../../types/types';
-import { upsertMetadata } from './metadata';
+import { NonNullableGraph, SeamlessModeInvocation } from 'services/api/types';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CANVAS_INPAINT_GRAPH,
@@ -16,6 +14,7 @@ import {
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
 } from './constants';
+import { upsertMetadata } from './metadata';
 
 export const addSeamlessToLinearGraph = (
   state: RootState,

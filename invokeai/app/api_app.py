@@ -1,7 +1,3 @@
-from typing import Any
-
-from fastapi.responses import HTMLResponse
-
 from .services.config import InvokeAIAppConfig
 
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
@@ -16,6 +12,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import socket
     from inspect import signature
     from pathlib import Path
+    from typing import Any
 
     import uvicorn
     from fastapi import FastAPI
@@ -23,7 +20,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
     from fastapi.openapi.utils import get_openapi
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, HTMLResponse
     from fastapi.staticfiles import StaticFiles
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
@@ -51,7 +48,12 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         workflows,
     )
     from .api.sockets import SocketIO
-    from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
+    from .invocations.baseinvocation import (
+        BaseInvocation,
+        InputFieldJSONSchemaExtra,
+        OutputFieldJSONSchemaExtra,
+        UIConfigBase,
+    )
 
     if is_mps_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
@@ -147,7 +149,11 @@ def custom_openapi() -> dict[str, Any]:
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = models_json_schema(
-        [(UIConfigBase, "serialization"), (_InputField, "serialization"), (_OutputField, "serialization")],
+        [
+            (UIConfigBase, "serialization"),
+            (InputFieldJSONSchemaExtra, "serialization"),
+            (OutputFieldJSONSchemaExtra, "serialization"),
+        ],
         ref_template="#/components/schemas/{model}",
     )
     for schema_key, ui_config_schema in ui_config_schemas[1]["$defs"].items():
@@ -155,7 +161,7 @@ def custom_openapi() -> dict[str, Any]:
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
-        invoker_name = invoker.__name__
+        invoker_name = invoker.__name__  # type: ignore [attr-defined] # this is a valid attribute
         output_type = signature(obj=invoker.invoke).return_annotation
         output_type_title = output_type_titles[output_type.__name__]
         invoker_schema = openapi_schema["components"]["schemas"][f"{invoker_name}"]

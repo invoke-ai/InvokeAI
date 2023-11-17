@@ -3,15 +3,15 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { fieldBoardValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  BoardInputFieldTemplate,
-  BoardInputFieldValue,
-  FieldComponentProps,
-} from 'features/nodes/types/types';
+  BoardFieldInputTemplate,
+  BoardFieldInputInstance,
+} from 'features/nodes/types/field';
+import { FieldComponentProps } from './types';
 import { memo, useCallback } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
-const BoardInputFieldComponent = (
-  props: FieldComponentProps<BoardInputFieldValue, BoardInputFieldTemplate>
+const BoardFieldInputComponent = (
+  props: FieldComponentProps<BoardFieldInputInstance, BoardFieldInputTemplate>
 ) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
@@ -61,4 +61,4 @@ const BoardInputFieldComponent = (
   );
 };
 
-export default memo(BoardInputFieldComponent);
+export default memo(BoardFieldInputComponent);

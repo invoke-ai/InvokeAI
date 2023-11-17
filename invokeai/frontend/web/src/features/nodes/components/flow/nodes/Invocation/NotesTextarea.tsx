@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAITextarea from 'common/components/IAITextarea';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { nodeNotesChanged } from 'features/nodes/store/nodesSlice';
-import { isInvocationNodeData } from 'features/nodes/types/types';
+import { isInvocationNodeData } from 'features/nodes/types/invocation';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
