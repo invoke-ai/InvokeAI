@@ -122,7 +122,36 @@ class LinearOverlapTiler(BaseTiler):
             raise TilerNotInitializedError("Called write_tile(...) before calling initialize(...).")
 
         tile = self._tile_props[i]
-        paste(dst_image=self._out_image, src_image=tile_image, box=tile.coords, mask=None)
+
+        tile_image = tile_image.to(device=self._out_image.device, dtype=self._out_image.dtype)
+
+        # Prepare 1D linear gradients for blending.
+        gradient_left_x = torch.linspace(
+            start=0.0, end=1.0, steps=self._write_blend_x, device=tile_image.device, dtype=tile_image.dtype
+        )
+        gradient_top_y = torch.linspace(
+            start=0.0, end=1.0, steps=self._write_blend_y, device=tile_image.device, dtype=tile_image.dtype
+        )
+        # Convert shape: (write_blend_y, ) -> (write_blend_y, 1). The extra dimension enables the gradient to be applied
+        # to a 2D image via broadcasting. Note that no additional dimension is needed on gradient_left_x for
+        # broadcasting to work correctly.
+        gradient_top_y = gradient_top_y.unsqueeze(1)
+
+        # We expect tiles to be written left-to-right, and top-to-bottom. We construct a mask that applies linear
+        # blending to the top and to the left of the current tile. The inverse linear blending is automatically applied
+        # to the bottom/right of the tiles that have already been pasted by the paste(...) operation.
+        mask = torch.ones_like(tile_image)
+        # Top blending:
+        if tile.overlap.top > 0:
+            blend_start_top = tile.overlap.top - self._read_overlap_y // 2 - self._write_blend_y // 2
+            mask[..., :blend_start_top, :] = 0.0  # The region above the blending region is masked completely.
+            mask[..., blend_start_top : blend_start_top + self._write_blend_y, :] *= gradient_top_y
+        # Left blending:
+        if tile.overlap.left > 0:
+            blend_start_left = tile.overlap.left - self._read_overlap_x // 2 - self._write_blend_x // 2
+            mask[..., :blend_start_left] = 0.0  # The region left of the blending region is masked completely.
+            mask[..., blend_start_left : blend_start_left + self._write_blend_x] *= gradient_left_x
+        paste(dst_image=self._out_image, src_image=tile_image, box=tile.coords, mask=mask)
 
     def get_output(self) -> torch.Tensor:
         if self._out_image is None:

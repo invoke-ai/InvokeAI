@@ -40,6 +40,5 @@ def paste(dst_image: torch.Tensor, src_image: torch.Tensor, box: TBLR, mask: Opt
     if mask is None:
         dst_image[..., box.top : box.bottom, box.left : box.right] = src_image
     else:
-        raise NotImplementedError()
-        # dst_image_box = dst_image[..., box.top : box.bottom, box.left : box.right]
-        # dst_image[..., box.top : box.bottom, box.left : box.right] = src_image * mask + dst_image_box * (1.0 - mask)
+        dst_image_box = dst_image[..., box.top : box.bottom, box.left : box.right]
+        dst_image[..., box.top : box.bottom, box.left : box.right] = src_image * mask + dst_image_box * (1.0 - mask)
