@@ -39,7 +39,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const InspectorOutputsTab = () => {
+const InspectorResultsTab = () => {
   const { node, template, nes } = useAppSelector(selector);
   const { t } = useTranslation();
 
@@ -91,6 +91,6 @@ const InspectorOutputsTab = () => {
   );
 };
 
-export default memo(InspectorOutputsTab);
+export default memo(InspectorResultsTab);
 
 const getKey = (result: AnyResult, i: number) => `${result.type}-${i}`;

@@ -1,15 +1,15 @@
-import { FormControl, FormLabel } from '@chakra-ui/react';
+import { FormControl, FormLabel, Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAITextarea from 'common/components/IAITextarea';
-import { useNodeData } from 'features/nodes/hooks/useNodeData';
+import { useNodeNotes } from 'features/nodes/hooks/useNodeNotes';
 import { nodeNotesChanged } from 'features/nodes/store/nodesSlice';
-import { isInvocationNodeData } from 'features/nodes/types/types';
+import { isNil } from 'lodash-es';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const NotesTextarea = ({ nodeId }: { nodeId: string }) => {
   const dispatch = useAppDispatch();
-  const data = useNodeData(nodeId);
+  const notes = useNodeNotes(nodeId);
   const { t } = useTranslation();
   const handleNotesChanged = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -17,16 +17,17 @@ const NotesTextarea = ({ nodeId }: { nodeId: string }) => {
     },
     [dispatch, nodeId]
   );
-  if (!isInvocationNodeData(data)) {
+  if (isNil(notes)) {
     return null;
   }
   return (
-    <FormControl>
+    <FormControl as={Flex} sx={{ flexDir: 'column', h: 'full' }}>
       <FormLabel>{t('nodes.notes')}</FormLabel>
       <IAITextarea
-        value={data?.notes}
+        value={notes}
         onChange={handleNotesChanged}
-        rows={10}
+        resize="none"
+        h="full"
       />
     </FormControl>
   );

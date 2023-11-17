@@ -22,9 +22,8 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSync } from 'react-icons/fa';
 import { Node } from 'reactflow';
-import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
 import ScrollableContent from '../ScrollableContent';
-import EditableNodeTitle from './details/EditableNodeTitle';
+import InputFields from './details/InputFields';
 
 const selector = createSelector(
   stateSelector,
@@ -82,42 +81,23 @@ const Content = (props: {
           sx={{
             flexDir: 'column',
             position: 'relative',
-            p: 1,
             gap: 2,
             w: 'full',
           }}
         >
-          <EditableNodeTitle nodeId={props.node.data.id} />
-          <HStack>
-            <FormControl>
-              <FormLabel>Node Type</FormLabel>
-              <Text fontSize="sm" fontWeight={600}>
-                {props.template.title}
-              </Text>
-            </FormControl>
-            <Flex
-              flexDir="row"
-              alignItems="center"
-              justifyContent="space-between"
-              w="full"
-            >
-              <FormControl isInvalid={needsUpdate}>
-                <FormLabel>Node Version</FormLabel>
-                <Text fontSize="sm" fontWeight={600}>
-                  {props.node.data.version}
-                </Text>
-              </FormControl>
-              {needsUpdate && (
-                <IAIIconButton
-                  aria-label={t('nodes.updateNode')}
-                  tooltip={t('nodes.updateNode')}
-                  icon={<FaSync />}
-                  onClick={updateNode}
-                />
-              )}
-            </Flex>
-          </HStack>
-          <NotesTextarea nodeId={props.node.data.id} />
+          <FormControl>
+            <FormLabel>Type</FormLabel>
+            <Text fontSize="sm" fontWeight={600}>
+              {props.template.title} ({props.template.type})
+            </Text>
+          </FormControl>
+          <FormControl>
+            <FormLabel>Description</FormLabel>
+            <Text fontSize="sm" fontWeight={600}>
+              {props.template.description}
+            </Text>
+          </FormControl>
+          <InputFields nodeId={props.node.id} />
         </Flex>
       </ScrollableContent>
     </Box>

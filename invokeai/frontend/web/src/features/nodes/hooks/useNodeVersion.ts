@@ -1,10 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppToaster } from 'app/components/Toaster';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { satisfies } from 'compare-versions';
 import { cloneDeep, defaultsDeep } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Node } from 'reactflow';
 import { AnyInvocationType } from 'services/events/types';
 import { nodeReplaced } from '../store/nodesSlice';
@@ -16,8 +18,6 @@ import {
   isInvocationNode,
   zParsedSemver,
 } from '../types/types';
-import { useAppToaster } from 'app/components/Toaster';
-import { useTranslation } from 'react-i18next';
 
 export const getNeedsUpdate = (
   node?: Node<NodeData>,
@@ -115,5 +115,17 @@ export const useNodeVersion = (nodeId: string) => {
     dispatch(nodeReplaced({ nodeId: updatedNode.id, node: updatedNode }));
   }, [dispatch, node, nodeTemplate, t, toast]);
 
-  return { needsUpdate, mayUpdate, updateNode: _updateNode };
+  const version = useMemo(() => {
+    if (!isInvocationNode(node)) {
+      return '';
+    }
+    return node.data.version;
+  }, [node]);
+
+  return {
+    needsUpdate,
+    mayUpdate,
+    updateNode: _updateNode,
+    version,
+  };
 };
