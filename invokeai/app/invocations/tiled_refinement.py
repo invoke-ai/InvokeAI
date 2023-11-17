@@ -46,16 +46,20 @@ class TiledRefinementInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
 
+    # TODO(ryand): Add titles, descriptions.
+    tile_dimension_x: int = InputField(default=512, ge=0, multiple_of=8)
+    tile_dimension_y: int = InputField(default=512, ge=0, multiple_of=8)
+    read_overlap: int = InputField(default=64, ge=0, multiple_of=8)
+    write_overlap: int = InputField(default=64, ge=0, multiple_of=8)
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         tiled_refiner = TiledRefiner(
             tiler=LinearOverlapTiler(
-                tile_dimension_x=512,
-                tile_dimension_y=512,
-                read_overlap_x=64,
-                read_overlap_y=64,
-                write_blend_x=64,
-                write_blend_y=64,
+                tile_dimension_x=self.tile_dimension_x,
+                tile_dimension_y=self.tile_dimension_y,
+                read_overlap=self.read_overlap,
+                write_overlap=self.write_overlap,
             ),
             refiner=ImageToImageRefiner(
                 context=context,
