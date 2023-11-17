@@ -60,6 +60,7 @@ const FIELD_VALUE_FALLBACK_MAP: {
   UNetField: undefined,
   VaeField: undefined,
   VaeModelField: undefined,
+  Unknown: undefined,
 };
 
 export const buildInputFieldValue = (
