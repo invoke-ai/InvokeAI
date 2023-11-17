@@ -81,6 +81,7 @@ import {
   T2IAdapterModelInputFieldTemplate,
   T2IAdapterPolymorphicInputFieldTemplate,
   UNetInputFieldTemplate,
+  UnknownInputFieldTemplate,
   VaeInputFieldTemplate,
   VaeModelInputFieldTemplate,
   isArraySchemaObject,
@@ -981,6 +982,18 @@ const buildSchedulerInputFieldTemplate = ({
   return template;
 };
 
+const buildUnknownInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): UnknownInputFieldTemplate => {
+  const template: UnknownInputFieldTemplate = {
+    ...baseField,
+    type: 'Unknown',
+    default: undefined,
+  };
+
+  return template;
+};
+
 export const getFieldType = (
   schemaObject: OpenAPIV3_1SchemaOrRef
 ): string | undefined => {
@@ -1145,12 +1158,8 @@ const TEMPLATE_BUILDER_MAP: {
   UNetField: buildUNetInputFieldTemplate,
   VaeField: buildVaeInputFieldTemplate,
   VaeModelField: buildVaeModelInputFieldTemplate,
+  Unknown: buildUnknownInputFieldTemplate,
 };
-
-const isTemplatedFieldType = (
-  fieldType: string | undefined
-): fieldType is keyof typeof TEMPLATE_BUILDER_MAP =>
-  Boolean(fieldType && fieldType in TEMPLATE_BUILDER_MAP);
 
 /**
  * Builds an input field from an invocation schema property.
@@ -1192,10 +1201,6 @@ export const buildInputFieldTemplate = (
     fieldKind: 'input' as const,
     ...extra,
   };
-
-  if (!isTemplatedFieldType(fieldType)) {
-    return;
-  }
 
   const builder = TEMPLATE_BUILDER_MAP[fieldType];
 

@@ -156,6 +156,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'Any field type is accepted.',
     title: 'Any',
   },
+  Unknown: {
+    color: 'gray.500',
+    description: 'Unknown field type is accepted.',
+    title: 'Unknown',
+  },
   MetadataField: {
     color: 'gray.500',
     description: 'A metadata dict.',

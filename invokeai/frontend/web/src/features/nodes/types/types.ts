@@ -133,6 +133,7 @@ export const zFieldType = z.enum([
   'UNetField',
   'VaeField',
   'VaeModelField',
+  'Unknown',
 ]);
 
 export type FieldType = z.infer<typeof zFieldType>;
@@ -789,6 +790,11 @@ export const zAnyInputFieldValue = zInputFieldValueBase.extend({
   value: z.any().optional(),
 });
 
+export const zUnknownInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('Unknown'),
+  value: z.any().optional(),
+});
+
 export const zInputFieldValue = z.discriminatedUnion('type', [
   zAnyInputFieldValue,
   zBoardInputFieldValue,
@@ -846,6 +852,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zMetadataItemPolymorphicInputFieldValue,
   zMetadataInputFieldValue,
   zMetadataCollectionInputFieldValue,
+  zUnknownInputFieldValue,
 ]);
 
 export type InputFieldValue = z.infer<typeof zInputFieldValue>;
@@ -860,6 +867,11 @@ export type InputFieldTemplateBase = {
 
 export type AnyInputFieldTemplate = InputFieldTemplateBase & {
   type: 'Any';
+  default: undefined;
+};
+
+export type UnknownInputFieldTemplate = InputFieldTemplateBase & {
+  type: 'Unknown';
   default: undefined;
 };
 
@@ -1259,7 +1271,8 @@ export type InputFieldTemplate =
   | MetadataItemCollectionInputFieldTemplate
   | MetadataInputFieldTemplate
   | MetadataItemPolymorphicInputFieldTemplate
-  | MetadataCollectionInputFieldTemplate;
+  | MetadataCollectionInputFieldTemplate
+  | UnknownInputFieldTemplate;
 
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue

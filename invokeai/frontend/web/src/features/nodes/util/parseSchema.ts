@@ -4,6 +4,7 @@ import { reduce, startCase } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
 import { AnyInvocationType } from 'services/events/types';
 import {
+  FieldType,
   InputFieldTemplate,
   InvocationSchemaObject,
   InvocationTemplate,
@@ -103,7 +104,7 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
-        const fieldType = property.ui_type ?? getFieldType(property);
+        let fieldType = property.ui_type ?? getFieldType(property);
 
         if (!fieldType) {
           logger('nodes').warn(
@@ -137,23 +138,23 @@ export const parseSchema = (
         }
 
         if (!isFieldType(fieldType)) {
-          logger('nodes').warn(
+          logger('nodes').debug(
             {
               node: type,
               fieldName: propertyName,
               fieldType,
               field: parseify(property),
             },
-            `Skipping unknown input field type: ${fieldType}`
+            `Fallback handling for unknown input field type: ${fieldType}`
           );
-          return inputsAccumulator;
+          fieldType = 'Unknown';
         }
 
         const field = buildInputFieldTemplate(
           schema,
           property,
           propertyName,
-          fieldType
+          fieldType as FieldType // we have already checked that fieldType is a valid FieldType, and forced it to be Unknown if not
         );
 
         if (!field) {
@@ -220,14 +221,14 @@ export const parseSchema = (
           return outputsAccumulator;
         }
 
-        const fieldType = property.ui_type ?? getFieldType(property);
+        let fieldType = property.ui_type ?? getFieldType(property);
 
         if (!isFieldType(fieldType)) {
-          logger('nodes').warn(
+          logger('nodes').debug(
             { fieldName: propertyName, fieldType, field: parseify(property) },
-            'Skipping unknown output field type'
+            `Fallback handling for unknown input field type: ${fieldType}`
           );
-          return outputsAccumulator;
+          fieldType = 'Unknown';
         }
 
         outputsAccumulator[propertyName] = {
@@ -236,7 +237,7 @@ export const parseSchema = (
           title:
             property.title ?? (propertyName ? startCase(propertyName) : ''),
           description: property.description ?? '',
-          type: fieldType,
+          type: fieldType as FieldType,
           ui_hidden: property.ui_hidden ?? false,
           ui_type: property.ui_type,
           ui_order: property.ui_order,
