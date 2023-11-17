@@ -329,7 +329,7 @@ export const buildLinearImageToImageGraph = (
       strength,
       init_image: initialImage.imageName,
     },
-    IMAGE_TO_LATENTS
+    LATENTS_TO_IMAGE
   );
 
   // Add Seamless To Graph
