@@ -350,7 +350,7 @@ export const buildLinearSDXLImageToImageGraph = (
       positive_style_prompt: positiveStylePrompt,
       negative_style_prompt: negativeStylePrompt,
     },
-    IMAGE_TO_LATENTS
+    LATENTS_TO_IMAGE
   );
 
   // Add Seamless To Graph
