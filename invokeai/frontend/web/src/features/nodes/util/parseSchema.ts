@@ -249,7 +249,7 @@ export const parseSchema = (
         if (!isFieldType(fieldType)) {
           logger('nodes').debug(
             { fieldName: propertyName, fieldType, field: parseify(property) },
-            `Fallback handling for unknown input field type: ${fieldType}`
+            `Fallback handling for unknown output field type: ${fieldType}`
           );
           fieldType = 'Custom';
           if (!isFieldType(fieldType)) {
