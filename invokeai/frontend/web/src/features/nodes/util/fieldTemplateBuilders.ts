@@ -8,9 +8,9 @@ import {
 } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
 import { ControlField } from 'services/api/types';
+import { getIsPolymorphic } from '../store/util/parseFieldType';
 import {
   COLLECTION_MAP,
-  POLYMORPHIC_TYPES,
   SINGLE_TO_POLYMORPHIC_MAP,
   isCollectionItemType,
   isPolymorphicItemType,
@@ -35,6 +35,9 @@ import {
   ControlInputFieldTemplate,
   ControlNetModelInputFieldTemplate,
   ControlPolymorphicInputFieldTemplate,
+  CustomCollectionInputFieldTemplate,
+  CustomInputFieldTemplate,
+  CustomPolymorphicInputFieldTemplate,
   DenoiseMaskInputFieldTemplate,
   EnumInputFieldTemplate,
   FieldType,
@@ -81,16 +84,13 @@ import {
   T2IAdapterModelInputFieldTemplate,
   T2IAdapterPolymorphicInputFieldTemplate,
   UNetInputFieldTemplate,
-  CustomInputFieldTemplate,
   VaeInputFieldTemplate,
   VaeModelInputFieldTemplate,
   isArraySchemaObject,
+  isFieldType,
   isNonArraySchemaObject,
   isRefObject,
   isSchemaObject,
-  isFieldType,
-  CustomCollectionInputFieldTemplate,
-  CustomPolymorphicInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -1269,7 +1269,7 @@ export const buildInputFieldTemplate = (
 
   const extra = {
     // TODO: Can we support polymorphic inputs in the UI?
-    input: POLYMORPHIC_TYPES.includes(fieldType) ? 'connection' : input,
+    input: getIsPolymorphic(fieldType) ? 'connection' : input,
     ui_hidden,
     ui_component,
     ui_type,

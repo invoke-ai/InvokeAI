@@ -1,9 +1,12 @@
 import { Tooltip } from '@chakra-ui/react';
+import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import {
-  COLLECTION_TYPES,
+  getIsCollection,
+  getIsPolymorphic,
+} from 'features/nodes/store/util/parseFieldType';
+import {
   HANDLE_TOOLTIP_OPEN_DELAY,
   MODEL_TYPES,
-  POLYMORPHIC_TYPES,
 } from 'features/nodes/types/constants';
 import {
   InputFieldTemplate,
@@ -50,23 +53,17 @@ const FieldHandle = (props: FieldHandleProps) => {
   const type = fieldTemplate.originalType ?? fieldTemplate.type;
 
   const styles: CSSProperties = useMemo(() => {
-    const isCollectionType = COLLECTION_TYPES.some(
-      (t) => t === fieldTemplate.type
-    );
-    const isPolymorphicType = POLYMORPHIC_TYPES.some(
-      (t) => t === fieldTemplate.type
-    );
+    const isCollection = getIsCollection(fieldTemplate.type);
+    const isPolymorphic = getIsPolymorphic(fieldTemplate.type);
     const isModelType = MODEL_TYPES.some((t) => t === type);
     const color = getFieldColor(type);
     const s: CSSProperties = {
       backgroundColor:
-        isCollectionType || isPolymorphicType
-          ? 'var(--invokeai-colors-base-900)'
-          : color,
+        isCollection || isPolymorphic ? colorTokenToCssVar('base.900') : color,
       position: 'absolute',
       width: '1rem',
       height: '1rem',
-      borderWidth: isCollectionType || isPolymorphicType ? 4 : 0,
+      borderWidth: isCollection || isPolymorphic ? 4 : 0,
       borderStyle: 'solid',
       borderColor: color,
       borderRadius: isModelType ? 4 : '100%',

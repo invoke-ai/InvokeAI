@@ -34,10 +34,10 @@ export const useIsValidConnection = () => {
         return false;
       }
 
-      const sourceType = sourceNode.data.outputs[sourceHandle]?.type;
-      const targetType = targetNode.data.inputs[targetHandle]?.type;
+      const sourceField = sourceNode.data.outputs[sourceHandle];
+      const targetField = targetNode.data.inputs[targetHandle];
 
-      if (!sourceType || !targetType) {
+      if (!sourceField || !targetField) {
         // something has gone terribly awry
         return false;
       }
@@ -70,12 +70,18 @@ export const useIsValidConnection = () => {
           return edge.target === target && edge.targetHandle === targetHandle;
         }) &&
         // except CollectionItem inputs can have multiples
-        targetType !== 'CollectionItem'
+        targetField.type !== 'CollectionItem'
       ) {
         return false;
       }
 
-      if (!validateSourceAndTargetTypes(sourceType, targetType)) {
+      // Must use the originalType here if it exists
+      if (
+        !validateSourceAndTargetTypes(
+          sourceField?.originalType ?? sourceField.type,
+          targetField?.originalType ?? targetField.type
+        )
+      ) {
         return false;
       }
 

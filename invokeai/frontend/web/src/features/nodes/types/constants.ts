@@ -20,40 +20,6 @@ export const KIND_MAP = {
   output: 'outputs' as const,
 };
 
-export const COLLECTION_TYPES: FieldType[] = [
-  'Collection',
-  'IntegerCollection',
-  'BooleanCollection',
-  'FloatCollection',
-  'StringCollection',
-  'ImageCollection',
-  'LatentsCollection',
-  'ConditioningCollection',
-  'ControlCollection',
-  'ColorCollection',
-  'T2IAdapterCollection',
-  'IPAdapterCollection',
-  'MetadataItemCollection',
-  'MetadataCollection',
-  'CustomCollection',
-];
-
-export const POLYMORPHIC_TYPES: FieldType[] = [
-  'IntegerPolymorphic',
-  'BooleanPolymorphic',
-  'FloatPolymorphic',
-  'StringPolymorphic',
-  'ImagePolymorphic',
-  'LatentsPolymorphic',
-  'ConditioningPolymorphic',
-  'ControlPolymorphic',
-  'ColorPolymorphic',
-  'T2IAdapterPolymorphic',
-  'IPAdapterPolymorphic',
-  'MetadataItemPolymorphic',
-  'CustomPolymorphic',
-];
-
 export const MODEL_TYPES: FieldType[] = [
   'IPAdapterModelField',
   'ControlNetModelField',

@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
 from types import UnionType
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Literal, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, ForwardRef, Iterable, Literal, Optional, Type, TypeVar, Union
 
 import semver
 from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, create_model
@@ -653,11 +653,29 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
     """
     Validates the fields of an invocation or invocation output:
     - must not override any pydantic reserved fields
+    - must not end with "Collection" or "Polymorphic" as these are reserved for internal use
     - must be created via `InputField`, `OutputField`, or be an internal field defined in this file
     """
     for name, field in model_fields.items():
         if name in RESERVED_PYDANTIC_FIELD_NAMES:
             raise InvalidFieldError(f'Invalid field name "{name}" on "{model_type}" (reserved by pydantic)')
+
+        if not field.annotation:
+            raise InvalidFieldError(f'Invalid field type "{name}" on "{model_type}" (missing annotation)')
+
+        annotation_name = (
+            field.annotation.__forward_arg__ if isinstance(field.annotation, ForwardRef) else field.annotation.__name__
+        )
+
+        if annotation_name.endswith("Polymorphic"):
+            raise InvalidFieldError(
+                f'Invalid field type "{annotation_name}" for "{name}" on "{model_type}" (must not end in "Polymorphic")'
+            )
+
+        if annotation_name.endswith("Collection"):
+            raise InvalidFieldError(
+                f'Invalid field type "{annotation_name}" for "{name}" on "{model_type}" (must not end in "Collection")'
+            )
 
         field_kind = (
             # _field_kind is defined via InputField(), OutputField() or by one of the internal fields defined in this file

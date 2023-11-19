@@ -1,18 +1,32 @@
-import {
-  COLLECTION_MAP,
-  COLLECTION_TYPES,
-  POLYMORPHIC_TO_SINGLE_MAP,
-  POLYMORPHIC_TYPES,
-} from 'features/nodes/types/constants';
 import { FieldType } from 'features/nodes/types/types';
+import {
+  getBaseType,
+  getIsCollection,
+  getIsPolymorphic,
+} from './parseFieldType';
 
+/**
+ * Validates that the source and target types are compatible for a connection.
+ * @param sourceType The type of the source field. Must be the originalType if it exists.
+ * @param targetType The type of the target field. Must be the originalType if it exists.
+ * @returns True if the connection is valid, false otherwise.
+ */
 export const validateSourceAndTargetTypes = (
   sourceType: FieldType | string,
   targetType: FieldType | string
 ) => {
+  const isSourcePolymorphic = getIsPolymorphic(sourceType);
+  const isSourceCollection = getIsCollection(sourceType);
+  const sourceBaseType = getBaseType(sourceType);
+
+  const isTargetPolymorphic = getIsPolymorphic(targetType);
+  const isTargetCollection = getIsCollection(targetType);
+  const targetBaseType = getBaseType(targetType);
+
   // TODO: There's a bug with Collect -> Iterate nodes:
   // https://github.com/invoke-ai/InvokeAI/issues/3956
   // Once this is resolved, we can remove this check.
+  // Note that 'Collection' here is a field type, not node type.
   if (sourceType === 'Collection' && targetType === 'Collection') {
     return false;
   }
@@ -31,39 +45,21 @@ export const validateSourceAndTargetTypes = (
    */
 
   const isCollectionItemToNonCollection =
-    sourceType === 'CollectionItem' &&
-    !COLLECTION_TYPES.some((t) => t === targetType);
+    sourceType === 'CollectionItem' && !isTargetCollection;
 
   const isNonCollectionToCollectionItem =
     targetType === 'CollectionItem' &&
-    !COLLECTION_TYPES.some((t) => t === sourceType) &&
-    !POLYMORPHIC_TYPES.some((t) => t === sourceType);
+    !isSourceCollection &&
+    !isSourcePolymorphic;
 
   const isAnythingToPolymorphicOfSameBaseType =
-    POLYMORPHIC_TYPES.some((t) => t === targetType) &&
-    (() => {
-      if (!POLYMORPHIC_TYPES.some((t) => t === targetType)) {
-        return false;
-      }
-      const baseType =
-        POLYMORPHIC_TO_SINGLE_MAP[
-          targetType as keyof typeof POLYMORPHIC_TO_SINGLE_MAP
-        ];
-
-      const collectionType =
-        COLLECTION_MAP[baseType as keyof typeof COLLECTION_MAP];
-
-      return sourceType === baseType || sourceType === collectionType;
-    })();
+    isTargetPolymorphic && sourceBaseType === targetBaseType;
 
   const isGenericCollectionToAnyCollectionOrPolymorphic =
-    sourceType === 'Collection' &&
-    (COLLECTION_TYPES.some((t) => t === targetType) ||
-      POLYMORPHIC_TYPES.some((t) => t === targetType));
+    sourceType === 'Collection' && (isTargetCollection || isTargetPolymorphic);
 
   const isCollectionToGenericCollection =
-    targetType === 'Collection' &&
-    COLLECTION_TYPES.some((t) => t === sourceType);
+    targetType === 'Collection' && isSourceCollection;
 
   const isIntToFloat = sourceType === 'integer' && targetType === 'float';
 
@@ -73,6 +69,7 @@ export const validateSourceAndTargetTypes = (
 
   const isTargetAnyType = targetType === 'Any';
 
+  // One of these must be true for the connection to be valid
   return (
     isCollectionItemToNonCollection ||
     isNonCollectionToCollectionItem ||

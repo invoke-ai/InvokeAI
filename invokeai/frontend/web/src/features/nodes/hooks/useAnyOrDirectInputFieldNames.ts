@@ -4,11 +4,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map } from 'lodash-es';
 import { useMemo } from 'react';
+import { getIsPolymorphic } from '../store/util/parseFieldType';
+import { TYPES_WITH_INPUT_COMPONENTS } from '../types/constants';
 import { isInvocationNode } from '../types/types';
-import {
-  POLYMORPHIC_TYPES,
-  TYPES_WITH_INPUT_COMPONENTS,
-} from '../types/constants';
 import { getSortedFilteredFieldNames } from '../util/getSortedFilteredFieldNames';
 
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
@@ -28,7 +26,7 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
           const fields = map(nodeTemplate.inputs).filter(
             (field) =>
               (['any', 'direct'].includes(field.input) ||
-                POLYMORPHIC_TYPES.includes(field.type)) &&
+                getIsPolymorphic(field.type)) &&
               TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
           );
           return getSortedFilteredFieldNames(fields);
