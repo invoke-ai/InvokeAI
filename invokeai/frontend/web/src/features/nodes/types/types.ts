@@ -134,6 +134,8 @@ export const zFieldType = z.enum([
   'VaeField',
   'VaeModelField',
   'Custom',
+  'CustomCollection',
+  'CustomPolymorphic',
 ]);
 
 export type FieldType = z.infer<typeof zFieldType>;
@@ -144,7 +146,7 @@ export type FieldTypeMapWithNumber = {
 
 export const zReservedFieldType = z.enum([
   'WorkflowField',
-  'IsIntermediate',
+  'IsIntermediate', // this is technically a reserved field type!
   'MetadataField',
 ]);
 
@@ -797,6 +799,16 @@ export const zCustomInputFieldValue = zInputFieldValueBase.extend({
   value: z.any().optional(),
 });
 
+export const zCustomCollectionInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('CustomCollection'),
+  value: z.array(z.any()).optional(),
+});
+
+export const zCustomPolymorphicInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('CustomPolymorphic'),
+  value: z.union([z.any(), z.array(z.any())]).optional(),
+});
+
 export const zInputFieldValue = z.discriminatedUnion('type', [
   zAnyInputFieldValue,
   zBoardInputFieldValue,
@@ -855,6 +867,8 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zMetadataInputFieldValue,
   zMetadataCollectionInputFieldValue,
   zCustomInputFieldValue,
+  zCustomCollectionInputFieldValue,
+  zCustomPolymorphicInputFieldValue,
 ]);
 
 export type InputFieldValue = z.infer<typeof zInputFieldValue>;
@@ -875,6 +889,16 @@ export type AnyInputFieldTemplate = InputFieldTemplateBase & {
 
 export type CustomInputFieldTemplate = InputFieldTemplateBase & {
   type: 'Custom';
+  default: undefined;
+};
+
+export type CustomCollectionInputFieldTemplate = InputFieldTemplateBase & {
+  type: 'CustomCollection';
+  default: [];
+};
+
+export type CustomPolymorphicInputFieldTemplate = InputFieldTemplateBase & {
+  type: 'CustomPolymorphic';
   default: undefined;
 };
 
@@ -1275,7 +1299,9 @@ export type InputFieldTemplate =
   | MetadataInputFieldTemplate
   | MetadataItemPolymorphicInputFieldTemplate
   | MetadataCollectionInputFieldTemplate
-  | CustomInputFieldTemplate;
+  | CustomInputFieldTemplate
+  | CustomCollectionInputFieldTemplate
+  | CustomPolymorphicInputFieldTemplate;
 
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue

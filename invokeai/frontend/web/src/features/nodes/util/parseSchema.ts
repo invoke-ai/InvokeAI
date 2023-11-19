@@ -103,14 +103,15 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
-        let fieldType = property.ui_type ?? getFieldType(property);
+        const fieldTypeResult = property.ui_type
+          ? { type: property.ui_type, originalType: property.ui_type }
+          : getFieldType(property);
 
-        if (!fieldType) {
+        if (!fieldTypeResult) {
           logger('nodes').warn(
             {
               node: type,
               fieldName: propertyName,
-              fieldType,
               field: parseify(property),
             },
             'Missing input field type'
@@ -119,7 +120,7 @@ export const parseSchema = (
         }
 
         // stash this for custom types
-        const originalType = fieldType;
+        const { type: fieldType, originalType } = fieldTypeResult;
 
         if (fieldType === 'WorkflowField') {
           withWorkflow = true;
@@ -139,7 +140,7 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
-        if (!isFieldType(fieldType)) {
+        if (!isFieldType(originalType)) {
           logger('nodes').debug(
             {
               node: type,
@@ -149,11 +150,19 @@ export const parseSchema = (
             },
             `Fallback handling for unknown input field type: ${fieldType}`
           );
-          fieldType = 'Custom';
-          if (!isFieldType(fieldType)) {
-            // satisfy TS gods
-            return inputsAccumulator;
-          }
+        }
+
+        if (!isFieldType(fieldType)) {
+          logger('nodes').warn(
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              field: parseify(property),
+            },
+            `Unable to parse field type: ${fieldType}`
+          );
+          return inputsAccumulator;
         }
 
         const field = buildInputFieldTemplate(
@@ -170,6 +179,7 @@ export const parseSchema = (
               node: type,
               fieldName: propertyName,
               fieldType,
+              originalType,
               field: parseify(property),
             },
             'Skipping input field with no template'
@@ -228,14 +238,15 @@ export const parseSchema = (
           return outputsAccumulator;
         }
 
-        let fieldType = property.ui_type ?? getFieldType(property);
+        const fieldTypeResult = property.ui_type
+          ? { type: property.ui_type, originalType: property.ui_type }
+          : getFieldType(property);
 
-        if (!fieldType) {
+        if (!fieldTypeResult) {
           logger('nodes').warn(
             {
               node: type,
               fieldName: propertyName,
-              fieldType,
               field: parseify(property),
             },
             'Missing output field type'
@@ -243,19 +254,32 @@ export const parseSchema = (
           return outputsAccumulator;
         }
 
-        // stash for custom types
-        const originalType = fieldType;
+        const { type: fieldType, originalType } = fieldTypeResult;
 
         if (!isFieldType(fieldType)) {
           logger('nodes').debug(
-            { fieldName: propertyName, fieldType, field: parseify(property) },
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              originalType,
+              field: parseify(property),
+            },
             `Fallback handling for unknown output field type: ${fieldType}`
           );
-          fieldType = 'Custom';
-          if (!isFieldType(fieldType)) {
-            // satisfy TS gods
-            return outputsAccumulator;
-          }
+        }
+
+        if (!isFieldType(fieldType)) {
+          logger('nodes').warn(
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              field: parseify(property),
+            },
+            `Unable to parse field type: ${fieldType}`
+          );
+          return outputsAccumulator;
         }
 
         outputsAccumulator[propertyName] = {

@@ -50,8 +50,12 @@ const FieldHandle = (props: FieldHandleProps) => {
   const type = fieldTemplate.originalType ?? fieldTemplate.type;
 
   const styles: CSSProperties = useMemo(() => {
-    const isCollectionType = COLLECTION_TYPES.some((t) => t === type);
-    const isPolymorphicType = POLYMORPHIC_TYPES.some((t) => t === type);
+    const isCollectionType = COLLECTION_TYPES.some(
+      (t) => t === fieldTemplate.type
+    );
+    const isPolymorphicType = POLYMORPHIC_TYPES.some(
+      (t) => t === fieldTemplate.type
+    );
     const isModelType = MODEL_TYPES.some((t) => t === type);
     const color = getFieldColor(type);
     const s: CSSProperties = {
@@ -92,6 +96,7 @@ const FieldHandle = (props: FieldHandleProps) => {
     return s;
   }, [
     connectionError,
+    fieldTemplate.type,
     handleType,
     isConnectionInProgress,
     isConnectionStartField,

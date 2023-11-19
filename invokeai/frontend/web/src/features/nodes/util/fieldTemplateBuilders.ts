@@ -88,6 +88,9 @@ import {
   isNonArraySchemaObject,
   isRefObject,
   isSchemaObject,
+  isFieldType,
+  CustomCollectionInputFieldTemplate,
+  CustomPolymorphicInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -982,6 +985,30 @@ const buildSchedulerInputFieldTemplate = ({
   return template;
 };
 
+const buildCustomCollectionInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): CustomCollectionInputFieldTemplate => {
+  const template: CustomCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'CustomCollection',
+    default: [],
+  };
+
+  return template;
+};
+
+const buildCustomPolymorphicInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): CustomPolymorphicInputFieldTemplate => {
+  const template: CustomPolymorphicInputFieldTemplate = {
+    ...baseField,
+    type: 'CustomPolymorphic',
+    default: undefined,
+  };
+
+  return template;
+};
+
 const buildCustomInputFieldTemplate = ({
   baseField,
 }: BuildInputFieldArg): CustomInputFieldTemplate => {
@@ -996,7 +1023,7 @@ const buildCustomInputFieldTemplate = ({
 
 export const getFieldType = (
   schemaObject: OpenAPIV3_1SchemaOrRef
-): string | undefined => {
+): { type: string; originalType: string } | undefined => {
   if (isSchemaObject(schemaObject)) {
     if (!schemaObject.type) {
       // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
@@ -1004,7 +1031,17 @@ export const getFieldType = (
       if (schemaObject.allOf) {
         const allOf = schemaObject.allOf;
         if (allOf && allOf[0] && isRefObject(allOf[0])) {
-          return refObjectToSchemaName(allOf[0]);
+          // This is a single ref type
+          const originalType = refObjectToSchemaName(allOf[0]);
+
+          if (!originalType) {
+            // something has gone terribly awry
+            return;
+          }
+          return {
+            type: isFieldType(originalType) ? originalType : 'Custom',
+            originalType,
+          };
         }
       } else if (schemaObject.anyOf) {
         // ignore null types
@@ -1017,8 +1054,17 @@ export const getFieldType = (
           return true;
         });
         if (anyOf.length === 1) {
+          // This is a single ref type
           if (isRefObject(anyOf[0])) {
-            return refObjectToSchemaName(anyOf[0]);
+            const originalType = refObjectToSchemaName(anyOf[0]);
+            if (!originalType) {
+              return;
+            }
+
+            return {
+              type: isFieldType(originalType) ? originalType : 'Custom',
+              originalType,
+            };
           } else if (isSchemaObject(anyOf[0])) {
             return getFieldType(anyOf[0]);
           }
@@ -1064,16 +1110,29 @@ export const getFieldType = (
             secondType = second.type;
           }
         }
-        if (firstType === secondType && isPolymorphicItemType(firstType)) {
-          return SINGLE_TO_POLYMORPHIC_MAP[firstType];
+        if (firstType === secondType) {
+          if (isPolymorphicItemType(firstType)) {
+            // Known polymorphic field type
+            const originalType = SINGLE_TO_POLYMORPHIC_MAP[firstType];
+            if (!originalType) {
+              return;
+            }
+            return { type: originalType, originalType };
+          }
+
+          // else custom polymorphic
+          return {
+            type: 'CustomPolymorphic',
+            originalType: `${firstType}Polymorphic`,
+          };
         }
       }
     } else if (schemaObject.enum) {
-      return 'enum';
+      return { type: 'enum', originalType: 'enum' };
     } else if (schemaObject.type) {
       if (schemaObject.type === 'number') {
         // floats are "number" in OpenAPI, while ints are "integer" - we need to distinguish them
-        return 'float';
+        return { type: 'float', originalType: 'float' };
       } else if (schemaObject.type === 'array') {
         const itemType = isSchemaObject(schemaObject.items)
           ? schemaObject.items.type
@@ -1085,16 +1144,39 @@ export const getFieldType = (
         }
 
         if (isCollectionItemType(itemType)) {
-          return COLLECTION_MAP[itemType];
+          // known collection field type
+          const originalType = COLLECTION_MAP[itemType];
+          if (!originalType) {
+            return;
+          }
+          return { type: originalType, originalType };
         }
 
-        return;
-      } else if (!isArray(schemaObject.type)) {
-        return schemaObject.type;
+        return {
+          type: 'CustomCollection',
+          originalType: `${itemType}Collection`,
+        };
+      } else if (
+        !isArray(schemaObject.type) &&
+        schemaObject.type !== 'null' && // 'null' is not valid
+        schemaObject.type !== 'object' // 'object' is not valid
+      ) {
+        const originalType = schemaObject.type;
+        return { type: originalType, originalType };
       }
+      // else ignore
+      return;
     }
   } else if (isRefObject(schemaObject)) {
-    return refObjectToSchemaName(schemaObject);
+    const originalType = refObjectToSchemaName(schemaObject);
+    if (!originalType) {
+      return;
+    }
+
+    return {
+      type: isFieldType(originalType) ? originalType : 'Custom',
+      originalType,
+    };
   }
   return;
 };
@@ -1159,6 +1241,8 @@ const TEMPLATE_BUILDER_MAP: {
   VaeField: buildVaeInputFieldTemplate,
   VaeModelField: buildVaeModelInputFieldTemplate,
   Custom: buildCustomInputFieldTemplate,
+  CustomCollection: buildCustomCollectionInputFieldTemplate,
+  CustomPolymorphic: buildCustomPolymorphicInputFieldTemplate,
 };
 
 /**

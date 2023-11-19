@@ -61,6 +61,8 @@ const FIELD_VALUE_FALLBACK_MAP: {
   VaeField: undefined,
   VaeModelField: undefined,
   Custom: undefined,
+  CustomCollection: [],
+  CustomPolymorphic: undefined,
 };
 
 export const buildInputFieldValue = (

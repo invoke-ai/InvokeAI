@@ -35,6 +35,7 @@ export const COLLECTION_TYPES: FieldType[] = [
   'IPAdapterCollection',
   'MetadataItemCollection',
   'MetadataCollection',
+  'CustomCollection',
 ];
 
 export const POLYMORPHIC_TYPES: FieldType[] = [
@@ -50,6 +51,7 @@ export const POLYMORPHIC_TYPES: FieldType[] = [
   'T2IAdapterPolymorphic',
   'IPAdapterPolymorphic',
   'MetadataItemPolymorphic',
+  'CustomPolymorphic',
 ];
 
 export const MODEL_TYPES: FieldType[] = [
@@ -83,6 +85,7 @@ export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   IPAdapterField: 'IPAdapterCollection',
   MetadataItemField: 'MetadataItemCollection',
   MetadataField: 'MetadataCollection',
+  Custom: 'CustomCollection',
 };
 export const isCollectionItemType = (
   itemType: string | undefined
@@ -103,6 +106,7 @@ export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
   T2IAdapterField: 'T2IAdapterPolymorphic',
   IPAdapterField: 'IPAdapterPolymorphic',
   MetadataItemField: 'MetadataItemPolymorphic',
+  Custom: 'CustomPolymorphic',
 };
 
 export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
@@ -118,6 +122,7 @@ export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
   T2IAdapterPolymorphic: 'T2IAdapterField',
   IPAdapterPolymorphic: 'IPAdapterField',
   MetadataItemPolymorphic: 'MetadataItemField',
+  CustomPolymorphic: 'Custom',
 };
 
 export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
@@ -160,6 +165,16 @@ export const FIELDS: Record<FieldType | string, FieldUIConfig> = {
     color: 'gray.500',
     description: 'A custom field, provided by an external node.',
     title: 'Custom',
+  },
+  CustomCollection: {
+    color: 'gray.500',
+    description: 'A custom field collection, provided by an external node.',
+    title: 'Custom Collection',
+  },
+  CustomPolymorphic: {
+    color: 'gray.500',
+    description: 'A custom field polymorphic, provided by an external node.',
+    title: 'Custom Polymorphic',
   },
   MetadataField: {
     color: 'gray.500',
