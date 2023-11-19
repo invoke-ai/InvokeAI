@@ -5,10 +5,11 @@ import { useCallback, useState } from 'react';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 import { useTranslation } from 'react-i18next';
+import { t } from 'i18next';
 
 export const advancedAddModeData: SelectItem[] = [
-  { label: 'Diffusers', value: 'diffusers' },
-  { label: 'Checkpoint / Safetensors', value: 'checkpoint' },
+  { label: t('Diffusers'), value: 'diffusers' },
+  { label: t('Checkpoint / Safetensors'), value: 'checkpoint' },
 ];
 
 export type ManualAddMode = 'diffusers' | 'checkpoint';
