@@ -44,9 +44,6 @@ export const makeConnectionErrorSelector = (
     const sourceType =
       handleType === 'source' ? fieldType : currentConnectionFieldType;
 
-    console.log('targetType', targetType);
-    console.log('sourceType', sourceType);
-
     if (nodeId === connectionNodeId) {
       return i18n.t('nodes.cannotConnectToSelf');
     }
