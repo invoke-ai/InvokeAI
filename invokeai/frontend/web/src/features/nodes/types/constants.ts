@@ -36,6 +36,26 @@ export const MODEL_TYPES: FieldType[] = [
   'IPAdapterModelField',
 ];
 
+/**
+ * TODO: Revise the field type naming scheme
+ *
+ * Unfortunately, due to inconsistent naming of types, we need to keep the below map objects/callbacks.
+ *
+ * Problems:
+ * - some types do not use the word "Field" in their name, e.g. "Scheduler"
+ * - primitive types use all-lowercase names, e.g. "integer"
+ * - collection and polymorphic types do not use the word "Field"
+ *
+ * If these inconsistencies were resolved, we could remove these mappings and use simple string
+ * parsing/manipulation to handle field types.
+ *
+ * It would make some of the parsing logic simpler and reduce the maintenance overhead of adding new
+ * "official" field types.
+ *
+ * This will require migration logic for workflows to update their field types. Workflows *do* have a
+ * version attached to them, so this shouldn't be too difficult.
+ */
+
 export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   integer: 'IntegerCollection',
   boolean: 'BooleanCollection',
