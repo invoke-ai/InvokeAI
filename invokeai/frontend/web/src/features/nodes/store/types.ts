@@ -21,7 +21,7 @@ export type NodesState = {
   edges: Edge<InvocationEdgeExtra>[];
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
-  currentConnectionFieldType: FieldType | string | null;
+  connectionStartFieldType: FieldType | string | null;
   connectionMade: boolean;
   modifyingEdge: boolean;
   shouldShowFieldTypeLegend: boolean;

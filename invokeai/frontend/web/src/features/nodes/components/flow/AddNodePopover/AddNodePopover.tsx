@@ -57,7 +57,7 @@ const AddNodePopover = () => {
   const { t } = useTranslation();
 
   const fieldFilter = useAppSelector(
-    (state) => state.nodes.currentConnectionFieldType
+    (state) => state.nodes.connectionStartFieldType
   );
   const handleFilter = useAppSelector(
     (state) => state.nodes.connectionStartParams?.handleType

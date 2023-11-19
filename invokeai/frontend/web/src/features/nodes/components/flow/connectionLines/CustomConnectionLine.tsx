@@ -7,11 +7,11 @@ import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
 import { getFieldColor } from '../edges/util/getEdgeColor';
 
 const selector = createSelector(stateSelector, ({ nodes }) => {
-  const { shouldAnimateEdges, currentConnectionFieldType, shouldColorEdges } =
+  const { shouldAnimateEdges, connectionStartFieldType, shouldColorEdges } =
     nodes;
 
   const stroke = shouldColorEdges
-    ? getFieldColor(currentConnectionFieldType)
+    ? getFieldColor(connectionStartFieldType)
     : colorTokenToCssVar('base.500');
 
   let className = 'react-flow__custom_connection-path';

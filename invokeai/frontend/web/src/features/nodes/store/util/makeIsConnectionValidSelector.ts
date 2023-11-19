@@ -22,10 +22,10 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.noFieldType');
     }
 
-    const { currentConnectionFieldType, connectionStartParams, nodes, edges } =
+    const { connectionStartFieldType, connectionStartParams, nodes, edges } =
       state.nodes;
 
-    if (!connectionStartParams || !currentConnectionFieldType) {
+    if (!connectionStartParams || !connectionStartFieldType) {
       return i18n.t('nodes.noConnectionInProgress');
     }
 
@@ -40,9 +40,9 @@ export const makeConnectionErrorSelector = (
     }
 
     const targetType =
-      handleType === 'target' ? fieldType : currentConnectionFieldType;
+      handleType === 'target' ? fieldType : connectionStartFieldType;
     const sourceType =
-      handleType === 'source' ? fieldType : currentConnectionFieldType;
+      handleType === 'source' ? fieldType : connectionStartFieldType;
 
     if (nodeId === connectionNodeId) {
       return i18n.t('nodes.cannotConnectToSelf');

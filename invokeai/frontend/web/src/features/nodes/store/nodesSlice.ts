@@ -93,7 +93,7 @@ export const initialNodesState: NodesState = {
   nodeTemplates: {},
   isReady: false,
   connectionStartParams: null,
-  currentConnectionFieldType: null,
+  connectionStartFieldType: null,
   connectionMade: false,
   modifyingEdge: false,
   addNewNodePosition: null,
@@ -203,7 +203,7 @@ const nodesSlice = createSlice({
           nodeId &&
           handleId &&
           handleType &&
-          state.currentConnectionFieldType
+          state.connectionStartFieldType
         ) {
           const newConnection = findConnectionToValidHandle(
             node,
@@ -212,7 +212,7 @@ const nodesSlice = createSlice({
             nodeId,
             handleId,
             handleType,
-            state.currentConnectionFieldType
+            state.connectionStartFieldType
           );
           if (newConnection) {
             state.edges = addEdge(
@@ -224,7 +224,7 @@ const nodesSlice = createSlice({
       }
 
       state.connectionStartParams = null;
-      state.currentConnectionFieldType = null;
+      state.connectionStartFieldType = null;
     },
     edgeChangeStarted: (state) => {
       state.modifyingEdge = true;
@@ -258,11 +258,11 @@ const nodesSlice = createSlice({
         handleType === 'source'
           ? node.data.outputs[handleId]
           : node.data.inputs[handleId];
-      state.currentConnectionFieldType =
+      state.connectionStartFieldType =
         field?.originalType ?? field?.type ?? null;
     },
     connectionMade: (state, action: PayloadAction<Connection>) => {
-      const fieldType = state.currentConnectionFieldType;
+      const fieldType = state.connectionStartFieldType;
       if (!fieldType) {
         return;
       }
@@ -287,7 +287,7 @@ const nodesSlice = createSlice({
               nodeId &&
               handleId &&
               handleType &&
-              state.currentConnectionFieldType
+              state.connectionStartFieldType
             ) {
               const newConnection = findConnectionToValidHandle(
                 mouseOverNode,
@@ -296,7 +296,7 @@ const nodesSlice = createSlice({
                 nodeId,
                 handleId,
                 handleType,
-                state.currentConnectionFieldType
+                state.connectionStartFieldType
               );
               if (newConnection) {
                 state.edges = addEdge(
@@ -307,14 +307,14 @@ const nodesSlice = createSlice({
             }
           }
           state.connectionStartParams = null;
-          state.currentConnectionFieldType = null;
+          state.connectionStartFieldType = null;
         } else {
           state.addNewNodePosition = action.payload.cursorPosition;
           state.isAddNodePopoverOpen = true;
         }
       } else {
         state.connectionStartParams = null;
-        state.currentConnectionFieldType = null;
+        state.connectionStartFieldType = null;
       }
       state.modifyingEdge = false;
     },
@@ -943,7 +943,7 @@ const nodesSlice = createSlice({
 
       //Make sure these get reset if we close the popover and haven't selected a node
       state.connectionStartParams = null;
-      state.currentConnectionFieldType = null;
+      state.connectionStartFieldType = null;
     },
     addNodePopoverToggled: (state) => {
       state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;
