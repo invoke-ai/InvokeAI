@@ -648,6 +648,8 @@ class _Model(BaseModel):
 # Get all pydantic model attrs, methods, etc
 RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
 
+RESERVED_INVOKEAI_FIELD_NAMES = {"Custom", "CustomCollection", "CustomPolymorphic"}
+
 
 def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None:
     """
@@ -676,6 +678,9 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
             raise InvalidFieldError(
                 f'Invalid field type "{annotation_name}" for "{name}" on "{model_type}" (must not end in "Collection")'
             )
+
+        if annotation_name in RESERVED_INVOKEAI_FIELD_NAMES:
+            raise InvalidFieldError(f'Invalid field type "{annotation_name}" for "{name}" on "{model_type}" (reserved)')
 
         field_kind = (
             # _field_kind is defined via InputField(), OutputField() or by one of the internal fields defined in this file
