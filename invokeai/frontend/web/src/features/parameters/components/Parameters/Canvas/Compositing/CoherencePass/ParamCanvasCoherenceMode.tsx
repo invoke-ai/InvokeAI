@@ -5,15 +5,8 @@ import { IAISelectDataType } from 'common/components/IAIMantineSearchableSelect'
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
 import { CanvasCoherenceModeParam } from 'features/parameters/types/parameterSchemas';
-
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const coherenceModeSelectData: IAISelectDataType[] = [
-  { label: 'Unmasked', value: 'unmasked' },
-  { label: 'Mask', value: 'mask' },
-  { label: 'Mask Edge', value: 'edge' },
-];
 
 const ParamCanvasCoherenceMode = () => {
   const dispatch = useAppDispatch();
@@ -21,6 +14,15 @@ const ParamCanvasCoherenceMode = () => {
     (state: RootState) => state.generation.canvasCoherenceMode
   );
   const { t } = useTranslation();
+
+  const coherenceModeSelectData: IAISelectDataType[] = useMemo(
+    () => [
+      { label: t('parameters.unmasked'), value: 'unmasked' },
+      { label: t('unifiedCanvas.mask'), value: 'mask' },
+      { label: t('parameters.maskEdge'), value: 'edge' },
+    ],
+    [t]
+  );
 
   const handleCoherenceModeChange = useCallback(
     (v: string | null) => {

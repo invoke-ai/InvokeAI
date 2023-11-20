@@ -79,7 +79,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: t('toast.setCanvasInitialImage'),
+            description: t('toast.setAsCanvasInitialImage'),
           })
         );
         return;

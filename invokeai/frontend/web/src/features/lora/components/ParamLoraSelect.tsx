@@ -95,7 +95,7 @@ const ParamLoRASelect = () => {
 
   return (
     <IAIMantineSearchableSelect
-      placeholder={data.length === 0 ? 'All LoRAs added' : 'Add LoRA'}
+      placeholder={data.length === 0 ? 'All LoRAs added' : t('models.addLora')}
       value={null}
       data={data}
       nothingFound="No matching LoRAs"
