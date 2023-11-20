@@ -1,16 +1,10 @@
 import { Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 import { useTranslation } from 'react-i18next';
-import { t } from 'i18next';
-
-export const advancedAddModeData: SelectItem[] = [
-  { label: t('Diffusers'), value: 'diffusers' },
-  { label: t('Checkpoint / Safetensors'), value: 'checkpoint' },
-];
 
 export type ManualAddMode = 'diffusers' | 'checkpoint';
 
@@ -25,6 +19,14 @@ export default function AdvancedAddModels() {
     }
     setAdvancedAddMode(v as ManualAddMode);
   }, []);
+
+  const advancedAddModeData: SelectItem[] = useMemo(
+    () => [
+      { label: t('modelManager.diffusersModels'), value: 'diffusers' },
+      { label: t('modelManager.checkpointOrSafetensors'), value: 'checkpoint' },
+    ],
+    [t]
+  );
 
   return (
     <Flex flexDirection="column" gap={4} width="100%">

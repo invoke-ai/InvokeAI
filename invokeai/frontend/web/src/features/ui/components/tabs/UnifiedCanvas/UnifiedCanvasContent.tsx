@@ -6,6 +6,7 @@ import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
 import { CanvasInitialImageDropData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const droppableData: CanvasInitialImageDropData = {
   id: 'canvas-intial-image',
@@ -13,6 +14,7 @@ const droppableData: CanvasInitialImageDropData = {
 };
 
 const UnifiedCanvasContent = () => {
+  const { t } = useTranslation();
   const {
     isOver,
     setNodeRef: setDroppableRef,
@@ -40,7 +42,10 @@ const UnifiedCanvasContent = () => {
       <IAICanvasToolbar />
       <IAICanvas />
       {isValidDrop(droppableData, active) && (
-        <IAIDropOverlay isOver={isOver} label="Set Canvas Initial Image" />
+        <IAIDropOverlay
+          isOver={isOver}
+          label={t('toast.setCanvasInitialImage')}
+        />
       )}
     </Flex>
   );
