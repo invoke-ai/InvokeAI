@@ -6,7 +6,7 @@
         "flipVertically": "Flip Vertically",
         "invokeProgressBar": "Invoke progress bar",
         "menu": "Menu",
-        "mode":"Mode",
+        "mode": "Mode",
         "modelSelect": "Model Select",
         "modifyConfig": "Modify Config",
         "nextImage": "Next Image",
@@ -56,12 +56,12 @@
         "cancel": "Cancel",
         "close": "Close",
         "on": "On",
-        "checkpoint":"Checkpoint",
+        "checkpoint": "Checkpoint",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
         "controlAdapter": "Control Adapter",
-        "data":"Data",
-        "details":"Details",
+        "data": "Data",
+        "details": "Details",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
         "darkMode": "Dark Mode",
@@ -73,7 +73,7 @@
         "imagePrompt": "Image Prompt",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
-        "inpaint":"inpaint",
+        "inpaint": "inpaint",
         "langArabic": "العربية",
         "langBrPortuguese": "Português do Brasil",
         "langDutch": "Nederlands",
@@ -102,8 +102,8 @@
         "nodes": "Workflow Editor",
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "openInNewTab": "Open in New Tab",
-        "outpaint":"outpaint",
-        "outputs":"Outputs",
+        "outpaint": "outpaint",
+        "outputs": "Outputs",
         "postProcessDesc1": "Invoke AI offers a wide variety of post processing features. Image Upscaling and Face Restoration are already available in the WebUI. You can access them from the Advanced Options menu of the Text To Image and Image To Image tabs. You can also process images directly, using the image action buttons above the current image display or in the viewer.",
         "postProcessDesc2": "A dedicated UI will be released soon to facilitate more advanced post processing workflows.",
         "postProcessDesc3": "The Invoke AI Command Line Interface offers various other features including Embiggen.",
@@ -140,7 +140,7 @@
         "statusSavingImage": "Saving Image",
         "statusUpscaling": "Upscaling",
         "statusUpscalingESRGAN": "Upscaling (ESRGAN)",
-        "template":"Template",
+        "template": "Template",
         "training": "Training",
         "trainingDesc1": "A dedicated workflow for training your own embeddings and checkpoints using Textual Inversion and Dreambooth from the web interface.",
         "trainingDesc2": "InvokeAI already supports training custom embeddourings using Textual Inversion using the main script.",
@@ -294,7 +294,7 @@
         "next": "Next",
         "status": "Status",
         "total": "Total",
-        "time":"Time",
+        "time": "Time",
         "pending": "Pending",
         "in_progress": "In Progress",
         "completed": "Completed",
@@ -302,7 +302,7 @@
         "canceled": "Canceled",
         "completedIn": "Completed in",
         "batch": "Batch",
-        "batchFieldValues":"Batch Field Values",
+        "batchFieldValues": "Batch Field Values",
         "item": "Item",
         "session": "Session",
         "batchValues": "Batch Values",
@@ -601,7 +601,7 @@
         "strength": "Image to image strength",
         "Threshold": "Noise Threshold",
         "variations": "Seed-weight pairs",
-        "vae": "VAE", 
+        "vae": "VAE",
         "width": "Width",
         "workflow": "Workflow"
     },
@@ -704,7 +704,7 @@
         "nameValidationMsg": "Enter a name for your model",
         "noCustomLocationProvided": "No Custom Location Provided",
         "noModels": "No Models Found",
-        "noModelSelected":"No Model Selected",
+        "noModelSelected": "No Model Selected",
         "noModelsFound": "No Models Found",
         "none": "none",
         "notLoaded": "not loaded",
@@ -751,7 +751,7 @@
     },
     "models": {
         "addLora": "Add LoRA",
-        "esrganModel":"ESRGAN Model",
+        "esrganModel": "ESRGAN Model",
         "loading": "loading",
         "noLoRAsAvailable": "No LoRAs available",
         "noMatchingLoRAs": "No matching LoRAs",
@@ -1080,7 +1080,7 @@
         "upscale": "Upscale (Shift + U)",
         "upscaleImage": "Upscale Image",
         "upscaling": "Upscaling",
-        "unmasked":"Unmasked",
+        "unmasked": "Unmasked",
         "useAll": "Use All",
         "useCpuNoise": "Use CPU Noise",
         "cpuNoise": "CPU Noise",
@@ -1145,7 +1145,7 @@
         "enableInformationalPopovers": "Enable Informational Popovers",
         "enableInvisibleWatermark": "Enable Invisible Watermark",
         "enableNodesEditor": "Enable Nodes Editor",
-        "enableNSFWChecker":"Enable NSFW Checker",
+        "enableNSFWChecker": "Enable NSFW Checker",
         "experimental": "Experimental",
         "favoriteSchedulers": "Favorite Schedulers",
         "favoriteSchedulersPlaceholder": "No schedulers favorited",
@@ -1304,11 +1304,15 @@
         },
         "compositingBlur": {
             "heading": "Blur",
-            "paragraphs": ["The blur radius of the mask."]
+            "paragraphs": [
+                "The blur radius of the mask."
+            ]
         },
         "compositingBlurMethod": {
             "heading": "Blur Method",
-            "paragraphs": ["The method of blur applied to the masked area."]
+            "paragraphs": [
+                "The method of blur applied to the masked area."
+            ]
         },
         "compositingCoherencePass": {
             "heading": "Coherence Pass",
@@ -1318,7 +1322,9 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": ["The mode of the Coherence Pass."]
+            "paragraphs": [
+                "The mode of the Coherence Pass."
+            ]
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
@@ -1336,7 +1342,9 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
-            "paragraphs": ["Adjust the mask."]
+            "paragraphs": [
+                "Adjust the mask."
+            ]
         },
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
@@ -1394,7 +1402,9 @@
         },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": ["Method to infill the selected area."]
+            "paragraphs": [
+                "Method to infill the selected area."
+            ]
         },
         "lora": {
             "heading": "LoRA Weight",
