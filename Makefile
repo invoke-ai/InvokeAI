@@ -16,5 +16,6 @@ mypy:
 		mypy scripts/invokeai-web.py
 
 # Runs mypy, ignoring the config in pyproject.toml but still ignoring missing (untyped) imports
+# (many files are ignored by the config, so this is useful for checking all files)
 mypy-all:
 		mypy scripts/invokeai-web.py --config-file= --ignore-missing-imports
