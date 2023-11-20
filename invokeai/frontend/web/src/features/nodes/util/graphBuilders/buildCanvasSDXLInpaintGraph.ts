@@ -14,7 +14,7 @@ import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -696,7 +696,7 @@ export const buildCanvasSDXLInpaintGraph = (
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

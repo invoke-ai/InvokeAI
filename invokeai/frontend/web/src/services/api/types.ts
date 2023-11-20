@@ -48,9 +48,11 @@ export type OffsetPaginatedResults_ImageDTO_ =
   s['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
-export type ModelType = s['ModelType'];
+export type ModelType =
+  s['invokeai__backend__model_management__models__base__ModelType'];
 export type SubModelType = s['SubModelType'];
-export type BaseModelType = s['BaseModelType'];
+export type BaseModelType =
+  s['invokeai__backend__model_management__models__base__BaseModelType'];
 export type MainModelField = s['MainModelField'];
 export type OnnxModelField = s['OnnxModelField'];
 export type VAEModelField = s['VAEModelField'];
@@ -58,7 +60,7 @@ export type LoRAModelField = s['LoRAModelField'];
 export type ControlNetModelField = s['ControlNetModelField'];
 export type IPAdapterModelField = s['IPAdapterModelField'];
 export type T2IAdapterModelField = s['T2IAdapterModelField'];
-export type ModelsList = s['ModelsList'];
+export type ModelsList = s['invokeai__app__api__routers__models__ModelsList'];
 export type ControlField = s['ControlField'];
 export type IPAdapterField = s['IPAdapterField'];
 
@@ -140,7 +142,7 @@ export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
-export type SaveImageInvocation = s['SaveImageInvocation'];
+export type LinearUIOutputInvocation = s['LinearUIOutputInvocation'];
 export type MetadataInvocation = s['MetadataInvocation'];
 export type CoreMetadataInvocation = s['CoreMetadataInvocation'];
 export type MetadataItemInvocation = s['MetadataItemInvocation'];

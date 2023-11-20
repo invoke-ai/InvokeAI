@@ -1,85 +1,39 @@
-import {
-  Flex,
-  Icon,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Text,
-  Tooltip,
-  useDisclosure,
-} from '@chakra-ui/react';
+import { Flex, Icon, Text, Tooltip } from '@chakra-ui/react';
 import { compare } from 'compare-versions';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
-import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
-import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
+import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
 import { isInvocationNodeData } from 'features/nodes/types/types';
 import { memo, useMemo } from 'react';
-import { FaInfoCircle } from 'react-icons/fa';
-import NotesTextarea from './NotesTextarea';
-import { useDoNodeVersionsMatch } from 'features/nodes/hooks/useDoNodeVersionsMatch';
 import { useTranslation } from 'react-i18next';
+import { FaInfoCircle } from 'react-icons/fa';
 
 interface Props {
   nodeId: string;
 }
 
-const InvocationNodeNotes = ({ nodeId }: Props) => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const label = useNodeLabel(nodeId);
-  const title = useNodeTemplateTitle(nodeId);
-  const doVersionsMatch = useDoNodeVersionsMatch(nodeId);
-  const { t } = useTranslation();
+const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
+  const { needsUpdate } = useNodeVersion(nodeId);
 
   return (
-    <>
-      <Tooltip
-        label={<TooltipContent nodeId={nodeId} />}
-        placement="top"
-        shouldWrapChildren
-      >
-        <Flex
-          className="nodrag"
-          onClick={onOpen}
-          sx={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            w: 8,
-            h: 8,
-            cursor: 'pointer',
-          }}
-        >
-          <Icon
-            as={FaInfoCircle}
-            sx={{
-              boxSize: 4,
-              w: 8,
-              color: doVersionsMatch ? 'base.400' : 'error.400',
-            }}
-          />
-        </Flex>
-      </Tooltip>
-
-      <Modal isOpen={isOpen} onClose={onClose} isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>{label || title || t('nodes.unknownNode')}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <NotesTextarea nodeId={nodeId} />
-          </ModalBody>
-          <ModalFooter />
-        </ModalContent>
-      </Modal>
-    </>
+    <Tooltip
+      label={<TooltipContent nodeId={nodeId} />}
+      placement="top"
+      shouldWrapChildren
+    >
+      <Icon
+        as={FaInfoCircle}
+        sx={{
+          boxSize: 4,
+          w: 8,
+          color: needsUpdate ? 'error.400' : 'base.400',
+        }}
+      />
+    </Tooltip>
   );
 };
 
-export default memo(InvocationNodeNotes);
+export default memo(InvocationNodeInfoIcon);
 
 const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
   const data = useNodeData(nodeId);

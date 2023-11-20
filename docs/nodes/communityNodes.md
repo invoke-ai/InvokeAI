@@ -32,6 +32,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Size Stepper Nodes](#size-stepper-nodes)
     + [Text font to Image](#text-font-to-image)
     + [Thresholding](#thresholding)
+    + [Unsharp Mask](#unsharp-mask)
     + [XY Image to Grid and Images to Grids nodes](#xy-image-to-grid-and-images-to-grids-nodes)
 - [Example Node Template](#example-node-template)
 - [Disclaimer](#disclaimer)
@@ -315,6 +316,13 @@ Highlights/Midtones/Shadows (with LUT blur enabled):
 <img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/19aa718a-70c1-4668-8169-d68f4bd13771" width="300" />
 <img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0a440e43-697f-4d17-82ee-f287467df0a5" width="300" />
 <img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0701fd0f-2ca7-4fe2-8613-2b52547bafce" width="300" />
+
+--------------------------------
+### Unsharp Mask
+
+**Description:** Applies an unsharp mask filter to an image, preserving its alpha channel in the process.
+
+**Node Link:** https://github.com/JPPhoto/unsharp-mask-node
 
 --------------------------------
 ### XY Image to Grid and Images to Grids nodes

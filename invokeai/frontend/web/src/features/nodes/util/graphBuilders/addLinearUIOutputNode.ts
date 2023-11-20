@@ -1,20 +1,20 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { SaveImageInvocation } from 'services/api/types';
+import { LinearUIOutputInvocation } from 'services/api/types';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
   LATENTS_TO_IMAGE_HRF_HR,
+  LINEAR_UI_OUTPUT,
   NSFW_CHECKER,
-  SAVE_IMAGE,
   WATERMARKER,
 } from './constants';
 
 /**
  * Set the `use_cache` field on the linear/canvas graph's final image output node to False.
  */
-export const addSaveImageNode = (
+export const addLinearUIOutputNode = (
   state: RootState,
   graph: NonNullableGraph
 ): void => {
@@ -23,18 +23,18 @@ export const addSaveImageNode = (
     activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
   const { autoAddBoardId } = state.gallery;
 
-  const saveImageNode: SaveImageInvocation = {
-    id: SAVE_IMAGE,
-    type: 'save_image',
+  const linearUIOutputNode: LinearUIOutputInvocation = {
+    id: LINEAR_UI_OUTPUT,
+    type: 'linear_ui_output',
     is_intermediate,
     use_cache: false,
     board: autoAddBoardId === 'none' ? undefined : { board_id: autoAddBoardId },
   };
 
-  graph.nodes[SAVE_IMAGE] = saveImageNode;
+  graph.nodes[LINEAR_UI_OUTPUT] = linearUIOutputNode;
 
   const destination = {
-    node_id: SAVE_IMAGE,
+    node_id: LINEAR_UI_OUTPUT,
     field: 'image',
   };
 
