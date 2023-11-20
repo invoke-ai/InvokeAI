@@ -1,6 +1,7 @@
+import numpy as np
 import pytest
 
-from invokeai.backend.tiles.tiles import calc_tiles_with_overlap
+from invokeai.backend.tiles.tiles import calc_tiles_with_overlap, merge_tiles_with_linear_blending
 from invokeai.backend.tiles.utils import TBLR, Tile
 
 ####################################
@@ -82,3 +83,142 @@ def test_calc_tiles_with_overlap_input_validation(
             calc_tiles_with_overlap(image_height, image_width, tile_height, tile_width, overlap)
     else:
         calc_tiles_with_overlap(image_height, image_width, tile_height, tile_width, overlap)
+
+
+#############################################
+# Test merge_tiles_with_linear_blending(...)
+#############################################
+
+
+@pytest.mark.parametrize("blend_amount", [0, 32])
+def test_merge_tiles_with_linear_blending_horizontal(blend_amount: int):
+    """Test merge_tiles_with_linear_blending(...) behavior when merging horizontally."""
+    # Initialize 2 tiles side-by-side.
+    tiles = [
+        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=64)),
+        Tile(coords=TBLR(top=0, bottom=512, left=448, right=960), overlap=TBLR(top=0, bottom=0, left=64, right=0)),
+    ]
+
+    dst_image = np.zeros((512, 960, 3), dtype=np.uint8)
+
+    # Prepare tile_images that match tiles. Pixel values are set based on the tile index.
+    tile_images = [
+        np.zeros((512, 512, 3)) + 64,
+        np.zeros((512, 512, 3)) + 128,
+    ]
+
+    # Calculate expected output.
+    expected_output = np.zeros((512, 960, 3), dtype=np.uint8)
+    expected_output[:, : 480 - (blend_amount // 2), :] = 64
+    if blend_amount > 0:
+        gradient = np.linspace(start=64, stop=128, num=blend_amount, dtype=np.uint8).reshape((1, blend_amount, 1))
+        expected_output[:, 480 - (blend_amount // 2) : 480 + (blend_amount // 2), :] = gradient
+    expected_output[:, 480 + (blend_amount // 2) :, :] = 128
+
+    merge_tiles_with_linear_blending(
+        dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=blend_amount
+    )
+
+    np.testing.assert_array_equal(dst_image, expected_output, strict=True)
+
+
+@pytest.mark.parametrize("blend_amount", [0, 32])
+def test_merge_tiles_with_linear_blending_vertical(blend_amount: int):
+    """Test merge_tiles_with_linear_blending(...) behavior when merging vertically."""
+    # Initialize 2 tiles stacked vertically.
+    tiles = [
+        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=64, left=0, right=0)),
+        Tile(coords=TBLR(top=448, bottom=960, left=0, right=512), overlap=TBLR(top=64, bottom=0, left=0, right=0)),
+    ]
+
+    dst_image = np.zeros((960, 512, 3), dtype=np.uint8)
+
+    # Prepare tile_images that match tiles. Pixel values are set based on the tile index.
+    tile_images = [
+        np.zeros((512, 512, 3)) + 64,
+        np.zeros((512, 512, 3)) + 128,
+    ]
+
+    # Calculate expected output.
+    expected_output = np.zeros((960, 512, 3), dtype=np.uint8)
+    expected_output[: 480 - (blend_amount // 2), :, :] = 64
+    if blend_amount > 0:
+        gradient = np.linspace(start=64, stop=128, num=blend_amount, dtype=np.uint8).reshape((blend_amount, 1, 1))
+        expected_output[480 - (blend_amount // 2) : 480 + (blend_amount // 2), :, :] = gradient
+    expected_output[480 + (blend_amount // 2) :, :, :] = 128
+
+    merge_tiles_with_linear_blending(
+        dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=blend_amount
+    )
+
+    np.testing.assert_array_equal(dst_image, expected_output, strict=True)
+
+
+def test_merge_tiles_with_linear_blending_blend_amount_exceeds_vertical_overlap():
+    """Test that merge_tiles_with_linear_blending(...) raises an exception if 'blend_amount' exceeds the overlap between
+    any vertically adjacent tiles.
+    """
+    # Initialize 2 tiles stacked vertically.
+    tiles = [
+        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=64, left=0, right=0)),
+        Tile(coords=TBLR(top=448, bottom=960, left=0, right=512), overlap=TBLR(top=64, bottom=0, left=0, right=0)),
+    ]
+
+    dst_image = np.zeros((960, 512, 3), dtype=np.uint8)
+
+    # Prepare tile_images that match tiles.
+    tile_images = [np.zeros((512, 512, 3)), np.zeros((512, 512, 3))]
+
+    # blend_amount=128 exceeds overlap of 64, so should raise exception.
+    with pytest.raises(AssertionError):
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128)
+
+
+def test_merge_tiles_with_linear_blending_blend_amount_exceeds_horizontal_overlap():
+    """Test that merge_tiles_with_linear_blending(...) raises an exception if 'blend_amount' exceeds the overlap between
+    any horizontally adjacent tiles.
+    """
+    # Initialize 2 tiles side-by-side.
+    tiles = [
+        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=64)),
+        Tile(coords=TBLR(top=0, bottom=512, left=448, right=960), overlap=TBLR(top=0, bottom=0, left=64, right=0)),
+    ]
+
+    dst_image = np.zeros((512, 960, 3), dtype=np.uint8)
+
+    # Prepare tile_images that match tiles.
+    tile_images = [np.zeros((512, 512, 3)), np.zeros((512, 512, 3))]
+
+    # blend_amount=128 exceeds overlap of 64, so should raise exception.
+    with pytest.raises(AssertionError):
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128)
+
+
+def test_merge_tiles_with_linear_blending_tiles_overflow_dst_image():
+    """Test that merge_tiles_with_linear_blending(...) raises an exception if any of the tiles overflows the
+    dst_image.
+    """
+    tiles = [Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=0))]
+
+    dst_image = np.zeros((256, 512, 3), dtype=np.uint8)
+
+    # Prepare tile_images that match tiles.
+    tile_images = [np.zeros((512, 512, 3))]
+
+    with pytest.raises(ValueError):
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0)
+
+
+def test_merge_tiles_with_linear_blending_mismatched_list_lengths():
+    """Test that merge_tiles_with_linear_blending(...) raises an exception if the lengths of 'tiles' and 'tile_images'
+    do not match.
+    """
+    tiles = [Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=0))]
+
+    dst_image = np.zeros((256, 512, 3), dtype=np.uint8)
+
+    # tile_images is longer than tiles, so should cause an exception.
+    tile_images = [np.zeros((512, 512, 3)), np.zeros((512, 512, 3))]
+
+    with pytest.raises(ValueError):
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0)
