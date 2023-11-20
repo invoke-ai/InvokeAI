@@ -10,10 +10,21 @@ class TBLR(BaseModel):
     left: int
     right: int
 
+    def __eq__(self, other):
+        return (
+            self.top == other.top
+            and self.bottom == other.bottom
+            and self.left == other.left
+            and self.right == other.right
+        )
+
 
 class Tile(BaseModel):
     coords: TBLR = Field(description="The coordinates of this tile relative to its parent image.")
     overlap: TBLR = Field(description="The amount of overlap with adjacent tiles on each side of this tile.")
+
+    def __eq__(self, other):
+        return self.coords == other.coords and self.overlap == other.overlap
 
 
 def paste(dst_image: np.ndarray, src_image: np.ndarray, box: TBLR, mask: Optional[np.ndarray] = None):
