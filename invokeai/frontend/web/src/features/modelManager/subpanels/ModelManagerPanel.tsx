@@ -13,6 +13,7 @@ import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import LoRAModelEdit from './ModelManagerPanel/LoRAModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
 import { ALL_BASE_MODELS } from 'services/api/constants';
+import { useTranslation } from 'react-i18next';
 
 export default function ModelManagerPanel() {
   const [selectedModelId, setSelectedModelId] = useState<string>();
@@ -45,6 +46,7 @@ type ModelEditProps = {
 };
 
 const ModelEdit = (props: ModelEditProps) => {
+  const { t } = useTranslation();
   const { model } = props;
 
   if (model?.model_format === 'checkpoint') {
@@ -75,7 +77,7 @@ const ModelEdit = (props: ModelEditProps) => {
         userSelect: 'none',
       }}
     >
-      <Text variant="subtext">No Model Selected</Text>
+      <Text variant="subtext">{t('modelManager.noModelSelected')}</Text>
     </Flex>
   );
 };

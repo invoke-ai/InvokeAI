@@ -298,13 +298,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
                 <SettingSwitch
-                  label="Enable NSFW Checker"
+                  label={t('settings.enableNSFWChecker')}
                   isDisabled={!isNSFWCheckerAvailable}
                   isChecked={shouldUseNSFWChecker}
                   onChange={handleChangeShouldUseNSFWChecker}
                 />
                 <SettingSwitch
-                  label="Enable Invisible Watermark"
+                  label={t('settings.enableInvisibleWatermark')}
                   isDisabled={!isWatermarkerAvailable}
                   isChecked={shouldUseWatermarker}
                   onChange={handleChangeShouldUseWatermarker}
@@ -351,7 +351,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   />
                 )}
                 <SettingSwitch
-                  label="Enable informational popovers"
+                  label={t('settings.enableInformationalPopovers')}
                   isChecked={shouldEnableInformationalPopovers}
                   onChange={handleChangeShouldEnableInformationalPopovers}
                 />

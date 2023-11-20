@@ -224,14 +224,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
-        Change Board
+        {t('boards.changeBoard')}
       </MenuItem>
       {imageDTO.starred ? (
         <MenuItem
           icon={customStarUi ? customStarUi.off.icon : <MdStar />}
           onClickCapture={handleUnstarImage}
         >
-          {customStarUi ? customStarUi.off.text : `Unstar Image`}
+          {customStarUi ? customStarUi.off.text : t('controlnet.unstarImage')}
         </MenuItem>
       ) : (
         <MenuItem

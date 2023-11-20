@@ -10,8 +10,10 @@ import { memo } from 'react';
 import WorkflowGeneralTab from './WorkflowGeneralTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
 import WorkflowLinearTab from './WorkflowLinearTab';
+import { useTranslation } from 'react-i18next';
 
 const WorkflowPanel = () => {
+  const { t } = useTranslation();
   return (
     <Flex
       layerStyle="first"
@@ -29,8 +31,8 @@ const WorkflowPanel = () => {
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
       >
         <TabList>
-          <Tab>Linear</Tab>
-          <Tab>Details</Tab>
+          <Tab>{t('common.linear')}</Tab>
+          <Tab>{t('common.details')}</Tab>
           <Tab>JSON</Tab>
         </TabList>
 
