@@ -1,16 +1,9 @@
 import math
+from typing import Union
 
 import numpy as np
 
 from invokeai.backend.tiles.utils import TBLR, Tile, paste
-
-# TODO(ryand)
-# Test the following:
-# - Tile too big in x, y
-# - Overlap too big in x, y
-# - Single tile fits
-# - Multiple tiles fit perfectly
-# - Not evenly divisible by tile size(with overlap)
 
 
 def calc_tiles_with_overlap(
@@ -40,8 +33,10 @@ def calc_tiles_with_overlap(
     num_tiles_y = math.ceil((image_height - overlap) / non_overlap_per_tile_height)
     num_tiles_x = math.ceil((image_width - overlap) / non_overlap_per_tile_width)
 
-    # Calculate tile coordinates and overlaps.
+    # tiles[y * num_tiles_x + x] is the tile for the y'th row, x'th column.
     tiles: list[Tile] = []
+
+    # Calculate tile coordinates. (Ignore overlap values for now.)
     for tile_idx_y in range(num_tiles_y):
         for tile_idx_x in range(num_tiles_x):
             tile = Tile(
@@ -51,12 +46,7 @@ def calc_tiles_with_overlap(
                     left=tile_idx_x * non_overlap_per_tile_width,
                     right=tile_idx_x * non_overlap_per_tile_width + tile_width,
                 ),
-                overlap=TBLR(
-                    top=0 if tile_idx_y == 0 else overlap,
-                    bottom=overlap,
-                    left=0 if tile_idx_x == 0 else overlap,
-                    right=overlap,
-                ),
+                overlap=TBLR(top=0, bottom=0, left=0, right=0),
             )
 
             if tile.coords.bottom > image_height:
@@ -64,22 +54,38 @@ def calc_tiles_with_overlap(
                 # of the image.
                 tile.coords.bottom = image_height
                 tile.coords.top = image_height - tile_height
-                tile.overlap.bottom = 0
-                # Note that this could result in a large overlap between this tile and the one above it.
-                top_neighbor_bottom = (tile_idx_y - 1) * non_overlap_per_tile_height + tile_height
-                tile.overlap.top = top_neighbor_bottom - tile.coords.top
 
             if tile.coords.right > image_width:
                 # If this tile would go off the right edge of the image, shift it so that it is aligned with the
                 # right edge of the image.
                 tile.coords.right = image_width
                 tile.coords.left = image_width - tile_width
-                tile.overlap.right = 0
-                # Note that this could result in a large overlap between this tile and the one to its left.
-                left_neighbor_right = (tile_idx_x - 1) * non_overlap_per_tile_width + tile_width
-                tile.overlap.left = left_neighbor_right - tile.coords.left
 
             tiles.append(tile)
+
+    def get_tile_or_none(idx_y: int, idx_x: int) -> Union[Tile, None]:
+        if idx_y < 0 or idx_y > num_tiles_y or idx_x < 0 or idx_x > num_tiles_x:
+            return None
+        return tiles[idx_y * num_tiles_x + idx_x]
+
+    # Iterate over tiles again and calculate overlaps.
+    for tile_idx_y in range(num_tiles_y):
+        for tile_idx_x in range(num_tiles_x):
+            cur_tile = get_tile_or_none(tile_idx_y, tile_idx_x)
+            top_neighbor_tile = get_tile_or_none(tile_idx_y - 1, tile_idx_x)
+            left_neighbor_tile = get_tile_or_none(tile_idx_y, tile_idx_x - 1)
+
+            assert cur_tile is not None
+
+            # Update cur_tile top-overlap and corresponding top-neighbor bottom-overlap.
+            if top_neighbor_tile is not None:
+                cur_tile.overlap.top = max(0, top_neighbor_tile.coords.bottom - cur_tile.coords.top)
+                top_neighbor_tile.overlap.bottom = cur_tile.overlap.top
+
+            # Update cur_tile left-overlap and corresponding left-neighbor right-overlap.
+            if left_neighbor_tile is not None:
+                cur_tile.overlap.left = max(0, left_neighbor_tile.coords.right - cur_tile.coords.left)
+                left_neighbor_tile.overlap.right = cur_tile.overlap.left
 
     return tiles
 
