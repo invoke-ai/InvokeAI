@@ -203,7 +203,7 @@ ignore = [
   "B008", # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
-select = ["B", "C", "E", "F", "W"]
+select = ["B", "C", "E", "F", "W", "I"]
 exclude = [
   ".git",
   "__pycache__",
