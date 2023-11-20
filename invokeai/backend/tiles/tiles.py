@@ -90,13 +90,6 @@ def calc_tiles_with_overlap(
     return tiles
 
 
-# TODO(ryand):
-# - Test with blend_amount=0
-# - Test tiles that go off of the dst_image.
-# - Test mismatched tiles and tile_images lengths.
-# - Test mismatched
-
-
 def merge_tiles_with_linear_blending(
     dst_image: np.ndarray, tiles: list[Tile], tile_images: list[np.ndarray], blend_amount: int
 ):
@@ -145,7 +138,7 @@ def merge_tiles_with_linear_blending(
             # Apply the blend gradient to the mask. Note that we use `*=` rather than `=` to achieve more natural
             # behavior on the corners where vertical and horizontal blending gradients overlap.
             mask[blend_start_top : blend_start_top + blend_amount, :] *= gradient_top_y
-            # HACK(ryand): For debugging
+            # For visual debugging:
             # tile_image[blend_start_top : blend_start_top + blend_amount, :] = 0
 
         # Left blending:
@@ -155,7 +148,7 @@ def merge_tiles_with_linear_blending(
             blend_start_left = tile.overlap.left // 2 - blend_amount // 2
             mask[:, :blend_start_left] = 0.0
             mask[:, blend_start_left : blend_start_left + blend_amount] *= gradient_left_x
-            # HACK(ryand): For debugging
+            # For visual debugging:
             # tile_image[:, blend_start_left : blend_start_left + blend_amount] = 0
 
         paste(dst_image=dst_image, src_image=tile_image, box=tile.coords, mask=mask)
