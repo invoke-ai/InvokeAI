@@ -28,6 +28,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Make 3D](#make-3d)
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
+    + [Remote Image](#remote-image)
     + [Retroize](#retroize)
     + [Size Stepper Nodes](#size-stepper-nodes)
     + [Text font to Image](#text-font-to-image)
@@ -251,6 +252,17 @@ This node works best with SDXL models, especially as the style can be described 
 See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md
 
 **Node Link:** https://github.com/skunkworxdark/Prompt-tools-nodes
+
+--------------------------------
+### Remote Image
+
+**Description:** This is a pack of nodes to interoperate with other services, be they public websites or bespoke local servers. The pack consists of these nodes:
+
+- *Load Remote Image* - Lets you load remote images such as a realtime webcam image, an image of the day, or dynamically created images.
+- *Post Image to Remote Server* - Lets you upload an image to a remote server using an HTTP POST request, eg for storage, display or further processing.
+
+**Node Link:** https://github.com/fieldOfView/InvokeAI-remote_image
+
 
 --------------------------------
 ### Retroize
