@@ -1,5 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import traceback
+
 from typing import Any, Optional
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
@@ -312,4 +314,56 @@ class EventServiceBase:
         self.__emit_queue_event(
             event_name="queue_cleared",
             payload={"queue_id": queue_id},
+        )
+
+    def emit_model_install_started(self, source: str) -> None:
+        """
+        Emitted when an install job is started.
+
+        :param source: Source of the model; local path, repo_id or url
+        """
+        self.__emit_queue_event(
+            event_name="model_install_started",
+            payload={"source": source},
+        )
+
+    def emit_model_install_completed(self, source: str, dest: str) -> None:
+        """
+        Emitted when an install job is completed successfully.
+
+        :param source: Source of the model; local path, repo_id or url
+        :param dest: Destination of the model files; always a local path
+        """
+        self.__emit_queue_event(
+            event_name="model_install_completed",
+            payload={
+                "source": source,
+                "dest": dest,
+            },
+        )
+
+    def emit_model_install_error(self,
+                                 source:str,
+                                 exception: Exception,
+                                 ) -> None:
+        """
+        Emitted when an install job encounters an exception.
+
+        :param source: Source of the model
+        :param exception: The exception that raised the error
+        """
+
+        # Revisit:
+        # it makes more sense to receive an exception and break it out
+        # into error_type and error here, rather than at the caller's side
+        error_type = exception.__class__.__name__,
+        error = traceback.format_exc(),
+
+        self.__emit_queue_event(
+            event_name="model_install_error",
+            payload={
+                "source": source,
+                "error_type": error_type,
+                "error": error,
+            },
         )
