@@ -1,6 +1,7 @@
 {
     "accessibility": {
         "copyMetadataJson": "Copy metadata JSON",
+        "createIssue":"Create Issue",
         "exitViewer": "Exit Viewer",
         "flipHorizontally": "Flip Horizontally",
         "flipVertically": "Flip Vertically",
@@ -12,6 +13,7 @@
         "nextImage": "Next Image",
         "previousImage": "Previous Image",
         "reset": "Reset",
+        "resetUI":"$t(accessibility.reset)UI",
         "rotateClockwise": "Rotate Clockwise",
         "rotateCounterClockwise": "Rotate Counter-Clockwise",
         "showGalleryPanel": "Show Gallery Panel",
@@ -54,6 +56,7 @@
         "back": "Back",
         "batch": "Batch Manager",
         "cancel": "Cancel",
+        "copyError":"$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
         "checkpoint": "Checkpoint",
@@ -114,6 +117,7 @@
         "safetensors": "Safetensors",
         "settingsLabel": "Settings",
         "simple": "Simple",
+        "somethingWentWrong": "Something went wrong",
         "statusConnected": "Connected",
         "statusConvertingModel": "Converting Model",
         "statusDisconnected": "Disconnected",
