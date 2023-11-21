@@ -65,7 +65,7 @@ The first set of things we need to do when creating a new Invocation are -
 So let us do that.
 
 ```python
-from .baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -99,8 +99,8 @@ create your own custom field types later in this guide. For now, let's go ahead
 and use it.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation
+from invokeai.app.invocations.primitives import ImageField
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -124,8 +124,8 @@ image: ImageField = InputField(description="The input image")
 Great. Now let us create our other inputs for `width` and `height`
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation
+from invokeai.app.invocations.primitives import ImageField
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -160,8 +160,8 @@ that are provided by it by InvokeAI.
 Let us create this function first.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation, InvocationContext
+from invokeai.app.invocations.primitives import ImageField
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -189,9 +189,9 @@ all the necessary info related to image outputs. So let us use that.
 We will cover how to create your own output types later in this guide.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
-from .image import ImageOutput
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation, InvocationContext
+from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.invocations.image import ImageOutput
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -216,9 +216,9 @@ Perfect. Now that we have our Invocation setup, let us do what we want to do.
 So let's do that.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
-from .image import ImageOutput
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation, InvocationContext
+from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.invocations.image import ImageOutput, ResourceOrigin, ImageCategory
 
 @invocation("resize")
 class ResizeInvocation(BaseInvocation):
