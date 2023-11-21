@@ -29,6 +29,9 @@ from typing_extensions import Annotated
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognized this combination of model type and format."""
 
+class DuplicateModelException(Exception):
+    """Exception for when a duplicate model is detected during installation."""
+
 
 class BaseModelType(str, Enum):
     """Base model type."""

@@ -344,7 +344,8 @@ class EventServiceBase:
 
     def emit_model_install_error(self,
                                  source:str,
-                                 exception: Exception,
+                                 error_type: str,
+                                 error: str,
                                  ) -> None:
         """
         Emitted when an install job encounters an exception.
@@ -352,13 +353,6 @@ class EventServiceBase:
         :param source: Source of the model
         :param exception: The exception that raised the error
         """
-
-        # Revisit:
-        # it makes more sense to receive an exception and break it out
-        # into error_type and error here, rather than at the caller's side
-        error_type = exception.__class__.__name__,
-        error = traceback.format_exc(),
-
         self.__emit_queue_event(
             event_name="model_install_error",
             payload={

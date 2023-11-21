@@ -1,11 +1,13 @@
+import traceback
+
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 from pydantic import BaseModel, Field
 from pydantic.networks import AnyHttpUrl
 
-from invokeai.app.services.model_records import  ModelRecordServiceBase
+from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
 
@@ -14,13 +16,25 @@ class InstallStatus(str, Enum):
     """State of an install job running in the background."""
 
     WAITING = "waiting"      # waiting to be dequeued
+    RUNNING = "running"      # being processed
     COMPLETED = "completed"  # finished running
     ERROR = "error"          # terminated with an error message
 
 
-class ModelInstallStatus(BaseModel):
-    status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")  # noqa #501
-    error: Optional[Exception] = Field(default=None, description="Exception that led to status==ERROR")  # noqa #501
+class ModelInstallJob(BaseModel):
+    """Object that tracks the current status of an install request."""
+
+    source: Union[str, Path, AnyHttpUrl] = Field(description="Source (URL, repo_id, or local path) of model")
+    status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
+    local_path: Optional[Path] = Field(default=None, description="Path to locally-downloaded model")
+    error_type: Optional[str] = Field(default=None, description="Class name of the exception that led to status==ERROR")
+    error: Optional[str] = Field(default=None, description="Error traceback")  # noqa #501
+
+    def set_error(self, e: Exception) -> None:
+        """Record the error and traceback from an exception."""
+        self.error_type = e.__class__.__name__
+        self.error = traceback.format_exc()
+        self.status = InstallStatus.ERROR
 
 
 class ModelInstallServiceBase(ABC):
@@ -40,18 +54,6 @@ class ModelInstallServiceBase(ABC):
         :param store: Systemwide ModelConfigStore
         :param event_bus: InvokeAI event bus for reporting events to.
         """
-        pass
-
-    @property
-    @abstractmethod
-    def config(self) -> InvokeAIAppConfig:
-        """Return the app_config used by the installer."""
-        pass
-
-    @property
-    @abstractmethod
-    def store(self) -> ModelRecordServiceBase:
-        """Return the storage backend used by the installer."""
         pass
 
     @abstractmethod
@@ -108,7 +110,7 @@ class ModelInstallServiceBase(ABC):
             subfolder: Optional[str] = None,
             metadata: Optional[Dict[str, str]] = None,
             access_token: Optional[str] = None,
-    ) -> ModelInstallStatus:
+    ) -> ModelInstallJob:
         """Install the indicated model.
 
         :param source: Either a URL or a HuggingFace repo_id.
@@ -142,7 +144,7 @@ class ModelInstallServiceBase(ABC):
         The `inplace` flag does not affect the behavior of downloaded
         models, which are always moved into the `models` directory.
 
-        The call returns a ModelInstallStatus object which can be
+        The call returns a ModelInstallJob object which can be
         polled to learn the current status and/or error message.
 
         Variants recognized by HuggingFace currently are:
@@ -195,34 +197,3 @@ class ModelInstallServiceBase(ABC):
         """
         pass
 
-    # The following are internal methods
-    @abstractmethod
-    def _create_name(self, model_path: Union[Path, str]) -> str:
-        """
-        Creates a default name for the model.
-
-        :param model_path: Path to the model on disk.
-        :return str: Model name
-        """
-        pass
-
-    @abstractmethod
-    def _create_description(self, model_path: Union[Path, str]) -> str:
-        """
-        Creates a default description for the model.
-
-        :param model_path: Path to the model on disk.
-        :return str: Model description
-        """
-        pass
-
-    @abstractmethod
-    def _create_id(self, model_path: Union[Path, str], name: Optional[str] = None) -> str:
-        """
-        Creates a unique ID for the model for use with the model records module.  # noqa E501
-
-        :param model_path: Path to the model on disk.
-        :param name: (optional) non-default name for the model
-        :return str: Unique ID
-        """
-        pass
