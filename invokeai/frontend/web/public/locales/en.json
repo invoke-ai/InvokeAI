@@ -256,6 +256,7 @@
     "embedding": {
         "addEmbedding": "Add Embedding",
         "incompatibleModel": "Incompatible base model:",
+        "noEmbeddingsLoaded": "No Embeddings Loaded",
         "noMatchingEmbedding": "No matching Embeddings"
     },
     "queue": {
@@ -343,6 +344,7 @@
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
+        "dropToUpload":"Drop to Upload",
         "deleteImage": "Delete Image",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
@@ -1203,6 +1205,7 @@
         "initialImageNotSet": "Initial Image Not Set",
         "initialImageNotSetDesc": "Could not load initial image",
         "initialImageSet": "Initial Image Set",
+        "invalidUpload": "Invalid Upload",
         "loadedWithWarnings": "Workflow Loaded with Warnings",
         "maskSavedAssets": "Mask Saved to Assets",
         "maskSentControlnetAssets": "Mask Sent to ControlNet & Assets",
@@ -1521,7 +1524,7 @@
         "clearCanvasHistoryConfirm": "Are you sure you want to clear the canvas history?",
         "clearCanvasHistoryMessage": "Clearing the canvas history leaves your current canvas intact, but irreversibly clears the undo and redo history.",
         "clearHistory": "Clear History",
-        "clearMask": "Clear Mask",
+        "clearMask": "Clear Mask (Shift+C)",
         "colorPicker": "Color Picker",
         "copyToClipboard": "Copy to Clipboard",
         "cursorPosition": "Cursor Position",
@@ -1548,6 +1551,7 @@
         "redo": "Redo",
         "resetView": "Reset View",
         "saveBoxRegionOnly": "Save Box Region Only",
+        "saveMask":"Save $t(unifiedCanvas.mask)",
         "saveToGallery": "Save To Gallery",
         "scaledBoundingBox": "Scaled Bounding Box",
         "showCanvasDebugInfo": "Show Additional Canvas Info",

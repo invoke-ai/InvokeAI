@@ -1,6 +1,7 @@
 import { Box, ChakraProps, Flex, Heading, Image, Text } from '@chakra-ui/react';
 import { memo } from 'react';
 import { TypesafeDraggableData } from '../types';
+import { useTranslation } from 'react-i18next';
 
 type OverlayDragImageProps = {
   dragData: TypesafeDraggableData | null;
@@ -26,6 +27,7 @@ const STYLES: ChakraProps['sx'] = {
 };
 
 const DragPreview = (props: OverlayDragImageProps) => {
+  const { t } = useTranslation();
   if (!props.dragData) {
     return null;
   }
@@ -89,7 +91,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
         }}
       >
         <Heading>{props.dragData.payload.imageDTOs.length}</Heading>
-        <Heading size="sm">Images</Heading>
+        <Heading size="sm">{t('gallery.images')}</Heading>
       </Flex>
     );
   }
