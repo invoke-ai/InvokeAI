@@ -46,9 +46,10 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "fastapi~=0.103.2",
+  "fastapi~=0.104.1",
   "fastapi-events~=0.9.1",
   "huggingface-hub~=0.16.4",
+  "imohash",
   "invisible-watermark~=0.2.0",            # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                            # needed for plotting of Penner easing functions
   "mediapipe",                             # needed for "mediapipeface" controlnet model
@@ -58,7 +59,7 @@ dependencies = [
   "onnx",
   "onnxruntime",
   "opencv-python",
-  "pydantic~=2.4.2",
+  "pydantic~=2.5.0",
   "pydantic-settings~=2.0.3",
   "picklescan",
   "pillow",
@@ -78,8 +79,8 @@ dependencies = [
   "semver~=3.0.1",
   "send2trash",
   "test-tube~=0.7.5",
-  "torch~=2.1.0",
-  "torchvision~=0.16",
+  "torch==2.1.0",
+  "torchvision==0.16.0",
   "torchmetrics~=0.11.0",
   "torchsde~=0.2.5",
   "transformers~=4.35.0",
@@ -136,6 +137,7 @@ dependencies = [
 "invokeai-node-web" = "invokeai.app.api_app:invoke_api"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
+"invokeai-migrate-models-to-db" = "invokeai.backend.model_manager.migrate_to_db:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
@@ -201,7 +203,7 @@ ignore = [
   "B008", # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
-select = ["B", "C", "E", "F", "W"]
+select = ["B", "C", "E", "F", "W", "I"]
 exclude = [
   ".git",
   "__pycache__",
@@ -213,11 +215,14 @@ exclude = [
 #=== End: Ruff
 
 #=== Begin: MyPy
+
+# global mypy config
 [tool.mypy]
 ignore_missing_imports = true # ignores missing types in third-party libraries
 
+# overrides for specific modules
 [[tool.mypy.overrides]]
-follow_imports = "skip"
+follow_imports = "skip" # skips type checking of the modules listed below
 module = [
   "invokeai.app.api.routers.models",
   "invokeai.app.invocations.compel",
@@ -227,6 +232,7 @@ module = [
   "invokeai.app.services.invocation_stats.invocation_stats_default",
   "invokeai.app.services.model_manager.model_manager_base",
   "invokeai.app.services.model_manager.model_manager_default",
+  "invokeai.app.services.model_records.model_records_sql",
   "invokeai.app.util.controlnet_utils",
   "invokeai.backend.image_util.txt2mask",
   "invokeai.backend.image_util.safety_checker",

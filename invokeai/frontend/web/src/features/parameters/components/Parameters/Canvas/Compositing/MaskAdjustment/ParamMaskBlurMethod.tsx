@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setMaskBlurMethod } from 'features/parameters/store/generationSlice';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type MaskBlurMethods = 'box' | 'gaussian';
@@ -21,12 +22,15 @@ export default function ParamMaskBlurMethod() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleMaskBlurMethodChange = (v: string | null) => {
-    if (!v) {
-      return;
-    }
-    dispatch(setMaskBlurMethod(v as MaskBlurMethods));
-  };
+  const handleMaskBlurMethodChange = useCallback(
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
+      dispatch(setMaskBlurMethod(v as MaskBlurMethods));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIInformationalPopover feature="compositingBlurMethod">

@@ -72,6 +72,7 @@ import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSa
 import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
+import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -178,6 +179,7 @@ addReceivedOpenAPISchemaListener();
 
 // Workflows
 addWorkflowLoadedListener();
+addUpdateAllNodesRequestedListener();
 
 // DND
 addImageDroppedListener();

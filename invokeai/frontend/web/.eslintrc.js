@@ -24,6 +24,7 @@ module.exports = {
   root: true,
   rules: {
     curly: 'error',
+    'react/jsx-no-bind': ['error', { allowBind: true }],
     'react/jsx-curly-brace-presence': [
       'error',
       { props: 'never', children: 'never' },

@@ -43,6 +43,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         board_images,
         boards,
         images,
+        model_records,
         models,
         session_queue,
         sessions,
@@ -106,6 +107,7 @@ app.include_router(sessions.session_router, prefix="/api")
 
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(models.models_router, prefix="/api")
+app.include_router(model_records.model_records_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")

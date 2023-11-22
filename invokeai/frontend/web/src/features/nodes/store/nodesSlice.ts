@@ -149,6 +149,18 @@ const nodesSlice = createSlice({
     nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
       state.nodes = applyNodeChanges(action.payload, state.nodes);
     },
+    nodeReplaced: (
+      state,
+      action: PayloadAction<{ nodeId: string; node: Node }>
+    ) => {
+      const nodeIndex = state.nodes.findIndex(
+        (n) => n.id === action.payload.nodeId
+      );
+      if (nodeIndex < 0) {
+        return;
+      }
+      state.nodes[nodeIndex] = action.payload.node;
+    },
     nodeAdded: (
       state,
       action: PayloadAction<
@@ -1029,6 +1041,7 @@ export const {
   mouseOverFieldChanged,
   mouseOverNodeChanged,
   nodeAdded,
+  nodeReplaced,
   nodeEditorReset,
   nodeEmbedWorkflowChanged,
   nodeExclusivelySelected,

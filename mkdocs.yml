@@ -139,17 +139,19 @@ nav:
     - Features:
       - Overview: 'features/index.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
-      - Concepts: 'features/CONCEPTS.md'
       - Configuration: 'features/CONFIGURATION.md'
       - Control Adapters: 'features/CONTROLNET.md'
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
+      - LoRAs & LCM-LoRAs: 'features/LORAS.md'
       - Model Merging: 'features/MODEL_MERGING.md'
-      - Using Nodes : 'nodes/overview.md'
+      - Nodes & Workflows: 'nodes/overview.md'
       - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
-      - Textual Inversion Training: 'features/TRAINING.md'
+      - Textual Inversions:
+        - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
+        - Textual Inversion Training: 'features/TRAINING.md'
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
       - InvokeAI Web Server: 'features/WEB.md'
       - WebUI Hotkeys: "features/WEBUIHOTKEYS.md"
@@ -180,6 +182,7 @@ nav:
       - Troubleshooting: 'help/deprecated/TROUBLESHOOT.md'
     - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
+      - FAQs: 'help/FAQ.md'
       - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:

@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setCanvasCoherenceSteps } from 'features/parameters/store/generationSlice';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamCanvasCoherenceSteps = () => {
@@ -12,6 +12,17 @@ const ParamCanvasCoherenceSteps = () => {
     (state: RootState) => state.generation.canvasCoherenceSteps
   );
   const { t } = useTranslation();
+
+  const handleChange = useCallback(
+    (v: number) => {
+      dispatch(setCanvasCoherenceSteps(v));
+    },
+    [dispatch]
+  );
+
+  const handleReset = useCallback(() => {
+    dispatch(setCanvasCoherenceSteps(20));
+  }, [dispatch]);
 
   return (
     <IAIInformationalPopover feature="compositingCoherenceSteps">
@@ -22,15 +33,11 @@ const ParamCanvasCoherenceSteps = () => {
         step={1}
         sliderNumberInputProps={{ max: 999 }}
         value={canvasCoherenceSteps}
-        onChange={(v) => {
-          dispatch(setCanvasCoherenceSteps(v));
-        }}
+        onChange={handleChange}
         withInput
         withSliderMarks
         withReset
-        handleReset={() => {
-          dispatch(setCanvasCoherenceSteps(20));
-        }}
+        handleReset={handleReset}
       />
     </IAIInformationalPopover>
   );

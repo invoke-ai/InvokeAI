@@ -10,7 +10,7 @@ import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -301,21 +301,27 @@ export const buildCanvasSDXLTextToImageGraph = (
     });
   }
 
-  addCoreMetadataNode(graph, {
-    generation_mode: 'txt2img',
-    cfg_scale,
-    width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
-    height: !isUsingScaledDimensions
-      ? height
-      : scaledBoundingBoxDimensions.height,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
-    model,
-    seed,
-    steps,
-    rand_device: use_cpu ? 'cpu' : 'cuda',
-    scheduler,
-  });
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'txt2img',
+      cfg_scale,
+      width: !isUsingScaledDimensions
+        ? width
+        : scaledBoundingBoxDimensions.width,
+      height: !isUsingScaledDimensions
+        ? height
+        : scaledBoundingBoxDimensions.height,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      model,
+      seed,
+      steps,
+      rand_device: use_cpu ? 'cpu' : 'cuda',
+      scheduler,
+    },
+    CANVAS_OUTPUT
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -360,7 +366,7 @@ export const buildCanvasSDXLTextToImageGraph = (
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

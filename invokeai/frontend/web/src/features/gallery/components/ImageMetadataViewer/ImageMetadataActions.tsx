@@ -157,6 +157,8 @@ const ImageMetadataActions = (props: Props) => {
     return null;
   }
 
+  console.log(metadata);
+
   return (
     <>
       {metadata.created_by && (
@@ -279,7 +281,7 @@ const ImageMetadataActions = (props: Props) => {
                 key={index}
                 label="LoRA"
                 value={`${lora.lora.model_name} - ${lora.weight}`}
-                onClick={() => handleRecallLoRA(lora)}
+                onClick={handleRecallLoRA.bind(null, lora)}
               />
             );
           }
@@ -289,7 +291,7 @@ const ImageMetadataActions = (props: Props) => {
           key={index}
           label="ControlNet"
           value={`${controlnet.control_model?.model_name} - ${controlnet.control_weight}`}
-          onClick={() => handleRecallControlNet(controlnet)}
+          onClick={handleRecallControlNet.bind(null, controlnet)}
         />
       ))}
       {validIPAdapters.map((ipAdapter, index) => (
@@ -297,7 +299,7 @@ const ImageMetadataActions = (props: Props) => {
           key={index}
           label="IP Adapter"
           value={`${ipAdapter.ip_adapter_model?.model_name} - ${ipAdapter.weight}`}
-          onClick={() => handleRecallIPAdapter(ipAdapter)}
+          onClick={handleRecallIPAdapter.bind(null, ipAdapter)}
         />
       ))}
       {validT2IAdapters.map((t2iAdapter, index) => (
@@ -305,7 +307,7 @@ const ImageMetadataActions = (props: Props) => {
           key={index}
           label="T2I Adapter"
           value={`${t2iAdapter.t2i_adapter_model?.model_name} - ${t2iAdapter.weight}`}
-          onClick={() => handleRecallT2IAdapter(t2iAdapter)}
+          onClick={handleRecallT2IAdapter.bind(null, t2iAdapter)}
         />
       ))}
     </>

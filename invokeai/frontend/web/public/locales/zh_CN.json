@@ -1222,7 +1222,8 @@
         "seamless": "无缝",
         "fit": "图生图匹配",
         "recallParameters": "召回参数",
-        "noRecallParameters": "未找到要召回的参数"
+        "noRecallParameters": "未找到要召回的参数",
+        "vae": "VAE"
     },
     "models": {
         "noMatchingModels": "无相匹配的模型",
@@ -1501,5 +1502,18 @@
         "clear": "清除",
         "maxCacheSize": "最大缓存大小",
         "cacheSize": "缓存大小"
+    },
+    "hrf": {
+        "enableHrf": "启用高分辨率修复",
+        "upscaleMethod": "放大方法",
+        "enableHrfTooltip": "使用较低的分辨率进行初始生成，放大到基础分辨率后进行图生图。",
+        "metadata": {
+            "strength": "高分辨率修复强度",
+            "enabled": "高分辨率修复已启用",
+            "method": "高分辨率修复方法"
+        },
+        "hrf": "高分辨率修复",
+        "hrfStrength": "高分辨率修复强度",
+        "strengthTooltip": "值越低细节越少，但可以减少部分潜在的伪影。"
     }
 }

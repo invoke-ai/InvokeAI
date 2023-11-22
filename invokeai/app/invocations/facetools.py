@@ -438,7 +438,7 @@ def get_faces_list(
     return all_faces
 
 
-@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.0.2")
+@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.1.0")
 class FaceOffInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Bound, extract, and mask a face from an image using MediaPipe detection"""
 
@@ -532,7 +532,7 @@ class FaceOffInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         return output
 
 
-@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.0.2")
+@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.1.0")
 class FaceMaskInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Face mask creation using mediapipe face detection"""
 
@@ -650,7 +650,7 @@ class FaceMaskInvocation(BaseInvocation, WithWorkflow, WithMetadata):
 
 
 @invocation(
-    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.0.2"
+    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.1.0"
 )
 class FaceIdentifierInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Outputs an image with detected face IDs printed on each face. For use with other FaceTools."""

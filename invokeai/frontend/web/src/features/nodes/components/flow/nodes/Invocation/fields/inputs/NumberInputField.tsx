@@ -19,7 +19,7 @@ import {
   IntegerPolymorphicInputFieldTemplate,
   IntegerPolymorphicInputFieldValue,
 } from 'features/nodes/types/types';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 const NumberInputFieldComponent = (
   props: FieldComponentProps<
@@ -43,20 +43,23 @@ const NumberInputFieldComponent = (
     [fieldTemplate.type]
   );
 
-  const handleValueChanged = (v: string) => {
-    setValueAsString(v);
-    // This allows negatives and decimals e.g. '-123', `.5`, `-0.2`, etc.
-    if (!v.match(numberStringRegex)) {
-      // Cast the value to number. Floor it if it should be an integer.
-      dispatch(
-        fieldNumberValueChanged({
-          nodeId,
-          fieldName: field.name,
-          value: isIntegerField ? Math.floor(Number(v)) : Number(v),
-        })
-      );
-    }
-  };
+  const handleValueChanged = useCallback(
+    (v: string) => {
+      setValueAsString(v);
+      // This allows negatives and decimals e.g. '-123', `.5`, `-0.2`, etc.
+      if (!v.match(numberStringRegex)) {
+        // Cast the value to number. Floor it if it should be an integer.
+        dispatch(
+          fieldNumberValueChanged({
+            nodeId,
+            fieldName: field.name,
+            value: isIntegerField ? Math.floor(Number(v)) : Number(v),
+          })
+        );
+      }
+    },
+    [dispatch, field.name, isIntegerField, nodeId]
+  );
 
   useEffect(() => {
     if (

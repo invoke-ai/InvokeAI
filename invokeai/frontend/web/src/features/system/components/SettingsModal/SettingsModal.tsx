@@ -212,6 +212,61 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     useFeatureStatus('localization').isFeatureEnabled;
   const language = useAppSelector(languageSelector);
 
+  const handleChangeShouldConfirmOnDelete = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldConfirmOnDelete(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldUseNSFWChecker = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldUseNSFWCheckerChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldUseWatermarker = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldUseWatermarkerChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldUseSliders = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldUseSliders(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldShowProgressInViewer = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldShowProgressInViewer(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldAntialiasProgressImage = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldAntialiasProgressImageChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldAutoChangeDimensions = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldAutoChangeDimensions(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldEnableInformationalPopovers = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldEnableInformationalPopovers(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeEnableImageDebugging = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setEnableImageDebugging(e.target.checked));
+    },
+    [dispatch]
+  );
+
   return (
     <>
       {cloneElement(children, {
@@ -235,9 +290,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 <SettingSwitch
                   label={t('settings.confirmOnDelete')}
                   isChecked={shouldConfirmOnDelete}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldConfirmOnDelete(e.target.checked))
-                  }
+                  onChange={handleChangeShouldConfirmOnDelete}
                 />
               </StyledFlex>
 
@@ -245,20 +298,16 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
                 <SettingSwitch
-                  label="Enable NSFW Checker"
+                  label={t('settings.enableNSFWChecker')}
                   isDisabled={!isNSFWCheckerAvailable}
                   isChecked={shouldUseNSFWChecker}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(shouldUseNSFWCheckerChanged(e.target.checked))
-                  }
+                  onChange={handleChangeShouldUseNSFWChecker}
                 />
                 <SettingSwitch
-                  label="Enable Invisible Watermark"
+                  label={t('settings.enableInvisibleWatermark')}
                   isDisabled={!isWatermarkerAvailable}
                   isChecked={shouldUseWatermarker}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(shouldUseWatermarkerChanged(e.target.checked))
-                  }
+                  onChange={handleChangeShouldUseWatermarker}
                 />
               </StyledFlex>
 
@@ -272,32 +321,22 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 <SettingSwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldUseSliders(e.target.checked))
-                  }
+                  onChange={handleChangeShouldUseSliders}
                 />
                 <SettingSwitch
                   label={t('settings.showProgressInViewer')}
                   isChecked={shouldShowProgressInViewer}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldShowProgressInViewer(e.target.checked))
-                  }
+                  onChange={handleChangeShouldShowProgressInViewer}
                 />
                 <SettingSwitch
                   label={t('settings.antialiasProgressImages')}
                   isChecked={shouldAntialiasProgressImage}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(
-                      shouldAntialiasProgressImageChanged(e.target.checked)
-                    )
-                  }
+                  onChange={handleChangeShouldAntialiasProgressImage}
                 />
                 <SettingSwitch
                   label={t('settings.autoChangeDimensions')}
                   isChecked={shouldAutoChangeDimensions}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldAutoChangeDimensions(e.target.checked))
-                  }
+                  onChange={handleChangeShouldAutoChangeDimensions}
                 />
                 {shouldShowLocalizationToggle && (
                   <IAIMantineSelect
@@ -312,13 +351,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   />
                 )}
                 <SettingSwitch
-                  label="Enable informational popovers"
+                  label={t('settings.enableInformationalPopovers')}
                   isChecked={shouldEnableInformationalPopovers}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(
-                      setShouldEnableInformationalPopovers(e.target.checked)
-                    )
-                  }
+                  onChange={handleChangeShouldEnableInformationalPopovers}
                 />
               </StyledFlex>
 
@@ -340,9 +375,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   <SettingSwitch
                     label={t('settings.enableImageDebugging')}
                     isChecked={enableImageDebugging}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setEnableImageDebugging(e.target.checked))
-                    }
+                    onChange={handleChangeEnableImageDebugging}
                   />
                 </StyledFlex>
               )}
