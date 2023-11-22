@@ -170,7 +170,10 @@ const CurrentImagePreview = () => {
           useThumbailFallback
           dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={
-            <IAINoContentFallback icon={FaImage} label="No image selected" />
+            <IAINoContentFallback
+              icon={FaImage}
+              label={t('gallery.noImageSelected')}
+            />
           }
           dataTestId="image-preview"
         />

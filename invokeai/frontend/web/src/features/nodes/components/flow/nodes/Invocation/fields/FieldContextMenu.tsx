@@ -104,6 +104,24 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     nodeId,
   ]);
 
+  const renderMenuFunc = useCallback(
+    () =>
+      !menuItems.length ? null : (
+        <MenuList
+          sx={{ visibility: 'visible !important' }}
+          motionProps={menuListMotionProps}
+          onContextMenu={skipEvent}
+        >
+          <MenuGroup
+            title={label || fieldTemplateTitle || t('nodes.unknownField')}
+          >
+            {menuItems}
+          </MenuGroup>
+        </MenuList>
+      ),
+    [fieldTemplateTitle, label, menuItems, skipEvent, t]
+  );
+
   return (
     <IAIContextMenu<HTMLDivElement>
       menuProps={{
@@ -114,21 +132,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
         bg: 'transparent',
         _hover: { bg: 'transparent' },
       }}
-      renderMenu={() =>
-        !menuItems.length ? null : (
-          <MenuList
-            sx={{ visibility: 'visible !important' }}
-            motionProps={menuListMotionProps}
-            onContextMenu={skipEvent}
-          >
-            <MenuGroup
-              title={label || fieldTemplateTitle || t('nodes.unknownField')}
-            >
-              {menuItems}
-            </MenuGroup>
-          </MenuList>
-        )
-      }
+      renderMenu={renderMenuFunc}
     >
       {children}
     </IAIContextMenu>

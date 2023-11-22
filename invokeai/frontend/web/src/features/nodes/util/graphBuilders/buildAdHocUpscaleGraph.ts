@@ -1,12 +1,13 @@
+import { BoardId } from 'features/gallery/store/types';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { ESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import {
-  Graph,
   ESRGANInvocation,
-  SaveImageInvocation,
+  Graph,
+  LinearUIOutputInvocation,
 } from 'services/api/types';
-import { REALESRGAN as ESRGAN, SAVE_IMAGE } from './constants';
-import { BoardId } from 'features/gallery/store/types';
+import { ESRGAN, LINEAR_UI_OUTPUT } from './constants';
+import { addCoreMetadataNode, upsertMetadata } from './metadata';
 
 type Arg = {
   image_name: string;
@@ -27,9 +28,9 @@ export const buildAdHocUpscaleGraph = ({
     is_intermediate: true,
   };
 
-  const saveImageNode: SaveImageInvocation = {
-    id: SAVE_IMAGE,
-    type: 'save_image',
+  const linearUIOutputNode: LinearUIOutputInvocation = {
+    id: LINEAR_UI_OUTPUT,
+    type: 'linear_ui_output',
     use_cache: false,
     is_intermediate: false,
     board: autoAddBoardId === 'none' ? undefined : { board_id: autoAddBoardId },
@@ -39,7 +40,7 @@ export const buildAdHocUpscaleGraph = ({
     id: `adhoc-esrgan-graph`,
     nodes: {
       [ESRGAN]: realesrganNode,
-      [SAVE_IMAGE]: saveImageNode,
+      [LINEAR_UI_OUTPUT]: linearUIOutputNode,
     },
     edges: [
       {
@@ -48,12 +49,17 @@ export const buildAdHocUpscaleGraph = ({
           field: 'image',
         },
         destination: {
-          node_id: SAVE_IMAGE,
+          node_id: LINEAR_UI_OUTPUT,
           field: 'image',
         },
       },
     ],
   };
+
+  addCoreMetadataNode(graph, {}, ESRGAN);
+  upsertMetadata(graph, {
+    esrgan_model: esrganModelName,
+  });
 
   return graph;
 };

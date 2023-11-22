@@ -123,8 +123,6 @@ class MigrateTo3(object):
                     logger.error(str(e))
                 except KeyboardInterrupt:
                     raise
-                except Exception as e:
-                    logger.error(str(e))
             for f in files:
                 # don't copy raw learned_embeds.bin or pytorch_lora_weights.bin
                 # let them be copied as part of a tree copy operation
@@ -143,8 +141,6 @@ class MigrateTo3(object):
                     logger.error(str(e))
                 except KeyboardInterrupt:
                     raise
-                except Exception as e:
-                    logger.error(str(e))
 
     def migrate_support_models(self):
         """
@@ -182,10 +178,10 @@ class MigrateTo3(object):
         """
 
         dest_directory = self.dest_models
-        kwargs = dict(
-            cache_dir=self.root_directory / "models/hub",
+        kwargs = {
+            "cache_dir": self.root_directory / "models/hub",
             # local_files_only = True
-        )
+        }
         try:
             logger.info("Migrating core tokenizers and text encoders")
             target_dir = dest_directory / "core" / "convert"
@@ -316,11 +312,11 @@ class MigrateTo3(object):
         dest_dir = self.dest_models
 
         cache = self.root_directory / "models/hub"
-        kwargs = dict(
-            cache_dir=cache,
-            safety_checker=None,
+        kwargs = {
+            "cache_dir": cache,
+            "safety_checker": None,
             # local_files_only = True,
-        )
+        }
 
         owner, repo_name = repo_id.split("/")
         model_name = model_name or repo_name

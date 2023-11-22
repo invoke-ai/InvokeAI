@@ -5,10 +5,11 @@ from typing import Optional, Tuple
 import torch
 from pydantic import BaseModel, Field
 
+from invokeai.app.shared.fields import FieldDescriptions
+
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -251,7 +252,9 @@ class ImageCollectionOutput(BaseInvocationOutput):
 
 
 @invocation("image", title="Image Primitive", tags=["primitives", "image"], category="primitives", version="1.0.0")
-class ImageInvocation(BaseInvocation):
+class ImageInvocation(
+    BaseInvocation,
+):
     """An image primitive value"""
 
     image: ImageField = InputField(description="The image to load")
@@ -291,7 +294,7 @@ class DenoiseMaskField(BaseModel):
     """An inpaint mask field"""
 
     mask_name: str = Field(description="The name of the mask image")
-    masked_latents_name: Optional[str] = Field(description="The name of the masked image latents")
+    masked_latents_name: Optional[str] = Field(default=None, description="The name of the masked image latents")
 
 
 @invocation_output("denoise_mask_output")

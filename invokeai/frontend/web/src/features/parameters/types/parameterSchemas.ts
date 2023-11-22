@@ -132,6 +132,7 @@ export const zScheduler = z.enum([
   'lms_k',
   'euler_a',
   'kdpm_2_a',
+  'lcm',
 ]);
 /**
  * Type alias for scheduler parameter, inferred from its zod schema
@@ -166,6 +167,7 @@ export const SCHEDULER_LABEL_MAP: Record<SchedulerParam, string> = {
   lms_k: 'LMS Karras',
   euler_a: 'Euler Ancestral',
   kdpm_2_a: 'KDPM 2 Ancestral',
+  lcm: 'LCM',
 };
 
 /**
@@ -209,6 +211,15 @@ export type HeightParam = z.infer<typeof zHeight>;
  */
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
+
+/**
+ * Zod schema for resolution parameter
+ */
+export const zResolution = z.tuple([zWidth, zHeight]);
+/**
+ * Type alias for resolution parameter, inferred from its zod schema
+ */
+export type ResolutionParam = z.infer<typeof zResolution>;
 
 export const zBaseModel = z.enum([
   'any',
@@ -390,6 +401,20 @@ export const isValidPrecision = (val: unknown): val is PrecisionParam =>
   zPrecision.safeParse(val).success;
 
 /**
+ * Zod schema for a high resolution fix method parameter.
+ */
+export const zHrfMethod = z.enum(['ESRGAN', 'bilinear']);
+/**
+ * Type alias for high resolution fix method parameter, inferred from its zod schema
+ */
+export type HrfMethodParam = z.infer<typeof zHrfMethod>;
+/**
+ * Validates/type-guards a value as a high resolution fix method parameter
+ */
+export const isValidHrfMethod = (val: unknown): val is HrfMethodParam =>
+  zHrfMethod.safeParse(val).success;
+
+/**
  * Zod schema for SDXL refiner positive aesthetic score parameter
  */
 export const zSDXLRefinerPositiveAestheticScore = z.number().min(1).max(10);
@@ -470,6 +495,17 @@ export const isValidCoherenceModeParam = (
   val: unknown
 ): val is CanvasCoherenceModeParam =>
   zCanvasCoherenceMode.safeParse(val).success;
+
+/**
+ * Zod schema for a boolean.
+ */
+export const zBoolean = z.boolean();
+
+/**
+ * Validates/type-guards a value as a boolean parameter
+ */
+export const isValidBoolean = (val: unknown): val is boolean =>
+  zBoolean.safeParse(val).success && val !== null && val !== undefined;
 
 // /**
 //  * Zod schema for BaseModelType

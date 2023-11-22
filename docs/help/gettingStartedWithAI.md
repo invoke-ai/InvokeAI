@@ -57,7 +57,9 @@ Prompts provide the models directions on what to generate. As a general rule of 
 
 Models are the magic that power InvokeAI. These files represent the output of training a machine on understanding massive amounts of images - providing them with the capability to generate new images using just a text description of what you’d like to see. (Like Stable Diffusion!)
 
-Invoke offers a simple way to download several different models upon installation, but many more can be discovered online, including at ****. Each model can produce a unique style of output, based on the images it was trained on - Try out different models to see which best fits your creative vision!
+Invoke offers a simple way to download several different models upon installation, but many more can be discovered online, including at https://models.invoke.ai 
+
+Each model can produce a unique style of output, based on the images it was trained on - Try out different models to see which best fits your creative vision!
 
 - *Models that contain “inpainting” in the name are designed for use with the inpainting feature of the Unified Canvas*
 

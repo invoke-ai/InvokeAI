@@ -69,6 +69,8 @@ export const validateSourceAndTargetTypes = (
     (sourceType === 'integer' || sourceType === 'float') &&
     targetType === 'string';
 
+  const isTargetAnyType = targetType === 'Any';
+
   return (
     isCollectionItemToNonCollection ||
     isNonCollectionToCollectionItem ||
@@ -76,6 +78,7 @@ export const validateSourceAndTargetTypes = (
     isGenericCollectionToAnyCollectionOrPolymorphic ||
     isCollectionToGenericCollection ||
     isIntToFloat ||
-    isIntOrFloatToString
+    isIntOrFloatToString ||
+    isTargetAnyType
   );
 };

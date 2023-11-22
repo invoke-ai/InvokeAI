@@ -25,9 +25,9 @@ import {
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
+import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { isEqual } from 'lodash-es';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -151,7 +151,9 @@ const IAICanvasToolbar = () => {
     [canvasBaseLayer]
   );
 
-  const handleSelectMoveTool = () => dispatch(setTool('move'));
+  const handleSelectMoveTool = useCallback(() => {
+    dispatch(setTool('move'));
+  }, [dispatch]);
 
   const handleClickResetCanvasView = useSingleAndDoubleClick(
     () => handleResetCanvasView(false),
@@ -174,36 +176,39 @@ const IAICanvasToolbar = () => {
     );
   };
 
-  const handleResetCanvas = () => {
+  const handleResetCanvas = useCallback(() => {
     dispatch(resetCanvas());
-  };
+  }, [dispatch]);
 
-  const handleMergeVisible = () => {
+  const handleMergeVisible = useCallback(() => {
     dispatch(canvasMerged());
-  };
+  }, [dispatch]);
 
-  const handleSaveToGallery = () => {
+  const handleSaveToGallery = useCallback(() => {
     dispatch(canvasSavedToGallery());
-  };
+  }, [dispatch]);
 
-  const handleCopyImageToClipboard = () => {
+  const handleCopyImageToClipboard = useCallback(() => {
     if (!isClipboardAPIAvailable) {
       return;
     }
     dispatch(canvasCopiedToClipboard());
-  };
+  }, [dispatch, isClipboardAPIAvailable]);
 
-  const handleDownloadAsImage = () => {
+  const handleDownloadAsImage = useCallback(() => {
     dispatch(canvasDownloadedAsImage());
-  };
+  }, [dispatch]);
 
-  const handleChangeLayer = (v: string) => {
-    const newLayer = v as CanvasLayer;
-    dispatch(setLayer(newLayer));
-    if (newLayer === 'mask' && !isMaskEnabled) {
-      dispatch(setIsMaskEnabled(true));
-    }
-  };
+  const handleChangeLayer = useCallback(
+    (v: string) => {
+      const newLayer = v as CanvasLayer;
+      dispatch(setLayer(newLayer));
+      if (newLayer === 'mask' && !isMaskEnabled) {
+        dispatch(setIsMaskEnabled(true));
+      }
+    },
+    [dispatch, isMaskEnabled]
+  );
 
   return (
     <Flex

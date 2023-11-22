@@ -1,4 +1,5 @@
 import pytest
+from pydantic import TypeAdapter
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -9,10 +10,15 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.image import ShowImageInvocation
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
-from invokeai.app.invocations.primitives import FloatInvocation, IntegerInvocation
+from invokeai.app.invocations.primitives import (
+    FloatCollectionInvocation,
+    FloatInvocation,
+    IntegerInvocation,
+    StringInvocation,
+)
 from invokeai.app.invocations.upscale import ESRGANInvocation
-from invokeai.app.services.default_graphs import create_text_to_image
-from invokeai.app.services.graph import (
+from invokeai.app.services.shared.default_graphs import create_text_to_image
+from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Edge,
     EdgeConnection,
@@ -26,8 +32,11 @@ from invokeai.app.services.graph import (
 )
 
 from .test_nodes import (
+    AnyTypeTestInvocation,
     ImageToImageTestInvocation,
     ListPassThroughInvocation,
+    PolymorphicStringTestInvocation,
+    PromptCollectionTestInvocation,
     PromptTestInvocation,
     TextToImageTestInvocation,
 )
@@ -462,7 +471,6 @@ def test_graph_gets_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)
@@ -494,8 +502,8 @@ def test_graph_expands_subgraph():
     g.add_edge(create_edge("1.2", "value", "2", "a"))
 
     dg = g.nx_graph_flat()
-    assert set(dg.nodes) == set(["1.1", "1.2", "2"])
-    assert set(dg.edges) == set([("1.1", "1.2"), ("1.2", "2")])
+    assert set(dg.nodes) == {"1.1", "1.2", "2"}
+    assert set(dg.edges) == {("1.1", "1.2"), ("1.2", "2")}
 
 
 def test_graph_subgraph_t2i():
@@ -523,9 +531,7 @@ def test_graph_subgraph_t2i():
 
     # Validate
     dg = g.nx_graph_flat()
-    assert set(dg.nodes) == set(
-        ["1.width", "1.height", "1.seed", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "2", "3", "4"]
-    )
+    assert set(dg.nodes) == {"1.width", "1.height", "1.seed", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "2", "3", "4"}
     expected_edges = [(f"1.{e.source.node_id}", f"1.{e.destination.node_id}") for e in lg.graph.edges]
     expected_edges.extend([("2", "1.width"), ("3", "1.height"), ("1.8", "4")])
     print(expected_edges)
@@ -537,7 +543,6 @@ def test_graph_fails_to_get_missing_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)
@@ -552,7 +557,6 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
     g = Graph()
     n1 = GraphInvocation(id="1")
     n1.graph = Graph()
-    n1.graph.add_node
 
     n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     n1.graph.add_node(n1_1)
@@ -593,20 +597,21 @@ def test_graph_can_serialize():
     g.add_edge(e)
 
     # Not throwing on this line is sufficient
-    _ = g.json()
+    _ = g.model_dump_json()
 
 
 def test_graph_can_deserialize():
     g = Graph()
     n1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
-    n2 = ESRGANInvocation(id="2")
+    n2 = ImageToImageTestInvocation(id="2")
     g.add_node(n1)
     g.add_node(n2)
     e = create_edge(n1.id, "image", n2.id, "image")
     g.add_edge(e)
 
-    json = g.json()
-    g2 = Graph.parse_raw(json)
+    json = g.model_dump_json()
+    GraphValidator = TypeAdapter(Graph)
+    g2 = GraphValidator.validate_json(json)
 
     assert g2 is not None
     assert g2.nodes["1"] is not None
@@ -619,7 +624,7 @@ def test_graph_can_deserialize():
 
 
 def test_invocation_decorator():
-    invocation_type = "test_invocation"
+    invocation_type = "test_invocation_decorator"
     title = "Test Invocation"
     tags = ["first", "second", "third"]
     category = "category"
@@ -630,7 +635,7 @@ def test_invocation_decorator():
         def invoke(self):
             pass
 
-    schema = TestInvocation.schema()
+    schema = TestInvocation.model_json_schema()
 
     assert schema.get("title") == title
     assert schema.get("tags") == tags
@@ -640,18 +645,17 @@ def test_invocation_decorator():
 
 
 def test_invocation_version_must_be_semver():
-    invocation_type = "test_invocation"
     valid_version = "1.0.0"
     invalid_version = "not_semver"
 
-    @invocation(invocation_type, version=valid_version)
+    @invocation("test_invocation_version_valid", version=valid_version)
     class ValidVersionInvocation(BaseInvocation):
         def invoke(self):
             pass
 
     with pytest.raises(InvalidVersionError):
 
-        @invocation(invocation_type, version=invalid_version)
+        @invocation("test_invocation_version_invalid", version=invalid_version)
         class InvalidVersionInvocation(BaseInvocation):
             def invoke(self):
                 pass
@@ -691,7 +695,145 @@ def test_ints_do_not_accept_floats():
         g.add_edge(e)
 
 
+def test_polymorphic_accepts_single():
+    g = Graph()
+    n1 = StringInvocation(id="1", value="banana")
+    n2 = PolymorphicStringTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e1 = create_edge(n1.id, "value", n2.id, "value")
+    # Not throwing on this line is sufficient
+    g.add_edge(e1)
+
+
+def test_polymorphic_accepts_collection_of_same_base_type():
+    g = Graph()
+    n1 = PromptCollectionTestInvocation(id="1", collection=["banana", "sundae"])
+    n2 = PolymorphicStringTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e1 = create_edge(n1.id, "collection", n2.id, "value")
+    # Not throwing on this line is sufficient
+    g.add_edge(e1)
+
+
+def test_polymorphic_does_not_accept_collection_of_different_base_type():
+    g = Graph()
+    n1 = FloatCollectionInvocation(id="1", collection=[1.0, 2.0, 3.0])
+    n2 = PolymorphicStringTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e1 = create_edge(n1.id, "collection", n2.id, "value")
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(e1)
+
+
+def test_polymorphic_does_not_accept_generic_collection():
+    g = Graph()
+    n1 = IntegerInvocation(id="1", value=1)
+    n2 = IntegerInvocation(id="2", value=2)
+    n3 = CollectInvocation(id="3")
+    n4 = PolymorphicStringTestInvocation(id="4")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+    e1 = create_edge(n1.id, "value", n3.id, "item")
+    e2 = create_edge(n2.id, "value", n3.id, "item")
+    e3 = create_edge(n3.id, "collection", n4.id, "value")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(e3)
+
+
+def test_any_accepts_integer():
+    g = Graph()
+    n1 = IntegerInvocation(id="1", value=1)
+    n2 = AnyTypeTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e = create_edge(n1.id, "value", n2.id, "value")
+    # Not throwing on this line is sufficient
+    g.add_edge(e)
+
+
+def test_any_accepts_string():
+    g = Graph()
+    n1 = StringInvocation(id="1", value="banana sundae")
+    n2 = AnyTypeTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e = create_edge(n1.id, "value", n2.id, "value")
+    # Not throwing on this line is sufficient
+    g.add_edge(e)
+
+
+def test_any_accepts_generic_collection():
+    g = Graph()
+    n1 = IntegerInvocation(id="1", value=1)
+    n2 = IntegerInvocation(id="2", value=2)
+    n3 = CollectInvocation(id="3")
+    n4 = AnyTypeTestInvocation(id="4")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+    e1 = create_edge(n1.id, "value", n3.id, "item")
+    e2 = create_edge(n2.id, "value", n3.id, "item")
+    e3 = create_edge(n3.id, "collection", n4.id, "value")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    # Not throwing on this line is sufficient
+    g.add_edge(e3)
+
+
+def test_any_accepts_prompt_collection():
+    g = Graph()
+    n1 = PromptCollectionTestInvocation(id="1", collection=["banana", "sundae"])
+    n2 = AnyTypeTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e = create_edge(n1.id, "collection", n2.id, "value")
+    # Not throwing on this line is sufficient
+    g.add_edge(e)
+
+
+def test_any_accepts_any():
+    g = Graph()
+    n1 = AnyTypeTestInvocation(id="1")
+    n2 = AnyTypeTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e = create_edge(n1.id, "value", n2.id, "value")
+    # Not throwing on this line is sufficient
+    g.add_edge(e)
+
+
+def test_iterate_accepts_collection():
+    """We need to update the validation for Collect -> Iterate to traverse to the Iterate
+    node's output and compare that against the item type of the Collect node's collection. Until
+    then, Collect nodes may not output into Iterate nodes."""
+    g = Graph()
+    n1 = IntegerInvocation(id="1", value=1)
+    n2 = IntegerInvocation(id="2", value=2)
+    n3 = CollectInvocation(id="3")
+    n4 = IterateInvocation(id="4")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+    e1 = create_edge(n1.id, "value", n3.id, "item")
+    e2 = create_edge(n2.id, "value", n3.id, "item")
+    e3 = create_edge(n3.id, "collection", n4.id, "collection")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    # Once we fix the validation logic as described, this should should not raise an error
+    with pytest.raises(InvalidEdgeError, match="Cannot connect collector to iterator"):
+        g.add_edge(e3)
+
+
 def test_graph_can_generate_schema():
     # Not throwing on this line is sufficient
     # NOTE: if this test fails, it's PROBABLY because a new invocation type is breaking schema generation
-    _ = Graph.schema_json(indent=2)
+    _ = Graph.model_json_schema()

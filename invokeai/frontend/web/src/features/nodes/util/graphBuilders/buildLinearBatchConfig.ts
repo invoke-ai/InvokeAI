@@ -2,15 +2,16 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { range, unset } from 'lodash-es';
+import { range } from 'lodash-es';
 import { components } from 'services/api/schema';
 import { Batch, BatchConfig } from 'services/api/types';
 import {
   CANVAS_COHERENCE_NOISE,
-  METADATA_ACCUMULATOR,
+  METADATA,
   NOISE,
   POSITIVE_CONDITIONING,
 } from './constants';
+import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (
   state: RootState,
@@ -24,7 +25,6 @@ export const prepareLinearUIBatch = (
   const data: Batch['data'] = [];
 
   if (prompts.length === 1) {
-    unset(graph.nodes[METADATA_ACCUMULATOR], 'seed');
     const seeds = generateSeeds({
       count: iterations,
       start: shouldRandomizeSeed ? undefined : seed,
@@ -40,9 +40,11 @@ export const prepareLinearUIBatch = (
       });
     }
 
-    if (graph.nodes[METADATA_ACCUMULATOR]) {
+    if (getHasMetadata(graph)) {
+      // add to metadata
+      removeMetadata(graph, 'seed');
       zipped.push({
-        node_path: METADATA_ACCUMULATOR,
+        node_path: METADATA,
         field_name: 'seed',
         items: seeds,
       });
@@ -77,9 +79,11 @@ export const prepareLinearUIBatch = (
         });
       }
 
-      if (graph.nodes[METADATA_ACCUMULATOR]) {
+      // add to metadata
+      if (getHasMetadata(graph)) {
+        removeMetadata(graph, 'seed');
         firstBatchDatumList.push({
-          node_path: METADATA_ACCUMULATOR,
+          node_path: METADATA,
           field_name: 'seed',
           items: seeds,
         });
@@ -106,13 +110,17 @@ export const prepareLinearUIBatch = (
           items: seeds,
         });
       }
-      if (graph.nodes[METADATA_ACCUMULATOR]) {
+
+      // add to metadata
+      if (getHasMetadata(graph)) {
+        removeMetadata(graph, 'seed');
         secondBatchDatumList.push({
-          node_path: METADATA_ACCUMULATOR,
+          node_path: METADATA,
           field_name: 'seed',
           items: seeds,
         });
       }
+
       if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
         secondBatchDatumList.push({
           node_path: CANVAS_COHERENCE_NOISE,
@@ -137,17 +145,17 @@ export const prepareLinearUIBatch = (
       });
     }
 
-    if (graph.nodes[METADATA_ACCUMULATOR]) {
+    // add to metadata
+    if (getHasMetadata(graph)) {
+      removeMetadata(graph, 'positive_prompt');
       firstBatchDatumList.push({
-        node_path: METADATA_ACCUMULATOR,
+        node_path: METADATA,
         field_name: 'positive_prompt',
         items: extendedPrompts,
       });
     }
 
     if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
-      unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
-
       const stylePrompts = extendedPrompts.map((p) =>
         [p, positiveStylePrompt].join(' ')
       );
@@ -160,11 +168,13 @@ export const prepareLinearUIBatch = (
         });
       }
 
-      if (graph.nodes[METADATA_ACCUMULATOR]) {
+      // add to metadata
+      if (getHasMetadata(graph)) {
+        removeMetadata(graph, 'positive_style_prompt');
         firstBatchDatumList.push({
-          node_path: METADATA_ACCUMULATOR,
+          node_path: METADATA,
           field_name: 'positive_style_prompt',
-          items: stylePrompts,
+          items: extendedPrompts,
         });
       }
     }

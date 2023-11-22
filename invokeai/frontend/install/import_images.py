@@ -341,19 +341,19 @@ class InvokeAIMetadataParser:
         # this was more elegant as a case statement, but that's not available in python 3.9
         if old_scheduler is None:
             return None
-        scheduler_map = dict(
-            ddim="ddim",
-            plms="pnmd",
-            k_lms="lms",
-            k_dpm_2="kdpm_2",
-            k_dpm_2_a="kdpm_2_a",
-            dpmpp_2="dpmpp_2s",
-            k_dpmpp_2="dpmpp_2m",
-            k_dpmpp_2_a=None,  # invalid, in 2.3.x, selecting this sample would just fallback to last run or plms if new session
-            k_euler="euler",
-            k_euler_a="euler_a",
-            k_heun="heun",
-        )
+        scheduler_map = {
+            "ddim": "ddim",
+            "plms": "pnmd",
+            "k_lms": "lms",
+            "k_dpm_2": "kdpm_2",
+            "k_dpm_2_a": "kdpm_2_a",
+            "dpmpp_2": "dpmpp_2s",
+            "k_dpmpp_2": "dpmpp_2m",
+            "k_dpmpp_2_a": None,  # invalid, in 2.3.x, selecting this sample would just fallback to last run or plms if new session
+            "k_euler": "euler",
+            "k_euler_a": "euler_a",
+            "k_heun": "heun",
+        }
         return scheduler_map.get(old_scheduler)
 
     def split_prompt(self, raw_prompt: str):

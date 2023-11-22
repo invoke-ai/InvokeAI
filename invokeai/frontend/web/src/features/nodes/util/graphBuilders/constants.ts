@@ -2,11 +2,18 @@
 export const POSITIVE_CONDITIONING = 'positive_conditioning';
 export const NEGATIVE_CONDITIONING = 'negative_conditioning';
 export const DENOISE_LATENTS = 'denoise_latents';
+export const DENOISE_LATENTS_HRF = 'denoise_latents_hrf';
 export const LATENTS_TO_IMAGE = 'latents_to_image';
-export const SAVE_IMAGE = 'save_image';
+export const LATENTS_TO_IMAGE_HRF_HR = 'latents_to_image_hrf_hr';
+export const LATENTS_TO_IMAGE_HRF_LR = 'latents_to_image_hrf_lr';
+export const IMAGE_TO_LATENTS_HRF = 'image_to_latents_hrf';
+export const RESIZE_HRF = 'resize_hrf';
+export const ESRGAN_HRF = 'esrgan_hrf';
+export const LINEAR_UI_OUTPUT = 'linear_ui_output';
 export const NSFW_CHECKER = 'nsfw_checker';
 export const WATERMARKER = 'invisible_watermark';
 export const NOISE = 'noise';
+export const NOISE_HRF = 'noise_hrf';
 export const RANDOM_INT = 'rand_int';
 export const RANGE_OF_SIZE = 'range_of_size';
 export const ITERATE = 'iterate';
@@ -52,8 +59,15 @@ export const IP_ADAPTER = 'ip_adapter';
 export const DYNAMIC_PROMPT = 'dynamic_prompt';
 export const IMAGE_COLLECTION = 'image_collection';
 export const IMAGE_COLLECTION_ITERATE = 'image_collection_iterate';
-export const METADATA_ACCUMULATOR = 'metadata_accumulator';
-export const REALESRGAN = 'esrgan';
+export const METADATA = 'core_metadata';
+export const BATCH_METADATA = 'batch_metadata';
+export const BATCH_METADATA_COLLECT = 'batch_metadata_collect';
+export const BATCH_SEED = 'batch_seed';
+export const BATCH_PROMPT = 'batch_prompt';
+export const BATCH_STYLE_PROMPT = 'batch_style_prompt';
+export const METADATA_COLLECT = 'metadata_collect';
+export const MERGE_METADATA = 'merge_metadata';
+export const ESRGAN = 'esrgan';
 export const DIVIDE = 'divide';
 export const SCALE = 'scale_image';
 export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
@@ -67,6 +81,32 @@ export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
 export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
 export const SEAMLESS = 'seamless';
 export const SDXL_REFINER_SEAMLESS = 'refiner_seamless';
+
+// these image-outputting nodes are from the linear UI and we should not handle the gallery logic on them
+// instead, we wait for LINEAR_UI_OUTPUT node, and handle it like any other image-outputting node
+export const nodeIDDenyList = [
+  CANVAS_OUTPUT,
+  LATENTS_TO_IMAGE,
+  LATENTS_TO_IMAGE_HRF_HR,
+  NSFW_CHECKER,
+  WATERMARKER,
+  ESRGAN,
+  ESRGAN_HRF,
+  RESIZE_HRF,
+  LATENTS_TO_IMAGE_HRF_LR,
+  IMG2IMG_RESIZE,
+  INPAINT_IMAGE,
+  SCALED_INPAINT_IMAGE,
+  INPAINT_IMAGE_RESIZE_UP,
+  INPAINT_IMAGE_RESIZE_DOWN,
+  INPAINT_INFILL,
+  INPAINT_INFILL_RESIZE_DOWN,
+  INPAINT_FINAL_IMAGE,
+  INPAINT_CREATE_MASK,
+  INPAINT_MASK,
+  PASTE_IMAGE,
+  SCALE,
+];
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

@@ -28,7 +28,7 @@ command line, then just be sure to activate it's virtual environment.
 Then run the following three commands:
 
 ```sh
-pip install xformers~=0.0.19
+pip install xformers~=0.0.22
 pip install triton    # WON'T WORK ON WINDOWS
 python -m xformers.info output
 ```
@@ -42,7 +42,7 @@ If all goes well, you'll see a report like the
 following:
 
 ```sh
-xFormers 0.0.20
+xFormers 0.0.22
 memory_efficient_attention.cutlassF:               available
 memory_efficient_attention.cutlassB:               available
 memory_efficient_attention.flshattF:               available
@@ -59,14 +59,14 @@ swiglu.gemm_fused_operand_sum:                     available
 swiglu.fused.p.cpp:                                available
 is_triton_available:                               True
 is_functorch_available:                            False
-pytorch.version:                                   2.0.1+cu118
+pytorch.version:                                   2.1.0+cu121
 pytorch.cuda:                                      available
 gpu.compute_capability:                            8.9
 gpu.name:                                          NVIDIA GeForce RTX 4070
 build.info:                                        available
 build.cuda_version:                                1108
 build.python_version:                              3.10.11
-build.torch_version:                               2.0.1+cu118
+build.torch_version:                               2.1.0+cu121
 build.env.TORCH_CUDA_ARCH_LIST:                    5.0+PTX 6.0 6.1 7.0 7.5 8.0 8.6
 build.env.XFORMERS_BUILD_TYPE:                     Release
 build.env.XFORMERS_ENABLE_DEBUG_ASSERTIONS:        None
@@ -92,33 +92,22 @@ installed from source. These instructions were written for a system
 running Ubuntu 22.04, but other Linux distributions should be able to
 adapt this recipe.
 
-#### 1. Install CUDA Toolkit 11.8
+#### 1. Install CUDA Toolkit 12.1
 
 You will need the CUDA developer's toolkit in order to compile and
 install xFormers. **Do not try to install Ubuntu's nvidia-cuda-toolkit
 package.** It is out of date and will cause conflicts among the NVIDIA
 driver and binaries. Instead install the CUDA Toolkit package provided
-by NVIDIA itself. Go to [CUDA Toolkit 11.8
-Downloads](https://developer.nvidia.com/cuda-11-8-0-download-archive)
+by NVIDIA itself. Go to [CUDA Toolkit 12.1
+Downloads](https://developer.nvidia.com/cuda-12-1-0-download-archive)
 and use the target selection wizard to choose your platform and Linux
 distribution. Select an installer type of "runfile (local)" at the
 last step.
 
 This will provide you with a recipe for downloading and running a
-install shell script that will install the toolkit and drivers. For
-example, the install script recipe for Ubuntu 22.04 running on a
-x86_64 system is:
+install shell script that will install the toolkit and drivers.
 
-```
-wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run
-sudo sh cuda_11.8.0_520.61.05_linux.run
-```
-
-Rather than cut-and-paste this example, We recommend that you walk
-through the toolkit wizard in order to get the most up to date
-installer for your system.
-
-#### 2. Confirm/Install pyTorch 2.01 with CUDA 11.8 support
+#### 2. Confirm/Install pyTorch 2.1.0 with CUDA 12.1 support
 
 If you are using InvokeAI 3.0.2 or higher, these will already be
 installed. If not, you can check whether you have the needed libraries
@@ -133,7 +122,7 @@ Then run the command:
 python -c 'exec("import torch\nprint(torch.__version__)")'
 ```
 
-If it prints __1.13.1+cu118__ you're good. If not, you can install the
+If it prints __2.1.0+cu121__ you're good. If not, you can install the
 most up to date libraries with this command:
 
 ```sh

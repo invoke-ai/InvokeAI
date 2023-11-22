@@ -67,6 +67,12 @@ class IPAttnProcessor2_0(torch.nn.Module):
         temb=None,
         ip_adapter_image_prompt_embeds=None,
     ):
+        """Apply IP-Adapter attention.
+
+        Args:
+            ip_adapter_image_prompt_embeds (torch.Tensor): The image prompt embeddings.
+                Shape: (batch_size, num_ip_images, seq_len, ip_embedding_len).
+        """
         residual = hidden_states
 
         if attn.spatial_norm is not None:
@@ -124,28 +130,39 @@ class IPAttnProcessor2_0(torch.nn.Module):
             assert ip_adapter_image_prompt_embeds is not None
             assert len(ip_adapter_image_prompt_embeds) == len(self._weights)
 
-            for ipa_embed, ipa_weights, scale in zip(ip_adapter_image_prompt_embeds, self._weights, self._scales):
+            for ipa_embed, ipa_weights, scale in zip(
+                ip_adapter_image_prompt_embeds, self._weights, self._scales, strict=True
+            ):
                 # The batch dimensions should match.
                 assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
-                # The channel dimensions should match.
-                assert ipa_embed.shape[2] == encoder_hidden_states.shape[2]
+                # The token_len dimensions should match.
+                assert ipa_embed.shape[-1] == encoder_hidden_states.shape[-1]
 
                 ip_hidden_states = ipa_embed
+
+                # Expected ip_hidden_state shape: (batch_size, num_ip_images, ip_seq_len, ip_image_embedding)
 
                 ip_key = ipa_weights.to_k_ip(ip_hidden_states)
                 ip_value = ipa_weights.to_v_ip(ip_hidden_states)
 
+                # Expected ip_key and ip_value shape: (batch_size, num_ip_images, ip_seq_len, head_dim * num_heads)
+
                 ip_key = ip_key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
                 ip_value = ip_value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
 
-                # The output of sdpa has shape: (batch, num_heads, seq_len, head_dim)
+                # Expected ip_key and ip_value shape: (batch_size, num_heads, num_ip_images * ip_seq_len, head_dim)
+
                 # TODO: add support for attn.scale when we move to Torch 2.1
                 ip_hidden_states = F.scaled_dot_product_attention(
                     query, ip_key, ip_value, attn_mask=None, dropout_p=0.0, is_causal=False
                 )
 
+                # Expected ip_hidden_states shape: (batch_size, num_heads, query_seq_len, head_dim)
+
                 ip_hidden_states = ip_hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
                 ip_hidden_states = ip_hidden_states.to(query.dtype)
+
+                # Expected ip_hidden_states shape: (batch_size, query_seq_len, num_heads * head_dim)
 
                 hidden_states = hidden_states + scale * ip_hidden_states
 

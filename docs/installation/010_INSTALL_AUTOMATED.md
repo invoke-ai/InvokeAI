@@ -40,7 +40,7 @@ experimental versions later.
     this, open up a command-line window ("Terminal" on Linux and
     Macintosh, "Command" or "Powershell" on Windows) and type `python
     --version`. If Python is installed, it will print out the version
-    number. If it is version `3.9.*`, `3.10.*` or `3.11.*` you meet
+    number. If it is version `3.10.*` or `3.11.*` you meet
     requirements.
 
     !!! warning "What to do if you have an unsupported version"
@@ -48,7 +48,7 @@ experimental versions later.
         Go to [Python Downloads](https://www.python.org/downloads/)
         and download the appropriate installer package for your
         platform. We recommend [Version
-        3.10.9](https://www.python.org/downloads/release/python-3109/),
+        3.10.12](https://www.python.org/downloads/release/python-3109/),
         which has been extensively tested with InvokeAI.
 
     _Please select your platform in the section below for platform-specific
@@ -179,7 +179,7 @@ experimental versions later.
     you will have the choice of CUDA (NVidia cards), ROCm (AMD cards),
     or CPU (no graphics acceleration). On Windows, you'll have the
     choice of CUDA vs CPU, and on Macs you'll be offered CPU only. When
-    you select CPU on M1 or M2 Macintoshes, you will get MPS-based
+    you select CPU on M1/M2/M3 Macintoshes, you will get MPS-based
     graphics acceleration without installing additional drivers. If you
     are unsure what GPU you are using, you can ask the installer to
     guess.
@@ -471,7 +471,7 @@ Then type the following commands:
 
 === "NVIDIA System"
     ```bash
-    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu118
+    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu121
     pip install xformers
     ```
 

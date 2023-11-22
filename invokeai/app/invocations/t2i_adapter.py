@@ -1,11 +1,10 @@
 from typing import Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -16,12 +15,15 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESIZE_VALUES
 from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.model_management.models.base import BaseModelType
 
 
 class T2IAdapterModelField(BaseModel):
     model_name: str = Field(description="Name of the T2I-Adapter model")
     base_model: BaseModelType = Field(description="Base model")
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class T2IAdapterField(BaseModel):

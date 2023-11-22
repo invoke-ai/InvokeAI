@@ -11,6 +11,7 @@ from invokeai.backend.model_management.model_load_optimizations import _no_op, s
         (torch.nn.Conv1d, {"in_channels": 10, "out_channels": 20, "kernel_size": 3}),
         (torch.nn.Conv2d, {"in_channels": 10, "out_channels": 20, "kernel_size": 3}),
         (torch.nn.Conv3d, {"in_channels": 10, "out_channels": 20, "kernel_size": 3}),
+        (torch.nn.Embedding, {"num_embeddings": 10, "embedding_dim": 10}),
     ],
 )
 def test_skip_torch_weight_init_linear(torch_module, layer_args):
@@ -36,12 +37,14 @@ def test_skip_torch_weight_init_linear(torch_module, layer_args):
     # Check that reset_parameters is skipped while `skip_torch_weight_init()` is active.
     assert reset_params_fn_during == _no_op
     assert not torch.allclose(layer_before.weight, layer_during.weight)
-    assert not torch.allclose(layer_before.bias, layer_during.bias)
+    if hasattr(layer_before, "bias"):
+        assert not torch.allclose(layer_before.bias, layer_during.bias)
 
     # Check that the original behavior is restored after `skip_torch_weight_init()` ends.
     assert reset_params_fn_before is reset_params_fn_after
     assert torch.allclose(layer_before.weight, layer_after.weight)
-    assert torch.allclose(layer_before.bias, layer_after.bias)
+    if hasattr(layer_before, "bias"):
+        assert torch.allclose(layer_before.bias, layer_after.bias)
 
 
 def test_skip_torch_weight_init_restores_base_class_behavior():

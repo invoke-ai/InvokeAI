@@ -41,7 +41,7 @@ from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
 from invokeai.app.services.config import InvokeAIAppConfig, PagingArgumentParser
-from invokeai.app.services.model_manager_service import ModelManagerService
+from invokeai.app.services.model_manager import ModelManagerService
 from invokeai.backend.model_management.models import SubModelType
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
@@ -615,7 +615,7 @@ def do_textual_inversion_training(
     vae_info = model_manager.get_model(*model_meta, submodel=SubModelType.Vae)
     unet_info = model_manager.get_model(*model_meta, submodel=SubModelType.UNet)
 
-    pipeline_args = dict(local_files_only=True)
+    pipeline_args = {"local_files_only": True}
     if tokenizer_name:
         tokenizer = CLIPTokenizer.from_pretrained(tokenizer_name, **pipeline_args)
     else:

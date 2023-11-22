@@ -80,6 +80,13 @@ const LoRAModelInputFieldComponent = (
     [dispatch, field.name, nodeId]
   );
 
+  const filterFunc = useCallback(
+    (value: string, item: SelectItem) =>
+      item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
+      item.value.toLowerCase().includes(value.toLowerCase().trim()),
+    []
+  );
+
   if (loraModels?.ids.length === 0) {
     return (
       <Flex sx={{ justifyContent: 'center', p: 2 }}>
@@ -101,10 +108,7 @@ const LoRAModelInputFieldComponent = (
       nothingFound={t('models.noMatchingLoRAs')}
       itemComponent={IAIMantineSelectItemWithTooltip}
       disabled={data.length === 0}
-      filter={(value, item: SelectItem) =>
-        item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
-        item.value.toLowerCase().includes(value.toLowerCase().trim())
-      }
+      filter={filterFunc}
       error={!selectedLoRAModel}
       onChange={handleChange}
       sx={{

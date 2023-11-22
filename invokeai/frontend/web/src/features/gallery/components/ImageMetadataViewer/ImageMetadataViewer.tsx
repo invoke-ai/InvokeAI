@@ -10,14 +10,14 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { memo } from 'react';
-import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
+import { useTranslation } from 'react-i18next';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
 import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
-import { useAppSelector } from '../../../../app/store/storeHooks';
-import { configSelector } from '../../../system/store/configSelectors';
-import { useTranslation } from 'react-i18next';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -31,17 +31,8 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // });
   const { t } = useTranslation();
 
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
-
-  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
-    { image, shouldFetchMetadataFromApi },
-    {
-      selectFromResult: (res) => ({
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
-  );
+  const { metadata } = useDebouncedMetadata(image.image_name);
+  const { workflow } = useDebouncedWorkflow(image.workflow_id);
 
   return (
     <Flex
@@ -65,19 +56,32 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         </Link>
       </Flex>
 
-      <ImageMetadataActions metadata={metadata} />
-
       <Tabs
         variant="line"
-        sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
+        sx={{
+          display: 'flex',
+          flexDir: 'column',
+          w: 'full',
+          h: 'full',
+        }}
       >
         <TabList>
+          <Tab>{t('metadata.recallParameters')}</Tab>
           <Tab>{t('metadata.metadata')}</Tab>
           <Tab>{t('metadata.imageDetails')}</Tab>
           <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
+          <TabPanel>
+            {metadata ? (
+              <ScrollableContent>
+                <ImageMetadataActions metadata={metadata} />
+              </ScrollableContent>
+            ) : (
+              <IAINoContentFallback label={t('metadata.noRecallParameters')} />
+            )}
+          </TabPanel>
           <TabPanel>
             {metadata ? (
               <DataViewer data={metadata} label={t('metadata.metadata')} />

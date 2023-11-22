@@ -488,7 +488,7 @@ sections describe what's new for InvokeAI.
 
 - A choice of installer scripts that automate installation and configuration.
   See
-  [Installation](installation/index.md).
+  [Installation](installation/INSTALLATION.md).
 - A streamlined manual installation process that works for both Conda and
   PIP-only installs. See
   [Manual Installation](installation/020_INSTALL_MANUAL.md).
@@ -657,7 +657,7 @@ sections describe what's new for InvokeAI.
 
 ## v1.13 <small>(3 September 2022)</small>
 
-- Support image variations (see [VARIATIONS](features/VARIATIONS.md)
+- Support image variations (see [VARIATIONS](deprecated/VARIATIONS.md)
   ([Kevin Gibbons](https://github.com/bakkot) and many contributors and
   reviewers)
 - Supports a Google Colab notebook for a standalone server running on Google

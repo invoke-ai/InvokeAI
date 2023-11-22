@@ -3,14 +3,21 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaSync } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import IAIButton from 'common/components/IAIButton';
+import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
+import { updateAllNodesRequested } from 'features/nodes/store/actions';
 
 const TopLeftPanel = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const nodesNeedUpdate = useGetNodesNeedUpdate();
   const handleOpenAddNodePopover = useCallback(() => {
     dispatch(addNodePopoverOpened());
+  }, [dispatch]);
+  const handleClickUpdateNodes = useCallback(() => {
+    dispatch(updateAllNodesRequested());
   }, [dispatch]);
 
   return (
@@ -21,6 +28,11 @@ const TopLeftPanel = () => {
         icon={<FaPlus />}
         onClick={handleOpenAddNodePopover}
       />
+      {nodesNeedUpdate && (
+        <IAIButton leftIcon={<FaSync />} onClick={handleClickUpdateNodes}>
+          {t('nodes.updateAllNodes')}
+        </IAIButton>
+      )}
     </Flex>
   );
 };

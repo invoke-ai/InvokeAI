@@ -1,15 +1,30 @@
-import { Box, Flex } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  FormControl,
+  FormLabel,
+  HStack,
+  Text,
+} from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvocationTemplate, NodeData } from 'features/nodes/types/types';
+import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
+import {
+  InvocationNodeData,
+  InvocationTemplate,
+  isInvocationNode,
+} from 'features/nodes/types/types';
 import { memo } from 'react';
-import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
-import NodeTitle from '../../flow/nodes/common/NodeTitle';
-import ScrollableContent from '../ScrollableContent';
 import { useTranslation } from 'react-i18next';
+import { FaSync } from 'react-icons/fa';
+import { Node } from 'reactflow';
+import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
+import ScrollableContent from '../ScrollableContent';
+import EditableNodeTitle from './details/EditableNodeTitle';
 
 const selector = createSelector(
   stateSelector,
@@ -26,7 +41,7 @@ const selector = createSelector(
       : undefined;
 
     return {
-      data: lastSelectedNode?.data,
+      node: lastSelectedNode,
       template: lastSelectedNodeTemplate,
     };
   },
@@ -34,23 +49,26 @@ const selector = createSelector(
 );
 
 const InspectorDetailsTab = () => {
-  const { data, template } = useAppSelector(selector);
+  const { node, template } = useAppSelector(selector);
   const { t } = useTranslation();
 
-  if (!template || !data) {
+  if (!template || !isInvocationNode(node)) {
     return (
       <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
     );
   }
 
-  return <Content data={data} template={template} />;
+  return <Content node={node} template={template} />;
 };
 
 export default memo(InspectorDetailsTab);
 
-const Content = (props: { data: NodeData; template: InvocationTemplate }) => {
-  const { data } = props;
-
+const Content = (props: {
+  node: Node<InvocationNodeData>;
+  template: InvocationTemplate;
+}) => {
+  const { t } = useTranslation();
+  const { needsUpdate, updateNode } = useNodeVersion(props.node.id);
   return (
     <Box
       sx={{
@@ -69,8 +87,37 @@ const Content = (props: { data: NodeData; template: InvocationTemplate }) => {
             w: 'full',
           }}
         >
-          <NodeTitle nodeId={data.id} />
-          <NotesTextarea nodeId={data.id} />
+          <EditableNodeTitle nodeId={props.node.data.id} />
+          <HStack>
+            <FormControl>
+              <FormLabel>Node Type</FormLabel>
+              <Text fontSize="sm" fontWeight={600}>
+                {props.template.title}
+              </Text>
+            </FormControl>
+            <Flex
+              flexDir="row"
+              alignItems="center"
+              justifyContent="space-between"
+              w="full"
+            >
+              <FormControl isInvalid={needsUpdate}>
+                <FormLabel>Node Version</FormLabel>
+                <Text fontSize="sm" fontWeight={600}>
+                  {props.node.data.version}
+                </Text>
+              </FormControl>
+              {needsUpdate && (
+                <IAIIconButton
+                  aria-label={t('nodes.updateNode')}
+                  tooltip={t('nodes.updateNode')}
+                  icon={<FaSync />}
+                  onClick={updateNode}
+                />
+              )}
+            </Flex>
+          </HStack>
+          <NotesTextarea nodeId={props.node.data.id} />
         </Flex>
       </ScrollableContent>
     </Box>

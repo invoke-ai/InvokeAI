@@ -5,7 +5,7 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
 from socketio import ASGIApp, AsyncServer
 
-from ..services.events import EventServiceBase
+from ..services.events.events_base import EventServiceBase
 
 
 class SocketIO:
@@ -30,8 +30,8 @@ class SocketIO:
 
     async def _handle_sub_queue(self, sid, data, *args, **kwargs):
         if "queue_id" in data:
-            self.__sio.enter_room(sid, data["queue_id"])
+            await self.__sio.enter_room(sid, data["queue_id"])
 
     async def _handle_unsub_queue(self, sid, data, *args, **kwargs):
         if "queue_id" in data:
-            self.__sio.enter_room(sid, data["queue_id"])
+            await self.__sio.leave_room(sid, data["queue_id"])

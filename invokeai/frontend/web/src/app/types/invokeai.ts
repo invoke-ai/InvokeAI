@@ -39,7 +39,8 @@ export type SDFeature =
   | 'hires'
   | 'lora'
   | 'embedding'
-  | 'vae';
+  | 'vae'
+  | 'hrf';
 
 /**
  * Configuration options for the InvokeAI UI.
@@ -58,6 +59,8 @@ export type AppConfig = {
   nodesAllowlist: string[] | undefined;
   nodesDenylist: string[] | undefined;
   maxUpscalePixels?: number;
+  metadataFetchDebounce?: number;
+  workflowFetchDebounce?: number;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
@@ -103,6 +106,14 @@ export type AppConfig = {
       coarseStep: number;
     };
     img2imgStrength: {
+      initial: number;
+      min: number;
+      sliderMax: number;
+      inputMax: number;
+      fineStep: number;
+      coarseStep: number;
+    };
+    hrfStrength: {
       initial: number;
       min: number;
       sliderMax: number;

@@ -44,13 +44,22 @@ from invokeai.app.invocations.primitives import FloatCollectionOutput
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
-@invocation("float_range", title="Float Range", tags=["math", "range"], category="math", version="1.0.0")
+@invocation(
+    "float_range",
+    title="Float Range",
+    tags=["math", "range"],
+    category="math",
+    version="1.0.0",
+)
 class FloatLinearRangeInvocation(BaseInvocation):
     """Creates a range"""
 
     start: float = InputField(default=5, description="The first value of the range")
     stop: float = InputField(default=10, description="The last value of the range")
-    steps: int = InputField(default=30, description="number of values to interpolate over (including start and stop)")
+    steps: int = InputField(
+        default=30,
+        description="number of values to interpolate over (including start and stop)",
+    )
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         param_list = list(np.linspace(self.start, self.stop, self.steps))
@@ -91,11 +100,17 @@ EASING_FUNCTIONS_MAP = {
     "BounceInOut": BounceEaseInOut,
 }
 
-EASING_FUNCTION_KEYS = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
+EASING_FUNCTION_KEYS = Literal[tuple(EASING_FUNCTIONS_MAP.keys())]
 
 
 # actually I think for now could just use CollectionOutput (which is list[Any]
-@invocation("step_param_easing", title="Step Param Easing", tags=["step", "easing"], category="step", version="1.0.0")
+@invocation(
+    "step_param_easing",
+    title="Step Param Easing",
+    tags=["step", "easing"],
+    category="step",
+    version="1.0.0",
+)
 class StepParamEasingInvocation(BaseInvocation):
     """Experimental per-step parameter easing for denoising steps"""
 
@@ -146,7 +161,7 @@ class StepParamEasingInvocation(BaseInvocation):
         easing_class = EASING_FUNCTIONS_MAP[self.easing]
         if log_diagnostics:
             context.services.logger.debug("easing class: " + str(easing_class))
-        easing_list = list()
+        easing_list = []
         if self.mirror:  # "expected" mirroring
             # if number of steps is even, squeeze duration down to (number_of_steps)/2
             # and create reverse copy of list to append
@@ -159,9 +174,11 @@ class StepParamEasingInvocation(BaseInvocation):
                 context.services.logger.debug("base easing duration: " + str(base_easing_duration))
             even_num_steps = num_easing_steps % 2 == 0  # even number of steps
             easing_function = easing_class(
-                start=self.start_value, end=self.end_value, duration=base_easing_duration - 1
+                start=self.start_value,
+                end=self.end_value,
+                duration=base_easing_duration - 1,
             )
-            base_easing_vals = list()
+            base_easing_vals = []
             for step_index in range(base_easing_duration):
                 easing_val = easing_function.ease(step_index)
                 base_easing_vals.append(easing_val)
@@ -199,7 +216,11 @@ class StepParamEasingInvocation(BaseInvocation):
         #
 
         else:  # no mirroring (default)
-            easing_function = easing_class(start=self.start_value, end=self.end_value, duration=num_easing_steps - 1)
+            easing_function = easing_class(
+                start=self.start_value,
+                end=self.end_value,
+                duration=num_easing_steps - 1,
+            )
             for step_index in range(num_easing_steps):
                 step_val = easing_function.ease(step_index)
                 easing_list.append(step_val)

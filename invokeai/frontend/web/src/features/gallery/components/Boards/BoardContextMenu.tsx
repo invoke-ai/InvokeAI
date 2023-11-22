@@ -90,6 +90,50 @@ const BoardContextMenu = ({
     e.preventDefault();
   }, []);
 
+  const renderMenuFunc = useCallback(
+    () => (
+      <MenuList
+        sx={{ visibility: 'visible !important' }}
+        motionProps={menuListMotionProps}
+        onContextMenu={skipEvent}
+      >
+        <MenuGroup title={boardName}>
+          <MenuItem
+            icon={<FaPlus />}
+            isDisabled={isAutoAdd || autoAssignBoardOnClick}
+            onClick={handleSetAutoAdd}
+          >
+            {t('boards.menuItemAutoAdd')}
+          </MenuItem>
+          {isBulkDownloadEnabled && (
+            <MenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
+              {t('boards.downloadBoard')}
+            </MenuItem>
+          )}
+          {!board && <NoBoardContextMenuItems />}
+          {board && (
+            <GalleryBoardContextMenuItems
+              board={board}
+              setBoardToDelete={setBoardToDelete}
+            />
+          )}
+        </MenuGroup>
+      </MenuList>
+    ),
+    [
+      autoAssignBoardOnClick,
+      board,
+      boardName,
+      handleBulkDownload,
+      handleSetAutoAdd,
+      isAutoAdd,
+      isBulkDownloadEnabled,
+      setBoardToDelete,
+      skipEvent,
+      t,
+    ]
+  );
+
   return (
     <IAIContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
@@ -97,38 +141,7 @@ const BoardContextMenu = ({
         bg: 'transparent',
         _hover: { bg: 'transparent' },
       }}
-      renderMenu={() => (
-        <MenuList
-          sx={{ visibility: 'visible !important' }}
-          motionProps={menuListMotionProps}
-          onContextMenu={skipEvent}
-        >
-          <MenuGroup title={boardName}>
-            <MenuItem
-              icon={<FaPlus />}
-              isDisabled={isAutoAdd || autoAssignBoardOnClick}
-              onClick={handleSetAutoAdd}
-            >
-              {t('boards.menuItemAutoAdd')}
-            </MenuItem>
-            {isBulkDownloadEnabled && (
-              <MenuItem
-                icon={<FaDownload />}
-                onClickCapture={handleBulkDownload}
-              >
-                {t('boards.downloadBoard')}
-              </MenuItem>
-            )}
-            {!board && <NoBoardContextMenuItems />}
-            {board && (
-              <GalleryBoardContextMenuItems
-                board={board}
-                setBoardToDelete={setBoardToDelete}
-              />
-            )}
-          </MenuGroup>
-        </MenuList>
-      )}
+      renderMenu={renderMenuFunc}
     >
       {children}
     </IAIContextMenu>

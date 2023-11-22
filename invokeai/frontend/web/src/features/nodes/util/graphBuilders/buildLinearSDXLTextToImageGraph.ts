@@ -6,14 +6,14 @@ import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
+import { addCoreMetadataNode } from './metadata';
 import {
   LATENTS_TO_IMAGE,
-  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -225,40 +225,25 @@ export const buildLinearSDXLTextToImageGraph = (
     ],
   };
 
-  // add metadata accumulator, which is only mostly populated - some fields are added later
-  graph.nodes[METADATA_ACCUMULATOR] = {
-    id: METADATA_ACCUMULATOR,
-    type: 'metadata_accumulator',
-    generation_mode: 'sdxl_txt2img',
-    cfg_scale,
-    height,
-    width,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
-    model,
-    seed,
-    steps,
-    rand_device: use_cpu ? 'cpu' : 'cuda',
-    scheduler,
-    vae: undefined,
-    controlnets: [],
-    loras: [],
-    ipAdapters: [],
-    t2iAdapters: [],
-    positive_style_prompt: positiveStylePrompt,
-    negative_style_prompt: negativeStylePrompt,
-  };
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'sdxl_txt2img',
+      cfg_scale,
+      height,
+      width,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      model,
+      seed,
+      steps,
+      rand_device: use_cpu ? 'cpu' : 'cuda',
+      scheduler,
+      positive_style_prompt: positiveStylePrompt,
+      negative_style_prompt: negativeStylePrompt,
     },
-    destination: {
-      node_id: LATENTS_TO_IMAGE,
-      field: 'metadata',
-    },
-  });
+    LATENTS_TO_IMAGE
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -299,7 +284,7 @@ export const buildLinearSDXLTextToImageGraph = (
     addWatermarkerToGraph(state, graph);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

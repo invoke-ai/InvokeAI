@@ -32,7 +32,7 @@ gaming):
 
 * **Python**
 
-    version 3.9 through 3.11
+    version 3.10 through 3.11
 
 * **CUDA Tools**
 
@@ -65,7 +65,7 @@ gaming):
 To install InvokeAI with virtual environments and the PIP package
 manager, please follow these steps:
 
-1.  Please make sure you are using Python 3.9 through 3.11. The rest of the install
+1.  Please make sure you are using Python 3.10 through 3.11. The rest of the install
     procedure depends on this and will not work with other versions:
 
     ```bash
@@ -148,7 +148,7 @@ manager, please follow these steps:
     === "CUDA (NVidia)"
 
         ```bash
-        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
+        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
         ```
 
     === "ROCm (AMD)"
@@ -327,7 +327,7 @@ installation protocol (important!)
 
     === "CUDA (NVidia)"
         ```bash
-        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
+        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
         ```
 
     === "ROCm (AMD)"
@@ -375,7 +375,7 @@ you can do so using this unsupported recipe:
 mkdir ~/invokeai
 conda create -n invokeai python=3.10
 conda activate invokeai
-pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
+pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
 invokeai-configure --root ~/invokeai
 invokeai --root ~/invokeai --web
 ```
