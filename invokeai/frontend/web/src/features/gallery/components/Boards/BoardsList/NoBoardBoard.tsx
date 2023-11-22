@@ -19,6 +19,7 @@ import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
 } from 'services/api/endpoints/boards';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   isSelected: boolean;
@@ -71,7 +72,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }),
     []
   );
-
+  const { t } = useTranslation();
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
       <Flex
@@ -161,7 +162,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 />
                 <IAIDroppable
                   data={droppableData}
-                  dropLabel={<Text fontSize="md">Move</Text>}
+                  dropLabel={
+                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                  }
                 />
               </Flex>
             </Tooltip>

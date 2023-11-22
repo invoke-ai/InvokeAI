@@ -76,7 +76,8 @@ function SearchFolderForm() {
               _dark: { color: 'base.300' },
             }}
           >
-            Folder
+            {t('common.folder')}
+            {/* Folder */}
           </Text>
           {!searchFolder ? (
             <IAIInput

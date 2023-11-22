@@ -32,6 +32,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
+import { useTranslation } from 'react-i18next';
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -143,7 +144,7 @@ const GalleryBoard = ({
   const handleChange = useCallback((newBoardName: string) => {
     setLocalBoardName(newBoardName);
   }, []);
-
+  const { t } = useTranslation();
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
       <Flex
@@ -292,7 +293,9 @@ const GalleryBoard = ({
 
                 <IAIDroppable
                   data={droppableData}
-                  dropLabel={<Text fontSize="md">Move</Text>}
+                  dropLabel={
+                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                  }
                 />
               </Flex>
             </Tooltip>
