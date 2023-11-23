@@ -40,11 +40,13 @@
         "loading": "Loading...",
         "menuItemAutoAdd": "Auto-add to this Board",
         "move": "Move",
+        "moving":"Moving",
         "myBoard": "My Board",
         "noMatching": "No matching Boards",
         "searchBoard": "Search Boards...",
         "selectBoard": "Select a Board",
         "topMessage": "This board contains images used in the following features:",
+        "toBoard": "to board",
         "uncategorized": "Uncategorized",
         "downloadBoard": "Download Board"
     },
@@ -72,6 +74,7 @@
         "dontAskMeAgain": "Don't ask me again",
         "file": "File",
         "folder": "Folder",
+        "format":"format",
         "generate": "Generate",
         "githubLabel": "Github",
         "hotkeysLabel": "Hotkeys",
@@ -339,7 +342,8 @@
         "enableFailed": "Problem Enabling Invocation Cache",
         "disable": "Disable",
         "disableSucceeded": "Invocation Cache Disabled",
-        "disableFailed": "Problem Disabling Invocation Cache"
+        "disableFailed": "Problem Disabling Invocation Cache",
+        "useCache": "Use Cache"
     },
     "gallery": {
         "allImagesLoaded": "All Images Loaded",
@@ -358,7 +362,7 @@
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
         "generations": "Generations",
-        "images": "Images",
+        "image": "image",
         "loading": "Loading",
         "loadMore": "Load More",
         "maintainAspectRatio": "Maintain Aspect Ratio",
@@ -777,6 +781,7 @@
     "nodes": {
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
+        "addLinearView":"Add to Linear View",
         "animatedEdges": "Animated Edges",
         "animatedEdgesHelp": "Animate selected edges and edges connected to selected nodes",
         "boardField": "Board",
@@ -951,6 +956,7 @@
         "unhandledOutputProperty": "Unhandled output property",
         "unknownField": "Unknown Field",
         "unknownNode": "Unknown Node",
+        "unknownNodeType":"$t(nodes.unknownNode) type",
         "unknownTemplate": "Unknown Template",
         "unkownInvocation": "Unknown Invocation type",
         "updateNode": "Update Node",

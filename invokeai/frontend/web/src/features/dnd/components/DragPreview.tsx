@@ -91,7 +91,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
         }}
       >
         <Heading>{props.dragData.payload.imageDTOs.length}</Heading>
-        <Heading size="sm">{t('gallery.images')}</Heading>
+        <Heading size="sm">{t('parameters.images')}</Heading>
       </Flex>
     );
   }

@@ -75,7 +75,7 @@ const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
   const { status, progress, progressImage } = nodeExecutionState;
   const { t } = useTranslation();
   if (status === NodeStatus.PENDING) {
-    return <Text>Pending</Text>;
+    return <Text>{t('queue.pending')}</Text>;
   }
   if (status === NodeStatus.IN_PROGRESS) {
     if (progressImage) {

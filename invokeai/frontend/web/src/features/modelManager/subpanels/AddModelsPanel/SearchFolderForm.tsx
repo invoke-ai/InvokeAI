@@ -77,7 +77,6 @@ function SearchFolderForm() {
             }}
           >
             {t('common.folder')}
-            {/* Folder */}
           </Text>
           {!searchFolder ? (
             <IAIInput
