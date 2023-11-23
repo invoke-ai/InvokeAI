@@ -1,7 +1,6 @@
 import traceback
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from threading import Thread
 from typing import Optional
 
 from fastapi_events.handlers.local import local_handler

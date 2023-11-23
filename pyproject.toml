@@ -203,7 +203,7 @@ ignore = [
   "B008", # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
-select = ["B", "C", "E", "F", "W"]
+select = ["B", "C", "E", "F", "W", "I"]
 exclude = [
   ".git",
   "__pycache__",
@@ -215,11 +215,14 @@ exclude = [
 #=== End: Ruff
 
 #=== Begin: MyPy
+
+# global mypy config
 [tool.mypy]
 ignore_missing_imports = true # ignores missing types in third-party libraries
 
+# overrides for specific modules
 [[tool.mypy.overrides]]
-follow_imports = "skip"
+follow_imports = "skip" # skips type checking of the modules listed below
 module = [
   "invokeai.app.api.routers.models",
   "invokeai.app.invocations.compel",
@@ -229,6 +232,7 @@ module = [
   "invokeai.app.services.invocation_stats.invocation_stats_default",
   "invokeai.app.services.model_manager.model_manager_base",
   "invokeai.app.services.model_manager.model_manager_default",
+  "invokeai.app.services.model_records.model_records_sql",
   "invokeai.app.util.controlnet_utils",
   "invokeai.backend.image_util.txt2mask",
   "invokeai.backend.image_util.safety_checker",

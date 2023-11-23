@@ -3,8 +3,10 @@ import IAIButton from 'common/components/IAIButton';
 import { useCallback, useState } from 'react';
 import AdvancedAddModels from './AdvancedAddModels';
 import SimpleAddModels from './SimpleAddModels';
+import { useTranslation } from 'react-i18next';
 
 export default function AddModels() {
+  const { t } = useTranslation();
   const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>(
     'simple'
   );
@@ -27,14 +29,14 @@ export default function AddModels() {
           isChecked={addModelMode == 'simple'}
           onClick={handleAddModelSimple}
         >
-          Simple
+          {t('common.simple')}
         </IAIButton>
         <IAIButton
           size="sm"
           isChecked={addModelMode == 'advanced'}
           onClick={handleAddModelAdvanced}
         >
-          Advanced
+          {t('common.advanced')}
         </IAIButton>
       </ButtonGroup>
       <Flex

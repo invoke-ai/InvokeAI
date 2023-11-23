@@ -1024,7 +1024,7 @@ class SaveImageInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     title="Linear UI Image Output",
     tags=["primitives", "image"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
     use_cache=False,
 )
 class LinearUIOutputInvocation(BaseInvocation, WithWorkflow, WithMetadata):
@@ -1039,7 +1039,10 @@ class LinearUIOutputInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         if self.board:
             context.services.board_images.add_image_to_board(self.board.board_id, self.image.image_name)
 
-        context.services.images.update(self.image.image_name, changes=ImageRecordChanges(is_intermediate=False))
+        if image_dto.is_intermediate != self.is_intermediate:
+            context.services.images.update(
+                self.image.image_name, changes=ImageRecordChanges(is_intermediate=self.is_intermediate)
+            )
 
         return ImageOutput(
             image=ImageField(image_name=self.image.image_name),

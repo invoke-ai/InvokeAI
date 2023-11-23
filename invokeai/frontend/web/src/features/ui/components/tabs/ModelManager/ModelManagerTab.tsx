@@ -1,6 +1,6 @@
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
-import i18n from 'i18n';
-import { ReactNode, memo } from 'react';
+import { ReactNode, memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import ImportModelsPanel from '../../../../modelManager/subpanels/ImportModelsPanel';
 import MergeModelsPanel from '../../../../modelManager/subpanels/MergeModelsPanel';
 import ModelManagerPanel from '../../../../modelManager/subpanels/ModelManagerPanel';
@@ -18,30 +18,34 @@ type ModelManagerTabInfo = {
   content: ReactNode;
 };
 
-const tabs: ModelManagerTabInfo[] = [
-  {
-    id: 'modelManager',
-    label: i18n.t('modelManager.modelManager'),
-    content: <ModelManagerPanel />,
-  },
-  {
-    id: 'importModels',
-    label: i18n.t('modelManager.importModels'),
-    content: <ImportModelsPanel />,
-  },
-  {
-    id: 'mergeModels',
-    label: i18n.t('modelManager.mergeModels'),
-    content: <MergeModelsPanel />,
-  },
-  {
-    id: 'settings',
-    label: i18n.t('modelManager.settings'),
-    content: <ModelManagerSettingsPanel />,
-  },
-];
-
 const ModelManagerTab = () => {
+  const { t } = useTranslation();
+
+  const tabs: ModelManagerTabInfo[] = useMemo(
+    () => [
+      {
+        id: 'modelManager',
+        label: t('modelManager.modelManager'),
+        content: <ModelManagerPanel />,
+      },
+      {
+        id: 'importModels',
+        label: t('modelManager.importModels'),
+        content: <ImportModelsPanel />,
+      },
+      {
+        id: 'mergeModels',
+        label: t('modelManager.mergeModels'),
+        content: <MergeModelsPanel />,
+      },
+      {
+        id: 'settings',
+        label: t('modelManager.settings'),
+        content: <ModelManagerSettingsPanel />,
+      },
+    ],
+    [t]
+  );
   return (
     <Tabs
       isLazy

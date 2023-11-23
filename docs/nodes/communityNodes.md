@@ -28,10 +28,12 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Make 3D](#make-3d)
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
+    + [Remote Image](#remote-image)
     + [Retroize](#retroize)
     + [Size Stepper Nodes](#size-stepper-nodes)
     + [Text font to Image](#text-font-to-image)
     + [Thresholding](#thresholding)
+    + [Unsharp Mask](#unsharp-mask)
     + [XY Image to Grid and Images to Grids nodes](#xy-image-to-grid-and-images-to-grids-nodes)
 - [Example Node Template](#example-node-template)
 - [Disclaimer](#disclaimer)
@@ -252,6 +254,17 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 **Node Link:** https://github.com/skunkworxdark/Prompt-tools-nodes
 
 --------------------------------
+### Remote Image
+
+**Description:** This is a pack of nodes to interoperate with other services, be they public websites or bespoke local servers. The pack consists of these nodes:
+
+- *Load Remote Image* - Lets you load remote images such as a realtime webcam image, an image of the day, or dynamically created images.
+- *Post Image to Remote Server* - Lets you upload an image to a remote server using an HTTP POST request, eg for storage, display or further processing.
+
+**Node Link:** https://github.com/fieldOfView/InvokeAI-remote_image
+
+
+--------------------------------
 ### Retroize
 
 **Description:** Retroize is a collection of nodes for InvokeAI to "Retroize" images. Any image can be given a fresh coat of retro paint with these nodes, either from your gallery or from within the graph itself. It includes nodes to pixelize, quantize, palettize, and ditherize images; as well as to retrieve palettes from existing images.
@@ -315,6 +328,13 @@ Highlights/Midtones/Shadows (with LUT blur enabled):
 <img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/19aa718a-70c1-4668-8169-d68f4bd13771" width="300" />
 <img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0a440e43-697f-4d17-82ee-f287467df0a5" width="300" />
 <img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0701fd0f-2ca7-4fe2-8613-2b52547bafce" width="300" />
+
+--------------------------------
+### Unsharp Mask
+
+**Description:** Applies an unsharp mask filter to an image, preserving its alpha channel in the process.
+
+**Node Link:** https://github.com/JPPhoto/unsharp-mask-node
 
 --------------------------------
 ### XY Image to Grid and Images to Grids nodes

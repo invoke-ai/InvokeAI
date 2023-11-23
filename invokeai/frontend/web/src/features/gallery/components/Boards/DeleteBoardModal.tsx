@@ -115,7 +115,7 @@ const DeleteBoardModal = (props: Props) => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            Delete {boardToDelete.board_name}
+            {t('controlnet.delete')} {boardToDelete.board_name}
           </AlertDialogHeader>
 
           <AlertDialogBody>
@@ -136,7 +136,7 @@ const DeleteBoardModal = (props: Props) => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>Deleted boards cannot be restored.</Text>
+              <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
               <Text>
                 {canRestoreDeletedImagesFromBin
                   ? t('gallery.deleteImageBin')
@@ -149,21 +149,21 @@ const DeleteBoardModal = (props: Props) => {
               sx={{ justifyContent: 'space-between', width: 'full', gap: 2 }}
             >
               <IAIButton ref={cancelRef} onClick={handleClose}>
-                Cancel
+                {t('boards.cancel')}
               </IAIButton>
               <IAIButton
                 colorScheme="warning"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardOnly}
               >
-                Delete Board Only
+                {t('boards.deleteBoardOnly')}
               </IAIButton>
               <IAIButton
                 colorScheme="error"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardAndImages}
               >
-                Delete Board and Images
+                {t('boards.deleteBoardAndImages')}
               </IAIButton>
             </Flex>
           </AlertDialogFooter>

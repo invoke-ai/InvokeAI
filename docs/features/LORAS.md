@@ -38,9 +38,11 @@ LCM-LoRAs are models that provide the benefit of LCMs but are able to be used as
 
 
 **Using LCM-LoRAs**
+
 LCM-LoRAs are natively supported in InvokeAI throughout the application. To get started, install any diffusers format LCM-LoRAs using the model manager and select it in the LoRA field.
 
 There are a number parameter differences when using LCM-LoRAs and standard generation: 
+
 - When using LCM-LoRAs, the LoRA strength should be lower than if using a standard LoRA, with 0.35 recommended as a starting point.  
 - The LCM scheduler should be used for generation
 - CFG-Scale should be reduced to ~1

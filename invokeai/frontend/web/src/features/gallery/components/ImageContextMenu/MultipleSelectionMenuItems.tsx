@@ -104,7 +104,7 @@ const MultipleSelectionMenuItems = () => {
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
-        Change Board
+        {t('boards.changeBoard')}
       </MenuItem>
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
