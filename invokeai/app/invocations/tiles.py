@@ -30,7 +30,7 @@ class CalculateImageTilesOutput(BaseInvocationOutput):
 
 
 @invocation("calculate_image_tiles", title="Calculate Image Tiles", tags=["tiles"], category="tiles", version="1.0.0")
-class CalculateImageTiles(BaseInvocation):
+class CalculateImageTilesInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
 
     image_height: int = InputField(
@@ -70,7 +70,7 @@ class TileToPropertiesOutput(BaseInvocationOutput):
 
 
 @invocation("tile_to_properties", title="Tile to Properties", tags=["tiles"], category="tiles", version="1.0.0")
-class TileToProperties(BaseInvocation):
+class TileToPropertiesInvocation(BaseInvocation):
     """Split a Tile into its individual properties."""
 
     tile: Tile = InputField(description="The tile to split into properties.")
@@ -94,7 +94,7 @@ class PairTileImageOutput(BaseInvocationOutput):
 
 
 @invocation("pair_tile_image", title="Pair Tile with Image", tags=["tiles"], category="tiles", version="1.0.0")
-class PairTileImage(BaseInvocation):
+class PairTileImageInvocation(BaseInvocation):
     """Pair an image with its tile properties."""
 
     # TODO(ryand): The only reason that PairTileImage is needed is because the iterate/collect nodes don't preserve
@@ -113,7 +113,7 @@ class PairTileImage(BaseInvocation):
 
 
 @invocation("merge_tiles_to_image", title="Merge Tiles to Image", tags=["tiles"], category="tiles", version="1.0.0")
-class MergeTilesToImage(BaseInvocation, WithMetadata, WithWorkflow):
+class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Merge multiple tile images into a single image."""
 
     # Inputs
