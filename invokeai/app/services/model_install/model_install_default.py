@@ -16,6 +16,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.app.services.events import EventServiceBase
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.model_manager.hash import FastModelHash
 
 # marker that the queue is done and that thread should exit
 STOP_JOB = ModelInstallJob(source="stop")
@@ -80,7 +81,9 @@ class ModelInstallService(ModelInstallServiceBase):
             description: Optional[str] = None,
             metadata: Optional[Dict[str, str]] = None,
     ) -> str:
-        raise NotImplementedError
+        model_path = Path(model_path)
+        info: ModelProbeInfo = self._probe_model(model_path, metadata)
+        return self._register(model_path, info)
 
     def install_path(
             self,
@@ -105,7 +108,7 @@ class ModelInstallService(ModelInstallServiceBase):
         raise NotImplementedError
 
     def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
-        raise NotImplementedError
+        self._install_queue.join()
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:
         raise NotImplementedError
@@ -114,7 +117,7 @@ class ModelInstallService(ModelInstallServiceBase):
         raise NotImplementedError
 
     def hash(self, model_path: Union[Path, str]) -> str:
-        raise NotImplementedError
+        return FastModelHash.hash(model_path)
 
     # The following are internal methods
     def _create_name(self, model_path: Union[Path, str]) -> str:
