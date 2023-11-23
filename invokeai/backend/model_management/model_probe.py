@@ -55,6 +55,7 @@ class ModelProbe(object):
         "StableDiffusionXLPipeline": ModelType.Main,
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
+        "LatentConsistencyModelPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "AutoencoderTiny": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
