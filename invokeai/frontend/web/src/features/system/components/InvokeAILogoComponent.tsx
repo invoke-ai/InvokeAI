@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useRef } from 'react';
 import { useHoverDirty } from 'react-use';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   showVersion?: boolean;
@@ -13,6 +14,7 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
   const { data: appVersion } = useGetAppVersionQuery();
   const ref = useRef(null);
   const isHovered = useHoverDirty(ref);
+  const { t } = useTranslation();
 
   return (
     <Flex alignItems="center" gap={5} ps={1} ref={ref}>
@@ -29,7 +31,7 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
       />
       <Flex sx={{ gap: 3, alignItems: 'center' }}>
         <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
-          invoke <strong>ai</strong>
+          {t('hotkeys.invoke.title')} <strong>{t('common.ai')}</strong>
         </Text>
         <AnimatePresence>
           {showVersion && isHovered && appVersion && (

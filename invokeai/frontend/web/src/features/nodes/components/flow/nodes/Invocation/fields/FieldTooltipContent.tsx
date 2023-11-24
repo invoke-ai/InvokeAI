@@ -49,8 +49,16 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
           {fieldTemplate.description}
         </Text>
       )}
-      {fieldTemplate && <Text>Type: {FIELDS[fieldTemplate.type].title}</Text>}
-      {isInputTemplate && <Text>Input: {startCase(fieldTemplate.input)}</Text>}
+      {fieldTemplate && (
+        <Text>
+          {t('parameters.type')}: {FIELDS[fieldTemplate.type].title}
+        </Text>
+      )}
+      {isInputTemplate && (
+        <Text>
+          {t('common.input')}: {startCase(fieldTemplate.input)}
+        </Text>
+      )}
     </Flex>
   );
 };

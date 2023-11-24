@@ -105,7 +105,7 @@ export default memo(ImageInputFieldComponent);
 
 const UploadElement = memo(() => (
   <Text fontSize={16} fontWeight={600}>
-    Drop or Upload
+    {t('gallery.dropOrUpload')}
   </Text>
 ));
 
@@ -113,7 +113,7 @@ UploadElement.displayName = 'UploadElement';
 
 const DropLabel = memo(() => (
   <Text fontSize={16} fontWeight={600}>
-    Drop
+    {t('gallery.drop')}
   </Text>
 ));
 
