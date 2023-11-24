@@ -7,6 +7,7 @@ import EditableFieldTitle from './EditableFieldTitle';
 import FieldContextMenu from './FieldContextMenu';
 import FieldHandle from './FieldHandle';
 import InputFieldRenderer from './InputFieldRenderer';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   nodeId: string;
@@ -14,6 +15,7 @@ interface Props {
 }
 
 const InputField = ({ nodeId, fieldName }: Props) => {
+  const { t } = useTranslation();
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
   const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
 
@@ -49,7 +51,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
         <FormControl
           sx={{ color: 'error.400', textAlign: 'left', fontSize: 'sm' }}
         >
-          Unknown input: {fieldName}
+          {t('nodes.unknownInput')}: {fieldName}
         </FormControl>
       </InputFieldWrapper>
     );

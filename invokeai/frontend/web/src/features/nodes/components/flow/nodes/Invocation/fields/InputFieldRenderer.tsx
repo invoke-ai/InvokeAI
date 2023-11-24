@@ -18,6 +18,7 @@ import VaeModelInputField from './inputs/VaeModelInputField';
 import IPAdapterModelInputField from './inputs/IPAdapterModelInputField';
 import T2IAdapterModelInputField from './inputs/T2IAdapterModelInputField';
 import BoardInputField from './inputs/BoardInputField';
+import { useTranslation } from 'react-i18next';
 
 type InputFieldProps = {
   nodeId: string;
@@ -25,11 +26,16 @@ type InputFieldProps = {
 };
 
 const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
+  const { t } = useTranslation();
   const field = useFieldData(nodeId, fieldName);
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
 
   if (fieldTemplate?.fieldKind === 'output') {
-    return <Box p={2}>Output field in input: {field?.type}</Box>;
+    return (
+      <Box p={2}>
+        {t('nodes.outputFieldInInput')}: {field?.type}
+      </Box>
+    );
   }
 
   if (
@@ -249,7 +255,7 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
           _dark: { color: 'error.300' },
         }}
       >
-        Unknown field type: {field?.type}
+        {t('nodes.unknownFieldType')}: {field?.type}
       </Text>
     </Box>
   );
