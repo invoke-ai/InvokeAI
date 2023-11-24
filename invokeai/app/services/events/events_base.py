@@ -1,6 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-import traceback
 
 from typing import Any, Optional
 
@@ -343,7 +342,7 @@ class EventServiceBase:
         )
 
     def emit_model_install_error(self,
-                                 source:str,
+                                 source: str,
                                  error_type: str,
                                  error: str,
                                  ) -> None:

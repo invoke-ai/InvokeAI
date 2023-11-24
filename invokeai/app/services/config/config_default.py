@@ -173,7 +173,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, TypeAdapter
@@ -336,10 +336,8 @@ class InvokeAIAppConfig(InvokeAISettings):
                 )
 
     @classmethod
-    def get_config(cls, **kwargs) -> InvokeAIAppConfig:
-        """
-        This returns a singleton InvokeAIAppConfig configuration object.
-        """
+    def get_config(cls, **kwargs: Dict[str, Any]) -> InvokeAIAppConfig:
+        """Return a singleton InvokeAIAppConfig configuration object."""
         if (
             cls.singleton_config is None
             or type(cls.singleton_config) is not cls

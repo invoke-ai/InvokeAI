@@ -1,15 +1,15 @@
 import traceback
-
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, Union, List
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel, Field
 from pydantic.networks import AnyHttpUrl
 
-from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.model_records import ModelRecordServiceBase
 
 
 class InstallStatus(str, Enum):
@@ -27,8 +27,8 @@ class ModelInstallJob(BaseModel):
     source: Union[str, Path, AnyHttpUrl] = Field(description="Source (URL, repo_id, or local path) of model")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
     local_path: Optional[Path] = Field(default=None, description="Path to locally-downloaded model")
-    error_type: Optional[str] = Field(default=None, description="Class name of the exception that led to status==ERROR")
-    error: Optional[str] = Field(default=None, description="Error traceback")  # noqa #501
+    error_type: str = Field(default="", description="Class name of the exception that led to status==ERROR")
+    error: str = Field(default="", description="Error traceback")  # noqa #501
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
@@ -43,8 +43,8 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def __init__(
             self,
-            config: InvokeAIAppConfig,
-            store: ModelRecordServiceBase,
+            app_config: InvokeAIAppConfig,
+            record_store: ModelRecordServiceBase,
             event_bus: Optional["EventServiceBase"] = None,
     ):
         """
@@ -54,15 +54,22 @@ class ModelInstallServiceBase(ABC):
         :param store: Systemwide ModelConfigStore
         :param event_bus: InvokeAI event bus for reporting events to.
         """
-        pass
+
+    @property
+    @abstractmethod
+    def app_config(self) -> InvokeAIAppConfig:
+        """Return the appConfig object associated with the installer."""
+
+    @property
+    @abstractmethod
+    def record_store(self) -> ModelRecordServiceBase:
+        """Return the ModelRecoreService object associated with the installer."""
 
     @abstractmethod
     def register_path(
             self,
             model_path: Union[Path, str],
-            name: Optional[str] = None,
-            description: Optional[str] = None,
-            metadata: Optional[Dict[str, str]] = None,
+            metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Probe and register the model at model_path.
@@ -70,21 +77,32 @@ class ModelInstallServiceBase(ABC):
         This keeps the model in its current location.
 
         :param model_path: Filesystem Path to the model.
-        :param name: Name for the model (optional)
-        :param description: Description for the model (optional)
-        :param metadata: Dict of attributes that will override probed values.
+        :param metadata: Dict of attributes that will override autoassigned values.
         :returns id: The string ID of the registered model.
         """
-        pass
+
+    @abstractmethod
+    def unregister(self, key: str) -> None:
+        """Remove model with indicated key from the database."""
+
+    @abstractmethod
+    def delete(self, key: str) -> None:
+        """Remove model with indicated key from the database and delete weight files from disk."""
+
+    @abstractmethod
+    def conditionally_delete(self, key: str) -> None:
+        """
+        Remove model with indicated key from the database
+        and conditeionally delete weight files from disk
+        if they reside within InvokeAI's models directory.
+        """
 
     @abstractmethod
     def install_path(
             self,
             model_path: Union[Path, str],
-            name: Optional[str] = None,
-            description: Optional[str] = None,
-            metadata: Optional[Dict[str, str]] = None,
-    )-> str:
+            metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """
         Probe, register and install the model in the models directory.
 
@@ -92,20 +110,15 @@ class ModelInstallServiceBase(ABC):
         the models directory handled by InvokeAI.
 
         :param model_path: Filesystem Path to the model.
-        :param name: Name for the model (optional)
-        :param description: Description for the model (optional)
-        :param metadata: Dict of attributes that will override probed values.
+        :param metadata: Dict of attributes that will override autoassigned values.
         :returns id: The string ID of the registered model.
         """
-        pass
 
     @abstractmethod
-    def install_model(
+    def import_model(
             self,
             source: Union[str, Path, AnyHttpUrl],
             inplace: bool = True,
-            name: Optional[str] = None,
-            description: Optional[str] = None,
             variant: Optional[str] = None,
             subfolder: Optional[str] = None,
             metadata: Optional[Dict[str, str]] = None,
@@ -125,9 +138,9 @@ class ModelInstallServiceBase(ABC):
          specify a subfolder of the HF repository to download from.
 
         :param metadata: Optional dict. Any fields in this dict
-         will override corresponding probe fields. Use it to override
-         `base_type`, `model_type`, `format`, `prediction_type`, `image_size`,
-         and `ztsnr_training`.
+         will override corresponding autoassigned probe fields. Use it to override
+         `name`, `description`, `base_type`, `model_type`, `format`,
+         `prediction_type`, `image_size`, and/or `ztsnr_training`.
 
         :param access_token: Access token for use in downloading remote
          models.
@@ -154,10 +167,9 @@ class ModelInstallServiceBase(ABC):
         4. None (usually returns fp32 model)
 
         """
-        pass
 
     @abstractmethod
-    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], Optional[str]]:
+    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], ModelInstallJob]:
         """
         Wait for all pending installs to complete.
 
@@ -169,7 +181,6 @@ class ModelInstallServiceBase(ABC):
         It will return a dict that maps the source model
         path, URL or repo_id to the ID of the installed model.
         """
-        pass
 
     @abstractmethod
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:
@@ -180,20 +191,7 @@ class ModelInstallServiceBase(ABC):
         :param install: Install if True, otherwise register in place.
         :returns list of IDs: Returns list of IDs of models registered/installed
         """
-        pass
 
     @abstractmethod
-    def sync_to_config(self):
+    def sync_to_config(self) -> None:
         """Synchronize models on disk to those in memory."""
-        pass
-
-    @abstractmethod
-    def hash(self, model_path: Union[Path, str]) -> str:
-        """
-        Compute and return the fast hash of the model.
-
-        :param model_path: Path to the model on disk.
-        :return str: FastHash of the model for use as an ID.
-        """
-        pass
-
