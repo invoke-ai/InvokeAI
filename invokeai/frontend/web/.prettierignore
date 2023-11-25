@@ -9,6 +9,5 @@ index.html
 .yalc/
 *.scss
 src/services/api/schema.d.ts
-docs/
 static/
 src/theme/css/overlayscrollbars.css
