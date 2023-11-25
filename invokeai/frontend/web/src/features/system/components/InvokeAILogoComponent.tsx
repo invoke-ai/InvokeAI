@@ -4,7 +4,6 @@ import { Flex, Image, Text } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useHoverDirty } from 'react-use';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
@@ -16,7 +15,6 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
   const { data: appVersion } = useGetAppVersionQuery();
   const ref = useRef(null);
   const isHovered = useHoverDirty(ref);
-  const { t } = useTranslation();
 
   return (
     <Flex alignItems="center" gap={5} ps={1} ref={ref}>
