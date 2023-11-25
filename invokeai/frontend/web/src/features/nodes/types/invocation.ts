@@ -71,7 +71,7 @@ export const isInvocationNode = (
 export const isNotesNode = (
   node?: Node<AnyNodeData>
 ): node is Node<NotesNodeData> => Boolean(node && node.type === 'notes');
-export const isProgressImageNode = (
+export const isCurrentImageNode = (
   node?: Node<AnyNodeData>
 ): node is Node<CurrentImageNodeData> =>
   Boolean(node && node.type === 'current_image');
