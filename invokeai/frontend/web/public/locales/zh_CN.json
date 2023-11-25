@@ -118,7 +118,6 @@
         "deleteImage": "删除图片",
         "deleteImageBin": "被删除的图片会发送到你操作系统的回收站。",
         "deleteImagePermanent": "删除的图片无法被恢复。",
-        "images": "图片",
         "assets": "素材",
         "autoAssignBoardOnClick": "点击后自动分配面板",
         "featuresWillReset": "如果您删除该图像，这些功能会立即被重置。",
