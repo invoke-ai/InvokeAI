@@ -1,13 +1,14 @@
 import { Middleware } from '@reduxjs/toolkit';
+import { $socketOptions } from 'app/hooks/useSocketIO';
+import { $authToken } from 'app/store/nanostores/authToken';
+import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
+import { $projectId } from 'app/store/nanostores/projectId';
+import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { store } from 'app/store/store';
 import { PartialAppConfig } from 'app/types/invokeai';
-import {
-  $queueId,
-  DEFAULT_QUEUE_ID,
-} from 'features/queue/store/queueNanoStore';
 import React, {
   PropsWithChildren,
   ReactNode,
@@ -16,13 +17,11 @@ import React, {
   useEffect,
 } from 'react';
 import { Provider } from 'react-redux';
-import { $authToken, $baseUrl, $projectId } from 'services/api/client';
+import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { ManagerOptions, SocketOptions } from 'socket.io-client';
 import Loading from '../../common/components/Loading/Loading';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
 import '../../i18n';
-import { $socketOptions } from '../hooks/useSocketIO';
-import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
