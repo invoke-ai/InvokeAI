@@ -1,11 +1,12 @@
 import { Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
-import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
+import { useFieldOutputInstance } from 'features/nodes/hooks/useFieldOutputInstance';
+import { useFieldOutputTemplate } from 'features/nodes/hooks/useFieldOutputTemplate';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { PropsWithChildren, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import FieldHandle from './FieldHandle';
 import FieldTooltipContent from './FieldTooltipContent';
-import { useTranslation } from 'react-i18next';
 
 interface Props {
   nodeId: string;
@@ -14,7 +15,8 @@ interface Props {
 
 const OutputField = ({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
-  const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'output');
+  const fieldTemplate = useFieldOutputTemplate(nodeId, fieldName);
+  const fieldInstance = useFieldOutputInstance(nodeId, fieldName);
 
   const {
     isConnected,
@@ -24,13 +26,35 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
     shouldDim,
   } = useConnectionState({ nodeId, fieldName, kind: 'output' });
 
-  if (fieldTemplate?.fieldKind !== 'output') {
+  if (!fieldTemplate || !fieldInstance) {
     return (
       <OutputFieldWrapper shouldDim={shouldDim}>
         <FormControl
-          sx={{ color: 'error.400', textAlign: 'right', fontSize: 'sm' }}
+          sx={{
+            alignItems: 'stretch',
+            justifyContent: 'space-between',
+            gap: 2,
+            h: 'full',
+            w: 'full',
+          }}
         >
-          {t('nodes.unknownOutput')}: {fieldName}
+          <FormLabel
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              mb: 0,
+              px: 1,
+              gap: 2,
+              h: 'full',
+              fontWeight: 600,
+              color: 'error.400',
+              _dark: { color: 'error.300' },
+            }}
+          >
+            {t('nodes.unknownOutput', {
+              name: fieldTemplate?.title ?? fieldName,
+            })}
+          </FormLabel>
         </FormControl>
       </OutputFieldWrapper>
     );
