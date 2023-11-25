@@ -811,6 +811,9 @@ def invocation(
             except ValueError as e:
                 raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
             cls.UIConfig.version = version
+        else:
+            logger.warn(f'No version specified for node "{invocation_type}", using "1.0.0"')
+            cls.UIConfig.version = "1.0.0"
         if use_cache is not None:
             cls.model_fields["use_cache"].default = use_cache
 
