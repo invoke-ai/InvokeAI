@@ -127,7 +127,7 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path = Path(model_path)
         metadata = metadata or {}
         if metadata.get('source') is None:
-            metadata['source'] = model_path.as_posix()
+            metadata['source'] = model_path.resolve().as_posix()
         return self._register(model_path, metadata)
 
     def install_path(
@@ -138,7 +138,7 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path = Path(model_path)
         metadata = metadata or {}
         if metadata.get('source') is None:
-            metadata['source'] = model_path.as_posix()
+            metadata['source'] = model_path.resolve().as_posix()
 
         info: AnyModelConfig = self._probe_model(Path(model_path), metadata)
 
@@ -366,6 +366,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # add 'main' specific fields
         if hasattr(info, 'config'):
             # make config relative to our root
-            info.config = self.app_config.legacy_conf_dir / info.config
+            legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config).resolve()
+            info.config = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
         self.record_store.add_model(key, info)
         return key
