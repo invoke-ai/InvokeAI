@@ -90,7 +90,7 @@ const Content = (props: {
           <EditableNodeTitle nodeId={props.node.data.id} />
           <HStack>
             <FormControl>
-              <FormLabel>{t('nodes.nodeType"')}</FormLabel>
+              <FormLabel>{t('nodes.nodeType')}</FormLabel>
               <Text fontSize="sm" fontWeight={600}>
                 {props.template.title}
               </Text>
