@@ -1,10 +1,12 @@
+/* eslint-disable i18next/no-literal-string */
+
 import { Flex, Image, Text } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useHoverDirty } from 'react-use';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
-import { useTranslation } from 'react-i18next';
 
 interface Props {
   showVersion?: boolean;
@@ -31,7 +33,7 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
       />
       <Flex sx={{ gap: 3, alignItems: 'center' }}>
         <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
-          {t('hotkeys.invoke.title')} <strong>{t('common.ai')}</strong>
+          invoke <strong>ai</strong>
         </Text>
         <AnimatePresence>
           {showVersion && isHovered && appVersion && (
