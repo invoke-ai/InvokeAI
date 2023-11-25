@@ -1,9 +1,10 @@
 import { useStore } from '@nanostores/react';
+import { $authToken } from 'app/store/nanostores/authToken';
+import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { MapStore, WritableAtom, atom, map } from 'nanostores';
 import { useEffect } from 'react';
-import { $authToken, $baseUrl } from 'services/api/client';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -11,6 +12,7 @@ import {
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { ManagerOptions, Socket, SocketOptions, io } from 'socket.io-client';
 
+// Inject socket options and url into window for debugging
 declare global {
   interface Window {
     $socketOptions?: MapStore<Partial<ManagerOptions & SocketOptions>>;
@@ -65,7 +67,11 @@ const makeSocket = (): Socket<ServerToClientEvents, ClientToServerEvents> => {
 
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
 export const $socketUrl = atom<string>(makeSocketUrl());
+export const $isSocketInitialized = atom<boolean>(false);
 
+/**
+ * Initializes the socket.io connection and sets up event listeners.
+ */
 export const useSocketIO = () => {
   const dispatch = useAppDispatch();
   const socketOptions = useStore($socketOptions);
@@ -74,6 +80,10 @@ export const useSocketIO = () => {
   const authToken = useStore($authToken);
 
   useEffect(() => {
+    if ($isSocketInitialized.get()) {
+      // Singleton!
+      return;
+    }
     const socket = makeSocket();
     setEventListeners({ dispatch, socket });
     socket.connect();
@@ -84,6 +94,8 @@ export const useSocketIO = () => {
       console.log('Socket initialized', socket);
     }
 
+    $isSocketInitialized.set(true);
+
     return () => {
       if ($isDebugging.get()) {
         window.$socketOptions = undefined;
@@ -91,6 +103,7 @@ export const useSocketIO = () => {
         console.log('Socket teardown', socket);
       }
       socket.disconnect();
+      $isSocketInitialized.set(false);
     };
   }, [dispatch, socketOptions, socketUrl, baseUrl, authToken]);
 };
