@@ -157,7 +157,7 @@ const CurrentImageButtons = () => {
     recallWidthAndHeight(metadata?.width, metadata?.height);
   }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
 
-  useHotkeys('d', handleUseSize, [imageDTO]);
+  useHotkeys('d', handleUseSize, [metadata]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
