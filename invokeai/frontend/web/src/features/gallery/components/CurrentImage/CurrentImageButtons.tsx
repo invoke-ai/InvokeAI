@@ -35,6 +35,7 @@ import {
   FaCode,
   FaHourglassHalf,
   FaQuoteRight,
+  FaRulerVertical,
   FaSeedling,
 } from 'react-icons/fa';
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
@@ -95,8 +96,12 @@ const CurrentImageButtons = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
-  const { recallBothPrompts, recallSeed, recallAllParameters } =
-    useRecallParameters();
+  const {
+    recallBothPrompts,
+    recallSeed,
+    recallWidthAndHeight,
+    recallAllParameters,
+  } = useRecallParameters();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(
     lastSelectedImage?.image_name ?? skipToken
@@ -116,6 +121,8 @@ const CurrentImageButtons = () => {
     }
     dispatch(workflowLoadRequested(workflow));
   }, [dispatch, workflow]);
+
+  useHotkeys('w', handleLoadWorkflow, [workflow]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -146,7 +153,9 @@ const CurrentImageButtons = () => {
 
   useHotkeys('p', handleUsePrompt, [imageDTO]);
 
-  useHotkeys('w', handleLoadWorkflow, [workflow]);
+  const handleUseSize = useCallback(() => {
+    recallWidthAndHeight(metadata?.width, metadata?.height);
+  }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
@@ -266,6 +275,19 @@ const CurrentImageButtons = () => {
             aria-label={`${t('parameters.useSeed')} (S)`}
             isDisabled={metadata?.seed === null || metadata?.seed === undefined}
             onClick={handleUseSeed}
+          />
+          <IAIIconButton
+            isLoading={isLoadingMetadata}
+            icon={<FaRulerVertical />}
+            tooltip={`${t('parameters.useSize')}`}
+            aria-label={`${t('parameters.useSize')}`}
+            isDisabled={
+              metadata?.height === null ||
+              metadata?.height === undefined ||
+              metadata?.width === null ||
+              metadata?.width === undefined
+            }
+            onClick={handleUseSize}
           />
           <IAIIconButton
             isLoading={isLoadingMetadata}
