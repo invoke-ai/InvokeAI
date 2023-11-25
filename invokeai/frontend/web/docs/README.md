@@ -13,6 +13,7 @@
     - [Vite](#vite)
     - [i18next & Weblate](#i18next--weblate)
     - [openapi-typescript](#openapi-typescript)
+    - [reactflow](#reactflow)
   - [Client Types Generation](#client-types-generation)
   - [Package Scripts](#package-scripts)
   - [Contributing](#contributing)
@@ -26,7 +27,7 @@ The UI is a fairly straightforward Typescript React app.
 
 ## Core Libraries
 
-The app makes heavy use of a handful of libraries.
+InvokeAI's UI is made possible by a number of excellent open-source libraries. The most heavily-used are listed below, but there are many others.
 
 ### Redux Toolkit
 
@@ -57,11 +58,19 @@ We use [redux-remember](https://github.com/zewish/redux-remember) for persistenc
 
 ### i18next & Weblate
 
-We use [i18next](https://github.com/i18next/react-i18next) for localisation, but translation to languages other than English happens on our [Weblate](https://hosted.weblate.org/engage/invokeai/) project. **Only the English source strings should be changed on this repo.**
+We use [i18next](https://github.com/i18next/react-i18next) for localization, but translation to languages other than English happens on our [Weblate](https://hosted.weblate.org/engage/invokeai/) project. **Only the English source strings should be changed on this repo.**
 
 ### openapi-typescript
 
 [openapi-typescript](https://github.com/drwpow/openapi-typescript) is used to generate types from the server's OpenAPI schema. See TYPES_CODEGEN.md.
+
+### reactflow
+
+[reactflow](https://github.com/xyflow/xyflow) powers the Workflow Editor.
+
+### zod
+
+[zod](https://github.com/colinhacks/zod) schemas are used to model data structures and provide runtime validation.
 
 ## Client Types Generation
 
