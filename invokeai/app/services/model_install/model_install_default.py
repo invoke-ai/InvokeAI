@@ -6,7 +6,7 @@ from pathlib import Path
 from queue import Queue
 from random import randbytes
 from shutil import move, rmtree
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Set, Optional, Union
 
 from pydantic.networks import AnyHttpUrl
 
@@ -18,14 +18,16 @@ from invokeai.backend.model_manager.config import (
     DuplicateModelException,
     InvalidModelConfigException,
 )
+from invokeai.backend.model_manager.config import ModelType, BaseModelType
 from invokeai.backend.model_manager.hash import FastModelHash
 from invokeai.backend.model_manager.probe import ModelProbe
-from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.util import Chdir, InvokeAILogger
 
-from .model_install_base import InstallStatus, ModelInstallJob, ModelInstallServiceBase
+from .model_install_base import ModelSource, InstallStatus, ModelInstallJob, ModelInstallServiceBase, UnknownInstallJobException
 
 # marker that the queue is done and that thread should exit
-STOP_JOB = ModelInstallJob(source="stop")
+STOP_JOB = ModelInstallJob(source="stop", local_path=Path("/dev/null"))
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -35,8 +37,10 @@ class ModelInstallService(ModelInstallServiceBase):
     _record_store: ModelRecordServiceBase
     _event_bus: Optional[EventServiceBase] = None
     _install_queue: Queue[ModelInstallJob]
-    _install_jobs: Dict[Union[str, Path, AnyHttpUrl], ModelInstallJob]
+    _install_jobs: Dict[ModelSource, ModelInstallJob]
     _logger: InvokeAILogger
+    _cached_model_paths: Set[Path]
+    _models_installed: Set[str]
 
     def __init__(self,
                  app_config: InvokeAIAppConfig,
@@ -52,9 +56,12 @@ class ModelInstallService(ModelInstallServiceBase):
         """
         self._app_config = app_config
         self._record_store = record_store
-        self._install_queue = Queue()
         self._event_bus = event_bus
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
+        self._install_jobs = {}
+        self._install_queue = Queue()
+        self._cached_model_paths = set()
+        self._models_installed = set()
         self._start_installer_thread()
 
     @property
@@ -65,6 +72,13 @@ class ModelInstallService(ModelInstallServiceBase):
     def record_store(self) -> ModelRecordServiceBase:   # noqa D102
         return self._record_store
 
+    @property
+    def event_bus(self) -> Optional[EventServiceBase]:   # noqa D102
+        return self._event_bus
+
+    def get_jobs(self) -> Dict[ModelSource, ModelInstallJob]:  # noqa D102
+        return self._install_jobs
+
     def _start_installer_thread(self) -> None:
         threading.Thread(target=self._install_next_item, daemon=True).start()
 
@@ -74,14 +88,20 @@ class ModelInstallService(ModelInstallServiceBase):
             job = self._install_queue.get()
             if job == STOP_JOB:
                 done = True
-            elif job.status == InstallStatus.WAITING:
-                assert job.local_path is not None
-                try:
-                    self._signal_job_running(job)
-                    self.register_path(job.local_path)
-                    self._signal_job_completed(job)
-                except (OSError, DuplicateModelException, InvalidModelConfigException) as excp:
-                    self._signal_job_errored(job, excp)
+                continue
+
+            assert job.local_path is not None
+            try:
+                self._signal_job_running(job)
+                if job.inplace:
+                    job.key = self.register_path(job.local_path, job.metadata)
+                else:
+                    job.key = self.install_path(job.local_path, job.metadata)
+                self._signal_job_completed(job)
+            except (OSError, DuplicateModelException, InvalidModelConfigException) as excp:
+                self._signal_job_errored(job, excp)
+            finally:
+                self._install_queue.task_done()
 
     def _signal_job_running(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.RUNNING
@@ -92,7 +112,7 @@ class ModelInstallService(ModelInstallServiceBase):
         job.status = InstallStatus.COMPLETED
         if self._event_bus:
             assert job.local_path is not None
-            self._event_bus.emit_model_install_completed(str(job.source), job.local_path.as_posix())
+            self._event_bus.emit_model_install_completed(str(job.source), job.key)
 
     def _signal_job_errored(self, job: ModelInstallJob, excp: Exception) -> None:
         job.set_error(excp)
@@ -136,29 +156,165 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def import_model(
             self,
-            source: Union[str, Path, AnyHttpUrl],
+            source: ModelSource,
             inplace: bool = True,
             variant: Optional[str] = None,
             subfolder: Optional[str] = None,
-            metadata: Optional[Dict[str, str]] = None,
+            metadata: Optional[Dict[str, Any]] = None,
             access_token: Optional[str] = None,
     ) -> ModelInstallJob:      # noqa D102
-        raise NotImplementedError
+        # Clean up a common source of error. Doesn't work with Paths.
+        if isinstance(source, str):
+            source = source.strip()
 
-    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], ModelInstallJob]:      # noqa D102
+        if not metadata:
+            metadata = {}
+
+        # Installing a local path
+        if isinstance(source, (str, Path)) and Path(source).exists():  # a path that is already on disk
+            job = ModelInstallJob(metadata=metadata,
+                                  source=source,
+                                  inplace=inplace,
+                                  local_path=Path(source),
+                                  )
+            self._install_jobs[source] = job
+            self._install_queue.put(job)
+            return job
+
+        else:  # waiting for download queue implementation
+            raise NotImplementedError
+
+    def get_job(self, source: ModelSource) -> ModelInstallJob:  # noqa D102
+        try:
+            return self._install_jobs[source]
+        except KeyError:
+            raise UnknownInstallJobException(f'{source}: unknown install job')
+
+    def wait_for_installs(self) -> Dict[ModelSource, ModelInstallJob]:      # noqa D102
         self._install_queue.join()
         return self._install_jobs
 
-    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:      # noqa D102
-        raise NotImplementedError
+    def prune_jobs(self) -> None:
+        """Prune all completed and errored jobs."""
+        finished_jobs = [source for source in self._install_jobs
+                         if self._install_jobs[source].status in [InstallStatus.COMPLETED, InstallStatus.ERROR]
+                         ]
+        for source in finished_jobs:
+            del self._install_jobs[source]
 
-    def sync_to_config(self) -> None:      # noqa D102
-        raise NotImplementedError
+    def sync_to_config(self) -> None:
+        """Synchronize models on disk to those in the config record store database."""
+        self._scan_models_directory()
+        if autoimport := self._app_config.autoimport_dir:
+            self._logger.info("Scanning autoimport directory for new models")
+            self.scan_directory(self._app_config.root_path / autoimport)
+
+    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:      # noqa D102
+        self._cached_model_paths = {Path(x.path) for x in self.record_store.all_models()}
+        callback = self._scan_install if install else self._scan_register
+        search = ModelSearch(on_model_found=callback)
+        self._models_installed: Set[str] = set()
+        search.search(scan_dir)
+        return list(self._models_installed)
+
+    def _scan_models_directory(self) -> None:
+        """
+        Scan the models directory for new and missing models.
+
+        New models will be added to the storage backend. Missing models
+        will be deleted.
+        """
+        defunct_models = set()
+        installed = set()
+
+        with Chdir(self._app_config.models_path):
+            self._logger.info("Checking for models that have been moved or deleted from disk")
+            for model_config in self.record_store.all_models():
+                path = Path(model_config.path)
+                if not path.exists():
+                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering")
+                    defunct_models.add(model_config.key)
+            for key in defunct_models:
+                self.unregister(key)
+
+            self._logger.info(f"Scanning {self._app_config.models_path} for new models")
+            for cur_base_model in BaseModelType:
+                for cur_model_type in ModelType:
+                    models_dir = Path(cur_base_model.value, cur_model_type.value)
+                    installed.update(self.scan_directory(models_dir))
+            self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
+
+    def _sync_model_path(self, key: str, ignore_hash_change: bool = False) -> AnyModelConfig:
+        """
+        Move model into the location indicated by its basetype, type and name.
+
+        Call this after updating a model's attributes in order to move
+        the model's path into the location indicated by its basetype, type and
+        name. Applies only to models whose paths are within the root `models_dir`
+        directory.
+
+        May raise an UnknownModelException.
+        """
+        model = self.record_store.get_model(key)
+        old_path = Path(model.path)
+        models_dir = self.app_config.models_path
+
+        if not old_path.is_relative_to(models_dir):
+            return model
+
+        new_path = models_dir / model.base.value / model.type.value / model.name
+        self._logger.info(f"Moving {model.name} to {new_path}.")
+        new_path = self._move_model(old_path, new_path)
+        new_hash = FastModelHash.hash(new_path)
+        model.path = new_path.relative_to(models_dir).as_posix()
+        if model.current_hash != new_hash:
+            assert (
+                ignore_hash_change
+            ), f"{model.name}: Model hash changed during installation, model is possibly corrupted"
+            model.current_hash = new_hash
+            self._logger.info(f"Model has new hash {model.current_hash}, but will continue to be identified by {key}")
+        self.record_store.update_model(key, model)
+        return model
+
+
+    def _scan_register(self, model: Path) -> bool:
+        if model in self._cached_model_paths:
+            return True
+        try:
+            id = self.register_path(model)
+            self._sync_model_path(id)  # possibly move it to right place in `models`
+            self._logger.info(f"Registered {model.name} with id {id}")
+            self._models_installed.add(id)
+        except DuplicateModelException:
+            pass
+        return True
+
+
+    def _scan_install(self, model: Path) -> bool:
+        if model in self._cached_model_paths:
+            return True
+        try:
+            id = self.install_path(model)
+            self._logger.info(f"Installed {model} with id {id}")
+            self._models_installed.add(id)
+        except DuplicateModelException:
+            pass
+        return True
 
     def unregister(self, key: str) -> None:      # noqa D102
         self.record_store.del_model(key)
 
-    def delete(self, key: str) -> None:      # noqa D102
+    def delete(self, key: str) -> None:  # noqa D102
+        """Unregister the model. Delete its files only if they are within our models directory."""
+        model = self.record_store.get_model(key)
+        models_dir = self.app_config.models_path
+        model_path = models_dir / model.path
+        if model_path.is_relative_to(models_dir):
+            self.unconditionally_delete(key)
+        else:
+            self.unregister(key)
+
+    def unconditionally_delete(self, key: str) -> None:      # noqa D102
         model = self.record_store.get_model(key)
         path = self.app_config.models_path / model.path
         if path.is_dir():
@@ -166,16 +322,6 @@ class ModelInstallService(ModelInstallServiceBase):
         else:
             path.unlink()
         self.unregister(key)
-
-    def conditionally_delete(self, key: str) -> None:  # noqa D102
-        """Unregister the model. Delete its files only if they are within our models directory."""
-        model = self.record_store.get_model(key)
-        models_dir = self.app_config.models_path
-        model_path = models_dir / model.path
-        if model_path.is_relative_to(models_dir):
-            self.delete(key)
-        else:
-            self.unregister(key)
 
     def _move_model(self, old_path: Path, new_path: Path) -> Path:
         if old_path == new_path:

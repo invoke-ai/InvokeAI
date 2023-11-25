@@ -21,12 +21,21 @@ class InstallStatus(str, Enum):
     ERROR = "error"          # terminated with an error message
 
 
+class UnknownInstallJobException(Exception):
+    """Raised when the status of an unknown job is requested."""
+
+
+ModelSource = Union[str, Path, AnyHttpUrl]
+
+
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""
-
-    source: Union[str, Path, AnyHttpUrl] = Field(description="Source (URL, repo_id, or local path) of model")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
-    local_path: Optional[Path] = Field(default=None, description="Path to locally-downloaded model")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Configuration metadata to apply to model before installing it")
+    inplace: bool = Field(default=False, description="Leave model in its current location; otherwise install under models directory")
+    source: ModelSource = Field(description="Source (URL, repo_id, or local path) of model")
+    local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
+    key: Optional[str] = Field(default=None, description="After model is installed, this is its config record key")
     error_type: str = Field(default="", description="Class name of the exception that led to status==ERROR")
     error: str = Field(default="", description="Error traceback")  # noqa #501
 
@@ -65,6 +74,11 @@ class ModelInstallServiceBase(ABC):
     def record_store(self) -> ModelRecordServiceBase:
         """Return the ModelRecoreService object associated with the installer."""
 
+    @property
+    @abstractmethod
+    def event_bus(self) -> Optional[EventServiceBase]:
+        """Return the event service base object associated with the installer."""
+
     @abstractmethod
     def register_path(
             self,
@@ -86,16 +100,12 @@ class ModelInstallServiceBase(ABC):
         """Remove model with indicated key from the database."""
 
     @abstractmethod
-    def delete(self, key: str) -> None:
-        """Remove model with indicated key from the database and delete weight files from disk."""
+    def delete(self, key: str) -> None:  # noqa D102
+        """Remove model with indicated key from the database. Delete its files only if they are within our models directory."""
 
     @abstractmethod
-    def conditionally_delete(self, key: str) -> None:
-        """
-        Remove model with indicated key from the database
-        and conditeionally delete weight files from disk
-        if they reside within InvokeAI's models directory.
-        """
+    def unconditionally_delete(self, key: str) -> None:
+        """Remove model with indicated key from the database and unconditionally delete weight files from disk."""
 
     @abstractmethod
     def install_path(
@@ -121,7 +131,7 @@ class ModelInstallServiceBase(ABC):
             inplace: bool = True,
             variant: Optional[str] = None,
             subfolder: Optional[str] = None,
-            metadata: Optional[Dict[str, str]] = None,
+            metadata: Optional[Dict[str, Any]] = None,
             access_token: Optional[str] = None,
     ) -> ModelInstallJob:
         """Install the indicated model.
@@ -169,6 +179,18 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
+    def get_job(self, source: ModelSource) -> ModelInstallJob:
+        """Return the ModelInstallJob corresponding to the provided source."""
+
+    @abstractmethod
+    def get_jobs(self) -> Dict[ModelSource, ModelInstallJob]:  # noqa D102
+        """Return a dict in which keys are model sources and values are corresponding model install jobs."""
+
+    @abstractmethod
+    def prune_jobs(self) -> None:
+        """Prune all completed and errored jobs."""
+
+    @abstractmethod
     def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], ModelInstallJob]:
         """
         Wait for all pending installs to complete.
@@ -194,4 +216,4 @@ class ModelInstallServiceBase(ABC):
 
     @abstractmethod
     def sync_to_config(self) -> None:
-        """Synchronize models on disk to those in memory."""
+        """Synchronize models on disk to those in the model record database."""

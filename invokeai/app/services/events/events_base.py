@@ -323,21 +323,23 @@ class EventServiceBase:
         """
         self.__emit_queue_event(
             event_name="model_install_started",
-            payload={"source": source},
+            payload={
+                "source": source
+            },
         )
 
-    def emit_model_install_completed(self, source: str, dest: str) -> None:
+    def emit_model_install_completed(self, source: str, key: str) -> None:
         """
         Emitted when an install job is completed successfully.
 
         :param source: Source of the model; local path, repo_id or url
-        :param dest: Destination of the model files; always a local path
+        :param key: Model config record key
         """
         self.__emit_queue_event(
             event_name="model_install_completed",
             payload={
                 "source": source,
-                "dest": dest,
+                "key": key,
             },
         )
 
