@@ -134,7 +134,7 @@ const CurrentImageButtons = () => {
     recallSeed(metadata?.seed);
   }, [metadata?.seed, recallSeed]);
 
-  useHotkeys('s', handleUseSeed, [imageDTO]);
+  useHotkeys('s', handleUseSeed, [metadata]);
 
   const handleUsePrompt = useCallback(() => {
     recallBothPrompts(
@@ -151,7 +151,7 @@ const CurrentImageButtons = () => {
     recallBothPrompts,
   ]);
 
-  useHotkeys('p', handleUsePrompt, [imageDTO]);
+  useHotkeys('p', handleUsePrompt, [metadata]);
 
   const handleUseSize = useCallback(() => {
     recallWidthAndHeight(metadata?.width, metadata?.height);

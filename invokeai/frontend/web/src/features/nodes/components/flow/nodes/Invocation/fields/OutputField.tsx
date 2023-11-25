@@ -5,6 +5,7 @@ import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { PropsWithChildren, memo } from 'react';
 import FieldHandle from './FieldHandle';
 import FieldTooltipContent from './FieldTooltipContent';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   nodeId: string;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 const OutputField = ({ nodeId, fieldName }: Props) => {
+  const { t } = useTranslation();
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'output');
 
   const {
@@ -28,7 +30,7 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
         <FormControl
           sx={{ color: 'error.400', textAlign: 'right', fontSize: 'sm' }}
         >
-          Unknown output: {fieldName}
+          {t('nodes.unknownOutput')}: {fieldName}
         </FormControl>
       </OutputFieldWrapper>
     );

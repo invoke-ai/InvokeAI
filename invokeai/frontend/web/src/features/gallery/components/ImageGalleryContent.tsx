@@ -113,7 +113,7 @@ const ImageGalleryContent = () => {
                   leftIcon={<FaImages />}
                   data-testid="images-tab"
                 >
-                  {t('gallery.images')}
+                  {t('parameters.images')}
                 </Tab>
                 <Tab
                   as={IAIButton}

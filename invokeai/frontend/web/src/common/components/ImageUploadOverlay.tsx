@@ -1,6 +1,7 @@
 import { Box, Flex, Heading } from '@chakra-ui/react';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 
 type ImageUploadOverlayProps = {
   isDragAccept: boolean;
@@ -9,6 +10,7 @@ type ImageUploadOverlayProps = {
 };
 
 const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
+  const { t } = useTranslation();
   const {
     isDragAccept,
     isDragReject: _isDragAccept,
@@ -76,11 +78,13 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
           }}
         >
           {isDragAccept ? (
-            <Heading size="lg">Drop to Upload</Heading>
+            <Heading size="lg">{t('gallery.dropToUpload')}</Heading>
           ) : (
             <>
-              <Heading size="lg">Invalid Upload</Heading>
-              <Heading size="md">Must be single JPEG or PNG image</Heading>
+              <Heading size="lg">{t('toast.invalidUpload')}</Heading>
+              <Heading size="md">
+                {t('toast.uploadFailedInvalidUploadDesc')}
+              </Heading>
             </>
           )}
         </Flex>

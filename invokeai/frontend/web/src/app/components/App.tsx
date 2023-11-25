@@ -20,6 +20,7 @@ import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
+import { useSocketIO } from '../hooks/useSocketIO';
 
 const DEFAULT_CONFIG = {};
 
@@ -33,9 +34,11 @@ interface Props {
 
 const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   const language = useAppSelector(languageSelector);
-
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
+
+  // singleton!
+  useSocketIO();
 
   const handleReset = useCallback(() => {
     localStorage.clear();

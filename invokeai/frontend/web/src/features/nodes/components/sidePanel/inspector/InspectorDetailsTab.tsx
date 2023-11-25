@@ -90,7 +90,7 @@ const Content = (props: {
           <EditableNodeTitle nodeId={props.node.data.id} />
           <HStack>
             <FormControl>
-              <FormLabel>Node Type</FormLabel>
+              <FormLabel>{t('nodes.nodeType')}</FormLabel>
               <Text fontSize="sm" fontWeight={600}>
                 {props.template.title}
               </Text>
@@ -102,7 +102,7 @@ const Content = (props: {
               w="full"
             >
               <FormControl isInvalid={needsUpdate}>
-                <FormLabel>Node Version</FormLabel>
+                <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
                 <Text fontSize="sm" fontWeight={600}>
                   {props.node.data.version}
                 </Text>
