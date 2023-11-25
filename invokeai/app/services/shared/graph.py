@@ -188,7 +188,7 @@ class GraphInvocationOutput(BaseInvocationOutput):
 
 
 # TODO: Fill this out and move to invocations
-@invocation("graph")
+@invocation("graph", version="1.0.0")
 class GraphInvocation(BaseInvocation):
     """Execute a graph"""
 
