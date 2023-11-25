@@ -1082,6 +1082,7 @@
         "upscaling": "Upscaling",
         "unmasked": "Unmasked",
         "useAll": "Use All",
+        "useSize": "Use Size",
         "useCpuNoise": "Use CPU Noise",
         "cpuNoise": "CPU Noise",
         "gpuNoise": "GPU Noise",

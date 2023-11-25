@@ -13,6 +13,7 @@ import { PostUploadAction } from 'services/api/types';
 import { FaRulerVertical } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 const selector = createSelector(
   [stateSelector],
@@ -49,6 +50,8 @@ const InitialImageDisplay = () => {
       recallWidthAndHeight(initialImage.width, initialImage.height);
     }
   }, [initialImage, recallWidthAndHeight]);
+
+  useHotkeys('shift+d', handleUseSizeInitialImage, [initialImage]);
 
   return (
     <Flex
@@ -95,8 +98,8 @@ const InitialImageDisplay = () => {
           {...getUploadButtonProps()}
         />
         <IAIIconButton
-          tooltip={t('parameters.useSize')}
-          aria-label={t('parameters.useSize')}
+          tooltip={`${t('parameters.useSize')} (Shift+D)`}
+          aria-label={`${t('parameters.useSize')} (Shift+D)`}
           icon={<FaRulerVertical />}
           onClick={handleUseSizeInitialImage}
           isDisabled={isResetButtonDisabled}

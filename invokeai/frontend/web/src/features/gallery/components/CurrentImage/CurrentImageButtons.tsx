@@ -157,6 +157,8 @@ const CurrentImageButtons = () => {
     recallWidthAndHeight(metadata?.width, metadata?.height);
   }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
 
+  useHotkeys('d', handleUseSize, [imageDTO]);
+
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
     dispatch(initialImageSelected(imageDTO));
@@ -279,8 +281,8 @@ const CurrentImageButtons = () => {
           <IAIIconButton
             isLoading={isLoadingMetadata}
             icon={<FaRulerVertical />}
-            tooltip={`${t('parameters.useSize')}`}
-            aria-label={`${t('parameters.useSize')}`}
+            tooltip={`${t('parameters.useSize')} (D)`}
+            aria-label={`${t('parameters.useSize')} (D)`}
             isDisabled={
               metadata?.height === null ||
               metadata?.height === undefined ||
