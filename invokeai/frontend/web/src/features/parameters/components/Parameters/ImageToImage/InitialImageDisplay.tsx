@@ -5,17 +5,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import {
-  clearInitialImage,
-  setWidth,
-  setHeight,
-} from 'features/parameters/store/generationSlice';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { FaUndo, FaUpload } from 'react-icons/fa';
 import InitialImage from './InitialImage';
 import { PostUploadAction } from 'services/api/types';
 import { FaRulerVertical } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 
 const selector = createSelector(
   [stateSelector],
@@ -34,6 +31,7 @@ const postUploadAction: PostUploadAction = {
 };
 
 const InitialImageDisplay = () => {
+  const { recallWidthAndHeight } = useRecallParameters();
   const { t } = useTranslation();
   const { isResetButtonDisabled, initialImage } = useAppSelector(selector);
   const dispatch = useAppDispatch();
@@ -48,10 +46,9 @@ const InitialImageDisplay = () => {
 
   const handleUseSizeInitialImage = useCallback(() => {
     if (initialImage) {
-      dispatch(setWidth(initialImage.width));
-      dispatch(setHeight(initialImage.height));
+      recallWidthAndHeight(initialImage.width, initialImage.height);
     }
-  }, [initialImage, dispatch]);
+  }, [initialImage, recallWidthAndHeight]);
 
   return (
     <Flex
