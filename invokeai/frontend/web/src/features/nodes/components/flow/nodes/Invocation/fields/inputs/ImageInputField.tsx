@@ -16,6 +16,7 @@ import {
   ImagePolymorphicInputFieldValue,
 } from 'features/nodes/types/types';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
@@ -103,18 +104,24 @@ const ImageInputFieldComponent = (
 
 export default memo(ImageInputFieldComponent);
 
-const UploadElement = memo(() => (
-  <Text fontSize={16} fontWeight={600}>
-    {t('gallery.dropOrUpload')}
-  </Text>
-));
+const UploadElement = memo(() => {
+  const { t } = useTranslation();
+  return (
+    <Text fontSize={16} fontWeight={600}>
+      {t('gallery.dropOrUpload')}
+    </Text>
+  );
+});
 
 UploadElement.displayName = 'UploadElement';
 
-const DropLabel = memo(() => (
-  <Text fontSize={16} fontWeight={600}>
-    {t('gallery.drop')}
-  </Text>
-));
+const DropLabel = memo(() => {
+  const { t } = useTranslation();
+  return (
+    <Text fontSize={16} fontWeight={600}>
+      {t('gallery.drop')}
+    </Text>
+  );
+});
 
 DropLabel.displayName = 'DropLabel';
