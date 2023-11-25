@@ -90,7 +90,16 @@
         "openInNewTab": "In einem neuem Tab öffnen",
         "statusProcessing": "wird bearbeitet",
         "linear": "Linear",
-        "imagePrompt": "Bild Prompt"
+        "imagePrompt": "Bild Prompt",
+        "checkpoint": "Checkpoint",
+        "inpaint": "inpaint",
+        "simple": "Einfach",
+        "template": "Vorlage",
+        "outputs": "Ausgabe",
+        "data": "Daten",
+        "safetensors": "Safetensors",
+        "outpaint": "outpaint",
+        "details": "Details"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -120,7 +129,8 @@
         "downloadSelection": "Auswahl herunterladen",
         "currentlyInUse": "Dieses Bild wird derzeit in den folgenden Funktionen verwendet:",
         "deleteImagePermanent": "Gelöschte Bilder können nicht wiederhergestellt werden.",
-        "autoAssignBoardOnClick": "Board per Klick automatisch zuweisen"
+        "autoAssignBoardOnClick": "Board per Klick automatisch zuweisen",
+        "noImageSelected": "Kein Bild ausgewählt"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
@@ -454,7 +464,7 @@
         "quickAdd": "Schnell hinzufügen",
         "simpleModelDesc": "Geben Sie einen Pfad zu einem lokalen Diffusers-Modell, einem lokalen Checkpoint-/Safetensors-Modell, einer HuggingFace-Repo-ID oder einer Checkpoint-/Diffusers-Modell-URL an.",
         "modelDeleted": "Modell gelöscht",
-        "inpainting": "v1 Ausmalen",
+        "inpainting": "v1 Inpainting",
         "modelUpdateFailed": "Modellaktualisierung fehlgeschlagen",
         "useCustomConfig": "Benutzerdefinierte Konfiguration verwenden",
         "settings": "Einstellungen",
@@ -473,7 +483,10 @@
         "variant": "Variante",
         "loraModels": "LoRAs",
         "modelDeleteFailed": "Modell konnte nicht gelöscht werden",
-        "mergedModelName": "Zusammengeführter Modellname"
+        "mergedModelName": "Zusammengeführter Modellname",
+        "checkpointOrSafetensors": "$t(common.checkpoint) / $t(common.safetensors)",
+        "formMessageDiffusersModelLocation": "Diffusers Modell Speicherort",
+        "noModelSelected": "Kein Modell ausgewählt"
     },
     "parameters": {
         "images": "Bilder",
@@ -683,7 +696,8 @@
         "exitViewer": "Betrachten beenden",
         "menu": "Menü",
         "loadMore": "Mehr laden",
-        "invokeProgressBar": "Invoke Fortschrittsanzeige"
+        "invokeProgressBar": "Invoke Fortschrittsanzeige",
+        "mode": "Modus"
     },
     "boards": {
         "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
@@ -701,7 +715,11 @@
         "changeBoard": "Ordner wechseln",
         "loading": "Laden...",
         "clearSearch": "Suche leeren",
-        "bottomMessage": "Durch das Löschen dieses Ordners und seiner Bilder werden alle Funktionen zurückgesetzt, die sie derzeit verwenden."
+        "bottomMessage": "Durch das Löschen dieses Ordners und seiner Bilder werden alle Funktionen zurückgesetzt, die sie derzeit verwenden.",
+        "deleteBoardOnly": "Nur Ordner löschen",
+        "deleteBoard": "Löschen Ordner",
+        "deleteBoardAndImages": "Löschen Ordner und Bilder",
+        "deletedBoardsCannotbeRestored": "Gelöschte Ordner könnte nicht wiederhergestellt werden"
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
@@ -786,7 +804,8 @@
         "canny": "Canny",
         "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
         "scribble": "Scribble",
-        "maxFaces": "Maximal Anzahl Gesichter"
+        "maxFaces": "Maximal Anzahl Gesichter",
+        "unstarImage": "Markierung aufheben"
     },
     "queue": {
         "status": "Status",
@@ -840,7 +859,8 @@
         "pauseTooltip": "Pause von Prozessor",
         "back": "Hinten",
         "resumeSucceeded": "Prozessor wieder aufgenommen",
-        "resumeTooltip": "Prozessor wieder aufnehmen"
+        "resumeTooltip": "Prozessor wieder aufnehmen",
+        "time": "Zeit"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -868,7 +888,8 @@
         "vae": "VAE",
         "workflow": "Arbeitsablauf",
         "scheduler": "Scheduler",
-        "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden"
+        "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden",
+        "recallParameters": "Recall Parameters"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -944,7 +965,9 @@
         "booleanCollection": "Boolesche Werte Sammlung",
         "cannotConnectToSelf": "Es kann keine Verbindung zu sich selbst hergestellt werden",
         "colorCodeEdges": "Farbkodierte Kanten",
-        "addNodeToolTip": "Knoten hinzufügen (Umschalt+A, Leertaste)"
+        "addNodeToolTip": "Knoten hinzufügen (Umschalt+A, Leertaste)",
+        "boardField": "Ordner",
+        "boardFieldDescription": "Ein Galerie Ordner"
     },
     "hrf": {
         "enableHrf": "Aktivieren Sie die Korrektur für hohe Auflösungen",
@@ -968,6 +991,8 @@
         "selectModel": "Wählen ein Modell aus",
         "noRefinerModelsInstalled": "Keine SDXL Refiner-Modelle installiert",
         "noLoRAsInstalled": "Keine LoRAs installiert",
-        "selectLoRA": "Wählen ein LoRA aus"
+        "selectLoRA": "Wählen ein LoRA aus",
+        "esrganModel": "ESRGAN Modell",
+        "addLora": "LoRA hinzufügen"
     }
 }
