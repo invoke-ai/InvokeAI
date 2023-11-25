@@ -3,6 +3,7 @@ import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
 import NodeCollapseButton from '../common/NodeCollapseButton';
 import NodeWrapper from '../common/NodeWrapper';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   nodeId: string;
@@ -19,6 +20,7 @@ const InvocationNodeUnknownFallback = ({
   type,
   selected,
 }: Props) => {
+  const { t } = useTranslation();
   return (
     <NodeWrapper nodeId={nodeId} selected={selected}>
       <Flex
@@ -61,7 +63,7 @@ const InvocationNodeUnknownFallback = ({
           }}
         >
           <Box>
-            <Text as="span">Unknown node type: </Text>
+            <Text as="span">{t('nodes.unknownNodeType')}: </Text>
             <Text as="span" fontWeight={600}>
               {type}
             </Text>

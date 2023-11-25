@@ -10,6 +10,7 @@ import { memo, useCallback } from 'react';
 import { FaUndo, FaUpload } from 'react-icons/fa';
 import InitialImage from './InitialImage';
 import { PostUploadAction } from 'services/api/types';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -37,6 +38,8 @@ const InitialImageDisplay = () => {
   const handleReset = useCallback(() => {
     dispatch(clearInitialImage());
   }, [dispatch]);
+
+  const { t } = useTranslation();
 
   return (
     <Flex
@@ -73,7 +76,7 @@ const InitialImageDisplay = () => {
             },
           }}
         >
-          Initial Image
+          {t('metadata.initImage')}
         </Text>
         <Spacer />
         <IAIIconButton

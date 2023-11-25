@@ -121,7 +121,7 @@ const ParamEmbeddingPopover = (props: Props) => {
                 _dark: { color: 'base.700' },
               }}
             >
-              <Text>No Embeddings Loaded</Text>
+              <Text>{t('embedding.noEmbeddingsLoaded')}</Text>
             </Flex>
           ) : (
             <IAIMantineSearchableSelect

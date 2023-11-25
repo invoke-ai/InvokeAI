@@ -110,8 +110,10 @@ const ChangeBoardModal = () => {
           <AlertDialogBody>
             <Flex sx={{ flexDir: 'column', gap: 4 }}>
               <Text>
-                Moving {`${imagesToChange.length}`} image
-                {`${imagesToChange.length > 1 ? 's' : ''}`} to board:
+                {t('boards.movingImagesToBoard', {
+                  count: imagesToChange.length,
+                })}
+                :
               </Text>
               <IAIMantineSearchableSelect
                 placeholder={

@@ -111,7 +111,7 @@ const MultipleSelectionMenuItems = () => {
         icon={<FaTrash />}
         onClickCapture={handleDeleteSelection}
       >
-        Delete Selection
+        {t('gallery.deleteSelection')}
       </MenuItem>
     </>
   );

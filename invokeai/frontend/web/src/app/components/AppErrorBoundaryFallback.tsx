@@ -2,6 +2,7 @@ import { Flex, Heading, Link, Text, useToast } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaCopy, FaExternalLinkAlt } from 'react-icons/fa';
 import { FaArrowRotateLeft } from 'react-icons/fa6';
 import { serializeError } from 'serialize-error';
@@ -13,6 +14,7 @@ type Props = {
 
 const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   const toast = useToast();
+  const { t } = useTranslation();
 
   const handleCopy = useCallback(() => {
     const text = JSON.stringify(serializeError(error), null, 2);
@@ -53,7 +55,7 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
           p: 16,
         }}
       >
-        <Heading>Something went wrong</Heading>
+        <Heading>{t('common.somethingWentWrong')}</Heading>
         <Flex
           layerStyle="second"
           sx={{
@@ -80,13 +82,15 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
             leftIcon={<FaArrowRotateLeft />}
             onClick={resetErrorBoundary}
           >
-            Reset UI
+            {t('accessibility.resetUI')}
           </IAIButton>
           <IAIButton leftIcon={<FaCopy />} onClick={handleCopy}>
-            Copy Error
+            {t('common.copyError')}
           </IAIButton>
           <Link href={url} isExternal>
-            <IAIButton leftIcon={<FaExternalLinkAlt />}>Create Issue</IAIButton>
+            <IAIButton leftIcon={<FaExternalLinkAlt />}>
+              {t('accessibility.createIssue')}
+            </IAIButton>
           </Link>
         </Flex>
       </Flex>
