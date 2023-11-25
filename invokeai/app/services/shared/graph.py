@@ -49,7 +49,7 @@ class Edge(BaseModel):
 
 def get_output_field(node: BaseInvocation, field: str) -> Any:
     node_type = type(node)
-    node_outputs = get_type_hints(node_type.get_output_type())
+    node_outputs = get_type_hints(node_type.get_output_annotation())
     node_output_field = node_outputs.get(field) or None
     return node_output_field
 
@@ -379,7 +379,7 @@ class Graph(BaseModel):
                 raise NodeNotFoundError(f"Edge destination node {edge.destination.node_id} does not exist in the graph")
 
             # output fields are not on the node object directly, they are on the output type
-            if edge.source.field not in source_node.get_output_type().model_fields:
+            if edge.source.field not in source_node.get_output_annotation().model_fields:
                 raise NodeFieldNotFoundError(
                     f"Edge source field {edge.source.field} does not exist in node {edge.source.node_id}"
                 )
