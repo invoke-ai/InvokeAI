@@ -115,6 +115,15 @@ export const parseFieldType = (
          * Any other cases we ignore.
          */
 
+        if (filteredAnyOf.length !== 2) {
+          // This is a union of more than 2 types, which we don't support
+          throw new UnsupportedFieldTypeError(
+            t('nodes.unsupportedAnyOfLength', {
+              count: filteredAnyOf.length,
+            })
+          );
+        }
+
         let firstType: string | undefined;
         let secondType: string | undefined;
 
@@ -154,6 +163,13 @@ export const parseFieldType = (
             isPolymorphic: true, // <-- don't forget, polymorphic!
           };
         }
+
+        throw new UnsupportedFieldTypeError(
+          t('nodes.unsupportedMismatchedUnion', {
+            firstType,
+            secondType,
+          })
+        );
       }
     } else if (schemaObject.enum) {
       return { name: 'EnumField', isCollection: false, isPolymorphic: false };
