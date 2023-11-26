@@ -231,15 +231,12 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # PATHS
     root                : Optional[Path] = Field(default=None, description='InvokeAI runtime root directory', json_schema_extra=Categories.Paths)
-    autoimport_dir      : Optional[Path] = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
-    lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
-    embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
-    controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
-    conf_path           : Optional[Path] = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
-    models_dir          : Optional[Path] = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
-    legacy_conf_dir     : Optional[Path] = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
-    db_dir              : Optional[Path] = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
-    outdir              : Optional[Path] = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
+    autoimport_dir      : Path = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
+    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
+    models_dir          : Path = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
+    legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
+    db_dir              : Path = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
+    outdir              : Path = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', json_schema_extra=Categories.Paths)
     custom_nodes_dir    : Path = Field(default=Path('nodes'), description='Path to directory for custom nodes', json_schema_extra=Categories.Paths)
     from_file           : Optional[Path] = Field(default=None, description='Take command input from the indicated file (command-line client only)', json_schema_extra=Categories.Paths)
@@ -282,11 +279,15 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
-    free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
     max_cache_size      : Optional[float] = Field(default=None, gt=0, description="Maximum memory amount used by model cache for rapid switching", json_schema_extra=Categories.MemoryPerformance)
     max_vram_cache_size : Optional[float] = Field(default=None, ge=0, description="Amount of VRAM reserved for model storage", json_schema_extra=Categories.MemoryPerformance)
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", json_schema_extra=Categories.MemoryPerformance)
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", json_schema_extra=Categories.MemoryPerformance)
+    lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
+    embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+    controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+    # this is not referred to in the source code and can be removed entirely
+    #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
 
     # See InvokeAIAppConfig subclass below for CACHE and DEVICE categories
     # fmt: on
@@ -336,7 +337,9 @@ class InvokeAIAppConfig(InvokeAISettings):
     def get_config(cls, **kwargs) -> InvokeAIAppConfig:
         """Return a singleton InvokeAIAppConfig configuration object."""
         if (
-            cls.singleton_config is None or type(cls.singleton_config) is not cls or (kwargs and cls.singleton_init != kwargs)
+            cls.singleton_config is None
+            or type(cls.singleton_config) is not cls
+            or (kwargs and cls.singleton_init != kwargs)
         ):
             cls.singleton_config = cls(**kwargs)
             cls.singleton_init = kwargs
@@ -363,42 +366,43 @@ class InvokeAIAppConfig(InvokeAISettings):
     @property
     def init_file_path(self) -> Path:
         """Path to invokeai.yaml."""
-        return self._resolve(INIT_FILE)
+        resolved_path = self._resolve(INIT_FILE)
+        assert resolved_path is not None
+        return resolved_path
 
     @property
-    def output_path(self) -> Path:
+    def output_path(self) -> Optional[Path]:
         """Path to defaults outputs directory."""
-        assert self.outdir
         return self._resolve(self.outdir)
 
     @property
     def db_path(self) -> Path:
         """Path to the invokeai.db file."""
-        assert self.db_dir
-        return self._resolve(self.db_dir) / DB_FILE
+        db_dir = self._resolve(self.db_dir)
+        assert db_dir is not None
+        return db_dir / DB_FILE
 
     @property
-    def model_conf_path(self) -> Path:
+    def model_conf_path(self) -> Optional[Path]:
         """Path to models configuration file."""
-        assert self.conf_path
         return self._resolve(self.conf_path)
 
     @property
-    def legacy_conf_path(self) -> Path:
+    def legacy_conf_path(self) -> Optional[Path]:
         """Path to directory of legacy configuration files (e.g. v1-inference.yaml)."""
-        assert self.legacy_conf_dir
         return self._resolve(self.legacy_conf_dir)
 
     @property
-    def models_path(self) -> Path:
+    def models_path(self) -> Optional[Path]:
         """Path to the models directory."""
-        assert self.models_dir
         return self._resolve(self.models_dir)
 
     @property
     def custom_nodes_path(self) -> Path:
         """Path to the custom nodes directory."""
-        return self._resolve(self.custom_nodes_dir)
+        custom_nodes_path = self._resolve(self.custom_nodes_dir)
+        assert custom_nodes_path is not None
+        return custom_nodes_path
 
     # the following methods support legacy calls leftover from the Globals era
     @property

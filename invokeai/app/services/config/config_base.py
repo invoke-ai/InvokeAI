@@ -152,6 +152,9 @@ class InvokeAISettings(BaseSettings):
             "free_gpu_mem",
             "xformers_enabled",
             "tiled_decode",
+            "lora_dir",
+            "embedding_dir",
+            "controlnet_dir",
         ]
 
     @classmethod

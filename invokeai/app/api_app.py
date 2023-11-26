@@ -232,7 +232,6 @@ app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")
 
 
 def invoke_api() -> None:
-
     def find_port(port: int) -> int:
         """Find a port not in use starting at given port"""
         # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
