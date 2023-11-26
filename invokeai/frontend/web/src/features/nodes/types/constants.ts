@@ -1,3 +1,5 @@
+import { Node } from 'reactflow';
+
 /**
  * How long to wait before showing a tooltip when hovering a field handle.
  */
@@ -13,6 +15,13 @@ export const NODE_WIDTH = 320;
  * applying the appropriate listeners to it.
  */
 export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
+
+/**
+ * reactflow-specifc properties shared between all node types.
+ */
+export const SHARED_NODE_PROPERTIES: Partial<Node> = {
+  dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
+};
 
 /**
  * Helper for getting the kind of a field.

@@ -1,6 +1,4 @@
 import {
-  Edge,
-  Node,
   OnConnectStartParams,
   SelectionMode,
   Viewport,
@@ -8,16 +6,16 @@ import {
 } from 'reactflow';
 import { FieldIdentifier, FieldType } from '../types/field';
 import {
-  AnyNodeData,
-  InvocationEdgeExtra,
+  AnyNode,
+  InvocationNodeEdge,
   InvocationTemplate,
   NodeExecutionState,
 } from '../types/invocation';
 import { WorkflowV2 } from '../types/workflow';
 
 export type NodesState = {
-  nodes: Node<AnyNodeData>[];
-  edges: Edge<InvocationEdgeExtra>[];
+  nodes: AnyNode[];
+  edges: InvocationNodeEdge[];
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   connectionStartFieldType: FieldType | null;
@@ -37,8 +35,8 @@ export type NodesState = {
   isReady: boolean;
   mouseOverField: FieldIdentifier | null;
   mouseOverNode: string | null;
-  nodesToCopy: Node<AnyNodeData>[];
-  edgesToCopy: Edge<InvocationEdgeExtra>[];
+  nodesToCopy: AnyNode[];
+  edgesToCopy: InvocationNodeEdge[];
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
