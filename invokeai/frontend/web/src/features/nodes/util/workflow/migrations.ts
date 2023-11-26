@@ -1,11 +1,11 @@
+import { t } from 'i18next';
 import { forEach, isString } from 'lodash-es';
 import { z } from 'zod';
-import { WorkflowVersionError } from '../error';
-import { zSemVer } from '../semver';
-import { WorkflowV2, zWorkflowV2 } from '../workflow';
-import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from './v1/fieldTypeMap';
-import { WorkflowV1, zWorkflowV1 } from './v1/workflowV1';
-import { t } from 'i18next';
+import { WorkflowVersionError } from '../../types/error';
+import { zSemVer } from '../../types/semver';
+import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from '../../types/v1/fieldTypeMap';
+import { WorkflowV1, zWorkflowV1 } from '../../types/v1/workflowV1';
+import { WorkflowV2, zWorkflowV2 } from '../../types/workflow';
 
 /**
  * Helper schema to extract the version from a workflow.

@@ -4,7 +4,7 @@ import { keyBy } from 'lodash-es';
 import { JsonObject } from 'type-fest';
 import { getNeedsUpdate } from '../node/nodeUpdate';
 import { InvocationTemplate } from '../../types/invocation';
-import { parseAndMigrateWorkflow } from '../../types/migration/migrations';
+import { parseAndMigrateWorkflow } from './migrations';
 import { WorkflowV2, isWorkflowInvocationNode } from '../../types/workflow';
 
 type WorkflowWarning = {
