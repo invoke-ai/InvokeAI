@@ -13,10 +13,10 @@ import {
 } from './common';
 
 /**
- * zod schemas & inferred types for input field values.
+ * zod schemas & inferred types for fields.
  *
- * These schemas and types are only required for field types that have UI components and allow the
- * user to directly provide values.
+ * These schemas and types are only required for stateful field - fields that have UI components
+ * and allow the user to directly provide values.
  *
  * This includes primitive values (numbers, strings, booleans), models, scheduler, etc.
  *
