@@ -15,7 +15,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal, Optional, Union, get_args, get_origin, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_args, get_origin, get_type_hints
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,10 +24,7 @@ from invokeai.app.services.config.config_common import PagingArgumentParser, int
 
 
 class InvokeAISettings(BaseSettings):
-    """
-    Runtime configuration settings in which default values are
-    read from an omegaconf .yaml file.
-    """
+    """Runtime configuration settings in which default values are read from an omegaconf .yaml file."""
 
     initconf: ClassVar[Optional[DictConfig]] = None
     argparse_groups: ClassVar[Dict] = {}
@@ -35,6 +32,7 @@ class InvokeAISettings(BaseSettings):
     model_config = SettingsConfigDict(env_file_encoding="utf-8", arbitrary_types_allowed=True, case_sensitive=True)
 
     def parse_args(self, argv: Optional[list] = sys.argv[1:]):
+        """Call to parse command-line arguments."""
         parser = self.get_parser()
         opt, unknown_opts = parser.parse_known_args(argv)
         if len(unknown_opts) > 0:
@@ -49,20 +47,19 @@ class InvokeAISettings(BaseSettings):
                 setattr(self, name, value)
 
     def to_yaml(self) -> str:
-        """
-        Return a YAML string representing our settings. This can be used
-        as the contents of `invokeai.yaml` to restore settings later.
-        """
+        """Return a YAML string representing our settings. This can be used as the contents of `invokeai.yaml` to restore settings later."""
         cls = self.__class__
         type = get_args(get_type_hints(cls)["type"])[0]
-        field_dict = {type: {}}
+        field_dict: Dict[str, Dict[str, Any]] = {type: {}}
         for name, field in self.model_fields.items():
             if name in cls._excluded_from_yaml():
                 continue
+            assert isinstance(field.json_schema_extra, dict)
             category = (
                 field.json_schema_extra.get("category", "Uncategorized") if field.json_schema_extra else "Uncategorized"
             )
             value = getattr(self, name)
+            assert isinstance(category, str)
             if category not in field_dict[type]:
                 field_dict[type][category] = {}
             # keep paths as strings to make it easier to read
@@ -72,6 +69,7 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def add_parser_arguments(cls, parser):
+        """Dynamically create arguments for a settings parser."""
         if "type" in get_type_hints(cls):
             settings_stanza = get_args(get_type_hints(cls)["type"])[0]
         else:
@@ -116,6 +114,7 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def cmd_name(cls, command_field: str = "type") -> str:
+        """Return the category of a setting."""
         hints = get_type_hints(cls)
         if command_field in hints:
             return get_args(hints[command_field])[0]
@@ -124,6 +123,7 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def get_parser(cls) -> ArgumentParser:
+        """Get the command-line parser for a setting."""
         parser = PagingArgumentParser(
             prog=cls.cmd_name(),
             description=cls.__doc__,
@@ -156,6 +156,7 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def add_field_argument(cls, command_parser, name: str, field, default_override=None):
+        """Add the argparse arguments for a setting parser."""
         field_type = get_type_hints(cls).get(name)
         default = (
             default_override

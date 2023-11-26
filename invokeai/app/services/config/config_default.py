@@ -177,6 +177,7 @@ from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hint
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, TypeAdapter
+from pydantic.fields import JsonDict
 from pydantic_settings import SettingsConfigDict
 
 from .config_base import InvokeAISettings
@@ -188,28 +189,24 @@ DEFAULT_MAX_VRAM = 0.5
 
 
 class Categories(object):
-    WebServer = {"category": "Web Server"}
-    Features = {"category": "Features"}
-    Paths = {"category": "Paths"}
-    Logging = {"category": "Logging"}
-    Development = {"category": "Development"}
-    Other = {"category": "Other"}
-    ModelCache = {"category": "Model Cache"}
-    Device = {"category": "Device"}
-    Generation = {"category": "Generation"}
-    Queue = {"category": "Queue"}
-    Nodes = {"category": "Nodes"}
-    MemoryPerformance = {"category": "Memory/Performance"}
+    """Category headers for configuration variable groups."""
+
+    WebServer: JsonDict = {"category": "Web Server"}
+    Features: JsonDict = {"category": "Features"}
+    Paths: JsonDict = {"category": "Paths"}
+    Logging: JsonDict = {"category": "Logging"}
+    Development: JsonDict = {"category": "Development"}
+    Other: JsonDict = {"category": "Other"}
+    ModelCache: JsonDict = {"category": "Model Cache"}
+    Device: JsonDict = {"category": "Device"}
+    Generation: JsonDict = {"category": "Generation"}
+    Queue: JsonDict = {"category": "Queue"}
+    Nodes: JsonDict = {"category": "Nodes"}
+    MemoryPerformance: JsonDict = {"category": "Memory/Performance"}
 
 
 class InvokeAIAppConfig(InvokeAISettings):
-    """
-    Generate images using Stable Diffusion. Use "invokeai" to launch
-    the command-line client (recommended for experts only), or
-    "invokeai-web" to launch the web server. Global options
-    can be changed by editing the file "INVOKEAI_ROOT/invokeai.yaml" or by
-    setting environment variables INVOKEAI_<setting>.
-    """
+    """Configuration object for InvokeAI App."""
 
     singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
     singleton_init: ClassVar[Optional[Dict]] = None
@@ -303,8 +300,8 @@ class InvokeAIAppConfig(InvokeAISettings):
         clobber=False,
     ):
         """
-        Update settings with contents of init file, environment, and
-        command-line settings.
+        Update settings with contents of init file, environment, and command-line settings.
+
         :param conf: alternate Omegaconf dictionary object
         :param argv: aternate sys.argv list
         :param clobber: ovewrite any initialization parameters passed during initialization
@@ -337,13 +334,9 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     @classmethod
     def get_config(cls, **kwargs) -> InvokeAIAppConfig:
-        """
-        This returns a singleton InvokeAIAppConfig configuration object.
-        """
+        """Return a singleton InvokeAIAppConfig configuration object."""
         if (
-            cls.singleton_config is None
-            or type(cls.singleton_config) is not cls
-            or (kwargs and cls.singleton_init != kwargs)
+            cls.singleton_config is None or type(cls.singleton_config) is not cls or (kwargs and cls.singleton_init != kwargs)
         ):
             cls.singleton_config = cls(**kwargs)
             cls.singleton_init = kwargs
@@ -351,9 +344,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     @property
     def root_path(self) -> Path:
-        """
-        Path to the runtime root directory
-        """
+        """Path to the runtime root directory."""
         if self.root:
             root = Path(self.root).expanduser().absolute()
         else:
@@ -363,9 +354,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     @property
     def root_dir(self) -> Path:
-        """
-        Alias for above.
-        """
+        """Alias for above."""
         return self.root_path
 
     def _resolve(self, partial_path: Path) -> Path:
@@ -373,108 +362,94 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     @property
     def init_file_path(self) -> Path:
-        """
-        Path to invokeai.yaml
-        """
+        """Path to invokeai.yaml."""
         return self._resolve(INIT_FILE)
 
     @property
     def output_path(self) -> Path:
-        """
-        Path to defaults outputs directory.
-        """
+        """Path to defaults outputs directory."""
+        assert self.outdir
         return self._resolve(self.outdir)
 
     @property
     def db_path(self) -> Path:
-        """
-        Path to the invokeai.db file.
-        """
+        """Path to the invokeai.db file."""
+        assert self.db_dir
         return self._resolve(self.db_dir) / DB_FILE
 
     @property
     def model_conf_path(self) -> Path:
-        """
-        Path to models configuration file.
-        """
+        """Path to models configuration file."""
+        assert self.conf_path
         return self._resolve(self.conf_path)
 
     @property
     def legacy_conf_path(self) -> Path:
-        """
-        Path to directory of legacy configuration files (e.g. v1-inference.yaml)
-        """
+        """Path to directory of legacy configuration files (e.g. v1-inference.yaml)."""
+        assert self.legacy_conf_dir
         return self._resolve(self.legacy_conf_dir)
 
     @property
     def models_path(self) -> Path:
-        """
-        Path to the models directory
-        """
+        """Path to the models directory."""
+        assert self.models_dir
         return self._resolve(self.models_dir)
 
     @property
     def custom_nodes_path(self) -> Path:
-        """
-        Path to the custom nodes directory
-        """
+        """Path to the custom nodes directory."""
         return self._resolve(self.custom_nodes_dir)
 
     # the following methods support legacy calls leftover from the Globals era
     @property
     def full_precision(self) -> bool:
-        """Return true if precision set to float32"""
+        """Return true if precision set to float32."""
         return self.precision == "float32"
 
     @property
     def try_patchmatch(self) -> bool:
-        """Return true if patchmatch true"""
+        """Return true if patchmatch true."""
         return self.patchmatch
 
     @property
     def nsfw_checker(self) -> bool:
-        """NSFW node is always active and disabled from Web UIe"""
+        """Return value for NSFW checker. The NSFW node is always active and disabled from Web UI."""
         return True
 
     @property
     def invisible_watermark(self) -> bool:
-        """invisible watermark node is always active and disabled from Web UIe"""
+        """Return value of invisible watermark. It is always active and disabled from Web UI."""
         return True
 
     @property
     def ram_cache_size(self) -> Union[Literal["auto"], float]:
+        """Return the ram cache size using the legacy or modern setting."""
         return self.max_cache_size or self.ram
 
     @property
     def vram_cache_size(self) -> Union[Literal["auto"], float]:
+        """Return the vram cache size using the legacy or modern setting."""
         return self.max_vram_cache_size or self.vram
 
     @property
     def use_cpu(self) -> bool:
+        """Return true if the device is set to CPU or the always_use_cpu flag is set."""
         return self.always_use_cpu or self.device == "cpu"
 
     @property
     def disable_xformers(self) -> bool:
-        """
-        Return true if enable_xformers is false (reversed logic)
-        and attention type is not set to xformers.
-        """
+        """Return true if enable_xformers is false (reversed logic) and attention type is not set to xformers."""
         disabled_in_config = not self.xformers_enabled
         return disabled_in_config and self.attention_type != "xformers"
 
     @staticmethod
     def find_root() -> Path:
-        """
-        Choose the runtime root directory when not specified on command line or
-        init file.
-        """
+        """Choose the runtime root directory when not specified on command line or init file."""
         return _find_root()
 
 
 def get_invokeai_config(**kwargs) -> InvokeAIAppConfig:
-    """
-    Legacy function which returns InvokeAIAppConfig.get_config()
-    """
+    """Legacy function which returns InvokeAIAppConfig.get_config()."""
     return InvokeAIAppConfig.get_config(**kwargs)
 
 

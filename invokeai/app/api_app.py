@@ -1,4 +1,5 @@
 from typing import Any
+import sys
 
 from fastapi.responses import HTMLResponse
 
@@ -7,8 +8,12 @@ from .services.config import InvokeAIAppConfig
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
+from invokeai.version.invokeai_version import __version__
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
+if app_config.version:
+    print(f"InvokeAI version {__version__}")
+    sys.exit(0)
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import asyncio
@@ -34,7 +39,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     # noinspection PyUnresolvedReferences
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
     import invokeai.frontend.web as web_dir
-    from invokeai.version.invokeai_version import __version__
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
@@ -222,6 +226,7 @@ app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")
 
 
 def invoke_api() -> None:
+
     def find_port(port: int) -> int:
         """Find a port not in use starting at given port"""
         # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
@@ -273,7 +278,4 @@ def invoke_api() -> None:
 
 
 if __name__ == "__main__":
-    if app_config.version:
-        print(f"InvokeAI version {__version__}")
-    else:
-        invoke_api()
+    invoke_api()
