@@ -23,7 +23,7 @@ import {
 } from './constants';
 import { setMetadataReceivingNode, upsertMetadata } from './metadata';
 
-// Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
+// Copy certain connections from previous finalDenoiseLatentsNodeId to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(
   graph: NonNullableGraph,
   finalDenoiseLatentsNodeId: string
