@@ -148,7 +148,7 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
     assert "model_install_started" in event_names
     assert "model_install_completed" in event_names
     assert bus.events[0].payload["source"] == source.as_posix()
-    assert bus.events[1].payload["source"] == source.as_posix()
+    assert Path(bus.events[1].payload["source"]) == Path(source)
     key = bus.events[1].payload["key"]
     assert key is not None
 
