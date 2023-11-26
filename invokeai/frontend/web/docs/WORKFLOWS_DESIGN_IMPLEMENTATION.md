@@ -9,7 +9,7 @@
     - [Linear UI](#linear-ui)
     - [Workflow Editor](#workflow-editor)
       - [Workflows](#workflows)
-        - [Workflow -\> reactflow state -\> InvokeAI graph](#workflow---reactflow-state---invokeai-graph)
+        - [Workflow -> reactflow state -> InvokeAI graph](#workflow---reactflow-state---invokeai-graph)
         - [Nodes vs Invocations](#nodes-vs-invocations)
         - [Workflow Linear View](#workflow-linear-view)
       - [OpenAPI Schema](#openapi-schema)
@@ -27,9 +27,15 @@
         - [Optional Fields](#optional-fields)
       - [Building Field Input Templates](#building-field-input-templates)
       - [Building Field Output Templates](#building-field-output-templates)
+    - [Managing reactflow State](#managing-reactflow-state)
+      - [Building Nodes and Edges](#building-nodes-and-edges)
+      - [Building a Workflow](#building-a-workflow)
+      - [Loading a Workflow](#loading-a-workflow)
     - [Workflow Migrations](#workflow-migrations)
 
 <!-- /code_chunk_output -->
+
+> This document describes, at a high level, the design and implementation of workflows in the InvokeAI frontend. There are a substantial number of implementation details not included, but which are hopefully clear from the code.
 
 InvokeAI's backend uses graphs, composed of **nodes** and **edges**, to process data and generate images.
 
@@ -54,7 +60,7 @@ The user-managed parameters on these tabs are stored as simple objects in the ap
 This logic can be fairly complex due to the range of features available and their interactions. Depending on the parameters selected, the graph may be very different. Building graphs in code can be challenging - you are trying to construct a non-linear structure in a linear context.
 
 The simplest graph building logic is for **Text to Image** with a SD1.5 model:
-`invokeai/frontend/web/src/features/nodes/util/graphBuilders/buildLinearTextToImageGraph.ts`
+`invokeai/frontend/web/src/features/nodes/util/graph/buildLinearTextToImageGraph.ts`
 
 There are many other graph builders in the same folder for different tabs or base models (e.g. SDXL). Some are pretty hairy.
 
@@ -64,7 +70,7 @@ In the Linear UI, we go straight from **simple application state** to **graph** 
 
 The Workflow Editor is a visual graph editor, allowing users to draw edges from node to node to construct a graph. This _far_ more approachable way to create complex graphs.
 
-InvokeAI uses the [reactflow](https://github.com/xyflow/xyflow) library to power the Workflow Editor. It provides both a graph editor UI and manages its own internal graph state.
+InvokeAI uses the [reactflow] library to power the Workflow Editor. It provides both a graph editor UI and manages its own internal graph state.
 
 #### Workflows
 
@@ -83,7 +89,7 @@ Workflows should have other qualities:
 - Resilient: you should be able to "upgrade" a workflow as the application changes.
 - Abstract: as much as is possible, workflows should not be married to the specific implementation details of the application.
 
-To support these qualities, workflows are serializable, have a versioned schemas, and represent graphs as minimally as possible. Fortunately, the reactflow state for nodes and edges works perfectly for this..
+To support these qualities, workflows are serializable, have a versioned schemas, and represent graphs as minimally as possible. Fortunately, the reactflow state for nodes and edges works perfectly for this.
 
 ##### Workflow -> reactflow state -> InvokeAI graph
 
@@ -92,13 +98,13 @@ Given a workflow, we need to be able to derive reactflow state and/or an InvokeA
 The first step - workflow to reactflow state - is very simple. The logic is in `invokeai/frontend/web/src/features/nodes/store/nodesSlice.ts`, in the `workflowLoaded` reducer.
 
 The reactflow state is, however, structurally incompatible with our backend's graph structure. When a user invokes on a Workflow, we need to convert the reactflow state into an InvokeAI graph. This is far simpler than the graph building logic from the Linear UI:
-`invokeai/frontend/web/src/features/nodes/util/graphBuilders/buildNodesGraph.ts`
+`invokeai/frontend/web/src/features/nodes/util/graph/buildNodesGraph.ts`
 
 ##### Nodes vs Invocations
 
 We often use the terms "node" and "invocation" interchangeably, but they may refer to different things in the frontend.
 
-reactflow [has its own definitions](https://reactflow.dev/learn/concepts/terms-and-definitions) of "node", "edge" and "handle" which are closely related to InvokeAI graph concepts.
+reactflow [has its own definitions][reactflow-concepts] of "node", "edge" and "handle" which are closely related to InvokeAI graph concepts.
 
 - A reactflow node is related to an InvokeAI invocation. It has a "data" property, which holds the InvokeAI-specific invocation data.
 - A reactflow edge is roughly equivalent to an InvokeAI edge.
@@ -157,13 +163,13 @@ If it is annotated as a union of a type and list, the type will be flagged as a 
 
 ## Implementation
 
-The majority of data structures in the backend are [pydantic](https://github.com/pydantic/pydantic) models. Pydantic provides OpenAPI schemas for all models and we then generate TypeScript types from those.
+The majority of data structures in the backend are [pydantic] models. Pydantic provides OpenAPI schemas for all models and we then generate TypeScript types from those.
 
 The OpenAPI schema is parsed at runtime into our invocation templates.
 
-Workflows and all related data are modeled in the frontend using [zod](https://github.com/colinhacks/zod). Related types are inferred from the zod schemas.
+Workflows and all related data are modeled in the frontend using [zod]. Related types are inferred from the zod schemas.
 
-> In python, invocations are pydantic models with fields. These fields become inputs. The invocation's `invoke()` function returns a pydantic model - its output. Like the invocation itself, the output model has any number of fields, which become outputs.
+> In python, invocations are pydantic models with fields. These fields become node inputs. The invocation's `invoke()` function returns a pydantic model - its output. Like the invocation itself, the output model has any number of fields, which become node outputs.
 
 ### zod Schemas and Types
 
@@ -176,11 +182,11 @@ Roughly order from lowest-level to highest:
 - `invocation.ts`: invocations and other node types
 - `workflow.ts`: workflows and constituents
 
-We customize the OpenAPI schema to include additional properties on invocation and field schemas. To facilitate parsing this schema into templates, we modify/wrap the types from [openapi-types](https://github.com/kogosoftwarellc/open-api/tree/main/packages/openapi-types) in `openapi.ts`.
+We customize the OpenAPI schema to include additional properties on invocation and field schemas. To facilitate parsing this schema into templates, we modify/wrap the types from [openapi-types] in `openapi.ts`.
 
 ### OpenAPI Schema Parsing
 
-The entrypoint for the OpenAPI schema parsing is `invokeai/frontend/web/src/features/nodes/util/parseSchema.ts`.
+Schema parsing logic lives in `invokeai/frontend/web/src/features/nodes/util/schema/`. The entrypoint is `parseSchema.ts`.
 
 General logic flow:
 
@@ -208,7 +214,7 @@ type FieldType = {
 };
 ```
 
-The parsing logic is in `invokeai/frontend/web/src/features/nodes/util/parseFieldType.ts`.
+The parsing logic is in `parseFieldType.ts`.
 
 There are 4 general cases for field type parsing.
 
@@ -222,7 +228,9 @@ We create a field type name from this `type` string (e.g. `string` -> `StringFie
 
 When a field is annotated as a pydantic model (e.g. `ImageField`, `MainModelField`, `ControlField`), it is represented as a **reference object**. Reference objects are pointers to another schema or reference object within the schema.
 
-We need to **dereference**[^dereference] the schema to pull these out. Dereferencing may require recursion. We use the reference object's name directly for the field type name.
+We need to **dereference** the schema to pull these out. Dereferencing may require recursion. We use the reference object's name directly for the field type name.
+
+> Unfortunately, at this time, we've had limited success using external libraries to deference at runtime, so we do this ourselves.
 
 ##### Collection Types
 
@@ -244,11 +252,9 @@ Handling this adds a fair bit of complexity, as we now must filter out the `'nul
 
 If there is a single remaining schema object, we must recursively call to `parseFieldType()` to get parse it.
 
-[^dereference]: Unfortunately, at this time, we've had limited success using external libraries to deference at runtime, so we do this ourselves.
-
 #### Building Field Input Templates
 
-Now that we have a field type, we can build an input template for the field. This logic is in `invokeai/frontend/web/src/features/nodes/util/buildFieldInputTemplate.ts`.
+Now that we have a field type, we can build an input template for the field. This logic is in `buildFieldInputTemplate.ts`.
 
 Stateful fields all get a function to build their template, while stateless fields are constructed directly. This is possible because stateless fields have no default value or constraints.
 
@@ -256,6 +262,78 @@ Stateful fields all get a function to build their template, while stateless fiel
 
 Field outputs are similar to stateless fields - they do not have any value in the frontend. When building their templates, we don't need a special function for each field type.
 
-The logic is in `invokeai/frontend/web/src/features/nodes/util/buildFieldOutputTemplate.ts`.
+The logic is in `buildFieldOutputTemplate.ts`.
+
+### Managing reactflow State
+
+As described above, the workflow editor state is the essentially the reactflow state, plus some extra metadata.
+
+We provide reactflow with an array of nodes and edges via redux, and a number of [event handlers][reactflow-events]. These handlers dispatch redux actions, managing nodes and edges.
+
+The pieces of redux state relevant to workflows are:
+
+- `state.nodes.nodes`: the reactflow nodes state
+- `state.nodes.edges`: the reactflow edges state
+- `state.nodes.workflow`: the workflow metadata
+
+#### Building Nodes and Edges
+
+A reactflow node has a few important top-level properties:
+
+- `id`: unique identifier
+- `type`: a string that maps to a react component to render the node
+- `position`: XY coordinates
+- `data`: arbitrary data
+
+When the user adds a node, we build **invocation node data**, storing it in `data`. Invocation properties (e.g. type, version, label, etc.) are copied from the invocation template. Inputs and outputs are built from the invocation template's field templates.
+
+See `invokeai/frontend/web/src/features/nodes/util/node/buildInvocationNode.ts`.
+
+Edges are managed by reactflow, but briefly, they consist of:
+
+- `source`: id of the source node
+- `sourceHandle`: id of the source node handle (output field)
+- `target`: id of the target node
+- `targetHandle`: id of the target node handle (input field)
+
+> Edge creation is gated behind validation logic. This validation compares the input and output field types and overall graph state.
+
+#### Building a Workflow
+
+Building a workflow entity is as simple as dropping the nodes, edges and metadata into an object.
+
+Each node and edge is parsed with a zod schema, which serves to strip out any unneeded data.
+
+See `invokeai/frontend/web/src/features/nodes/util/workflow/buildWorkflow.ts``.
+
+#### Loading a Workflow
+
+Workflows may be loaded from external sources or the user's local instance. In all cases, the workflow needs to be handled with care, as an untrusted object.
+
+Loading has a few stages which may throw or warn if there are problems:
+
+- Parsing the workflow data structure itself, [migrating](#workflow-migrations) it if necessary (throws)
+- Check for a template for each node (warns)
+- Check each node's version against its template (warns)
+- Validate the source and target of each edge (warns)
+
+This validation occurs in `invokeai/frontend/web/src/features/nodes/util/workflow/validateWorkflow.ts`.
+
+If there are no fatal errors, the workflow is then stored in redux state.
 
 ### Workflow Migrations
+
+When the workflow schema changes, we may need to perform some data migrations. This occurs as workflows are loaded. zod schemas for each workflow schema version is retained to facilitate migrations.
+
+Previous schemas are in folders in `invokeai/frontend/web/src/features/nodes/types/`, eg `v1/`.
+
+Migration logic is in `invokeai/frontend/web/src/features/nodes/util/workflow/migrations.ts`.
+
+<!-- links -->
+
+[pydantic]: https://github.com/pydantic/pydantic 'pydantic'
+[zod]: https://github.com/colinhacks/zod 'zod'
+[openapi-types]: https://github.com/kogosoftwarellc/open-api/tree/main/packages/openapi-types 'openapi-types'
+[reactflow]: https://github.com/xyflow/xyflow 'reactflow'
+[reactflow-concepts]: https://reactflow.dev/learn/concepts/terms-and-definitions
+[reactflow-events]: https://reactflow.dev/api-reference/react-flow#event-handlers
