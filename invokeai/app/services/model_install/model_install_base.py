@@ -183,8 +183,12 @@ class ModelInstallServiceBase(ABC):
         """Return the ModelInstallJob corresponding to the provided source."""
 
     @abstractmethod
-    def get_jobs(self) -> Dict[ModelSource, ModelInstallJob]:  # noqa D102
-        """Return a dict in which keys are model sources and values are corresponding model install jobs."""
+    def list_jobs(self, source: Optional[ModelSource]=None) -> List[ModelInstallJob]:  # noqa D102
+        """
+        List active and complete install jobs.
+
+        :param source: Filter by jobs whose sources are a partial match to the argument.
+        """
 
     @abstractmethod
     def prune_jobs(self) -> None:

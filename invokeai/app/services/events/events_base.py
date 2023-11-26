@@ -17,6 +17,7 @@ from invokeai.backend.model_management.models.base import BaseModelType, ModelTy
 
 class EventServiceBase:
     queue_event: str = "queue_event"
+    model_event: str = "model_event"
 
     """Basic event bus, to have an empty stand-in when not needed"""
 
@@ -28,6 +29,13 @@ class EventServiceBase:
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.queue_event,
+            payload={"event": event_name, "data": payload},
+        )
+
+    def __emit_model_event(self, event_name: str, payload: dict) -> None:
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.model_event,
             payload={"event": event_name, "data": payload},
         )
 
@@ -321,7 +329,7 @@ class EventServiceBase:
 
         :param source: Source of the model; local path, repo_id or url
         """
-        self.__emit_queue_event(
+        self.__emit_model_event(
             event_name="model_install_started",
             payload={
                 "source": source
@@ -335,7 +343,7 @@ class EventServiceBase:
         :param source: Source of the model; local path, repo_id or url
         :param key: Model config record key
         """
-        self.__emit_queue_event(
+        self.__emit_model_event(
             event_name="model_install_completed",
             payload={
                 "source": source,
@@ -354,7 +362,7 @@ class EventServiceBase:
         :param source: Source of the model
         :param exception: The exception that raised the error
         """
-        self.__emit_queue_event(
+        self.__emit_model_event(
             event_name="model_install_error",
             payload={
                 "source": source,

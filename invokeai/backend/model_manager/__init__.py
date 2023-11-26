@@ -3,7 +3,6 @@
 from .probe import ModelProbe
 from .config import (
     InvalidModelConfigException,
-    DuplicateModelException,
     ModelConfigFactory,
     BaseModelType,
     ModelType,
@@ -17,7 +16,6 @@ from .search import ModelSearch
 
 __all__ = ['ModelProbe', 'ModelSearch',
            'InvalidModelConfigException',
-           'DuplicateModelException',
            'ModelConfigFactory',
            'BaseModelType',
            'ModelType',

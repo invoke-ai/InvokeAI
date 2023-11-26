@@ -12,10 +12,9 @@ from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.model_records import ModelRecordServiceBase
+from invokeai.app.services.model_records import ModelRecordServiceBase, DuplicateModelException
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    DuplicateModelException,
     InvalidModelConfigException,
 )
 from invokeai.backend.model_manager.config import ModelType, BaseModelType
@@ -25,6 +24,7 @@ from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
 
 from .model_install_base import ModelSource, InstallStatus, ModelInstallJob, ModelInstallServiceBase, UnknownInstallJobException
+
 
 # marker that the queue is done and that thread should exit
 STOP_JOB = ModelInstallJob(source="stop", local_path=Path("/dev/null"))
@@ -75,9 +75,6 @@ class ModelInstallService(ModelInstallServiceBase):
     @property
     def event_bus(self) -> Optional[EventServiceBase]:   # noqa D102
         return self._event_bus
-
-    def get_jobs(self) -> Dict[ModelSource, ModelInstallJob]:  # noqa D102
-        return self._install_jobs
 
     def _start_installer_thread(self) -> None:
         threading.Thread(target=self._install_next_item, daemon=True).start()
@@ -183,6 +180,13 @@ class ModelInstallService(ModelInstallServiceBase):
 
         else:  # waiting for download queue implementation
             raise NotImplementedError
+
+    def list_jobs(self, source: Optional[ModelSource]=None) -> List[ModelInstallJob]:  # noqa D102
+        jobs = self._install_jobs
+        if not source:
+            return jobs.values()
+        else:
+            return [jobs[x] for x in jobs if source in str(x)]
 
     def get_job(self, source: ModelSource) -> ModelInstallJob:  # noqa D102
         try:

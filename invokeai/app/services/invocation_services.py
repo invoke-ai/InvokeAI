@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from .latents_storage.latents_storage_base import LatentsStorageBase
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .model_records import ModelRecordServiceBase
+    from .model_install import ModelInstallServiceBase
     from .names.names_base import NameServiceBase
     from .session_processor.session_processor_base import SessionProcessorBase
     from .session_queue.session_queue_base import SessionQueueBase
@@ -51,6 +52,7 @@ class InvocationServices:
     logger: "Logger"
     model_manager: "ModelManagerServiceBase"
     model_records: "ModelRecordServiceBase"
+    model_install: "ModelRecordInstallServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
     queue: "InvocationQueueABC"
@@ -79,6 +81,7 @@ class InvocationServices:
         logger: "Logger",
         model_manager: "ModelManagerServiceBase",
         model_records: "ModelRecordServiceBase",
+        model_install: "ModelInstallServiceBase",
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
         queue: "InvocationQueueABC",
@@ -105,6 +108,7 @@ class InvocationServices:
         self.logger = logger
         self.model_manager = model_manager
         self.model_records = model_records
+        self.model_install = model_install
         self.processor = processor
         self.performance_statistics = performance_statistics
         self.queue = queue
