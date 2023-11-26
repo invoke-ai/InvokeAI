@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
 import { isInvocationNode } from '../types/invocation';
-import { getNeedsUpdate } from '../store/util/nodeUpdate';
+import { getNeedsUpdate } from '../util/node/nodeUpdate';
 
 export const useNodeNeedsUpdate = (nodeId: string) => {
   const selector = useMemo(

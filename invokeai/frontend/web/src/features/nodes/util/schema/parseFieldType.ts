@@ -1,8 +1,11 @@
 import { t } from 'i18next';
 import { isArray } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
-import { FieldTypeParseError, UnsupportedFieldTypeError } from '../types/error';
-import { FieldType } from '../types/field';
+import {
+  FieldTypeParseError,
+  UnsupportedFieldTypeError,
+} from '../../types/error';
+import { FieldType } from '../../types/field';
 import {
   OpenAPIV3_1SchemaOrRef,
   isArraySchemaObject,
@@ -10,7 +13,7 @@ import {
   isNonArraySchemaObject,
   isRefObject,
   isSchemaObject,
-} from '../types/openapi';
+} from '../../types/openapi';
 
 /**
  * Transforms an invocation output ref object to field type.

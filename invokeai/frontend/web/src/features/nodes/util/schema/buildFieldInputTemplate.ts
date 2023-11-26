@@ -22,8 +22,8 @@ import {
   T2IAdapterModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
   isStatefulFieldType,
-} from '../types/field';
-import { InvocationFieldSchema } from '../types/openapi';
+} from '../../types/field';
+import { InvocationFieldSchema } from '../../types/openapi';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!
