@@ -127,7 +127,7 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
     """Note: may want to break this down into several smaller unit tests."""
     source = test_file
     description = "Test of metadata assignment"
-    job = installer.import_model(source, inplace=False, metadata={"description": description})
+    job = installer.import_model(source, inplace=False, config={"description": description})
     assert job is not None
     assert isinstance(job, ModelInstallJob)
 
@@ -172,9 +172,10 @@ def test_delete_install(installer: ModelInstallServiceBase, test_file: Path, app
     key = installer.install_path(test_file)
     model_record = store.get_model(key)
     assert Path(app_config.models_dir / model_record.path).exists()
-    assert not test_file.exists()  # original should not still be there after installation
+    assert test_file.exists()  # original should still be there after installation
     installer.delete(key)
-    assert not Path(app_config.models_dir / model_record.path).exists()  # but installed copy should not!
+    assert not Path(app_config.models_dir / model_record.path).exists()  # after deletion, installed copy should not exist
+    assert test_file.exists()  # but original should still be there
     with pytest.raises(UnknownModelException):
         store.get_model(key)
 

@@ -21,9 +21,9 @@ if TYPE_CHECKING:
     from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from .item_storage.item_storage_base import ItemStorageABC
     from .latents_storage.latents_storage_base import LatentsStorageBase
+    from .model_install import ModelInstallServiceBase
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .model_records import ModelRecordServiceBase
-    from .model_install import ModelInstallServiceBase
     from .names.names_base import NameServiceBase
     from .session_processor.session_processor_base import SessionProcessorBase
     from .session_queue.session_queue_base import SessionQueueBase
@@ -52,7 +52,7 @@ class InvocationServices:
     logger: "Logger"
     model_manager: "ModelManagerServiceBase"
     model_records: "ModelRecordServiceBase"
-    model_install: "ModelRecordInstallServiceBase"
+    model_install: "ModelInstallServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
     queue: "InvocationQueueABC"

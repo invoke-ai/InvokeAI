@@ -351,6 +351,29 @@ class EventServiceBase:
             },
         )
 
+    def emit_model_install_progress(self,
+                                    source: str,
+                                    current_bytes: int,
+                                    total_bytes: int,
+                                    ) -> None:
+        """
+        Emitted while the install job is in progress.
+        (Downloaded models only)
+
+        :param source: Source of the model
+        :param current_bytes: Number of bytes downloaded so far
+        :param total_bytes: Total bytes to download
+        """
+        self.__emit_model_event(
+            event_name="model_install_progress",
+            payload={
+                "source": source,
+                "current_bytes": int,
+                "total_bytes": int,
+            },
+        )
+
+
     def emit_model_install_error(self,
                                  source: str,
                                  error_type: str,

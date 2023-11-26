@@ -23,9 +23,9 @@ from ..services.invoker import Invoker
 from ..services.item_storage.item_storage_sqlite import SqliteItemStorage
 from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
+from ..services.model_install import ModelInstallService
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
-from ..services.model_install import ModelInstallService
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue

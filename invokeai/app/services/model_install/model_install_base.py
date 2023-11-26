@@ -9,7 +9,9 @@ from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
+from invokeai.backend.model_manager import AnyModelConfig
 
 
 class InstallStatus(str, Enum):
@@ -31,13 +33,13 @@ ModelSource = Union[str, Path, AnyHttpUrl]
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Configuration metadata to apply to model before installing it")
+    config_in: Dict[str, Any] = Field(default_factory=dict, description="Configuration information (e.g. 'description') to apply to model.")
+    config_out: Optional[AnyModelConfig] = Field(default=None, description="After successful installation, this will hold the configuration object.")
     inplace: bool = Field(default=False, description="Leave model in its current location; otherwise install under models directory")
     source: ModelSource = Field(description="Source (URL, repo_id, or local path) of model")
     local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
-    key: str = Field(default="<NO KEY>", description="After model is installed, this is its config record key")
-    error_type: str = Field(default="", description="Class name of the exception that led to status==ERROR")
-    error: str = Field(default="", description="Error traceback")  # noqa #501
+    error_type: Optional[str] = Field(default=None, description="Class name of the exception that led to status==ERROR")
+    error: Optional[str] = Field(default=None, description="Error traceback")  # noqa #501
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
@@ -64,6 +66,9 @@ class ModelInstallServiceBase(ABC):
         :param event_bus: InvokeAI event bus for reporting events to.
         """
 
+    def start(self, invoker: Invoker) -> None:
+        self.sync_to_config()
+
     @property
     @abstractmethod
     def app_config(self) -> InvokeAIAppConfig:
@@ -83,7 +88,7 @@ class ModelInstallServiceBase(ABC):
     def register_path(
             self,
             model_path: Union[Path, str],
-            metadata: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Probe and register the model at model_path.
@@ -91,7 +96,7 @@ class ModelInstallServiceBase(ABC):
         This keeps the model in its current location.
 
         :param model_path: Filesystem Path to the model.
-        :param metadata: Dict of attributes that will override autoassigned values.
+        :param config: Dict of attributes that will override autoassigned values.
         :returns id: The string ID of the registered model.
         """
 
@@ -111,7 +116,7 @@ class ModelInstallServiceBase(ABC):
     def install_path(
             self,
             model_path: Union[Path, str],
-            metadata: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Probe, register and install the model in the models directory.
@@ -120,7 +125,7 @@ class ModelInstallServiceBase(ABC):
         the models directory handled by InvokeAI.
 
         :param model_path: Filesystem Path to the model.
-        :param metadata: Dict of attributes that will override autoassigned values.
+        :param config: Dict of attributes that will override autoassigned values.
         :returns id: The string ID of the registered model.
         """
 
@@ -128,10 +133,10 @@ class ModelInstallServiceBase(ABC):
     def import_model(
             self,
             source: Union[str, Path, AnyHttpUrl],
-            inplace: bool = True,
+            inplace: bool = False,
             variant: Optional[str] = None,
             subfolder: Optional[str] = None,
-            metadata: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
             access_token: Optional[str] = None,
     ) -> ModelInstallJob:
         """Install the indicated model.
@@ -147,8 +152,9 @@ class ModelInstallServiceBase(ABC):
         :param subfolder: When downloading HF repo_ids this can be used to
          specify a subfolder of the HF repository to download from.
 
-        :param metadata: Optional dict. Any fields in this dict
-         will override corresponding autoassigned probe fields. Use it to override
+        :param config: Optional dict. Any fields in this dict
+         will override corresponding autoassigned probe fields in the
+         model's config record. Use it to override
          `name`, `description`, `base_type`, `model_type`, `format`,
          `prediction_type`, `image_size`, and/or `ztsnr_training`.
 

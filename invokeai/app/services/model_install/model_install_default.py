@@ -5,26 +5,30 @@ from hashlib import sha256
 from pathlib import Path
 from queue import Queue
 from random import randbytes
-from shutil import move, rmtree
-from typing import Any, Dict, List, Set, Optional, Union
-
-from pydantic.networks import AnyHttpUrl
+from shutil import copyfile, copytree, move, rmtree
+from typing import Any, Dict, List, Optional, Set, Union
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.model_records import ModelRecordServiceBase, DuplicateModelException
+from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
+    BaseModelType,
     InvalidModelConfigException,
+    ModelType,
 )
-from invokeai.backend.model_manager.config import ModelType, BaseModelType
 from invokeai.backend.model_manager.hash import FastModelHash
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
 
-from .model_install_base import ModelSource, InstallStatus, ModelInstallJob, ModelInstallServiceBase, UnknownInstallJobException
-
+from .model_install_base import (
+    InstallStatus,
+    ModelInstallJob,
+    ModelInstallServiceBase,
+    ModelSource,
+    UnknownInstallJobException,
+)
 
 # marker that the queue is done and that thread should exit
 STOP_JOB = ModelInstallJob(source="stop", local_path=Path("/dev/null"))
@@ -91,10 +95,12 @@ class ModelInstallService(ModelInstallServiceBase):
             try:
                 self._signal_job_running(job)
                 if job.inplace:
-                    job.key = self.register_path(job.local_path, job.metadata)
+                    key = self.register_path(job.local_path, job.config_in)
                 else:
-                    job.key = self.install_path(job.local_path, job.metadata)
+                    key = self.install_path(job.local_path, job.config_in)
+                job.config_out = self.record_store.get_model(key)
                 self._signal_job_completed(job)
+
             except (OSError, DuplicateModelException, InvalidModelConfigException) as excp:
                 self._signal_job_errored(job, excp)
             finally:
@@ -109,67 +115,73 @@ class ModelInstallService(ModelInstallServiceBase):
         job.status = InstallStatus.COMPLETED
         if self._event_bus:
             assert job.local_path is not None
-            self._event_bus.emit_model_install_completed(str(job.source), job.key)
+            assert job.config_out is not None
+            key = job.config_out.key
+            self._event_bus.emit_model_install_completed(str(job.source), key)
 
     def _signal_job_errored(self, job: ModelInstallJob, excp: Exception) -> None:
         job.set_error(excp)
         if self._event_bus:
-            self._event_bus.emit_model_install_error(str(job.source), job.error_type, job.error)
+            error_type = job.error_type
+            error = job.error
+            assert error_type is not None
+            assert error is not None
+            self._event_bus.emit_model_install_error(str(job.source), error_type, error)
 
     def register_path(
             self,
             model_path: Union[Path, str],
-            metadata: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
     ) -> str:    # noqa D102
         model_path = Path(model_path)
-        metadata = metadata or {}
-        if metadata.get('source') is None:
-            metadata['source'] = model_path.resolve().as_posix()
-        return self._register(model_path, metadata)
+        config = config or {}
+        if config.get('source') is None:
+            config['source'] = model_path.resolve().as_posix()
+        return self._register(model_path, config)
 
     def install_path(
             self,
             model_path: Union[Path, str],
-            metadata: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
     ) -> str:    # noqa D102
         model_path = Path(model_path)
-        metadata = metadata or {}
-        if metadata.get('source') is None:
-            metadata['source'] = model_path.resolve().as_posix()
+        config = config or {}
+        if config.get('source') is None:
+            config['source'] = model_path.resolve().as_posix()
 
-        info: AnyModelConfig = self._probe_model(Path(model_path), metadata)
+        info: AnyModelConfig = self._probe_model(Path(model_path), config)
 
         old_hash = info.original_hash
         dest_path = self.app_config.models_path / info.base.value / info.type.value / model_path.name
-        new_path = self._move_model(model_path, dest_path)
+        new_path = self._copy_model(model_path, dest_path)
         new_hash = FastModelHash.hash(new_path)
         assert new_hash == old_hash, f"{model_path}: Model hash changed during installation, possibly corrupted."
 
         return self._register(
             new_path,
-            metadata,
+            config,
             info,
         )
 
     def import_model(
             self,
             source: ModelSource,
-            inplace: bool = True,
+            inplace: bool = False,
             variant: Optional[str] = None,
             subfolder: Optional[str] = None,
-            metadata: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None,
             access_token: Optional[str] = None,
     ) -> ModelInstallJob:      # noqa D102
         # Clean up a common source of error. Doesn't work with Paths.
         if isinstance(source, str):
             source = source.strip()
 
-        if not metadata:
-            metadata = {}
+        if not config:
+            config = {}
 
         # Installing a local path
         if isinstance(source, (str, Path)) and Path(source).exists():  # a path that is already on disk
-            job = ModelInstallJob(metadata=metadata,
+            job = ModelInstallJob(config_in=config,
                                   source=source,
                                   inplace=inplace,
                                   local_path=Path(source),
@@ -179,7 +191,7 @@ class ModelInstallService(ModelInstallServiceBase):
             return job
 
         else:  # here is where we'd download a URL or repo_id. Implementation pending download queue.
-            raise NotImplementedError
+            raise UnknownModelException("File or directory not found")
 
     def list_jobs(self, source: Optional[ModelSource]=None) -> List[ModelInstallJob]:  # noqa D102
         jobs = self._install_jobs
@@ -212,7 +224,9 @@ class ModelInstallService(ModelInstallServiceBase):
         self._scan_models_directory()
         if autoimport := self._app_config.autoimport_dir:
             self._logger.info("Scanning autoimport directory for new models")
-            self.scan_directory(self._app_config.root_path / autoimport)
+            installed = self.scan_directory(self._app_config.root_path / autoimport)
+            self._logger.info(f"{len(installed)} new models registered")
+        self._logger.info("Model installer (re)initialized")
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:      # noqa D102
         self._cached_model_paths = {Path(x.path) for x in self.record_store.all_models()}
@@ -242,7 +256,7 @@ class ModelInstallService(ModelInstallServiceBase):
             for key in defunct_models:
                 self.unregister(key)
 
-            self._logger.info(f"Scanning {self._app_config.models_path} for new models")
+            self._logger.info(f"Scanning {self._app_config.models_path} for new and orphaned models")
             for cur_base_model in BaseModelType:
                 for cur_model_type in ModelType:
                     models_dir = Path(cur_base_model.value, cur_model_type.value)
@@ -328,6 +342,16 @@ class ModelInstallService(ModelInstallServiceBase):
             path.unlink()
         self.unregister(key)
 
+    def _copy_model(self, old_path: Path, new_path: Path) -> Path:
+        if old_path == new_path:
+            return old_path
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        if old_path.is_dir():
+            copytree(old_path, new_path)
+        else:
+            copyfile(old_path, new_path)
+        return new_path
+
     def _move_model(self, old_path: Path, new_path: Path) -> Path:
         if old_path == new_path:
             return old_path
@@ -344,10 +368,10 @@ class ModelInstallService(ModelInstallServiceBase):
         move(old_path, new_path)
         return new_path
 
-    def _probe_model(self, model_path: Path, metadata: Optional[Dict[str, Any]] = None) -> AnyModelConfig:
+    def _probe_model(self, model_path: Path, config: Optional[Dict[str, Any]] = None) -> AnyModelConfig:
         info: AnyModelConfig = ModelProbe.probe(Path(model_path))
-        if metadata:  # used to override probe fields
-            for key, value in metadata.items():
+        if config:  # used to override probe fields
+            for key, value in config.items():
                 setattr(info, key, value)
         return info
 
@@ -356,10 +380,10 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _register(self,
                   model_path: Path,
-                  metadata: Optional[Dict[str, Any]] = None,
+                  config: Optional[Dict[str, Any]] = None,
                   info: Optional[AnyModelConfig] = None) -> str:
 
-        info = info or ModelProbe.probe(model_path, metadata)
+        info = info or ModelProbe.probe(model_path, config)
         key = self._create_key()
 
         model_path = model_path.absolute()

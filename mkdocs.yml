@@ -164,6 +164,7 @@ nav:
         - Overview: 'contributing/contribution_guides/development.md'
         - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
         - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
+        - Model Manager v2: 'contributing/MODEL_MANAGER.md'
         - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
         - Adding Tests: 'contributing/TESTS.md'
