@@ -273,10 +273,10 @@ export const buildLinearTextToImageGraph = (
 
   addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
-  // High resolution fix.
+  // Add High resolution fix.
   // NOTE: Not supported for onnx models.
   if (state.generation.hrfEnabled && !isUsingOnnxModel) {
-    addHrfToGraph(state, graph, DENOISE_LATENTS);
+    addHrfToGraph(state, graph, DENOISE_LATENTS, MAIN_MODEL_LOADER);
   }
 
   // NSFW & watermark - must be last thing added to graph

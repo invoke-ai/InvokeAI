@@ -4,6 +4,7 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addHrfToGraph } from './addHrfToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -65,6 +66,8 @@ export const buildLinearSDXLTextToImageGraph = (
   // Construct Style Prompt
   const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
     buildSDXLStylePrompts(state);
+
+  const isUsingOnnxModel = model.model_type === 'onnx';
 
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
@@ -272,6 +275,12 @@ export const buildLinearSDXLTextToImageGraph = (
   addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+
+  // Add High resolution fix.
+  // NOTE: Not supported for onnx models.
+  if (state.generation.hrfEnabled && !isUsingOnnxModel) {
+    addHrfToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
+  }
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

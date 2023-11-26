@@ -10,14 +10,12 @@ import {
   NoiseInvocation,
 } from 'services/api/types';
 import {
-  DENOISE_LATENTS,
   DENOISE_LATENTS_HRF,
   ESRGAN_HRF,
   IMAGE_TO_LATENTS_HRF,
   LATENTS_TO_IMAGE,
   LATENTS_TO_IMAGE_HRF_HR,
   LATENTS_TO_IMAGE_HRF_LR,
-  MAIN_MODEL_LOADER,
   NOISE,
   NOISE_HRF,
   RESIZE_HRF,
@@ -114,7 +112,8 @@ export const addHrfToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   // The final denoise latents in the graph.
-  finalDenoiseLatents: string
+  finalDenoiseLatentsNodeId: string,
+  modelLoaderNodeId: string
 ): void => {
   // Double check hrf is enabled.
   if (
@@ -139,7 +138,7 @@ export const addHrfToGraph = (
     height
   );
 
-  const finalDenoiseLatentsNode = graph.nodes[finalDenoiseLatents] as
+  const finalDenoiseLatentsNode = graph.nodes[finalDenoiseLatentsNodeId] as
     | DenoiseLatentsInvocation
     | undefined;
   const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation | undefined;
@@ -175,7 +174,7 @@ export const addHrfToGraph = (
   graph.edges.push(
     {
       source: {
-        node_id: DENOISE_LATENTS,
+        node_id: finalDenoiseLatentsNodeId,
         field: 'latents',
       },
       destination: {
@@ -185,7 +184,7 @@ export const addHrfToGraph = (
     },
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -286,7 +285,7 @@ export const addHrfToGraph = (
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -349,7 +348,7 @@ export const addHrfToGraph = (
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
