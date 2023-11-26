@@ -1,14 +1,15 @@
-from typing import Any
 import sys
+from typing import Any
 
 from fastapi.responses import HTMLResponse
-
-from .services.config import InvokeAIAppConfig
 
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
 from invokeai.version.invokeai_version import __version__
+
+from .services.config import InvokeAIAppConfig
+
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
 if app_config.version:
@@ -55,7 +56,12 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         workflows,
     )
     from .api.sockets import SocketIO
-    from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
+    from .invocations.baseinvocation import (
+        BaseInvocation,
+        UIConfigBase,
+        _InputField,
+        _OutputField,
+    )
 
     if is_mps_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
