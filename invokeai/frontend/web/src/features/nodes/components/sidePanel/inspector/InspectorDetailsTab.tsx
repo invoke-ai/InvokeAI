@@ -11,7 +11,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { getNeedsUpdate } from 'features/nodes/store/util/nodeUpdate';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import {
   InvocationNodeData,
   InvocationTemplate,

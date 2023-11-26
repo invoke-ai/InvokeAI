@@ -2,10 +2,10 @@ import { parseify } from 'common/util/serialize';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
 import { JsonObject } from 'type-fest';
-import { getNeedsUpdate } from '../store/util/nodeUpdate';
-import { InvocationTemplate } from '../types/invocation';
-import { parseAndMigrateWorkflow } from '../types/migration/migrations';
-import { WorkflowV2, isWorkflowInvocationNode } from '../types/workflow';
+import { getNeedsUpdate } from '../node/nodeUpdate';
+import { InvocationTemplate } from '../../types/invocation';
+import { parseAndMigrateWorkflow } from '../../types/migration/migrations';
+import { WorkflowV2, isWorkflowInvocationNode } from '../../types/workflow';
 
 type WorkflowWarning = {
   message: string;

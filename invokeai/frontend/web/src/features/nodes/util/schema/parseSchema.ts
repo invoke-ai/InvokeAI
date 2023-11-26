@@ -3,15 +3,18 @@ import { parseify } from 'common/util/serialize';
 import { t } from 'i18next';
 import { reduce } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
-import { FieldTypeParseError, UnsupportedFieldTypeError } from '../types/error';
-import { FieldInputTemplate, FieldOutputTemplate } from '../types/field';
-import { InvocationTemplate } from '../types/invocation';
+import {
+  FieldTypeParseError,
+  UnsupportedFieldTypeError,
+} from '../../types/error';
+import { FieldInputTemplate, FieldOutputTemplate } from '../../types/field';
+import { InvocationTemplate } from '../../types/invocation';
 import {
   InvocationSchemaObject,
   isInvocationFieldSchema,
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
-} from '../types/openapi';
+} from '../../types/openapi';
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
 import { parseFieldType } from './parseFieldType';

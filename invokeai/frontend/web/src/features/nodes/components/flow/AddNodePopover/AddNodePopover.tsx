@@ -11,7 +11,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-import { useBuildNodeData } from 'features/nodes/hooks/useBuildNodeData';
+import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   addNodePopoverClosed,
   addNodePopoverOpened,
@@ -51,7 +51,7 @@ const selectFilter = (value: string, item: NodeTemplate) => {
 
 const AddNodePopover = () => {
   const dispatch = useAppDispatch();
-  const buildInvocation = useBuildNodeData();
+  const buildInvocation = useBuildNode();
   const toaster = useAppToaster();
   const { t } = useTranslation();
 

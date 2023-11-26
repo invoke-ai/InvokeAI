@@ -1,5 +1,5 @@
 import { enqueueRequested } from 'app/store/actions';
-import { buildNodesGraph } from 'features/nodes/util/graphBuilders/buildNodesGraph';
+import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { queueApi } from 'services/api/endpoints/queue';
 import { BatchConfig } from 'services/api/types';
 import { startAppListening } from '..';
