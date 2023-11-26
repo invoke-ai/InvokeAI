@@ -59,10 +59,9 @@ The user-managed parameters on these tabs are stored as simple objects in the ap
 
 This logic can be fairly complex due to the range of features available and their interactions. Depending on the parameters selected, the graph may be very different. Building graphs in code can be challenging - you are trying to construct a non-linear structure in a linear context.
 
-The simplest graph building logic is for **Text to Image** with a SD1.5 model:
-`invokeai/frontend/web/src/features/nodes/util/graph/buildLinearTextToImageGraph.ts`
+The simplest graph building logic is for **Text to Image** with a SD1.5 model: [buildLinearTextToImageGraph.ts]
 
-There are many other graph builders in the same folder for different tabs or base models (e.g. SDXL). Some are pretty hairy.
+There are many other graph builders in the same directory for different tabs or base models (e.g. SDXL). Some are pretty hairy.
 
 In the Linear UI, we go straight from **simple application state** to **graph** via these builders.
 
@@ -95,10 +94,10 @@ To support these qualities, workflows are serializable, have a versioned schemas
 
 Given a workflow, we need to be able to derive reactflow state and/or an InvokeAI graph from it.
 
-The first step - workflow to reactflow state - is very simple. The logic is in `invokeai/frontend/web/src/features/nodes/store/nodesSlice.ts`, in the `workflowLoaded` reducer.
+The first step - workflow to reactflow state - is very simple. The logic is in [nodesSlice.ts], in the `workflowLoaded` reducer.
 
 The reactflow state is, however, structurally incompatible with our backend's graph structure. When a user invokes on a Workflow, we need to convert the reactflow state into an InvokeAI graph. This is far simpler than the graph building logic from the Linear UI:
-`invokeai/frontend/web/src/features/nodes/util/graph/buildNodesGraph.ts`
+[buildNodesGraph.ts]
 
 ##### Nodes vs Invocations
 
@@ -173,7 +172,7 @@ Workflows and all related data are modeled in the frontend using [zod]. Related 
 
 ### zod Schemas and Types
 
-The zod schemas, inferred types, and type guards are in `invokeai/frontend/web/src/features/nodes/types/`.
+The zod schemas, inferred types, and type guards are in [types/].
 
 Roughly order from lowest-level to highest:
 
@@ -186,7 +185,7 @@ We customize the OpenAPI schema to include additional properties on invocation a
 
 ### OpenAPI Schema Parsing
 
-Schema parsing logic lives in `invokeai/frontend/web/src/features/nodes/util/schema/`. The entrypoint is `parseSchema.ts`.
+The entrypoint for OpenAPI schema parsing is [parseSchema.ts].
 
 General logic flow:
 
@@ -254,15 +253,17 @@ If there is a single remaining schema object, we must recursively call to `parse
 
 #### Building Field Input Templates
 
-Now that we have a field type, we can build an input template for the field. This logic is in `buildFieldInputTemplate.ts`.
+Now that we have a field type, we can build an input template for the field.
 
 Stateful fields all get a function to build their template, while stateless fields are constructed directly. This is possible because stateless fields have no default value or constraints.
+
+See [buildFieldInputTemplate.ts].
 
 #### Building Field Output Templates
 
 Field outputs are similar to stateless fields - they do not have any value in the frontend. When building their templates, we don't need a special function for each field type.
 
-The logic is in `buildFieldOutputTemplate.ts`.
+See [buildFieldOutputTemplate.ts].
 
 ### Managing reactflow State
 
@@ -287,7 +288,7 @@ A reactflow node has a few important top-level properties:
 
 When the user adds a node, we build **invocation node data**, storing it in `data`. Invocation properties (e.g. type, version, label, etc.) are copied from the invocation template. Inputs and outputs are built from the invocation template's field templates.
 
-See `invokeai/frontend/web/src/features/nodes/util/node/buildInvocationNode.ts`.
+See [buildInvocationNode.ts].
 
 Edges are managed by reactflow, but briefly, they consist of:
 
@@ -304,7 +305,7 @@ Building a workflow entity is as simple as dropping the nodes, edges and metadat
 
 Each node and edge is parsed with a zod schema, which serves to strip out any unneeded data.
 
-See `invokeai/frontend/web/src/features/nodes/util/workflow/buildWorkflow.ts``.
+See [buildWorkflow.ts].
 
 #### Loading a Workflow
 
@@ -317,7 +318,7 @@ Loading has a few stages which may throw or warn if there are problems:
 - Check each node's version against its template (warns)
 - Validate the source and target of each edge (warns)
 
-This validation occurs in `invokeai/frontend/web/src/features/nodes/util/workflow/validateWorkflow.ts`.
+This validation occurs in [validateWorkflow.ts].
 
 If there are no fatal errors, the workflow is then stored in redux state.
 
@@ -327,7 +328,7 @@ When the workflow schema changes, we may need to perform some data migrations. T
 
 Previous schemas are in folders in `invokeai/frontend/web/src/features/nodes/types/`, eg `v1/`.
 
-Migration logic is in `invokeai/frontend/web/src/features/nodes/util/workflow/migrations.ts`.
+Migration logic is in [migrations.ts].
 
 <!-- links -->
 
@@ -337,3 +338,13 @@ Migration logic is in `invokeai/frontend/web/src/features/nodes/util/workflow/mi
 [reactflow]: https://github.com/xyflow/xyflow 'reactflow'
 [reactflow-concepts]: https://reactflow.dev/learn/concepts/terms-and-definitions
 [reactflow-events]: https://reactflow.dev/api-reference/react-flow#event-handlers
+[buildWorkflow.ts]: ../src/features/nodes/util/workflow/buildWorkflow.ts
+[nodesSlice.ts]: ../src/features/nodes/store/nodesSlice.ts
+[buildLinearTextToImageGraph.ts]: ../src/features/nodes/util/graph/buildLinearTextToImageGraph.ts
+[buildNodesGraph.ts]: ../src/features/nodes/util/graph/buildNodesGraph.ts
+[buildInvocationNode.ts]: ../src/features/nodes/util/node/buildInvocationNode.ts
+[validateWorkflow.ts]: ../src/features/nodes/util/workflow/validateWorkflow.ts
+[migrations.ts]: ../src/features/nodes/util/workflow/migrations.ts
+[parseSchema.ts]: ../src/features/nodes/util/schema/parseSchema.ts
+[buildFieldInputTemplate.ts]: ../src/features/nodes/util/schema/buildFieldInputTemplate.ts
+[buildFieldOutputTemplate.ts]: ../src/features/nodes/util/schema/buildFieldOutputTemplate.ts
