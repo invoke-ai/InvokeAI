@@ -28,7 +28,7 @@ import {
   appSocketQueueItemStatusChanged,
 } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
-import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
+import { SHARED_NODE_PROPERTIES } from '../types/constants';
 import {
   BoardFieldValue,
   BooleanFieldValue,
@@ -50,7 +50,7 @@ import {
   VAEModelFieldValue,
 } from '../types/field';
 import {
-  AnyNodeData,
+  AnyNode,
   InvocationTemplate,
   isInvocationNode,
   isNotesNode,
@@ -157,7 +157,7 @@ const nodesSlice = createSlice({
       }
       state.nodes[nodeIndex] = action.payload.node;
     },
-    nodeAdded: (state, action: PayloadAction<Node<AnyNodeData>>) => {
+    nodeAdded: (state, action: PayloadAction<AnyNode>) => {
       const node = action.payload;
       const position = findUnoccupiedPosition(
         state.nodes,
@@ -520,7 +520,7 @@ const nodesSlice = createSlice({
         state.edges = applyEdgeChanges(edgeChanges, state.edges);
       }
     },
-    nodesDeleted: (state, action: PayloadAction<Node<AnyNodeData>[]>) => {
+    nodesDeleted: (state, action: PayloadAction<AnyNode[]>) => {
       action.payload.forEach((node) => {
         state.workflow.exposedFields = state.workflow.exposedFields.filter(
           (f) => f.nodeId !== node.id
@@ -731,7 +731,7 @@ const nodesSlice = createSlice({
 
       state.nodes = applyNodeChanges(
         nodes.map((node) => ({
-          item: { ...node, dragHandle: `.${DRAG_HANDLE_CLASSNAME}` },
+          item: { ...node, ...SHARED_NODE_PROPERTIES },
           type: 'add',
         })),
         []
