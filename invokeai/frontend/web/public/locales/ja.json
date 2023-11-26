@@ -660,7 +660,7 @@
         "queueTotal": "合計 {{total}}",
         "resumeSucceeded": "処理が再開されました",
         "resumeTooltip": "処理を再開",
-        "resume": "再会",
+        "resume": "再開",
         "status": "ステータス",
         "pruneSucceeded": "キューから完了アイテム{{item_count}}件を削除しました",
         "cancelTooltip": "現在のアイテムをキャンセル",

@@ -89,7 +89,9 @@
         "t2iAdapter": "Adattatore T2I",
         "controlAdapter": "Adattatore di Controllo",
         "controlNet": "ControlNet",
-        "auto": "Automatico"
+        "auto": "Automatico",
+        "simple": "Semplice",
+        "details": "Dettagli"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -108,7 +110,6 @@
         "deleteImage": "Elimina l'immagine",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
         "deleteImageBin": "Le immagini eliminate verranno spostate nel Cestino del tuo sistema operativo.",
-        "images": "Immagini",
         "assets": "Risorse",
         "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
@@ -120,7 +121,8 @@
         "setCurrentImage": "Imposta come immagine corrente",
         "preparingDownload": "Preparazione del download",
         "preparingDownloadFailed": "Problema durante la preparazione del download",
-        "downloadSelection": "Scarica gli elementi selezionati"
+        "downloadSelection": "Scarica gli elementi selezionati",
+        "noImageSelected": "Nessuna immagine selezionata"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti rapidi",
@@ -474,7 +476,8 @@
         "closeAdvanced": "Chiudi Avanzate",
         "modelType": "Tipo di modello",
         "customConfigFileLocation": "Posizione del file di configurazione personalizzato",
-        "vaePrecision": "Precisione VAE"
+        "vaePrecision": "Precisione VAE",
+        "noModelSelected": "Nessun modello selezionato"
     },
     "parameters": {
         "images": "Immagini",
@@ -601,7 +604,9 @@
         "seamlessX": "Senza cuciture X",
         "seamlessY": "Senza cuciture Y",
         "imageActions": "Azioni Immagine",
-        "aspectRatioFree": "Libere"
+        "aspectRatioFree": "Libere",
+        "maskEdge": "Maschera i bordi",
+        "unmasked": "No maschera"
     },
     "settings": {
         "models": "Modelli",
@@ -642,7 +647,10 @@
         "clearIntermediatesWithCount_one": "Cancella {{count}} immagine intermedia",
         "clearIntermediatesWithCount_many": "Cancella {{count}} immagini intermedie",
         "clearIntermediatesWithCount_other": "Cancella {{count}} immagini intermedie",
-        "clearIntermediatesDisabled": "La coda deve essere vuota per cancellare le immagini intermedie"
+        "clearIntermediatesDisabled": "La coda deve essere vuota per cancellare le immagini intermedie",
+        "enableNSFWChecker": "Abilita controllo NSFW",
+        "enableInvisibleWatermark": "Abilita filigrana invisibile",
+        "enableInformationalPopovers": "Abilita testo informativo a comparsa"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -727,7 +735,8 @@
         "setCanvasInitialImage": "Imposta come immagine iniziale della tela",
         "workflowLoaded": "Flusso di lavoro caricato",
         "setIPAdapterImage": "Imposta come immagine per l'Adattatore IP",
-        "problemSavingMaskDesc": "Impossibile salvare la maschera"
+        "problemSavingMaskDesc": "Impossibile salvare la maschera",
+        "setAsCanvasInitialImage": "Imposta come immagine iniziale della tela"
     },
     "tooltip": {
         "feature": {
@@ -828,7 +837,8 @@
         "modifyConfig": "Modifica configurazione",
         "menu": "Menu",
         "showGalleryPanel": "Mostra il pannello Galleria",
-        "loadMore": "Carica altro"
+        "loadMore": "Carica altro",
+        "mode": "Modalità"
     },
     "ui": {
         "hideProgressImages": "Nascondi avanzamento immagini",
@@ -1048,7 +1058,11 @@
         "noMatching": "Nessuna bacheca corrispondente",
         "selectBoard": "Seleziona una Bacheca",
         "uncategorized": "Non categorizzato",
-        "downloadBoard": "Scarica la bacheca"
+        "downloadBoard": "Scarica la bacheca",
+        "deleteBoardOnly": "Elimina solo la Bacheca",
+        "deleteBoard": "Elimina Bacheca",
+        "deleteBoardAndImages": "Elimina Bacheca e Immagini",
+        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate"
     },
     "controlnet": {
         "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
@@ -1089,7 +1103,7 @@
         "none": "Nessuno",
         "incompatibleBaseModel": "Modello base incompatibile:",
         "pidiDescription": "Elaborazione immagini PIDI",
-        "fill": "Riempire",
+        "fill": "Riempie",
         "colorMapDescription": "Genera una mappa dei colori dall'immagine",
         "lineartAnimeDescription": "Elaborazione lineart in stile anime",
         "imageResolution": "Risoluzione dell'immagine",
@@ -1183,7 +1197,9 @@
         "clearQueueAlertDialog2": "Sei sicuro di voler cancellare la coda?",
         "item": "Elemento",
         "graphFailedToQueue": "Impossibile mettere in coda il grafico",
-        "queueMaxExceeded": "È stato superato il limite massimo di {{max_queue_size}} e {{skip}} elementi verrebbero saltati"
+        "queueMaxExceeded": "È stato superato il limite massimo di {{max_queue_size}} e {{skip}} elementi verrebbero saltati",
+        "batchFieldValues": "Valori Campi Lotto",
+        "time": "Tempo"
     },
     "embedding": {
         "noMatchingEmbedding": "Nessun Incorporamento corrispondente",
@@ -1199,7 +1215,9 @@
         "selectModel": "Seleziona un modello",
         "selectLoRA": "Seleziona un LoRA",
         "noRefinerModelsInstalled": "Nessun modello SDXL Refiner installato",
-        "noLoRAsInstalled": "Nessun LoRA installato"
+        "noLoRAsInstalled": "Nessun LoRA installato",
+        "esrganModel": "Modello ESRGAN",
+        "addLora": "Aggiungi LoRA"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1231,7 +1249,8 @@
         "promptsWithCount_one": "{{count}} Prompt",
         "promptsWithCount_many": "{{count}} Prompt",
         "promptsWithCount_other": "{{count}} Prompt",
-        "dynamicPrompts": "Prompt dinamici"
+        "dynamicPrompts": "Prompt dinamici",
+        "promptsPreview": "Anteprima dei prompt"
     },
     "popovers": {
         "paramScheduler": {

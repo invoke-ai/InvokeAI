@@ -110,7 +110,6 @@
         "deleteImageBin": "Verwijderde afbeeldingen worden naar de prullenbak van je besturingssysteem gestuurd.",
         "deleteImagePermanent": "Verwijderde afbeeldingen kunnen niet worden hersteld.",
         "assets": "Eigen onderdelen",
-        "images": "Afbeeldingen",
         "autoAssignBoardOnClick": "Ken automatisch bord toe bij klikken",
         "featuresWillReset": "Als je deze afbeelding verwijdert, dan worden deze functies onmiddellijk teruggezet.",
         "loading": "Bezig met laden",

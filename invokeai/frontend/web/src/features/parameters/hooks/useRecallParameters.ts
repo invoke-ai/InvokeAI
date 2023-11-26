@@ -374,6 +374,26 @@ export const useRecallParameters = () => {
   );
 
   /**
+   * Recall width and height with toast
+   */
+  const recallWidthAndHeight = useCallback(
+    (width: unknown, height: unknown) => {
+      if (!isValidWidth(width)) {
+        allParameterNotSetToast();
+        return;
+      }
+      if (!isValidHeight(height)) {
+        allParameterNotSetToast();
+        return;
+      }
+      dispatch(setHeight(height));
+      dispatch(setWidth(width));
+      allParameterSetToast();
+    },
+    [dispatch, allParameterSetToast, allParameterNotSetToast]
+  );
+
+  /**
    * Recall strength with toast
    */
   const recallStrength = useCallback(
@@ -966,6 +986,7 @@ export const useRecallParameters = () => {
     recallSteps,
     recallWidth,
     recallHeight,
+    recallWidthAndHeight,
     recallStrength,
     recallHrfEnabled,
     recallHrfStrength,

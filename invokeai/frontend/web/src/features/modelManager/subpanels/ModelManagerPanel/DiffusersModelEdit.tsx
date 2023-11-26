@@ -95,7 +95,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
           {model.model_name}
         </Text>
         <Text fontSize="sm" color="base.400">
-          {MODEL_TYPE_MAP[model.base_model]} Model
+          {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
         </Text>
       </Flex>
       <Divider />

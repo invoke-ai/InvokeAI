@@ -423,7 +423,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
             <Flex justifyContent="center">
               <Text fontSize="lg">
                 <Text>
-                  {t('settings.resetComplete')} Reloading in {countdown}...
+                  {t('settings.resetComplete')} {t('settings.reloadingIn')}{' '}
+                  {countdown}...
                 </Text>
               </Text>
             </Flex>

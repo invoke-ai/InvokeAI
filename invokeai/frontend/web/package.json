@@ -19,7 +19,6 @@
     "dist"
   ],
   "scripts": {
-    "prepare": "cd ../../../ && husky install invokeai/frontend/web/.husky",
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
     "dev:host": "concurrently \"vite dev --host\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
@@ -30,7 +29,7 @@
     "lint:prettier": "prettier --check .",
     "lint:tsc": "tsc --noEmit",
     "lint": "concurrently -g -n eslint,prettier,tsc,madge -c cyan,green,magenta,yellow \"yarn run lint:eslint\" \"yarn run lint:prettier\" \"yarn run lint:tsc\" \"yarn run lint:madge\"",
-    "fix": "eslint --fix . && prettier --loglevel warn --write . && tsc --noEmit",
+    "fix": "eslint --fix . && prettier --loglevel warn --write .",
     "lint-staged": "lint-staged",
     "postinstall": "patch-package && yarn run theme",
     "theme": "chakra-cli tokens src/theme/theme.ts",
@@ -80,7 +79,6 @@
     "lodash-es": "^4.17.21",
     "nanostores": "^0.9.4",
     "new-github-issue-url": "^1.0.0",
-    "openapi-fetch": "^0.8.1",
     "overlayscrollbars": "^2.4.4",
     "overlayscrollbars-react": "^0.5.3",
     "patch-package": "^8.0.0",
@@ -133,6 +131,7 @@
     "concurrently": "^8.2.2",
     "eslint": "^8.53.0",
     "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-i18next": "^6.0.3",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "husky": "^8.0.3",

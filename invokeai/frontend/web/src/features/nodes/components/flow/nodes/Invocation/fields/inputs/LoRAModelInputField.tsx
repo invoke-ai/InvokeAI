@@ -91,7 +91,7 @@ const LoRAModelInputFieldComponent = (
     return (
       <Flex sx={{ justifyContent: 'center', p: 2 }}>
         <Text sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}>
-          No LoRAs Loaded
+          {t('models.noLoRAsLoaded')}
         </Text>
       </Flex>
     );

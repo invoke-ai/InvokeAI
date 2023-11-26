@@ -49,7 +49,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
       }}
     >
       <Flex gap={2}>
-        <Text fontWeight="semibold">File:</Text>
+        <Text fontWeight="semibold">{t('common.file')}:</Text>
         <Link href={image.image_url} isExternal maxW="calc(100% - 3rem)">
           {image.image_name}
           <ExternalLinkIcon mx="2px" />

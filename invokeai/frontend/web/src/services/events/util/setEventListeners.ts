@@ -1,7 +1,5 @@
-import { MiddlewareAPI } from '@reduxjs/toolkit';
-import { logger } from 'app/logging/logger';
-import { AppDispatch, RootState } from 'app/store/store';
-import { $queueId } from 'features/queue/store/queueNanoStore';
+import { $queueId } from 'app/store/nanostores/queueId';
+import { AppDispatch } from 'app/store/store';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { Socket } from 'socket.io-client';
@@ -23,20 +21,16 @@ import { ClientToServerEvents, ServerToClientEvents } from '../types';
 
 type SetEventListenersArg = {
   socket: Socket<ServerToClientEvents, ClientToServerEvents>;
-  storeApi: MiddlewareAPI<AppDispatch, RootState>;
+  dispatch: AppDispatch;
 };
 
 export const setEventListeners = (arg: SetEventListenersArg) => {
-  const { socket, storeApi } = arg;
-  const { dispatch } = storeApi;
+  const { socket, dispatch } = arg;
 
   /**
    * Connect
    */
   socket.on('connect', () => {
-    const log = logger('socketio');
-    log.debug('Connected');
-
     dispatch(socketConnected());
     const queue_id = $queueId.get();
     socket.emit('subscribe_queue', { queue_id });
