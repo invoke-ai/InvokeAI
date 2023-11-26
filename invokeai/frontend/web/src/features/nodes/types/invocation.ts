@@ -1,4 +1,4 @@
-import { Node } from 'reactflow';
+import { Edge, Node } from 'reactflow';
 import { z } from 'zod';
 import { zProgressImage } from './common';
 import {
@@ -64,16 +64,16 @@ export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
 export type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
 export type AnyNodeData = z.infer<typeof zAnyNodeData>;
 
-export const isInvocationNode = (
-  node?: Node<AnyNodeData>
-): node is Node<InvocationNodeData> =>
+export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
+export type NotesNode = Node<NotesNodeData, 'notes'>;
+export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
+export type AnyNode = Node<AnyNodeData>;
+
+export const isInvocationNode = (node?: AnyNode): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
-export const isNotesNode = (
-  node?: Node<AnyNodeData>
-): node is Node<NotesNodeData> => Boolean(node && node.type === 'notes');
-export const isCurrentImageNode = (
-  node?: Node<AnyNodeData>
-): node is Node<CurrentImageNodeData> =>
+export const isNotesNode = (node?: AnyNode): node is NotesNode =>
+  Boolean(node && node.type === 'notes');
+export const isCurrentImageNode = (node?: AnyNode): node is CurrentImageNode =>
   Boolean(node && node.type === 'current_image');
 export const isInvocationNodeData = (
   node?: AnyNodeData
@@ -101,8 +101,9 @@ export type NodeStatus = z.infer<typeof zNodeStatus>;
 // #endregion
 
 // #region Edges
-export const zInvocationEdgeExtra = z.object({
+export const zInvocationNodeEdgeExtra = z.object({
   type: z.union([z.literal('default'), z.literal('collapsed')]),
 });
-export type InvocationEdgeExtra = z.infer<typeof zInvocationEdgeExtra>;
+export type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
+export type InvocationNodeEdge = Edge<InvocationNodeEdgeExtra>;
 // #endregion

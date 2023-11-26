@@ -9,7 +9,7 @@ import {
   buildNotesNode,
 } from '../store/util/buildNodeData';
 import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from '../types/constants';
-import { AnyNodeData, InvocationTemplate } from '../types/invocation';
+import { AnyNode, InvocationTemplate } from '../types/invocation';
 const templatesSelector = createSelector(
   [(state: RootState) => state.nodes],
   (nodes) => nodes.nodeTemplates
@@ -26,7 +26,7 @@ export const useBuildNodeData = () => {
 
   return useCallback(
     // string here is "any invocation type"
-    (type: string | 'current_image' | 'notes'): Node<AnyNodeData> => {
+    (type: string | 'current_image' | 'notes'): AnyNode => {
       let _x = window.innerWidth / 2;
       let _y = window.innerHeight / 2;
 

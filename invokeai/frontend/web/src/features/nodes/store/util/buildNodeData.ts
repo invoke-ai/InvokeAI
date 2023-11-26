@@ -1,4 +1,4 @@
-import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
+import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import {
   FieldInputInstance,
   FieldOutputInstance,
@@ -13,10 +13,6 @@ import { buildFieldInputInstance } from 'features/nodes/util/buildFieldInputInst
 import { reduce } from 'lodash-es';
 import { Node, XYPosition } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
-
-export const SHARED_NODE_PROPERTIES: Partial<Node> = {
-  dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
-};
 
 export const buildNotesNode = (position: XYPosition): Node<NotesNodeData> => {
   const nodeId = uuidv4();
