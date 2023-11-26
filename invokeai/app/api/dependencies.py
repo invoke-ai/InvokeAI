@@ -88,7 +88,9 @@ class ApiDependencies:
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
-        model_install_service = ModelInstallService(app_config=config, record_store=model_record_service, event_bus=events)
+        model_install_service = ModelInstallService(
+            app_config=config, record_store=model_record_service, event_bus=events
+        )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         processor = DefaultInvocationProcessor()

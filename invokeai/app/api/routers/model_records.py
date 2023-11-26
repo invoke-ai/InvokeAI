@@ -51,7 +51,9 @@ async def list_model_records(
     found_models: list[AnyModelConfig] = []
     if base_models:
         for base_model in base_models:
-            found_models.extend(record_store.search_by_attr(base_model=base_model, model_type=model_type, model_name=model_name))
+            found_models.extend(
+                record_store.search_by_attr(base_model=base_model, model_type=model_type, model_name=model_name)
+            )
     else:
         found_models.extend(record_store.search_by_attr(model_type=model_type, model_name=model_name))
     return ModelsList(models=found_models)
@@ -184,25 +186,25 @@ async def add_model_record(
     status_code=201,
 )
 async def import_model(
-        source: ModelSource = Body(
-            description="A model path, repo_id or URL to import. NOTE: only model path is implemented currently!"
-        ),
-        config: Optional[Dict[str, Any]] = Body(
-            description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
-            default=None,
-        ),
-        variant: Optional[str] = Body(
-            description="When fetching a repo_id, force variant type to fetch such as 'fp16'",
-            default=None,
-        ),
-        subfolder: Optional[str] = Body(
-            description="When fetching a repo_id, specify subfolder to fetch model from",
-            default=None,
-        ),
-        access_token: Optional[str] = Body(
-            description="When fetching a repo_id or URL, access token for web access",
-            default=None,
-        ),
+    source: ModelSource = Body(
+        description="A model path, repo_id or URL to import. NOTE: only model path is implemented currently!"
+    ),
+    config: Optional[Dict[str, Any]] = Body(
+        description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
+        default=None,
+    ),
+    variant: Optional[str] = Body(
+        description="When fetching a repo_id, force variant type to fetch such as 'fp16'",
+        default=None,
+    ),
+    subfolder: Optional[str] = Body(
+        description="When fetching a repo_id, specify subfolder to fetch model from",
+        default=None,
+    ),
+    access_token: Optional[str] = Body(
+        description="When fetching a repo_id or URL, access token for web access",
+        default=None,
+    ),
 ) -> ModelInstallJob:
     """Add a model using its local path, repo_id, or remote URL.
 
@@ -250,14 +252,16 @@ async def import_model(
         raise HTTPException(status_code=409, detail=str(e))
     return result
 
+
 @model_records_router.get(
     "/import",
     operation_id="list_model_install_jobs",
 )
 async def list_model_install_jobs(
-        source: Optional[str] = Query(description="Filter list by install source, partial string match.",
-                                      default=None,
-                                      )
+    source: Optional[str] = Query(
+        description="Filter list by install source, partial string match.",
+        default=None,
+    ),
 ) -> List[ModelInstallJob]:
     """
     Return list of model install jobs.
@@ -268,6 +272,7 @@ async def list_model_install_jobs(
     jobs: List[ModelInstallJob] = ApiDependencies.invoker.services.model_install.list_jobs(source)
     return jobs
 
+
 @model_records_router.patch(
     "/import",
     operation_id="prune_model_install_jobs",
@@ -276,13 +281,13 @@ async def list_model_install_jobs(
         400: {"description": "Bad request"},
     },
 )
-async def prune_model_install_jobs(
-) -> Response:
+async def prune_model_install_jobs() -> Response:
     """
     Prune all completed and errored jobs from the install job list.
     """
     ApiDependencies.invoker.services.model_install.prune_jobs()
     return Response(status_code=204)
+
 
 @model_records_router.patch(
     "/sync",
@@ -292,8 +297,7 @@ async def prune_model_install_jobs(
         400: {"description": "Bad request"},
     },
 )
-async def sync_models_to_config(
-) -> Response:
+async def sync_models_to_config() -> Response:
     """
     Traverse the models and autoimport directories. Model files without a corresponding
     record in the database are added. Orphan records without a models file are deleted.

@@ -8,9 +8,9 @@ from .model_records_base import (  # noqa F401
 from .model_records_sql import ModelRecordServiceSQL  # noqa F401
 
 __all__ = [
-    'ModelRecordServiceBase',
-    'ModelRecordServiceSQL',
-    'DuplicateModelException',
-    'InvalidModelException',
-    'UnknownModelException',
+    "ModelRecordServiceBase",
+    "ModelRecordServiceSQL",
+    "DuplicateModelException",
+    "InvalidModelException",
+    "UnknownModelException",
 ]

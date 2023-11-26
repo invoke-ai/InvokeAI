@@ -165,14 +165,14 @@ class ModelSearch(ModelSearchBase):
                     self.scanned_dirs.add(path)
                     continue
                 if any(
-                        (path / x).exists()
-                        for x in [
-                            "config.json",
-                            "model_index.json",
-                            "learned_embeds.bin",
-                            "pytorch_lora_weights.bin",
-                            "image_encoder.txt",
-                        ]
+                    (path / x).exists()
+                    for x in [
+                        "config.json",
+                        "model_index.json",
+                        "learned_embeds.bin",
+                        "pytorch_lora_weights.bin",
+                        "image_encoder.txt",
+                    ]
                 ):
                     self.scanned_dirs.add(path)
                     try:

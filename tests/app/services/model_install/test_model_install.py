@@ -44,12 +44,12 @@ def store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
 
 
 @pytest.fixture
-def installer(app_config: InvokeAIAppConfig,
-              store: ModelRecordServiceBase) -> ModelInstallServiceBase:
-    return ModelInstallService(app_config=app_config,
-                               record_store=store,
-                               event_bus=DummyEventService(),
-                               )
+def installer(app_config: InvokeAIAppConfig, store: ModelRecordServiceBase) -> ModelInstallServiceBase:
+    return ModelInstallService(
+        app_config=app_config,
+        record_store=store,
+        event_bus=DummyEventService(),
+    )
 
 
 class DummyEvent(BaseModel):
@@ -70,10 +70,8 @@ class DummyEventService(EventServiceBase):
 
     def dispatch(self, event_name: str, payload: Any) -> None:
         """Dispatch an event by appending it to self.events."""
-        self.events.append(
-            DummyEvent(event_name=payload['event'],
-                       payload=payload['data'])
-        )
+        self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
+
 
 def test_registration(installer: ModelInstallServiceBase, test_file: Path) -> None:
     store = installer.record_store
@@ -83,6 +81,7 @@ def test_registration(installer: ModelInstallServiceBase, test_file: Path) -> No
     assert key is not None
     assert len(key) == 32
 
+
 def test_registration_meta(installer: ModelInstallServiceBase, test_file: Path) -> None:
     store = installer.record_store
     key = installer.register_path(test_file)
@@ -91,10 +90,11 @@ def test_registration_meta(installer: ModelInstallServiceBase, test_file: Path) 
     assert model_record.name == "test_embedding"
     assert model_record.type == ModelType.TextualInversion
     assert Path(model_record.path) == test_file
-    assert model_record.base == BaseModelType('sd-1')
+    assert model_record.base == BaseModelType("sd-1")
     assert model_record.description is not None
     assert model_record.source is not None
     assert Path(model_record.source) == test_file
+
 
 def test_registration_meta_override_fail(installer: ModelInstallServiceBase, test_file: Path) -> None:
     key = None
@@ -102,19 +102,17 @@ def test_registration_meta_override_fail(installer: ModelInstallServiceBase, tes
         key = installer.register_path(test_file, {"name": "banana_sushi", "type": ModelType("lora")})
     assert key is None
 
+
 def test_registration_meta_override_succeed(installer: ModelInstallServiceBase, test_file: Path) -> None:
     store = installer.record_store
-    key = installer.register_path(test_file,
-                                  {
-                                      "name": "banana_sushi",
-                                      "source": "fake/repo_id",
-                                      "current_hash": "New Hash"
-                                  }
-                                  )
+    key = installer.register_path(
+        test_file, {"name": "banana_sushi", "source": "fake/repo_id", "current_hash": "New Hash"}
+    )
     model_record = store.get_model(key)
     assert model_record.name == "banana_sushi"
     assert model_record.source == "fake/repo_id"
     assert model_record.current_hash == "New Hash"
+
 
 def test_install(installer: ModelInstallServiceBase, test_file: Path, app_config: InvokeAIAppConfig) -> None:
     store = installer.record_store
@@ -122,6 +120,7 @@ def test_install(installer: ModelInstallServiceBase, test_file: Path, app_config
     model_record = store.get_model(key)
     assert model_record.path == "sd-1/embedding/test_embedding.safetensors"
     assert model_record.source == test_file.as_posix()
+
 
 def test_background_install(installer: ModelInstallServiceBase, test_file: Path, app_config: InvokeAIAppConfig) -> None:
     """Note: may want to break this down into several smaller unit tests."""
@@ -142,7 +141,7 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
 
     # test that the expected events were issued
     bus = installer.event_bus
-    assert bus is not None                         # sigh - ruff is a stickler for type checking
+    assert bus is not None  # sigh - ruff is a stickler for type checking
     assert isinstance(bus, DummyEventService)
     assert len(bus.events) == 2
     event_names = [x.event_name for x in bus.events]
@@ -167,6 +166,7 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
     with pytest.raises(UnknownInstallJobException):
         assert installer.get_job(source)
 
+
 def test_delete_install(installer: ModelInstallServiceBase, test_file: Path, app_config: InvokeAIAppConfig):
     store = installer.record_store
     key = installer.install_path(test_file)
@@ -174,10 +174,13 @@ def test_delete_install(installer: ModelInstallServiceBase, test_file: Path, app
     assert Path(app_config.models_dir / model_record.path).exists()
     assert test_file.exists()  # original should still be there after installation
     installer.delete(key)
-    assert not Path(app_config.models_dir / model_record.path).exists()  # after deletion, installed copy should not exist
+    assert not Path(
+        app_config.models_dir / model_record.path
+    ).exists()  # after deletion, installed copy should not exist
     assert test_file.exists()  # but original should still be there
     with pytest.raises(UnknownModelException):
         store.get_model(key)
+
 
 def test_delete_register(installer: ModelInstallServiceBase, test_file: Path, app_config: InvokeAIAppConfig):
     store = installer.record_store

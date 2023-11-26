@@ -37,9 +37,5 @@ class SocketIO:
         if "queue_id" in data:
             await self.__sio.leave_room(sid, data["queue_id"])
 
-
     async def _handle_model_event(self, event: Event) -> None:
-        await self.__sio.emit(
-            event=event[1]["event"],
-            data=event[1]["data"]
-        )
+        await self.__sio.emit(event=event[1]["event"], data=event[1]["data"])

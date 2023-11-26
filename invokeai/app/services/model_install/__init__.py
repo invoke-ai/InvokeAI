@@ -9,10 +9,11 @@ from .model_install_base import (
 )
 from .model_install_default import ModelInstallService
 
-__all__ = ['ModelInstallServiceBase',
-           'ModelInstallService',
-           'InstallStatus',
-           'ModelInstallJob',
-           'UnknownInstallJobException',
-           'ModelSource',
-           ]
+__all__ = [
+    "ModelInstallServiceBase",
+    "ModelInstallService",
+    "InstallStatus",
+    "ModelInstallJob",
+    "UnknownInstallJobException",
+    "ModelSource",
+]

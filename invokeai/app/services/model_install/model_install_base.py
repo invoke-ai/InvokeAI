@@ -17,10 +17,10 @@ from invokeai.backend.model_manager import AnyModelConfig
 class InstallStatus(str, Enum):
     """State of an install job running in the background."""
 
-    WAITING = "waiting"      # waiting to be dequeued
-    RUNNING = "running"      # being processed
+    WAITING = "waiting"  # waiting to be dequeued
+    RUNNING = "running"  # being processed
     COMPLETED = "completed"  # finished running
-    ERROR = "error"          # terminated with an error message
+    ERROR = "error"  # terminated with an error message
 
 
 class UnknownInstallJobException(Exception):
@@ -32,10 +32,17 @@ ModelSource = Union[str, Path, AnyHttpUrl]
 
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""
+
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
-    config_in: Dict[str, Any] = Field(default_factory=dict, description="Configuration information (e.g. 'description') to apply to model.")
-    config_out: Optional[AnyModelConfig] = Field(default=None, description="After successful installation, this will hold the configuration object.")
-    inplace: bool = Field(default=False, description="Leave model in its current location; otherwise install under models directory")
+    config_in: Dict[str, Any] = Field(
+        default_factory=dict, description="Configuration information (e.g. 'description') to apply to model."
+    )
+    config_out: Optional[AnyModelConfig] = Field(
+        default=None, description="After successful installation, this will hold the configuration object."
+    )
+    inplace: bool = Field(
+        default=False, description="Leave model in its current location; otherwise install under models directory"
+    )
     source: ModelSource = Field(description="Source (URL, repo_id, or local path) of model")
     local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
     error_type: Optional[str] = Field(default=None, description="Class name of the exception that led to status==ERROR")
@@ -53,10 +60,10 @@ class ModelInstallServiceBase(ABC):
 
     @abstractmethod
     def __init__(
-            self,
-            app_config: InvokeAIAppConfig,
-            record_store: ModelRecordServiceBase,
-            event_bus: Optional["EventServiceBase"] = None,
+        self,
+        app_config: InvokeAIAppConfig,
+        record_store: ModelRecordServiceBase,
+        event_bus: Optional["EventServiceBase"] = None,
     ):
         """
         Create ModelInstallService object.
@@ -86,9 +93,9 @@ class ModelInstallServiceBase(ABC):
 
     @abstractmethod
     def register_path(
-            self,
-            model_path: Union[Path, str],
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        model_path: Union[Path, str],
+        config: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Probe and register the model at model_path.
@@ -114,9 +121,9 @@ class ModelInstallServiceBase(ABC):
 
     @abstractmethod
     def install_path(
-            self,
-            model_path: Union[Path, str],
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        model_path: Union[Path, str],
+        config: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Probe, register and install the model in the models directory.
@@ -131,13 +138,13 @@ class ModelInstallServiceBase(ABC):
 
     @abstractmethod
     def import_model(
-            self,
-            source: Union[str, Path, AnyHttpUrl],
-            inplace: bool = False,
-            variant: Optional[str] = None,
-            subfolder: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
-            access_token: Optional[str] = None,
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        inplace: bool = False,
+        variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
+        access_token: Optional[str] = None,
     ) -> ModelInstallJob:
         """Install the indicated model.
 
@@ -189,7 +196,7 @@ class ModelInstallServiceBase(ABC):
         """Return the ModelInstallJob corresponding to the provided source."""
 
     @abstractmethod
-    def list_jobs(self, source: Optional[ModelSource]=None) -> List[ModelInstallJob]:  # noqa D102
+    def list_jobs(self, source: Optional[ModelSource] = None) -> List[ModelInstallJob]:  # noqa D102
         """
         List active and complete install jobs.
 

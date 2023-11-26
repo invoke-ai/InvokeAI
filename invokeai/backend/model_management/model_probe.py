@@ -123,8 +123,8 @@ class ModelProbe(object):
                 base_type=base_type,
                 variant_type=variant_type,
                 prediction_type=prediction_type,
-                name = name,
-                description = description,
+                name=name,
+                description=description,
                 upcast_attention=(
                     base_type == BaseModelType.StableDiffusion2
                     and prediction_type == SchedulerPredictionType.VPrediction
@@ -150,7 +150,7 @@ class ModelProbe(object):
 
     @classmethod
     def get_model_name(cls, model_path: Path) -> str:
-        if model_path.suffix in {'.safetensors', '.bin', '.pt', '.ckpt'}:
+        if model_path.suffix in {".safetensors", ".bin", ".pt", ".ckpt"}:
             return model_path.stem
         else:
             return model_path.name

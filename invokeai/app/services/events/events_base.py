@@ -331,9 +331,7 @@ class EventServiceBase:
         """
         self.__emit_model_event(
             event_name="model_install_started",
-            payload={
-                "source": source
-            },
+            payload={"source": source},
         )
 
     def emit_model_install_completed(self, source: str, key: str) -> None:
@@ -351,11 +349,12 @@ class EventServiceBase:
             },
         )
 
-    def emit_model_install_progress(self,
-                                    source: str,
-                                    current_bytes: int,
-                                    total_bytes: int,
-                                    ) -> None:
+    def emit_model_install_progress(
+        self,
+        source: str,
+        current_bytes: int,
+        total_bytes: int,
+    ) -> None:
         """
         Emitted while the install job is in progress.
         (Downloaded models only)
@@ -373,12 +372,12 @@ class EventServiceBase:
             },
         )
 
-
-    def emit_model_install_error(self,
-                                 source: str,
-                                 error_type: str,
-                                 error: str,
-                                 ) -> None:
+    def emit_model_install_error(
+        self,
+        source: str,
+        error_type: str,
+        error: str,
+    ) -> None:
         """
         Emitted when an install job encounters an exception.
 

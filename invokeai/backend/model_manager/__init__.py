@@ -14,15 +14,16 @@ from .config import (
 from .probe import ModelProbe
 from .search import ModelSearch
 
-__all__ = ['ModelProbe', 'ModelSearch',
-           'InvalidModelConfigException',
-           'ModelConfigFactory',
-           'BaseModelType',
-           'ModelType',
-           'SubModelType',
-           'ModelVariantType',
-           'ModelFormat',
-           'SchedulerPredictionType',
-           'AnyModelConfig',
-           ]
-
+__all__ = [
+    "ModelProbe",
+    "ModelSearch",
+    "InvalidModelConfigException",
+    "ModelConfigFactory",
+    "BaseModelType",
+    "ModelType",
+    "SubModelType",
+    "ModelVariantType",
+    "ModelFormat",
+    "SchedulerPredictionType",
+    "AnyModelConfig",
+]

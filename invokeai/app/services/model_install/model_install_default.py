@@ -46,11 +46,12 @@ class ModelInstallService(ModelInstallServiceBase):
     _cached_model_paths: Set[Path]
     _models_installed: Set[str]
 
-    def __init__(self,
-                 app_config: InvokeAIAppConfig,
-                 record_store: ModelRecordServiceBase,
-                 event_bus: Optional[EventServiceBase] = None
-                 ):
+    def __init__(
+        self,
+        app_config: InvokeAIAppConfig,
+        record_store: ModelRecordServiceBase,
+        event_bus: Optional[EventServiceBase] = None,
+    ):
         """
         Initialize the installer object.
 
@@ -73,11 +74,11 @@ class ModelInstallService(ModelInstallServiceBase):
         return self._app_config
 
     @property
-    def record_store(self) -> ModelRecordServiceBase:   # noqa D102
+    def record_store(self) -> ModelRecordServiceBase:  # noqa D102
         return self._record_store
 
     @property
-    def event_bus(self) -> Optional[EventServiceBase]:   # noqa D102
+    def event_bus(self) -> Optional[EventServiceBase]:  # noqa D102
         return self._event_bus
 
     def _start_installer_thread(self) -> None:
@@ -129,25 +130,25 @@ class ModelInstallService(ModelInstallServiceBase):
             self._event_bus.emit_model_install_error(str(job.source), error_type, error)
 
     def register_path(
-            self,
-            model_path: Union[Path, str],
-            config: Optional[Dict[str, Any]] = None,
-    ) -> str:    # noqa D102
+        self,
+        model_path: Union[Path, str],
+        config: Optional[Dict[str, Any]] = None,
+    ) -> str:  # noqa D102
         model_path = Path(model_path)
         config = config or {}
-        if config.get('source') is None:
-            config['source'] = model_path.resolve().as_posix()
+        if config.get("source") is None:
+            config["source"] = model_path.resolve().as_posix()
         return self._register(model_path, config)
 
     def install_path(
-            self,
-            model_path: Union[Path, str],
-            config: Optional[Dict[str, Any]] = None,
-    ) -> str:    # noqa D102
+        self,
+        model_path: Union[Path, str],
+        config: Optional[Dict[str, Any]] = None,
+    ) -> str:  # noqa D102
         model_path = Path(model_path)
         config = config or {}
-        if config.get('source') is None:
-            config['source'] = model_path.resolve().as_posix()
+        if config.get("source") is None:
+            config["source"] = model_path.resolve().as_posix()
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
 
@@ -164,14 +165,14 @@ class ModelInstallService(ModelInstallServiceBase):
         )
 
     def import_model(
-            self,
-            source: ModelSource,
-            inplace: bool = False,
-            variant: Optional[str] = None,
-            subfolder: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
-            access_token: Optional[str] = None,
-    ) -> ModelInstallJob:      # noqa D102
+        self,
+        source: ModelSource,
+        inplace: bool = False,
+        variant: Optional[str] = None,
+        subfolder: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
+        access_token: Optional[str] = None,
+    ) -> ModelInstallJob:  # noqa D102
         # Clean up a common source of error. Doesn't work with Paths.
         if isinstance(source, str):
             source = source.strip()
@@ -181,11 +182,12 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Installing a local path
         if isinstance(source, (str, Path)) and Path(source).exists():  # a path that is already on disk
-            job = ModelInstallJob(config_in=config,
-                                  source=source,
-                                  inplace=inplace,
-                                  local_path=Path(source),
-                                  )
+            job = ModelInstallJob(
+                config_in=config,
+                source=source,
+                inplace=inplace,
+                local_path=Path(source),
+            )
             self._install_jobs[source] = job
             self._install_queue.put(job)
             return job
@@ -193,7 +195,7 @@ class ModelInstallService(ModelInstallServiceBase):
         else:  # here is where we'd download a URL or repo_id. Implementation pending download queue.
             raise UnknownModelException("File or directory not found")
 
-    def list_jobs(self, source: Optional[ModelSource]=None) -> List[ModelInstallJob]:  # noqa D102
+    def list_jobs(self, source: Optional[ModelSource] = None) -> List[ModelInstallJob]:  # noqa D102
         jobs = self._install_jobs
         if not source:
             return list(jobs.values())
@@ -205,17 +207,19 @@ class ModelInstallService(ModelInstallServiceBase):
         try:
             return self._install_jobs[source]
         except KeyError:
-            raise UnknownInstallJobException(f'{source}: unknown install job')
+            raise UnknownInstallJobException(f"{source}: unknown install job")
 
-    def wait_for_installs(self) -> Dict[ModelSource, ModelInstallJob]:      # noqa D102
+    def wait_for_installs(self) -> Dict[ModelSource, ModelInstallJob]:  # noqa D102
         self._install_queue.join()
         return self._install_jobs
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
-        finished_jobs = [source for source in self._install_jobs
-                         if self._install_jobs[source].status in [InstallStatus.COMPLETED, InstallStatus.ERROR]
-                         ]
+        finished_jobs = [
+            source
+            for source in self._install_jobs
+            if self._install_jobs[source].status in [InstallStatus.COMPLETED, InstallStatus.ERROR]
+        ]
         for source in finished_jobs:
             del self._install_jobs[source]
 
@@ -228,7 +232,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.info(f"{len(installed)} new models registered")
         self._logger.info("Model installer (re)initialized")
 
-    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:      # noqa D102
+    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path) for x in self.record_store.all_models()}
         callback = self._scan_install if install else self._scan_register
         search = ModelSearch(on_model_found=callback)
@@ -295,7 +299,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self.record_store.update_model(key, model)
         return model
 
-
     def _scan_register(self, model: Path) -> bool:
         if model in self._cached_model_paths:
             return True
@@ -308,7 +311,6 @@ class ModelInstallService(ModelInstallServiceBase):
             pass
         return True
 
-
     def _scan_install(self, model: Path) -> bool:
         if model in self._cached_model_paths:
             return True
@@ -320,7 +322,7 @@ class ModelInstallService(ModelInstallServiceBase):
             pass
         return True
 
-    def unregister(self, key: str) -> None:      # noqa D102
+    def unregister(self, key: str) -> None:  # noqa D102
         self.record_store.del_model(key)
 
     def delete(self, key: str) -> None:  # noqa D102
@@ -333,7 +335,7 @@ class ModelInstallService(ModelInstallServiceBase):
         else:
             self.unregister(key)
 
-    def unconditionally_delete(self, key: str) -> None:      # noqa D102
+    def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
         path = self.app_config.models_path / model.path
         if path.is_dir():
@@ -378,11 +380,9 @@ class ModelInstallService(ModelInstallServiceBase):
     def _create_key(self) -> str:
         return sha256(randbytes(100)).hexdigest()[0:32]
 
-    def _register(self,
-                  model_path: Path,
-                  config: Optional[Dict[str, Any]] = None,
-                  info: Optional[AnyModelConfig] = None) -> str:
-
+    def _register(
+        self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
+    ) -> str:
         info = info or ModelProbe.probe(model_path, config)
         key = self._create_key()
 
@@ -393,7 +393,7 @@ class ModelInstallService(ModelInstallServiceBase):
         info.path = model_path.as_posix()
 
         # add 'main' specific fields
-        if hasattr(info, 'config'):
+        if hasattr(info, "config"):
             # make config relative to our root
             legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config).resolve()
             info.config = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
