@@ -326,7 +326,7 @@ export const TEMPLATE_BUILDER_MAP: Record<
 
 export const buildFieldInputTemplate = (
   fieldSchema: InvocationFieldSchema,
-  name: string,
+  fieldName: string,
   fieldType: FieldType
 ): FieldInputTemplate => {
   const {
@@ -342,8 +342,8 @@ export const buildFieldInputTemplate = (
   // This is the base field template that is common to all fields. The builder function will add all other
   // properties to this template.
   const baseField: Omit<FieldInputTemplate, 'type'> = {
-    name,
-    title: fieldSchema.title ?? (name ? startCase(name) : ''),
+    name: fieldName,
+    title: fieldSchema.title ?? (fieldName ? startCase(fieldName) : ''),
     required,
     description: fieldSchema.description ?? '',
     fieldKind: 'input' as const,
