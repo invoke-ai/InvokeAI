@@ -1,7 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { reduce, startCase } from 'lodash-es';
+import { t } from 'i18next';
+import { reduce } from 'lodash-es';
 import { OpenAPIV3_1 } from 'openapi-types';
+import { FieldTypeParseError, UnsupportedFieldTypeError } from '../types/error';
 import { FieldInputTemplate, FieldOutputTemplate } from '../types/field';
 import { InvocationTemplate } from '../types/invocation';
 import {
@@ -11,9 +13,8 @@ import {
   isInvocationSchemaObject,
 } from '../types/openapi';
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
+import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
 import { parseFieldType } from './parseFieldType';
-import { FieldTypeParseError, UnsupportedFieldTypeError } from '../types/error';
-import { t } from 'i18next';
 
 const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
@@ -209,17 +210,11 @@ export const parseSchema = (
             return outputsAccumulator;
           }
 
-          const fieldOutputTemplate: FieldOutputTemplate = {
-            fieldKind: 'output',
-            name: propertyName,
-            title:
-              property.title ?? (propertyName ? startCase(propertyName) : ''),
-            description: property.description ?? '',
-            type: fieldType,
-            ui_hidden: property.ui_hidden ?? false,
-            ui_type: property.ui_type,
-            ui_order: property.ui_order,
-          };
+          const fieldOutputTemplate = buildFieldOutputTemplate(
+            property,
+            propertyName,
+            fieldType
+          );
 
           outputsAccumulator[propertyName] = fieldOutputTemplate;
         } catch (e) {
