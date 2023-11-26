@@ -26,7 +26,10 @@ import {
 import { setMetadataReceivingNode, upsertMetadata } from './metadata';
 
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
-function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
+function copyConnectionsToDenoiseLatentsHrf(
+  graph: NonNullableGraph,
+  finalDenoiseLatentsNode: DenoiseLatentsInvocation
+): void {
   const destinationFields = [
     'vae',
     'control',
@@ -38,10 +41,10 @@ function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
   ];
   const newEdges: Edge[] = [];
 
-  // Loop through the existing edges connected to DENOISE_LATENTS
+  // Loop through the existing edges connected to finalDenoiseLatentsNode
   graph.edges.forEach((edge: Edge) => {
     if (
-      edge.destination.node_id === DENOISE_LATENTS &&
+      edge.destination.node_id === finalDenoiseLatentsNode.id &&
       destinationFields.includes(edge.destination.field)
     ) {
       // Add a similar connection to DENOISE_LATENTS_HRF
@@ -109,7 +112,9 @@ function calculateHrfRes(
 // Adds the high-res fix feature to the given graph.
 export const addHrfToGraph = (
   state: RootState,
-  graph: NonNullableGraph
+  graph: NonNullableGraph,
+  // The final denoise latents in the graph.
+  finalDenoiseLatents: string
 ): void => {
   // Double check hrf is enabled.
   if (
@@ -134,24 +139,23 @@ export const addHrfToGraph = (
     height
   );
 
-  // Pre-existing (original) graph nodes.
-  const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
+  const finalDenoiseLatentsNode = graph.nodes[finalDenoiseLatents] as
     | DenoiseLatentsInvocation
     | undefined;
   const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation | undefined;
   const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as
     | LatentsToImageInvocation
     | undefined;
-  if (!originalDenoiseLatentsNode) {
-    log.error('originalDenoiseLatentsNode is undefined');
+  if (!finalDenoiseLatentsNode) {
+    log.error('finalDenoiseLatentsNode is not present in linear graph');
     return;
   }
   if (!originalNoiseNode) {
-    log.error('originalNoiseNode is undefined');
+    log.error('originalNoiseNode is not present in linear graph');
     return;
   }
   if (!originalLatentsToImageNode) {
-    log.error('originalLatentsToImageNode is undefined');
+    log.error('originalLatentsToImageNode is not present in linear graph');
     return;
   }
 
@@ -306,9 +310,9 @@ export const addHrfToGraph = (
     type: 'denoise_latents',
     id: DENOISE_LATENTS_HRF,
     is_intermediate: true,
-    cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
-    scheduler: originalDenoiseLatentsNode?.scheduler,
-    steps: originalDenoiseLatentsNode?.steps,
+    cfg_scale: finalDenoiseLatentsNode?.cfg_scale,
+    scheduler: finalDenoiseLatentsNode?.scheduler,
+    steps: finalDenoiseLatentsNode?.steps,
     denoising_start: 1 - state.generation.hrfStrength,
     denoising_end: 1,
   };
@@ -334,7 +338,7 @@ export const addHrfToGraph = (
       },
     }
   );
-  copyConnectionsToDenoiseLatentsHrf(graph);
+  copyConnectionsToDenoiseLatentsHrf(graph, finalDenoiseLatentsNode);
 
   graph.nodes[LATENTS_TO_IMAGE_HRF_HR] = {
     type: 'l2i',

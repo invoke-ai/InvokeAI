@@ -276,7 +276,7 @@ export const buildLinearTextToImageGraph = (
   // High resolution fix.
   // NOTE: Not supported for onnx models.
   if (state.generation.hrfEnabled && !isUsingOnnxModel) {
-    addHrfToGraph(state, graph);
+    addHrfToGraph(state, graph, DENOISE_LATENTS);
   }
 
   // NSFW & watermark - must be last thing added to graph
