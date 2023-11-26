@@ -7,7 +7,7 @@ import {
 import { zParsedSemver } from 'features/nodes/types/semver';
 import { cloneDeep, defaultsDeep } from 'lodash-es';
 import { Node } from 'reactflow';
-import { buildInvocationNode } from './buildNodeData';
+import { buildInvocationNode } from './buildInvocationNode';
 
 export const getNeedsUpdate = (
   node: Node<InvocationNodeData>,

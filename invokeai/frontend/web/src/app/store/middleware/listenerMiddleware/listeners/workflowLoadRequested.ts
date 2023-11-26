@@ -4,7 +4,7 @@ import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { WorkflowVersionError } from 'features/nodes/types/error';
-import { validateWorkflow } from 'features/nodes/util/validateWorkflow';
+import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { setActiveTab } from 'features/ui/store/uiSlice';

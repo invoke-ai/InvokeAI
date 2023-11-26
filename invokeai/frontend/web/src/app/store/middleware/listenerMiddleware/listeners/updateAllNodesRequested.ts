@@ -4,7 +4,7 @@ import { nodeReplaced } from 'features/nodes/store/nodesSlice';
 import {
   getNeedsUpdate,
   updateNode,
-} from 'features/nodes/store/util/nodeUpdate';
+} from 'features/nodes/util/node/nodeUpdate';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { addToast } from 'features/system/store/systemSlice';

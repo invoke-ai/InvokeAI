@@ -10,7 +10,7 @@ import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import {
   LINEAR_UI_OUTPUT,
   nodeIDDenyList,
-} from 'features/nodes/util/graphBuilders/constants';
+} from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';

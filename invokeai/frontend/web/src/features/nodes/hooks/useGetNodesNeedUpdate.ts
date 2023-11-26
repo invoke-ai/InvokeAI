@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { getNeedsUpdate } from '../store/util/nodeUpdate';
+import { getNeedsUpdate } from '../util/node/nodeUpdate';
 import { isInvocationNode } from '../types/invocation';
 
 const selector = createSelector(

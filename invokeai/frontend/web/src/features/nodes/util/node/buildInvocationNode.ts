@@ -4,57 +4,18 @@ import {
   FieldOutputInstance,
 } from 'features/nodes/types/field';
 import {
-  CurrentImageNodeData,
-  InvocationNodeData,
+  InvocationNode,
   InvocationTemplate,
-  NotesNodeData,
 } from 'features/nodes/types/invocation';
-import { buildFieldInputInstance } from 'features/nodes/util/buildFieldInputInstance';
+import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { reduce } from 'lodash-es';
-import { Node, XYPosition } from 'reactflow';
+import { XYPosition } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
-
-export const buildNotesNode = (position: XYPosition): Node<NotesNodeData> => {
-  const nodeId = uuidv4();
-  const node: Node<NotesNodeData> = {
-    ...SHARED_NODE_PROPERTIES,
-    id: nodeId,
-    type: 'notes',
-    position,
-    data: {
-      id: nodeId,
-      isOpen: true,
-      label: 'Notes',
-      notes: '',
-      type: 'notes',
-    },
-  };
-  return node;
-};
-
-export const buildCurrentImageNode = (
-  position: XYPosition
-): Node<CurrentImageNodeData> => {
-  const nodeId = uuidv4();
-  const node: Node<CurrentImageNodeData> = {
-    ...SHARED_NODE_PROPERTIES,
-    id: nodeId,
-    type: 'current_image',
-    position,
-    data: {
-      id: nodeId,
-      type: 'current_image',
-      isOpen: true,
-      label: 'Current Image',
-    },
-  };
-  return node;
-};
 
 export const buildInvocationNode = (
   position: XYPosition,
   template: InvocationTemplate
-): Node<InvocationNodeData> => {
+): InvocationNode => {
   const nodeId = uuidv4();
   const { type } = template;
 
@@ -94,7 +55,7 @@ export const buildInvocationNode = (
     {} as Record<string, FieldOutputInstance>
   );
 
-  const node: Node<InvocationNodeData> = {
+  const node: InvocationNode = {
     ...SHARED_NODE_PROPERTIES,
     id: nodeId,
     type: 'invocation',

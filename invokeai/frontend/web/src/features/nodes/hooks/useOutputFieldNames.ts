@@ -5,7 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map } from 'lodash-es';
 import { useMemo } from 'react';
 import { isInvocationNode } from '../types/invocation';
-import { getSortedFilteredFieldNames } from '../util/getSortedFilteredFieldNames';
+import { getSortedFilteredFieldNames } from '../util/node/getSortedFilteredFieldNames';
 
 export const useOutputFieldNames = (nodeId: string) => {
   const selector = useMemo(

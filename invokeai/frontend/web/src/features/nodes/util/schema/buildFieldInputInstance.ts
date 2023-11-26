@@ -1,5 +1,5 @@
 import { get } from 'lodash-es';
-import { FieldInputInstance, FieldInputTemplate } from '../types/field';
+import { FieldInputInstance, FieldInputTemplate } from '../../types/field';
 
 const FIELD_VALUE_FALLBACK_MAP = {
   EnumField: '',
