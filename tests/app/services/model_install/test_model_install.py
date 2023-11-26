@@ -3,18 +3,18 @@ Test the model installer
 """
 
 from pathlib import Path
-from typing import List, Any, Dict
+from typing import Any, Dict, List
 
 import pytest
-from pydantic import ValidationError, BaseModel
+from pydantic import BaseModel, ValidationError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.model_install import (
-    ModelInstallService,
-    ModelInstallServiceBase,
     InstallStatus,
     ModelInstallJob,
+    ModelInstallService,
+    ModelInstallServiceBase,
     UnknownInstallJobException,
 )
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL, UnknownModelException

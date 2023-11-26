@@ -5,9 +5,7 @@
 import argparse
 from pathlib import Path
 
-from invokeai.backend.model_manager import ModelProbe, InvalidModelConfigException
-
-
+from invokeai.backend.model_manager import InvalidModelConfigException, ModelProbe
 
 parser = argparse.ArgumentParser(description="Probe model type")
 parser.add_argument(
