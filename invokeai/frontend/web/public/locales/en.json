@@ -1,7 +1,7 @@
 {
     "accessibility": {
         "copyMetadataJson": "Copy metadata JSON",
-        "createIssue":"Create Issue",
+        "createIssue": "Create Issue",
         "exitViewer": "Exit Viewer",
         "flipHorizontally": "Flip Horizontally",
         "flipVertically": "Flip Vertically",
@@ -13,7 +13,7 @@
         "nextImage": "Next Image",
         "previousImage": "Previous Image",
         "reset": "Reset",
-        "resetUI":"$t(accessibility.reset) UI",
+        "resetUI": "$t(accessibility.reset) UI",
         "rotateClockwise": "Rotate Clockwise",
         "rotateCounterClockwise": "Rotate Counter-Clockwise",
         "showGalleryPanel": "Show Gallery Panel",
@@ -59,7 +59,7 @@
         "back": "Back",
         "batch": "Batch Manager",
         "cancel": "Cancel",
-        "copyError":"$t(gallery.copy) Error",
+        "copyError": "$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
         "checkpoint": "Checkpoint",
@@ -76,7 +76,7 @@
         "error": "Error",
         "file": "File",
         "folder": "Folder",
-        "format":"format",
+        "format": "format",
         "generate": "Generate",
         "githubLabel": "Github",
         "hotkeysLabel": "Hotkeys",
@@ -355,9 +355,9 @@
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
-        "drop":"Drop",
-        "dropOrUpload":"$t(gallery.drop) or Upload",
-        "dropToUpload":"$t(gallery.drop) to Upload",
+        "drop": "Drop",
+        "dropOrUpload": "$t(gallery.drop) or Upload",
+        "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage": "Delete Image",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
@@ -775,7 +775,7 @@
         "esrganModel": "ESRGAN Model",
         "loading": "loading",
         "noLoRAsAvailable": "No LoRAs available",
-        "noLoRAsLoaded":"No LoRAs Loaded",
+        "noLoRAsLoaded": "No LoRAs Loaded",
         "noMatchingLoRAs": "No matching LoRAs",
         "noMatchingModels": "No matching Models",
         "noModelsAvailable": "No models available",
@@ -787,7 +787,7 @@
     "nodes": {
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
-        "addLinearView":"Add to Linear View",
+        "addLinearView": "Add to Linear View",
         "animatedEdges": "Animated Edges",
         "animatedEdgesHelp": "Animate selected edges and edges connected to selected nodes",
         "boardField": "Board",
@@ -971,6 +971,8 @@
         "outputFieldTypeParseError": "Unable to parse type of output field {{node}}.{{field}} ({{message}})",
         "unableToExtractSchemaNameFromRef": "unable to extract schema name from ref",
         "unsupportedArrayItemType": "unsupported array item type \"{{type}}\"",
+        "unsupportedAnyOfLength": "too many union members ({{count}})",
+        "unsupportedMismatchedUnion": "mismatched polymorphic type with members {{firstType}} and {{secondType}}",
         "unableToParseFieldType": "unable to parse field type",
         "uNetField": "UNet",
         "uNetFieldDescription": "UNet submodel.",
@@ -979,7 +981,7 @@
         "unknownField": "Unknown field",
         "unknownFieldType": "$t(nodes.unknownField) type",
         "unknownNode": "Unknown Node",
-        "unknownNodeType":"$t(nodes.unknownNode) type",
+        "unknownNodeType": "$t(nodes.unknownNode) type",
         "unknownTemplate": "Unknown Template",
         "unknownInput": "Unknown input: {{name}}",
         "unkownInvocation": "Unknown Invocation type",
@@ -1353,15 +1355,11 @@
         },
         "compositingBlur": {
             "heading": "Blur",
-            "paragraphs": [
-                "The blur radius of the mask."
-            ]
+            "paragraphs": ["The blur radius of the mask."]
         },
         "compositingBlurMethod": {
             "heading": "Blur Method",
-            "paragraphs": [
-                "The method of blur applied to the masked area."
-            ]
+            "paragraphs": ["The method of blur applied to the masked area."]
         },
         "compositingCoherencePass": {
             "heading": "Coherence Pass",
@@ -1371,9 +1369,7 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": [
-                "The mode of the Coherence Pass."
-            ]
+            "paragraphs": ["The mode of the Coherence Pass."]
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
@@ -1391,9 +1387,7 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
-            "paragraphs": [
-                "Adjust the mask."
-            ]
+            "paragraphs": ["Adjust the mask."]
         },
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
@@ -1451,9 +1445,7 @@
         },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": [
-                "Method to infill the selected area."
-            ]
+            "paragraphs": ["Method to infill the selected area."]
         },
         "lora": {
             "heading": "LoRA Weight",
@@ -1593,7 +1585,7 @@
         "redo": "Redo",
         "resetView": "Reset View",
         "saveBoxRegionOnly": "Save Box Region Only",
-        "saveMask":"Save $t(unifiedCanvas.mask)",
+        "saveMask": "Save $t(unifiedCanvas.mask)",
         "saveToGallery": "Save To Gallery",
         "scaledBoundingBox": "Scaled Bounding Box",
         "showCanvasDebugInfo": "Show Additional Canvas Info",
