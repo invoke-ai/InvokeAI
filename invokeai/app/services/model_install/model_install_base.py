@@ -35,7 +35,7 @@ class ModelInstallJob(BaseModel):
     inplace: bool = Field(default=False, description="Leave model in its current location; otherwise install under models directory")
     source: ModelSource = Field(description="Source (URL, repo_id, or local path) of model")
     local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
-    key: Optional[str] = Field(default=None, description="After model is installed, this is its config record key")
+    key: str = Field(default="<NO KEY>", description="After model is installed, this is its config record key")
     error_type: str = Field(default="", description="Class name of the exception that led to status==ERROR")
     error: str = Field(default="", description="Error traceback")  # noqa #501
 

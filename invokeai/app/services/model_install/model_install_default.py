@@ -178,14 +178,15 @@ class ModelInstallService(ModelInstallServiceBase):
             self._install_queue.put(job)
             return job
 
-        else:  # waiting for download queue implementation
+        else:  # here is where we'd download a URL or repo_id. Implementation pending download queue.
             raise NotImplementedError
 
     def list_jobs(self, source: Optional[ModelSource]=None) -> List[ModelInstallJob]:  # noqa D102
         jobs = self._install_jobs
         if not source:
-            return jobs.values()
+            return list(jobs.values())
         else:
+            source = str(source)
             return [jobs[x] for x in jobs if source in str(x)]
 
     def get_job(self, source: ModelSource) -> ModelInstallJob:  # noqa D102
