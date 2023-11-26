@@ -279,7 +279,7 @@ export const buildLinearSDXLTextToImageGraph = (
   // Add High resolution fix.
   // NOTE: Not supported for onnx models.
   if (state.generation.hrfEnabled && !isUsingOnnxModel) {
-    addHrfToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
+    addHrfToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
   }
 
   // NSFW & watermark - must be last thing added to graph
