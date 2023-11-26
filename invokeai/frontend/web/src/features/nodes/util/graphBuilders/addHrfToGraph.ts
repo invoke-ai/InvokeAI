@@ -26,7 +26,7 @@ import { setMetadataReceivingNode, upsertMetadata } from './metadata';
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(
   graph: NonNullableGraph,
-  finalDenoiseLatentsNode: DenoiseLatentsInvocation
+  finalDenoiseLatentsNodeId: string
 ): void {
   const destinationFields = [
     'vae',
@@ -42,7 +42,7 @@ function copyConnectionsToDenoiseLatentsHrf(
   // Loop through the existing edges connected to finalDenoiseLatentsNode
   graph.edges.forEach((edge: Edge) => {
     if (
-      edge.destination.node_id === finalDenoiseLatentsNode.id &&
+      edge.destination.node_id === finalDenoiseLatentsNodeId &&
       destinationFields.includes(edge.destination.field)
     ) {
       // Add a similar connection to DENOISE_LATENTS_HRF
@@ -337,7 +337,7 @@ export const addHrfToGraph = (
       },
     }
   );
-  copyConnectionsToDenoiseLatentsHrf(graph, finalDenoiseLatentsNode);
+  copyConnectionsToDenoiseLatentsHrf(graph, finalDenoiseLatentsNodeId);
 
   graph.nodes[LATENTS_TO_IMAGE_HRF_HR] = {
     type: 'l2i',
