@@ -1,12 +1,13 @@
 import { OpenAPIV3_1 } from 'openapi-types';
 import {
   InputFieldJSONSchemaExtra,
+  InvocationJSONSchemaExtra,
   OutputFieldJSONSchemaExtra,
 } from 'services/api/types';
 
 // Janky customization of OpenAPI Schema :/
 
-export type InvocationSchemaExtra = {
+export type InvocationSchemaExtra = InvocationJSONSchemaExtra & {
   output: OpenAPIV3_1.ReferenceObject; // the output of the invocation
   title: string;
   category?: string;
