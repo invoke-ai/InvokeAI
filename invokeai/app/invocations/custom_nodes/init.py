@@ -40,7 +40,7 @@ for d in Path(__file__).parent.iterdir():
         logger.warn(f"Could not load {init}")
         continue
 
-    logger.info(f"Loading node pack {spec.name}")
+    logger.info(f"Loading node pack {module_name}")
 
     module = module_from_spec(spec)
     sys.modules[spec.name] = module
