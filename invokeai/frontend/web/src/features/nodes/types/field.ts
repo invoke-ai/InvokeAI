@@ -30,6 +30,8 @@ import {
  * - z<TypeName>FieldOutputInstance - zod schema for the field's output instance
  * - z<TypeName>FieldInputTemplate - zod schema for the field's input template
  * - z<TypeName>FieldOutputTemplate - zod schema for the field's output template
+ * - inferred types for each schema
+ * - type guards for InputInstance and InputTemplate
  *
  * These then must be added to the unions at the bottom of this file.
  */
