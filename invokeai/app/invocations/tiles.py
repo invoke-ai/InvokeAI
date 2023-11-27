@@ -127,8 +127,6 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Merge multiple tile images into a single image."""
 
     # Inputs
-    image_width: int = InputField(ge=1, description="The width of the output image, in pixels.")
-    image_height: int = InputField(ge=1, description="The height of the output image, in pixels.")
     tiles_with_images: list[TileWithImage] = InputField(description="A list of tile images with tile properties.")
     blend_amount: int = InputField(
         ge=0,
@@ -138,6 +136,13 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         images = [twi.image for twi in self.tiles_with_images]
         tiles = [twi.tile for twi in self.tiles_with_images]
+
+        # Infer the output image dimensions from the max/min tile limits.
+        height = 0
+        width = 0
+        for tile in tiles:
+            height = max(height, tile.coords.bottom)
+            width = max(width, tile.coords.right)
 
         # Get all tile images for processing.
         # TODO(ryand): It pains me that we spend time PNG decoding each tile from disk when they almost certainly
@@ -152,7 +157,7 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
         # Check the first tile to determine how many image channels are expected in the output.
         channels = tile_np_images[0].shape[-1]
         dtype = tile_np_images[0].dtype
-        np_image = np.zeros(shape=(self.image_height, self.image_width, channels), dtype=dtype)
+        np_image = np.zeros(shape=(height, width, channels), dtype=dtype)
 
         merge_tiles_with_linear_blending(
             dst_image=np_image, tiles=tiles, tile_images=tile_np_images, blend_amount=self.blend_amount
