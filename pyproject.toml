@@ -34,6 +34,7 @@ classifiers = [
 dependencies = [
   "accelerate~=0.24.0",
   "albumentations",
+  "basicsr",
   "click",
   "clip_anytorch",                         # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel~=2.0.2",
@@ -71,7 +72,6 @@ dependencies = [
   "python-multipart",
   "python-socketio~=5.10.0",
   "pytorch-lightning",
-  "realesrgan",
   "requests~=2.28.2",
   "rich~=13.3",
   "safetensors~=0.4.0",
