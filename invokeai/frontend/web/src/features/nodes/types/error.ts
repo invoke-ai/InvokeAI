@@ -12,6 +12,20 @@ export class WorkflowVersionError extends Error {
     this.name = this.constructor.name;
   }
 }
+/**
+ * Workflow Migration Error
+ * Raised when a workflow migration fails.
+ */
+export class WorkflowMigrationError extends Error {
+  /**
+   * Create WorkflowMigrationError
+   * @param {String} message
+   */
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
 
 /**
  * Unable to Update Node Error
