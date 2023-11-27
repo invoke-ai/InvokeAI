@@ -24,6 +24,7 @@ const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
       <Icon
         as={FaInfoCircle}
         sx={{
+          display: 'block',
           boxSize: 4,
           w: 8,
           color: needsUpdate ? 'error.400' : 'base.400',
@@ -109,6 +110,11 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
       <Text as="span" sx={{ fontWeight: 600 }}>
         {title}
       </Text>
+      {nodeTemplate?.nodePack && (
+        <Text opacity={0.7}>
+          {t('nodes.nodePack')}: {nodeTemplate.nodePack}
+        </Text>
+      )}
       <Text sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
         {nodeTemplate?.description}
       </Text>

@@ -82,6 +82,7 @@ export const parseSchema = (
     const tags = schema.tags ?? [];
     const description = schema.description ?? '';
     const version = schema.version;
+    const nodePack = schema.node_pack;
     let withWorkflow = false;
 
     const inputs = reduce(
@@ -257,6 +258,7 @@ export const parseSchema = (
       outputs,
       useCache,
       withWorkflow,
+      nodePack,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });

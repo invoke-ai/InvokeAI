@@ -1,7 +1,14 @@
+import { $store } from 'app/store/nanostores/store';
+import { RootState } from 'app/store/store';
+import { FieldType } from 'features/nodes/types/field';
+import { InvocationNodeData } from 'features/nodes/types/invocation';
 import { t } from 'i18next';
-import { forEach, isString } from 'lodash-es';
+import { forEach } from 'lodash-es';
 import { z } from 'zod';
-import { WorkflowVersionError } from '../../types/error';
+import {
+  WorkflowMigrationError,
+  WorkflowVersionError,
+} from '../../types/error';
 import { zSemVer } from '../../types/semver';
 import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from '../../types/v1/fieldTypeMap';
 import { WorkflowV1, zWorkflowV1 } from '../../types/v1/workflowV1';
@@ -20,22 +27,39 @@ const zWorkflowMetaVersion = z.object({
  * Migrates a workflow from V1 to V2.
  */
 const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
+  const invocationTemplates = ($store.get()?.getState() as RootState).nodes
+    .nodeTemplates;
   workflowToMigrate.nodes.forEach((node) => {
     if (node.type === 'invocation') {
+      // Migrate field types
       forEach(node.data.inputs, (input) => {
-        if (!isString(input.type)) {
-          return;
+        const newFieldType = FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING[input.type];
+        if (!newFieldType) {
+          throw new WorkflowMigrationError(
+            t('nodes.unknownFieldType', { type: input.type })
+          );
         }
-        (input.type as unknown) =
-          FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING[input.type];
+        // Cast as the V2 type
+        (input.type as unknown as FieldType) = newFieldType;
       });
       forEach(node.data.outputs, (output) => {
-        if (!isString(output.type)) {
-          return;
-        }
-        (output.type as unknown) =
+        const newFieldType =
           FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING[output.type];
+        if (!newFieldType) {
+          throw new WorkflowMigrationError(
+            t('nodes.unknownFieldType', { type: output.type })
+          );
+        }
+        // Cast as the V2 type
+        (output.type as unknown as FieldType) = newFieldType;
       });
+      // Migrate nodePack
+      const invocationTemplate = invocationTemplates[node.data.type];
+      const nodePack = invocationTemplate
+        ? invocationTemplate.nodePack
+        : t('common.unknown');
+      // Cast as the V2 type
+      (node.data as unknown as InvocationNodeData).nodePack = nodePack;
     }
   });
   (workflowToMigrate.meta.version as WorkflowV2['meta']['version']) = '2.0.0';
@@ -49,6 +73,7 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV2 => {
   const workflowVersionResult = zWorkflowMetaVersion.safeParse(data);
 
   if (!workflowVersionResult.success) {
+    console.log(data);
     throw new WorkflowVersionError(t('nodes.unableToGetWorkflowVersion'));
   }
 

@@ -21,6 +21,7 @@ export const zInvocationTemplate = z.object({
   withWorkflow: z.boolean(),
   version: zSemVer,
   useCache: z.boolean(),
+  nodePack: z.string().min(1).nullish(),
 });
 export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
 // #endregion
@@ -36,6 +37,7 @@ export const zInvocationNodeData = z.object({
   isIntermediate: z.boolean(),
   useCache: z.boolean(),
   version: zSemVer,
+  nodePack: z.string().min(1).nullish(),
   inputs: z.record(zFieldInputInstance),
   outputs: z.record(zFieldOutputInstance),
 });

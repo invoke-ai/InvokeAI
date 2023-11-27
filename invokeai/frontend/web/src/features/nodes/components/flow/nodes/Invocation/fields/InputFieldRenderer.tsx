@@ -298,7 +298,7 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
           _dark: { color: 'error.300' },
         }}
       >
-        {t('nodes.unknownFieldType')}: {fieldInstance?.type.name}
+        {t('nodes.unknownFieldType', { type: fieldInstance?.type.name })}
       </Text>
     </Box>
   );
