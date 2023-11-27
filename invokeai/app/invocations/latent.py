@@ -1178,31 +1178,33 @@ class BlendLatentsInvocation(BaseInvocation):
     version="1.0.0",
 )
 class CropLatentsInvocation(BaseInvocation):
-    """Crops latents"""
+    """Crops a latent-space tensor to a box specified in image-space. The box dimensions and coordinates must be
+    divisible by the latent scale factor of 8.
+    """
 
     latents: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,
     )
     width: int = InputField(
-        ge=64,
+        ge=1,
         multiple_of=LATENT_SCALE_FACTOR,
-        description=FieldDescriptions.width,
+        description="The width (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
     )
     height: int = InputField(
-        ge=64,
+        ge=1,
         multiple_of=LATENT_SCALE_FACTOR,
-        description=FieldDescriptions.width,
+        description="The height (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
     )
     x_offset: int = InputField(
         ge=0,
         multiple_of=LATENT_SCALE_FACTOR,
-        description="x-coordinate",
+        description="The left x coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
     )
     y_offset: int = InputField(
         ge=0,
         multiple_of=LATENT_SCALE_FACTOR,
-        description="y-coordinate",
+        description="The top y coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
     )
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
