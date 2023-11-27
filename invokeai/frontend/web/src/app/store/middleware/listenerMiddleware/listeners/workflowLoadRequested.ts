@@ -3,7 +3,10 @@ import { parseify } from 'common/util/serialize';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
-import { WorkflowVersionError } from 'features/nodes/types/error';
+import {
+  WorkflowMigrationError,
+  WorkflowVersionError,
+} from 'features/nodes/types/error';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -57,6 +60,18 @@ export const addWorkflowLoadRequestedListener = () => {
       } catch (e) {
         if (e instanceof WorkflowVersionError) {
           // The workflow version was not recognized in the valid list of versions
+          log.error({ error: parseify(e) }, e.message);
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('nodes.unableToValidateWorkflow'),
+                status: 'error',
+                description: e.message,
+              })
+            )
+          );
+        } else if (e instanceof WorkflowMigrationError) {
+          // There was a problem migrating the workflow to the latest version
           log.error({ error: parseify(e) }, e.message);
           dispatch(
             addToast(

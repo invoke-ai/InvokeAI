@@ -1,9 +1,10 @@
-import { Box, Flex, Text } from '@chakra-ui/react';
+import { Flex, Text } from '@chakra-ui/react';
+import { useNodePack } from 'features/nodes/hooks/useNodePack';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import NodeCollapseButton from '../common/NodeCollapseButton';
 import NodeWrapper from '../common/NodeWrapper';
-import { useTranslation } from 'react-i18next';
 
 type Props = {
   nodeId: string;
@@ -21,6 +22,7 @@ const InvocationNodeUnknownFallback = ({
   selected,
 }: Props) => {
   const { t } = useTranslation();
+  const nodePack = useNodePack(nodeId);
   return (
     <NodeWrapper nodeId={nodeId} selected={selected}>
       <Flex
@@ -62,12 +64,22 @@ const InvocationNodeUnknownFallback = ({
             fontSize: 'sm',
           }}
         >
-          <Box>
-            <Text as="span">{t('nodes.unknownNodeType')}: </Text>
-            <Text as="span" fontWeight={600}>
-              {type}
+          <Flex gap={2} flexDir="column">
+            <Text as="span">
+              {t('nodes.unknownNodeType')}:{' '}
+              <Text as="span" fontWeight={600}>
+                {type}
+              </Text>
             </Text>
-          </Box>
+            {nodePack && (
+              <Text as="span">
+                {t('nodes.nodePack')}:{' '}
+                <Text as="span" fontWeight={600}>
+                  {nodePack}
+                </Text>
+              </Text>
+            )}
+          </Flex>
         </Flex>
       )}
     </NodeWrapper>
