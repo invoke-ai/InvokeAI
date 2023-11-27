@@ -32,7 +32,7 @@ class ImageMode(str, Enum):
     RGBA = "RGBA"
 
 
-class RealESRGANer:
+class RealESRGAN:
     """A helper class for upsampling images with RealESRGAN.
 
     Args:
@@ -202,7 +202,7 @@ class RealESRGANer:
         return self.output
 
     @torch.no_grad()
-    def enhance(self, img: MatLike, esrgan_alpha_upscale: bool = True) -> npt.NDArray[Any]:
+    def upscale(self, img: MatLike, esrgan_alpha_upscale: bool = True) -> npt.NDArray[Any]:
         np_img = img.astype(np.float32)
         alpha: Optional[np.ndarray] = None
         if np.max(np_img) > 256:
