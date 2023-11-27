@@ -177,7 +177,7 @@ from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hint
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, TypeAdapter
-from pydantic.fields import JsonDict
+from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
 from .config_base import InvokeAISettings
