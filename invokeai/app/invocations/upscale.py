@@ -103,13 +103,7 @@ class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         # prepare image - Real-ESRGAN uses cv2 internally, and cv2 uses BGR vs RGB for PIL
         # TODO: This strips the alpha... is that okay?
         cv2_image = cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
-
-        # We can pass an `outscale` value here, but it just resizes the image by that factor after
-        # upscaling, so it's kinda pointless for our purposes. If you want something other than 4x
-        # upscaling, you'll need to add a resize node after this one.
         upscaled_image = upscaler.upscale(cv2_image)
-
-        # back to PIL
         pil_image = Image.fromarray(cv2.cvtColor(upscaled_image, cv2.COLOR_BGR2RGB)).convert("RGBA")
 
         torch.cuda.empty_cache()
