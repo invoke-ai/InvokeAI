@@ -7,7 +7,7 @@ import { RefObject, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ZodError } from 'zod';
 import { fromZodIssue } from 'zod-validation-error';
-import { workflowLoadRequested } from '../store/actions';
+import { workflowLoadRequested } from 'features/nodes/store/actions';
 
 export const useLoadWorkflowFromFile = (resetRef: RefObject<() => void>) => {
   const dispatch = useAppDispatch();

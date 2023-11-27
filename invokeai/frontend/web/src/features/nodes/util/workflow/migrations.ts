@@ -8,11 +8,11 @@ import { z } from 'zod';
 import {
   WorkflowMigrationError,
   WorkflowVersionError,
-} from '../../types/error';
-import { zSemVer } from '../../types/semver';
-import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from '../../types/v1/fieldTypeMap';
-import { WorkflowV1, zWorkflowV1 } from '../../types/v1/workflowV1';
-import { WorkflowV2, zWorkflowV2 } from '../../types/workflow';
+} from 'features/nodes/types/error';
+import { zSemVer } from 'features/nodes/types/semver';
+import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from 'features/nodes/types/v1/fieldTypeMap';
+import { WorkflowV1, zWorkflowV1 } from 'features/nodes/types/v1/workflowV1';
+import { WorkflowV2, zWorkflowV2 } from 'features/nodes/types/workflow';
 
 /**
  * Helper schema to extract the version from a workflow.

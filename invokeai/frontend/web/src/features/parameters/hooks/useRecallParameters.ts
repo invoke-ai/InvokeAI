@@ -50,9 +50,12 @@ import {
   useGetIPAdapterModelsQuery,
   useGetLoRAModelsQuery,
   useGetT2IAdapterModelsQuery,
-} from '../../../services/api/endpoints/models';
-import { loraRecalled, lorasCleared } from '../../lora/store/loraSlice';
-import { initialImageSelected, modelSelected } from '../store/actions';
+} from 'services/api/endpoints/models';
+import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
+import {
+  initialImageSelected,
+  modelSelected,
+} from 'features/parameters/store/actions';
 import {
   setCfgScale,
   setHeight,
@@ -67,7 +70,7 @@ import {
   setSteps,
   setWidth,
   vaeSelected,
-} from '../store/generationSlice';
+} from 'features/parameters/store/generationSlice';
 import {
   isParameterHRFEnabled,
   isParameterCFGScale,
@@ -91,7 +94,7 @@ import {
   isParameterStrength,
   isParameterVAEModel,
   isParameterWidth,
-} from '../types/parameterSchemas';
+} from 'features/parameters/types/parameterSchemas';
 
 const selector = createSelector(
   stateSelector,

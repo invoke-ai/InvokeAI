@@ -4,9 +4,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { keys, map } from 'lodash-es';
 import { useMemo } from 'react';
-import { isInvocationNode } from '../types/invocation';
-import { getSortedFilteredFieldNames } from '../util/node/getSortedFilteredFieldNames';
-import { TEMPLATE_BUILDER_MAP } from '../util/schema/buildFieldInputTemplate';
+import { isInvocationNode } from 'features/nodes/types/invocation';
+import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
+import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(

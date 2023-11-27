@@ -13,7 +13,7 @@ import {
 import { cloneDeep, merge, uniq } from 'lodash-es';
 import { appSocketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
-import { buildControlAdapter } from '../util/buildControlAdapter';
+import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import { controlAdapterImageProcessed } from './actions';
 import {
   CONTROLNET_MODEL_DEFAULT_PROCESSORS as CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS,

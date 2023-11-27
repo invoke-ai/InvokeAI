@@ -1,7 +1,7 @@
 import { ChakraProps } from '@chakra-ui/react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQueueBack } from '../hooks/useQueueBack';
+import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
 import QueueButton from './common/QueueButton';
 import GreyscaleInvokeAIIcon from 'common/components/GreyscaleInvokeAIIcon';

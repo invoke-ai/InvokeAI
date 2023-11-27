@@ -9,8 +9,8 @@ import {
   imagesApi,
   useLazyListImagesQuery,
 } from 'services/api/endpoints/images';
-import { selectListImagesBaseQueryArgs } from '../store/gallerySelectors';
-import { IMAGE_LIMIT } from '../store/types';
+import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import { ListImagesArgs } from 'services/api/types';
 import { imagesAdapter } from 'services/api/util';
 

@@ -3,8 +3,8 @@ import { useNodePack } from 'features/nodes/hooks/useNodePack';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import NodeCollapseButton from '../common/NodeCollapseButton';
-import NodeWrapper from '../common/NodeWrapper';
+import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 
 type Props = {
   nodeId: string;

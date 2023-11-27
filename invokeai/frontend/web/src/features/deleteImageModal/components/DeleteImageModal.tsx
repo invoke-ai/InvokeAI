@@ -19,10 +19,16 @@ import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { some } from 'lodash-es';
 import { ChangeEvent, memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { imageDeletionConfirmed } from '../store/actions';
-import { getImageUsage, selectImageUsage } from '../store/selectors';
-import { imageDeletionCanceled, isModalOpenChanged } from '../store/slice';
-import { ImageUsage } from '../store/types';
+import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
+import {
+  getImageUsage,
+  selectImageUsage,
+} from 'features/deleteImageModal/store/selectors';
+import {
+  imageDeletionCanceled,
+  isModalOpenChanged,
+} from 'features/deleteImageModal/store/slice';
+import { ImageUsage } from 'features/deleteImageModal/store/types';
 import ImageUsageMessage from './ImageUsageMessage';
 
 const selector = createSelector(

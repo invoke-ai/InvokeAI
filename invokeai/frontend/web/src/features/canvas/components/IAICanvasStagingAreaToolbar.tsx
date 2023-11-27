@@ -28,7 +28,7 @@ import {
   FaTimes,
 } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { stagingAreaImageSaved } from '../store/actions';
+import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 
 const selector = createSelector(
   [canvasSelector],

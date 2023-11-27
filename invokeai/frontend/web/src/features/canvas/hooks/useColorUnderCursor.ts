@@ -3,11 +3,11 @@ import Konva from 'konva';
 import {
   commitColorPickerColor,
   setColorPickerColor,
-} from '../store/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import {
   getCanvasBaseLayer,
   getCanvasStage,
-} from '../util/konvaInstanceProvider';
+} from 'features/canvas/util/konvaInstanceProvider';
 
 const useColorPicker = () => {
   const dispatch = useAppDispatch();

@@ -11,9 +11,9 @@ import { configSelector } from 'features/system/store/configSelectors';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CONTROLNET_PROCESSORS } from '../../store/constants';
-import { controlAdapterProcessortTypeChanged } from '../../store/controlAdaptersSlice';
-import { ControlAdapterProcessorType } from '../../store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { controlAdapterProcessortTypeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { ControlAdapterProcessorType } from 'features/controlAdapters/store/types';
 
 type Props = {
   id: string;

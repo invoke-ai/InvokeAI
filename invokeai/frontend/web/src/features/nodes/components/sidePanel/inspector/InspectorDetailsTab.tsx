@@ -20,8 +20,8 @@ import {
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Node } from 'reactflow';
-import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
-import ScrollableContent from '../ScrollableContent';
+import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import EditableNodeTitle from './details/EditableNodeTitle';
 
 const selector = createSelector(

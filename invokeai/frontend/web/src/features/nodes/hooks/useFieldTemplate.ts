@@ -3,8 +3,8 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
-import { KIND_MAP } from '../types/constants';
-import { isInvocationNode } from '../types/invocation';
+import { KIND_MAP } from 'features/nodes/types/constants';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 
 export const useFieldTemplate = (
   nodeId: string,

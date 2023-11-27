@@ -17,8 +17,8 @@ import {
   appSocketQueueItemStatusChanged,
   appSocketSessionRetrievalError,
 } from 'services/events/actions';
-import { calculateStepPercentage } from '../util/calculateStepPercentage';
-import { makeToast } from '../util/makeToast';
+import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
+import { makeToast } from 'features/system/util/makeToast';
 import { LANGUAGES, SystemState } from './types';
 
 export const initialSystemState: SystemState = {

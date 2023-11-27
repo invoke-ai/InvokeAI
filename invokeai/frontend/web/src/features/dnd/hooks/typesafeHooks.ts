@@ -4,7 +4,7 @@ import {
   UseDraggableTypesafeReturnValue,
   UseDroppableTypesafeArguments,
   UseDroppableTypesafeReturnValue,
-} from '../types';
+} from 'features/dnd/types';
 
 export function useDroppableTypesafe(props: UseDroppableTypesafeArguments) {
   return useDroppable(props) as UseDroppableTypesafeReturnValue;

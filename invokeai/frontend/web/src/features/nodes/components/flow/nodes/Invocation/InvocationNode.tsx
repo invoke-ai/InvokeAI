@@ -3,7 +3,7 @@ import { useAnyOrDirectInputFieldNames } from 'features/nodes/hooks/useAnyOrDire
 import { useConnectionInputFieldNames } from 'features/nodes/hooks/useConnectionInputFieldNames';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { memo } from 'react';
-import NodeWrapper from '../common/NodeWrapper';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import InvocationNodeFooter from './InvocationNodeFooter';
 import InvocationNodeHeader from './InvocationNodeHeader';
 import InputField from './fields/InputField';

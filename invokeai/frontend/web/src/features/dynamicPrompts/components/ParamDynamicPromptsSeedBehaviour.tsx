@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   SeedBehaviour,
   seedBehaviourChanged,
-} from '../store/dynamicPromptsSlice';
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import IAIMantineSelectItemWithDescription from 'common/components/IAIMantineSelectItemWithDescription';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 

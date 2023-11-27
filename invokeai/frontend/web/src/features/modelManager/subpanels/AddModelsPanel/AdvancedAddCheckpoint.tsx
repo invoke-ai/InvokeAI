@@ -10,10 +10,10 @@ import { FocusEventHandler, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import { CheckpointModelConfig } from 'services/api/types';
-import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
-import BaseModelSelect from '../shared/BaseModelSelect';
-import CheckpointConfigsSelect from '../shared/CheckpointConfigsSelect';
-import ModelVariantSelect from '../shared/ModelVariantSelect';
+import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/CheckpointConfigsSelect';
+import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import { getModelName } from './util';
 
 type AdvancedAddCheckpointProps = {

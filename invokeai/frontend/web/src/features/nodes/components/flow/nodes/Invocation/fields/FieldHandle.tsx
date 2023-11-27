@@ -11,7 +11,7 @@ import {
 } from 'features/nodes/types/field';
 import { CSSProperties, memo, useMemo } from 'react';
 import { Handle, HandleType, Position } from 'reactflow';
-import { getFieldColor } from '../../../edges/util/getEdgeColor';
+import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 
 export const handleBaseStyles: CSSProperties = {
   position: 'absolute',

@@ -43,8 +43,8 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { menuListMotionProps } from 'theme/components/menu';
-import { sentImageToImg2Img } from '../../store/actions';
-import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
+import { sentImageToImg2Img } from 'features/gallery/store/actions';
+import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],

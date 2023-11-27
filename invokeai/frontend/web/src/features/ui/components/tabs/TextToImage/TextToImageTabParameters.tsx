@@ -5,7 +5,7 @@ import ControlAdaptersCollapse from 'features/controlAdapters/components/Control
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 import ParamHrfCollapse from 'features/parameters/components/Parameters/HighResFix/ParamHrfCollapse';
 import { memo } from 'react';
-import ParamPromptArea from '../../../../parameters/components/Parameters/Prompt/ParamPromptArea';
+import ParamPromptArea from 'features/parameters/components/Parameters/Prompt/ParamPromptArea';
 import TextToImageTabCoreParameters from './TextToImageTabCoreParameters';
 
 const TextToImageTabParameters = () => {

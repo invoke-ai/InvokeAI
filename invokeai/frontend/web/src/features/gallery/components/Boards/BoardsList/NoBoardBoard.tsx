@@ -13,8 +13,8 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import AutoAddIcon from '../AutoAddIcon';
-import BoardContextMenu from '../BoardContextMenu';
+import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,

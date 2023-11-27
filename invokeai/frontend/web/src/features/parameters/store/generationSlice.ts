@@ -6,7 +6,7 @@ import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { CLIP_SKIP_MAP } from '../types/constants';
+import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import {
   ParameterCanvasCoherenceMode,
   ParameterCFGScale,
@@ -24,7 +24,7 @@ import {
   ParameterVAEModel,
   ParameterWidth,
   zParameterModel,
-} from '../types/parameterSchemas';
+} from 'features/parameters/types/parameterSchemas';
 
 export interface GenerationState {
   hrfEnabled: boolean;

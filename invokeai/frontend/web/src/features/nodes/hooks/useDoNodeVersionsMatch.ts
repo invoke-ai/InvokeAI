@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { compareVersions } from 'compare-versions';
 import { useMemo } from 'react';
-import { isInvocationNode } from '../types/invocation';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 
 export const useDoNodeVersionsMatch = (nodeId: string) => {
   const selector = useMemo(

@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { memo } from 'react';
-import NodeCollapseButton from '../common/NodeCollapseButton';
-import NodeTitle from '../common/NodeTitle';
+import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
+import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import InvocationNodeCollapsedHandles from './InvocationNodeCollapsedHandles';
 import InvocationNodeInfoIcon from './InvocationNodeInfoIcon';
 import InvocationNodeStatusIndicator from './InvocationNodeStatusIndicator';

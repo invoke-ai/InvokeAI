@@ -1,5 +1,8 @@
 import { isNil } from 'lodash-es';
-import { FieldInputTemplate, FieldOutputTemplate } from '../../types/field';
+import {
+  FieldInputTemplate,
+  FieldOutputTemplate,
+} from 'features/nodes/types/field';
 
 export const getSortedFilteredFieldNames = (
   fields: FieldInputTemplate[] | FieldOutputTemplate[]

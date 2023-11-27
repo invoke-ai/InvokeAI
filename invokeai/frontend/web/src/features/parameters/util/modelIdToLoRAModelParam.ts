@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import {
   ParameterLoRAModel,
   zParameterLoRAModel,
-} from '../types/parameterSchemas';
+} from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToLoRAModelParam = (
   loraModelId: string

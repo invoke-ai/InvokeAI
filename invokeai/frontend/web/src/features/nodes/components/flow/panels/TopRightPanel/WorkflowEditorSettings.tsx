@@ -28,7 +28,7 @@ import {
 import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCog } from 'react-icons/fa';
 import { SelectionMode } from 'reactflow';
-import ReloadNodeTemplatesButton from '../TopCenterPanel/ReloadSchemaButton';
+import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopCenterPanel/ReloadSchemaButton';
 import { useTranslation } from 'react-i18next';
 
 const formLabelProps: FormLabelProps = {

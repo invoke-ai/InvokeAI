@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { NodeProps } from 'reactflow';
-import InvocationNode from '../Invocation/InvocationNode';
+import InvocationNode from 'features/nodes/components/flow/nodes/Invocation/InvocationNode';
 import InvocationNodeUnknownFallback from './InvocationNodeUnknownFallback';
 
 const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
