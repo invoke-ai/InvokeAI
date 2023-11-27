@@ -114,7 +114,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
             {model.model_name}
           </Text>
           <Text fontSize="sm" color="base.400">
-            {MODEL_TYPE_MAP[model.base_model]} Model
+            {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
           </Text>
         </Flex>
         {![''].includes(model.base_model) ? (
@@ -128,7 +128,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               _dark: { bg: 'error.400' },
             }}
           >
-            Conversion Not Supported
+            {t('modelManager.conversionNotSupported')}
           </Badge>
         )}
       </Flex>

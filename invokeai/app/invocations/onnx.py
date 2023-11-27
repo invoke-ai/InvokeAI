@@ -326,7 +326,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     title="ONNX Latents to Image",
     tags=["latents", "image", "vae", "onnx"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
 )
 class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Generates an image from latents."""

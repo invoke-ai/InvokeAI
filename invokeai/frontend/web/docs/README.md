@@ -1,33 +1,98 @@
 # InvokeAI Web UI
 
+<!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
+
+<!-- code_chunk_output -->
+
 - [InvokeAI Web UI](#invokeai-web-ui)
-  - [Stack](#stack)
+  - [Core Libraries](#core-libraries)
+    - [Redux Toolkit](#redux-toolkit)
+    - [Socket\.IO](#socketio)
+    - [Chakra UI](#chakra-ui)
+    - [KonvaJS](#konvajs)
+    - [Vite](#vite)
+    - [i18next & Weblate](#i18next--weblate)
+    - [openapi-typescript](#openapi-typescript)
+  - [Client Types Generation](#client-types-generation)
+  - [Package Scripts](#package-scripts)
   - [Contributing](#contributing)
     - [Dev Environment](#dev-environment)
+      - [VSCode Remote Dev](#vscode-remote-dev)
     - [Production builds](#production-builds)
 
-The UI is a fairly straightforward Typescript React app. The only really fancy stuff is the Unified Canvas.
+<!-- /code_chunk_output -->
 
-Code in `invokeai/frontend/web/` if you want to have a look.
+The UI is a fairly straightforward Typescript React app.
 
-## Stack
+## Core Libraries
 
-State management is Redux via [Redux Toolkit](https://github.com/reduxjs/redux-toolkit). We lean heavily on RTK:
-- `createAsyncThunk` for HTTP requests
-- `createEntityAdapter` for fetching images and models
-- `createListenerMiddleware` for workflows
+The app makes heavy use of a handful of libraries.
 
-The API client and associated types are generated from the OpenAPI schema. See API_CLIENT.md.
+### Redux Toolkit
 
-Communication with server is a mix of HTTP and [socket.io](https://github.com/socketio/socket.io-client) (with a simple socket.io redux middleware to help).
+[Redux Toolkit](https://github.com/reduxjs/redux-toolkit) is used for state management and fetching/caching:
 
-[Chakra-UI](https://github.com/chakra-ui/chakra-ui) for components and styling.
+- `RTK-Query` for data fetching and caching
+- `createAsyncThunk` for a couple other HTTP requests
+- `createEntityAdapter` to normalize things like images and models
+- `createListenerMiddleware` for async workflows
 
-[Konva](https://github.com/konvajs/react-konva) for the canvas, but we are pushing the limits of what is feasible with it (and HTML canvas in general). We plan to rebuild it with [PixiJS](https://github.com/pixijs/pixijs) to take advantage of WebGL's improved raster handling.
+We use [redux-remember](https://github.com/zewish/redux-remember) for persistence.
 
-[Vite](https://vitejs.dev/) for bundling.
+### Socket\.IO
 
-Localisation is via [i18next](https://github.com/i18next/react-i18next), but translation happens on our [Weblate](https://hosted.weblate.org/engage/invokeai/) project. Only the English source strings should be changed on this repo.
+[Socket\.IO](https://github.com/socketio/socket.io) is used for server-to-client events, like generation process and queue state changes.
+
+### Chakra UI
+
+[Chakra UI](https://github.com/chakra-ui/chakra-ui) is our primary UI library, but we also use a few components from [Mantine v6](https://v6.mantine.dev/).
+
+### KonvaJS
+
+[KonvaJS](https://github.com/konvajs/react-konva) powers the canvas. In the future, we'd like to explore [PixiJS](https://github.com/pixijs/pixijs) or WebGPU.
+
+### Vite
+
+[Vite](https://github.com/vitejs/vite) is our bundler.
+
+### i18next & Weblate
+
+We use [i18next](https://github.com/i18next/react-i18next) for localisation, but translation to languages other than English happens on our [Weblate](https://hosted.weblate.org/engage/invokeai/) project. **Only the English source strings should be changed on this repo.**
+
+### openapi-typescript
+
+[openapi-typescript](https://github.com/drwpow/openapi-typescript) is used to generate types from the server's OpenAPI schema. See TYPES_CODEGEN.md.
+
+## Client Types Generation
+
+We use [`openapi-typescript`](https://github.com/drwpow/openapi-typescript) to generate types from the app's OpenAPI schema.
+
+The generated types are written to `invokeai/frontend/web/src/services/api/schema.d.ts`. This file is committed to the repo.
+
+The server must be started and available at <http://127.0.0.1:9090>.
+
+```sh
+# from the repo root, start the server
+python scripts/invokeai-web.py
+# from invokeai/frontend/web/, run the script
+yarn typegen
+```
+
+## Package Scripts
+
+See `package.json` for all scripts.
+
+Run with `yarn <script name>`.
+
+- `dev`: run the frontend in dev mode, enabling hot reloading
+- `build`: run all checks (madge, eslint, prettier, tsc) and then build the frontend
+- `typegen`: generate types from the OpenAPI schema (see [Client Types Generation](#client-types-generation))
+- `lint:madge`: check frontend for circular dependencies
+- `lint:eslint`: check frontend for code quality
+- `lint:prettier`: check frontend for code formatting
+- `lint:tsc`: check frontend for type issues
+- `lint`: run all checks concurrently
+- `fix`: run `eslint` and `prettier`, fixing fixable issues
 
 ## Contributing
 

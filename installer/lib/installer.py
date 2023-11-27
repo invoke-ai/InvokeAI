@@ -244,7 +244,7 @@ class InvokeAiInstance:
                 "numpy~=1.24.0",  # choose versions that won't be uninstalled during phase 2
                 "urllib3~=1.26.0",
                 "requests~=2.28.0",
-                "torch~=2.1.0",
+                "torch==2.1.0",
                 "torchmetrics==0.11.4",
                 "torchvision>=0.14.1",
                 "--force-reinstall",

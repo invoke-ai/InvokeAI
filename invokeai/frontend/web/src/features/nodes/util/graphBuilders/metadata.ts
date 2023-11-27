@@ -1,11 +1,12 @@
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { CoreMetadataInvocation } from 'services/api/types';
 import { JsonObject } from 'type-fest';
-import { METADATA, SAVE_IMAGE } from './constants';
+import { METADATA } from './constants';
 
 export const addCoreMetadataNode = (
   graph: NonNullableGraph,
-  metadata: Partial<CoreMetadataInvocation>
+  metadata: Partial<CoreMetadataInvocation>,
+  nodeId: string
 ): void => {
   graph.nodes[METADATA] = {
     id: METADATA,
@@ -19,7 +20,7 @@ export const addCoreMetadataNode = (
       field: 'metadata',
     },
     destination: {
-      node_id: SAVE_IMAGE,
+      node_id: nodeId,
       field: 'metadata',
     },
   });
@@ -63,4 +64,22 @@ export const getHasMetadata = (graph: NonNullableGraph): boolean => {
     | undefined;
 
   return Boolean(metadataNode);
+};
+
+export const setMetadataReceivingNode = (
+  graph: NonNullableGraph,
+  nodeId: string
+) => {
+  graph.edges = graph.edges.filter((edge) => edge.source.node_id !== METADATA);
+
+  graph.edges.push({
+    source: {
+      node_id: METADATA,
+      field: 'metadata',
+    },
+    destination: {
+      node_id: nodeId,
+      field: 'metadata',
+    },
+  });
 };

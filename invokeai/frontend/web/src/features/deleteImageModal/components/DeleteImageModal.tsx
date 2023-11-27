@@ -124,10 +124,10 @@ const DeleteImageModal = () => {
           </AlertDialogBody>
           <AlertDialogFooter>
             <IAIButton ref={cancelRef} onClick={handleClose}>
-              Cancel
+              {t('boards.cancel')}
             </IAIButton>
             <IAIButton colorScheme="error" onClick={handleDelete} ml={3}>
-              Delete
+              {t('controlnet.delete')}
             </IAIButton>
           </AlertDialogFooter>
         </AlertDialogContent>

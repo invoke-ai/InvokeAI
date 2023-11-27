@@ -10,7 +10,7 @@ import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -331,23 +331,27 @@ export const buildLinearSDXLImageToImageGraph = (
     });
   }
 
-  addCoreMetadataNode(graph, {
-    generation_mode: 'sdxl_img2img',
-    cfg_scale,
-    height,
-    width,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
-    model,
-    seed,
-    steps,
-    rand_device: use_cpu ? 'cpu' : 'cuda',
-    scheduler,
-    strength,
-    init_image: initialImage.imageName,
-    positive_style_prompt: positiveStylePrompt,
-    negative_style_prompt: negativeStylePrompt,
-  });
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'sdxl_img2img',
+      cfg_scale,
+      height,
+      width,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      model,
+      seed,
+      steps,
+      rand_device: use_cpu ? 'cpu' : 'cuda',
+      scheduler,
+      strength,
+      init_image: initialImage.imageName,
+      positive_style_prompt: positiveStylePrompt,
+      negative_style_prompt: negativeStylePrompt,
+    },
+    LATENTS_TO_IMAGE
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -388,7 +392,7 @@ export const buildLinearSDXLImageToImageGraph = (
     addWatermarkerToGraph(state, graph);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

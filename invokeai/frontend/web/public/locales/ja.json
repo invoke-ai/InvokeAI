@@ -438,7 +438,15 @@
         "useSeed": "シード値を使用",
         "useAll": "すべてを使用",
         "info": "情報",
-        "showOptionsPanel": "オプションパネルを表示"
+        "showOptionsPanel": "オプションパネルを表示",
+        "aspectRatioFree": "自由",
+        "invoke": {
+            "noControlImageForControlAdapter": "コントロールアダプター #{{number}} に画像がありません",
+            "noModelForControlAdapter": "コントロールアダプター #{{number}} のモデルが選択されていません。"
+        },
+        "aspectRatio": "縦横比",
+        "iterations": "生成回数",
+        "general": "基本設定"
     },
     "settings": {
         "models": "モデル",
@@ -603,7 +611,7 @@
         "delete": "削除",
         "controlAdapter_other": "コントロールアダプター",
         "colorMapTileSize": "タイルサイズ",
-        "ipAdapterImageFallback": "IP Adapterの画像が選択されていません",
+        "ipAdapterImageFallback": "IPアダプターの画像が選択されていません",
         "mediapipeFaceDescription": "Mediapipeを使用して顔を検出",
         "depthZoeDescription": "Zoeを使用して深度マップを生成",
         "setControlImageDimensions": "コントロール画像のサイズを幅と高さにセット",
@@ -652,7 +660,7 @@
         "queueTotal": "合計 {{total}}",
         "resumeSucceeded": "処理が再開されました",
         "resumeTooltip": "処理を再開",
-        "resume": "再会",
+        "resume": "再開",
         "status": "ステータス",
         "pruneSucceeded": "キューから完了アイテム{{item_count}}件を削除しました",
         "cancelTooltip": "現在のアイテムをキャンセル",
@@ -812,5 +820,13 @@
         "clear": "クリア",
         "maxCacheSize": "最大キャッシュサイズ",
         "cacheSize": "キャッシュサイズ"
+    },
+    "popovers": {
+        "paramRatio": {
+            "heading": "縦横比",
+            "paragraphs": [
+                "生成された画像の縦横比。"
+            ]
+        }
     }
 }

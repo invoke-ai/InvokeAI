@@ -7,7 +7,7 @@ import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -319,23 +319,29 @@ export const buildCanvasSDXLImageToImageGraph = (
     });
   }
 
-  addCoreMetadataNode(graph, {
-    generation_mode: 'img2img',
-    cfg_scale,
-    width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
-    height: !isUsingScaledDimensions
-      ? height
-      : scaledBoundingBoxDimensions.height,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
-    model,
-    seed,
-    steps,
-    rand_device: use_cpu ? 'cpu' : 'cuda',
-    scheduler,
-    strength,
-    init_image: initialImage.image_name,
-  });
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'img2img',
+      cfg_scale,
+      width: !isUsingScaledDimensions
+        ? width
+        : scaledBoundingBoxDimensions.width,
+      height: !isUsingScaledDimensions
+        ? height
+        : scaledBoundingBoxDimensions.height,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      model,
+      seed,
+      steps,
+      rand_device: use_cpu ? 'cpu' : 'cuda',
+      scheduler,
+      strength,
+      init_image: initialImage.image_name,
+    },
+    CANVAS_OUTPUT
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -380,7 +386,7 @@ export const buildCanvasSDXLImageToImageGraph = (
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

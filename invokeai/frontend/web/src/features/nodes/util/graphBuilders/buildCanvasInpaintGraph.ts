@@ -13,7 +13,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -666,7 +666,7 @@ export const buildCanvasInpaintGraph = (
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

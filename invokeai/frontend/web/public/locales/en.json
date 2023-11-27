@@ -1,16 +1,19 @@
 {
     "accessibility": {
         "copyMetadataJson": "Copy metadata JSON",
+        "createIssue":"Create Issue",
         "exitViewer": "Exit Viewer",
         "flipHorizontally": "Flip Horizontally",
         "flipVertically": "Flip Vertically",
         "invokeProgressBar": "Invoke progress bar",
         "menu": "Menu",
+        "mode": "Mode",
         "modelSelect": "Model Select",
         "modifyConfig": "Modify Config",
         "nextImage": "Next Image",
         "previousImage": "Previous Image",
         "reset": "Reset",
+        "resetUI":"$t(accessibility.reset) UI",
         "rotateClockwise": "Rotate Clockwise",
         "rotateCounterClockwise": "Rotate Counter-Clockwise",
         "showGalleryPanel": "Show Gallery Panel",
@@ -30,9 +33,15 @@
         "cancel": "Cancel",
         "changeBoard": "Change Board",
         "clearSearch": "Clear Search",
+        "deleteBoard": "Delete Board",
+        "deleteBoardAndImages": "Delete Board and Images",
+        "deleteBoardOnly": "Delete Board Only",
+        "deletedBoardsCannotbeRestored": "Deleted boards cannot be restored",
         "loading": "Loading...",
         "menuItemAutoAdd": "Auto-add to this Board",
         "move": "Move",
+        "movingImagesToBoard_one": "Moving {{count}} image to board:",
+        "movingImagesToBoard_other": "Moving {{count}} images to board:",
         "myBoard": "My Board",
         "noMatching": "No matching Boards",
         "searchBoard": "Search Boards...",
@@ -44,27 +53,39 @@
     "common": {
         "accept": "Accept",
         "advanced": "Advanced",
+        "ai": "ai",
         "areYouSure": "Are you sure?",
         "auto": "Auto",
         "back": "Back",
         "batch": "Batch Manager",
         "cancel": "Cancel",
+        "copyError":"$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
+        "checkpoint": "Checkpoint",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
         "controlAdapter": "Control Adapter",
+        "data": "Data",
+        "details": "Details",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
         "darkMode": "Dark Mode",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
+        "error": "Error",
+        "file": "File",
+        "folder": "Folder",
+        "format":"format",
         "generate": "Generate",
         "githubLabel": "Github",
         "hotkeysLabel": "Hotkeys",
         "imagePrompt": "Image Prompt",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
+        "inpaint": "inpaint",
+        "input": "Input",
+        "installed": "Installed",
         "langArabic": "العربية",
         "langBrPortuguese": "Português do Brasil",
         "langDutch": "Nederlands",
@@ -92,7 +113,10 @@
         "nodeEditor": "Node Editor",
         "nodes": "Workflow Editor",
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
+        "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
+        "outpaint": "outpaint",
+        "outputs": "Outputs",
         "postProcessDesc1": "Invoke AI offers a wide variety of post processing features. Image Upscaling and Face Restoration are already available in the WebUI. You can access them from the Advanced Options menu of the Text To Image and Image To Image tabs. You can also process images directly, using the image action buttons above the current image display or in the viewer.",
         "postProcessDesc2": "A dedicated UI will be released soon to facilitate more advanced post processing workflows.",
         "postProcessDesc3": "The Invoke AI Command Line Interface offers various other features including Embiggen.",
@@ -100,7 +124,10 @@
         "postProcessing": "Post Processing",
         "random": "Random",
         "reportBugLabel": "Report Bug",
+        "safetensors": "Safetensors",
         "settingsLabel": "Settings",
+        "simple": "Simple",
+        "somethingWentWrong": "Something went wrong",
         "statusConnected": "Connected",
         "statusConvertingModel": "Converting Model",
         "statusDisconnected": "Disconnected",
@@ -127,6 +154,7 @@
         "statusSavingImage": "Saving Image",
         "statusUpscaling": "Upscaling",
         "statusUpscalingESRGAN": "Upscaling (ESRGAN)",
+        "template": "Template",
         "training": "Training",
         "trainingDesc1": "A dedicated workflow for training your own embeddings and checkpoints using Textual Inversion and Dreambooth from the web interface.",
         "trainingDesc2": "InvokeAI already supports training custom embeddourings using Textual Inversion using the main script.",
@@ -214,6 +242,7 @@
         "setControlImageDimensions": "Set Control Image Dimensions To W/H",
         "showAdvanced": "Show Advanced",
         "toggleControlNet": "Toggle this ControlNet",
+        "unstarImage": "Unstar Image",
         "w": "W",
         "weight": "Weight",
         "enableIPAdapter": "Enable IP Adapter",
@@ -237,6 +266,7 @@
     "embedding": {
         "addEmbedding": "Add Embedding",
         "incompatibleModel": "Incompatible base model:",
+        "noEmbeddingsLoaded": "No Embeddings Loaded",
         "noMatchingEmbedding": "No matching Embeddings"
     },
     "queue": {
@@ -279,6 +309,7 @@
         "next": "Next",
         "status": "Status",
         "total": "Total",
+        "time": "Time",
         "pending": "Pending",
         "in_progress": "In Progress",
         "completed": "Completed",
@@ -286,6 +317,7 @@
         "canceled": "Canceled",
         "completedIn": "Completed in",
         "batch": "Batch",
+        "batchFieldValues": "Batch Field Values",
         "item": "Item",
         "session": "Session",
         "batchValues": "Batch Values",
@@ -313,7 +345,8 @@
         "enableFailed": "Problem Enabling Invocation Cache",
         "disable": "Disable",
         "disableSucceeded": "Invocation Cache Disabled",
-        "disableFailed": "Problem Disabling Invocation Cache"
+        "disableFailed": "Problem Disabling Invocation Cache",
+        "useCache": "Use Cache"
     },
     "gallery": {
         "allImagesLoaded": "All Images Loaded",
@@ -322,6 +355,9 @@
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
+        "drop":"Drop",
+        "dropOrUpload":"$t(gallery.drop) or Upload",
+        "dropToUpload":"$t(gallery.drop) to Upload",
         "deleteImage": "Delete Image",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
@@ -331,10 +367,11 @@
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
         "generations": "Generations",
-        "images": "Images",
+        "image": "image",
         "loading": "Loading",
         "loadMore": "Load More",
         "maintainAspectRatio": "Maintain Aspect Ratio",
+        "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
         "setCurrentImage": "Set as Current Image",
         "showGenerations": "Show Generations",
@@ -342,6 +379,7 @@
         "singleColumnLayout": "Single Column Layout",
         "unableToLoad": "Unable to load Gallery",
         "uploads": "Uploads",
+        "deleteSelection": "Delete Selection",
         "downloadSelection": "Download Selection",
         "preparingDownload": "Preparing Download",
         "preparingDownloadFailed": "Problem Preparing Download"
@@ -583,7 +621,7 @@
         "strength": "Image to image strength",
         "Threshold": "Noise Threshold",
         "variations": "Seed-weight pairs",
-        "vae": "VAE", 
+        "vae": "VAE",
         "width": "Width",
         "workflow": "Workflow"
     },
@@ -606,10 +644,12 @@
         "cannotUseSpaces": "Cannot Use Spaces",
         "checkpointFolder": "Checkpoint Folder",
         "checkpointModels": "Checkpoints",
+        "checkpointOrSafetensors": "$t(common.checkpoint) / $t(common.safetensors)",
         "clearCheckpointFolder": "Clear Checkpoint Folder",
         "closeAdvanced": "Close Advanced",
         "config": "Config",
         "configValidationMsg": "Path to the config file of your model.",
+        "conversionNotSupported": "Conversion Not Supported",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",
         "convertToDiffusers": "Convert To Diffusers",
@@ -685,6 +725,7 @@
         "nameValidationMsg": "Enter a name for your model",
         "noCustomLocationProvided": "No Custom Location Provided",
         "noModels": "No Models Found",
+        "noModelSelected": "No Model Selected",
         "noModelsFound": "No Models Found",
         "none": "none",
         "notLoaded": "not loaded",
@@ -730,8 +771,11 @@
         "widthValidationMsg": "Default width of your model."
     },
     "models": {
+        "addLora": "Add LoRA",
+        "esrganModel": "ESRGAN Model",
         "loading": "loading",
         "noLoRAsAvailable": "No LoRAs available",
+        "noLoRAsLoaded":"No LoRAs Loaded",
         "noMatchingLoRAs": "No matching LoRAs",
         "noMatchingModels": "No matching Models",
         "noModelsAvailable": "No models available",
@@ -743,6 +787,7 @@
     "nodes": {
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
+        "addLinearView":"Add to Linear View",
         "animatedEdges": "Animated Edges",
         "animatedEdgesHelp": "Animate selected edges and edges connected to selected nodes",
         "boardField": "Board",
@@ -863,6 +908,7 @@
         "noMatchingNodes": "No matching nodes",
         "noNodeSelected": "No node selected",
         "nodeOpacity": "Node Opacity",
+        "nodeVersion": "Node Version",
         "noOutputRecorded": "No outputs recorded",
         "noOutputSchemaName": "No output schema name found in ref object",
         "notes": "Notes",
@@ -870,6 +916,7 @@
         "oNNXModelField": "ONNX Model",
         "oNNXModelFieldDescription": "ONNX model field.",
         "outputField": "Output Field",
+        "outputFieldInInput": "Output field in input",
         "outputFields": "Output Fields",
         "outputNode": "Output node",
         "outputSchemaNotFound": "Output schema not found",
@@ -915,12 +962,19 @@
         "uNetFieldDescription": "UNet submodel.",
         "unhandledInputProperty": "Unhandled input property",
         "unhandledOutputProperty": "Unhandled output property",
-        "unknownField": "Unknown Field",
+        "unknownField": "Unknown field",
+        "unknownFieldType": "$(nodes.unknownField) type",
         "unknownNode": "Unknown Node",
+        "unknownNodeType":"$t(nodes.unknownNode) type",
         "unknownTemplate": "Unknown Template",
+        "unknownInput": "Unknown input",
         "unkownInvocation": "Unknown Invocation type",
+        "unknownOutput": "Unknown output",
         "updateNode": "Update Node",
+        "updateAllNodes": "Update All Nodes",
         "updateApp": "Update App",
+        "unableToUpdateNodes_one": "Unable to update {{count}} node",
+        "unableToUpdateNodes_other": "Unable to update {{count}} nodes",
         "vaeField": "Vae",
         "vaeFieldDescription": "Vae submodel.",
         "vaeModelField": "VAE",
@@ -1007,6 +1061,7 @@
         "maskAdjustmentsHeader": "Mask Adjustments",
         "maskBlur": "Blur",
         "maskBlurMethod": "Blur Method",
+        "maskEdge": "Mask Edge",
         "negativePromptPlaceholder": "Negative Prompt",
         "noiseSettings": "Noise",
         "noiseThreshold": "Noise Threshold",
@@ -1054,7 +1109,9 @@
         "upscale": "Upscale (Shift + U)",
         "upscaleImage": "Upscale Image",
         "upscaling": "Upscaling",
+        "unmasked": "Unmasked",
         "useAll": "Use All",
+        "useSize": "Use Size",
         "useCpuNoise": "Use CPU Noise",
         "cpuNoise": "CPU Noise",
         "gpuNoise": "GPU Noise",
@@ -1075,6 +1132,7 @@
         "dynamicPrompts": "Dynamic Prompts",
         "enableDynamicPrompts": "Enable Dynamic Prompts",
         "maxPrompts": "Max Prompts",
+        "promptsPreview": "Prompts Preview",
         "promptsWithCount_one": "{{count}} Prompt",
         "promptsWithCount_other": "{{count}} Prompts",
         "seedBehaviour": {
@@ -1114,7 +1172,10 @@
         "displayHelpIcons": "Display Help Icons",
         "displayInProgress": "Display Progress Images",
         "enableImageDebugging": "Enable Image Debugging",
+        "enableInformationalPopovers": "Enable Informational Popovers",
+        "enableInvisibleWatermark": "Enable Invisible Watermark",
         "enableNodesEditor": "Enable Nodes Editor",
+        "enableNSFWChecker": "Enable NSFW Checker",
         "experimental": "Experimental",
         "favoriteSchedulers": "Favorite Schedulers",
         "favoriteSchedulersPlaceholder": "No schedulers favorited",
@@ -1140,7 +1201,8 @@
         "clearIntermediatesWithCount_other": "Clear {{count}} Intermediates",
         "intermediatesCleared_one": "Cleared {{count}} Intermediate",
         "intermediatesCleared_other": "Cleared {{count}} Intermediates",
-        "intermediatesClearedFailed": "Problem Clearing Intermediates"
+        "intermediatesClearedFailed": "Problem Clearing Intermediates",
+        "reloadingIn": "Reloading in"
     },
     "toast": {
         "addedToBoard": "Added to board",
@@ -1168,6 +1230,7 @@
         "initialImageNotSet": "Initial Image Not Set",
         "initialImageNotSetDesc": "Could not load initial image",
         "initialImageSet": "Initial Image Set",
+        "invalidUpload": "Invalid Upload",
         "loadedWithWarnings": "Workflow Loaded with Warnings",
         "maskSavedAssets": "Mask Saved to Assets",
         "maskSentControlnetAssets": "Mask Sent to ControlNet & Assets",
@@ -1214,7 +1277,8 @@
         "sentToImageToImage": "Sent To Image To Image",
         "sentToUnifiedCanvas": "Sent to Unified Canvas",
         "serverError": "Server Error",
-        "setCanvasInitialImage": "Set as canvas initial image",
+        "setAsCanvasInitialImage": "Set as canvas initial image",
+        "setCanvasInitialImage": "Set canvas initial image",
         "setControlImage": "Set as control image",
         "setIPAdapterImage": "Set as IP Adapter Image",
         "setInitialImage": "Set as initial image",
@@ -1272,11 +1336,15 @@
         },
         "compositingBlur": {
             "heading": "Blur",
-            "paragraphs": ["The blur radius of the mask."]
+            "paragraphs": [
+                "The blur radius of the mask."
+            ]
         },
         "compositingBlurMethod": {
             "heading": "Blur Method",
-            "paragraphs": ["The method of blur applied to the masked area."]
+            "paragraphs": [
+                "The method of blur applied to the masked area."
+            ]
         },
         "compositingCoherencePass": {
             "heading": "Coherence Pass",
@@ -1286,7 +1354,9 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": ["The mode of the Coherence Pass."]
+            "paragraphs": [
+                "The mode of the Coherence Pass."
+            ]
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
@@ -1304,7 +1374,9 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
-            "paragraphs": ["Adjust the mask."]
+            "paragraphs": [
+                "Adjust the mask."
+            ]
         },
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
@@ -1362,7 +1434,9 @@
         },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": ["Method to infill the selected area."]
+            "paragraphs": [
+                "Method to infill the selected area."
+            ]
         },
         "lora": {
             "heading": "LoRA Weight",
@@ -1475,7 +1549,7 @@
         "clearCanvasHistoryConfirm": "Are you sure you want to clear the canvas history?",
         "clearCanvasHistoryMessage": "Clearing the canvas history leaves your current canvas intact, but irreversibly clears the undo and redo history.",
         "clearHistory": "Clear History",
-        "clearMask": "Clear Mask",
+        "clearMask": "Clear Mask (Shift+C)",
         "colorPicker": "Color Picker",
         "copyToClipboard": "Copy to Clipboard",
         "cursorPosition": "Cursor Position",
@@ -1502,6 +1576,7 @@
         "redo": "Redo",
         "resetView": "Reset View",
         "saveBoxRegionOnly": "Save Box Region Only",
+        "saveMask":"Save $t(unifiedCanvas.mask)",
         "saveToGallery": "Save To Gallery",
         "scaledBoundingBox": "Scaled Bounding Box",
         "showCanvasDebugInfo": "Show Additional Canvas Info",

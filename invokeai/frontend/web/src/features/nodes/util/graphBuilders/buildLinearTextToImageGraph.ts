@@ -10,7 +10,7 @@ import { addHrfToGraph } from './addHrfToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addSaveImageNode } from './addSaveImageNode';
+import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -234,20 +234,24 @@ export const buildLinearTextToImageGraph = (
     ],
   };
 
-  addCoreMetadataNode(graph, {
-    generation_mode: 'txt2img',
-    cfg_scale,
-    height,
-    width,
-    positive_prompt: positivePrompt,
-    negative_prompt: negativePrompt,
-    model,
-    seed,
-    steps,
-    rand_device: use_cpu ? 'cpu' : 'cuda',
-    scheduler,
-    clip_skip: clipSkip,
-  });
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'txt2img',
+      cfg_scale,
+      height,
+      width,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      model,
+      seed,
+      steps,
+      rand_device: use_cpu ? 'cpu' : 'cuda',
+      scheduler,
+      clip_skip: clipSkip,
+    },
+    LATENTS_TO_IMAGE
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -286,7 +290,7 @@ export const buildLinearTextToImageGraph = (
     addWatermarkerToGraph(state, graph);
   }
 
-  addSaveImageNode(state, graph);
+  addLinearUIOutputNode(state, graph);
 
   return graph;
 };
