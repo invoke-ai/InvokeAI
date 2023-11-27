@@ -22,7 +22,7 @@ const zControlNetMetadataItem = zControlField.deepPartial();
 const zIPAdapterMetadataItem = zIPAdapterField.deepPartial();
 const zT2IAdapterMetadataItem = zT2IAdapterField.deepPartial();
 const zSDXLRefinerModelMetadataItem = zSDXLRefinerModelField.deepPartial();
-const zModelMetadataitem = z.union([
+const zModelMetadataItem = z.union([
   zMainModelField.deepPartial(),
   zONNXModelField.deepPartial(),
 ]);
@@ -34,7 +34,7 @@ export type T2IAdapterMetadataItem = z.infer<typeof zT2IAdapterMetadataItem>;
 export type SDXLRefinerModelMetadataItem = z.infer<
   typeof zSDXLRefinerModelMetadataItem
 >;
-export type ModelMetadataitem = z.infer<typeof zModelMetadataitem>;
+export type ModelMetadataItem = z.infer<typeof zModelMetadataItem>;
 export type VAEModelMetadataItem = z.infer<typeof zVAEModelMetadataItem>;
 // #endregion
 
@@ -54,7 +54,7 @@ export const zCoreMetadata = z
     steps: z.number().int().nullish().catch(null),
     scheduler: z.string().nullish().catch(null),
     clip_skip: z.number().int().nullish().catch(null),
-    model: zModelMetadataitem.nullish().catch(null),
+    model: zModelMetadataItem.nullish().catch(null),
     controlnets: z.array(zControlNetMetadataItem).nullish().catch(null),
     ipAdapters: z.array(zIPAdapterMetadataItem).nullish().catch(null),
     t2iAdapters: z.array(zT2IAdapterMetadataItem).nullish().catch(null),
