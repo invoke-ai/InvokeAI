@@ -261,7 +261,6 @@ module = [
   "invokeai.backend.stable_diffusion.diffusion.cross_attention_control",
   "invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion",
   "invokeai.backend.util.hotfixes",
-  "invokeai.backend.util.logging",
   "invokeai.backend.util.mps_fixes",
   "invokeai.backend.util.util",
   "invokeai.frontend.install.model_install",
