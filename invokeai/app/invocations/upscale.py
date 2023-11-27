@@ -11,7 +11,7 @@ from pydantic import ConfigDict
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGANer
+from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
 from invokeai.backend.util.devices import choose_torch_device
 
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
@@ -92,7 +92,7 @@ class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
 
         esrgan_model_path = Path(f"core/upscaling/realesrgan/{self.model_name}")
 
-        upsampler = RealESRGANer(
+        upscaler = RealESRGAN(
             scale=netscale,
             model_path=models_path / esrgan_model_path,
             model=rrdbnet_model,
@@ -107,7 +107,7 @@ class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         # We can pass an `outscale` value here, but it just resizes the image by that factor after
         # upscaling, so it's kinda pointless for our purposes. If you want something other than 4x
         # upscaling, you'll need to add a resize node after this one.
-        upscaled_image = upsampler.enhance(cv2_image)
+        upscaled_image = upscaler.upscale(cv2_image)
 
         # back to PIL
         pil_image = Image.fromarray(cv2.cvtColor(upscaled_image, cv2.COLOR_BGR2RGB)).convert("RGBA")
