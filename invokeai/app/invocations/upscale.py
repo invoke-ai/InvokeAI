@@ -11,7 +11,7 @@ from pydantic import ConfigDict
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.backend.image_util.esrgan import RealESRGANer
+from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGANer
 from invokeai.backend.util.devices import choose_torch_device
 
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
