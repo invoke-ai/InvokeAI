@@ -33,12 +33,12 @@ class CalculateImageTilesOutput(BaseInvocationOutput):
 class CalculateImageTilesInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
 
+    image_width: int = InputField(ge=1, default=1024, description="The image width, in pixels, to calculate tiles for.")
     image_height: int = InputField(
         ge=1, default=1024, description="The image height, in pixels, to calculate tiles for."
     )
-    image_width: int = InputField(ge=1, default=1024, description="The image width, in pixels, to calculate tiles for.")
-    tile_height: int = InputField(ge=1, default=576, description="The tile height, in pixels.")
     tile_width: int = InputField(ge=1, default=576, description="The tile width, in pixels.")
+    tile_height: int = InputField(ge=1, default=576, description="The tile height, in pixels.")
     overlap: int = InputField(
         ge=0,
         default=128,
@@ -117,8 +117,8 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Merge multiple tile images into a single image."""
 
     # Inputs
-    image_height: int = InputField(ge=1, description="The height of the output image, in pixels.")
     image_width: int = InputField(ge=1, description="The width of the output image, in pixels.")
+    image_height: int = InputField(ge=1, description="The height of the output image, in pixels.")
     tiles_with_images: list[TileWithImage] = InputField(description="A list of tile images with tile properties.")
     blend_amount: int = InputField(
         ge=0,
