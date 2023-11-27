@@ -15,6 +15,7 @@ from invokeai.backend.util.devices import choose_torch_device
 
 """
 Adapted from https://github.com/xinntao/Real-ESRGAN/blob/master/realesrgan/utils.py
+License is BSD3, copied to `LICENSE` in this directory.
 
 The adaptation here has a few changes:
 - Remove print statements, use `tqdm` to show progress
