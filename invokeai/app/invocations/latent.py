@@ -1174,14 +1174,18 @@ class BlendLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=blended_latents)
 
 
+# The Crop Latents node was copied from @skunkworxdark's implementation here:
+# https://github.com/skunkworxdark/XYGrid_nodes/blob/74647fa9c1fa57d317a94bd43ca689af7f0aae5e/images_to_grids.py#L1117C1-L1167C80
 @invocation(
-    "lcrop",
+    "crop_latents",
     title="Crop Latents",
     tags=["latents", "crop"],
     category="latents",
     version="1.0.0",
 )
-class CropLatentsInvocation(BaseInvocation):
+# TODO(ryand): Named `CropLatentsCoreInvocation` to prevent a conflict with custom node `CropLatentsInvocation`.
+# Currently, if the class names conflict then 'GET /openapi.json' fails.
+class CropLatentsCoreInvocation(BaseInvocation):
     """Crops a latent-space tensor to a box specified in image-space. The box dimensions and coordinates must be
     divisible by the latent scale factor of 8.
     """
@@ -1219,9 +1223,7 @@ class CropLatentsInvocation(BaseInvocation):
         x2 = x1 + (self.width // LATENT_SCALE_FACTOR)
         y2 = y1 + (self.height // LATENT_SCALE_FACTOR)
 
-        cropped_latents = latents[:, :, y1:y2, x1:x2]
-
-        # resized_latents = resized_latents.to("cpu")
+        cropped_latents = latents[..., y1:y2, x1:x2]
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         context.services.latents.save(name, cropped_latents)
