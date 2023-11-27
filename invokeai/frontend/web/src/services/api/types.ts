@@ -30,6 +30,7 @@ export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
 
 export type InputFieldJSONSchemaExtra = s['InputFieldJSONSchemaExtra'];
 export type OutputFieldJSONSchemaExtra = s['OutputFieldJSONSchemaExtra'];
+export type InvocationJSONSchemaExtra = s['UIConfigBase'];
 
 // App Info
 export type AppVersion = s['AppVersion'];
