@@ -63,6 +63,14 @@ class TileToPropertiesOutput(BaseInvocationOutput):
     coords_left: int = OutputField(description="Left coordinate of the tile relative to its parent image.")
     coords_right: int = OutputField(description="Right coordinate of the tile relative to its parent image.")
 
+    # HACK: The width and height fields are 'meta' fields that can easily be calculated from the other fields on this
+    # object. Including redundant fields that can cheaply/easily be re-calculated goes against conventional API design
+    # principles. These fields are included, because 1) they are often useful in tiled workflows, and 2) they are
+    # difficult to calculate in a workflow (even though it's just a couple of subtraction nodes the graph gets
+    # surprisingly complicated).
+    width: int = OutputField(description="The width of the tile. Equal to coords_right - coords_left.")
+    height: int = OutputField(description="The height of the tile. Equal to coords_bottom - coords_top.")
+
     overlap_top: int = OutputField(description="Overlap between this tile and its top neighbor.")
     overlap_bottom: int = OutputField(description="Overlap between this tile and its bottom neighbor.")
     overlap_left: int = OutputField(description="Overlap between this tile and its left neighbor.")
@@ -81,6 +89,8 @@ class TileToPropertiesInvocation(BaseInvocation):
             coords_bottom=self.tile.coords.bottom,
             coords_left=self.tile.coords.left,
             coords_right=self.tile.coords.right,
+            width=self.tile.coords.right - self.tile.coords.left,
+            height=self.tile.coords.bottom - self.tile.coords.top,
             overlap_top=self.tile.overlap.top,
             overlap_bottom=self.tile.overlap.bottom,
             overlap_left=self.tile.overlap.left,
