@@ -20,7 +20,7 @@ import {
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 const selector = createSelector(

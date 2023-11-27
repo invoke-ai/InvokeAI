@@ -4,7 +4,7 @@ import {
   FieldInputTemplate,
   FieldValue,
   StatefulFieldType,
-} from '../../types/field';
+} from 'features/nodes/types/field';
 
 const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> =
   {

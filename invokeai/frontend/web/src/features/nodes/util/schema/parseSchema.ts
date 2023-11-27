@@ -6,15 +6,18 @@ import { OpenAPIV3_1 } from 'openapi-types';
 import {
   FieldTypeParseError,
   UnsupportedFieldTypeError,
-} from '../../types/error';
-import { FieldInputTemplate, FieldOutputTemplate } from '../../types/field';
-import { InvocationTemplate } from '../../types/invocation';
+} from 'features/nodes/types/error';
+import {
+  FieldInputTemplate,
+  FieldOutputTemplate,
+} from 'features/nodes/types/field';
+import { InvocationTemplate } from 'features/nodes/types/invocation';
 import {
   InvocationSchemaObject,
   isInvocationFieldSchema,
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
-} from '../../types/openapi';
+} from 'features/nodes/types/openapi';
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
 import { parseFieldType } from './parseFieldType';

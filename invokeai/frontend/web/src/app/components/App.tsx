@@ -20,7 +20,7 @@ import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
-import { useSocketIO } from '../hooks/useSocketIO';
+import { useSocketIO } from 'app/hooks/useSocketIO';
 
 const DEFAULT_CONFIG = {};
 

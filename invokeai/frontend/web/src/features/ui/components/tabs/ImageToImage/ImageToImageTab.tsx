@@ -7,8 +7,8 @@ import {
   Panel,
   PanelGroup,
 } from 'react-resizable-panels';
-import ResizeHandle from '../ResizeHandle';
-import TextToImageTabMain from '../TextToImage/TextToImageTabMain';
+import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
+import TextToImageTabMain from 'features/ui/components/tabs/TextToImage/TextToImageTabMain';
 
 const ImageToImageTab = () => {
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);

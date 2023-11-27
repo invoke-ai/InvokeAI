@@ -5,7 +5,7 @@ import {
   GraphExecutionState,
   ModelType,
   SubModelType,
-} from '../api/types';
+} from 'services/api/types';
 
 /**
  * A progress image, we get one for each step in the generation

@@ -15,7 +15,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback, useRef } from 'react';
 import { FaImages, FaServer } from 'react-icons/fa';
-import { galleryViewChanged } from '../store/gallerySlice';
+import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';

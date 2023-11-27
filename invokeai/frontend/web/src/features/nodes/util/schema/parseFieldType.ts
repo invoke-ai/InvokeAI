@@ -4,8 +4,8 @@ import { OpenAPIV3_1 } from 'openapi-types';
 import {
   FieldTypeParseError,
   UnsupportedFieldTypeError,
-} from '../../types/error';
-import { FieldType } from '../../types/field';
+} from 'features/nodes/types/error';
+import { FieldType } from 'features/nodes/types/field';
 import {
   OpenAPIV3_1SchemaOrRef,
   isArraySchemaObject,
@@ -13,7 +13,7 @@ import {
   isNonArraySchemaObject,
   isRefObject,
   isSchemaObject,
-} from '../../types/openapi';
+} from 'features/nodes/types/openapi';
 
 /**
  * Transforms an invocation output ref object to field type.

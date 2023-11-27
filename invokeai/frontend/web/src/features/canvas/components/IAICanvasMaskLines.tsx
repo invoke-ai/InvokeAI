@@ -5,7 +5,7 @@ import { GroupConfig } from 'konva/lib/Group';
 import { isEqual } from 'lodash-es';
 
 import { Group, Line } from 'react-konva';
-import { isCanvasMaskLine } from '../store/canvasTypes';
+import { isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
 import { memo } from 'react';
 
 export const canvasLinesSelector = createSelector(

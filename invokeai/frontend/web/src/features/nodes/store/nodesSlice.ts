@@ -28,7 +28,7 @@ import {
   appSocketQueueItemStatusChanged,
 } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
-import { SHARED_NODE_PROPERTIES } from '../types/constants';
+import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import {
   BoardFieldValue,
   BooleanFieldValue,
@@ -48,7 +48,7 @@ import {
   StringFieldValue,
   T2IAdapterModelFieldValue,
   VAEModelFieldValue,
-} from '../types/field';
+} from 'features/nodes/types/field';
 import {
   AnyNode,
   InvocationTemplate,
@@ -56,8 +56,8 @@ import {
   isNotesNode,
   NodeExecutionState,
   zNodeStatus,
-} from '../types/invocation';
-import { WorkflowV2 } from '../types/workflow';
+} from 'features/nodes/types/invocation';
+import { WorkflowV2 } from 'features/nodes/types/workflow';
 import { NodesState } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';

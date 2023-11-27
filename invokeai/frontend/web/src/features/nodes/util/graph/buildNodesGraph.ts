@@ -4,7 +4,7 @@ import { cloneDeep, omit, reduce } from 'lodash-es';
 import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
-import { buildWorkflow } from '../workflow/buildWorkflow';
+import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
 import {
   FieldInputInstance,
   isColorFieldInputInstance,

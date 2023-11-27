@@ -6,8 +6,8 @@ import {
   IPAdapterConfig,
   RequiredCannyImageProcessorInvocation,
   T2IAdapterConfig,
-} from '../store/types';
-import { CONTROLNET_PROCESSORS } from '../store/constants';
+} from 'features/controlAdapters/store/types';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 
 export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   type: 'controlnet',

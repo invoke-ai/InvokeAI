@@ -9,7 +9,7 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
 import { ImageOutput } from 'services/api/types';
 import { AnyResult } from 'services/events/types';
-import ScrollableContent from '../ScrollableContent';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 import { useTranslation } from 'react-i18next';
 

@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { WorkflowV2, zWorkflowV2 } from 'features/nodes/types/workflow';
 import { api } from '..';
-import { paths } from '../schema';
+import { paths } from 'services/api/schema';
 
 export const workflowsApi = api.injectEndpoints({
   endpoints: (build) => ({

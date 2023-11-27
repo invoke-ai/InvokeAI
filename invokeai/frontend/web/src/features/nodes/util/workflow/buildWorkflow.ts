@@ -1,6 +1,10 @@
 import { logger } from 'app/logging/logger';
-import { NodesState } from '../../store/types';
-import { WorkflowV2, zWorkflowEdge, zWorkflowNode } from '../../types/workflow';
+import { NodesState } from 'features/nodes/store/types';
+import {
+  WorkflowV2,
+  zWorkflowEdge,
+  zWorkflowNode,
+} from 'features/nodes/types/workflow';
 import { fromZodError } from 'zod-validation-error';
 import { parseify } from 'common/util/serialize';
 import i18n from 'i18next';

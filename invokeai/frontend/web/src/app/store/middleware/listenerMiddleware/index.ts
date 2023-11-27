@@ -6,7 +6,7 @@ import {
   createListenerMiddleware,
 } from '@reduxjs/toolkit';
 
-import type { AppDispatch, RootState } from '../../store';
+import type { AppDispatch, RootState } from 'app/store/store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
 import { addAnyEnqueuedListener } from './listeners/anyEnqueued';

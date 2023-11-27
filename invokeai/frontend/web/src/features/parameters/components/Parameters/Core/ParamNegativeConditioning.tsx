@@ -9,7 +9,7 @@ import { setNegativePrompt } from 'features/parameters/store/generationSlice';
 import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const ParamNegativeConditioning = () => {
   const negativePrompt = useAppSelector(

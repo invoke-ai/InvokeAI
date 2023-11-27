@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
-import { InvocationTemplate } from '../types/invocation';
+import { InvocationTemplate } from 'features/nodes/types/invocation';
 
 export const useNodeTemplateByType = (type: string) => {
   const selector = useMemo(

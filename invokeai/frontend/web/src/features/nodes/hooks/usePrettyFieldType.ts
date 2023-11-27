@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { FieldType } from '../types/field';
+import { FieldType } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 
 export const useFieldTypeName = (fieldType?: FieldType): string => {

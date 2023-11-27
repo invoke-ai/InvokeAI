@@ -12,7 +12,7 @@ import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 import { SessionQueueItemDTO } from 'services/api/types';
-import QueueStatusBadge from '../common/QueueStatusBadge';
+import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import QueueItemDetail from './QueueItemDetail';
 import { COLUMN_WIDTHS } from './constants';
 import { ListContext } from './types';

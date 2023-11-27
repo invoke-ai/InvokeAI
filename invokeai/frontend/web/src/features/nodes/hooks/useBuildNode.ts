@@ -3,11 +3,14 @@ import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { Node, useReactFlow } from 'reactflow';
-import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from '../types/constants';
-import { AnyNode, InvocationTemplate } from '../types/invocation';
-import { buildCurrentImageNode } from '../util/node/buildCurrentImageNode';
-import { buildInvocationNode } from '../util/node/buildInvocationNode';
-import { buildNotesNode } from '../util/node/buildNotesNode';
+import {
+  DRAG_HANDLE_CLASSNAME,
+  NODE_WIDTH,
+} from 'features/nodes/types/constants';
+import { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
+import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
+import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
 
 const templatesSelector = createSelector(
   [(state: RootState) => state.nodes],

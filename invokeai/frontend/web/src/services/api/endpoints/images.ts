@@ -10,7 +10,7 @@ import {
 import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/metadata';
 import { keyBy } from 'lodash-es';
 import { ApiTagDescription, LIST_TAG, api } from '..';
-import { components, paths } from '../schema';
+import { components, paths } from 'services/api/schema';
 import {
   DeleteBoardResult,
   ImageCategory,
@@ -18,14 +18,14 @@ import {
   ListImagesArgs,
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
-} from '../types';
+} from 'services/api/types';
 import {
   getCategories,
   getIsImageInDateRange,
   getListImagesUrl,
   imagesAdapter,
   imagesSelectors,
-} from '../util';
+} from 'services/api/util';
 import { boardsApi } from './boards';
 
 export const imagesApi = api.injectEndpoints({

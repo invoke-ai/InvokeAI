@@ -4,14 +4,14 @@ import {
   Viewport,
   XYPosition,
 } from 'reactflow';
-import { FieldIdentifier, FieldType } from '../types/field';
+import { FieldIdentifier, FieldType } from 'features/nodes/types/field';
 import {
   AnyNode,
   InvocationNodeEdge,
   InvocationTemplate,
   NodeExecutionState,
-} from '../types/invocation';
-import { WorkflowV2 } from '../types/workflow';
+} from 'features/nodes/types/invocation';
+import { WorkflowV2 } from 'features/nodes/types/workflow';
 
 export type NodesState = {
   nodes: AnyNode[];

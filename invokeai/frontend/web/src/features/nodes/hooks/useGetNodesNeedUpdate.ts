@@ -2,8 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { getNeedsUpdate } from '../util/node/nodeUpdate';
-import { isInvocationNode } from '../types/invocation';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 
 const selector = createSelector(
   stateSelector,

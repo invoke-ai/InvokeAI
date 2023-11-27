@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import {
   ParameterVAEModel,
   zParameterVAEModel,
-} from '../types/parameterSchemas';
+} from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToVAEModelParam = (
   vaeModelId: string

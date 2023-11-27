@@ -5,9 +5,9 @@ import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
 import { NotesNodeData } from 'features/nodes/types/invocation';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { NodeProps } from 'reactflow';
-import NodeWrapper from '../common/NodeWrapper';
-import NodeCollapseButton from '../common/NodeCollapseButton';
-import NodeTitle from '../common/NodeTitle';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
+import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
+import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 
 const NotesNode = (props: NodeProps<NotesNodeData>) => {
   const { id: nodeId, data, selected } = props;

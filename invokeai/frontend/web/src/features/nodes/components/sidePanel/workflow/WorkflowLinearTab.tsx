@@ -5,8 +5,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
-import LinearViewField from '../../flow/nodes/Invocation/fields/LinearViewField';
-import ScrollableContent from '../ScrollableContent';
+import LinearViewField from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(

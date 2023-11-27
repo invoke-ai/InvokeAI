@@ -1,4 +1,4 @@
-import { FieldType, StatefulFieldType } from '../field';
+import { FieldType, StatefulFieldType } from 'features/nodes/types/field';
 import { FieldTypeV1 } from './workflowV1';
 
 /**

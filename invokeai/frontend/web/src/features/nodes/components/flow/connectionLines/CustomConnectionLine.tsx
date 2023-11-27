@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { memo } from 'react';
 import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
-import { getFieldColor } from '../edges/util/getEdgeColor';
+import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 
 const selector = createSelector(stateSelector, ({ nodes }) => {
   const { shouldAnimateEdges, connectionStartFieldType, shouldColorEdges } =

@@ -10,7 +10,7 @@ import {
   UpdateBoardArg,
 } from 'services/api/types';
 import { ApiTagDescription, LIST_TAG, api } from '..';
-import { getListImagesUrl } from '../util';
+import { getListImagesUrl } from 'services/api/util';
 
 export const boardsApi = api.injectEndpoints({
   endpoints: (build) => ({

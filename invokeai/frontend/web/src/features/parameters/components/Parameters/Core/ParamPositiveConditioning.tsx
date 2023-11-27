@@ -12,7 +12,7 @@ import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const promptInputSelector = createSelector(
   [stateSelector],

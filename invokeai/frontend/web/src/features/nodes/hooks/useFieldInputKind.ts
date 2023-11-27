@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
-import { isInvocationNode } from '../types/invocation';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 
 export const useFieldInputKind = (nodeId: string, fieldName: string) => {
   const selector = useMemo(

@@ -14,7 +14,7 @@ import {
   CANVAS_SCALE_BY,
   MAX_CANVAS_SCALE,
   MIN_CANVAS_SCALE,
-} from '../util/constants';
+} from 'features/canvas/util/constants';
 
 const selector = createSelector(
   [canvasSelector],

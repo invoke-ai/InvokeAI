@@ -25,12 +25,12 @@ import { FaCube, FaFont, FaImage, FaStream } from 'react-icons/fa';
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
-import { usePanel } from '../hooks/usePanel';
-import { usePanelStorage } from '../hooks/usePanelStorage';
+import { usePanel } from 'features/ui/hooks/usePanel';
+import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import {
   activeTabIndexSelector,
   activeTabNameSelector,
-} from '../store/uiSelectors';
+} from 'features/ui/store/uiSelectors';
 import FloatingGalleryButton from './FloatingGalleryButton';
 import FloatingSidePanelButtons from './FloatingParametersPanelButtons';
 import ParametersPanel from './ParametersPanel';

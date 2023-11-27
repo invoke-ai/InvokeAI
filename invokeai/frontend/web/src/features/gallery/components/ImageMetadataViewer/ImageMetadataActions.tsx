@@ -12,7 +12,7 @@ import {
   isParameterControlNetModel,
   isParameterLoRAModel,
   isParameterT2IAdapterModel,
-} from '../../../parameters/types/parameterSchemas';
+} from 'features/parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {

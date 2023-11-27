@@ -5,7 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import IAICollapse from 'common/components/IAICollapse';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
 import ParamDynamicPromptsSeedBehaviour from './ParamDynamicPromptsSeedBehaviour';
