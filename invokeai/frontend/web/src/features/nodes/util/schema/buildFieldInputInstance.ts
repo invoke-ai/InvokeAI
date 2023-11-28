@@ -1,28 +1,31 @@
 import { get } from 'lodash-es';
-import { FieldInputInstance, FieldInputTemplate } from '../../types/field';
+import {
+  FieldInputInstance,
+  FieldInputTemplate,
+  FieldValue,
+  StatefulFieldType,
+} from '../../types/field';
 
-const FIELD_VALUE_FALLBACK_MAP = {
-  EnumField: '',
-  BoardField: undefined,
-  BooleanField: false,
-  ClipField: undefined,
-  ColorField: { r: 0, g: 0, b: 0, a: 1 },
-  FloatField: 0,
-  ImageField: undefined,
-  IntegerField: 0,
-  IPAdapterModelField: undefined,
-  LoRAModelField: undefined,
-  MainModelField: undefined,
-  ONNXModelField: undefined,
-  SchedulerField: 'euler',
-  SDXLMainModelField: undefined,
-  SDXLRefinerModelField: undefined,
-  StringField: '',
-  T2IAdapterModelField: undefined,
-  T2IAdapterPolymorphic: undefined,
-  VAEModelField: undefined,
-  ControlNetModelField: undefined,
-};
+const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> =
+  {
+    EnumField: '',
+    BoardField: undefined,
+    BooleanField: false,
+    ColorField: { r: 0, g: 0, b: 0, a: 1 },
+    FloatField: 0,
+    ImageField: undefined,
+    IntegerField: 0,
+    IPAdapterModelField: undefined,
+    LoRAModelField: undefined,
+    MainModelField: undefined,
+    SchedulerField: 'euler',
+    SDXLMainModelField: undefined,
+    SDXLRefinerModelField: undefined,
+    StringField: '',
+    T2IAdapterModelField: undefined,
+    VAEModelField: undefined,
+    ControlNetModelField: undefined,
+  };
 
 export const buildFieldInputInstance = (
   id: string,
