@@ -54,7 +54,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                INSERT INTO workflows(workflow)
+                INSERT OR IGNORE INTO workflows(workflow)
                 VALUES (?);
                 """,
                 (workflow.model_dump_json(),),
