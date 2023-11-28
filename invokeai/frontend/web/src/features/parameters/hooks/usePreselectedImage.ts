@@ -1,5 +1,4 @@
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { CoreMetadata } from 'features/nodes/types/types';
 import { t } from 'i18next';
 import { useCallback, useEffect } from 'react';
 import { useAppToaster } from '../../../app/components/Toaster';
@@ -51,7 +50,7 @@ export const usePreselectedImage = (selectedImage?: {
 
   const handleUseAllMetadata = useCallback(() => {
     if (selectedImageMetadata) {
-      recallAllParameters(selectedImageMetadata.metadata as CoreMetadata);
+      recallAllParameters(selectedImageMetadata);
     }
     // disabled because `recallAllParameters` changes the model, but its dep to prepare LoRAs has model as a dep. this introduces circular logic that causes infinite re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
