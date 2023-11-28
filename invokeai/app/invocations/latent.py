@@ -64,7 +64,6 @@ from .baseinvocation import (
     OutputField,
     UIType,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -792,9 +791,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
 )
-class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+class LatentsToImageInvocation(BaseInvocation, WithMetadata):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
@@ -876,7 +875,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

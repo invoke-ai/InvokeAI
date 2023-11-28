@@ -16,6 +16,7 @@ from pydantic.fields import FieldInfo, _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
@@ -452,6 +453,7 @@ class InvocationContext:
     queue_id: str
     queue_item_id: int
     queue_batch_id: str
+    workflow: Optional[WorkflowWithoutID]
 
     def __init__(
         self,
@@ -460,12 +462,14 @@ class InvocationContext:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
+        workflow: Optional[WorkflowWithoutID],
     ):
         self.services = services
         self.graph_execution_state_id = graph_execution_state_id
         self.queue_id = queue_id
         self.queue_item_id = queue_item_id
         self.queue_batch_id = queue_batch_id
+        self.workflow = workflow
 
 
 class BaseInvocationOutput(BaseModel):
@@ -901,24 +905,6 @@ def invocation_output(
         return cls
 
     return wrapper
-
-
-class WorkflowField(RootModel):
-    """
-    Pydantic model for workflows with custom root of type dict[str, Any].
-    Workflows are stored without a strict schema.
-    """
-
-    root: dict[str, Any] = Field(description="The workflow")
-
-
-WorkflowFieldValidator = TypeAdapter(WorkflowField)
-
-
-class WithWorkflow(BaseModel):
-    workflow: Optional[WorkflowField] = Field(
-        default=None, description=FieldDescriptions.workflow, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
-    )
 
 
 class MetadataField(RootModel):

@@ -11,7 +11,7 @@ from invokeai.app.services.model_records import (
     DuplicateModelException,
     ModelRecordServiceSQL,
 )
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,

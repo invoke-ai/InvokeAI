@@ -2,7 +2,6 @@
 
 from logging import Logger
 
-from invokeai.app.services.workflow_image_records.workflow_image_records_sqlite import SqliteWorkflowImageRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -30,7 +29,7 @@ from ..services.session_processor.session_processor_default import DefaultSessio
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from ..services.shared.default_graphs import create_system_graphs
 from ..services.shared.graph import GraphExecutionState, LibraryGraph
-from ..services.shared.sqlite import SqliteDatabase
+from ..services.shared.sqlite.sqlite_database import SqliteDatabase
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
@@ -94,7 +93,6 @@ class ApiDependencies:
         session_processor = DefaultSessionProcessor()
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
-        workflow_image_records = SqliteWorkflowImageRecordsStorage(db=db)
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
 
         services = InvocationServices(
@@ -121,15 +119,14 @@ class ApiDependencies:
             session_processor=session_processor,
             session_queue=session_queue,
             urls=urls,
-            workflow_image_records=workflow_image_records,
             workflow_records=workflow_records,
         )
 
         create_system_graphs(services.graph_library)
 
-        ApiDependencies.invoker = Invoker(services)
-
+        db.run_migrations()
         db.clean()
+        ApiDependencies.invoker = Invoker(services)
 
     @staticmethod
     def shutdown():

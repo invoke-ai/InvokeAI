@@ -1,0 +1,1 @@
+sqlite_memory = ":memory:"

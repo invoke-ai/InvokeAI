@@ -3,27 +3,22 @@ import threading
 from logging import Logger
 
 from invokeai.app.services.config import InvokeAIAppConfig
-
-sqlite_memory = ":memory:"
+from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
+from invokeai.app.services.shared.sqlite.sqlite_migrator import MigrationSet, SQLiteMigrator
 
 
 class SqliteDatabase:
-    conn: sqlite3.Connection
-    lock: threading.RLock
-    _logger: Logger
-    _config: InvokeAIAppConfig
-
     def __init__(self, config: InvokeAIAppConfig, logger: Logger):
         self._logger = logger
         self._config = config
 
         if self._config.use_memory_db:
             location = sqlite_memory
-            logger.info("Using in-memory database")
+            self._logger.info("Using in-memory database")
         else:
             db_path = self._config.db_path
             db_path.parent.mkdir(parents=True, exist_ok=True)
-            location = str(db_path)
+            location = db_path
             self._logger.info(f"Using database at {location}")
 
         self.conn = sqlite3.connect(location, check_same_thread=False)
@@ -34,6 +29,7 @@ class SqliteDatabase:
             self.conn.set_trace_callback(self._logger.debug)
 
         self.conn.execute("PRAGMA foreign_keys = ON;")
+        self._migrator = SQLiteMigrator(db_path=location, lock=self.lock, logger=self._logger)
 
     def clean(self) -> None:
         try:
@@ -41,8 +37,14 @@ class SqliteDatabase:
             self.conn.execute("VACUUM;")
             self.conn.commit()
             self._logger.info("Cleaned database")
-        except Exception as e:
+        except sqlite3.Error as e:
             self._logger.error(f"Error cleaning database: {e}")
-            raise e
+            raise
         finally:
             self.lock.release()
+
+    def register_migration_set(self, migration_set: MigrationSet) -> None:
+        self._migrator.register_migration_set(migration_set)
+
+    def run_migrations(self) -> None:
+        self._migrator.run_migrations()
