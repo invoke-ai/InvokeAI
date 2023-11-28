@@ -73,6 +73,7 @@ export type WorkflowEdge = z.infer<typeof zWorkflowEdge>;
 
 // #region Workflow
 export const zWorkflowV2 = z.object({
+  id: z.string().min(1).optional(),
   name: z.string(),
   author: z.string(),
   description: z.string(),

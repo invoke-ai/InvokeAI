@@ -20,6 +20,7 @@ export const tagTypes = [
   'ImageNameList',
   'ImageList',
   'ImageMetadata',
+  'ImageWorkflow',
   'ImageMetadataFromFile',
   'IntermediatesCount',
   'SessionQueueItem',

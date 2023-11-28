@@ -344,20 +344,6 @@ const nodesSlice = createSlice({
       }
       field.label = label;
     },
-    nodeEmbedWorkflowChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; embedWorkflow: boolean }>
-    ) => {
-      const { nodeId, embedWorkflow } = action.payload;
-      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-
-      const node = state.nodes?.[nodeIndex];
-
-      if (!isInvocationNode(node)) {
-        return;
-      }
-      node.data.embedWorkflow = embedWorkflow;
-    },
     nodeUseCacheChanged: (
       state,
       action: PayloadAction<{ nodeId: string; useCache: boolean }>
@@ -984,7 +970,6 @@ export const {
   nodeAdded,
   nodeReplaced,
   nodeEditorReset,
-  nodeEmbedWorkflowChanged,
   nodeExclusivelySelected,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

@@ -16,6 +16,8 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
+import { sentImageToImg2Img } from 'features/gallery/store/actions';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
@@ -39,12 +41,12 @@ import {
   FaSeedling,
 } from 'react-icons/fa';
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import {
+  useGetImageDTOQuery,
+  useLazyGetImageWorkflowQuery,
+} from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
-import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { menuListMotionProps } from 'theme/components/menu';
-import { sentImageToImg2Img } from 'features/gallery/store/actions';
-import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -111,18 +113,17 @@ const CurrentImageButtons = () => {
     lastSelectedImage?.image_name
   );
 
-  const { workflow, isLoading: isLoadingWorkflow } = useDebouncedWorkflow(
-    lastSelectedImage?.workflow_id
-  );
-
+  const [getWorkflow, getWorkflowResult] = useLazyGetImageWorkflowQuery();
   const handleLoadWorkflow = useCallback(() => {
-    if (!workflow) {
+    if (!lastSelectedImage) {
       return;
     }
-    dispatch(workflowLoadRequested(workflow));
-  }, [dispatch, workflow]);
+    getWorkflow(lastSelectedImage?.image_name).then((workflow) => {
+      dispatch(workflowLoadRequested(workflow.data));
+    });
+  }, [dispatch, getWorkflow, lastSelectedImage]);
 
-  useHotkeys('w', handleLoadWorkflow, [workflow]);
+  useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -255,12 +256,12 @@ const CurrentImageButtons = () => {
 
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
-            isLoading={isLoadingWorkflow}
             icon={<FaCircleNodes />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
-            isDisabled={!workflow}
+            isDisabled={!imageDTO?.has_workflow}
             onClick={handleLoadWorkflow}
+            isLoading={getWorkflowResult.isLoading}
           />
           <IAIIconButton
             isLoading={isLoadingMetadata}

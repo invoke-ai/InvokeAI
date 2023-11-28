@@ -3,17 +3,21 @@ import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import {
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from 'features/gallery/store/actions';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
@@ -32,16 +36,12 @@ import {
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
+  useLazyGetImageWorkflowQuery,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
-import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
-import {
-  sentImageToCanvas,
-  sentImageToImg2Img,
-} from 'features/gallery/store/actions';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -61,9 +61,13 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
     imageDTO?.image_name
   );
-  const { workflow, isLoading: isLoadingWorkflow } = useDebouncedWorkflow(
-    imageDTO?.workflow_id
-  );
+
+  const [getWorkflow, getWorkflowResult] = useLazyGetImageWorkflowQuery();
+  const handleLoadWorkflow = useCallback(() => {
+    getWorkflow(imageDTO.image_name).then((workflow) => {
+      dispatch(workflowLoadRequested(workflow.data));
+    });
+  }, [dispatch, getWorkflow, imageDTO]);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
@@ -100,13 +104,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const handleRecallSeed = useCallback(() => {
     recallSeed(metadata?.seed);
   }, [metadata?.seed, recallSeed]);
-
-  const handleLoadWorkflow = useCallback(() => {
-    if (!workflow) {
-      return;
-    }
-    dispatch(workflowLoadRequested(workflow));
-  }, [dispatch, workflow]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
@@ -179,9 +176,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('parameters.downloadImage')}
       </MenuItem>
       <MenuItem
-        icon={isLoadingWorkflow ? <SpinnerIcon /> : <FaCircleNodes />}
+        icon={getWorkflowResult.isLoading ? <SpinnerIcon /> : <FaCircleNodes />}
         onClickCapture={handleLoadWorkflow}
-        isDisabled={isLoadingWorkflow || !workflow}
+        isDisabled={!imageDTO.has_workflow}
       >
         {t('nodes.loadWorkflow')}
       </MenuItem>

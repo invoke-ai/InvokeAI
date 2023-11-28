@@ -161,7 +161,9 @@
         "txt2img": "Text To Image",
         "unifiedCanvas": "Unified Canvas",
         "unknown": "Unknown",
-        "upload": "Upload"
+        "upload": "Upload",
+        "prevPage": "Previous Page",
+        "nextPage": "Next Page"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -1599,5 +1601,12 @@
         "showIntermediates": "Show Intermediates",
         "snapToGrid": "Snap to Grid",
         "undo": "Undo"
+    },
+    "workflows": {
+        "workflowLibrary": "Workflow Library",
+        "userCategory": "User",
+        "systemCategory": "System",
+        "loadWorkflow": "$t(nodes.loadWorkflow)",
+        "deleteWorkflow": "Delete Workflow"
     }
 }

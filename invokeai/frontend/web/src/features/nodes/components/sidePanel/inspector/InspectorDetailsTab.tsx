@@ -11,17 +11,16 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import {
-  InvocationNodeData,
+  InvocationNode,
   InvocationTemplate,
   isInvocationNode,
 } from 'features/nodes/types/invocation';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Node } from 'reactflow';
-import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import EditableNodeTitle from './details/EditableNodeTitle';
 
 const selector = createSelector(
@@ -62,7 +61,7 @@ const InspectorDetailsTab = () => {
 export default memo(InspectorDetailsTab);
 
 type ContentProps = {
-  node: Node<InvocationNodeData>;
+  node: InvocationNode;
   template: InvocationTemplate;
 };
 

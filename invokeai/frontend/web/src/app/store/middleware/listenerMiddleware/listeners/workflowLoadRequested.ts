@@ -99,7 +99,6 @@ export const addWorkflowLoadRequestedListener = () => {
           );
         } else {
           // Some other error occurred
-          console.log(e);
           log.error(
             { error: parseify(e) },
             t('nodes.unknownErrorValidatingWorkflow')

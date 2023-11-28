@@ -159,6 +159,10 @@ export type paths = {
      */
     get: operations["get_image_metadata"];
   };
+  "/api/v1/images/i/{image_name}/workflow": {
+    /** Get Image Workflow */
+    get: operations["get_image_workflow"];
+  };
   "/api/v1/images/i/{image_name}/full": {
     /**
      * Get Image Full
@@ -415,6 +419,28 @@ export type paths = {
      * @description Gets a workflow
      */
     get: operations["get_workflow"];
+    /**
+     * Delete Workflow
+     * @description Deletes a workflow
+     */
+    delete: operations["delete_workflow"];
+    /**
+     * Update Workflow
+     * @description Updates a workflow
+     */
+    patch: operations["update_workflow"];
+  };
+  "/api/v1/workflows/": {
+    /**
+     * List Workflows
+     * @description Deletes a workflow
+     */
+    get: operations["list_workflows"];
+    /**
+     * Create Workflow
+     * @description Creates a workflow
+     */
+    post: operations["create_workflow"];
   };
 };
 
@@ -527,6 +553,8 @@ export type components = {
       data?: components["schemas"]["BatchDatum"][][] | null;
       /** @description The graph to initialize the session with */
       graph: components["schemas"]["Graph"];
+      /** @description The workflow to initialize the session with */
+      workflow?: components["schemas"]["WorkflowWithoutID"] | null;
       /**
        * Runs
        * @description Int stating how many times to iterate through all possible batch indices
@@ -600,8 +628,6 @@ export type components = {
      * @description Creates a blank image and forwards it to the pipeline
      */
     BlankImageInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -795,6 +821,11 @@ export type components = {
        */
       batch_ids: string[];
     };
+    /** Body_create_workflow */
+    Body_create_workflow: {
+      /** @description The workflow to create */
+      workflow: components["schemas"]["Workflow"];
+    };
     /** Body_delete_images_from_list */
     Body_delete_images_from_list: {
       /**
@@ -896,6 +927,11 @@ export type components = {
        * @description The list of names of images to unstar
        */
       image_names: string[];
+    };
+    /** Body_update_workflow */
+    Body_update_workflow: {
+      /** @description The updated workflow */
+      workflow: components["schemas"]["Workflow"];
     };
     /** Body_upload_image */
     Body_upload_image: {
@@ -1110,8 +1146,6 @@ export type components = {
     CV2InfillInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -1154,8 +1188,6 @@ export type components = {
      * @description Canny edge detection for ControlNet
      */
     CannyImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -1360,8 +1392,6 @@ export type components = {
     ColorCorrectInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -1468,8 +1498,6 @@ export type components = {
      * @description Generates a color map from the provided image
      */
     ColorMapImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -1671,8 +1699,6 @@ export type components = {
      * @description Applies content shuffle processing to image
      */
     ContentShuffleImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -2261,8 +2287,6 @@ export type components = {
      * @description Simple inpaint using opencv.
      */
     CvInpaintInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -2534,8 +2558,6 @@ export type components = {
     ESRGANInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2620,6 +2642,13 @@ export type components = {
        */
       priority: number;
     };
+    /** ExposedField */
+    ExposedField: {
+      /** Nodeid */
+      nodeId: string;
+      /** Fieldname */
+      fieldName: string;
+    };
     /**
      * FaceIdentifier
      * @description Outputs an image with detected face IDs printed on each face. For use with other FaceTools.
@@ -2627,8 +2656,6 @@ export type components = {
     FaceIdentifierInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2674,8 +2701,6 @@ export type components = {
     FaceMaskInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2771,8 +2796,6 @@ export type components = {
     FaceOffInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3220,7 +3243,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["RangeInvocation"];
+        [key: string]: components["schemas"]["GraphInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageInvocation"];
       };
       /**
        * Edges
@@ -3257,7 +3280,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["String2Output"] | components["schemas"]["VAEOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["SchedulerOutput"];
+        [key: string]: components["schemas"]["StringOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["String2Output"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["StringPosNegOutput"];
       };
       /**
        * Errors
@@ -3331,8 +3354,6 @@ export type components = {
      * @description Applies HED edge detection to image
      */
     HedImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -3589,8 +3610,6 @@ export type components = {
     ImageBlurInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3649,8 +3668,6 @@ export type components = {
     ImageChannelInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3691,8 +3708,6 @@ export type components = {
     ImageChannelMultiplyInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3744,8 +3759,6 @@ export type components = {
     ImageChannelOffsetInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3842,8 +3855,6 @@ export type components = {
     ImageConvertInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3884,8 +3895,6 @@ export type components = {
     ImageCropInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4006,15 +4015,15 @@ export type components = {
        */
       starred: boolean;
       /**
+       * Has Workflow
+       * @description Whether this image has a workflow.
+       */
+      has_workflow: boolean;
+      /**
        * Board Id
        * @description The id of the board the image belongs to, if one exists.
        */
       board_id?: string | null;
-      /**
-       * Workflow Id
-       * @description The workflow that generated this image.
-       */
-      workflow_id?: string | null;
     };
     /**
      * ImageField
@@ -4034,8 +4043,6 @@ export type components = {
     ImageHueAdjustmentInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4075,8 +4082,6 @@ export type components = {
     ImageInverseLerpInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4153,8 +4158,6 @@ export type components = {
     ImageLerpInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4200,8 +4203,6 @@ export type components = {
     ImageMultiplyInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4235,8 +4236,6 @@ export type components = {
      * @description Add blur to NSFW-flagged images
      */
     ImageNSFWBlurInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -4296,8 +4295,6 @@ export type components = {
     ImagePasteInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4381,8 +4378,6 @@ export type components = {
      * @description Resizes an image to specific dimensions
      */
     ImageResizeInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -4435,8 +4430,6 @@ export type components = {
      * @description Scales an image by a factor
      */
     ImageScaleInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -4549,8 +4542,6 @@ export type components = {
      * @description Add an invisible watermark to an image
      */
     ImageWatermarkInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -4608,8 +4599,6 @@ export type components = {
     InfillColorInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4653,8 +4642,6 @@ export type components = {
     InfillPatchMatchInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4701,8 +4688,6 @@ export type components = {
     InfillTileInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4979,6 +4964,7 @@ export type components = {
        */
       type: "iterate_output";
     };
+    JsonValue: unknown;
     /**
      * LaMa Infill
      * @description Infills transparent areas of an image using the LaMa model
@@ -4986,8 +4972,6 @@ export type components = {
     LaMaInfillInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5141,8 +5125,6 @@ export type components = {
      * @description Generates an image from latents.
      */
     LatentsToImageInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5190,8 +5172,6 @@ export type components = {
      * @description Applies leres processing to image
      */
     LeresImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5257,8 +5237,6 @@ export type components = {
     LinearUIOutputInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5292,8 +5270,6 @@ export type components = {
      * @description Applies line art anime processing to image
      */
     LineartAnimeImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5339,8 +5315,6 @@ export type components = {
      * @description Applies line art processing to image
      */
     LineartImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5752,8 +5726,6 @@ export type components = {
     MaskCombineInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5789,8 +5761,6 @@ export type components = {
     MaskEdgeInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5844,8 +5814,6 @@ export type components = {
     MaskFromAlphaInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5883,8 +5851,6 @@ export type components = {
      * @description Applies mediapipe face processing to image
      */
     MediapipeFaceProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6118,8 +6084,6 @@ export type components = {
      * @description Applies Midas depth processing to image
      */
     MidasDepthImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6165,8 +6129,6 @@ export type components = {
      * @description Applies MLSD processing to image
      */
     MlsdImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6406,8 +6368,6 @@ export type components = {
      * @description Applies NormalBae processing to image
      */
     NormalbaeImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6453,8 +6413,6 @@ export type components = {
      * @description Generates an image from latents.
      */
     ONNXLatentsToImageInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6897,8 +6855,6 @@ export type components = {
      * @description Applies Openpose processing to image
      */
     OpenposeImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6945,13 +6901,39 @@ export type components = {
        */
       type: "openpose_image_processor";
     };
+    /** PaginatedResults[WorkflowRecordDTO] */
+    PaginatedResults_WorkflowRecordDTO_: {
+      /**
+       * Page
+       * @description Current Page
+       */
+      page: number;
+      /**
+       * Pages
+       * @description Total number of pages
+       */
+      pages: number;
+      /**
+       * Per Page
+       * @description Number of items per page
+       */
+      per_page: number;
+      /**
+       * Total
+       * @description Total number of items in result
+       */
+      total: number;
+      /**
+       * Items
+       * @description Items
+       */
+      items: components["schemas"]["WorkflowRecordDTO"][];
+    };
     /**
      * PIDI Processor
      * @description Applies PIDI processing to image
      */
     PidiImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7773,8 +7755,6 @@ export type components = {
     SaveImageInvocation: {
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -7981,8 +7961,6 @@ export type components = {
      * @description Applies segment anything processing to image
      */
     SegmentAnythingProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -8099,6 +8077,8 @@ export type components = {
       field_values?: components["schemas"]["NodeFieldValue"][] | null;
       /** @description The fully-populated session to be executed */
       session: components["schemas"]["GraphExecutionState"];
+      /** @description The workflow associated with this queue item */
+      workflow?: components["schemas"]["WorkflowWithoutID"] | null;
     };
     /** SessionQueueItemDTO */
     SessionQueueItemDTO: {
@@ -9158,8 +9138,6 @@ export type components = {
      * @description Tile resampler processor
      */
     TileResamplerProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -9441,19 +9419,162 @@ export type components = {
       /** Error Type */
       type: string;
     };
-    /**
-     * WorkflowField
-     * @description Pydantic model for workflows with custom root of type dict[str, Any].
-     * Workflows are stored without a strict schema.
-     */
-    WorkflowField: Record<string, never>;
+    /** Workflow */
+    Workflow: {
+      /**
+       * Name
+       * @description The name of the workflow.
+       */
+      name: string;
+      /**
+       * Author
+       * @description The author of the workflow.
+       */
+      author: string;
+      /**
+       * Description
+       * @description The description of the workflow.
+       */
+      description: string;
+      /**
+       * Version
+       * @description The version of the workflow.
+       */
+      version: string;
+      /**
+       * Contact
+       * @description The contact of the workflow.
+       */
+      contact: string;
+      /**
+       * Tags
+       * @description The tags of the workflow.
+       */
+      tags: string;
+      /**
+       * Notes
+       * @description The notes of the workflow.
+       */
+      notes: string;
+      /**
+       * Exposedfields
+       * @description The exposed fields of the workflow.
+       */
+      exposedFields: components["schemas"]["ExposedField"][];
+      /** @description The meta of the workflow. */
+      meta: components["schemas"]["WorkflowMeta"];
+      /**
+       * Nodes
+       * @description The nodes of the workflow.
+       */
+      nodes: {
+          [key: string]: components["schemas"]["JsonValue"];
+        }[];
+      /**
+       * Edges
+       * @description The edges of the workflow.
+       */
+      edges: {
+          [key: string]: components["schemas"]["JsonValue"];
+        }[];
+      /**
+       * Id
+       * @description The id of the workflow.
+       */
+      id?: string;
+    };
+    /** WorkflowMeta */
+    WorkflowMeta: {
+      /**
+       * Version
+       * @description The version of the workflow schema.
+       */
+      version: string;
+    };
+    /** WorkflowRecordDTO */
+    WorkflowRecordDTO: {
+      /**
+       * Workflow Id
+       * @description The id of the workflow.
+       */
+      workflow_id: string;
+      /** @description The workflow. */
+      workflow: components["schemas"]["Workflow"];
+      /**
+       * Created At
+       * @description The created timestamp of the workflow.
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * @description The updated timestamp of the workflow.
+       */
+      updated_at: string;
+    };
+    /** WorkflowWithoutID */
+    WorkflowWithoutID: {
+      /**
+       * Name
+       * @description The name of the workflow.
+       */
+      name: string;
+      /**
+       * Author
+       * @description The author of the workflow.
+       */
+      author: string;
+      /**
+       * Description
+       * @description The description of the workflow.
+       */
+      description: string;
+      /**
+       * Version
+       * @description The version of the workflow.
+       */
+      version: string;
+      /**
+       * Contact
+       * @description The contact of the workflow.
+       */
+      contact: string;
+      /**
+       * Tags
+       * @description The tags of the workflow.
+       */
+      tags: string;
+      /**
+       * Notes
+       * @description The notes of the workflow.
+       */
+      notes: string;
+      /**
+       * Exposedfields
+       * @description The exposed fields of the workflow.
+       */
+      exposedFields: components["schemas"]["ExposedField"][];
+      /** @description The meta of the workflow. */
+      meta: components["schemas"]["WorkflowMeta"];
+      /**
+       * Nodes
+       * @description The nodes of the workflow.
+       */
+      nodes: {
+          [key: string]: components["schemas"]["JsonValue"];
+        }[];
+      /**
+       * Edges
+       * @description The edges of the workflow.
+       */
+      edges: {
+          [key: string]: components["schemas"]["JsonValue"];
+        }[];
+    };
     /**
      * Zoe (Depth) Processor
      * @description Applies Zoe depth processing to image
      */
     ZoeDepthImageProcessorInvocation: {
-      /** @description Optional workflow to be saved with the image */
-      workflow?: components["schemas"]["WorkflowField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -9692,41 +9813,11 @@ export type components = {
      */
     UIType: "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_MainModel" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
     /**
-     * StableDiffusionXLModelFormat
+     * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
-    /**
-     * T2IAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    T2IAdapterModelFormat: "diffusers";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
-     * IPAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    IPAdapterModelFormat: "invokeai";
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
@@ -9734,11 +9825,41 @@ export type components = {
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
-     * StableDiffusion2ModelFormat
+     * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * T2IAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    T2IAdapterModelFormat: "diffusers";
+    /**
+     * CLIPVisionModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    CLIPVisionModelFormat: "diffusers";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * IPAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    IPAdapterModelFormat: "invokeai";
   };
   responses: never;
   parameters: never;
@@ -10466,6 +10587,29 @@ export type operations = {
       200: {
         content: {
           "application/json": components["schemas"]["MetadataField"] | null;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Image Workflow */
+  get_image_workflow: {
+    parameters: {
+      path: {
+        /** @description The name of image whose workflow to get */
+        image_name: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["WorkflowWithoutID"] | null;
         };
       };
       /** @description Validation Error */
@@ -11457,7 +11601,111 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["WorkflowField"];
+          "application/json": components["schemas"]["WorkflowRecordDTO"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Delete Workflow
+   * @description Deletes a workflow
+   */
+  delete_workflow: {
+    parameters: {
+      path: {
+        /** @description The workflow to delete */
+        workflow_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Update Workflow
+   * @description Updates a workflow
+   */
+  update_workflow: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_update_workflow"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Workflow"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List Workflows
+   * @description Deletes a workflow
+   */
+  list_workflows: {
+    parameters: {
+      query?: {
+        /** @description The page to get */
+        page?: number;
+        /** @description The number of workflows per page */
+        per_page?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedResults_WorkflowRecordDTO_"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Create Workflow
+   * @description Creates a workflow
+   */
+  create_workflow: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_create_workflow"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["WorkflowRecordDTO"];
         };
       };
       /** @description Validation Error */

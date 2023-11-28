@@ -3,6 +3,7 @@ import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { queueApi } from 'services/api/endpoints/queue';
 import { BatchConfig } from 'services/api/types';
 import { startAppListening } from '..';
+import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
 
 export const addEnqueueRequestedNodes = () => {
   startAppListening({
@@ -11,9 +12,11 @@ export const addEnqueueRequestedNodes = () => {
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const graph = buildNodesGraph(state.nodes);
+      const workflow = buildWorkflow(state.nodes);
       const batchConfig: BatchConfig = {
         batch: {
           graph,
+          workflow,
           runs: state.generation.iterations,
         },
         prepend: action.payload.prepend,
