@@ -150,5 +150,5 @@ export const theme: ThemeOverride = {
 };
 
 export const TOAST_OPTIONS: ToastProviderProps = {
-  defaultOptions: { isClosable: true },
+  defaultOptions: { isClosable: true, position: 'bottom-right' },
 };
