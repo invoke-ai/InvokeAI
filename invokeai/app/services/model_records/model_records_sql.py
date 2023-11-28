@@ -48,7 +48,6 @@ from typing import List, Optional, Union
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
-    ModelConfigBase,
     ModelConfigFactory,
     ModelType,
 )
@@ -158,7 +157,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             ("version", CONFIG_FILE_VERSION),
         )
 
-    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> AnyModelConfig:
+    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
         """
         Add a model to the database.
 
@@ -255,7 +254,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 raise e
 
-    def update_model(self, key: str, config: ModelConfigBase) -> AnyModelConfig:
+    def update_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
@@ -368,7 +367,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
 
-    def search_by_path(self, path: Union[str, Path]) -> List[ModelConfigBase]:
+    def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
         """Return models with the indicated path."""
         results = []
         with self._db.lock:
@@ -382,7 +381,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
 
-    def search_by_hash(self, hash: str) -> List[ModelConfigBase]:
+    def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
         """Return models with the indicated original_hash."""
         results = []
         with self._db.lock:
