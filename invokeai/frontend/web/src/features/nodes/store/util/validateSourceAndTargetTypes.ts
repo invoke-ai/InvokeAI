@@ -29,8 +29,8 @@ export const validateSourceAndTargetTypes = (
    * Connection types must be the same for a connection, with exceptions:
    * - CollectionItem can connect to any non-Collection
    * - Non-Collections can connect to CollectionItem
-   * - Anything (non-Collections, Collections, Polymorphics) can connect to Polymorphics of the same base type
-   * - Generic Collection can connect to any other Collection or Polymorphic
+   * - Anything (non-Collections, Collections, CollectionOrScalar) can connect to CollectionOrScalar of the same base type
+   * - Generic Collection can connect to any other Collection or CollectionOrScalar
    * - Any Collection can connect to a Generic Collection
    */
 
@@ -40,23 +40,23 @@ export const validateSourceAndTargetTypes = (
   const isNonCollectionToCollectionItem =
     targetType.name === 'CollectionItemField' &&
     !sourceType.isCollection &&
-    !sourceType.isPolymorphic;
+    !sourceType.isCollectionOrScalar;
 
-  const isAnythingToPolymorphicOfSameBaseType =
-    targetType.isPolymorphic && sourceType.name === targetType.name;
+  const isAnythingToCollectionOrScalarOfSameBaseType =
+    targetType.isCollectionOrScalar && sourceType.name === targetType.name;
 
-  const isGenericCollectionToAnyCollectionOrPolymorphic =
+  const isGenericCollectionToAnyCollectionOrCollectionOrScalar =
     sourceType.name === 'CollectionField' &&
-    (targetType.isCollection || targetType.isPolymorphic);
+    (targetType.isCollection || targetType.isCollectionOrScalar);
 
   const isCollectionToGenericCollection =
     targetType.name === 'CollectionField' && sourceType.isCollection;
 
   const areBothTypesSingle =
     !sourceType.isCollection &&
-    !sourceType.isPolymorphic &&
+    !sourceType.isCollectionOrScalar &&
     !targetType.isCollection &&
-    !targetType.isPolymorphic;
+    !targetType.isCollectionOrScalar;
 
   const isIntToFloat =
     areBothTypesSingle &&
@@ -74,8 +74,8 @@ export const validateSourceAndTargetTypes = (
   return (
     isCollectionItemToNonCollection ||
     isNonCollectionToCollectionItem ||
-    isAnythingToPolymorphicOfSameBaseType ||
-    isGenericCollectionToAnyCollectionOrPolymorphic ||
+    isAnythingToCollectionOrScalarOfSameBaseType ||
+    isGenericCollectionToAnyCollectionOrCollectionOrScalar ||
     isCollectionToGenericCollection ||
     isIntToFloat ||
     isIntOrFloatToString ||

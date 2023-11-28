@@ -13,8 +13,8 @@ export const useFieldTypeName = (fieldType?: FieldType): string => {
     if (fieldType.isCollection) {
       return t('nodes.collectionFieldType', { name });
     }
-    if (fieldType.isPolymorphic) {
-      return t('nodes.polymorphicFieldType', { name });
+    if (fieldType.isCollectionOrScalar) {
+      return t('nodes.collectionOrScalarFieldType', { name });
     }
     return name;
   }, [fieldType, t]);

@@ -209,7 +209,7 @@ Field types are represented as structured objects:
 type FieldType = {
   name: string;
   isCollection: boolean;
-  isPolymorphic: boolean;
+  isCollectionOrScalar: boolean;
 };
 ```
 
@@ -237,11 +237,11 @@ When a field is annotated as a list of a single type, the schema object has an `
 
 We use the item type for field type name, adding `isCollection: true` to the field type.
 
-##### Polymorphic Types
+##### Collection or Scalar Types
 
 When a field is annotated as a union of a type and list of that type, the schema object has an `anyOf` property, which holds a list of valid types for the union.
 
-After verifying that the union has two members (a type and list of the same type), we use the type for field type name, adding `isPolymorphic: true` to the field type.
+After verifying that the union has two members (a type and list of the same type), we use the type for field type name, adding `isCollectionOrScalar: true` to the field type.
 
 ##### Optional Fields
 

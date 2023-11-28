@@ -30,7 +30,7 @@ export const addControlNetToLinearGraph = (
   const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
 
   if (validControlNets.length) {
-    // Even though denoise_latents' control input is polymorphic, keep it simple and always use a collect
+    // Even though denoise_latents' control input is collection or scalar, keep it simple and always use a collect
     const controlNetIterateNode: CollectInvocation = {
       id: CONTROL_NET_COLLECT,
       type: 'collect',
