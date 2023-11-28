@@ -114,6 +114,24 @@ def merge_tiles_with_linear_blending(
     tiles_and_images = sorted(tiles_and_images, key=lambda x: x[0].coords.left)
     tiles_and_images = sorted(tiles_and_images, key=lambda x: x[0].coords.top)
 
+    # Organize tiles into rows.
+    tile_and_image_rows: list[list[tuple[Tile, np.ndarray]]] = []
+    cur_tile_and_image_row: list[tuple[Tile, np.ndarray]] = []
+    first_tile_in_cur_row, _ = tiles_and_images[0]
+    for tile_and_image in tiles_and_images:
+        tile, _ = tile_and_image
+        if not (
+            tile.coords.top == first_tile_in_cur_row.coords.top
+            and tile.coords.bottom == first_tile_in_cur_row.coords.bottom
+        ):
+            # Store the previous row, and start a new one.
+            tile_and_image_rows.append(cur_tile_and_image_row)
+            cur_tile_and_image_row = []
+            first_tile_in_cur_row, _ = tile_and_image
+
+        cur_tile_and_image_row.append(tile_and_image)
+    tile_and_image_rows.append(cur_tile_and_image_row)
+
     # Prepare 1D linear gradients for blending.
     gradient_left_x = np.linspace(start=0.0, stop=1.0, num=blend_amount)
     gradient_top_y = np.linspace(start=0.0, stop=1.0, num=blend_amount)
@@ -122,33 +140,62 @@ def merge_tiles_with_linear_blending(
     # broadcasting to work correctly.
     gradient_top_y = np.expand_dims(gradient_top_y, axis=1)
 
-    for tile, tile_image in tiles_and_images:
-        # We expect tiles to be written left-to-right, top-to-bottom. We construct a mask that applies linear blending
-        # to the top and to the left of the current tile. The inverse linear blending is automatically applied to the
-        # bottom/right of the tiles that have already been pasted by the paste(...) operation.
-        tile_height, tile_width, _ = tile_image.shape
-        mask = np.ones(shape=(tile_height, tile_width), dtype=np.float64)
+    for tile_and_image_row in tile_and_image_rows:
+        first_tile_in_row, _ = tile_and_image_row[0]
+        row_height = first_tile_in_row.coords.bottom - first_tile_in_row.coords.top
+        row_image = np.zeros((row_height, dst_image.shape[1], dst_image.shape[2]), dtype=dst_image.dtype)
+
+        # Blend the tiles in the row horizontally.
+        for tile, tile_image in tile_and_image_row:
+            # We expect the tiles to be ordered left-to-right. For each tile, we construct a mask that applies linear
+            # blending to the left of the current tile. The inverse linear blending is automatically applied to the
+            # right of the tiles that have already been pasted by the paste(...) operation.
+            tile_height, tile_width, _ = tile_image.shape
+            mask = np.ones(shape=(tile_height, tile_width), dtype=np.float64)
+
+            # Left blending:
+            if tile.overlap.left > 0:
+                assert tile.overlap.left >= blend_amount
+                # Center the blending gradient in the middle of the overlap.
+                blend_start_left = tile.overlap.left // 2 - blend_amount // 2
+                # The region left of the blending region is masked completely.
+                mask[:, :blend_start_left] = 0.0
+                # Apply the blend gradient to the mask.
+                mask[:, blend_start_left : blend_start_left + blend_amount] = gradient_left_x
+                # For visual debugging:
+                # tile_image[:, blend_start_left : blend_start_left + blend_amount] = 0
+
+            paste(
+                dst_image=row_image,
+                src_image=tile_image,
+                box=TBLR(
+                    top=0, bottom=tile.coords.bottom - tile.coords.top, left=tile.coords.left, right=tile.coords.right
+                ),
+                mask=mask,
+            )
+
+        # Blend the row into the dst_image vertically.
+        # We construct a mask that applies linear blending to the top of the current row. The inverse linear blending is
+        # automatically applied to the bottom of the tiles that have already been pasted by the paste(...) operation.
+        mask = np.ones(shape=(row_image.shape[0], row_image.shape[1]), dtype=np.float64)
         # Top blending:
-        if tile.overlap.top > 0:
-            assert tile.overlap.top >= blend_amount
-            # Center the blending gradient in the middle of the overlap.
-            blend_start_top = tile.overlap.top // 2 - blend_amount // 2
-            # The region above the blending region is masked completely.
+        # (See comments under 'Left blending' for an explanation of the logic.)
+        # We assume that the entire row has the same vertical overlaps as the first_tile_in_row.
+        if first_tile_in_row.overlap.top > 0:
+            assert first_tile_in_row.overlap.top >= blend_amount
+            blend_start_top = first_tile_in_row.overlap.top // 2 - blend_amount // 2
             mask[:blend_start_top, :] = 0.0
-            # Apply the blend gradient to the mask. Note that we use `*=` rather than `=` to achieve more natural
-            # behavior on the corners where vertical and horizontal blending gradients overlap.
-            mask[blend_start_top : blend_start_top + blend_amount, :] *= gradient_top_y
+            mask[blend_start_top : blend_start_top + blend_amount, :] = gradient_top_y
             # For visual debugging:
-            # tile_image[blend_start_top : blend_start_top + blend_amount, :] = 0
-
-        # Left blending:
-        # (See comments under 'top blending' for an explanation of the logic.)
-        if tile.overlap.left > 0:
-            assert tile.overlap.left >= blend_amount
-            blend_start_left = tile.overlap.left // 2 - blend_amount // 2
-            mask[:, :blend_start_left] = 0.0
-            mask[:, blend_start_left : blend_start_left + blend_amount] *= gradient_left_x
-            # For visual debugging:
-            # tile_image[:, blend_start_left : blend_start_left + blend_amount] = 0
-
-        paste(dst_image=dst_image, src_image=tile_image, box=tile.coords, mask=mask)
+            # row_image[blend_start_top : blend_start_top + blend_amount, :] = 0
+        paste(
+            dst_image=dst_image,
+            src_image=row_image,
+            box=TBLR(
+                top=first_tile_in_row.coords.top,
+                bottom=first_tile_in_row.coords.bottom,
+                left=0,
+                right=row_image.shape[1],
+            ),
+            mask=mask,
+        )
