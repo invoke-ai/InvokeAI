@@ -60,7 +60,7 @@ dependencies = [
   "onnx",
   "onnxruntime",
   "opencv-python~=4.8.1.1",
-  "pydantic~=2.5.0",
+  "pydantic~=2.5.2",
   "pydantic-settings~=2.0.3",
   "picklescan",
   "pillow",
