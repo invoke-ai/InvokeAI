@@ -24,7 +24,7 @@ export const addIPAdapterToLinearGraph = (
   );
 
   if (validIPAdapters.length) {
-    // Even though denoise_latents' control input is polymorphic, keep it simple and always use a collect
+    // Even though denoise_latents' ip adapter input is collection or scalar, keep it simple and always use a collect
     const ipAdapterCollectNode: CollectInvocation = {
       id: IP_ADAPTER_COLLECT,
       type: 'collect',

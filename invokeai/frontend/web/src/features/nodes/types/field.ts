@@ -84,7 +84,7 @@ export type FieldOutputTemplateBase = z.infer<typeof zFieldOutputTemplateBase>;
 
 export const zFieldTypeBase = z.object({
   isCollection: z.boolean(),
-  isPolymorphic: z.boolean(),
+  isCollectionOrScalar: z.boolean(),
 });
 
 export const zFieldIdentifier = z.object({

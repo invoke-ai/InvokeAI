@@ -56,7 +56,7 @@ export const parseFieldType = (
       return {
         name: ui_type,
         isCollection: isCollectionFieldType(ui_type),
-        isPolymorphic: false,
+        isCollectionOrScalar: false,
       };
     }
   }
@@ -77,7 +77,7 @@ export const parseFieldType = (
           return {
             name,
             isCollection: false,
-            isPolymorphic: false,
+            isCollectionOrScalar: false,
           };
         }
       } else if (schemaObject.anyOf) {
@@ -103,14 +103,14 @@ export const parseFieldType = (
             return {
               name,
               isCollection: false,
-              isPolymorphic: false,
+              isCollectionOrScalar: false,
             };
           } else if (isSchemaObject(filteredAnyOf[0])) {
             return parseFieldType(filteredAnyOf[0]);
           }
         }
         /**
-         * Handle Polymorphic inputs, eg string | string[]. In OpenAPI, this is:
+         * Handle CollectionOrScalar inputs, eg string | string[]. In OpenAPI, this is:
          * - an `anyOf` with two items
          * - one is an `ArraySchemaObject` with a single `SchemaObject or ReferenceObject` of type T in its `items`
          * - the other is a `SchemaObject` or `ReferenceObject` of type T
@@ -163,7 +163,7 @@ export const parseFieldType = (
           return {
             name: OPENAPI_TO_FIELD_TYPE_MAP[firstType] ?? firstType,
             isCollection: false,
-            isPolymorphic: true, // <-- don't forget, polymorphic!
+            isCollectionOrScalar: true, // <-- don't forget, CollectionOrScalar type!
           };
         }
 
@@ -175,7 +175,11 @@ export const parseFieldType = (
         );
       }
     } else if (schemaObject.enum) {
-      return { name: 'EnumField', isCollection: false, isPolymorphic: false };
+      return {
+        name: 'EnumField',
+        isCollection: false,
+        isCollectionOrScalar: false,
+      };
     } else if (schemaObject.type) {
       if (schemaObject.type === 'array') {
         // We need to get the type of the items
@@ -201,7 +205,7 @@ export const parseFieldType = (
           return {
             name,
             isCollection: true, // <-- don't forget, collection!
-            isPolymorphic: false,
+            isCollectionOrScalar: false,
           };
         }
 
@@ -215,7 +219,7 @@ export const parseFieldType = (
         return {
           name,
           isCollection: true, // <-- don't forget, collection!
-          isPolymorphic: false,
+          isCollectionOrScalar: false,
         };
       } else if (!isArray(schemaObject.type)) {
         // This is an OpenAPI primitive - 'null', 'object', 'array', 'integer', 'number', 'string', 'boolean'
@@ -231,7 +235,7 @@ export const parseFieldType = (
         return {
           name,
           isCollection: false,
-          isPolymorphic: false,
+          isCollectionOrScalar: false,
         };
       }
     }
@@ -245,7 +249,7 @@ export const parseFieldType = (
     return {
       name,
       isCollection: false,
-      isPolymorphic: false,
+      isCollectionOrScalar: false,
     };
   }
   throw new FieldTypeParseError(t('nodes.unableToParseFieldType'));

@@ -25,7 +25,7 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
           const fields = map(nodeTemplate.inputs).filter(
             (field) =>
               (['any', 'direct'].includes(field.input) ||
-                field.type.isPolymorphic) &&
+                field.type.isCollectionOrScalar) &&
               keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
           );
           return getSortedFilteredFieldNames(fields);

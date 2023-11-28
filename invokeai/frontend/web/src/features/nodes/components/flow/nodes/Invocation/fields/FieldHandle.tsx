@@ -54,13 +54,13 @@ const FieldHandle = (props: FieldHandleProps) => {
     const color = getFieldColor(type);
     const s: CSSProperties = {
       backgroundColor:
-        type.isCollection || type.isPolymorphic
+        type.isCollection || type.isCollectionOrScalar
           ? colorTokenToCssVar('base.900')
           : color,
       position: 'absolute',
       width: '1rem',
       height: '1rem',
-      borderWidth: type.isCollection || type.isPolymorphic ? 4 : 0,
+      borderWidth: type.isCollection || type.isCollectionOrScalar ? 4 : 0,
       borderStyle: 'solid',
       borderColor: color,
       borderRadius: isModelType ? 4 : '100%',

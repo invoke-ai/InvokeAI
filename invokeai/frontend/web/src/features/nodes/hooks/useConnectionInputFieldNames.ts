@@ -26,7 +26,8 @@ export const useConnectionInputFieldNames = (nodeId: string) => {
           // get the visible fields
           const fields = map(nodeTemplate.inputs).filter(
             (field) =>
-              (field.input === 'connection' && !field.type.isPolymorphic) ||
+              (field.input === 'connection' &&
+                !field.type.isCollectionOrScalar) ||
               !keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
           );
 
