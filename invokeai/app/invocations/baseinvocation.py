@@ -314,7 +314,6 @@ def InputField(
 
     if default_factory is not _Unset and default_factory is not None:
         default = default_factory()
-        del default_factory
         logger.warn('"default_factory" is not supported, calling it now to set "default"')
 
     # These are the args we may wish pass to the pydantic `Field()` function
