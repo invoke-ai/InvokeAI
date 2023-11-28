@@ -105,17 +105,6 @@ export const isParameterHeight = (val: unknown): val is ParameterHeight =>
   zParameterHeight.safeParse(val).success;
 // #endregion
 
-// #region Resolution
-export const zParameterResolution = z.tuple([
-  zParameterWidth,
-  zParameterHeight,
-]);
-export type ParameterResolution = z.infer<typeof zParameterResolution>;
-export const iParameterResolution = (
-  val: unknown
-): val is ParameterResolution => zParameterResolution.safeParse(val).success;
-// #endregion
-
 // #region Model
 export const zParameterModel = zMainOrONNXModelField;
 export type ParameterModel = z.infer<typeof zParameterModel>;
