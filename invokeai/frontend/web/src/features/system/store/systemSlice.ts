@@ -1,5 +1,7 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
+import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { startCase } from 'lodash-es';
 import { LogLevelName } from 'roarr';
@@ -17,8 +19,6 @@ import {
   appSocketQueueItemStatusChanged,
   appSocketSessionRetrievalError,
 } from 'services/events/actions';
-import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
-import { makeToast } from 'features/system/util/makeToast';
 import { LANGUAGES, SystemState } from './types';
 
 export const initialSystemState: SystemState = {
@@ -169,7 +169,7 @@ export const systemSlice = createSlice({
         )
       ) {
         state.status = 'CONNECTED';
-        // state.denoiseProgress = null;
+        state.denoiseProgress = null;
       }
     });
 
