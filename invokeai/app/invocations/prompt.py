@@ -82,7 +82,7 @@ class PromptsFromFileInvocation(BaseInvocation):
         end_line = start_line + max_prompts
         if max_prompts <= 0:
             end_line = np.iinfo(np.int32).max
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             for i, line in enumerate(f):
                 if i >= start_line and i < end_line:
                     prompts.append((pre_prompt or "") + line.strip() + (post_prompt or ""))
