@@ -1,7 +1,7 @@
 import { Middleware } from '@reduxjs/toolkit';
 import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
-import { store } from 'app/store/store';
+import { createStore } from 'app/store/store';
 import { PartialAppConfig } from 'app/types/invokeai';
 import {
   $queueId,
@@ -13,6 +13,7 @@ import React, {
   lazy,
   memo,
   useEffect,
+  useMemo,
 } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
@@ -21,6 +22,7 @@ import { socketMiddleware } from 'services/events/middleware';
 import Loading from '../../common/components/Loading/Loading';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
 import '../../i18n';
+import { $store } from '../store/nanostores/store';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -115,6 +117,14 @@ const InvokeAIUI = ({
       $headerComponent.set(undefined);
     };
   }, [headerComponent]);
+
+  const store = useMemo(() => {
+    return createStore(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    $store.set(store);
+  }, [store]);
 
   return (
     <React.StrictMode>
