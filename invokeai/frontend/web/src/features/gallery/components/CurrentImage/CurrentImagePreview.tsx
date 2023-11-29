@@ -160,6 +160,8 @@ const CurrentImagePreview = () => {
             }}
             style={{
               position: 'absolute',
+              width: '100%',
+              height: '100%',
             }}
           >
             <Image
@@ -172,6 +174,7 @@ const CurrentImagePreview = () => {
                 objectFit: 'contain',
                 maxWidth: 'full',
                 maxHeight: 'full',
+                height: 'full',
                 position: 'relative',
                 margin: 'auto',
                 borderRadius: 'base',
