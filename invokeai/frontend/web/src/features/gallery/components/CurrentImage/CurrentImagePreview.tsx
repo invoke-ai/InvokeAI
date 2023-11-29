@@ -160,8 +160,6 @@ const CurrentImagePreview = () => {
             }}
             style={{
               position: 'absolute',
-              width: '100%',
-              height: '100%',
             }}
           >
             <Image
@@ -174,7 +172,6 @@ const CurrentImagePreview = () => {
                 objectFit: 'contain',
                 maxWidth: 'full',
                 maxHeight: 'full',
-                height: 'auto',
                 position: 'relative',
                 margin: 'auto',
                 borderRadius: 'base',
@@ -195,10 +192,6 @@ const CurrentImagePreview = () => {
             animate={{
               opacity: [0, 1],
               transition: { duration: 0.5, delay: 0.1 },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 1.5 },
             }}
             style={{
               width: '100%',
