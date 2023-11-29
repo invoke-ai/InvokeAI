@@ -9,17 +9,17 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
+import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
+import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { AnimatePresence, motion } from 'framer-motion';
 import { isEqual } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
-import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { useTranslation } from 'react-i18next';
 
 export const imagesSelector = createSelector(
   [stateSelector, selectLastSelectedImage],
@@ -144,39 +144,85 @@ const CurrentImagePreview = () => {
       }}
     >
       {denoiseProgress?.progress_image && shouldShowProgressInViewer ? (
-        <Image
-          src={denoiseProgress.progress_image.dataURL}
-          width={denoiseProgress.progress_image.width}
-          height={denoiseProgress.progress_image.height}
-          draggable={false}
-          data-testid="progress-image"
-          sx={{
-            objectFit: 'contain',
-            maxWidth: 'full',
-            maxHeight: 'full',
-            height: 'auto',
-            position: 'absolute',
-            borderRadius: 'base',
-            imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
-          }}
-        />
-      ) : (
-        <IAIDndImage
-          imageDTO={imageDTO}
-          droppableData={droppableData}
-          draggableData={draggableData}
-          isUploadDisabled={true}
-          fitContainer
-          useThumbailFallback
-          dropLabel={t('gallery.setCurrentImage')}
-          noContentFallback={
-            <IAINoContentFallback
-              icon={FaImage}
-              label={t('gallery.noImageSelected')}
+        <AnimatePresence>
+          <motion.div
+            key="progressDisplayImage"
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 1 },
+            }}
+            exit={{
+              opacity: 0,
+              transition: { duration: 2 },
+            }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+            }}
+          >
+            <Image
+              src={denoiseProgress.progress_image.dataURL}
+              width={denoiseProgress.progress_image.width}
+              height={denoiseProgress.progress_image.height}
+              draggable={false}
+              data-testid="progress-image"
+              sx={{
+                objectFit: 'contain',
+                maxWidth: 'full',
+                maxHeight: 'full',
+                height: 'auto',
+                position: 'relative',
+                margin: 'auto',
+                borderRadius: 'base',
+                imageRendering: shouldAntialiasProgressImage
+                  ? 'auto'
+                  : 'pixelated',
+              }}
             />
-          }
-          dataTestId="image-preview"
-        />
+          </motion.div>
+        </AnimatePresence>
+      ) : (
+        <AnimatePresence>
+          <motion.div
+            key="currentDisplayImage"
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: [0, 1],
+              transition: { duration: 1.25 },
+            }}
+            exit={{
+              opacity: 0,
+              transition: { duration: 2 },
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+            }}
+          >
+            <IAIDndImage
+              imageDTO={imageDTO}
+              droppableData={droppableData}
+              draggableData={draggableData}
+              isUploadDisabled={true}
+              fitContainer
+              useThumbailFallback
+              dropLabel={t('gallery.setCurrentImage')}
+              noContentFallback={
+                <IAINoContentFallback
+                  icon={FaImage}
+                  label={t('gallery.noImageSelected')}
+                />
+              }
+              dataTestId="image-preview"
+            />
+          </motion.div>
+        </AnimatePresence>
       )}
       {shouldShowImageDetails && imageDTO && (
         <Box
