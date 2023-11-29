@@ -3,6 +3,8 @@ from pathlib import Path
 from queue import Queue
 from typing import Dict, Optional, Union
 
+import cv2
+import numpy as np
 from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
@@ -70,17 +72,23 @@ class DiskImageFileStorage(ImageFileStorageBase):
             if workflow is not None:
                 pnginfo.add_text("invokeai_workflow", workflow.model_dump_json())
 
-            image.save(
-                image_path,
-                "PNG",
-                pnginfo=pnginfo,
-                compress_level=self.__invoker.services.configuration.png_compress_level,
+            cv2_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            cv2.imwrite(
+                image_path.as_posix(),
+                cv2_image,
+                [cv2.IMWRITE_PNG_COMPRESSION, self.__invoker.services.configuration.png_compress_level],
             )
 
             thumbnail_name = get_thumbnail_name(image_name)
             thumbnail_path = self.get_path(thumbnail_name, thumbnail=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
-            thumbnail_image.save(thumbnail_path)
+
+            cv2_thumbnail = cv2.cvtColor(np.array(thumbnail_image), cv2.COLOR_RGB2BGR)
+            cv2.imwrite(
+                thumbnail_path.as_posix(),
+                cv2_thumbnail,
+                [cv2.IMWRITE_PNG_COMPRESSION, self.__invoker.services.configuration.png_compress_level],
+            )
 
             self.__set_cache(image_path, image)
             self.__set_cache(thumbnail_path, thumbnail_image)
