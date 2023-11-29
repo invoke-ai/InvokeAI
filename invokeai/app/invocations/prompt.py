@@ -44,7 +44,7 @@ class DynamicPromptInvocation(BaseInvocation):
     title="Prompts from File",
     tags=["prompt", "file"],
     category="prompt",
-    version="1.0.0",
+    version="1.0.1",
 )
 class PromptsFromFileInvocation(BaseInvocation):
     """Loads prompts from a text file"""
