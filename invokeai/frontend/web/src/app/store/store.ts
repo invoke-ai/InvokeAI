@@ -94,7 +94,7 @@ export const createStore = (projectId?: string) =>
             serialize,
             unserialize,
             prefix: projectId
-              ? `${STORAGE_PREFIX}-${projectId}`
+              ? `${STORAGE_PREFIX}${projectId}-`
               : STORAGE_PREFIX,
           })
         )
