@@ -929,3 +929,13 @@ class WithMetadata(BaseModel):
             orig_required=False,
         ).model_dump(exclude_none=True),
     )
+
+
+class WithWorkflow:
+    workflow = None
+
+    def __init_subclass__(cls) -> None:
+        logger.warn(
+            f"{cls.__module__.split('.')[0]}.{cls.__name__}: WithWorkflow is deprecated. Use `context.workflow` to access the workflow."
+        )
+        super().__init_subclass__()
