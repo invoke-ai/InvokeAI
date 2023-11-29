@@ -8,7 +8,7 @@ To use a node, add the node to the `nodes` folder found in your InvokeAI install
 
 The suggested method is to use `git clone` to clone the repository the node is found in. This allows for easy updates of the node in the future. 
 
-If you'd prefer, you can also just download the `.py` file from the linked repository and add it to the `nodes` folder. 
+If you'd prefer, you can also just download the whole node folder from the linked repository and add it to the `nodes` folder. 
 
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
