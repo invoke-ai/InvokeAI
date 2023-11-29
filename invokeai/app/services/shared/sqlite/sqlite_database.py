@@ -4,7 +4,6 @@ from logging import Logger
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
-from invokeai.app.services.shared.sqlite.sqlite_migrator import MigrationSet, SQLiteMigrator
 
 
 class SqliteDatabase:
@@ -29,7 +28,6 @@ class SqliteDatabase:
             self.conn.set_trace_callback(self._logger.debug)
 
         self.conn.execute("PRAGMA foreign_keys = ON;")
-        self._migrator = SQLiteMigrator(db_path=location, lock=self.lock, logger=self._logger)
 
     def clean(self) -> None:
         try:
@@ -42,9 +40,3 @@ class SqliteDatabase:
             raise
         finally:
             self.lock.release()
-
-    def register_migration_set(self, migration_set: MigrationSet) -> None:
-        self._migrator.register_migration_set(migration_set)
-
-    def run_migrations(self) -> None:
-        self._migrator.run_migrations()

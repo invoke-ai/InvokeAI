@@ -124,7 +124,6 @@ class ApiDependencies:
 
         create_system_graphs(services.graph_library)
 
-        db.run_migrations()
         db.clean()
         ApiDependencies.invoker = Invoker(services)
 

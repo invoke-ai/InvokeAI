@@ -3,11 +3,8 @@ from datetime import datetime
 from typing import Optional, Union, cast
 
 from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
-from invokeai.app.services.image_records.migrations import v0, v1, v2
-from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite.sqlite_migrator import Migration, MigrationSet
 
 from .image_records_base import ImageRecordStorageBase
 from .image_records_common import (
@@ -22,27 +19,107 @@ from .image_records_common import (
     deserialize_image_record,
 )
 
-images_migrations = MigrationSet(
-    table_name="images",
-    migrations=[
-        Migration(version=0, migrate=v0),
-        Migration(version=1, migrate=v1),
-        Migration(version=2, migrate=v2),
-    ],
-)
-
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
-        self._db = db
         self._lock = db.lock
         self._conn = db.conn
         self._cursor = self._conn.cursor()
-        self._db.register_migration_set(images_migrations)
+        self._create_tables()
 
-    def start(self, invoker: Invoker) -> None:
-        self._invoker = invoker
+    def _create_tables(self) -> None:
+        """Creates the `images` table."""
+        with self._lock:
+            try:
+                self._cursor.execute(
+                    """--sql
+                    CREATE TABLE IF NOT EXISTS images (
+                        image_name TEXT NOT NULL PRIMARY KEY,
+                        -- This is an enum in python, unrestricted string here for flexibility
+                        image_origin TEXT NOT NULL,
+                        -- This is an enum in python, unrestricted string here for flexibility
+                        image_category TEXT NOT NULL,
+                        width INTEGER NOT NULL,
+                        height INTEGER NOT NULL,
+                        session_id TEXT,
+                        node_id TEXT,
+                        metadata TEXT,
+                        is_intermediate BOOLEAN DEFAULT FALSE,
+                        created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                        -- Updated via trigger
+                        updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                        -- Soft delete, currently unused
+                        deleted_at DATETIME
+                    );
+                    """
+                )
+
+                self._cursor.execute("PRAGMA table_info(images)")
+                columns = [column[1] for column in self._cursor.fetchall()]
+
+                if "starred" not in columns:
+                    self._cursor.execute(
+                        """--sql
+                        ALTER TABLE images ADD COLUMN starred BOOLEAN DEFAULT FALSE;
+                        """
+                    )
+
+                # Create the `images` table indices.
+                self._cursor.execute(
+                    """--sql
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_images_image_name ON images(image_name);
+                    """
+                )
+                self._cursor.execute(
+                    """--sql
+                    CREATE INDEX IF NOT EXISTS idx_images_image_origin ON images(image_origin);
+                    """
+                )
+                self._cursor.execute(
+                    """--sql
+                    CREATE INDEX IF NOT EXISTS idx_images_image_category ON images(image_category);
+                    """
+                )
+                self._cursor.execute(
+                    """--sql
+                    CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at);
+                    """
+                )
+
+                self._cursor.execute(
+                    """--sql
+                    CREATE INDEX IF NOT EXISTS idx_images_starred ON images(starred);
+                    """
+                )
+
+                # Add trigger for `updated_at`.
+                self._cursor.execute(
+                    """--sql
+                    CREATE TRIGGER IF NOT EXISTS tg_images_updated_at
+                    AFTER UPDATE
+                    ON images FOR EACH ROW
+                    BEGIN
+                        UPDATE images SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+                            WHERE image_name = old.image_name;
+                    END;
+                    """
+                )
+
+                self._cursor.execute("PRAGMA table_info(images)")
+                columns = [column[1] for column in self._cursor.fetchall()]
+                if "has_workflow" not in columns:
+                    self._cursor.execute(
+                        """--sql
+                        ALTER TABLE images
+                        ADD COLUMN has_workflow BOOLEAN DEFAULT FALSE;
+                        """
+                    )
+
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
 
     def get(self, image_name: str) -> ImageRecord:
         try:
