@@ -1,21 +1,21 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import {
-  NegativeStylePromptSDXLParam,
-  PositiveStylePromptSDXLParam,
-  SDXLRefinerModelParam,
-  SchedulerParam,
+  ParameterNegativeStylePromptSDXL,
+  ParameterPositiveStylePromptSDXL,
+  ParameterSDXLRefinerModel,
+  ParameterScheduler,
 } from 'features/parameters/types/parameterSchemas';
 
 type SDXLState = {
-  positiveStylePrompt: PositiveStylePromptSDXLParam;
-  negativeStylePrompt: NegativeStylePromptSDXLParam;
+  positiveStylePrompt: ParameterPositiveStylePromptSDXL;
+  negativeStylePrompt: ParameterNegativeStylePromptSDXL;
   shouldConcatSDXLStylePrompt: boolean;
   shouldUseSDXLRefiner: boolean;
   sdxlImg2ImgDenoisingStrength: number;
-  refinerModel: SDXLRefinerModelParam | null;
+  refinerModel: ParameterSDXLRefinerModel | null;
   refinerSteps: number;
   refinerCFGScale: number;
-  refinerScheduler: SchedulerParam;
+  refinerScheduler: ParameterScheduler;
   refinerPositiveAestheticScore: number;
   refinerNegativeAestheticScore: number;
   refinerStart: number;
@@ -57,7 +57,7 @@ const sdxlSlice = createSlice({
     },
     refinerModelChanged: (
       state,
-      action: PayloadAction<SDXLRefinerModelParam | null>
+      action: PayloadAction<ParameterSDXLRefinerModel | null>
     ) => {
       state.refinerModel = action.payload;
     },
@@ -67,7 +67,7 @@ const sdxlSlice = createSlice({
     setRefinerCFGScale: (state, action: PayloadAction<number>) => {
       state.refinerCFGScale = action.payload;
     },
-    setRefinerScheduler: (state, action: PayloadAction<SchedulerParam>) => {
+    setRefinerScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.refinerScheduler = action.payload;
     },
     setRefinerPositiveAestheticScore: (

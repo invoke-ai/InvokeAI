@@ -4,7 +4,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants'
 import { RequiredHedImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
+import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor

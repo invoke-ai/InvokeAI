@@ -15,7 +15,7 @@ import {
   workflowVersionChanged,
 } from 'features/nodes/store/nodesSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
-import ScrollableContent from '../ScrollableContent';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(

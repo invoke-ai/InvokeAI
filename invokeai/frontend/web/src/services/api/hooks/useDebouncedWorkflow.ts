@@ -1,7 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDebounce } from 'use-debounce';
-import { useGetWorkflowQuery } from '../endpoints/workflows';
+import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
 export const useDebouncedWorkflow = (workflowId?: string | null) => {
   const workflowFetchDebounce = useAppSelector(

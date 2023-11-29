@@ -48,9 +48,9 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
-import { useFeatureStatus } from '../../hooks/useFeatureStatus';
-import { languageSelector } from '../../store/systemSelectors';
-import { languageChanged } from '../../store/systemSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { languageSelector } from 'features/system/store/systemSelectors';
+import { languageChanged } from 'features/system/store/systemSlice';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';

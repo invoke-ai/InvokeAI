@@ -7,7 +7,7 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { BoardDTO } from 'services/api/types';
-import DeleteBoardModal from '../DeleteBoardModal';
+import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';

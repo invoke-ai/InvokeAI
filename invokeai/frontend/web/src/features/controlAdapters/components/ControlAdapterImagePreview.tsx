@@ -22,11 +22,11 @@ import {
   useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
-import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
-import { controlAdapterImageChanged } from '../store/controlAdaptersSlice';
-import { useControlAdapterControlImage } from '../hooks/useControlAdapterControlImage';
-import { useControlAdapterProcessedControlImage } from '../hooks/useControlAdapterProcessedControlImage';
-import { useControlAdapterProcessorType } from '../hooks/useControlAdapterProcessorType';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
+import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
+import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
 
 type Props = {
   id: string;

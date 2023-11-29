@@ -20,7 +20,7 @@ import { merge, omit } from 'lodash-es';
 import { PropsWithChildren, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExternalLinkAlt } from 'react-icons/fa';
-import { useAppSelector } from '../../../app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import {
   Feature,
   OPEN_DELAY,

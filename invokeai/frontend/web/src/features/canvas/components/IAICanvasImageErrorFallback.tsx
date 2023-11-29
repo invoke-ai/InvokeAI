@@ -2,7 +2,7 @@ import { useColorModeValue, useToken } from '@chakra-ui/react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Group, Rect, Text } from 'react-konva';
-import { CanvasImage } from '../store/canvasTypes';
+import { CanvasImage } from 'features/canvas/store/canvasTypes';
 
 type IAICanvasImageErrorFallbackProps = {
   canvasImage: CanvasImage;

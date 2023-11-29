@@ -38,7 +38,10 @@ import {
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
-import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import {
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from 'features/gallery/store/actions';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;

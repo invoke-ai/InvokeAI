@@ -3,10 +3,8 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-import {
-  SCHEDULER_LABEL_MAP,
-  SchedulerParam,
-} from 'features/parameters/types/parameterSchemas';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { SCHEDULER_LABEL_MAP } from 'features/parameters/types/constants';
 import { setRefinerScheduler } from 'features/sdxl/store/sdxlSlice';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
@@ -22,7 +20,7 @@ const selector = createSelector(
     const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
       value: name,
       label: label,
-      group: enabledSchedulers.includes(name as SchedulerParam)
+      group: enabledSchedulers.includes(name as ParameterScheduler)
         ? 'Favorites'
         : undefined,
     })).sort((a, b) => a.label.localeCompare(b.label));
@@ -45,7 +43,7 @@ const ParamSDXLRefinerScheduler = () => {
       if (!v) {
         return;
       }
-      dispatch(setRefinerScheduler(v as SchedulerParam));
+      dispatch(setRefinerScheduler(v as ParameterScheduler));
     },
     [dispatch]
   );

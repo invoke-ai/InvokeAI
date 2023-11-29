@@ -2,7 +2,7 @@ import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { some } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageUsage } from '../store/types';
+import { ImageUsage } from 'features/deleteImageModal/store/types';
 
 type Props = {
   imageUsage?: ImageUsage;

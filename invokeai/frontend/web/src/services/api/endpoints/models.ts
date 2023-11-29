@@ -20,7 +20,7 @@ import {
 
 import queryString from 'query-string';
 import { ApiTagDescription, LIST_TAG, api } from '..';
-import { operations, paths } from '../schema';
+import { operations, paths } from 'services/api/schema';
 
 export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
 export type CheckpointModelConfigEntity = CheckpointModelConfig & {

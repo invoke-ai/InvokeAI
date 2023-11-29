@@ -1,7 +1,7 @@
 import { useColorModeValue } from '@chakra-ui/react';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
-import { isInvocationNodeData } from 'features/nodes/types/types';
+import { isInvocationNodeData } from 'features/nodes/types/invocation';
 import { map } from 'lodash-es';
 import { CSSProperties, memo, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';

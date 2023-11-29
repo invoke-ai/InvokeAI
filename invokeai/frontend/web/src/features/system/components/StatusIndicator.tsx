@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { FaCircle } from 'react-icons/fa';
 import { useHoverDirty } from 'react-use';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { STATUS_TRANSLATION_KEYS } from '../store/types';
+import { STATUS_TRANSLATION_KEYS } from 'features/system/store/types';
 
 const statusIndicatorSelector = createSelector(
   stateSelector,

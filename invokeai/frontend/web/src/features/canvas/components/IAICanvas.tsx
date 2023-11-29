@@ -11,18 +11,18 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
-import useCanvasDragMove from '../hooks/useCanvasDragMove';
-import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
-import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
-import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
-import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
-import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
-import useCanvasWheel from '../hooks/useCanvasZoom';
-import { canvasResized } from '../store/canvasSlice';
+import useCanvasDragMove from 'features/canvas/hooks/useCanvasDragMove';
+import useCanvasHotkeys from 'features/canvas/hooks/useCanvasHotkeys';
+import useCanvasMouseDown from 'features/canvas/hooks/useCanvasMouseDown';
+import useCanvasMouseMove from 'features/canvas/hooks/useCanvasMouseMove';
+import useCanvasMouseOut from 'features/canvas/hooks/useCanvasMouseOut';
+import useCanvasMouseUp from 'features/canvas/hooks/useCanvasMouseUp';
+import useCanvasWheel from 'features/canvas/hooks/useCanvasZoom';
+import { canvasResized } from 'features/canvas/store/canvasSlice';
 import {
   setCanvasBaseLayer,
   setCanvasStage,
-} from '../util/konvaInstanceProvider';
+} from 'features/canvas/util/konvaInstanceProvider';
 import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';

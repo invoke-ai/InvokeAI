@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useCallback, useMemo } from 'react';
-import { mouseOverNodeChanged } from '../store/nodesSlice';
+import { mouseOverNodeChanged } from 'features/nodes/store/nodesSlice';
 
 export const useMouseOverNode = (nodeId: string) => {
   const dispatch = useAppDispatch();

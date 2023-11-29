@@ -7,7 +7,7 @@ import {
   setShouldLockAspectRatio,
 } from 'features/parameters/store/generationSlice';
 import i18next from 'i18next';
-import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 
 const aspectRatios = [

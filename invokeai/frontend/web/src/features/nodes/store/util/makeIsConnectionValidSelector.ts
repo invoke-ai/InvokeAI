@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
-import { getIsGraphAcyclic } from './getIsGraphAcyclic';
-import { FieldType } from 'features/nodes/types/types';
+import { FieldType } from 'features/nodes/types/field';
 import i18n from 'i18next';
 import { HandleType } from 'reactflow';
+import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
 /**
@@ -17,15 +17,15 @@ export const makeConnectionErrorSelector = (
   handleType: HandleType,
   fieldType?: FieldType
 ) => {
-  return createSelector(stateSelector, (state) => {
+  return createSelector(stateSelector, (state): string | undefined => {
     if (!fieldType) {
       return i18n.t('nodes.noFieldType');
     }
 
-    const { currentConnectionFieldType, connectionStartParams, nodes, edges } =
+    const { connectionStartFieldType, connectionStartParams, nodes, edges } =
       state.nodes;
 
-    if (!connectionStartParams || !currentConnectionFieldType) {
+    if (!connectionStartParams || !connectionStartFieldType) {
       return i18n.t('nodes.noConnectionInProgress');
     }
 
@@ -40,9 +40,9 @@ export const makeConnectionErrorSelector = (
     }
 
     const targetType =
-      handleType === 'target' ? fieldType : currentConnectionFieldType;
+      handleType === 'target' ? fieldType : connectionStartFieldType;
     const sourceType =
-      handleType === 'source' ? fieldType : currentConnectionFieldType;
+      handleType === 'source' ? fieldType : connectionStartFieldType;
 
     if (nodeId === connectionNodeId) {
       return i18n.t('nodes.cannotConnectToSelf');
@@ -80,7 +80,7 @@ export const makeConnectionErrorSelector = (
         return edge.target === target && edge.targetHandle === targetHandle;
       }) &&
       // except CollectionItem inputs can have multiples
-      targetType !== 'CollectionItem'
+      targetType.name !== 'CollectionItemField'
     ) {
       return i18n.t('nodes.inputMayOnlyHaveOneConnection');
     }
@@ -100,6 +100,6 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.connectionWouldCreateCycle');
     }
 
-    return null;
+    return;
   });
 };

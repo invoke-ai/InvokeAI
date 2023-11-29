@@ -1,11 +1,12 @@
-import {
-  COLLECTION_MAP,
-  COLLECTION_TYPES,
-  POLYMORPHIC_TO_SINGLE_MAP,
-  POLYMORPHIC_TYPES,
-} from 'features/nodes/types/constants';
-import { FieldType } from 'features/nodes/types/types';
+import { FieldType } from 'features/nodes/types/field';
+import { isEqual } from 'lodash-es';
 
+/**
+ * Validates that the source and target types are compatible for a connection.
+ * @param sourceType The type of the source field.
+ * @param targetType The type of the target field.
+ * @returns True if the connection is valid, false otherwise.
+ */
 export const validateSourceAndTargetTypes = (
   sourceType: FieldType,
   targetType: FieldType
@@ -13,11 +14,14 @@ export const validateSourceAndTargetTypes = (
   // TODO: There's a bug with Collect -> Iterate nodes:
   // https://github.com/invoke-ai/InvokeAI/issues/3956
   // Once this is resolved, we can remove this check.
-  if (sourceType === 'Collection' && targetType === 'Collection') {
+  if (
+    sourceType.name === 'CollectionField' &&
+    targetType.name === 'CollectionField'
+  ) {
     return false;
   }
 
-  if (sourceType === targetType) {
+  if (isEqual(sourceType, targetType)) {
     return true;
   }
 
@@ -25,57 +29,53 @@ export const validateSourceAndTargetTypes = (
    * Connection types must be the same for a connection, with exceptions:
    * - CollectionItem can connect to any non-Collection
    * - Non-Collections can connect to CollectionItem
-   * - Anything (non-Collections, Collections, Polymorphics) can connect to Polymorphics of the same base type
-   * - Generic Collection can connect to any other Collection or Polymorphic
+   * - Anything (non-Collections, Collections, CollectionOrScalar) can connect to CollectionOrScalar of the same base type
+   * - Generic Collection can connect to any other Collection or CollectionOrScalar
    * - Any Collection can connect to a Generic Collection
    */
 
   const isCollectionItemToNonCollection =
-    sourceType === 'CollectionItem' && !COLLECTION_TYPES.includes(targetType);
+    sourceType.name === 'CollectionItemField' && !targetType.isCollection;
 
   const isNonCollectionToCollectionItem =
-    targetType === 'CollectionItem' &&
-    !COLLECTION_TYPES.includes(sourceType) &&
-    !POLYMORPHIC_TYPES.includes(sourceType);
+    targetType.name === 'CollectionItemField' &&
+    !sourceType.isCollection &&
+    !sourceType.isCollectionOrScalar;
 
-  const isAnythingToPolymorphicOfSameBaseType =
-    POLYMORPHIC_TYPES.includes(targetType) &&
-    (() => {
-      if (!POLYMORPHIC_TYPES.includes(targetType)) {
-        return false;
-      }
-      const baseType =
-        POLYMORPHIC_TO_SINGLE_MAP[
-          targetType as keyof typeof POLYMORPHIC_TO_SINGLE_MAP
-        ];
+  const isAnythingToCollectionOrScalarOfSameBaseType =
+    targetType.isCollectionOrScalar && sourceType.name === targetType.name;
 
-      const collectionType =
-        COLLECTION_MAP[baseType as keyof typeof COLLECTION_MAP];
-
-      return sourceType === baseType || sourceType === collectionType;
-    })();
-
-  const isGenericCollectionToAnyCollectionOrPolymorphic =
-    sourceType === 'Collection' &&
-    (COLLECTION_TYPES.includes(targetType) ||
-      POLYMORPHIC_TYPES.includes(targetType));
+  const isGenericCollectionToAnyCollectionOrCollectionOrScalar =
+    sourceType.name === 'CollectionField' &&
+    (targetType.isCollection || targetType.isCollectionOrScalar);
 
   const isCollectionToGenericCollection =
-    targetType === 'Collection' && COLLECTION_TYPES.includes(sourceType);
+    targetType.name === 'CollectionField' && sourceType.isCollection;
 
-  const isIntToFloat = sourceType === 'integer' && targetType === 'float';
+  const areBothTypesSingle =
+    !sourceType.isCollection &&
+    !sourceType.isCollectionOrScalar &&
+    !targetType.isCollection &&
+    !targetType.isCollectionOrScalar;
+
+  const isIntToFloat =
+    areBothTypesSingle &&
+    sourceType.name === 'IntegerField' &&
+    targetType.name === 'FloatField';
 
   const isIntOrFloatToString =
-    (sourceType === 'integer' || sourceType === 'float') &&
-    targetType === 'string';
+    areBothTypesSingle &&
+    (sourceType.name === 'IntegerField' || sourceType.name === 'FloatField') &&
+    targetType.name === 'StringField';
 
-  const isTargetAnyType = targetType === 'Any';
+  const isTargetAnyType = targetType.name === 'AnyField';
 
+  // One of these must be true for the connection to be valid
   return (
     isCollectionItemToNonCollection ||
     isNonCollectionToCollectionItem ||
-    isAnythingToPolymorphicOfSameBaseType ||
-    isGenericCollectionToAnyCollectionOrPolymorphic ||
+    isAnythingToCollectionOrScalarOfSameBaseType ||
+    isGenericCollectionToAnyCollectionOrCollectionOrScalar ||
     isCollectionToGenericCollection ||
     isIntToFloat ||
     isIntOrFloatToString ||

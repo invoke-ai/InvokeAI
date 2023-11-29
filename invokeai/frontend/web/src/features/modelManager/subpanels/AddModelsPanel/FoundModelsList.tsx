@@ -15,7 +15,7 @@ import {
   useGetModelsInFolderQuery,
   useImportMainModelsMutation,
 } from 'services/api/endpoints/models';
-import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
+import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 
 export default function FoundModelsList() {

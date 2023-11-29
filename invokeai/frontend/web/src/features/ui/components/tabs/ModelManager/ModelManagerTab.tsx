@@ -1,10 +1,10 @@
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
 import { ReactNode, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import ImportModelsPanel from '../../../../modelManager/subpanels/ImportModelsPanel';
-import MergeModelsPanel from '../../../../modelManager/subpanels/MergeModelsPanel';
-import ModelManagerPanel from '../../../../modelManager/subpanels/ModelManagerPanel';
-import ModelManagerSettingsPanel from '../../../../modelManager/subpanels/ModelManagerSettingsPanel';
+import ImportModelsPanel from 'features/modelManager/subpanels/ImportModelsPanel';
+import MergeModelsPanel from 'features/modelManager/subpanels/MergeModelsPanel';
+import ModelManagerPanel from 'features/modelManager/subpanels/ModelManagerPanel';
+import ModelManagerSettingsPanel from 'features/modelManager/subpanels/ModelManagerSettingsPanel';
 
 type ModelManagerTabName =
   | 'modelManager'

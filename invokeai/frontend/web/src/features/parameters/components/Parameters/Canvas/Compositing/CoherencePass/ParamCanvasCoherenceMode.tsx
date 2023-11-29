@@ -4,7 +4,7 @@ import IAIInformationalPopover from 'common/components/IAIInformationalPopover/I
 import { IAISelectDataType } from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
-import { CanvasCoherenceModeParam } from 'features/parameters/types/parameterSchemas';
+import { ParameterCanvasCoherenceMode } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,7 +30,7 @@ const ParamCanvasCoherenceMode = () => {
         return;
       }
 
-      dispatch(setCanvasCoherenceMode(v as CanvasCoherenceModeParam));
+      dispatch(setCanvasCoherenceMode(v as ParameterCanvasCoherenceMode));
     },
     [dispatch]
   );

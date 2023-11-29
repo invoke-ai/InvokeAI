@@ -6,7 +6,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import { size } from 'lodash-es';
 import { memo } from 'react';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import ParamLoraList from './ParamLoraList';
 import ParamLoRASelect from './ParamLoraSelect';
 import { useTranslation } from 'react-i18next';

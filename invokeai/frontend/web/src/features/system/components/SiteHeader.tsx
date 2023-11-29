@@ -19,7 +19,7 @@ import {
   FaKeyboard,
 } from 'react-icons/fa';
 import { menuListMotionProps } from 'theme/components/menu';
-import { useFeatureStatus } from '../hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 import InvokeAILogoComponent from './InvokeAILogoComponent';
 import SettingsModal from './SettingsModal/SettingsModal';

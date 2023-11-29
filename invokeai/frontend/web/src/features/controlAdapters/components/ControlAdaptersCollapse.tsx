@@ -19,7 +19,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPlus } from 'react-icons/fa';
-import { useAddControlAdapter } from '../hooks/useAddControlAdapter';
+import { useAddControlAdapter } from 'features/controlAdapters/hooks/useAddControlAdapter';
 
 const selector = createSelector(
   [stateSelector],

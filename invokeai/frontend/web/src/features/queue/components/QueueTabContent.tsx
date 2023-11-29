@@ -1,6 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { memo } from 'react';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import InvocationCacheStatus from './InvocationCacheStatus';
 import QueueList from './QueueList/QueueList';
 import QueueStatus from './QueueStatus';

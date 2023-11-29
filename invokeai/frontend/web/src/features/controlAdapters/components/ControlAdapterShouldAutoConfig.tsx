@@ -3,8 +3,8 @@ import IAISwitch from 'common/components/IAISwitch';
 import { controlAdapterAutoConfigToggled } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
-import { useControlAdapterShouldAutoConfig } from '../hooks/useControlAdapterShouldAutoConfig';
+import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterShouldAutoConfig } from 'features/controlAdapters/hooks/useControlAdapterShouldAutoConfig';
 import { isNil } from 'lodash-es';
 
 type Props = {

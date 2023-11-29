@@ -19,9 +19,9 @@ import React, {
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { ManagerOptions, SocketOptions } from 'socket.io-client';
-import Loading from '../../common/components/Loading/Loading';
-import AppDndContext from '../../features/dnd/components/AppDndContext';
-import '../../i18n';
+import Loading from 'common/components/Loading/Loading';
+import AppDndContext from 'features/dnd/components/AppDndContext';
+import 'i18n';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
