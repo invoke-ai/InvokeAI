@@ -4,6 +4,8 @@ from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
     WorkflowRecordDTO,
+    WorkflowRecordListItemDTO,
+    WorkflowWithoutID,
 )
 
 
@@ -16,7 +18,7 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def create(self, workflow: Workflow) -> WorkflowRecordDTO:
+    def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
         """Creates a workflow."""
         pass
 
@@ -31,6 +33,6 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_many(self, page: int, per_page: int) -> PaginatedResults[WorkflowRecordDTO]:
+    def get_many(self, page: int, per_page: int) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass

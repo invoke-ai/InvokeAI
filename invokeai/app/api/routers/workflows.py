@@ -6,6 +6,8 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
+    WorkflowRecordListItemDTO,
+    WorkflowWithoutID,
 )
 
 workflows_router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
@@ -61,7 +63,7 @@ async def delete_workflow(
     },
 )
 async def create_workflow(
-    workflow: Workflow = Body(description="The workflow to create", embed=True),
+    workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
 ) -> WorkflowRecordDTO:
     """Creates a workflow"""
     return ApiDependencies.invoker.services.workflow_records.create(workflow)
@@ -71,12 +73,12 @@ async def create_workflow(
     "/",
     operation_id="list_workflows",
     responses={
-        200: {"model": PaginatedResults[WorkflowRecordDTO]},
+        200: {"model": PaginatedResults[WorkflowRecordListItemDTO]},
     },
 )
 async def list_workflows(
     page: int = Query(default=0, description="The page to get"),
     per_page: int = Query(default=10, description="The number of workflows per page"),
-) -> PaginatedResults[WorkflowRecordDTO]:
-    """Deletes a workflow"""
+) -> PaginatedResults[WorkflowRecordListItemDTO]:
+    """Gets a page of workflows"""
     return ApiDependencies.invoker.services.workflow_records.get_many(page=page, per_page=per_page)

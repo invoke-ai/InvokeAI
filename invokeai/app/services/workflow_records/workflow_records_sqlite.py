@@ -6,6 +6,10 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
+    WorkflowRecordListItemDTO,
+    WorkflowRecordListItemDTOValidator,
+    WorkflowValidator,
+    WorkflowWithoutID,
 )
 
 
@@ -41,15 +45,22 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         finally:
             self._lock.release()
 
-    def create(self, workflow: Workflow) -> WorkflowRecordDTO:
+    def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
         try:
+            workflow_with_id = WorkflowValidator.validate_python(workflow.model_dump())
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                INSERT OR IGNORE INTO workflow_library(workflow)
-                VALUES (?);
+                INSERT OR IGNORE INTO workflow_library (
+                    workflow_id,
+                    workflow
+                )
+                VALUES (?, ?);
                 """,
-                (workflow.model_dump_json(),),
+                (
+                    workflow_with_id.workflow_id,
+                    workflow_with_id.model_dump_json(),
+                ),
             )
             self._conn.commit()
         except Exception:
@@ -57,7 +68,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             raise
         finally:
             self._lock.release()
-        return self.get(workflow.id)
+        return self.get(workflow_with_id.workflow_id)
 
     def update(self, workflow: Workflow) -> WorkflowRecordDTO:
         try:
@@ -68,7 +79,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 SET workflow = ?
                 WHERE workflow_id = ?;
                 """,
-                (workflow.model_dump_json(), workflow.id),
+                (workflow.model_dump_json(), workflow.workflow_id),
             )
             self._conn.commit()
         except Exception:
@@ -76,7 +87,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             raise
         finally:
             self._lock.release()
-        return self.get(workflow.id)
+        return self.get(workflow.workflow_id)
 
     def delete(self, workflow_id: str) -> None:
         try:
@@ -96,26 +107,31 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._lock.release()
         return None
 
-    def get_many(self, page: int, per_page: int) -> PaginatedResults[WorkflowRecordDTO]:
+    def get_many(self, page: int, per_page: int) -> PaginatedResults[WorkflowRecordListItemDTO]:
         try:
             self._lock.acquire()
 
             self._cursor.execute(
                 """--sql
-                SELECT workflow_id, workflow, created_at, updated_at
+                SELECT
+                    workflow_id,
+                    json_extract(workflow, '$.name') AS name,
+                    json_extract(workflow, '$.description') AS description,
+                    created_at,
+                    updated_at
                 FROM workflow_library
-                ORDER BY created_at DESC
+                ORDER BY name ASC
                 LIMIT ? OFFSET ?;
-            """,
+                """,
                 (per_page, page * per_page),
             )
             rows = self._cursor.fetchall()
-            workflows = [WorkflowRecordDTO.from_dict(dict(row)) for row in rows]
+            workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
             self._cursor.execute(
                 """--sql
                 SELECT COUNT(*)
                 FROM workflow_library;
-            """
+                """
             )
             total = self._cursor.fetchone()[0]
             pages = int(total / per_page) + 1
@@ -138,8 +154,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._cursor.execute(
                 """--sql
                 CREATE TABLE IF NOT EXISTS workflow_library (
+                    workflow_id TEXT NOT NULL PRIMARY KEY, -- gets implicit index
                     workflow TEXT NOT NULL,
-                    workflow_id TEXT GENERATED ALWAYS AS (json_extract(workflow, '$.id')) VIRTUAL NOT NULL UNIQUE, -- gets implicit index
                     created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                     updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')) -- updated via trigger
                 );

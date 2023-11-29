@@ -48,7 +48,7 @@ WorkflowWithoutIDValidator = TypeAdapter(WorkflowWithoutID)
 
 
 class Workflow(WorkflowWithoutID):
-    id: str = Field(default_factory=uuid_string, description="The id of the workflow.")
+    workflow_id: str = Field(default_factory=uuid_string, description="The id of the workflow.")
 
 
 WorkflowValidator = TypeAdapter(Workflow)
@@ -67,6 +67,17 @@ class WorkflowRecordDTO(BaseModel):
 
 
 WorkflowRecordDTOValidator = TypeAdapter(WorkflowRecordDTO)
+
+
+class WorkflowRecordListItemDTO(BaseModel):
+    workflow_id: str = Field(description="The id of the workflow.")
+    name: str = Field(description="The name of the workflow.")
+    description: str = Field(description="The description of the workflow.")
+    created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the workflow.")
+    updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the workflow.")
+
+
+WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
 
 
 class WorkflowNotFoundError(Exception):
