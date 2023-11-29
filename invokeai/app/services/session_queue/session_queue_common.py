@@ -171,10 +171,12 @@ def get_session(queue_item_dict: dict) -> GraphExecutionState:
     return session
 
 
-def get_workflow(queue_item_dict: dict) -> WorkflowWithoutID:
-    workflow_raw = queue_item_dict.get("workflow", "{}")
-    workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw, strict=False)
-    return workflow
+def get_workflow(queue_item_dict: dict) -> Optional[WorkflowWithoutID]:
+    workflow_raw = queue_item_dict.get("workflow", None)
+    if workflow_raw is not None:
+        workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw, strict=False)
+        return workflow
+    return None
 
 
 class SessionQueueItemWithoutGraph(BaseModel):
