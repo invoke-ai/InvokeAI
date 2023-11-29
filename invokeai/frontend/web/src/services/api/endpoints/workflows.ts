@@ -62,7 +62,7 @@ export const workflowsApi = api.injectEndpoints({
 });
 
 export const {
-  useGetWorkflowQuery,
+  useLazyGetWorkflowQuery,
   useCreateWorkflowMutation,
   useDeleteWorkflowMutation,
   useUpdateWorkflowMutation,

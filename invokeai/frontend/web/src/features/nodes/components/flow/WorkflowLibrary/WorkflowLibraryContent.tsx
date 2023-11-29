@@ -1,26 +1,28 @@
 import { Flex } from '@chakra-ui/react';
-import { WorkflowCategory } from './types';
-import { Dispatch, SetStateAction, memo } from 'react';
-import { paths } from 'services/api/schema';
+import { memo, useState } from 'react';
+import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import WorkflowLibraryCategories from './WorkflowLibraryCategories';
-import WorkflowLibraryPagination from './WorkflowLibraryPagination';
 import WorkflowLibraryList from './WorkflowLibraryList';
+import WorkflowLibraryPagination from './WorkflowLibraryPagination';
+import { WorkflowCategory } from './types';
 
-type Props = {
-  data: paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'];
-  category: WorkflowCategory;
-  setCategory: Dispatch<SetStateAction<WorkflowCategory>>;
-  page: number;
-  setPage: Dispatch<SetStateAction<number>>;
-};
+const PER_PAGE = 10;
 
-const WorkflowLibraryContent = ({
-  data,
-  category,
-  setCategory,
-  page,
-  setPage,
-}: Props) => {
+const WorkflowLibraryContent = () => {
+  const [page, setPage] = useState(0);
+  const [category, setCategory] = useState<WorkflowCategory>('user');
+  const { data } = useListWorkflowsQuery(
+    {
+      page,
+      per_page: PER_PAGE,
+    },
+    { refetchOnMountOrArgChange: true }
+  );
+
+  if (!data) {
+    return null;
+  }
+
   return (
     <Flex w="full" h="full" gap={2}>
       <WorkflowLibraryCategories

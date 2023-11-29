@@ -1,23 +1,20 @@
 import {
   Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
   ModalBody,
   ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
 } from '@chakra-ui/react';
+import WorkflowLibraryContent from 'features/nodes/components/flow/WorkflowLibrary/WorkflowLibraryContent';
+import { useWorkflowLibraryContext } from 'features/nodes/components/flow/WorkflowLibrary/useWorkflowLibraryContext';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import WorkflowLibraryWrapper from './WorkflowLibraryWrapper';
 
-type Props = {
-  isOpen: boolean;
-  onClose: () => void;
-};
-
-const WorkflowLibraryModal = ({ isOpen, onClose }: Props) => {
+const WorkflowLibraryModal = () => {
   const { t } = useTranslation();
+  const { isOpen, onClose } = useWorkflowLibraryContext();
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered>
       <ModalOverlay />
@@ -32,7 +29,7 @@ const WorkflowLibraryModal = ({ isOpen, onClose }: Props) => {
         <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
-          <WorkflowLibraryWrapper />
+          <WorkflowLibraryContent />
         </ModalBody>
         <ModalFooter />
       </ModalContent>

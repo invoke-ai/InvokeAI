@@ -67,6 +67,7 @@
         "controlNet": "ControlNet",
         "controlAdapter": "Control Adapter",
         "data": "Data",
+        "delete": "Delete",
         "details": "Details",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
@@ -103,6 +104,7 @@
         "langSpanish": "Español",
         "languagePickerLabel": "Language",
         "langUkranian": "Украї́нська",
+        "lastUpdated": "Last updated: {{date}}",
         "lightMode": "Light Mode",
         "linear": "Linear",
         "load": "Load",
@@ -1312,7 +1314,10 @@
         "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "uploadFailedUnableToLoadDesc": "Unable to load file",
         "upscalingFailed": "Upscaling Failed",
-        "workflowLoaded": "Workflow Loaded"
+        "workflowLoaded": "Workflow Loaded",
+        "problemRetrievingWorkflow": "Problem Retrieving Workflow",
+        "workflowDeleted": "Workflow Deleted",
+        "problemDeletingWorkflow": "Problem Deleting Workflow"
     },
     "tooltip": {
         "feature": {
@@ -1607,6 +1612,7 @@
         "userCategory": "User",
         "systemCategory": "System",
         "loadWorkflow": "$t(nodes.loadWorkflow)",
-        "deleteWorkflow": "Delete Workflow"
+        "deleteWorkflow": "Delete Workflow",
+        "unnamedWorkflow": "Unnamed Workflow"
     }
 }
