@@ -108,7 +108,7 @@ export const systemSlice = createSlice({
      * Invocation Started
      */
     builder.addCase(appSocketInvocationStarted, (state) => {
-      state.denoiseProgress = null;
+      // state.denoiseProgress = null;
       state.status = 'PROCESSING';
     });
 
@@ -142,7 +142,7 @@ export const systemSlice = createSlice({
      * Invocation Complete
      */
     builder.addCase(appSocketInvocationComplete, (state) => {
-      state.denoiseProgress = null;
+      // state.denoiseProgress = null;
       state.status = 'CONNECTED';
     });
 
@@ -169,7 +169,7 @@ export const systemSlice = createSlice({
         )
       ) {
         state.status = 'CONNECTED';
-        state.denoiseProgress = null;
+        // state.denoiseProgress = null;
       }
     });
 
