@@ -32,7 +32,6 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
-import { $store } from './nanostores/store';
 import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 
 const allReducers = {
@@ -135,14 +134,11 @@ export const createStore = (projectId?: string) =>
   });
 
 export type AppGetState = ReturnType<
-  ReturnType<typeof configureStore>['getState']
+  ReturnType<typeof createStore>['getState']
 >;
-export type RootState = ReturnType<
-  ReturnType<typeof configureStore>['getState']
->;
+export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
-export type AppDispatch = ReturnType<
-  ReturnType<typeof configureStore>['dispatch']
->;
+export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
+
 export const stateSelector = (state: RootState) => state;
