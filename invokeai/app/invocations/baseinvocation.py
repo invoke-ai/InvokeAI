@@ -811,9 +811,9 @@ def invocation(
         cls.UIConfig.category = category
 
         # Grab the node pack's name from the module name, if it's a custom node
-        module_name = cls.__module__.split(".")[0]
-        if module_name.endswith(CUSTOM_NODE_PACK_SUFFIX):
-            cls.UIConfig.node_pack = module_name.split(CUSTOM_NODE_PACK_SUFFIX)[0]
+        is_custom_node = cls.__module__.rsplit(".", 1)[0] == "invokeai.app.invocations"
+        if is_custom_node:
+            cls.UIConfig.node_pack = cls.__module__.split(".")[0]
         else:
             cls.UIConfig.node_pack = None
 
