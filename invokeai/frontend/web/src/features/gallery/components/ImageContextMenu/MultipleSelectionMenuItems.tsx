@@ -14,9 +14,9 @@ import {
   useBulkDownloadImagesMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
-} from '../../../../services/api/endpoints/images';
-import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
-import { addToast } from '../../../system/store/systemSlice';
+} from 'services/api/endpoints/images';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { addToast } from 'features/system/store/systemSlice';
 import { useTranslation } from 'react-i18next';
 
 const MultipleSelectionMenuItems = () => {
@@ -104,14 +104,14 @@ const MultipleSelectionMenuItems = () => {
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
-        Change Board
+        {t('boards.changeBoard')}
       </MenuItem>
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
         onClickCapture={handleDeleteSelection}
       >
-        Delete Selection
+        {t('gallery.deleteSelection')}
       </MenuItem>
     </>
   );

@@ -1,10 +1,8 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
-import {
-  SCHEDULER_LABEL_MAP,
-  SchedulerParam,
-} from 'features/parameters/types/parameterSchemas';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { SCHEDULER_LABEL_MAP } from 'features/parameters/types/constants';
 import { favoriteSchedulersChanged } from 'features/ui/store/uiSlice';
 import { map } from 'lodash-es';
 import { useCallback } from 'react';
@@ -26,7 +24,7 @@ export default function SettingsSchedulers() {
 
   const handleChange = useCallback(
     (v: string[]) => {
-      dispatch(favoriteSchedulersChanged(v as SchedulerParam[]));
+      dispatch(favoriteSchedulersChanged(v as ParameterScheduler[]));
     },
     [dispatch]
   );

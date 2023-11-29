@@ -5,7 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { combinatorialToggled } from '../store/dynamicPromptsSlice';
+import { combinatorialToggled } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 
 const selector = createSelector(
   stateSelector,

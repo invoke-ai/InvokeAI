@@ -1,16 +1,23 @@
 import { Flex } from '@chakra-ui/layout';
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
+import { updateAllNodesRequested } from 'features/nodes/store/actions';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
-import { FaPlus } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { FaExclamationTriangle, FaPlus } from 'react-icons/fa';
 
 const TopLeftPanel = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const nodesNeedUpdate = useGetNodesNeedUpdate();
   const handleOpenAddNodePopover = useCallback(() => {
     dispatch(addNodePopoverOpened());
+  }, [dispatch]);
+  const handleClickUpdateNodes = useCallback(() => {
+    dispatch(updateAllNodesRequested());
   }, [dispatch]);
 
   return (
@@ -21,6 +28,14 @@ const TopLeftPanel = () => {
         icon={<FaPlus />}
         onClick={handleOpenAddNodePopover}
       />
+      {nodesNeedUpdate && (
+        <IAIButton
+          leftIcon={<FaExclamationTriangle />}
+          onClick={handleClickUpdateNodes}
+        >
+          {t('nodes.updateAllNodes')}
+        </IAIButton>
+      )}
     </Flex>
   );
 };

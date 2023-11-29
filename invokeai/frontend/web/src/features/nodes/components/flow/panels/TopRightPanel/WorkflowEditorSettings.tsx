@@ -28,7 +28,7 @@ import {
 import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCog } from 'react-icons/fa';
 import { SelectionMode } from 'reactflow';
-import ReloadNodeTemplatesButton from '../TopCenterPanel/ReloadSchemaButton';
+import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopCenterPanel/ReloadSchemaButton';
 import { useTranslation } from 'react-i18next';
 
 const formLabelProps: FormLabelProps = {
@@ -127,7 +127,7 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
                 py: 4,
               }}
             >
-              <Heading size="sm">General</Heading>
+              <Heading size="sm">{t('parameters.general')}</Heading>
               <IAISwitch
                 formLabelProps={formLabelProps}
                 onChange={handleChangeShouldAnimate}
@@ -159,7 +159,7 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
                 helperText={t('nodes.fullyContainNodesHelp')}
               />
               <Heading size="sm" pt={4}>
-                Advanced
+                {t('common.advanced')}
               </Heading>
               <IAISwitch
                 formLabelProps={formLabelProps}

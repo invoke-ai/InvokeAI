@@ -1,12 +1,13 @@
+# ruff: noqa: I001, F401
 """
 Initialization file for invokeai.backend.model_management
 """
 # This import must be first
-from .model_manager import ModelManager, ModelInfo, AddModelResult, SchedulerPredictionType  # noqa: F401 isort: split
+from .model_manager import AddModelResult, ModelInfo, ModelManager, SchedulerPredictionType
+from .lora import ModelPatcher, ONNXModelPatcher
+from .model_cache import ModelCache
 
-from .lora import ModelPatcher, ONNXModelPatcher  # noqa: F401
-from .model_cache import ModelCache  # noqa: F401
-from .models import (  # noqa: F401
+from .models import (
     BaseModelType,
     DuplicateModelException,
     ModelNotFoundException,
@@ -16,4 +17,4 @@ from .models import (  # noqa: F401
 )
 
 # This import must be last
-from .model_merge import ModelMerger, MergeInterpolationMethod  # noqa: F401 isort: split
+from .model_merge import MergeInterpolationMethod, ModelMerger

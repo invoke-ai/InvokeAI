@@ -9,7 +9,6 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
@@ -59,7 +58,7 @@ class T2IAdapterInvocation(BaseInvocation):
         ui_order=-1,
     )
     weight: Union[float, list[float]] = InputField(
-        default=1, ge=0, description="The weight given to the T2I-Adapter", ui_type=UIType.Float, title="Weight"
+        default=1, ge=0, description="The weight given to the T2I-Adapter", title="Weight"
     )
     begin_step_percent: float = InputField(
         default=0, ge=-1, le=2, description="When the T2I-Adapter is first applied (% of total steps)"

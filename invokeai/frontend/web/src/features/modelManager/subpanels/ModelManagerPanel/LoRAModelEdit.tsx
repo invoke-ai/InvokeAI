@@ -16,7 +16,7 @@ import {
   useUpdateLoRAModelsMutation,
 } from 'services/api/endpoints/models';
 import { LoRAModelConfig } from 'services/api/types';
-import BaseModelSelect from '../shared/BaseModelSelect';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 
 type LoRAModelEditProps = {
   model: LoRAModelConfigEntity;
@@ -95,8 +95,8 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
           {model.model_name}
         </Text>
         <Text fontSize="sm" color="base.400">
-          {MODEL_TYPE_MAP[model.base_model]} Model ⋅{' '}
-          {LORA_MODEL_FORMAT_MAP[model.model_format]} format
+          {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')} ⋅{' '}
+          {LORA_MODEL_FORMAT_MAP[model.model_format]} {t('common.format')}
         </Text>
       </Flex>
       <Divider />

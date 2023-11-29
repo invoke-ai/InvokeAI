@@ -155,10 +155,10 @@ const IAICanvasMaskOptions = () => {
           <IAIColorPicker color={maskColor} onChange={handleChangeMaskColor} />
         </Box>
         <IAIButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
-          Save Mask
+          {t('unifiedCanvas.saveMask')}
         </IAIButton>
         <IAIButton size="sm" leftIcon={<FaTrash />} onClick={handleClearMask}>
-          {t('unifiedCanvas.clearMask')} (Shift+C)
+          {t('unifiedCanvas.clearMask')}
         </IAIButton>
       </Flex>
     </IAIPopover>

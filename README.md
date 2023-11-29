@@ -161,7 +161,7 @@ the command `npm install -g yarn` if needed)
     _For Windows/Linux with an NVIDIA GPU:_
 
     ```terminal
-    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
+    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
     ```
 
     _For Linux with an AMD GPU:_
@@ -395,7 +395,7 @@ Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 
 ### Troubleshooting
 
-Please check out our **[Q&A](https://invoke-ai.github.io/InvokeAI/help/TROUBLESHOOT/#faq)** to get solutions for common installation
+Please check out our **[Troubleshooting Guide](https://invoke-ai.github.io/InvokeAI/installation/010_INSTALL_AUTOMATED/#troubleshooting)** to get solutions for common installation
 problems and other issues. For more help, please join our [Discord][discord link]
 
 ## Contributing

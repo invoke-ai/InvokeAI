@@ -15,7 +15,7 @@ import {
   useGetModelsInFolderQuery,
   useImportMainModelsMutation,
 } from 'services/api/endpoints/models';
-import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
+import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 
 export default function FoundModelsList() {
@@ -165,7 +165,7 @@ export default function FoundModelsList() {
                 },
               }}
             >
-              Installed
+              {t('common.installed')}
             </Text>
           )}
         </Flex>
@@ -215,7 +215,7 @@ export default function FoundModelsList() {
         />
         <Flex p={2} gap={2}>
           <Text sx={{ fontWeight: 600 }}>
-            Models Found: {foundModels.length}
+            {t('modelManager.modelsFound')}: {foundModels.length}
           </Text>
           <Text
             sx={{
@@ -226,7 +226,7 @@ export default function FoundModelsList() {
               },
             }}
           >
-            Not Installed: {filteredModels.length}
+            {t('common.notInstalled')}: {filteredModels.length}
           </Text>
         </Flex>
 

@@ -11,7 +11,7 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const QueueControls = () => {
   const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;

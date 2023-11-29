@@ -11,9 +11,9 @@ import {
   useDroppable as useOriginalDroppable,
 } from '@dnd-kit/core';
 import {
-  InputFieldTemplate,
-  InputFieldValue,
-} from 'features/nodes/types/types';
+  FieldInputTemplate,
+  FieldInputInstance,
+} from 'features/nodes/types/field';
 import { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
@@ -93,8 +93,8 @@ export type NodeFieldDraggableData = BaseDragData & {
   payloadType: 'NODE_FIELD';
   payload: {
     nodeId: string;
-    field: InputFieldValue;
-    fieldTemplate: InputFieldTemplate;
+    field: FieldInputInstance;
+    fieldTemplate: FieldInputTemplate;
   };
 };
 

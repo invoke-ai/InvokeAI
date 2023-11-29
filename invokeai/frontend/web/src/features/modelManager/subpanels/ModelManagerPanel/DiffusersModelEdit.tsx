@@ -13,8 +13,8 @@ import {
   useUpdateMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { DiffusersModelConfig } from 'services/api/types';
-import BaseModelSelect from '../shared/BaseModelSelect';
-import ModelVariantSelect from '../shared/ModelVariantSelect';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 
 type DiffusersModelEditProps = {
   model: DiffusersModelConfigEntity;
@@ -95,7 +95,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
           {model.model_name}
         </Text>
         <Text fontSize="sm" color="base.400">
-          {MODEL_TYPE_MAP[model.base_model]} Model
+          {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
         </Text>
       </Flex>
       <Divider />

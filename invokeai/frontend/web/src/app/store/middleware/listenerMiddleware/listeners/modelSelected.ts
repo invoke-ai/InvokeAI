@@ -12,12 +12,12 @@ import {
   setWidth,
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
-import { zMainOrOnnxModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
+import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 
 export const addModelSelectedListener = () => {
   startAppListening({
@@ -26,7 +26,7 @@ export const addModelSelectedListener = () => {
       const log = logger('models');
 
       const state = getState();
-      const result = zMainOrOnnxModel.safeParse(action.payload);
+      const result = zParameterModel.safeParse(action.payload);
 
       if (!result.success) {
         log.error(

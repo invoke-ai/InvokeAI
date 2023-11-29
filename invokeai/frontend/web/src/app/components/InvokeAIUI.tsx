@@ -1,12 +1,15 @@
 import { Middleware } from '@reduxjs/toolkit';
+import { $socketOptions } from 'app/hooks/useSocketIO';
+import { $authToken } from 'app/store/nanostores/authToken';
+import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
+import { $isDebugging } from 'app/store/nanostores/isDebugging';
+import { $projectId } from 'app/store/nanostores/projectId';
+import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { createStore } from 'app/store/store';
 import { PartialAppConfig } from 'app/types/invokeai';
-import {
-  $queueId,
-  DEFAULT_QUEUE_ID,
-} from 'features/queue/store/queueNanoStore';
+import 'i18n';
 import React, {
   PropsWithChildren,
   ReactNode,
@@ -17,12 +20,11 @@ import React, {
 } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { $authToken, $baseUrl, $projectId } from 'services/api/client';
-import { socketMiddleware } from 'services/events/middleware';
-import Loading from '../../common/components/Loading/Loading';
-import AppDndContext from '../../features/dnd/components/AppDndContext';
-import '../../i18n';
-import { $store } from '../store/nanostores/store';
+import { ManagerOptions, SocketOptions } from 'socket.io-client';
+import Loading from 'common/components/Loading/Loading';
+import AppDndContext from 'features/dnd/components/AppDndContext';
+import 'i18n';
+import { $store } from 'app/store/nanostores/store';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -40,6 +42,8 @@ interface Props extends PropsWithChildren {
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
   customStarUi?: CustomStarUi;
+  socketOptions?: Partial<ManagerOptions & SocketOptions>;
+  isDebugging?: boolean;
 }
 
 const InvokeAIUI = ({
@@ -52,6 +56,8 @@ const InvokeAIUI = ({
   queueId,
   selectedImage,
   customStarUi,
+  socketOptions,
+  isDebugging = false,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -84,9 +90,7 @@ const InvokeAIUI = ({
 
     // rebuild socket middleware with token and apiUrl
     if (middleware && middleware.length > 0) {
-      addMiddleware(socketMiddleware(), ...middleware);
-    } else {
-      addMiddleware(socketMiddleware());
+      addMiddleware(...middleware);
     }
 
     return () => {
@@ -125,6 +129,24 @@ const InvokeAIUI = ({
   useEffect(() => {
     $store.set(store);
   }, [store]);
+
+  useEffect(() => {
+    if (socketOptions) {
+      $socketOptions.set(socketOptions);
+    }
+    return () => {
+      $socketOptions.set({});
+    };
+  }, [socketOptions]);
+
+  useEffect(() => {
+    if (isDebugging) {
+      $isDebugging.set(isDebugging);
+    }
+    return () => {
+      $isDebugging.set(false);
+    };
+  }, [isDebugging]);
 
   return (
     <React.StrictMode>

@@ -1,6 +1,6 @@
-# Invocations
+# Nodes
 
-Features in InvokeAI are added in the form of modular node-like systems called
+Features in InvokeAI are added in the form of modular nodes systems called
 **Invocations**.
 
 An Invocation is simply a single operation that takes in some inputs and gives
@@ -9,13 +9,34 @@ complex functionality.
 
 ## Invocations Directory
 
-InvokeAI Invocations can be found in the `invokeai/app/invocations` directory.
+InvokeAI Nodes can be found in the `invokeai/app/invocations` directory. These can be used as examples to create your own nodes.
 
-You can add your new functionality to one of the existing Invocations in this
-directory or create a new file in this directory as per your needs.
+New nodes should be added to a subfolder in `nodes` direction found at the root level of the InvokeAI installation location. Nodes added to this folder will be able to be used upon application startup. 
 
-**Note:** _All Invocations must be inside this directory for InvokeAI to
-recognize them as valid Invocations._
+Example `nodes`  subfolder structure:
+```py
+├── __init__.py # Invoke-managed custom node loader
+│
+├── cool_node
+│   ├── __init__.py # see example below
+│   └── cool_node.py
+│
+└── my_node_pack
+    ├── __init__.py # see example below
+    ├── tasty_node.py
+    ├── bodacious_node.py
+    ├── utils.py
+    └── extra_nodes
+        └── fancy_node.py
+```
+
+Each node folder must have an `__init__.py` file that imports its nodes. Only nodes imported in the `__init__.py` file are loaded.
+ See the README in the nodes folder for more examples: 
+
+```py
+from .cool_node import CoolInvocation
+```
+
 
 ## Creating A New Invocation
 
@@ -44,7 +65,7 @@ The first set of things we need to do when creating a new Invocation are -
 So let us do that.
 
 ```python
-from .baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -78,8 +99,8 @@ create your own custom field types later in this guide. For now, let's go ahead
 and use it.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation
+from invokeai.app.invocations.primitives import ImageField
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -103,8 +124,8 @@ image: ImageField = InputField(description="The input image")
 Great. Now let us create our other inputs for `width` and `height`
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation
+from invokeai.app.invocations.primitives import ImageField
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -139,8 +160,8 @@ that are provided by it by InvokeAI.
 Let us create this function first.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation, InvocationContext
+from invokeai.app.invocations.primitives import ImageField
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -168,9 +189,9 @@ all the necessary info related to image outputs. So let us use that.
 We will cover how to create your own output types later in this guide.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
-from .image import ImageOutput
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation, InvocationContext
+from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.invocations.image import ImageOutput
 
 @invocation('resize')
 class ResizeInvocation(BaseInvocation):
@@ -195,9 +216,9 @@ Perfect. Now that we have our Invocation setup, let us do what we want to do.
 So let's do that.
 
 ```python
-from .baseinvocation import BaseInvocation, InputField, invocation
-from .primitives import ImageField
-from .image import ImageOutput
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, invocation, InvocationContext
+from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.invocations.image import ImageOutput, ResourceOrigin, ImageCategory
 
 @invocation("resize")
 class ResizeInvocation(BaseInvocation):

@@ -8,7 +8,7 @@ import { useFieldType } from './useFieldType.ts';
 const selectIsConnectionInProgress = createSelector(
   stateSelector,
   ({ nodes }) =>
-    nodes.currentConnectionFieldType !== null &&
+    nodes.connectionStartFieldType !== null &&
     nodes.connectionStartParams !== null
 );
 

@@ -1,8 +1,9 @@
 import { Flex, Text } from '@chakra-ui/react';
 import { memo } from 'react';
 import { COLUMN_WIDTHS } from './constants';
-
+import { useTranslation } from 'react-i18next';
 const QueueListHeader = () => {
+  const { t } = useTranslation();
   return (
     <Flex
       alignItems="center"
@@ -22,16 +23,16 @@ const QueueListHeader = () => {
         <Text variant="subtext">#</Text>
       </Flex>
       <Flex ps={0.5} w={COLUMN_WIDTHS.statusBadge} alignItems="center">
-        <Text variant="subtext">status</Text>
+        <Text variant="subtext">{t('queue.status')}</Text>
       </Flex>
       <Flex ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center">
-        <Text variant="subtext">time</Text>
+        <Text variant="subtext">{t('queue.time')}</Text>
       </Flex>
       <Flex ps={0.5} w={COLUMN_WIDTHS.batchId} alignItems="center">
-        <Text variant="subtext">batch</Text>
+        <Text variant="subtext">{t('queue.batch')}</Text>
       </Flex>
       <Flex ps={0.5} w={COLUMN_WIDTHS.fieldValues} alignItems="center">
-        <Text variant="subtext">batch field values</Text>
+        <Text variant="subtext">{t('queue.batchFieldValues')}</Text>
       </Flex>
     </Flex>
   );

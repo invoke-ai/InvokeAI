@@ -6,6 +6,7 @@ import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
+from invokeai.app.invocations.baseinvocation import CUSTOM_NODE_PACK_SUFFIX
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
@@ -32,12 +33,14 @@ for d in Path(__file__).parent.iterdir():
     if module_name in globals():
         continue
 
-    # we have a legit module to import
-    spec = spec_from_file_location(module_name, init.absolute())
+    # load the module, appending adding a suffix to identify it as a custom node pack
+    spec = spec_from_file_location(f"{module_name}{CUSTOM_NODE_PACK_SUFFIX}", init.absolute())
 
     if spec is None or spec.loader is None:
         logger.warn(f"Could not load {init}")
         continue
+
+    logger.info(f"Loading node pack {module_name}")
 
     module = module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -47,5 +50,5 @@ for d in Path(__file__).parent.iterdir():
 
     del init, module_name
 
-
-logger.info(f"Loaded {loaded_count} modules from {Path(__file__).parent}")
+if loaded_count > 0:
+    logger.info(f"Loaded {loaded_count} node packs from {Path(__file__).parent}")

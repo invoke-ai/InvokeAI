@@ -4,13 +4,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { motion } from 'framer-motion';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { FaTimes } from 'react-icons/fa';
-import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
+import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
-import { ManualAddMode, advancedAddModeData } from './AdvancedAddModels';
+import { ManualAddMode } from './AdvancedAddModels';
 import { useTranslation } from 'react-i18next';
+import { SelectItem } from '@mantine/core';
 
 export default function ScanAdvancedAddModels() {
   const advancedAddScanModel = useAppSelector(
@@ -18,6 +19,14 @@ export default function ScanAdvancedAddModels() {
   );
 
   const { t } = useTranslation();
+
+  const advancedAddModeData: SelectItem[] = useMemo(
+    () => [
+      { label: t('modelManager.diffusersModels'), value: 'diffusers' },
+      { label: t('modelManager.checkpointOrSafetensors'), value: 'checkpoint' },
+    ],
+    [t]
+  );
 
   const [advancedAddMode, setAdvancedAddMode] =
     useState<ManualAddMode>('diffusers');

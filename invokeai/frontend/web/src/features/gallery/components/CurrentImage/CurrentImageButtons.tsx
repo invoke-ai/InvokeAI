@@ -35,6 +35,7 @@ import {
   FaCode,
   FaHourglassHalf,
   FaQuoteRight,
+  FaRulerVertical,
   FaSeedling,
 } from 'react-icons/fa';
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
@@ -42,8 +43,8 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { menuListMotionProps } from 'theme/components/menu';
-import { sentImageToImg2Img } from '../../store/actions';
-import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
+import { sentImageToImg2Img } from 'features/gallery/store/actions';
+import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -95,8 +96,12 @@ const CurrentImageButtons = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
-  const { recallBothPrompts, recallSeed, recallAllParameters } =
-    useRecallParameters();
+  const {
+    recallBothPrompts,
+    recallSeed,
+    recallWidthAndHeight,
+    recallAllParameters,
+  } = useRecallParameters();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(
     lastSelectedImage?.image_name ?? skipToken
@@ -117,6 +122,8 @@ const CurrentImageButtons = () => {
     dispatch(workflowLoadRequested(workflow));
   }, [dispatch, workflow]);
 
+  useHotkeys('w', handleLoadWorkflow, [workflow]);
+
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
   }, [metadata, recallAllParameters]);
@@ -127,7 +134,7 @@ const CurrentImageButtons = () => {
     recallSeed(metadata?.seed);
   }, [metadata?.seed, recallSeed]);
 
-  useHotkeys('s', handleUseSeed, [imageDTO]);
+  useHotkeys('s', handleUseSeed, [metadata]);
 
   const handleUsePrompt = useCallback(() => {
     recallBothPrompts(
@@ -144,9 +151,13 @@ const CurrentImageButtons = () => {
     recallBothPrompts,
   ]);
 
-  useHotkeys('p', handleUsePrompt, [imageDTO]);
+  useHotkeys('p', handleUsePrompt, [metadata]);
 
-  useHotkeys('w', handleLoadWorkflow, [workflow]);
+  const handleUseSize = useCallback(() => {
+    recallWidthAndHeight(metadata?.width, metadata?.height);
+  }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
+
+  useHotkeys('d', handleUseSize, [metadata]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
@@ -266,6 +277,19 @@ const CurrentImageButtons = () => {
             aria-label={`${t('parameters.useSeed')} (S)`}
             isDisabled={metadata?.seed === null || metadata?.seed === undefined}
             onClick={handleUseSeed}
+          />
+          <IAIIconButton
+            isLoading={isLoadingMetadata}
+            icon={<FaRulerVertical />}
+            tooltip={`${t('parameters.useSize')} (D)`}
+            aria-label={`${t('parameters.useSize')} (D)`}
+            isDisabled={
+              metadata?.height === null ||
+              metadata?.height === undefined ||
+              metadata?.width === null ||
+              metadata?.width === undefined
+            }
+            onClick={handleUseSize}
           />
           <IAIIconButton
             isLoading={isLoadingMetadata}

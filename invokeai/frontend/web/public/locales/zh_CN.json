@@ -90,7 +90,16 @@
         "controlAdapter": "Control Adapter",
         "controlNet": "ControlNet",
         "on": "开",
-        "auto": "自动"
+        "auto": "自动",
+        "checkpoint": "Checkpoint",
+        "inpaint": "内补重绘",
+        "simple": "简单",
+        "template": "模板",
+        "outputs": "输出",
+        "data": "数据",
+        "safetensors": "Safetensors",
+        "outpaint": "外扩绘制",
+        "details": "详情"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -109,7 +118,6 @@
         "deleteImage": "删除图片",
         "deleteImageBin": "被删除的图片会发送到你操作系统的回收站。",
         "deleteImagePermanent": "删除的图片无法被恢复。",
-        "images": "图片",
         "assets": "素材",
         "autoAssignBoardOnClick": "点击后自动分配面板",
         "featuresWillReset": "如果您删除该图像，这些功能会立即被重置。",
@@ -121,7 +129,8 @@
         "setCurrentImage": "设为当前图像",
         "preparingDownload": "准备下载",
         "preparingDownloadFailed": "准备下载时出现问题",
-        "downloadSelection": "下载所选内容"
+        "downloadSelection": "下载所选内容",
+        "noImageSelected": "无选中的图像"
     },
     "hotkeys": {
         "keyboardShortcuts": "键盘快捷键",
@@ -475,7 +484,9 @@
         "oliveModels": "Olive",
         "loraModels": "LoRA",
         "alpha": "Alpha",
-        "vaePrecision": "VAE 精度"
+        "vaePrecision": "VAE 精度",
+        "checkpointOrSafetensors": "$t(common.checkpoint) / $t(common.safetensors)",
+        "noModelSelected": "无选中的模型"
     },
     "parameters": {
         "images": "图像",
@@ -602,7 +613,9 @@
         "seamlessX&Y": "无缝 X & Y",
         "aspectRatioFree": "自由",
         "seamlessX": "无缝 X",
-        "seamlessY": "无缝 Y"
+        "seamlessY": "无缝 Y",
+        "maskEdge": "遮罩边缘",
+        "unmasked": "取消遮罩"
     },
     "settings": {
         "models": "模型",
@@ -639,7 +652,10 @@
         "clearIntermediatesDesc1": "清除中间产物会重置您的画布和 ControlNet 状态。",
         "intermediatesClearedFailed": "清除中间产物时出现问题",
         "clearIntermediatesWithCount_other": "清除 {{count}} 个中间产物",
-        "clearIntermediatesDisabled": "队列为空才能清理中间产物"
+        "clearIntermediatesDisabled": "队列为空才能清理中间产物",
+        "enableNSFWChecker": "启用成人内容检测器",
+        "enableInvisibleWatermark": "启用不可见水印",
+        "enableInformationalPopovers": "启用信息弹窗"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
@@ -705,7 +721,7 @@
         "modelAddFailed": "模型添加失败",
         "problemDownloadingCanvas": "下载画布时出现问题",
         "problemMergingCanvas": "合并画布时出现问题",
-        "setCanvasInitialImage": "设为画布初始图像",
+        "setCanvasInitialImage": "设定画布初始图像",
         "imageUploaded": "图像已上传",
         "addedToBoard": "已添加到面板",
         "workflowLoaded": "工作流已加载",
@@ -722,7 +738,8 @@
         "canvasSavedGallery": "画布已保存到图库",
         "imageUploadFailed": "图像上传失败",
         "problemImportingMask": "导入遮罩时出现问题",
-        "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{count}} 个不兼容的子模型"
+        "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{count}} 个不兼容的子模型",
+        "setAsCanvasInitialImage": "设为画布初始图像"
     },
     "unifiedCanvas": {
         "layer": "图层",
@@ -808,7 +825,8 @@
         "toggleAutoscroll": "切换自动缩放",
         "menu": "菜单",
         "showGalleryPanel": "显示图库浮窗",
-        "loadMore": "加载更多"
+        "loadMore": "加载更多",
+        "mode": "模式"
     },
     "ui": {
         "showProgressImages": "显示处理中的图片",
@@ -1031,7 +1049,9 @@
         "integerPolymorphic": "整数多态",
         "latentsPolymorphic": "Latents 多态",
         "conditioningField": "条件",
-        "latentsField": "Latents"
+        "latentsField": "Latents",
+        "updateAllNodes": "更新所有节点",
+        "unableToUpdateNodes_other": "{{count}} 个节点无法完成更新"
     },
     "controlnet": {
         "resize": "直接缩放",
@@ -1117,7 +1137,8 @@
         "openPose": "Openpose",
         "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
-        "canny": "Canny"
+        "canny": "Canny",
+        "unstarImage": "取消收藏图像"
     },
     "queue": {
         "status": "状态",
@@ -1176,7 +1197,9 @@
         "queueTotal": "总计 {{total}}",
         "enqueueing": "队列中的批次",
         "queueMaxExceeded": "超出最大值 {{max_queue_size}}，将跳过 {{skip}}",
-        "graphFailedToQueue": "节点图加入队列失败"
+        "graphFailedToQueue": "节点图加入队列失败",
+        "batchFieldValues": "批处理值",
+        "time": "时间"
     },
     "sdxl": {
         "refinerStart": "Refiner 开始作用时机",
@@ -1222,7 +1245,8 @@
         "seamless": "无缝",
         "fit": "图生图匹配",
         "recallParameters": "召回参数",
-        "noRecallParameters": "未找到要召回的参数"
+        "noRecallParameters": "未找到要召回的参数",
+        "vae": "VAE"
     },
     "models": {
         "noMatchingModels": "无相匹配的模型",
@@ -1233,7 +1257,9 @@
         "selectModel": "选择一个模型",
         "selectLoRA": "选择一个 LoRA",
         "noRefinerModelsInstalled": "无已安装的 SDXL Refiner 模型",
-        "noLoRAsInstalled": "无已安装的 LoRA"
+        "noLoRAsInstalled": "无已安装的 LoRA",
+        "esrganModel": "ESRGAN 模型",
+        "addLora": "添加 LoRA"
     },
     "boards": {
         "autoAddBoard": "自动添加面板",
@@ -1251,7 +1277,11 @@
         "changeBoard": "更改面板",
         "loading": "加载中...",
         "clearSearch": "清除检索",
-        "downloadBoard": "下载面板"
+        "downloadBoard": "下载面板",
+        "deleteBoardOnly": "仅删除面板",
+        "deleteBoard": "删除面板",
+        "deleteBoardAndImages": "删除面板和图像",
+        "deletedBoardsCannotbeRestored": "已删除的面板无法被恢复"
     },
     "embedding": {
         "noMatchingEmbedding": "不匹配的 Embedding",
@@ -1270,7 +1300,8 @@
         "combinatorial": "组合生成",
         "maxPrompts": "最大提示词数",
         "dynamicPrompts": "动态提示词",
-        "promptsWithCount_other": "{{count}} 个提示词"
+        "promptsWithCount_other": "{{count}} 个提示词",
+        "promptsPreview": "提示词预览"
     },
     "popovers": {
         "compositingMaskAdjustments": {
@@ -1501,5 +1532,18 @@
         "clear": "清除",
         "maxCacheSize": "最大缓存大小",
         "cacheSize": "缓存大小"
+    },
+    "hrf": {
+        "enableHrf": "启用高分辨率修复",
+        "upscaleMethod": "放大方法",
+        "enableHrfTooltip": "使用较低的分辨率进行初始生成，放大到基础分辨率后进行图生图。",
+        "metadata": {
+            "strength": "高分辨率修复强度",
+            "enabled": "高分辨率修复已启用",
+            "method": "高分辨率修复方法"
+        },
+        "hrf": "高分辨率修复",
+        "hrfStrength": "高分辨率修复强度",
+        "strengthTooltip": "值越低细节越少，但可以减少部分潜在的伪影。"
     }
 }

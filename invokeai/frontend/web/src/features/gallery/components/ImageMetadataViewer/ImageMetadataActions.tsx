@@ -4,15 +4,15 @@ import {
   LoRAMetadataItem,
   IPAdapterMetadataItem,
   T2IAdapterMetadataItem,
-} from 'features/nodes/types/types';
+} from 'features/nodes/types/metadata';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  isValidControlNetModel,
-  isValidLoRAModel,
-  isValidT2IAdapterModel,
-} from '../../../parameters/types/parameterSchemas';
+  isParameterControlNetModel,
+  isParameterLoRAModel,
+  isParameterT2IAdapterModel,
+} from 'features/parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
@@ -132,7 +132,7 @@ const ImageMetadataActions = (props: Props) => {
   const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
     return metadata?.controlnets
       ? metadata.controlnets.filter((controlnet) =>
-          isValidControlNetModel(controlnet.control_model)
+          isParameterControlNetModel(controlnet.control_model)
         )
       : [];
   }, [metadata?.controlnets]);
@@ -140,7 +140,7 @@ const ImageMetadataActions = (props: Props) => {
   const validIPAdapters: IPAdapterMetadataItem[] = useMemo(() => {
     return metadata?.ipAdapters
       ? metadata.ipAdapters.filter((ipAdapter) =>
-          isValidControlNetModel(ipAdapter.ip_adapter_model)
+          isParameterControlNetModel(ipAdapter.ip_adapter_model)
         )
       : [];
   }, [metadata?.ipAdapters]);
@@ -148,7 +148,7 @@ const ImageMetadataActions = (props: Props) => {
   const validT2IAdapters: T2IAdapterMetadataItem[] = useMemo(() => {
     return metadata?.t2iAdapters
       ? metadata.t2iAdapters.filter((t2iAdapter) =>
-          isValidT2IAdapterModel(t2iAdapter.t2i_adapter_model)
+          isParameterT2IAdapterModel(t2iAdapter.t2i_adapter_model)
         )
       : [];
   }, [metadata?.t2iAdapters]);
@@ -273,7 +273,7 @@ const ImageMetadataActions = (props: Props) => {
       )}
       {metadata.loras &&
         metadata.loras.map((lora, index) => {
-          if (isValidLoRAModel(lora.lora)) {
+          if (isParameterLoRAModel(lora.lora)) {
             return (
               <ImageMetadataItem
                 key={index}

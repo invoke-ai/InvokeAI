@@ -56,7 +56,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   );
 
   const mayExpose = useMemo(
-    () => ['any', 'direct'].includes(input ?? '__UNKNOWN_INPUT__'),
+    () => input && ['any', 'direct'].includes(input),
     [input]
   );
 
@@ -79,7 +79,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
           icon={<FaPlus />}
           onClick={handleExposeField}
         >
-          Add to Linear View
+          {t('nodes.addLinearView')}
         </MenuItem>
       );
     }
@@ -90,7 +90,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
           icon={<FaMinus />}
           onClick={handleUnexposeField}
         >
-          Remove from Linear View
+          {t('nodes.removeLinearView')}
         </MenuItem>
       );
     }
@@ -102,6 +102,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     isExposed,
     mayExpose,
     nodeId,
+    t,
   ]);
 
   const renderMenuFunc = useCallback(

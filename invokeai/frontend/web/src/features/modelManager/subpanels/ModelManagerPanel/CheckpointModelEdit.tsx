@@ -15,9 +15,9 @@ import {
   useUpdateMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { CheckpointModelConfig } from 'services/api/types';
-import BaseModelSelect from '../shared/BaseModelSelect';
-import CheckpointConfigsSelect from '../shared/CheckpointConfigsSelect';
-import ModelVariantSelect from '../shared/ModelVariantSelect';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/CheckpointConfigsSelect';
+import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import ModelConvert from './ModelConvert';
 
 type CheckpointModelEditProps = {
@@ -114,7 +114,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
             {model.model_name}
           </Text>
           <Text fontSize="sm" color="base.400">
-            {MODEL_TYPE_MAP[model.base_model]} Model
+            {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
           </Text>
         </Flex>
         {![''].includes(model.base_model) ? (
@@ -128,7 +128,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               _dark: { bg: 'error.400' },
             }}
           >
-            Conversion Not Supported
+            {t('modelManager.conversionNotSupported')}
           </Badge>
         )}
       </Flex>

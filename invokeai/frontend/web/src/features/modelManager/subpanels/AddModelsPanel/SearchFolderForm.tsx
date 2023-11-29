@@ -11,7 +11,7 @@ import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 import {
   setAdvancedAddScanModel,
   setSearchFolder,
-} from '../../store/modelManagerSlice';
+} from 'features/modelManager/store/modelManagerSlice';
 
 type SearchFolderForm = {
   folder: string;
@@ -76,7 +76,7 @@ function SearchFolderForm() {
               _dark: { color: 'base.300' },
             }}
           >
-            Folder
+            {t('common.folder')}
           </Text>
           {!searchFolder ? (
             <IAIInput

@@ -12,8 +12,8 @@ import NormalBaeProcessor from './processors/NormalBaeProcessor';
 import OpenposeProcessor from './processors/OpenposeProcessor';
 import PidiProcessor from './processors/PidiProcessor';
 import ZoeDepthProcessor from './processors/ZoeDepthProcessor';
-import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
-import { useControlAdapterProcessorNode } from '../hooks/useControlAdapterProcessorNode';
+import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterProcessorNode } from 'features/controlAdapters/hooks/useControlAdapterProcessorNode';
 
 export type Props = {
   id: string;

@@ -6,7 +6,10 @@ import {
   useGetQueueStatusQuery,
   usePruneQueueMutation,
 } from 'services/api/endpoints/queue';
-import { listCursorChanged, listPriorityChanged } from '../store/queueSlice';
+import {
+  listCursorChanged,
+  listPriorityChanged,
+} from 'features/queue/store/queueSlice';
 
 export const usePruneQueue = () => {
   const dispatch = useAppDispatch();

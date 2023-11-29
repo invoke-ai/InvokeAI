@@ -53,6 +53,7 @@ class ModelProbe(object):
         "StableDiffusionXLPipeline": ModelType.Main,
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
+        "LatentConsistencyModelPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "AutoencoderTiny": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
@@ -224,7 +225,7 @@ class ModelProbe(object):
         with SilenceWarnings():
             if model_path.suffix.endswith((".ckpt", ".pt", ".bin")):
                 cls._scan_model(model_path, model_path)
-                return torch.load(model_path)
+                return torch.load(model_path, map_location="cpu")
             else:
                 return safetensors.torch.load_file(model_path)
 

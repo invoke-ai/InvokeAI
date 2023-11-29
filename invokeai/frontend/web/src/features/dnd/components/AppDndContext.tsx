@@ -11,9 +11,13 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PropsWithChildren, memo, useCallback, useState } from 'react';
-import { useScaledModifer } from '../hooks/useScaledCenteredModifer';
-import { DragEndEvent, DragStartEvent, TypesafeDraggableData } from '../types';
-import { customPointerWithin } from '../util/customPointerWithin';
+import { useScaledModifer } from 'features/dnd/hooks/useScaledCenteredModifer';
+import {
+  DragEndEvent,
+  DragStartEvent,
+  TypesafeDraggableData,
+} from 'features/dnd/types';
+import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
 import { DndContextTypesafe } from './DndContextTypesafe';
 import DragPreview from './DragPreview';
 

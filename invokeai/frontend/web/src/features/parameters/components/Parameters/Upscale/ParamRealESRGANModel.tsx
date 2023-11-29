@@ -7,6 +7,7 @@ import {
   ESRGANModelName,
   esrganModelNameChanged,
 } from 'features/parameters/store/postprocessingSlice';
+import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 
 export const ESRGAN_MODEL_NAMES: SelectItem[] = [
@@ -37,6 +38,8 @@ export const ESRGAN_MODEL_NAMES: SelectItem[] = [
 ];
 
 export default function ParamESRGANModel() {
+  const { t } = useTranslation();
+
   const esrganModelName = useAppSelector(
     (state: RootState) => state.postprocessing.esrganModelName
   );
@@ -50,7 +53,7 @@ export default function ParamESRGANModel() {
 
   return (
     <IAIMantineSelect
-      label="ESRGAN Model"
+      label={t('models.esrganModel')}
       value={esrganModelName}
       itemComponent={IAIMantineSelectItemWithTooltip}
       onChange={handleChange}

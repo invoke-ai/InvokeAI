@@ -14,7 +14,6 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
@@ -395,7 +394,6 @@ class VaeLoaderInvocation(BaseInvocation):
     vae_model: VAEModelField = InputField(
         description=FieldDescriptions.vae_model,
         input=Input.Direct,
-        ui_type=UIType.VaeModel,
         title="VAE",
     )
 

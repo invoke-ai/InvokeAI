@@ -8,9 +8,9 @@ import { makeToast } from 'features/system/util/makeToast';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import { DiffusersModelConfig } from 'services/api/types';
-import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
-import BaseModelSelect from '../shared/BaseModelSelect';
-import ModelVariantSelect from '../shared/ModelVariantSelect';
+import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import { getModelName } from './util';
 import { FocusEventHandler, useCallback } from 'react';
 

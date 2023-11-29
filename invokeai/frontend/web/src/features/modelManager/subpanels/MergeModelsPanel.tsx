@@ -227,7 +227,7 @@ export default function MergeModelsPanel() {
 
       <Flex columnGap={4}>
         <IAIMantineSelect
-          label="Model Type"
+          label={t('modelManager.modelType')}
           w="100%"
           data={baseModelTypeSelectData}
           value={baseModel}

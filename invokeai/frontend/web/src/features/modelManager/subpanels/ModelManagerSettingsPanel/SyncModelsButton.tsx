@@ -54,7 +54,7 @@ export default function SyncModelsButton(props: SyncModelsButtonProps) {
       minW="max-content"
       {...rest}
     >
-      Sync Models
+      {t('modelManager.syncModels')}
     </IAIButton>
   ) : (
     <IAIIconButton

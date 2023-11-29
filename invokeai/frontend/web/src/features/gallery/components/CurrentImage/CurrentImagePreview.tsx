@@ -17,8 +17,8 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import ImageMetadataViewer from '../ImageMetadataViewer/ImageMetadataViewer';
-import NextPrevImageButtons from '../NextPrevImageButtons';
+import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
+import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useTranslation } from 'react-i18next';
 
 export const imagesSelector = createSelector(
@@ -170,7 +170,10 @@ const CurrentImagePreview = () => {
           useThumbailFallback
           dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={
-            <IAINoContentFallback icon={FaImage} label="No image selected" />
+            <IAINoContentFallback
+              icon={FaImage}
+              label={t('gallery.noImageSelected')}
+            />
           }
           dataTestId="image-preview"
         />

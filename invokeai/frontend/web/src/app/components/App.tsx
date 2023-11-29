@@ -1,11 +1,13 @@
 import { Flex, Grid } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
+import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
+import { useClearStorage } from 'common/hooks/useClearStorage';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import SiteHeader from 'features/system/components/SiteHeader';
@@ -20,7 +22,6 @@ import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
-import { useClearStorage } from 'common/hooks/useClearStorage';
 
 const DEFAULT_CONFIG = {};
 
@@ -34,10 +35,12 @@ interface Props {
 
 const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   const language = useAppSelector(languageSelector);
-
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
   const clearStorage = useClearStorage();
+
+  // singleton!
+  useSocketIO();
 
   const handleReset = useCallback(() => {
     clearStorage();

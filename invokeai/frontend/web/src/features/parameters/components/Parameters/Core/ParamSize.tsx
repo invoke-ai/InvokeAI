@@ -14,7 +14,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaLock } from 'react-icons/fa';
 import { MdOutlineSwapVert } from 'react-icons/md';
-import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import ParamAspectRatio, { mappedAspectRatios } from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';

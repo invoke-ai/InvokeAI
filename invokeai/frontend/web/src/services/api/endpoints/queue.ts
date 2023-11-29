@@ -4,11 +4,11 @@ import {
   ThunkDispatch,
   createEntityAdapter,
 } from '@reduxjs/toolkit';
-import { $queueId } from 'features/queue/store/queueNanoStore';
+import { $queueId } from 'app/store/nanostores/queueId';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
 import { ApiTagDescription, api } from '..';
-import { components, paths } from '../schema';
+import { components, paths } from 'services/api/schema';
 
 const getListQueueItemsUrl = (
   queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']

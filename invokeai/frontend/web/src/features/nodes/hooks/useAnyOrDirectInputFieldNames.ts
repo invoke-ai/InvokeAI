@@ -2,14 +2,11 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { map } from 'lodash-es';
+import { keys, map } from 'lodash-es';
 import { useMemo } from 'react';
-import { isInvocationNode } from '../types/types';
-import {
-  POLYMORPHIC_TYPES,
-  TYPES_WITH_INPUT_COMPONENTS,
-} from '../types/constants';
-import { getSortedFilteredFieldNames } from '../util/getSortedFilteredFieldNames';
+import { isInvocationNode } from 'features/nodes/types/invocation';
+import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
+import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
@@ -28,8 +25,8 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
           const fields = map(nodeTemplate.inputs).filter(
             (field) =>
               (['any', 'direct'].includes(field.input) ||
-                POLYMORPHIC_TYPES.includes(field.type)) &&
-              TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
+                field.type.isCollectionOrScalar) &&
+              keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
           );
           return getSortedFilteredFieldNames(fields);
         },

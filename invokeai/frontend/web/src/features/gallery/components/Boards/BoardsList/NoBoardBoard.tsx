@@ -13,12 +13,13 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import AutoAddIcon from '../AutoAddIcon';
-import BoardContextMenu from '../BoardContextMenu';
+import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
 } from 'services/api/endpoints/boards';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   isSelected: boolean;
@@ -71,7 +72,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }),
     []
   );
-
+  const { t } = useTranslation();
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
       <Flex
@@ -161,7 +162,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 />
                 <IAIDroppable
                   data={droppableData}
-                  dropLabel={<Text fontSize="md">Move</Text>}
+                  dropLabel={
+                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                  }
                 />
               </Flex>
             </Tooltip>
