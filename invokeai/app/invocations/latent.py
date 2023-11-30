@@ -215,7 +215,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.4.0",
+    version="1.5.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -272,6 +272,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         default=None,
         input=Input.Connection,
         ui_order=7,
+    )
+    cfg_rescale_multiplier: float = InputField(
+        default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
     )
     latents: Optional[LatentsField] = InputField(
         default=None,
@@ -332,6 +335,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             unconditioned_embeddings=uc,
             text_embeddings=c,
             guidance_scale=self.cfg_scale,
+            guidance_rescale_multiplier=self.cfg_rescale_multiplier,
             extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,  # threshold,

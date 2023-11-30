@@ -25,6 +25,7 @@ export type Feature =
   | 'lora'
   | 'noiseUseCPU'
   | 'paramCFGScale'
+  | 'paramCFGRescaleMultiplier'
   | 'paramDenoisingStrength'
   | 'paramIterations'
   | 'paramModel'
