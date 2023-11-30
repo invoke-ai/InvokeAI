@@ -94,7 +94,7 @@ export const createStore = (uniqueStoreKey?: string) =>
             serialize,
             unserialize,
             prefix: uniqueStoreKey
-              ? `${STORAGE_PREFIX}-${uniqueStoreKey}-`
+              ? `${STORAGE_PREFIX}${uniqueStoreKey}-`
               : STORAGE_PREFIX,
           })
         )
@@ -133,8 +133,11 @@ export const createStore = (uniqueStoreKey?: string) =>
     },
   });
 
-export type RootState = ReturnType<typeof rootReducer>;
+export type AppGetState = ReturnType<
+  ReturnType<typeof createStore>['getState']
+>;
+export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
-export type AppDispatch = ReturnType<typeof configureStore>['dispatch'];
+export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
 export const stateSelector = (state: RootState) => state;
