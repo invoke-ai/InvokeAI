@@ -13,6 +13,7 @@ import {
   NumberInputStepperProps,
   Tooltip,
   TooltipProps,
+  forwardRef,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPastePropagation } from 'common/util/stopPastePropagation';
@@ -50,7 +51,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
 /**
  * Customized Chakra FormControl + NumberInput multi-part component.
  */
-const IAINumberInput = (props: Props) => {
+const IAINumberInput = forwardRef((props: Props, ref) => {
   const {
     label,
     isDisabled = false,
@@ -97,28 +98,34 @@ const IAINumberInput = (props: Props) => {
     }
   }, [value, valueAsString]);
 
-  const handleOnChange = (v: string) => {
-    setValueAsString(v);
-    // This allows negatives and decimals e.g. '-123', `.5`, `-0.2`, etc.
-    if (!v.match(numberStringRegex)) {
-      // Cast the value to number. Floor it if it should be an integer.
-      onChange(isInteger ? Math.floor(Number(v)) : Number(v));
-    }
-  };
+  const handleOnChange = useCallback(
+    (v: string) => {
+      setValueAsString(v);
+      // This allows negatives and decimals e.g. '-123', `.5`, `-0.2`, etc.
+      if (!v.match(numberStringRegex)) {
+        // Cast the value to number. Floor it if it should be an integer.
+        onChange(isInteger ? Math.floor(Number(v)) : Number(v));
+      }
+    },
+    [isInteger, onChange]
+  );
 
   /**
    * Clicking the steppers allows the value to go outside bounds; we need to
    * clamp it on blur and floor it if needed.
    */
-  const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
-    const clamped = clamp(
-      isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
-      min,
-      max
-    );
-    setValueAsString(String(clamped));
-    onChange(clamped);
-  };
+  const handleBlur = useCallback(
+    (e: FocusEvent<HTMLInputElement>) => {
+      const clamped = clamp(
+        isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
+        min,
+        max
+      );
+      setValueAsString(String(clamped));
+      onChange(clamped);
+    },
+    [isInteger, max, min, onChange]
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -141,6 +148,7 @@ const IAINumberInput = (props: Props) => {
   return (
     <Tooltip {...tooltipProps}>
       <FormControl
+        ref={ref}
         isDisabled={isDisabled}
         isInvalid={isInvalid}
         {...formControlProps}
@@ -172,6 +180,8 @@ const IAINumberInput = (props: Props) => {
       </FormControl>
     </Tooltip>
   );
-};
+});
+
+IAINumberInput.displayName = 'IAINumberInput';
 
 export default memo(IAINumberInput);

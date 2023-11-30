@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
+import { FormControl, FormLabel, Tooltip, forwardRef } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
@@ -12,12 +12,12 @@ export type IAISelectDataType = {
 };
 
 type IAISelectProps = Omit<SelectProps, 'label'> & {
-  tooltip?: string;
+  tooltip?: string | null;
   label?: string;
   inputRef?: RefObject<HTMLInputElement>;
 };
 
-const IAIMantineSearchableSelect = (props: IAISelectProps) => {
+const IAIMantineSearchableSelect = forwardRef((props: IAISelectProps, ref) => {
   const {
     searchable = true,
     tooltip,
@@ -53,7 +53,9 @@ const IAIMantineSearchableSelect = (props: IAISelectProps) => {
   // wrap onChange to clear search value on select
   const handleChange = useCallback(
     (v: string | null) => {
-      setSearchValue('');
+      // cannot figure out why we were doing this, but it was causing an issue where if you
+      // select the currently-selected item, it reset the search value to empty
+      // setSearchValue('');
 
       if (!onChange) {
         return;
@@ -68,28 +70,31 @@ const IAIMantineSearchableSelect = (props: IAISelectProps) => {
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
-      <Select
-        ref={inputRef}
-        label={
-          label ? (
-            <FormControl isDisabled={disabled}>
-              <FormLabel>{label}</FormLabel>
-            </FormControl>
-          ) : undefined
-        }
-        disabled={disabled}
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleKeyUp}
-        searchable={searchable}
-        maxDropdownHeight={300}
-        styles={styles}
-        {...rest}
-      />
+      <FormControl
+        ref={ref}
+        isDisabled={disabled}
+        position="static"
+        data-testid={`select-${label || props.placeholder}`}
+      >
+        {label && <FormLabel>{label}</FormLabel>}
+        <Select
+          ref={inputRef}
+          disabled={disabled}
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
+          searchable={searchable}
+          maxDropdownHeight={300}
+          styles={styles}
+          {...rest}
+        />
+      </FormControl>
     </Tooltip>
   );
-};
+});
+
+IAIMantineSearchableSelect.displayName = 'IAIMantineSearchableSelect';
 
 export default memo(IAIMantineSearchableSelect);

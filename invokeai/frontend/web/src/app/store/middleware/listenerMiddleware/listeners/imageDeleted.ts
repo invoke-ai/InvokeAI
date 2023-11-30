@@ -1,79 +1,141 @@
 import { logger } from 'app/logging/logger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlAdapterImageChanged,
+  controlAdapterProcessedImageChanged,
+  selectControlAdapterAll,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
+import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { imageDeletionConfirmed } from 'features/imageDeletion/store/actions';
-import { isModalOpenChanged } from 'features/imageDeletion/store/imageDeletionSlice';
-import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { isImageFieldInputInstance } from 'features/nodes/types/field';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { clamp } from 'lodash-es';
+import { clamp, forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
+import { imagesAdapter } from 'services/api/util';
 import { startAppListening } from '..';
 
-/**
- * Called when the user requests an image deletion
- */
-export const addRequestedImageDeletionListener = () => {
+export const addRequestedSingleImageDeletionListener = () => {
   startAppListening({
     actionCreator: imageDeletionConfirmed,
     effect: async (action, { dispatch, getState, condition }) => {
-      const { imageDTO, imageUsage } = action.payload;
+      const { imageDTOs, imagesUsage } = action.payload;
+
+      if (imageDTOs.length !== 1 || imagesUsage.length !== 1) {
+        // handle multiples in separate listener
+        return;
+      }
+
+      const imageDTO = imageDTOs[0];
+      const imageUsage = imagesUsage[0];
+
+      if (!imageDTO || !imageUsage) {
+        // satisfy noUncheckedIndexedAccess
+        return;
+      }
 
       dispatch(isModalOpenChanged(false));
 
-      const { image_name } = imageDTO;
-
       const state = getState();
       const lastSelectedImage =
-        state.gallery.selection[state.gallery.selection.length - 1];
+        state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
 
-      if (lastSelectedImage === image_name) {
+      if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
+        const { image_name } = imageDTO;
+
         const baseQueryArgs = selectListImagesBaseQueryArgs(state);
         const { data } =
           imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
-        const ids = data?.ids ?? [];
+        const cachedImageDTOs = data
+          ? imagesAdapter.getSelectors().selectAll(data)
+          : [];
 
-        const deletedImageIndex = ids.findIndex(
-          (result) => result.toString() === image_name
+        const deletedImageIndex = cachedImageDTOs.findIndex(
+          (i) => i.image_name === image_name
         );
 
-        const filteredIds = ids.filter((id) => id.toString() !== image_name);
+        const filteredImageDTOs = cachedImageDTOs.filter(
+          (i) => i.image_name !== image_name
+        );
 
         const newSelectedImageIndex = clamp(
           deletedImageIndex,
           0,
-          filteredIds.length - 1
+          filteredImageDTOs.length - 1
         );
 
-        const newSelectedImageId = filteredIds[newSelectedImageIndex];
+        const newSelectedImageDTO = filteredImageDTOs[newSelectedImageIndex];
 
-        if (newSelectedImageId) {
-          dispatch(imageSelected(newSelectedImageId as string));
+        if (newSelectedImageDTO) {
+          dispatch(imageSelected(newSelectedImageDTO));
         } else {
           dispatch(imageSelected(null));
         }
       }
 
       // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
-
       if (imageUsage.isCanvasImage) {
         dispatch(resetCanvas());
       }
 
-      if (imageUsage.isControlNetImage) {
-        dispatch(controlNetReset());
-      }
+      imageDTOs.forEach((imageDTO) => {
+        // reset init image if we deleted it
+        if (
+          getState().generation.initialImage?.imageName === imageDTO.image_name
+        ) {
+          dispatch(clearInitialImage());
+        }
 
-      if (imageUsage.isInitialImage) {
-        dispatch(clearInitialImage());
-      }
+        // reset control adapters that use the deleted images
+        forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
+          if (
+            ca.controlImage === imageDTO.image_name ||
+            (isControlNetOrT2IAdapter(ca) &&
+              ca.processedControlImage === imageDTO.image_name)
+          ) {
+            dispatch(
+              controlAdapterImageChanged({
+                id: ca.id,
+                controlImage: null,
+              })
+            );
+            dispatch(
+              controlAdapterProcessedImageChanged({
+                id: ca.id,
+                processedControlImage: null,
+              })
+            );
+          }
+        });
 
-      if (imageUsage.isNodesImage) {
-        dispatch(nodeEditorReset());
-      }
+        // reset nodes that use the deleted images
+        getState().nodes.nodes.forEach((node) => {
+          if (!isInvocationNode(node)) {
+            return;
+          }
+
+          forEach(node.data.inputs, (input) => {
+            if (
+              isImageFieldInputInstance(input) &&
+              input.value?.image_name === imageDTO.image_name
+            ) {
+              dispatch(
+                fieldImageValueChanged({
+                  nodeId: node.data.id,
+                  fieldName: input.name,
+                  value: undefined,
+                })
+              );
+            }
+          });
+        });
+      });
 
       // Delete from server
       const { requestId } = dispatch(
@@ -90,8 +152,112 @@ export const addRequestedImageDeletionListener = () => {
 
       if (wasImageDeleted) {
         dispatch(
-          api.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id }])
+          api.util.invalidateTags([
+            { type: 'Board', id: imageDTO.board_id ?? 'none' },
+          ])
         );
+      }
+    },
+  });
+};
+
+/**
+ * Called when the user requests an image deletion
+ */
+export const addRequestedMultipleImageDeletionListener = () => {
+  startAppListening({
+    actionCreator: imageDeletionConfirmed,
+    effect: async (action, { dispatch, getState }) => {
+      const { imageDTOs, imagesUsage } = action.payload;
+
+      if (imageDTOs.length <= 1 || imagesUsage.length <= 1) {
+        // handle singles in separate listener
+        return;
+      }
+
+      try {
+        // Delete from server
+        await dispatch(
+          imagesApi.endpoints.deleteImages.initiate({ imageDTOs })
+        ).unwrap();
+        const state = getState();
+        const baseQueryArgs = selectListImagesBaseQueryArgs(state);
+        const { data } =
+          imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+
+        const newSelectedImageDTO = data
+          ? imagesAdapter.getSelectors().selectAll(data)[0]
+          : undefined;
+
+        if (newSelectedImageDTO) {
+          dispatch(imageSelected(newSelectedImageDTO));
+        } else {
+          dispatch(imageSelected(null));
+        }
+
+        dispatch(isModalOpenChanged(false));
+
+        // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
+
+        if (imagesUsage.some((i) => i.isCanvasImage)) {
+          dispatch(resetCanvas());
+        }
+
+        imageDTOs.forEach((imageDTO) => {
+          // reset init image if we deleted it
+          if (
+            getState().generation.initialImage?.imageName ===
+            imageDTO.image_name
+          ) {
+            dispatch(clearInitialImage());
+          }
+
+          // reset control adapters that use the deleted images
+          forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
+            if (
+              ca.controlImage === imageDTO.image_name ||
+              (isControlNetOrT2IAdapter(ca) &&
+                ca.processedControlImage === imageDTO.image_name)
+            ) {
+              dispatch(
+                controlAdapterImageChanged({
+                  id: ca.id,
+                  controlImage: null,
+                })
+              );
+              dispatch(
+                controlAdapterProcessedImageChanged({
+                  id: ca.id,
+                  processedControlImage: null,
+                })
+              );
+            }
+          });
+
+          // reset nodes that use the deleted images
+          getState().nodes.nodes.forEach((node) => {
+            if (!isInvocationNode(node)) {
+              return;
+            }
+
+            forEach(node.data.inputs, (input) => {
+              if (
+                isImageFieldInputInstance(input) &&
+                input.value?.image_name === imageDTO.image_name
+              ) {
+                dispatch(
+                  fieldImageValueChanged({
+                    nodeId: node.data.id,
+                    fieldName: input.name,
+                    value: undefined,
+                  })
+                );
+              }
+            });
+          });
+        });
+      } catch {
+        // no-op
       }
     },
   });

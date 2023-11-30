@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-import sys
 import json
+import sys
+
 from invokeai.backend.image_util import retrieve_metadata
 
 if len(sys.argv) < 2:
@@ -13,10 +14,10 @@ filenames = sys.argv[1:]
 for f in filenames:
     try:
         metadata = retrieve_metadata(f)
-        print(f'{f}:\n',json.dumps(metadata['sd-metadata'], indent=4))
+        print(f"{f}:\n", json.dumps(metadata["sd-metadata"], indent=4))
     except FileNotFoundError:
-        sys.stderr.write(f'{f} not found\n')
+        sys.stderr.write(f"{f} not found\n")
         continue
     except PermissionError:
-        sys.stderr.write(f'{f} could not be opened due to inadequate permissions\n')
+        sys.stderr.write(f"{f} could not be opened due to inadequate permissions\n")
         continue

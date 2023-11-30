@@ -2,8 +2,6 @@ name: Lint frontend
 
 on:
   pull_request:
-    paths:
-      - 'invokeai/frontend/web/**'
     types:
       - 'ready_for_review'
       - 'opened'
@@ -11,8 +9,6 @@ on:
   push:
     branches:
       - 'main'
-    paths:
-      - 'invokeai/frontend/web/**'
   merge_group:
   workflow_dispatch:
 

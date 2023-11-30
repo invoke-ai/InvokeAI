@@ -3,22 +3,24 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
-import { useCallback } from 'react';
-import { combinatorialToggled } from '../store/dynamicPromptsSlice';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { combinatorialToggled } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { combinatorial, isEnabled } = state.dynamicPrompts;
+    const { combinatorial } = state.dynamicPrompts;
 
-    return { combinatorial, isDisabled: !isEnabled };
+    return { combinatorial };
   },
   defaultSelectorOptions
 );
 
 const ParamDynamicPromptsCombinatorial = () => {
-  const { combinatorial, isDisabled } = useAppSelector(selector);
+  const { combinatorial } = useAppSelector(selector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleChange = useCallback(() => {
     dispatch(combinatorialToggled());
@@ -26,12 +28,11 @@ const ParamDynamicPromptsCombinatorial = () => {
 
   return (
     <IAISwitch
-      isDisabled={isDisabled}
-      label="Combinatorial Generation"
+      label={t('dynamicPrompts.combinatorial')}
       isChecked={combinatorial}
       onChange={handleChange}
     />
   );
 };
 
-export default ParamDynamicPromptsCombinatorial;
+export default memo(ParamDynamicPromptsCombinatorial);

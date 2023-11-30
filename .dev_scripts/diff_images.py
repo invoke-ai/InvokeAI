@@ -20,13 +20,13 @@ def calc_images_mean_L1(image1_path, image2_path):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('image1_path')
-    parser.add_argument('image2_path')
+    parser.add_argument("image1_path")
+    parser.add_argument("image2_path")
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     mean_L1 = calc_images_mean_L1(args.image1_path, args.image2_path)
     print(mean_L1)

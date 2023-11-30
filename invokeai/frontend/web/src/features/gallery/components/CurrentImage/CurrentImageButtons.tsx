@@ -4,31 +4,30 @@ import { isEqual } from 'lodash-es';
 import {
   ButtonGroup,
   Flex,
-  FlexProps,
   Menu,
   MenuButton,
   MenuList,
 } from '@chakra-ui/react';
-// import { runESRGAN, runFacetool } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
-
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { stateSelector } from 'app/store/store';
-import { DeleteImageButton } from 'features/imageDeletion/components/DeleteImageButton';
-import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { workflowLoadRequested } from 'features/nodes/store/actions';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -36,23 +35,21 @@ import {
   FaCode,
   FaHourglassHalf,
   FaQuoteRight,
+  FaRulerVertical,
   FaSeedling,
-  FaShareAlt,
 } from 'react-icons/fa';
-import {
-  useGetImageDTOQuery,
-  useGetImageMetadataQuery,
-} from 'services/api/endpoints/images';
+import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { menuListMotionProps } from 'theme/components/menu';
-import { useDebounce } from 'use-debounce';
-import { sentImageToImg2Img } from '../../store/actions';
-import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
+import { sentImageToImg2Img } from 'features/gallery/store/actions';
+import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ gallery, system, ui }, activeTabName) => {
-    const { isProcessing, isConnected, shouldConfirmOnDelete, progressImage } =
-      system;
+  ({ gallery, system, ui, config }, activeTabName) => {
+    const { isConnected, shouldConfirmOnDelete, denoiseProgress } = system;
 
     const {
       shouldShowImageDetails,
@@ -60,19 +57,21 @@ const currentImageButtonsSelector = createSelector(
       shouldShowProgressInViewer,
     } = ui;
 
+    const { shouldFetchMetadataFromApi } = config;
+
     const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
 
     return {
-      canDeleteImage: isConnected && !isProcessing,
       shouldConfirmOnDelete,
-      isProcessing,
       isConnected,
-      shouldDisableToolbarButtons: Boolean(progressImage) || !lastSelectedImage,
+      shouldDisableToolbarButtons:
+        Boolean(denoiseProgress?.progress_image) || !lastSelectedImage,
       shouldShowImageDetails,
       activeTabName,
       shouldHidePreview,
       shouldShowProgressInViewer,
       lastSelectedImage,
+      shouldFetchMetadataFromApi,
     };
   },
   {
@@ -82,12 +81,9 @@ const currentImageButtonsSelector = createSelector(
   }
 );
 
-type CurrentImageButtonsProps = FlexProps;
-
-const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
+const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const {
-    isProcessing,
     isConnected,
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
@@ -96,53 +92,72 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   } = useAppSelector(currentImageButtonsSelector);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
-
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
-  const { recallBothPrompts, recallSeed, recallAllParameters } =
-    useRecallParameters();
-
-  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
-    lastSelectedImage,
-    500
-  );
+  const {
+    recallBothPrompts,
+    recallSeed,
+    recallWidthAndHeight,
+    recallAllParameters,
+  } = useRecallParameters();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(
-    lastSelectedImage ?? skipToken
+    lastSelectedImage?.image_name ?? skipToken
   );
 
-  const { currentData: metadataData } = useGetImageMetadataQuery(
-    debounceState.isPending()
-      ? skipToken
-      : debouncedMetadataQueryArg ?? skipToken
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
+    lastSelectedImage?.image_name
   );
 
-  const metadata = metadataData?.metadata;
+  const { workflow, isLoading: isLoadingWorkflow } = useDebouncedWorkflow(
+    lastSelectedImage?.workflow_id
+  );
+
+  const handleLoadWorkflow = useCallback(() => {
+    if (!workflow) {
+      return;
+    }
+    dispatch(workflowLoadRequested(workflow));
+  }, [dispatch, workflow]);
+
+  useHotkeys('w', handleLoadWorkflow, [workflow]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
   }, [metadata, recallAllParameters]);
 
-  useHotkeys(
-    'a',
-    () => {
-      handleClickUseAllParameters;
-    },
-    [metadata, recallAllParameters]
-  );
+  useHotkeys('a', handleClickUseAllParameters, [metadata]);
 
   const handleUseSeed = useCallback(() => {
     recallSeed(metadata?.seed);
   }, [metadata?.seed, recallSeed]);
 
-  useHotkeys('s', handleUseSeed, [imageDTO]);
+  useHotkeys('s', handleUseSeed, [metadata]);
 
   const handleUsePrompt = useCallback(() => {
-    recallBothPrompts(metadata?.positive_prompt, metadata?.negative_prompt);
-  }, [metadata?.negative_prompt, metadata?.positive_prompt, recallBothPrompts]);
+    recallBothPrompts(
+      metadata?.positive_prompt,
+      metadata?.negative_prompt,
+      metadata?.positive_style_prompt,
+      metadata?.negative_style_prompt
+    );
+  }, [
+    metadata?.negative_prompt,
+    metadata?.positive_prompt,
+    metadata?.positive_style_prompt,
+    metadata?.negative_style_prompt,
+    recallBothPrompts,
+  ]);
 
-  useHotkeys('p', handleUsePrompt, [imageDTO]);
+  useHotkeys('p', handleUsePrompt, [metadata]);
+
+  const handleUseSize = useCallback(() => {
+    recallWidthAndHeight(metadata?.width, metadata?.height);
+  }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
+
+  useHotkeys('d', handleUseSize, [metadata]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
@@ -155,14 +170,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     if (!imageDTO) {
       return;
     }
-    dispatch(upscaleRequested({ image_name: imageDTO.image_name }));
+    dispatch(upscaleRequested({ imageDTO }));
   }, [dispatch, imageDTO]);
 
   const handleDelete = useCallback(() => {
     if (!imageDTO) {
       return;
     }
-    dispatch(imageToDeleteSelected(imageDTO));
+    dispatch(imagesToDeleteSelected([imageDTO]));
   }, [dispatch, imageDTO]);
 
   useHotkeys(
@@ -173,19 +188,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     {
       enabled: () =>
         Boolean(
-          isUpscalingEnabled &&
-            !shouldDisableToolbarButtons &&
-            isConnected &&
-            !isProcessing
+          isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected
         ),
     },
-    [
-      isUpscalingEnabled,
-      imageDTO,
-      shouldDisableToolbarButtons,
-      isConnected,
-      isProcessing,
-    ]
+    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
   );
 
   const handleClickShowImageDetails = useCallback(
@@ -231,16 +237,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           alignItems: 'center',
           gap: 2,
         }}
-        {...props}
       >
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
-          <Menu>
+          <Menu isLazy>
             <MenuButton
               as={IAIIconButton}
-              aria-label={`${t('parameters.sendTo')}...`}
-              tooltip={`${t('parameters.sendTo')}...`}
+              aria-label={t('parameters.imageActions')}
+              tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
-              icon={<FaShareAlt />}
+              icon={<FaEllipsis />}
             />
             <MenuList motionProps={menuListMotionProps}>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
@@ -250,22 +255,44 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
+            isLoading={isLoadingWorkflow}
+            icon={<FaCircleNodes />}
+            tooltip={`${t('nodes.loadWorkflow')} (W)`}
+            aria-label={`${t('nodes.loadWorkflow')} (W)`}
+            isDisabled={!workflow}
+            onClick={handleLoadWorkflow}
+          />
+          <IAIIconButton
+            isLoading={isLoadingMetadata}
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
             isDisabled={!metadata?.positive_prompt}
             onClick={handleUsePrompt}
           />
-
           <IAIIconButton
+            isLoading={isLoadingMetadata}
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={!metadata?.seed}
+            isDisabled={metadata?.seed === null || metadata?.seed === undefined}
             onClick={handleUseSeed}
           />
-
           <IAIIconButton
+            isLoading={isLoadingMetadata}
+            icon={<FaRulerVertical />}
+            tooltip={`${t('parameters.useSize')} (D)`}
+            aria-label={`${t('parameters.useSize')} (D)`}
+            isDisabled={
+              metadata?.height === null ||
+              metadata?.height === undefined ||
+              metadata?.width === null ||
+              metadata?.width === undefined
+            }
+            onClick={handleUseSize}
+          />
+          <IAIIconButton
+            isLoading={isLoadingMetadata}
             icon={<FaAsterisk />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
@@ -275,15 +302,12 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         {isUpscalingEnabled && (
-          <ButtonGroup
-            isAttached={true}
-            isDisabled={shouldDisableToolbarButtons}
-          >
+          <ButtonGroup isAttached={true} isDisabled={isQueueMutationInProgress}>
             {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
           </ButtonGroup>
         )}
 
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
+        <ButtonGroup isAttached={true}>
           <IAIIconButton
             icon={<FaCode />}
             tooltip={`${t('parameters.info')} (I)`}
@@ -304,14 +328,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         <ButtonGroup isAttached={true}>
-          <DeleteImageButton
-            onClick={handleDelete}
-            isDisabled={shouldDisableToolbarButtons}
-          />
+          <DeleteImageButton onClick={handleDelete} />
         </ButtonGroup>
       </Flex>
     </>
   );
 };
 
-export default CurrentImageButtons;
+export default memo(CurrentImageButtons);

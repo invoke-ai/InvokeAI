@@ -9,7 +9,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { setBoardSearchText } from 'features/gallery/store/boardSlice';
+import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import {
   ChangeEvent,
   KeyboardEvent,
@@ -18,30 +18,32 @@ import {
   useEffect,
   useRef,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
-  ({ boards }) => {
-    const { searchText } = boards;
-    return { searchText };
+  ({ gallery }) => {
+    const { boardSearchText } = gallery;
+    return { boardSearchText };
   },
   defaultSelectorOptions
 );
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();
-  const { searchText } = useAppSelector(selector);
+  const { boardSearchText } = useAppSelector(selector);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const handleBoardSearch = useCallback(
     (searchTerm: string) => {
-      dispatch(setBoardSearchText(searchTerm));
+      dispatch(boardSearchTextChanged(searchTerm));
     },
     [dispatch]
   );
 
   const clearBoardSearch = useCallback(() => {
-    dispatch(setBoardSearchText(''));
+    dispatch(boardSearchTextChanged(''));
   }, [dispatch]);
 
   const handleKeydown = useCallback(
@@ -73,18 +75,19 @@ const BoardsSearch = () => {
     <InputGroup>
       <Input
         ref={inputRef}
-        placeholder="Search Boards..."
-        value={searchText}
+        placeholder={t('boards.searchBoard')}
+        value={boardSearchText}
         onKeyDown={handleKeydown}
         onChange={handleChange}
+        data-testid="board-search-input"
       />
-      {searchText && searchText.length && (
+      {boardSearchText && boardSearchText.length && (
         <InputRightElement>
           <IconButton
             onClick={clearBoardSearch}
             size="xs"
             variant="ghost"
-            aria-label="Clear Search"
+            aria-label={t('boards.clearSearch')}
             opacity={0.5}
             icon={<CloseIcon boxSize={2} />}
           />

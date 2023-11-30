@@ -11,20 +11,20 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { ImageUsage } from 'app/contexts/AddImageToBoardContext';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import ImageUsageMessage from 'features/imageDeletion/components/ImageUsageMessage';
-import { getImageUsage } from 'features/imageDeletion/store/imageDeletionSelectors';
+import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
+import { getImageUsage } from 'features/deleteImageModal/store/selectors';
+import { ImageUsage } from 'features/deleteImageModal/store/types';
 import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
 import {
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
-  useListAllImageNamesForBoardQuery,
-} from 'services/api/endpoints/boards';
+} from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -32,7 +32,7 @@ type Props = {
   setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-const DeleteImageModal = (props: Props) => {
+const DeleteBoardModal = (props: Props) => {
   const { boardToDelete, setBoardToDelete } = props;
   const { t } = useTranslation();
   const canRestoreDeletedImagesFromBin = useAppSelector(
@@ -49,13 +49,10 @@ const DeleteImageModal = (props: Props) => {
         );
 
         const imageUsageSummary: ImageUsage = {
-          isInitialImage: some(allImageUsage, (usage) => usage.isInitialImage),
-          isCanvasImage: some(allImageUsage, (usage) => usage.isCanvasImage),
-          isNodesImage: some(allImageUsage, (usage) => usage.isNodesImage),
-          isControlNetImage: some(
-            allImageUsage,
-            (usage) => usage.isControlNetImage
-          ),
+          isInitialImage: some(allImageUsage, (i) => i.isInitialImage),
+          isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
+          isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+          isControlImage: some(allImageUsage, (i) => i.isControlImage),
         };
         return { imageUsageSummary };
       }),
@@ -118,7 +115,7 @@ const DeleteImageModal = (props: Props) => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            Delete {boardToDelete.board_name}
+            {t('controlnet.delete')} {boardToDelete.board_name}
           </AlertDialogHeader>
 
           <AlertDialogBody>
@@ -135,11 +132,11 @@ const DeleteImageModal = (props: Props) => {
               ) : (
                 <ImageUsageMessage
                   imageUsage={imageUsageSummary}
-                  topMessage="This board contains images used in the following features:"
-                  bottomMessage="Deleting this board and its images will reset any features currently using them."
+                  topMessage={t('boards.topMessage')}
+                  bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>Deleted boards cannot be restored.</Text>
+              <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
               <Text>
                 {canRestoreDeletedImagesFromBin
                   ? t('gallery.deleteImageBin')
@@ -152,21 +149,21 @@ const DeleteImageModal = (props: Props) => {
               sx={{ justifyContent: 'space-between', width: 'full', gap: 2 }}
             >
               <IAIButton ref={cancelRef} onClick={handleClose}>
-                Cancel
+                {t('boards.cancel')}
               </IAIButton>
               <IAIButton
                 colorScheme="warning"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardOnly}
               >
-                Delete Board Only
+                {t('boards.deleteBoardOnly')}
               </IAIButton>
               <IAIButton
                 colorScheme="error"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardAndImages}
               >
-                Delete Board and Images
+                {t('boards.deleteBoardAndImages')}
               </IAIButton>
             </Flex>
           </AlertDialogFooter>
@@ -176,4 +173,4 @@ const DeleteImageModal = (props: Props) => {
   );
 };
 
-export default memo(DeleteImageModal);
+export default memo(DeleteBoardModal);

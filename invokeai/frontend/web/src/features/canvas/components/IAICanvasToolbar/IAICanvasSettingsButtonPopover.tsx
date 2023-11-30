@@ -18,11 +18,11 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { isEqual } from 'lodash-es';
 
-import { ChangeEvent } from 'react';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
-import ClearCanvasHistoryButtonModal from '../ClearCanvasHistoryButtonModal';
+import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],
@@ -86,8 +86,52 @@ const IAICanvasSettingsButtonPopover = () => {
     [shouldSnapToGrid]
   );
 
-  const handleChangeShouldSnapToGrid = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldSnapToGrid(e.target.checked));
+  const handleChangeShouldSnapToGrid = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldSnapToGrid(e.target.checked)),
+    [dispatch]
+  );
+
+  const handleChangeShouldShowIntermediates = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldShowIntermediates(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldShowGrid = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldShowGrid(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldDarkenOutsideBoundingBox = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldAutoSave = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldAutoSave(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldCropToBoundingBoxOnSave = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldRestrictStrokesToBox = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldRestrictStrokesToBox(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldShowCanvasDebugInfo = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldShowCanvasDebugInfo(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldAntialias = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldAntialias(e.target.checked)),
+    [dispatch]
+  );
 
   return (
     <IAIPopover
@@ -104,14 +148,12 @@ const IAICanvasSettingsButtonPopover = () => {
         <IAISimpleCheckbox
           label={t('unifiedCanvas.showIntermediates')}
           isChecked={shouldShowIntermediates}
-          onChange={(e) =>
-            dispatch(setShouldShowIntermediates(e.target.checked))
-          }
+          onChange={handleChangeShouldShowIntermediates}
         />
         <IAISimpleCheckbox
           label={t('unifiedCanvas.showGrid')}
           isChecked={shouldShowGrid}
-          onChange={(e) => dispatch(setShouldShowGrid(e.target.checked))}
+          onChange={handleChangeShouldShowGrid}
         />
         <IAISimpleCheckbox
           label={t('unifiedCanvas.snapToGrid')}
@@ -121,41 +163,33 @@ const IAICanvasSettingsButtonPopover = () => {
         <IAISimpleCheckbox
           label={t('unifiedCanvas.darkenOutsideSelection')}
           isChecked={shouldDarkenOutsideBoundingBox}
-          onChange={(e) =>
-            dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked))
-          }
+          onChange={handleChangeShouldDarkenOutsideBoundingBox}
         />
         <IAISimpleCheckbox
           label={t('unifiedCanvas.autoSaveToGallery')}
           isChecked={shouldAutoSave}
-          onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
+          onChange={handleChangeShouldAutoSave}
         />
         <IAISimpleCheckbox
           label={t('unifiedCanvas.saveBoxRegionOnly')}
           isChecked={shouldCropToBoundingBoxOnSave}
-          onChange={(e) =>
-            dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
-          }
+          onChange={handleChangeShouldCropToBoundingBoxOnSave}
         />
         <IAISimpleCheckbox
           label={t('unifiedCanvas.limitStrokesToBox')}
           isChecked={shouldRestrictStrokesToBox}
-          onChange={(e) =>
-            dispatch(setShouldRestrictStrokesToBox(e.target.checked))
-          }
+          onChange={handleChangeShouldRestrictStrokesToBox}
         />
         <IAISimpleCheckbox
           label={t('unifiedCanvas.showCanvasDebugInfo')}
           isChecked={shouldShowCanvasDebugInfo}
-          onChange={(e) =>
-            dispatch(setShouldShowCanvasDebugInfo(e.target.checked))
-          }
+          onChange={handleChangeShouldShowCanvasDebugInfo}
         />
 
         <IAISimpleCheckbox
           label={t('unifiedCanvas.antialiasing')}
           isChecked={shouldAntialias}
-          onChange={(e) => dispatch(setShouldAntialias(e.target.checked))}
+          onChange={handleChangeShouldAntialias}
         />
         <ClearCanvasHistoryButtonModal />
       </Flex>
@@ -163,4 +197,4 @@ const IAICanvasSettingsButtonPopover = () => {
   );
 };
 
-export default IAICanvasSettingsButtonPopover;
+export default memo(IAICanvasSettingsButtonPopover);

@@ -6,19 +6,27 @@ import {
   createListenerMiddleware,
 } from '@reduxjs/toolkit';
 
-import type { AppDispatch, RootState } from '../../store';
+import type { AppDispatch, RootState } from 'app/store/store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
+import { addAnyEnqueuedListener } from './listeners/anyEnqueued';
 import { addAppConfigReceivedListener } from './listeners/appConfigReceived';
 import { addAppStartedListener } from './listeners/appStarted';
+import { addBatchEnqueuedListener } from './listeners/batchEnqueued';
 import { addDeleteBoardAndImagesFulfilledListener } from './listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
 import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
 import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
+import { addCanvasImageToControlNetListener } from './listeners/canvasImageToControlNet';
+import { addCanvasMaskSavedToGalleryListener } from './listeners/canvasMaskSavedToGallery';
+import { addCanvasMaskToControlNetListener } from './listeners/canvasMaskToControlNet';
 import { addCanvasMergedListener } from './listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGallery';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
+import { addEnqueueRequestedCanvasListener } from './listeners/enqueueRequestedCanvas';
+import { addEnqueueRequestedLinear } from './listeners/enqueueRequestedLinear';
+import { addEnqueueRequestedNodes } from './listeners/enqueueRequestedNodes';
 import {
   addImageAddedToBoardFulfilledListener,
   addImageAddedToBoardRejectedListener,
@@ -27,7 +35,8 @@ import {
   addImageDeletedFulfilledListener,
   addImageDeletedPendingListener,
   addImageDeletedRejectedListener,
-  addRequestedImageDeletionListener,
+  addRequestedMultipleImageDeletionListener,
+  addRequestedSingleImageDeletionListener,
 } from './listeners/imageDeleted';
 import { addImageDroppedListener } from './listeners/imageDropped';
 import {
@@ -39,44 +48,31 @@ import {
   addImageUploadedFulfilledListener,
   addImageUploadedRejectedListener,
 } from './listeners/imageUploaded';
+import { addImagesStarredListener } from './listeners/imagesStarred';
+import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
+import { addDynamicPromptsListener } from './listeners/promptChanged';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
-import {
-  addSessionCanceledFulfilledListener,
-  addSessionCanceledPendingListener,
-  addSessionCanceledRejectedListener,
-} from './listeners/sessionCanceled';
-import {
-  addSessionCreatedFulfilledListener,
-  addSessionCreatedPendingListener,
-  addSessionCreatedRejectedListener,
-} from './listeners/sessionCreated';
-import {
-  addSessionInvokedFulfilledListener,
-  addSessionInvokedPendingListener,
-  addSessionInvokedRejectedListener,
-} from './listeners/sessionInvoked';
-import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
 import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
 import { addGraphExecutionStateCompleteEventListener as addGraphExecutionStateCompleteListener } from './listeners/socketio/socketGraphExecutionStateComplete';
 import { addInvocationCompleteEventListener as addInvocationCompleteListener } from './listeners/socketio/socketInvocationComplete';
 import { addInvocationErrorEventListener as addInvocationErrorListener } from './listeners/socketio/socketInvocationError';
+import { addInvocationRetrievalErrorEventListener } from './listeners/socketio/socketInvocationRetrievalError';
 import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
 import { addModelLoadEventListener } from './listeners/socketio/socketModelLoad';
+import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
+import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
+import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
-import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
-import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
-import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
-import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
-import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
-import { addInvocationRetrievalErrorEventListener } from './listeners/socketio/socketInvocationRetrievalError';
+import { addWorkflowLoadRequestedListener } from './listeners/workflowLoadRequested';
+import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -110,22 +106,30 @@ addImageUploadedRejectedListener();
 addInitialImageSelectedListener();
 
 // Image deleted
-addRequestedImageDeletionListener();
+addRequestedSingleImageDeletionListener();
+addRequestedMultipleImageDeletionListener();
 addImageDeletedPendingListener();
 addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();
 addDeleteBoardAndImagesFulfilledListener();
 addImageToDeleteSelectedListener();
 
+// Image starred
+addImagesStarredListener();
+addImagesUnstarredListener();
+
 // User Invoked
-addUserInvokedCanvasListener();
-addUserInvokedNodesListener();
-addUserInvokedTextToImageListener();
-addUserInvokedImageToImageListener();
-addSessionReadyToInvokeListener();
+addEnqueueRequestedCanvasListener();
+addEnqueueRequestedNodes();
+addEnqueueRequestedLinear();
+addAnyEnqueuedListener();
+addBatchEnqueuedListener();
 
 // Canvas actions
 addCanvasSavedToGalleryListener();
+addCanvasMaskSavedToGalleryListener();
+addCanvasImageToControlNetListener();
+addCanvasMaskToControlNetListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
@@ -157,21 +161,7 @@ addSocketUnsubscribedListener();
 addModelLoadEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
-
-// Session Created
-addSessionCreatedPendingListener();
-addSessionCreatedFulfilledListener();
-addSessionCreatedRejectedListener();
-
-// Session Invoked
-addSessionInvokedPendingListener();
-addSessionInvokedFulfilledListener();
-addSessionInvokedRejectedListener();
-
-// Session Canceled
-addSessionCanceledPendingListener();
-addSessionCanceledFulfilledListener();
-addSessionCanceledRejectedListener();
+addSocketQueueItemStatusChangedEventListener();
 
 // ControlNet
 addControlNetImageProcessedListener();
@@ -187,6 +177,10 @@ addBoardIdSelectedListener();
 // Node schemas
 addReceivedOpenAPISchemaListener();
 
+// Workflows
+addWorkflowLoadRequestedListener();
+addUpdateAllNodesRequestedListener();
+
 // DND
 addImageDroppedListener();
 
@@ -201,3 +195,9 @@ addFirstListImagesListener();
 
 // Ad-hoc upscale workflwo
 addUpscaleRequestedListener();
+
+// Tab Change
+addTabChangedListener();
+
+// Dynamic prompts
+addDynamicPromptsListener();

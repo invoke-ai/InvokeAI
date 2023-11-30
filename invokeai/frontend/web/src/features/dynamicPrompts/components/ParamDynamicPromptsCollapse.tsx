@@ -2,25 +2,31 @@ import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
-import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
-import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
+import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
-
-const selector = createSelector(
-  stateSelector,
-  (state) => {
-    const { isEnabled } = state.dynamicPrompts;
-
-    return { activeLabel: isEnabled ? 'Enabled' : undefined };
-  },
-  defaultSelectorOptions
-);
+import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
+import ParamDynamicPromptsSeedBehaviour from './ParamDynamicPromptsSeedBehaviour';
 
 const ParamDynamicPromptsCollapse = () => {
-  const { activeLabel } = useAppSelector(selector);
+  const { t } = useTranslation();
+  const selectActiveLabel = useMemo(
+    () =>
+      createSelector(stateSelector, ({ dynamicPrompts }) => {
+        const count = dynamicPrompts.prompts.length;
+        if (count > 1) {
+          return t('dynamicPrompts.promptsWithCount_other', {
+            count,
+          });
+        }
+
+        return;
+      }),
+    [t]
+  );
+  const activeLabel = useAppSelector(selectActiveLabel);
 
   const isDynamicPromptingEnabled =
     useFeatureStatus('dynamicPrompting').isFeatureEnabled;
@@ -30,14 +36,17 @@ const ParamDynamicPromptsCollapse = () => {
   }
 
   return (
-    <IAICollapse label="Dynamic Prompts" activeLabel={activeLabel}>
+    <IAICollapse
+      label={t('dynamicPrompts.dynamicPrompts')}
+      activeLabel={activeLabel}
+    >
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
-        <ParamDynamicPromptsToggle />
-        <ParamDynamicPromptsCombinatorial />
+        <ParamDynamicPromptsPreview />
+        <ParamDynamicPromptsSeedBehaviour />
         <ParamDynamicPromptsMaxPrompts />
       </Flex>
     </IAICollapse>
   );
 };
 
-export default ParamDynamicPromptsCollapse;
+export default memo(ParamDynamicPromptsCollapse);

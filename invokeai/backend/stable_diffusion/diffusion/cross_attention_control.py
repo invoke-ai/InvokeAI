@@ -4,18 +4,21 @@
 
 import enum
 import math
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 import diffusers
 import psutil
 import torch
 from compel.cross_attention_control import Arguments
+from diffusers.models.attention_processor import Attention, AttentionProcessor, AttnProcessor, SlicedAttnProcessor
 from diffusers.models.unet_2d_condition import UNet2DConditionModel
-from diffusers.models.attention_processor import AttentionProcessor
 from torch import nn
 
 import invokeai.backend.util.logging as logger
+
 from ...util import torch_dtype
+
 
 class CrossAttentionType(enum.Enum):
     SELF = 1
@@ -51,15 +54,13 @@ class Context:
         self.clear_requests(cleanup=True)
 
     def register_cross_attention_modules(self, model):
-        for name, module in get_cross_attention_modules(model, CrossAttentionType.SELF):
+        for name, _module in get_cross_attention_modules(model, CrossAttentionType.SELF):
             if name in self.self_cross_attention_module_identifiers:
-                assert False, f"name {name} cannot appear more than once"
+                raise AssertionError(f"name {name} cannot appear more than once")
             self.self_cross_attention_module_identifiers.append(name)
-        for name, module in get_cross_attention_modules(
-            model, CrossAttentionType.TOKENS
-        ):
+        for name, _module in get_cross_attention_modules(model, CrossAttentionType.TOKENS):
             if name in self.tokens_cross_attention_module_identifiers:
-                assert False, f"name {name} cannot appear more than once"
+                raise AssertionError(f"name {name} cannot appear more than once")
             self.tokens_cross_attention_module_identifiers.append(name)
 
     def request_save_attention_maps(self, cross_attention_type: CrossAttentionType):
@@ -68,9 +69,7 @@ class Context:
         else:
             self.tokens_cross_attention_action = Context.Action.SAVE
 
-    def request_apply_saved_attention_maps(
-        self, cross_attention_type: CrossAttentionType
-    ):
+    def request_apply_saved_attention_maps(self, cross_attention_type: CrossAttentionType):
         if cross_attention_type == CrossAttentionType.SELF:
             self.self_cross_attention_action = Context.Action.APPLY
         else:
@@ -139,9 +138,7 @@ class Context:
         saved_attention_dict = self.saved_cross_attention_maps[identifier]
         if requested_dim is None:
             if saved_attention_dict["dim"] is not None:
-                raise RuntimeError(
-                    f"dim mismatch: expected dim=None, have {saved_attention_dict['dim']}"
-                )
+                raise RuntimeError(f"dim mismatch: expected dim=None, have {saved_attention_dict['dim']}")
             return saved_attention_dict["slices"][0]
 
         if saved_attention_dict["dim"] == requested_dim:
@@ -154,21 +151,13 @@ class Context:
         if saved_attention_dict["dim"] is None:
             whole_saved_attention = saved_attention_dict["slices"][0]
             if requested_dim == 0:
-                return whole_saved_attention[
-                    requested_offset : requested_offset + slice_size
-                ]
+                return whole_saved_attention[requested_offset : requested_offset + slice_size]
             elif requested_dim == 1:
-                return whole_saved_attention[
-                    :, requested_offset : requested_offset + slice_size
-                ]
+                return whole_saved_attention[:, requested_offset : requested_offset + slice_size]
 
-        raise RuntimeError(
-            f"Cannot convert dim {saved_attention_dict['dim']} to requested dim {requested_dim}"
-        )
+        raise RuntimeError(f"Cannot convert dim {saved_attention_dict['dim']} to requested dim {requested_dim}")
 
-    def get_slicing_strategy(
-        self, identifier: str
-    ) -> tuple[Optional[int], Optional[int]]:
+    def get_slicing_strategy(self, identifier: str) -> tuple[Optional[int], Optional[int]]:
         saved_attention = self.saved_cross_attention_maps.get(identifier, None)
         if saved_attention is None:
             return None, None
@@ -181,7 +170,7 @@ class Context:
             self.saved_cross_attention_maps = {}
 
     def offload_saved_attention_slices_to_cpu(self):
-        for key, map_dict in self.saved_cross_attention_maps.items():
+        for _key, map_dict in self.saved_cross_attention_maps.items():
             for offset, slice in map_dict["slices"].items():
                 map_dict[offset] = slice.to("cpu")
 
@@ -201,9 +190,7 @@ class InvokeAICrossAttentionMixin:
 
     def set_attention_slice_wrangler(
         self,
-        wrangler: Optional[
-            Callable[[nn.Module, torch.Tensor, int, int, int], torch.Tensor]
-        ],
+        wrangler: Optional[Callable[[nn.Module, torch.Tensor, int, int, int], torch.Tensor]],
     ):
         """
         Set custom attention calculator to be called when attention is calculated
@@ -219,14 +206,10 @@ class InvokeAICrossAttentionMixin:
         """
         self.attention_slice_wrangler = wrangler
 
-    def set_slicing_strategy_getter(
-        self, getter: Optional[Callable[[nn.Module], tuple[int, int]]]
-    ):
+    def set_slicing_strategy_getter(self, getter: Optional[Callable[[nn.Module], tuple[int, int]]]):
         self.slicing_strategy_getter = getter
 
-    def set_attention_slice_calculated_callback(
-        self, callback: Optional[Callable[[torch.Tensor], None]]
-    ):
+    def set_attention_slice_calculated_callback(self, callback: Optional[Callable[[torch.Tensor], None]]):
         self.attention_slice_calculated_callback = callback
 
     def einsum_lowest_level(self, query, key, value, dim, offset, slice_size):
@@ -247,45 +230,31 @@ class InvokeAICrossAttentionMixin:
         )
 
         # calculate attention slice by taking the best scores for each latent pixel
-        default_attention_slice = attention_scores.softmax(
-            dim=-1, dtype=attention_scores.dtype
-        )
+        default_attention_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
         attention_slice_wrangler = self.attention_slice_wrangler
         if attention_slice_wrangler is not None:
-            attention_slice = attention_slice_wrangler(
-                self, default_attention_slice, dim, offset, slice_size
-            )
+            attention_slice = attention_slice_wrangler(self, default_attention_slice, dim, offset, slice_size)
         else:
             attention_slice = default_attention_slice
 
         if self.attention_slice_calculated_callback is not None:
-            self.attention_slice_calculated_callback(
-                attention_slice, dim, offset, slice_size
-            )
+            self.attention_slice_calculated_callback(attention_slice, dim, offset, slice_size)
 
         hidden_states = torch.bmm(attention_slice, value)
         return hidden_states
 
     def einsum_op_slice_dim0(self, q, k, v, slice_size):
-        r = torch.zeros(
-            q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype
-        )
+        r = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
         for i in range(0, q.shape[0], slice_size):
             end = i + slice_size
-            r[i:end] = self.einsum_lowest_level(
-                q[i:end], k[i:end], v[i:end], dim=0, offset=i, slice_size=slice_size
-            )
+            r[i:end] = self.einsum_lowest_level(q[i:end], k[i:end], v[i:end], dim=0, offset=i, slice_size=slice_size)
         return r
 
     def einsum_op_slice_dim1(self, q, k, v, slice_size):
-        r = torch.zeros(
-            q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype
-        )
+        r = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
         for i in range(0, q.shape[1], slice_size):
             end = i + slice_size
-            r[:, i:end] = self.einsum_lowest_level(
-                q[:, i:end], k, v, dim=1, offset=i, slice_size=slice_size
-            )
+            r[:, i:end] = self.einsum_lowest_level(q[:, i:end], k, v, dim=1, offset=i, slice_size=slice_size)
         return r
 
     def einsum_op_mps_v1(self, q, k, v):
@@ -353,6 +322,7 @@ def restore_default_cross_attention(
     else:
         remove_attention_function(model)
 
+
 def setup_cross_attention_control_attention_processors(unet: UNet2DConditionModel, context: Context):
     """
     Inject attention parameters and functions into the passed in model to enable cross attention editing.
@@ -372,7 +342,7 @@ def setup_cross_attention_control_attention_processors(unet: UNet2DConditionMode
     indices = torch.arange(max_length, dtype=torch.long)
     for name, a0, a1, b0, b1 in context.arguments.edit_opcodes:
         if b0 < max_length:
-            if name == "equal":# or (name == "replace" and a1 - a0 == b1 - b0):
+            if name == "equal":  # or (name == "replace" and a1 - a0 == b1 - b0):
                 # these tokens have not been edited
                 indices[b0:b1] = indices_target[a0:a1]
                 mask[b0:b1] = 1
@@ -386,16 +356,14 @@ def setup_cross_attention_control_attention_processors(unet: UNet2DConditionMode
     else:
         # try to re-use an existing slice size
         default_slice_size = 4
-        slice_size = next((p.slice_size for p in old_attn_processors.values() if type(p) is SlicedAttnProcessor), default_slice_size)
+        slice_size = next(
+            (p.slice_size for p in old_attn_processors.values() if type(p) is SlicedAttnProcessor), default_slice_size
+        )
         unet.set_attn_processor(SlicedSwapCrossAttnProcesser(slice_size=slice_size))
 
-def get_cross_attention_modules(
-    model, which: CrossAttentionType
-) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
 
-    cross_attention_class: type = (
-        InvokeAIDiffusersCrossAttention
-    )
+def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
+    cross_attention_class: type = InvokeAIDiffusersCrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [
         (name, module)
@@ -408,11 +376,11 @@ def get_cross_attention_modules(
         # non-fatal error but .swap() won't work.
         logger.error(
             f"Error! CrossAttentionControl found an unexpected number of {cross_attention_class} modules in the model "
-            + f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching failed "
-            + "or some assumption has changed about the structure of the model itself. Please fix the monkey-patching, "
-            + f"and/or update the {expected_count} above to an appropriate number, and/or find and inform someone who knows "
-            + "what it means. This error is non-fatal, but it is likely that .swap() and attention map display will not "
-            + "work properly until it is fixed."
+            f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching "
+            "failed or some assumption has changed about the structure of the model itself. Please fix the "
+            f"monkey-patching, and/or update the {expected_count} above to an appropriate number, and/or find and "
+            "inform someone who knows what it means. This error is non-fatal, but it is likely that .swap() and "
+            "attention map display will not work properly until it is fixed."
         )
     return attention_module_tuples
 
@@ -420,9 +388,7 @@ def get_cross_attention_modules(
 def inject_attention_function(unet, context: Context):
     # ORIGINAL SOURCE CODE: https://github.com/huggingface/diffusers/blob/91ddd2a25b848df0fa1262d4f1cd98c7ccb87750/src/diffusers/models/attention.py#L276
 
-    def attention_slice_wrangler(
-        module, suggested_attention_slice: torch.Tensor, dim, offset, slice_size
-    ):
+    def attention_slice_wrangler(module, suggested_attention_slice: torch.Tensor, dim, offset, slice_size):
         # memory_usage = suggested_attention_slice.element_size() * suggested_attention_slice.nelement()
 
         attention_slice = suggested_attention_slice
@@ -430,9 +396,7 @@ def inject_attention_function(unet, context: Context):
         if context.get_should_save_maps(module.identifier):
             # print(module.identifier, "saving suggested_attention_slice of shape",
             #      suggested_attention_slice.shape, "dim", dim, "offset", offset)
-            slice_to_save = (
-                attention_slice.to("cpu") if dim is not None else attention_slice
-            )
+            slice_to_save = attention_slice.to("cpu") if dim is not None else attention_slice
             context.save_slice(
                 module.identifier,
                 slice_to_save,
@@ -442,31 +406,20 @@ def inject_attention_function(unet, context: Context):
             )
         elif context.get_should_apply_saved_maps(module.identifier):
             # print(module.identifier, "applying saved attention slice for dim", dim, "offset", offset)
-            saved_attention_slice = context.get_slice(
-                module.identifier, dim, offset, slice_size
-            )
+            saved_attention_slice = context.get_slice(module.identifier, dim, offset, slice_size)
 
             # slice may have been offloaded to CPU
-            saved_attention_slice = saved_attention_slice.to(
-                suggested_attention_slice.device
-            )
+            saved_attention_slice = saved_attention_slice.to(suggested_attention_slice.device)
 
             if context.is_tokens_cross_attention(module.identifier):
                 index_map = context.cross_attention_index_map
-                remapped_saved_attention_slice = torch.index_select(
-                    saved_attention_slice, -1, index_map
-                )
+                remapped_saved_attention_slice = torch.index_select(saved_attention_slice, -1, index_map)
                 this_attention_slice = suggested_attention_slice
 
-                mask = context.cross_attention_mask.to(
-                    torch_dtype(suggested_attention_slice.device)
-                )
+                mask = context.cross_attention_mask.to(torch_dtype(suggested_attention_slice.device))
                 saved_mask = mask
                 this_mask = 1 - mask
-                attention_slice = (
-                    remapped_saved_attention_slice * saved_mask
-                    + this_attention_slice * this_mask
-                )
+                attention_slice = remapped_saved_attention_slice * saved_mask + this_attention_slice * this_mask
             else:
                 # just use everything
                 attention_slice = saved_attention_slice
@@ -480,14 +433,10 @@ def inject_attention_function(unet, context: Context):
         module.identifier = identifier
         try:
             module.set_attention_slice_wrangler(attention_slice_wrangler)
-            module.set_slicing_strategy_getter(
-                lambda module: context.get_slicing_strategy(identifier)
-            )
+            module.set_slicing_strategy_getter(lambda module: context.get_slicing_strategy(identifier))  # noqa: B023
         except AttributeError as e:
             if is_attribute_error_about(e, "set_attention_slice_wrangler"):
-                print(
-                    f"TODO: implement set_attention_slice_wrangler for {type(module)}"
-                )  # TODO
+                print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")  # TODO
             else:
                 raise
 
@@ -496,16 +445,14 @@ def remove_attention_function(unet):
     cross_attention_modules = get_cross_attention_modules(
         unet, CrossAttentionType.TOKENS
     ) + get_cross_attention_modules(unet, CrossAttentionType.SELF)
-    for identifier, module in cross_attention_modules:
+    for _identifier, module in cross_attention_modules:
         try:
             # clear wrangler callback
             module.set_attention_slice_wrangler(None)
             module.set_slicing_strategy_getter(None)
         except AttributeError as e:
             if is_attribute_error_about(e, "set_attention_slice_wrangler"):
-                print(
-                    f"TODO: implement set_attention_slice_wrangler for {type(module)}"
-                )
+                print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")
             else:
                 raise
 
@@ -530,9 +477,7 @@ def get_mem_free_total(device):
     return mem_free_total
 
 
-class InvokeAIDiffusersCrossAttention(
-    diffusers.models.attention.Attention, InvokeAICrossAttentionMixin
-):
+class InvokeAIDiffusersCrossAttention(diffusers.models.attention.Attention, InvokeAICrossAttentionMixin):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         InvokeAICrossAttentionMixin.__init__(self)
@@ -579,14 +524,6 @@ class AttnProcessor:
         return hidden_states
 
 """
-from dataclasses import dataclass, field
-
-import torch
-from diffusers.models.attention_processor import (
-    Attention,
-    AttnProcessor,
-    SlicedAttnProcessor,
-)
 
 
 @dataclass
@@ -640,12 +577,9 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
         attention_mask=None,
         # kwargs
         swap_cross_attn_context: SwapCrossAttnContext = None,
+        **kwargs,
     ):
-        attention_type = (
-            CrossAttentionType.SELF
-            if encoder_hidden_states is None
-            else CrossAttentionType.TOKENS
-        )
+        attention_type = CrossAttentionType.SELF if encoder_hidden_states is None else CrossAttentionType.TOKENS
 
         # if cross-attention control is not in play, just call through to the base implementation.
         if (
@@ -654,9 +588,7 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
             or not swap_cross_attn_context.wants_cross_attention_control(attention_type)
         ):
             # print(f"SwapCrossAttnContext for {attention_type} not active - passing request to superclass")
-            return super().__call__(
-                attn, hidden_states, encoder_hidden_states, attention_mask
-            )
+            return super().__call__(attn, hidden_states, encoder_hidden_states, attention_mask)
         # else:
         #    print(f"SwapCrossAttnContext for {attention_type} active")
 
@@ -699,18 +631,10 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
             query_slice = query[start_idx:end_idx]
             original_key_slice = original_text_key[start_idx:end_idx]
             modified_key_slice = modified_text_key[start_idx:end_idx]
-            attn_mask_slice = (
-                attention_mask[start_idx:end_idx]
-                if attention_mask is not None
-                else None
-            )
+            attn_mask_slice = attention_mask[start_idx:end_idx] if attention_mask is not None else None
 
-            original_attn_slice = attn.get_attention_scores(
-                query_slice, original_key_slice, attn_mask_slice
-            )
-            modified_attn_slice = attn.get_attention_scores(
-                query_slice, modified_key_slice, attn_mask_slice
-            )
+            original_attn_slice = attn.get_attention_scores(query_slice, original_key_slice, attn_mask_slice)
+            modified_attn_slice = attn.get_attention_scores(query_slice, modified_key_slice, attn_mask_slice)
 
             # because the prompt modifications may result in token sequences shifted forwards or backwards,
             # the original attention probabilities must be remapped to account for token index changes in the
@@ -722,9 +646,7 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
             # only some tokens taken from the original attention probabilities. this is controlled by the mask.
             mask = swap_cross_attn_context.mask
             inverse_mask = 1 - mask
-            attn_slice = (
-                remapped_original_attn_slice * mask + modified_attn_slice * inverse_mask
-            )
+            attn_slice = remapped_original_attn_slice * mask + modified_attn_slice * inverse_mask
 
             del remapped_original_attn_slice, modified_attn_slice
 
@@ -744,6 +666,4 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
 
 class SwapCrossAttnProcessor(SlicedSwapCrossAttnProcesser):
     def __init__(self):
-        super(SwapCrossAttnProcessor, self).__init__(
-            slice_size=int(1e9)
-        )  # massive slice size = don't slice
+        super(SwapCrossAttnProcessor, self).__init__(slice_size=int(1e9))  # massive slice size = don't slice

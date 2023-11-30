@@ -2,14 +2,16 @@
 Not really a test, but a way to verify that the paths are existing
 and fail early if they are not.
 """
-import unittest
 import pathlib
+import unittest
 from os import path as osp
+
 from PIL import Image
 
-import invokeai.frontend.web.dist as frontend
+import invokeai.app.assets.images as image_assets
 import invokeai.configs as configs
-import invokeai.assets.web as assets_web
+import invokeai.frontend.web.dist as frontend
+
 
 class ConfigsTestCase(unittest.TestCase):
     """Test the configuration related imports and objects"""
@@ -35,7 +37,7 @@ class ConfigsTestCase(unittest.TestCase):
 
     def test_caution_img(self):
         """Verify the caution image"""
-        caution_img = Image.open(osp.join(assets_web.__path__[0], "caution.png"))
+        caution_img = Image.open(osp.join(image_assets.__path__[0], "caution.png"))
         assert caution_img.width == int(500)
         assert caution_img.height == int(441)
         assert caution_img.format == str("PNG")

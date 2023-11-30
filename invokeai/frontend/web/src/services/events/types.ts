@@ -1,11 +1,11 @@
-import { O } from 'ts-toolbelt';
+import { components } from 'services/api/schema';
 import {
   BaseModelType,
   Graph,
   GraphExecutionState,
   ModelType,
   SubModelType,
-} from '../api/types';
+} from 'services/api/types';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -15,11 +15,6 @@ export type ProgressImage = {
   width: number;
   height: number;
 };
-
-export type AnyInvocationType = O.Required<
-  NonNullable<NonNullable<Graph['nodes']>[string]>,
-  'type'
->['type'];
 
 export type AnyInvocation = NonNullable<NonNullable<Graph['nodes']>[string]>;
 
@@ -32,6 +27,9 @@ export type BaseNode = {
 };
 
 export type ModelLoadStartedEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   model_name: string;
   base_model: BaseModelType;
@@ -40,6 +38,9 @@ export type ModelLoadStartedEvent = {
 };
 
 export type ModelLoadCompletedEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   model_name: string;
   base_model: BaseModelType;
@@ -56,11 +57,15 @@ export type ModelLoadCompletedEvent = {
  * @example socket.on('generator_progress', (data: GeneratorProgressEvent) => { ... }
  */
 export type GeneratorProgressEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
-  node: BaseNode;
+  node_id: string;
   source_node_id: string;
   progress_image?: ProgressImage;
   step: number;
+  order: number;
   total_steps: number;
 };
 
@@ -72,6 +77,9 @@ export type GeneratorProgressEvent = {
  * @example socket.on('invocation_complete', (data: InvocationCompleteEvent) => { ... }
  */
 export type InvocationCompleteEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -84,6 +92,9 @@ export type InvocationCompleteEvent = {
  * @example socket.on('invocation_error', (data: InvocationErrorEvent) => { ... }
  */
 export type InvocationErrorEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -97,6 +108,9 @@ export type InvocationErrorEvent = {
  * @example socket.on('invocation_started', (data: InvocationStartedEvent) => { ... }
  */
 export type InvocationStartedEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
@@ -108,6 +122,9 @@ export type InvocationStartedEvent = {
  * @example socket.on('graph_execution_state_complete', (data: GraphExecutionStateCompleteEvent) => { ... }
  */
 export type GraphExecutionStateCompleteEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
 };
 
@@ -117,6 +134,9 @@ export type GraphExecutionStateCompleteEvent = {
  * @example socket.on('session_retrieval_error', (data: SessionRetrievalErrorEvent) => { ... }
  */
 export type SessionRetrievalErrorEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   error_type: string;
   error: string;
@@ -128,18 +148,64 @@ export type SessionRetrievalErrorEvent = {
  * @example socket.on('invocation_retrieval_error', (data: InvocationRetrievalErrorEvent) => { ... }
  */
 export type InvocationRetrievalErrorEvent = {
+  queue_id: string;
+  queue_item_id: number;
+  queue_batch_id: string;
   graph_execution_state_id: string;
   node_id: string;
   error_type: string;
   error: string;
 };
 
-export type ClientEmitSubscribe = {
-  session: string;
+/**
+ * A `queue_item_status_changed` socket.io event.
+ *
+ * @example socket.on('queue_item_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
+ */
+export type QueueItemStatusChangedEvent = {
+  queue_id: string;
+  queue_item: {
+    queue_id: string;
+    item_id: number;
+    batch_id: string;
+    session_id: string;
+    status: components['schemas']['SessionQueueItemDTO']['status'];
+    error: string | undefined;
+    created_at: string;
+    updated_at: string;
+    started_at: string | undefined;
+    completed_at: string | undefined;
+  };
+  batch_status: {
+    queue_id: string;
+    batch_id: string;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+    total: number;
+  };
+  queue_status: {
+    queue_id: string;
+    item_id?: number;
+    batch_id?: string;
+    session_id?: string;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+    total: number;
+  };
 };
 
-export type ClientEmitUnsubscribe = {
-  session: string;
+export type ClientEmitSubscribeQueue = {
+  queue_id: string;
+};
+
+export type ClientEmitUnsubscribeQueue = {
+  queue_id: string;
 };
 
 export type ServerToClientEvents = {
@@ -154,11 +220,12 @@ export type ServerToClientEvents = {
   model_load_completed: (payload: ModelLoadCompletedEvent) => void;
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
+  queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
 };
 
 export type ClientToServerEvents = {
   connect: () => void;
   disconnect: () => void;
-  subscribe: (payload: ClientEmitSubscribe) => void;
-  unsubscribe: (payload: ClientEmitUnsubscribe) => void;
+  subscribe_queue: (payload: ClientEmitSubscribeQueue) => void;
+  unsubscribe_queue: (payload: ClientEmitUnsubscribeQueue) => void;
 };

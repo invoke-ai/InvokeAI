@@ -1,0 +1,597 @@
+{
+  "name": "Text to Image",
+  "author": "InvokeAI",
+  "description": "Sample text to image workflow for Stable Diffusion 1.5/2",
+  "version": "1.0.1",
+  "contact": "invoke@invoke.ai",
+  "tags": "text2image, SD1.5, SD2, default",
+  "notes": "",
+  "exposedFields": [
+    {
+      "nodeId": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "7d8bf987-284f-413a-b2fd-d825445a5d6c",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "93dc02a4-d05b-48ed-b99c-c9b616af3402",
+      "fieldName": "prompt"
+    }
+  ],
+  "meta": {
+    "version": "1.0.0"
+  },
+  "nodes": [
+    {
+      "id": "93dc02a4-d05b-48ed-b99c-c9b616af3402",
+      "type": "invocation",
+      "data": {
+        "id": "93dc02a4-d05b-48ed-b99c-c9b616af3402",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "id": "7739aff6-26cb-4016-8897-5a1fb2305e4e",
+            "name": "prompt",
+            "type": "string",
+            "fieldKind": "input",
+            "label": "Negative Prompt",
+            "value": ""
+          },
+          "clip": {
+            "id": "48d23dce-a6ae-472a-9f8c-22a714ea5ce0",
+            "name": "clip",
+            "type": "ClipField",
+            "fieldKind": "input",
+            "label": ""
+          }
+        },
+        "outputs": {
+          "conditioning": {
+            "id": "37cf3a9d-f6b7-4b64-8ff6-2558c5ecc447",
+            "name": "conditioning",
+            "type": "ConditioningField",
+            "fieldKind": "output"
+          }
+        },
+        "label": "Negative Compel Prompt",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
+      },
+      "width": 320,
+      "height": 261,
+      "position": {
+        "x": 995.7263915923627,
+        "y": 239.67783573351227
+      }
+    },
+    {
+      "id": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "type": "invocation",
+      "data": {
+        "id": "55705012-79b9-4aac-9f26-c0b10309785b",
+        "type": "noise",
+        "inputs": {
+          "seed": {
+            "id": "6431737c-918a-425d-a3b4-5d57e2f35d4d",
+            "name": "seed",
+            "type": "integer",
+            "fieldKind": "input",
+            "label": "",
+            "value": 0
+          },
+          "width": {
+            "id": "38fc5b66-fe6e-47c8-bba9-daf58e454ed7",
+            "name": "width",
+            "type": "integer",
+            "fieldKind": "input",
+            "label": "",
+            "value": 512
+          },
+          "height": {
+            "id": "16298330-e2bf-4872-a514-d6923df53cbb",
+            "name": "height",
+            "type": "integer",
+            "fieldKind": "input",
+            "label": "",
+            "value": 512
+          },
+          "use_cpu": {
+            "id": "c7c436d3-7a7a-4e76-91e4-c6deb271623c",
+            "name": "use_cpu",
+            "type": "boolean",
+            "fieldKind": "input",
+            "label": "",
+            "value": true
+          }
+        },
+        "outputs": {
+          "noise": {
+            "id": "50f650dc-0184-4e23-a927-0497a96fe954",
+            "name": "noise",
+            "type": "LatentsField",
+            "fieldKind": "output"
+          },
+          "width": {
+            "id": "bb8a452b-133d-42d1-ae4a-3843d7e4109a",
+            "name": "width",
+            "type": "integer",
+            "fieldKind": "output"
+          },
+          "height": {
+            "id": "35cfaa12-3b8b-4b7a-a884-327ff3abddd9",
+            "name": "height",
+            "type": "integer",
+            "fieldKind": "output"
+          }
+        },
+        "label": "",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
+      },
+      "width": 320,
+      "height": 389,
+      "position": {
+        "x": 993.4442117555518,
+        "y": 605.6757415334787
+      }
+    },
+    {
+      "id": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
+      "type": "invocation",
+      "data": {
+        "id": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
+        "type": "main_model_loader",
+        "inputs": {
+          "model": {
+            "id": "993eabd2-40fd-44fe-bce7-5d0c7075ddab",
+            "name": "model",
+            "type": "MainModelField",
+            "fieldKind": "input",
+            "label": "",
+            "value": {
+              "model_name": "stable-diffusion-v1-5",
+              "base_model": "sd-1",
+              "model_type": "main"
+            }
+          }
+        },
+        "outputs": {
+          "unet": {
+            "id": "5c18c9db-328d-46d0-8cb9-143391c410be",
+            "name": "unet",
+            "type": "UNetField",
+            "fieldKind": "output"
+          },
+          "clip": {
+            "id": "6effcac0-ec2f-4bf5-a49e-a2c29cf921f4",
+            "name": "clip",
+            "type": "ClipField",
+            "fieldKind": "output"
+          },
+          "vae": {
+            "id": "57683ba3-f5f5-4f58-b9a2-4b83dacad4a1",
+            "name": "vae",
+            "type": "VaeField",
+            "fieldKind": "output"
+          }
+        },
+        "label": "",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
+      },
+      "width": 320,
+      "height": 226,
+      "position": {
+        "x": 163.04436745878343,
+        "y": 254.63156870373479
+      }
+    },
+    {
+      "id": "7d8bf987-284f-413a-b2fd-d825445a5d6c",
+      "type": "invocation",
+      "data": {
+        "id": "7d8bf987-284f-413a-b2fd-d825445a5d6c",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "id": "7739aff6-26cb-4016-8897-5a1fb2305e4e",
+            "name": "prompt",
+            "type": "string",
+            "fieldKind": "input",
+            "label": "Positive Prompt",
+            "value": ""
+          },
+          "clip": {
+            "id": "48d23dce-a6ae-472a-9f8c-22a714ea5ce0",
+            "name": "clip",
+            "type": "ClipField",
+            "fieldKind": "input",
+            "label": ""
+          }
+        },
+        "outputs": {
+          "conditioning": {
+            "id": "37cf3a9d-f6b7-4b64-8ff6-2558c5ecc447",
+            "name": "conditioning",
+            "type": "ConditioningField",
+            "fieldKind": "output"
+          }
+        },
+        "label": "Positive Compel Prompt",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.0.0"
+      },
+      "width": 320,
+      "height": 261,
+      "position": {
+        "x": 595.7263915923627,
+        "y": 239.67783573351227
+      }
+    },
+    {
+      "id": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
+      "type": "invocation",
+      "data": {
+        "id": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
+        "type": "rand_int",
+        "inputs": {
+          "low": {
+            "id": "3ec65a37-60ba-4b6c-a0b2-553dd7a84b84",
+            "name": "low",
+            "type": "integer",
+            "fieldKind": "input",
+            "label": "",
+            "value": 0
+          },
+          "high": {
+            "id": "085f853a-1a5f-494d-8bec-e4ba29a3f2d1",
+            "name": "high",
+            "type": "integer",
+            "fieldKind": "input",
+            "label": "",
+            "value": 2147483647
+          }
+        },
+        "outputs": {
+          "value": {
+            "id": "812ade4d-7699-4261-b9fc-a6c9d2ab55ee",
+            "name": "value",
+            "type": "integer",
+            "fieldKind": "output"
+          }
+        },
+        "label": "Random Seed",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": true,
+        "useCache": false,
+        "version": "1.0.0"
+      },
+      "width": 320,
+      "height": 218,
+      "position": {
+        "x": 541.094822888628,
+        "y": 694.5704476446829
+      }
+    },
+    {
+      "id": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
+      "type": "invocation",
+      "data": {
+        "id": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
+        "type": "denoise_latents",
+        "inputs": {
+          "positive_conditioning": {
+            "id": "90b7f4f8-ada7-4028-8100-d2e54f192052",
+            "name": "positive_conditioning",
+            "type": "ConditioningField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "negative_conditioning": {
+            "id": "9393779e-796c-4f64-b740-902a1177bf53",
+            "name": "negative_conditioning",
+            "type": "ConditioningField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "noise": {
+            "id": "8e17f1e5-4f98-40b1-b7f4-86aeeb4554c1",
+            "name": "noise",
+            "type": "LatentsField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "steps": {
+            "id": "9b63302d-6bd2-42c9-ac13-9b1afb51af88",
+            "name": "steps",
+            "type": "integer",
+            "fieldKind": "input",
+            "label": "",
+            "value": 10
+          },
+          "cfg_scale": {
+            "id": "87dd04d3-870e-49e1-98bf-af003a810109",
+            "name": "cfg_scale",
+            "type": "FloatPolymorphic",
+            "fieldKind": "input",
+            "label": "",
+            "value": 7.5
+          },
+          "denoising_start": {
+            "id": "f369d80f-4931-4740-9bcd-9f0620719fab",
+            "name": "denoising_start",
+            "type": "float",
+            "fieldKind": "input",
+            "label": "",
+            "value": 0
+          },
+          "denoising_end": {
+            "id": "747d10e5-6f02-445c-994c-0604d814de8c",
+            "name": "denoising_end",
+            "type": "float",
+            "fieldKind": "input",
+            "label": "",
+            "value": 1
+          },
+          "scheduler": {
+            "id": "1de84a4e-3a24-4ec8-862b-16ce49633b9b",
+            "name": "scheduler",
+            "type": "Scheduler",
+            "fieldKind": "input",
+            "label": "",
+            "value": "euler"
+          },
+          "unet": {
+            "id": "ffa6fef4-3ce2-4bdb-9296-9a834849489b",
+            "name": "unet",
+            "type": "UNetField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "control": {
+            "id": "077b64cb-34be-4fcc-83f2-e399807a02bd",
+            "name": "control",
+            "type": "ControlPolymorphic",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "ip_adapter": {
+            "id": "1d6948f7-3a65-4a65-a20c-768b287251aa",
+            "name": "ip_adapter",
+            "type": "IPAdapterPolymorphic",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "t2i_adapter": {
+            "id": "75e67b09-952f-4083-aaf4-6b804d690412",
+            "name": "t2i_adapter",
+            "type": "T2IAdapterPolymorphic",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "latents": {
+            "id": "334d4ba3-5a99-4195-82c5-86fb3f4f7d43",
+            "name": "latents",
+            "type": "LatentsField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "denoise_mask": {
+            "id": "0d3dbdbf-b014-4e95-8b18-ff2ff9cb0bfa",
+            "name": "denoise_mask",
+            "type": "DenoiseMaskField",
+            "fieldKind": "input",
+            "label": ""
+          }
+        },
+        "outputs": {
+          "latents": {
+            "id": "70fa5bbc-0c38-41bb-861a-74d6d78d2f38",
+            "name": "latents",
+            "type": "LatentsField",
+            "fieldKind": "output"
+          },
+          "width": {
+            "id": "98ee0e6c-82aa-4e8f-8be5-dc5f00ee47f0",
+            "name": "width",
+            "type": "integer",
+            "fieldKind": "output"
+          },
+          "height": {
+            "id": "e8cb184a-5e1a-47c8-9695-4b8979564f5d",
+            "name": "height",
+            "type": "integer",
+            "fieldKind": "output"
+          }
+        },
+        "label": "",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": true,
+        "useCache": true,
+        "version": "1.4.0"
+      },
+      "width": 320,
+      "height": 646,
+      "position": {
+        "x": 1476.5794704734735,
+        "y": 256.80174342731783
+      }
+    },
+    {
+      "id": "58c957f5-0d01-41fc-a803-b2bbf0413d4f",
+      "type": "invocation",
+      "data": {
+        "id": "58c957f5-0d01-41fc-a803-b2bbf0413d4f",
+        "type": "l2i",
+        "inputs": {
+          "metadata": {
+            "id": "ab375f12-0042-4410-9182-29e30db82c85",
+            "name": "metadata",
+            "type": "MetadataField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "latents": {
+            "id": "3a7e7efd-bff5-47d7-9d48-615127afee78",
+            "name": "latents",
+            "type": "LatentsField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "vae": {
+            "id": "a1f5f7a1-0795-4d58-b036-7820c0b0ef2b",
+            "name": "vae",
+            "type": "VaeField",
+            "fieldKind": "input",
+            "label": ""
+          },
+          "tiled": {
+            "id": "da52059a-0cee-4668-942f-519aa794d739",
+            "name": "tiled",
+            "type": "boolean",
+            "fieldKind": "input",
+            "label": "",
+            "value": false
+          },
+          "fp32": {
+            "id": "c4841df3-b24e-4140-be3b-ccd454c2522c",
+            "name": "fp32",
+            "type": "boolean",
+            "fieldKind": "input",
+            "label": "",
+            "value": false
+          }
+        },
+        "outputs": {
+          "image": {
+            "id": "72d667d0-cf85-459d-abf2-28bd8b823fe7",
+            "name": "image",
+            "type": "ImageField",
+            "fieldKind": "output"
+          },
+          "width": {
+            "id": "c8c907d8-1066-49d1-b9a6-83bdcd53addc",
+            "name": "width",
+            "type": "integer",
+            "fieldKind": "output"
+          },
+          "height": {
+            "id": "230f359c-b4ea-436c-b372-332d7dcdca85",
+            "name": "height",
+            "type": "integer",
+            "fieldKind": "output"
+          }
+        },
+        "label": "",
+        "isOpen": true,
+        "notes": "",
+        "embedWorkflow": false,
+        "isIntermediate": false,
+        "useCache": true,
+        "version": "1.0.0"
+      },
+      "width": 320,
+      "height": 267,
+      "position": {
+        "x": 2037.9648469717395,
+        "y": 426.10844427600136
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
+      "sourceHandle": "value",
+      "target": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "targetHandle": "seed",
+      "id": "reactflow__edge-ea94bc37-d995-4a83-aa99-4af42479f2f2value-55705012-79b9-4aac-9f26-c0b10309785bseed",
+      "type": "default"
+    },
+    {
+      "source": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
+      "sourceHandle": "clip",
+      "target": "7d8bf987-284f-413a-b2fd-d825445a5d6c",
+      "targetHandle": "clip",
+      "id": "reactflow__edge-c8d55139-f380-4695-b7f2-8b3d1e1e3db8clip-7d8bf987-284f-413a-b2fd-d825445a5d6cclip",
+      "type": "default"
+    },
+    {
+      "source": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
+      "sourceHandle": "clip",
+      "target": "93dc02a4-d05b-48ed-b99c-c9b616af3402",
+      "targetHandle": "clip",
+      "id": "reactflow__edge-c8d55139-f380-4695-b7f2-8b3d1e1e3db8clip-93dc02a4-d05b-48ed-b99c-c9b616af3402clip",
+      "type": "default"
+    },
+    {
+      "source": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "sourceHandle": "noise",
+      "target": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
+      "targetHandle": "noise",
+      "id": "reactflow__edge-55705012-79b9-4aac-9f26-c0b10309785bnoise-eea2702a-19fb-45b5-9d75-56b4211ec03cnoise",
+      "type": "default"
+    },
+    {
+      "source": "7d8bf987-284f-413a-b2fd-d825445a5d6c",
+      "sourceHandle": "conditioning",
+      "target": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
+      "targetHandle": "positive_conditioning",
+      "id": "reactflow__edge-7d8bf987-284f-413a-b2fd-d825445a5d6cconditioning-eea2702a-19fb-45b5-9d75-56b4211ec03cpositive_conditioning",
+      "type": "default"
+    },
+    {
+      "source": "93dc02a4-d05b-48ed-b99c-c9b616af3402",
+      "sourceHandle": "conditioning",
+      "target": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
+      "targetHandle": "negative_conditioning",
+      "id": "reactflow__edge-93dc02a4-d05b-48ed-b99c-c9b616af3402conditioning-eea2702a-19fb-45b5-9d75-56b4211ec03cnegative_conditioning",
+      "type": "default"
+    },
+    {
+      "source": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
+      "sourceHandle": "unet",
+      "target": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
+      "targetHandle": "unet",
+      "id": "reactflow__edge-c8d55139-f380-4695-b7f2-8b3d1e1e3db8unet-eea2702a-19fb-45b5-9d75-56b4211ec03cunet",
+      "type": "default"
+    },
+    {
+      "source": "eea2702a-19fb-45b5-9d75-56b4211ec03c",
+      "sourceHandle": "latents",
+      "target": "58c957f5-0d01-41fc-a803-b2bbf0413d4f",
+      "targetHandle": "latents",
+      "id": "reactflow__edge-eea2702a-19fb-45b5-9d75-56b4211ec03clatents-58c957f5-0d01-41fc-a803-b2bbf0413d4flatents",
+      "type": "default"
+    },
+    {
+      "source": "c8d55139-f380-4695-b7f2-8b3d1e1e3db8",
+      "sourceHandle": "vae",
+      "target": "58c957f5-0d01-41fc-a803-b2bbf0413d4f",
+      "targetHandle": "vae",
+      "id": "reactflow__edge-c8d55139-f380-4695-b7f2-8b3d1e1e3db8vae-58c957f5-0d01-41fc-a803-b2bbf0413d4fvae",
+      "type": "default"
+    }
+  ]
+}

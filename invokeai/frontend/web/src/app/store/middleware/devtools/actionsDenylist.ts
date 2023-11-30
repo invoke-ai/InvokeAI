@@ -15,7 +15,7 @@ export const actionsDenylist = [
   'socket/socketGeneratorProgress',
   'socket/appSocketGeneratorProgress',
   // every time user presses shift
-  'hotkeys/shiftKeyPressed',
+  // 'hotkeys/shiftKeyPressed',
   // this happens after every state change
   '@@REMEMBER_PERSISTED',
 ];

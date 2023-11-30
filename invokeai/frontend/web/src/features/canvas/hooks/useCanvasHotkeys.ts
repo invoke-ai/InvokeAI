@@ -17,8 +17,8 @@ import { isEqual } from 'lodash-es';
 
 import { useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { CanvasTool } from '../store/canvasTypes';
-import { getCanvasStage } from '../util/konvaInstanceProvider';
+import { CanvasTool } from 'features/canvas/store/canvasTypes';
+import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 
 const selector = createSelector(
   [canvasSelector, activeTabNameSelector, isStagingSelector],
@@ -134,7 +134,9 @@ const useInpaintingCanvasHotkeys = () => {
   useHotkeys(
     ['space'],
     (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      if (e.repeat) {
+        return;
+      }
 
       canvasStage?.container().focus();
 

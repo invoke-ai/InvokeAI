@@ -1,31 +1,43 @@
 import os
-import torch
 from enum import Enum
-from typing import Optional
+from pathlib import Path
+from typing import Literal, Optional
+
+import torch
+
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import InvokeAIAppConfig
+
 from .base import (
+    BaseModelType,
+    EmptyConfigLoader,
+    InvalidModelException,
     ModelBase,
     ModelConfigBase,
-    BaseModelType,
+    ModelNotFoundException,
     ModelType,
     SubModelType,
-    EmptyConfigLoader,
-    calc_model_size_by_fs,
     calc_model_size_by_data,
+    calc_model_size_by_fs,
     classproperty,
-    InvalidModelException,
-    ModelNotFoundException,
 )
+
 
 class ControlNetModelFormat(str, Enum):
     Checkpoint = "checkpoint"
     Diffusers = "diffusers"
 
-class ControlNetModel(ModelBase):
-    #model_class: Type
-    #model_size: int
 
-    class Config(ModelConfigBase):
-        model_format: ControlNetModelFormat
+class ControlNetModel(ModelBase):
+    # model_class: Type
+    # model_size: int
+
+    class DiffusersConfig(ModelConfigBase):
+        model_format: Literal[ControlNetModelFormat.Diffusers]
+
+    class CheckpointConfig(ModelConfigBase):
+        model_format: Literal[ControlNetModelFormat.Checkpoint]
+        config: str
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.ControlNet
@@ -33,8 +45,8 @@ class ControlNetModel(ModelBase):
 
         try:
             config = EmptyConfigLoader.load_config(self.model_path, config_name="config.json")
-            #config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
+            # config = json.loads(os.path.join(self.model_path, "config.json"))
+        except Exception:
             raise Exception("Invalid controlnet model! (config.json not found or invalid)")
 
         model_class_name = config.get("_class_name", None)
@@ -44,7 +56,7 @@ class ControlNetModel(ModelBase):
         try:
             self.model_class = self._hf_definition_to_type(["diffusers", model_class_name])
             self.model_size = calc_model_size_by_fs(self.model_path)
-        except:
+        except Exception:
             raise Exception("Invalid ControlNet model!")
 
     def get_size(self, child_type: Optional[SubModelType] = None):
@@ -58,10 +70,10 @@ class ControlNetModel(ModelBase):
         child_type: Optional[SubModelType] = None,
     ):
         if child_type is not None:
-            raise Exception("There is no child models in controlnet model")
+            raise Exception("There are no child models in controlnet model")
 
         model = None
-        for variant in ['fp16',None]:
+        for variant in ["fp16", None]:
             try:
                 model = self.model_class.from_pretrained(
                     self.model_path,
@@ -69,11 +81,11 @@ class ControlNetModel(ModelBase):
                     variant=variant,
                 )
                 break
-            except:
+            except Exception:
                 pass
         if not model:
             raise ModelNotFoundException()
-        
+
         # calc more accurate size
         self.model_size = calc_model_size_by_data(model)
         return model
@@ -92,7 +104,7 @@ class ControlNetModel(ModelBase):
                 return ControlNetModelFormat.Diffusers
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "pth"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "pth"]):
                 return ControlNetModelFormat.Checkpoint
 
         raise InvalidModelException(f"Not a valid model: {path}")
@@ -102,10 +114,50 @@ class ControlNetModel(ModelBase):
         cls,
         model_path: str,
         output_path: str,
-        config: ModelConfigBase, # empty config or config of parent model
+        config: ModelConfigBase,
         base_model: BaseModelType,
     ) -> str:
-        if cls.detect_format(model_path) != ControlNetModelFormat.Diffusers:
-            raise NotImplementedError("Checkpoint controlnet models currently unsupported")
+        if cls.detect_format(model_path) == ControlNetModelFormat.Checkpoint:
+            return _convert_controlnet_ckpt_and_cache(
+                model_path=model_path,
+                model_config=config.config,
+                output_path=output_path,
+                base_model=base_model,
+            )
         else:
             return model_path
+
+
+def _convert_controlnet_ckpt_and_cache(
+    model_path: str,
+    output_path: str,
+    base_model: BaseModelType,
+    model_config: str,
+) -> str:
+    """
+    Convert the controlnet from checkpoint format to diffusers format,
+    cache it to disk, and return Path to converted
+    file. If already on disk then just returns Path.
+    """
+    print(f"DEBUG: controlnet config = {model_config}")
+    app_config = InvokeAIAppConfig.get_config()
+    weights = app_config.root_path / model_path
+    output_path = Path(output_path)
+
+    logger.info(f"Converting {weights} to diffusers format")
+    # return cached version if it exists
+    if output_path.exists():
+        return output_path
+
+    # to avoid circular import errors
+    from ..convert_ckpt_to_diffusers import convert_controlnet_to_diffusers
+
+    convert_controlnet_to_diffusers(
+        weights,
+        output_path,
+        original_config_file=app_config.root_path / model_config,
+        image_size=512,
+        scan_needed=True,
+        from_safetensors=weights.suffix == ".safetensors",
+    )
+    return output_path

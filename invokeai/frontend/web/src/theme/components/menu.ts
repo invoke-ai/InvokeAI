@@ -33,12 +33,16 @@ const invokeAI = definePartsStyle((props) => ({
     bg: mode('base.200', 'base.800')(props),
     _hover: {
       bg: mode('base.300', 'base.700')(props),
+      svg: {
+        opacity: 1,
+      },
     },
     _focus: {
       bg: mode('base.400', 'base.600')(props),
     },
     svg: {
-      opacity: 0.5,
+      opacity: 0.7,
+      fontSize: 14,
     },
   },
 }));

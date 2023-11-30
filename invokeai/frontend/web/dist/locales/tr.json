@@ -19,21 +19,15 @@
         "reset": "Sıfırla",
         "uploadImage": "Resim Yükle",
         "previousImage": "Önceki Resim",
-        "menu": "Menü",
-        "showGallery": "Galeriyi Göster"
+        "menu": "Menü"
     },
     "common": {
         "hotkeysLabel": "Kısayol Tuşları",
-        "themeLabel": "Tema",
         "languagePickerLabel": "Dil Seçimi",
         "reportBugLabel": "Hata Bildir",
         "githubLabel": "Github",
         "discordLabel": "Discord",
         "settingsLabel": "Ayarlar",
-        "darkTheme": "Karanlık Tema",
-        "lightTheme": "Aydınlık Tema",
-        "greenTheme": "Yeşil Tema",
-        "oceanTheme": "Okyanus Tema",
         "langArabic": "Arapça",
         "langEnglish": "İngilizce",
         "langDutch": "Hollandaca",

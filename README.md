@@ -43,16 +43,16 @@ Web Interface, interactive Command Line Interface, and also serves as
 the foundation for multiple commercial products.
 
 **Quick links**: [[How to
-  Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a
+  Install](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)] [<a
   href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a
   href="https://invoke-ai.github.io/InvokeAI/">Documentation and
-  Tutorials</a>] [<a
-  href="https://github.com/invoke-ai/InvokeAI/">Code and
-  Downloads</a>] [<a
-  href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>]
+  Tutorials</a>]
+  [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>]
   [<a
   href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion,
-  Ideas & Q&A</a>]
+  Ideas & Q&A</a>] 
+   [<a
+  href="https://invoke-ai.github.io/InvokeAI/contributing/CONTRIBUTING/">Contributing</a>] 
 
 <div align="center">
 
@@ -81,7 +81,7 @@ Table of Contents 📝
 ## Quick Start
 
 For full installation and upgrade instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)
 
 If upgrading from version 2.3, please read [Migrating a 2.3 root
 directory to 3.0](#migrating-to-3) first.
@@ -123,7 +123,7 @@ and go to http://localhost:9090.
 
 ### Command-Line Installation (for developers and users familiar with Terminals)
 
-You must have Python 3.9 or 3.10 installed on your machine. Earlier or
+You must have Python 3.10 through 3.11 installed on your machine. Earlier or
 later versions are not supported.
 Node.js also needs to be installed along with yarn (can be installed with
 the command `npm install -g yarn` if needed)
@@ -161,7 +161,7 @@ the command `npm install -g yarn` if needed)
     _For Windows/Linux with an NVIDIA GPU:_
 
     ```terminal
-    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
     ```
 
     _For Linux with an AMD GPU:_
@@ -175,7 +175,7 @@ the command `npm install -g yarn` if needed)
     pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
     ``` 
 
-    _For Macintoshes, either Intel or M1/M2:_
+    _For Macintoshes, either Intel or M1/M2/M3:_
 
     ```sh
     pip install InvokeAI --use-pep517
@@ -184,8 +184,9 @@ the command `npm install -g yarn` if needed)
 6. Configure InvokeAI and install a starting set of image generation models (you only need to do this once):
 
     ```terminal
-    invokeai-configure
+    invokeai-configure --root .
     ```
+	Don't miss the dot at the end!
 
 7. Launch the web server (do it every time you run InvokeAI):
 
@@ -193,15 +194,9 @@ the command `npm install -g yarn` if needed)
     invokeai-web
     ```
 
-8. Build Node.js assets
+8. Point your browser to http://localhost:9090 to bring up the web interface.
 
-  ```terminal
-  cd invokeai/frontend/web/
-  yarn vite build
-  ```
-
-9. Point your browser to http://localhost:9090 to bring up the web interface.
-10. Type `banana sushi` in the box on the top left and click `Invoke`.
+9. Type `banana sushi` in the box on the top left and click `Invoke`.
 
 Be sure to activate the virtual environment each time before re-launching InvokeAI,
 using `source .venv/bin/activate` or `.venv\Scripts\activate`.
@@ -311,13 +306,30 @@ InvokeAI. The second will prepare the 2.3 directory for use with 3.0.
 You may now launch the WebUI in the usual way, by selecting option [1]
 from the launcher script
 
-#### Migration Caveats
+#### Migrating Images
 
 The migration script will migrate your invokeai settings and models,
 including textual inversion models, LoRAs and merges that you may have
 installed previously. However it does **not** migrate the generated
-images stored in your 2.3-format outputs directory. You will need to
-manually import selected images into the 3.0 gallery via drag-and-drop.
+images stored in your 2.3-format outputs directory. To do this, you 
+need to run an additional step:
+
+1. From a working InvokeAI 3.0 root directory, start the launcher and
+enter menu option [8] to open the "developer's console".
+
+2. At the developer's console command line, type the command:
+
+```bash
+invokeai-import-images
+```
+
+3. This will lead you through the process of confirming the desired
+   source and destination for the imported images. The images will
+   appear in the gallery board of your choice, and contain the
+   original prompt, model name, and other parameters used to generate
+   the image.
+   
+(Many kudos to **techjedi** for contributing this script.)
 
 ## Hardware Requirements
 
@@ -356,9 +368,9 @@ InvokeAI offers a locally hosted Web Server & React Frontend, with an industry l
 
 The Unified Canvas is a fully integrated canvas implementation with support for all core generation capabilities, in/outpainting, brush tools, and more. This creative tool unlocks the capability for artists to create with AI as a creative collaborator, and can be used to augment AI-generated imagery, sketches, photography, renders, and more.
 
-### *Node Architecture & Editor (Beta)*
+### *Workflows & Nodes*
 
-Invoke AI's backend is built on a graph-based execution architecture. This allows for customizable generation pipelines to be developed by professional users looking to create specific workflows to support their production use-cases, and will be extended in the future with additional capabilities.
+InvokeAI offers a fully featured workflow management solution, enabling users to combine the power of nodes based workflows with the easy of a UI. This allows for customizable generation pipelines to be developed and shared by users looking to create specific workflows to support their production use-cases.
 
 ### *Board & Gallery Management*
 
@@ -371,8 +383,9 @@ Invoke AI provides an organized gallery system for easily storing, accessing, an
 - *Upscaling Tools*
 - *Embedding Manager & Support*
 - *Model Manager & Support*
+- *Workflow creation & management*
 - *Node-Based Architecture*
-- *Node-Based Plug-&-Play UI (Beta)*
+
 
 ### Latest Changes
 
@@ -382,21 +395,19 @@ Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 
 ### Troubleshooting
 
-Please check out our **[Q&A](https://invoke-ai.github.io/InvokeAI/help/TROUBLESHOOT/#faq)** to get solutions for common installation
-problems and other issues.
+Please check out our **[Troubleshooting Guide](https://invoke-ai.github.io/InvokeAI/installation/010_INSTALL_AUTOMATED/#troubleshooting)** to get solutions for common installation
+problems and other issues. For more help, please join our [Discord][discord link]
 
 ## Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
 cleanup, testing, or code reviews, is very much encouraged to do so.
 
-To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board.
-
-If you'd like to help with translation, please see our [translation guide](docs/other/TRANSLATION.md).
+Get started with contributing by reading our [Contribution documentation](https://invoke-ai.github.io/InvokeAI/contributing/CONTRIBUTING/), joining the [#dev-chat](https://discord.com/channels/1020123559063990373/1049495067846524939) or the GitHub discussion board.
 
 If you are unfamiliar with how
-to contribute to GitHub projects, here is a
-[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress. You can **make your pull request against the "main" branch**.
+to contribute to GitHub projects, we have a new contributor checklist you can follow to get started contributing: 
+[New Contributor Checklist](https://invoke-ai.github.io/InvokeAI/contributing/contribution_guides/newContributorChecklist/).
 
 We hope you enjoy using our software as much as we enjoy creating it,
 and we hope that some of those of you who are reading this will elect
@@ -412,7 +423,7 @@ their time, hard work and effort.
 
 ### Support
 
-For support, please use this repository's GitHub Issues tracking service, or join the Discord.
+For support, please use this repository's GitHub Issues tracking service, or join the [Discord][discord link].
 
 Original portions of the software are Copyright (c) 2023 by respective contributors.
 

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import platform
 from contextlib import nullcontext
+from typing import Union
 
 import torch
+from packaging import version
 from torch import autocast
-from typing import Union
+
 from invokeai.app.services.config import InvokeAIAppConfig
 
 CPU_DEVICE = torch.device("cpu")
@@ -12,15 +15,20 @@ CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
 config = InvokeAIAppConfig.get_config()
 
+
 def choose_torch_device() -> torch.device:
     """Convenience routine for guessing which GPU device to run model on"""
-    if config.always_use_cpu:
+    if config.use_cpu:  # legacy setting - force CPU
         return CPU_DEVICE
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return CPU_DEVICE
+    elif config.device == "auto":
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return torch.device("mps")
+        else:
+            return CPU_DEVICE
+    else:
+        return torch.device(config.device)
 
 
 def choose_precision(device: torch.device) -> str:
@@ -29,7 +37,7 @@ def choose_precision(device: torch.device) -> str:
         device_name = torch.cuda.get_device_name(device)
         if not ("GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name):
             return "float16"
-    elif device.type == "mps":
+    elif device.type == "mps" and version.parse(platform.mac_ver()[0]) < version.parse("14.0.0"):
         return "float16"
     return "float32"
 

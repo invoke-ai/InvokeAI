@@ -24,13 +24,8 @@ import torch.utils.checkpoint
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.utils import set_seed, ProjectConfiguration
-from diffusers import (
-    AutoencoderKL,
-    DDPMScheduler,
-    StableDiffusionPipeline,
-    UNet2DConditionModel,
-)
+from accelerate.utils import ProjectConfiguration, set_seed
+from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version
 from diffusers.utils.import_utils import is_xformers_available
@@ -45,8 +40,8 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
-from invokeai.app.services.config import InvokeAIAppConfig,PagingArgumentParser
-from invokeai.app.services.model_manager_service import ModelManagerService
+from invokeai.app.services.config import InvokeAIAppConfig, PagingArgumentParser
+from invokeai.app.services.model_manager import ModelManagerService
 from invokeai.backend.model_management.models import SubModelType
 
 if version.parse(version.parse(PIL.__version__).base_version) >= version.parse("9.1.0"):
@@ -75,24 +70,16 @@ check_min_version("0.10.0.dev0")
 logger = get_logger(__name__)
 
 
-def save_progress(
-    text_encoder, placeholder_token_id, accelerator, placeholder_token, save_path
-):
+def save_progress(text_encoder, placeholder_token_id, accelerator, placeholder_token, save_path):
     logger.info("Saving embeddings")
-    learned_embeds = (
-        accelerator.unwrap_model(text_encoder)
-        .get_input_embeddings()
-        .weight[placeholder_token_id]
-    )
+    learned_embeds = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[placeholder_token_id]
     learned_embeds_dict = {placeholder_token: learned_embeds.detach().cpu()}
     torch.save(learned_embeds_dict, save_path)
 
 
 def parse_args():
     config = InvokeAIAppConfig.get_config()
-    parser = PagingArgumentParser(
-        description="Textual inversion training"
-    )
+    parser = PagingArgumentParser(description="Textual inversion training")
     general_group = parser.add_argument_group("General")
     model_group = parser.add_argument_group("Models and Paths")
     image_group = parser.add_argument_group("Training Image Location and Options")
@@ -221,9 +208,7 @@ def parse_args():
         default=100,
         help="How many times to repeat the training data.",
     )
-    training_group.add_argument(
-        "--seed", type=int, default=None, help="A seed for reproducible training."
-    )
+    training_group.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
     training_group.add_argument(
         "--train_batch_size",
         type=int,
@@ -287,9 +272,7 @@ def parse_args():
         default=0.999,
         help="The beta2 parameter for the Adam optimizer.",
     )
-    training_group.add_argument(
-        "--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use."
-    )
+    training_group.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
     training_group.add_argument(
         "--adam_epsilon",
         type=float,
@@ -442,9 +425,7 @@ class TextualInversionDataset(Dataset):
             self.data_root / file_path
             for file_path in self.data_root.iterdir()
             if file_path.is_file()
-            and file_path.name.endswith(
-                (".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG", ".gif", ".GIF")
-            )
+            and file_path.name.endswith((".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG", ".gif", ".GIF"))
         ]
 
         self.num_images = len(self.image_paths)
@@ -460,11 +441,7 @@ class TextualInversionDataset(Dataset):
             "lanczos": PIL_INTERPOLATION["lanczos"],
         }[interpolation]
 
-        self.templates = (
-            imagenet_style_templates_small
-            if learnable_property == "style"
-            else imagenet_templates_small
-        )
+        self.templates = imagenet_style_templates_small if learnable_property == "style" else imagenet_templates_small
         self.flip_transform = transforms.RandomHorizontalFlip(p=self.flip_p)
 
     def __len__(self):
@@ -500,9 +477,7 @@ class TextualInversionDataset(Dataset):
                 img.shape[0],
                 img.shape[1],
             )
-            img = img[
-                (h - crop) // 2 : (h + crop) // 2, (w - crop) // 2 : (w + crop) // 2
-            ]
+            img = img[(h - crop) // 2 : (h + crop) // 2, (w - crop) // 2 : (w + crop) // 2]
 
         image = Image.fromarray(img)
         image = image.resize((self.size, self.size), resample=self.interpolation)
@@ -515,9 +490,7 @@ class TextualInversionDataset(Dataset):
         return example
 
 
-def get_full_repo_name(
-    model_id: str, organization: Optional[str] = None, token: Optional[str] = None
-):
+def get_full_repo_name(model_id: str, organization: Optional[str] = None, token: Optional[str] = None):
     if token is None:
         token = HfFolder.get_token()
     if organization is None:
@@ -570,9 +543,7 @@ def do_textual_inversion_training(
     **kwargs,
 ):
     assert model, "Please specify a base model with --model"
-    assert (
-        train_data_dir
-    ), "Please specify a directory containing the training images using --train_data_dir"
+    assert train_data_dir, "Please specify a directory containing the training images using --train_data_dir"
     assert placeholder_token, "Please specify a trigger term using --placeholder_token"
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != local_rank:
@@ -593,7 +564,7 @@ def do_textual_inversion_training(
         project_config=accelerator_config,
     )
 
-    model_manager = ModelManagerService(config,logger)
+    model_manager = ModelManagerService(config, logger)
 
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -633,26 +604,22 @@ def do_textual_inversion_training(
             os.makedirs(output_dir, exist_ok=True)
 
     known_models = model_manager.model_names()
-    model_name = model.split('/')[-1]
+    model_name = model.split("/")[-1]
     model_meta = next((mm for mm in known_models if mm[0].endswith(model_name)), None)
     assert model_meta is not None, f"Unknown model: {model}"
     model_info = model_manager.model_info(*model_meta)
-    assert (
-        model_info['model_format'] == "diffusers"
-    ), "This script only works with models of type 'diffusers'"
+    assert model_info["model_format"] == "diffusers", "This script only works with models of type 'diffusers'"
     tokenizer_info = model_manager.get_model(*model_meta, submodel=SubModelType.Tokenizer)
     noise_scheduler_info = model_manager.get_model(*model_meta, submodel=SubModelType.Scheduler)
     text_encoder_info = model_manager.get_model(*model_meta, submodel=SubModelType.TextEncoder)
     vae_info = model_manager.get_model(*model_meta, submodel=SubModelType.Vae)
     unet_info = model_manager.get_model(*model_meta, submodel=SubModelType.UNet)
 
-    pipeline_args = dict(local_files_only=True)
+    pipeline_args = {"local_files_only": True}
     if tokenizer_name:
         tokenizer = CLIPTokenizer.from_pretrained(tokenizer_name, **pipeline_args)
     else:
-        tokenizer = CLIPTokenizer.from_pretrained(
-            tokenizer_info.location, subfolder='tokenizer', **pipeline_args
-        )
+        tokenizer = CLIPTokenizer.from_pretrained(tokenizer_info.location, subfolder="tokenizer", **pipeline_args)
 
     # Load scheduler and models
     noise_scheduler = DDPMScheduler.from_pretrained(
@@ -722,9 +689,7 @@ def do_textual_inversion_training(
         if is_xformers_available():
             unet.enable_xformers_memory_efficient_attention()
         else:
-            raise ValueError(
-                "xformers is not available. Make sure it is installed correctly"
-            )
+            raise ValueError("xformers is not available. Make sure it is installed correctly")
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -732,12 +697,7 @@ def do_textual_inversion_training(
         torch.backends.cuda.matmul.allow_tf32 = True
 
     if scale_lr:
-        learning_rate = (
-            learning_rate
-            * gradient_accumulation_steps
-            * train_batch_size
-            * accelerator.num_processes
-        )
+        learning_rate = learning_rate * gradient_accumulation_steps * train_batch_size * accelerator.num_processes
 
     # Initialize the optimizer
     optimizer = torch.optim.AdamW(
@@ -759,15 +719,11 @@ def do_textual_inversion_training(
         center_crop=center_crop,
         set="train",
     )
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=train_batch_size, shuffle=True
-    )
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / gradient_accumulation_steps
-    )
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
     if max_train_steps is None:
         max_train_steps = num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -797,9 +753,7 @@ def do_textual_inversion_training(
     vae.to(accelerator.device, dtype=weight_dtype)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / gradient_accumulation_steps
-    )
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
     if overrode_max_train_steps:
         max_train_steps = num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
@@ -814,17 +768,13 @@ def do_textual_inversion_training(
         accelerator.init_trackers("textual_inversion", config=params)
 
     # Train!
-    total_batch_size = (
-        train_batch_size * accelerator.num_processes * gradient_accumulation_steps
-    )
+    total_batch_size = train_batch_size * accelerator.num_processes * gradient_accumulation_steps
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {train_batch_size}")
-    logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
-    )
+    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {max_train_steps}")
     global_step = 0
@@ -843,9 +793,7 @@ def do_textual_inversion_training(
             path = dirs[-1] if len(dirs) > 0 else None
 
         if path is None:
-            accelerator.print(
-                f"Checkpoint '{resume_from_checkpoint}' does not exist. Starting a new training run."
-            )
+            accelerator.print(f"Checkpoint '{resume_from_checkpoint}' does not exist. Starting a new training run.")
             resume_from_checkpoint = None
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
@@ -854,9 +802,7 @@ def do_textual_inversion_training(
 
             resume_global_step = global_step * gradient_accumulation_steps
             first_epoch = global_step // num_update_steps_per_epoch
-            resume_step = resume_global_step % (
-                num_update_steps_per_epoch * gradient_accumulation_steps
-            )
+            resume_step = resume_global_step % (num_update_steps_per_epoch * gradient_accumulation_steps)
 
     # Only show the progress bar once on each machine.
     progress_bar = tqdm(
@@ -866,33 +812,20 @@ def do_textual_inversion_training(
     progress_bar.set_description("Steps")
 
     # keep original embeddings as reference
-    orig_embeds_params = (
-        accelerator.unwrap_model(text_encoder)
-        .get_input_embeddings()
-        .weight.data.clone()
-    )
+    orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
 
     for epoch in range(first_epoch, num_train_epochs):
         text_encoder.train()
         for step, batch in enumerate(train_dataloader):
             # Skip steps until we reach the resumed step
-            if (
-                resume_step
-                and resume_from_checkpoint
-                and epoch == first_epoch
-                and step < resume_step
-            ):
+            if resume_step and resume_from_checkpoint and epoch == first_epoch and step < resume_step:
                 if step % gradient_accumulation_steps == 0:
                     progress_bar.update(1)
                 continue
 
             with accelerator.accumulate(text_encoder):
                 # Convert images to latent space
-                latents = (
-                    vae.encode(batch["pixel_values"].to(dtype=weight_dtype))
-                    .latent_dist.sample()
-                    .detach()
-                )
+                latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample().detach()
                 latents = latents * 0.18215
 
                 # Sample noise that we'll add to the latents
@@ -912,14 +845,10 @@ def do_textual_inversion_training(
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(
-                    dtype=weight_dtype
-                )
+                encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype)
 
                 # Predict the noise residual
-                model_pred = unet(
-                    noisy_latents, timesteps, encoder_hidden_states
-                ).sample
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
                 # Get the target for loss depending on the prediction type
                 if noise_scheduler.config.prediction_type == "epsilon":
@@ -927,9 +856,7 @@ def do_textual_inversion_training(
                 elif noise_scheduler.config.prediction_type == "v_prediction":
                     target = noise_scheduler.get_velocity(latents, noise, timesteps)
                 else:
-                    raise ValueError(
-                        f"Unknown prediction type {noise_scheduler.config.prediction_type}"
-                    )
+                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
                 loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
@@ -942,22 +869,16 @@ def do_textual_inversion_training(
                 # Let's make sure we don't update any embedding weights besides the newly added token
                 index_no_updates = torch.arange(len(tokenizer)) != placeholder_token_id
                 with torch.no_grad():
-                    accelerator.unwrap_model(
-                        text_encoder
-                    ).get_input_embeddings().weight[
+                    accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[
                         index_no_updates
-                    ] = orig_embeds_params[
-                        index_no_updates
-                    ]
+                    ] = orig_embeds_params[index_no_updates]
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
                 progress_bar.update(1)
                 global_step += 1
                 if global_step % save_steps == 0:
-                    save_path = os.path.join(
-                        output_dir, f"learned_embeds-steps-{global_step}.bin"
-                    )
+                    save_path = os.path.join(output_dir, f"learned_embeds-steps-{global_step}.bin")
                     save_progress(
                         text_encoder,
                         placeholder_token_id,
@@ -968,9 +889,7 @@ def do_textual_inversion_training(
 
                 if global_step % checkpointing_steps == 0:
                     if accelerator.is_main_process:
-                        save_path = os.path.join(
-                            output_dir, f"checkpoint-{global_step}"
-                        )
+                        save_path = os.path.join(output_dir, f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
 
@@ -985,9 +904,7 @@ def do_textual_inversion_training(
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
         if push_to_hub and only_save_embeds:
-            logger.warn(
-                "Enabling full model saving because --push_to_hub=True was specified."
-            )
+            logger.warn("Enabling full model saving because --push_to_hub=True was specified.")
             save_full_model = True
         else:
             save_full_model = not only_save_embeds
@@ -1012,8 +929,6 @@ def do_textual_inversion_training(
         )
 
         if push_to_hub:
-            repo.push_to_hub(
-                commit_message="End of training", blocking=False, auto_lfs_prune=True
-            )
+            repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
 
     accelerator.end_training()

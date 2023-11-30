@@ -128,7 +128,7 @@ python scripts/invoke.py --web --max_load_models=3 \
 ```
 
 These options are described in detail in the
-[Command-Line Interface](../../features/CLI.md) documentation.
+[Command-Line Interface](../../deprecated/CLI.md) documentation.
 
 ## Troubleshooting
 

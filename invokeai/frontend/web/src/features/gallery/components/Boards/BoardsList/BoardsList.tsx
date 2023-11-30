@@ -7,7 +7,7 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { BoardDTO } from 'services/api/types';
-import DeleteBoardModal from '../DeleteBoardModal';
+import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
@@ -15,10 +15,9 @@ import NoBoardBoard from './NoBoardBoard';
 
 const selector = createSelector(
   [stateSelector],
-  ({ boards, gallery }) => {
-    const { searchText } = boards;
-    const { selectedBoardId } = gallery;
-    return { selectedBoardId, searchText };
+  ({ gallery }) => {
+    const { selectedBoardId, boardSearchText } = gallery;
+    return { selectedBoardId, boardSearchText };
   },
   defaultSelectorOptions
 );
@@ -29,11 +28,11 @@ type Props = {
 
 const BoardsList = (props: Props) => {
   const { isOpen } = props;
-  const { selectedBoardId, searchText } = useAppSelector(selector);
+  const { selectedBoardId, boardSearchText } = useAppSelector(selector);
   const { data: boards } = useListAllBoardsQuery();
-  const filteredBoards = searchText
+  const filteredBoards = boardSearchText
     ? boards?.filter((board) =>
-        board.board_name.toLowerCase().includes(searchText.toLowerCase())
+        board.board_name.toLowerCase().includes(boardSearchText.toLowerCase())
       )
     : boards;
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
@@ -42,7 +41,7 @@ const BoardsList = (props: Props) => {
     <>
       <Collapse in={isOpen} animateOpacity>
         <Flex
-          layerStyle={'first'}
+          layerStyle="first"
           sx={{
             flexDir: 'column',
             gap: 2,
@@ -69,17 +68,22 @@ const BoardsList = (props: Props) => {
           >
             <Grid
               className="list-container"
+              data-testid="boards-list"
               sx={{
                 gridTemplateColumns: `repeat(auto-fill, minmax(108px, 1fr));`,
                 maxH: 346,
               }}
             >
-              <GridItem sx={{ p: 1.5 }}>
-                <NoBoardBoard isSelected={selectedBoardId === undefined} />
+              <GridItem sx={{ p: 1.5 }} data-testid="no-board">
+                <NoBoardBoard isSelected={selectedBoardId === 'none'} />
               </GridItem>
               {filteredBoards &&
-                filteredBoards.map((board) => (
-                  <GridItem key={board.board_id} sx={{ p: 1.5 }}>
+                filteredBoards.map((board, index) => (
+                  <GridItem
+                    key={board.board_id}
+                    sx={{ p: 1.5 }}
+                    data-testid={`board-${index}`}
+                  >
                     <GalleryBoard
                       board={board}
                       isSelected={selectedBoardId === board.board_id}

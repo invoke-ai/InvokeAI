@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 
 import IAISlider from 'common/components/IAISlider';
@@ -56,30 +57,34 @@ const ParamSteps = () => {
   }, [dispatch]);
 
   return shouldUseSliders ? (
-    <IAISlider
-      label={t('parameters.steps')}
-      min={min}
-      max={sliderMax}
-      step={step}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={steps}
-      withInput
-      withReset
-      withSliderMarks
-      sliderNumberInputProps={{ max: inputMax }}
-    />
+    <IAIInformationalPopover feature="paramSteps">
+      <IAISlider
+        label={t('parameters.steps')}
+        min={min}
+        max={sliderMax}
+        step={step}
+        onChange={handleChange}
+        handleReset={handleReset}
+        value={steps}
+        withInput
+        withReset
+        withSliderMarks
+        sliderNumberInputProps={{ max: inputMax }}
+      />
+    </IAIInformationalPopover>
   ) : (
-    <IAINumberInput
-      label={t('parameters.steps')}
-      min={min}
-      max={inputMax}
-      step={step}
-      onChange={handleChange}
-      value={steps}
-      numberInputFieldProps={{ textAlign: 'center' }}
-      onBlur={handleBlur}
-    />
+    <IAIInformationalPopover feature="paramSteps">
+      <IAINumberInput
+        label={t('parameters.steps')}
+        min={min}
+        max={inputMax}
+        step={step}
+        onChange={handleChange}
+        value={steps}
+        numberInputFieldProps={{ textAlign: 'center' }}
+        onBlur={handleBlur}
+      />
+    </IAIInformationalPopover>
   );
 };
 

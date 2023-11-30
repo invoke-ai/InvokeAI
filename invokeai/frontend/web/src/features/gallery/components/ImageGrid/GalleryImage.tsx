@@ -1,26 +1,26 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
-import { stateSelector } from 'app/store/store';
+import { useStore } from '@nanostores/react';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-
-export const makeSelector = (image_name: string) =>
-  createSelector(
-    [stateSelector],
-    ({ gallery }) => ({
-      isSelected: gallery.selection.includes(image_name),
-      selectionCount: gallery.selection.length,
-      selection: gallery.selection,
-    }),
-    defaultSelectorOptions
-  );
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import {
+  ImageDTOsDraggableData,
+  ImageDraggableData,
+  TypesafeDraggableData,
+} from 'features/dnd/types';
+import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
+import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaTrash } from 'react-icons/fa';
+import { MdStar, MdStarBorder } from 'react-icons/md';
+import {
+  useGetImageDTOQuery,
+  useStarImagesMutation,
+  useUnstarImagesMutation,
+} from 'services/api/endpoints/images';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 
 interface HoverableImageProps {
   imageName: string;
@@ -30,22 +30,13 @@ const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const localSelector = useMemo(() => makeSelector(imageName), [imageName]);
+  const shift = useAppSelector((state) => state.hotkeys.shift);
+  const { t } = useTranslation();
 
-  const { isSelected, selectionCount, selection } =
-    useAppSelector(localSelector);
+  const { handleClick, isSelected, selection, selectionCount } =
+    useMultiselect(imageDTO);
 
-  const handleClick = useCallback(() => {
-    // disable multiselect for now
-    // if (e.shiftKey) {
-    //   dispatch(imageRangeEndSelected(imageName));
-    // } else if (e.ctrlKey || e.metaKey) {
-    //   dispatch(imageSelectionToggled(imageName));
-    // } else {
-    //   dispatch(imageSelected(imageName));
-    // }
-    dispatch(imageSelected(imageName));
-  }, [dispatch, imageName]);
+  const customStarUi = useStore($customStarUI);
 
   const handleDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -53,35 +44,83 @@ const GalleryImage = (props: HoverableImageProps) => {
       if (!imageDTO) {
         return;
       }
-      dispatch(imageToDeleteSelected(imageDTO));
+      dispatch(imagesToDeleteSelected([imageDTO]));
     },
     [dispatch, imageDTO]
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (selectionCount > 1) {
-      return {
+      const data: ImageDTOsDraggableData = {
         id: 'gallery-image',
-        payloadType: 'IMAGE_NAMES',
-        payload: { image_names: selection },
+        payloadType: 'IMAGE_DTOS',
+        payload: { imageDTOs: selection },
       };
+      return data;
     }
 
     if (imageDTO) {
-      return {
+      const data: ImageDraggableData = {
         id: 'gallery-image',
         payloadType: 'IMAGE_DTO',
         payload: { imageDTO },
       };
+      return data;
     }
   }, [imageDTO, selection, selectionCount]);
+
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
+
+  const toggleStarredState = useCallback(() => {
+    if (imageDTO) {
+      if (imageDTO.starred) {
+        unstarImages({ imageDTOs: [imageDTO] });
+      }
+      if (!imageDTO.starred) {
+        starImages({ imageDTOs: [imageDTO] });
+      }
+    }
+  }, [starImages, unstarImages, imageDTO]);
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
+  const starIcon = useMemo(() => {
+    if (imageDTO?.starred) {
+      return customStarUi ? customStarUi.on.icon : <MdStar size="20" />;
+    }
+    if (!imageDTO?.starred && isHovered) {
+      return customStarUi ? customStarUi.off.icon : <MdStarBorder size="20" />;
+    }
+  }, [imageDTO?.starred, isHovered, customStarUi]);
+
+  const starTooltip = useMemo(() => {
+    if (imageDTO?.starred) {
+      return customStarUi ? customStarUi.off.text : 'Unstar';
+    }
+    if (!imageDTO?.starred) {
+      return customStarUi ? customStarUi.on.text : 'Star';
+    }
+    return '';
+  }, [imageDTO?.starred, customStarUi]);
 
   if (!imageDTO) {
     return <IAIFillSkeleton />;
   }
 
   return (
-    <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
+    <Box
+      sx={{ w: 'full', h: 'full', touchAction: 'none' }}
+      data-testid={`image-${imageDTO.image_name}`}
+    >
       <Flex
         userSelect="none"
         sx={{
@@ -97,16 +136,34 @@ const GalleryImage = (props: HoverableImageProps) => {
           draggableData={draggableData}
           isSelected={isSelected}
           minSize={0}
-          onClickReset={handleDelete}
           imageSx={{ w: 'full', h: 'full' }}
           isDropDisabled={true}
           isUploadDisabled={true}
           thumbnail={true}
           withHoverOverlay
-          // resetIcon={<FaTrash />}
-          // resetTooltip="Delete image"
-          // withResetIcon // removed bc it's too easy to accidentally delete images
-        />
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
+        >
+          <>
+            <IAIDndImageIcon
+              onClick={toggleStarredState}
+              icon={starIcon}
+              tooltip={starTooltip}
+            />
+
+            {isHovered && shift && (
+              <IAIDndImageIcon
+                onClick={handleDelete}
+                icon={<FaTrash />}
+                tooltip={t('gallery.deleteImage')}
+                styleOverrides={{
+                  bottom: 2,
+                  top: 'auto',
+                }}
+              />
+            )}
+          </>
+        </IAIDndImage>
       </Flex>
     </Box>
   );

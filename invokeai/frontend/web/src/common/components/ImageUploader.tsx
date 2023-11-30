@@ -1,10 +1,11 @@
 import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   KeyboardEvent,
   ReactNode,
@@ -18,8 +19,6 @@ import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import ImageUploadOverlay from './ImageUploadOverlay';
-import { AnimatePresence, motion } from 'framer-motion';
-import { stateSelector } from 'app/store/store';
 
 const selector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -51,7 +50,6 @@ type ImageUploaderProps = {
 const ImageUploader = (props: ImageUploaderProps) => {
   const { children } = props;
   const { autoAddBoardId, postUploadAction } = useAppSelector(selector);
-  const isBusy = useAppSelector(selectIsBusy);
   const toaster = useAppToaster();
   const { t } = useTranslation();
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
@@ -78,7 +76,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         image_category: 'user',
         is_intermediate: false,
         postUploadAction,
-        board_id: autoAddBoardId,
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
       });
     },
     [autoAddBoardId, postUploadAction, uploadImage]
@@ -106,6 +104,10 @@ const ImageUploader = (props: ImageUploaderProps) => {
     [t, toaster, fileAcceptedCallback, fileRejectionCallback]
   );
 
+  const onDragOver = useCallback(() => {
+    setIsHandlingUpload(true);
+  }, []);
+
   const {
     getRootProps,
     getInputProps,
@@ -117,8 +119,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
     noClick: true,
     onDrop,
-    onDragOver: () => setIsHandlingUpload(true),
-    disabled: isBusy,
+    onDragOver,
     multiple: false,
   });
 
@@ -145,14 +146,15 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [inputRef]);
 
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Bail out if user hits spacebar - do not open the uploader
+    if (e.key === ' ') {
+      return;
+    }
+  }, []);
+
   return (
-    <Box
-      {...getRootProps({ style: {} })}
-      onKeyDown={(e: KeyboardEvent) => {
-        // Bail out if user hits spacebar - do not open the uploader
-        if (e.key === ' ') return;
-      }}
-    >
+    <Box {...getRootProps({ style: {} })} onKeyDown={handleKeyDown}>
       <input {...getInputProps()} />
       {children}
       <AnimatePresence>

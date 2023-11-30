@@ -1,7 +1,7 @@
 import {
   As,
-  ChakraProps,
   Flex,
+  FlexProps,
   Icon,
   Skeleton,
   Spinner,
@@ -47,15 +47,14 @@ export const IAILoadingImageFallback = (props: Props) => {
   );
 };
 
-type IAINoImageFallbackProps = {
+type IAINoImageFallbackProps = FlexProps & {
   label?: string;
-  icon?: As;
+  icon?: As | null;
   boxSize?: StyleProps['boxSize'];
-  sx?: ChakraProps['sx'];
 };
 
 export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
-  const { icon = FaImage, boxSize = 16 } = props;
+  const { icon = FaImage, boxSize = 16, sx, ...rest } = props;
 
   return (
     <Flex
@@ -73,10 +72,46 @@ export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
         _dark: {
           color: 'base.500',
         },
-        ...props.sx,
+        ...sx,
       }}
+      {...rest}
     >
-      <Icon as={icon} boxSize={boxSize} opacity={0.7} />
+      {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
+      {props.label && <Text textAlign="center">{props.label}</Text>}
+    </Flex>
+  );
+};
+
+type IAINoImageFallbackWithSpinnerProps = FlexProps & {
+  label?: string;
+};
+
+export const IAINoContentFallbackWithSpinner = (
+  props: IAINoImageFallbackWithSpinnerProps
+) => {
+  const { sx, ...rest } = props;
+
+  return (
+    <Flex
+      sx={{
+        w: 'full',
+        h: 'full',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 'base',
+        flexDir: 'column',
+        gap: 2,
+        userSelect: 'none',
+        opacity: 0.7,
+        color: 'base.700',
+        _dark: {
+          color: 'base.500',
+        },
+        ...sx,
+      }}
+      {...rest}
+    >
+      <Spinner size="xl" />
       {props.label && <Text textAlign="center">{props.label}</Text>}
     </Flex>
   );

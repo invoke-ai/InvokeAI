@@ -4,9 +4,9 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
-from invokeai.app.services.board_record_storage import BoardChanges
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.board_record import BoardDTO
+from invokeai.app.services.board_records.board_records_common import BoardChanges
+from invokeai.app.services.boards.boards_common import BoardDTO
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 from ..dependencies import ApiDependencies
 
@@ -18,9 +18,7 @@ class DeleteBoardResult(BaseModel):
     deleted_board_images: list[str] = Field(
         description="The image names of the board-images relationships that were deleted."
     )
-    deleted_images: list[str] = Field(
-        description="The names of the images that were deleted."
-    )
+    deleted_images: list[str] = Field(description="The names of the images that were deleted.")
 
 
 @boards_router.post(
@@ -39,7 +37,7 @@ async def create_board(
     try:
         result = ApiDependencies.invoker.services.boards.create(board_name=board_name)
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to create board")
 
 
@@ -52,7 +50,7 @@ async def get_board(
     try:
         result = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404, detail="Board not found")
 
 
@@ -73,22 +71,16 @@ async def update_board(
 ) -> BoardDTO:
     """Updates a board"""
     try:
-        result = ApiDependencies.invoker.services.boards.update(
-            board_id=board_id, changes=changes
-        )
+        result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to update board")
 
 
-@boards_router.delete(
-    "/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult
-)
+@boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
 async def delete_board(
     board_id: str = Path(description="The id of board to delete"),
-    include_images: Optional[bool] = Query(
-        description="Permanently delete all images on the board", default=False
-    ),
+    include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
 ) -> DeleteBoardResult:
     """Deletes a board"""
     try:
@@ -96,9 +88,7 @@ async def delete_board(
             deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
                 board_id=board_id
             )
-            ApiDependencies.invoker.services.images.delete_images_on_board(
-                board_id=board_id
-            )
+            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
@@ -115,7 +105,7 @@ async def delete_board(
                 deleted_board_images=deleted_board_images,
                 deleted_images=[],
             )
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete board")
 
 
@@ -127,9 +117,7 @@ async def delete_board(
 async def list_boards(
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
     offset: Optional[int] = Query(default=None, description="The page offset"),
-    limit: Optional[int] = Query(
-        default=None, description="The number of boards per page"
-    ),
+    limit: Optional[int] = Query(default=None, description="The number of boards per page"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards"""
     if all:

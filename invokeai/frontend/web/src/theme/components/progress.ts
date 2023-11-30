@@ -9,7 +9,7 @@ const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
 
 const invokeAIFilledTrack = defineStyle((_props) => ({
-  bg: 'accentAlpha.500',
+  bg: 'accentAlpha.700',
 }));
 
 const invokeAITrack = defineStyle((_props) => {

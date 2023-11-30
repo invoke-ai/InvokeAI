@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
-import { parseSchema } from 'features/nodes/util/parseSchema';
+import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { startAppListening } from '..';
@@ -9,13 +9,18 @@ import { startAppListening } from '..';
 export const addReceivedOpenAPISchemaListener = () => {
   startAppListening({
     actionCreator: receivedOpenAPISchema.fulfilled,
-    effect: (action, { dispatch }) => {
+    effect: (action, { dispatch, getState }) => {
       const log = logger('system');
       const schemaJSON = action.payload;
 
-      log.debug({ schemaJSON }, 'Dereferenced OpenAPI schema');
+      log.debug({ schemaJSON }, 'Received OpenAPI schema');
+      const { nodesAllowlist, nodesDenylist } = getState().config;
 
-      const nodeTemplates = parseSchema(schemaJSON);
+      const nodeTemplates = parseSchema(
+        schemaJSON,
+        nodesAllowlist,
+        nodesDenylist
+      );
 
       log.debug(
         { nodeTemplates: parseify(nodeTemplates) },
@@ -28,9 +33,12 @@ export const addReceivedOpenAPISchemaListener = () => {
 
   startAppListening({
     actionCreator: receivedOpenAPISchema.rejected,
-    effect: () => {
+    effect: (action) => {
       const log = logger('system');
-      log.error('Problem dereferencing OpenAPI Schema');
+      log.error(
+        { error: parseify(action.error) },
+        'Problem retrieving OpenAPI Schema'
+      );
     },
   });
 };

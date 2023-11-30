@@ -4,6 +4,7 @@ import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addCanvasSavedToGalleryListener = () => {
   startAppListening({
@@ -12,19 +13,22 @@ export const addCanvasSavedToGalleryListener = () => {
       const log = logger('canvas');
       const state = getState();
 
-      const blob = await getBaseLayerBlob(state);
-
-      if (!blob) {
-        log.error('Problem getting base layer blob');
+      let blob;
+      try {
+        blob = await getBaseLayerBlob(state);
+      } catch (err) {
+        log.error(String(err));
         dispatch(
           addToast({
-            title: 'Problem Saving Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemSavingCanvas'),
+            description: t('toast.problemSavingCanvasDesc'),
             status: 'error',
           })
         );
         return;
       }
+
+      const { autoAddBoardId } = state.gallery;
 
       dispatch(
         imagesApi.endpoints.uploadImage.initiate({
@@ -33,11 +37,11 @@ export const addCanvasSavedToGalleryListener = () => {
           }),
           image_category: 'general',
           is_intermediate: false,
-          board_id: state.gallery.autoAddBoardId,
+          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: 'Canvas Saved to Gallery' },
+            toastOptions: { title: t('toast.canvasSavedGallery') },
           },
         })
       );

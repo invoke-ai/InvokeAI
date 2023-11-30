@@ -7,23 +7,32 @@ import {
   Icon,
   Image,
   Text,
+  Tooltip,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { AddToBoardDropData } from 'features/dnd/types';
+import {
+  autoAddBoardIdChanged,
+  boardIdSelected,
+} from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FaUser } from 'react-icons/fa';
-import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
+import {
+  useGetBoardAssetsTotalQuery,
+  useGetBoardImagesTotalQuery,
+  useUpdateBoardMutation,
+} from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
-import AutoAddIcon from '../AutoAddIcon';
-import BoardContextMenu from '../BoardContextMenu';
+import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
+import { useTranslation } from 'react-i18next';
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -31,110 +40,132 @@ interface GalleryBoardProps {
   setBoardToDelete: (board?: BoardDTO) => void;
 }
 
-const GalleryBoard = memo(
-  ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
-    const dispatch = useAppDispatch();
-    const selector = useMemo(
-      () =>
-        createSelector(
-          stateSelector,
-          ({ gallery }) => {
-            const isSelectedForAutoAdd =
-              board.board_id === gallery.autoAddBoardId;
+const GalleryBoard = ({
+  board,
+  isSelected,
+  setBoardToDelete,
+}: GalleryBoardProps) => {
+  const dispatch = useAppDispatch();
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ gallery }) => {
+          const isSelectedForAutoAdd =
+            board.board_id === gallery.autoAddBoardId;
+          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
 
-            return { isSelectedForAutoAdd };
-          },
-          defaultSelectorOptions
-        ),
-      [board.board_id]
-    );
+          return {
+            isSelectedForAutoAdd,
+            autoAssignBoardOnClick,
+          };
+        },
+        defaultSelectorOptions
+      ),
+    [board.board_id]
+  );
 
-    const { isSelectedForAutoAdd } = useAppSelector(selector);
-    const [isHovered, setIsHovered] = useState(false);
-    const handleMouseOver = useCallback(() => {
-      setIsHovered(true);
-    }, []);
-    const handleMouseOut = useCallback(() => {
-      setIsHovered(false);
-    }, []);
-    const { currentData: coverImage } = useGetImageDTOQuery(
-      board.cover_image_name ?? skipToken
-    );
+  const { isSelectedForAutoAdd, autoAssignBoardOnClick } =
+    useAppSelector(selector);
+  const [isHovered, setIsHovered] = useState(false);
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
 
-    const { board_name, board_id } = board;
-    const [localBoardName, setLocalBoardName] = useState(board_name);
+  const { data: imagesTotal } = useGetBoardImagesTotalQuery(board.board_id);
+  const { data: assetsTotal } = useGetBoardAssetsTotalQuery(board.board_id);
+  const tooltip = useMemo(() => {
+    if (imagesTotal?.total === undefined || assetsTotal?.total === undefined) {
+      return undefined;
+    }
+    return `${imagesTotal.total} image${imagesTotal.total === 1 ? '' : 's'}, ${
+      assetsTotal.total
+    } asset${assetsTotal.total === 1 ? '' : 's'}`;
+  }, [assetsTotal, imagesTotal]);
 
-    const handleSelectBoard = useCallback(() => {
-      dispatch(boardIdSelected(board_id));
-    }, [board_id, dispatch]);
+  const { currentData: coverImage } = useGetImageDTOQuery(
+    board.cover_image_name ?? skipToken
+  );
 
-    const [updateBoard, { isLoading: isUpdateBoardLoading }] =
-      useUpdateBoardMutation();
+  const { board_name, board_id } = board;
+  const [localBoardName, setLocalBoardName] = useState(board_name);
 
-    const droppableData: MoveBoardDropData = useMemo(
-      () => ({
-        id: board_id,
-        actionType: 'MOVE_BOARD',
-        context: { boardId: board_id },
-      }),
-      [board_id]
-    );
+  const handleSelectBoard = useCallback(() => {
+    dispatch(boardIdSelected({ boardId: board_id }));
+    if (autoAssignBoardOnClick) {
+      dispatch(autoAddBoardIdChanged(board_id));
+    }
+  }, [board_id, autoAssignBoardOnClick, dispatch]);
 
-    const handleSubmit = useCallback(
-      async (newBoardName: string) => {
-        // empty strings are not allowed
-        if (!newBoardName.trim()) {
-          setLocalBoardName(board_name);
-          return;
-        }
+  const [updateBoard, { isLoading: isUpdateBoardLoading }] =
+    useUpdateBoardMutation();
 
-        // don't updated the board name if it hasn't changed
-        if (newBoardName === board_name) {
-          return;
-        }
+  const droppableData: AddToBoardDropData = useMemo(
+    () => ({
+      id: board_id,
+      actionType: 'ADD_TO_BOARD',
+      context: { boardId: board_id },
+    }),
+    [board_id]
+  );
 
-        try {
-          const { board_name } = await updateBoard({
-            board_id,
-            changes: { board_name: newBoardName },
-          }).unwrap();
+  const handleSubmit = useCallback(
+    async (newBoardName: string) => {
+      // empty strings are not allowed
+      if (!newBoardName.trim()) {
+        setLocalBoardName(board_name);
+        return;
+      }
 
-          // update local state
-          setLocalBoardName(board_name);
-        } catch {
-          // revert on error
-          setLocalBoardName(board_name);
-        }
-      },
-      [board_id, board_name, updateBoard]
-    );
+      // don't updated the board name if it hasn't changed
+      if (newBoardName === board_name) {
+        return;
+      }
 
-    const handleChange = useCallback((newBoardName: string) => {
-      setLocalBoardName(newBoardName);
-    }, []);
+      try {
+        const { board_name } = await updateBoard({
+          board_id,
+          changes: { board_name: newBoardName },
+        }).unwrap();
 
-    return (
-      <Box
-        sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}
+        // update local state
+        setLocalBoardName(board_name);
+      } catch {
+        // revert on error
+        setLocalBoardName(board_name);
+      }
+    },
+    [board_id, board_name, updateBoard]
+  );
+
+  const handleChange = useCallback((newBoardName: string) => {
+    setLocalBoardName(newBoardName);
+  }, []);
+  const { t } = useTranslation();
+  return (
+    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+      <Flex
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
+        sx={{
+          position: 'relative',
+          justifyContent: 'center',
+          alignItems: 'center',
+          aspectRatio: '1/1',
+          w: 'full',
+          h: 'full',
+        }}
       >
-        <Flex
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
-          sx={{
-            position: 'relative',
-            justifyContent: 'center',
-            alignItems: 'center',
-            aspectRatio: '1/1',
-            w: 'full',
-            h: 'full',
-          }}
+        <BoardContextMenu
+          board={board}
+          board_id={board_id}
+          setBoardToDelete={setBoardToDelete}
         >
-          <BoardContextMenu
-            board={board}
-            board_id={board_id}
-            setBoardToDelete={setBoardToDelete}
-          >
-            {(ref) => (
+          {(ref) => (
+            <Tooltip label={tooltip} openDelay={1000} hasArrow>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -262,17 +293,17 @@ const GalleryBoard = memo(
 
                 <IAIDroppable
                   data={droppableData}
-                  dropLabel={<Text fontSize="md">Move</Text>}
+                  dropLabel={
+                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                  }
                 />
               </Flex>
-            )}
-          </BoardContextMenu>
-        </Flex>
-      </Box>
-    );
-  }
-);
+            </Tooltip>
+          )}
+        </BoardContextMenu>
+      </Flex>
+    </Box>
+  );
+};
 
-GalleryBoard.displayName = 'HoverableBoard';
-
-export default GalleryBoard;
+export default memo(GalleryBoard);

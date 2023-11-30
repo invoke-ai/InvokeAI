@@ -1,16 +1,23 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { ButtonGroup } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import { setAspectRatio } from 'features/parameters/store/generationSlice';
-import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
+import {
+  setAspectRatio,
+  setShouldLockAspectRatio,
+} from 'features/parameters/store/generationSlice';
+import i18next from 'i18next';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useCallback } from 'react';
 
 const aspectRatios = [
-  { name: 'Free', value: null },
-  { name: 'Portrait', value: 0.67 / 1 },
-  { name: 'Wide', value: 16 / 9 },
-  { name: 'Square', value: 1 / 1 },
+  { name: i18next.t('parameters.aspectRatioFree'), value: null },
+  { name: '2:3', value: 2 / 3 },
+  { name: '16:9', value: 16 / 9 },
+  { name: '1:1', value: 1 / 1 },
 ];
+
+export const mappedAspectRatios = aspectRatios.map((ar) => ar.value);
 
 export default function ParamAspectRatio() {
   const aspectRatio = useAppSelector(
@@ -23,23 +30,29 @@ export default function ParamAspectRatio() {
   );
   const activeTabName = useAppSelector(activeTabNameSelector);
 
+  const handleClick = useCallback(
+    (ratio: (typeof aspectRatios)[number]) => {
+      dispatch(setAspectRatio(ratio.value));
+      dispatch(setShouldLockAspectRatio(false));
+    },
+    [dispatch]
+  );
+
   return (
-    <Flex gap={2} flexGrow={1}>
-      <ButtonGroup isAttached>
-        {aspectRatios.map((ratio) => (
-          <IAIButton
-            key={ratio.name}
-            size="sm"
-            isChecked={aspectRatio === ratio.value}
-            isDisabled={
-              activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
-            }
-            onClick={() => dispatch(setAspectRatio(ratio.value))}
-          >
-            {ratio.name}
-          </IAIButton>
-        ))}
-      </ButtonGroup>
-    </Flex>
+    <ButtonGroup isAttached>
+      {aspectRatios.map((ratio) => (
+        <IAIButton
+          key={ratio.name}
+          size="sm"
+          isChecked={aspectRatio === ratio.value}
+          isDisabled={
+            activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+          }
+          onClick={handleClick.bind(null, ratio)}
+        >
+          {ratio.name}
+        </IAIButton>
+      ))}
+    </ButtonGroup>
   );
 }

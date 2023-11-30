@@ -20,13 +20,14 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
+import { EntityId } from '@reduxjs/toolkit';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
   options: {
     scrollbars: {
       visibility: 'auto',
-      autoHide: 'leave',
+      autoHide: 'scroll',
       autoHideDelay: 1300,
       theme: 'os-theme-dark',
     },
@@ -71,6 +72,13 @@ const GalleryImageGrid = () => {
     });
   }, [areMoreAvailable, listImages, queryArgs, currentData?.ids.length]);
 
+  const itemContentFunc = useCallback(
+    (index: number, imageName: EntityId) => (
+      <GalleryImage key={imageName} imageName={imageName as string} />
+    ),
+    []
+  );
+
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
     const { current: root } = rootRef;
@@ -95,7 +103,7 @@ const GalleryImageGrid = () => {
           justifyContent: 'center',
         }}
       >
-        <IAINoContentFallback label="Loading..." icon={FaImage} />
+        <IAINoContentFallback label={t('gallery.loading')} icon={FaImage} />
       </Flex>
     );
   }
@@ -131,16 +139,14 @@ const GalleryImageGrid = () => {
               List: ImageGridListContainer,
             }}
             scrollerRef={setScroller}
-            itemContent={(index, imageName) => (
-              <GalleryImage key={imageName} imageName={imageName as string} />
-            )}
+            itemContent={itemContentFunc}
           />
         </Box>
         <IAIButton
           onClick={handleLoadMoreImages}
           isDisabled={!areMoreAvailable}
           isLoading={isFetching}
-          loadingText="Loading"
+          loadingText={t('gallery.loading')}
           flexShrink={0}
         >
           {`Load More (${currentData.ids.length} of ${currentViewTotal})`}
@@ -153,7 +159,7 @@ const GalleryImageGrid = () => {
     return (
       <Box sx={{ w: 'full', h: 'full' }}>
         <IAINoContentFallback
-          label="Unable to load Gallery"
+          label={t('gallery.unableToLoad')}
           icon={FaExclamationCircle}
         />
       </Box>

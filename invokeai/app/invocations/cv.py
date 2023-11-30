@@ -1,47 +1,22 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal
 
 import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
-from pydantic import BaseModel, Field
 
-from invokeai.app.models.image import ImageCategory, ImageField, ResourceOrigin
-from .baseinvocation import BaseInvocation, InvocationContext, InvocationConfig
-from .image import ImageOutput
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
-
-class CvInvocationConfig(BaseModel):
-    """Helper class to provide all OpenCV invocations with additional config"""
-
-    # Schema customisation
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["cv", "image"],
-            },
-        }
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
 
 
-class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
+@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.1.0")
+class CvInpaintInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Simple inpaint using opencv."""
 
-    # fmt: off
-    type: Literal["cv_inpaint"] = "cv_inpaint"
-
-    # Inputs
-    image: ImageField = Field(default=None, description="The image to inpaint")
-    mask: ImageField = Field(default=None, description="The mask to use when inpainting")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "OpenCV Inpaint",
-                "tags": ["opencv", "inpaint"]
-            },
-        }
+    image: ImageField = InputField(description="The image to inpaint")
+    mask: ImageField = InputField(description="The mask to use when inpainting")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -66,6 +41,7 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(

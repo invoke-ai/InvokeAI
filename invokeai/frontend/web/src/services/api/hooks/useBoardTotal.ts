@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
-} from '../endpoints/images';
+} from 'services/api/endpoints/boards';
 
 export const useBoardTotal = (board_id: BoardId) => {
   const galleryView = useAppSelector((state) => state.gallery.galleryView);
@@ -13,7 +13,7 @@ export const useBoardTotal = (board_id: BoardId) => {
   const { data: totalAssets } = useGetBoardAssetsTotalQuery(board_id);
 
   const currentViewTotal = useMemo(
-    () => (galleryView === 'images' ? totalImages : totalAssets),
+    () => (galleryView === 'images' ? totalImages?.total : totalAssets?.total),
     [galleryView, totalAssets, totalImages]
   );
 

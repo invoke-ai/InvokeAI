@@ -14,7 +14,7 @@ import { Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 
 import { MutableRefObject, useCallback } from 'react';
-import getScaledCursorPosition from '../util/getScaledCursorPosition';
+import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
 
 const selector = createSelector(
@@ -41,11 +41,15 @@ const useCanvasMouseMove = (
   const { updateColorUnderCursor } = useColorPicker();
 
   return useCallback(() => {
-    if (!stageRef.current) return;
+    if (!stageRef.current) {
+      return;
+    }
 
     const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-    if (!scaledCursorPosition) return;
+    if (!scaledCursorPosition) {
+      return;
+    }
 
     dispatch(setCursorPosition(scaledCursorPosition));
 
@@ -56,7 +60,9 @@ const useCanvasMouseMove = (
       return;
     }
 
-    if (!isDrawing || tool === 'move' || isStaging) return;
+    if (!isDrawing || tool === 'move' || isStaging) {
+      return;
+    }
 
     didMouseMoveRef.current = true;
     dispatch(

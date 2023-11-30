@@ -1,5 +1,4 @@
-import { ThemeOverride } from '@chakra-ui/react';
-
+import { ThemeOverride, ToastProviderProps } from '@chakra-ui/react';
 import { InvokeAIColors } from './colors/colors';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
@@ -21,6 +20,7 @@ import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
+import { reactflowStyles } from './custom/reactflow';
 
 export const theme: ThemeOverride = {
   config: {
@@ -44,16 +44,38 @@ export const theme: ThemeOverride = {
       color: 'base.900',
       '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
     },
+    third: {
+      bg: 'base.300',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.750', color: 'base.100' },
+    },
+    nodeBody: {
+      bg: 'base.100',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
+    },
+    nodeHeader: {
+      bg: 'base.200',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.100' },
+    },
+    nodeFooter: {
+      bg: 'base.200',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.100' },
+    },
   },
   styles: {
     global: () => ({
       layerStyle: 'body',
       '*': { ...no_scrollbar },
+      ...reactflowStyles,
     }),
   },
   direction: 'ltr',
   fonts: {
     body: `'Inter Variable', sans-serif`,
+    heading: `'Inter Variable', sans-serif`,
   },
   shadows: {
     light: {
@@ -85,7 +107,23 @@ export const theme: ThemeOverride = {
         '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 3px var(--invokeai-colors-accent-500)',
       dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 3px var(--invokeai-colors-accent-400)',
     },
-    nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-accent-450)`,
+    nodeSelected: {
+      light: `0 0 0 3px var(--invokeai-colors-accent-400)`,
+      dark: `0 0 0 3px var(--invokeai-colors-accent-500)`,
+    },
+    nodeHovered: {
+      light: `0 0 0 2px var(--invokeai-colors-accent-500)`,
+      dark: `0 0 0 2px var(--invokeai-colors-accent-400)`,
+    },
+    nodeHoveredSelected: {
+      light: `0 0 0 3px var(--invokeai-colors-accent-500)`,
+      dark: `0 0 0 3px var(--invokeai-colors-accent-400)`,
+    },
+    nodeInProgress: {
+      light:
+        '0 0 0 2px var(--invokeai-colors-accent-500), 0 0 10px 2px var(--invokeai-colors-accent-600)',
+      dark: '0 0 0 2px var(--invokeai-colors-yellow-400), 0 0 20px 2px var(--invokeai-colors-orange-700)',
+    },
   },
   colors: InvokeAIColors,
   components: {
@@ -109,4 +147,8 @@ export const theme: ThemeOverride = {
     Text: textTheme,
     Tooltip: tooltipTheme,
   },
+};
+
+export const TOAST_OPTIONS: ToastProviderProps = {
+  defaultOptions: { isClosable: true, position: 'bottom-right' },
 };

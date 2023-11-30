@@ -13,12 +13,12 @@ const invokeAIControl = defineStyle((props) => {
 
   return {
     bg: mode('base.200', 'base.700')(props),
-    borderColor: mode('base.200', 'base.700')(props),
+    borderColor: mode('base.300', 'base.600')(props),
     color: mode('base.900', 'base.100')(props),
 
     _checked: {
-      bg: mode(`${c}.300`, `${c}.600`)(props),
-      borderColor: mode(`${c}.300`, `${c}.600`)(props),
+      bg: mode(`${c}.300`, `${c}.500`)(props),
+      borderColor: mode(`${c}.300`, `${c}.500`)(props),
       color: mode(`${c}.900`, `${c}.100`)(props),
 
       _hover: {
@@ -45,7 +45,8 @@ const invokeAIControl = defineStyle((props) => {
     },
 
     _focusVisible: {
-      boxShadow: 'outline',
+      boxShadow: 'none',
+      outline: 'none',
     },
 
     _invalid: {

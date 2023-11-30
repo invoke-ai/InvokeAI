@@ -1,4 +1,7 @@
 import datetime
+import typing
+import uuid
+
 import numpy as np
 
 
@@ -18,5 +21,15 @@ SEED_MAX = np.iinfo(np.uint32).max
 
 
 def get_random_seed():
-    rng = np.random.default_rng(seed=0)
+    rng = np.random.default_rng(seed=None)
     return int(rng.integers(0, SEED_MAX))
+
+
+def uuid_string():
+    res = uuid.uuid4()
+    return str(res)
+
+
+def is_optional(value: typing.Any):
+    """Checks if a value is typed as Optional. Note that Optional is sugar for Union[x, None]."""
+    return typing.get_origin(value) is typing.Union and type(None) in typing.get_args(value)

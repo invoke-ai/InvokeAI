@@ -1,6 +1,6 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   canvasSelector,
@@ -9,19 +9,20 @@ import {
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
-import useCanvasDragMove from '../hooks/useCanvasDragMove';
-import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
-import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
-import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
-import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
-import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
-import useCanvasWheel from '../hooks/useCanvasZoom';
+import useCanvasDragMove from 'features/canvas/hooks/useCanvasDragMove';
+import useCanvasHotkeys from 'features/canvas/hooks/useCanvasHotkeys';
+import useCanvasMouseDown from 'features/canvas/hooks/useCanvasMouseDown';
+import useCanvasMouseMove from 'features/canvas/hooks/useCanvasMouseMove';
+import useCanvasMouseOut from 'features/canvas/hooks/useCanvasMouseOut';
+import useCanvasMouseUp from 'features/canvas/hooks/useCanvasMouseUp';
+import useCanvasWheel from 'features/canvas/hooks/useCanvasZoom';
+import { canvasResized } from 'features/canvas/store/canvasSlice';
 import {
   setCanvasBaseLayer,
   setCanvasStage,
-} from '../util/konvaInstanceProvider';
+} from 'features/canvas/util/konvaInstanceProvider';
 import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
@@ -106,7 +107,8 @@ const IAICanvas = () => {
     shouldAntialias,
   } = useAppSelector(selector);
   useCanvasHotkeys();
-
+  const dispatch = useAppDispatch();
+  const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const canvasBaseLayerRef = useRef<Konva.Layer | null>(null);
 
@@ -137,8 +139,37 @@ const IAICanvas = () => {
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
 
+  const handleContextMenu = useCallback(
+    (e: KonvaEventObject<MouseEvent>) => e.evt.preventDefault(),
+    []
+  );
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentBoxSize) {
+          const { width, height } = entry.contentRect;
+          dispatch(canvasResized({ width, height }));
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    const { width, height } = containerRef.current.getBoundingClientRect();
+    dispatch(canvasResized({ width, height }));
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [dispatch]);
+
   return (
     <Flex
+      id="canvas-container"
+      ref={containerRef}
       sx={{
         position: 'relative',
         height: '100%',
@@ -146,13 +177,18 @@ const IAICanvas = () => {
         borderRadius: 'base',
       }}
     >
-      <Box sx={{ position: 'relative' }}>
+      <Box
+        sx={{
+          position: 'absolute',
+          // top: 0,
+          // insetInlineStart: 0,
+        }}
+      >
         <ChakraStage
           tabIndex={-1}
           ref={canvasStageRefCallback}
           sx={{
             outline: 'none',
-            // boxShadow: '0px 0px 0px 1px var(--border-color-light)',
             overflow: 'hidden',
             cursor: stageCursor ? stageCursor : undefined,
             canvas: {
@@ -174,9 +210,7 @@ const IAICanvas = () => {
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
-          onContextMenu={(e: KonvaEventObject<MouseEvent>) =>
-            e.evt.preventDefault()
-          }
+          onContextMenu={handleContextMenu}
           onWheel={handleWheel}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
@@ -192,7 +226,11 @@ const IAICanvas = () => {
           >
             <IAICanvasObjectRenderer />
           </Layer>
-          <Layer id="mask" visible={isMaskEnabled} listening={false}>
+          <Layer
+            id="mask"
+            visible={isMaskEnabled && !isStaging}
+            listening={false}
+          >
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
@@ -213,11 +251,11 @@ const IAICanvas = () => {
             />
           </Layer>
         </ChakraStage>
-        <IAICanvasStatusText />
-        <IAICanvasStagingAreaToolbar />
       </Box>
+      <IAICanvasStatusText />
+      <IAICanvasStagingAreaToolbar />
     </Flex>
   );
 };
 
-export default IAICanvas;
+export default memo(IAICanvas);

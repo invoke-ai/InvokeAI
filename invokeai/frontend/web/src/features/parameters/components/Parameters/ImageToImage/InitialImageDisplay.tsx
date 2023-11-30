@@ -5,11 +5,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
-import { FaUndo, FaUpload } from 'react-icons/fa';
-import InitialImage from './InitialImage';
+import { memo, useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
+import { FaRulerVertical, FaUndo, FaUpload } from 'react-icons/fa';
 import { PostUploadAction } from 'services/api/types';
+import InitialImage from './InitialImage';
 
 const selector = createSelector(
   [stateSelector],
@@ -17,6 +20,7 @@ const selector = createSelector(
     const { initialImage } = state.generation;
     return {
       isResetButtonDisabled: !initialImage,
+      initialImage,
     };
   },
   defaultSelectorOptions
@@ -27,7 +31,9 @@ const postUploadAction: PostUploadAction = {
 };
 
 const InitialImageDisplay = () => {
-  const { isResetButtonDisabled } = useAppSelector(selector);
+  const { recallWidthAndHeight } = useRecallParameters();
+  const { t } = useTranslation();
+  const { isResetButtonDisabled, initialImage } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
@@ -38,9 +44,17 @@ const InitialImageDisplay = () => {
     dispatch(clearInitialImage());
   }, [dispatch]);
 
+  const handleUseSizeInitialImage = useCallback(() => {
+    if (initialImage) {
+      recallWidthAndHeight(initialImage.width, initialImage.height);
+    }
+  }, [initialImage, recallWidthAndHeight]);
+
+  useHotkeys('shift+d', handleUseSizeInitialImage, [initialImage]);
+
   return (
     <Flex
-      layerStyle={'first'}
+      layerStyle="first"
       sx={{
         position: 'relative',
         flexDirection: 'column',
@@ -49,7 +63,7 @@ const InitialImageDisplay = () => {
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 'base',
-        p: 4,
+        p: 2,
         gap: 4,
       }}
     >
@@ -64,6 +78,7 @@ const InitialImageDisplay = () => {
       >
         <Text
           sx={{
+            ps: 2,
             fontWeight: 600,
             userSelect: 'none',
             color: 'base.700',
@@ -72,18 +87,25 @@ const InitialImageDisplay = () => {
             },
           }}
         >
-          Initial Image
+          {t('metadata.initImage')}
         </Text>
         <Spacer />
         <IAIIconButton
-          tooltip={'Upload Initial Image'}
-          aria-label={'Upload Initial Image'}
+          tooltip="Upload Initial Image"
+          aria-label="Upload Initial Image"
           icon={<FaUpload />}
           {...getUploadButtonProps()}
         />
         <IAIIconButton
-          tooltip={'Reset Initial Image'}
-          aria-label={'Reset Initial Image'}
+          tooltip={`${t('parameters.useSize')} (Shift+D)`}
+          aria-label={`${t('parameters.useSize')} (Shift+D)`}
+          icon={<FaRulerVertical />}
+          onClick={handleUseSizeInitialImage}
+          isDisabled={isResetButtonDisabled}
+        />
+        <IAIIconButton
+          tooltip="Reset Initial Image"
+          aria-label="Reset Initial Image"
           icon={<FaUndo />}
           onClick={handleReset}
           isDisabled={isResetButtonDisabled}
@@ -95,4 +117,4 @@ const InitialImageDisplay = () => {
   );
 };
 
-export default InitialImageDisplay;
+export default memo(InitialImageDisplay);

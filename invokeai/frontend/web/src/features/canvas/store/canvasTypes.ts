@@ -11,9 +11,9 @@ export const LAYER_NAMES = ['base', 'mask'] as const;
 export type CanvasLayer = (typeof LAYER_NAMES)[number];
 
 export const BOUNDING_BOX_SCALES_DICT = [
+  { label: 'None', value: 'none' },
   { label: 'Auto', value: 'auto' },
   { label: 'Manual', value: 'manual' },
-  { label: 'None', value: 'none' },
 ];
 
 export const BOUNDING_BOX_SCALES = ['none', 'auto', 'manual'] as const;
@@ -89,7 +89,6 @@ export type CanvasLayerState = {
   stagingArea: {
     images: CanvasImage[];
     selectedImageIndex: number;
-    sessionId?: string;
     boundingBox?: IRect;
   };
 };
@@ -126,12 +125,9 @@ export interface CanvasState {
   boundingBoxScaleMethod: BoundingBoxScale;
   brushColor: RgbaColor;
   brushSize: number;
-  canvasContainerDimensions: Dimensions;
   colorPickerColor: RgbaColor;
   cursorPosition: Vector2d | null;
-  doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];
-  isCanvasInitialized: boolean;
   isDrawing: boolean;
   isMaskEnabled: boolean;
   isMouseOverBoundingBox: boolean;
@@ -169,6 +165,7 @@ export interface CanvasState {
   stageScale: number;
   tool: CanvasTool;
   generationMode?: GenerationMode;
+  batchIds: string[];
 }
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';

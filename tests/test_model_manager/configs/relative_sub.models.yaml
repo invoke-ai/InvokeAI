@@ -1,0 +1,22 @@
+__metadata__:
+  version: 3.0.0
+
+sdxl/main/SDXL base:
+  path: sdxl/main/SDXL base 1_0
+  description: SDXL base v1.0
+  variant: normal
+  format: diffusers
+
+sdxl/main/SDXL with VAE:
+  path: sdxl/main/SDXL base 1_0
+  description: SDXL with customized VAE
+  vae: sdxl/vae/sdxl-vae-fp16-fix/
+  variant: normal
+  format: diffusers
+
+sdxl/main/SDXL with empty VAE:
+  path: sdxl/main/SDXL base 1_0
+  description: SDXL with customized VAE
+  vae: ''
+  variant: normal
+  format: diffusers

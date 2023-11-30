@@ -34,11 +34,11 @@ directly from NVIDIA. **Do not try to install Ubuntu's
 nvidia-cuda-toolkit package. It is out of date and will cause
 conflicts among the NVIDIA driver and binaries.**
 
-Go to [CUDA Toolkit 11.7
-Downloads](https://developer.nvidia.com/cuda-11-7-0-download-archive),
-and use the target selection wizard to choose your operating system,
-hardware platform, and preferred installation method (e.g. "local"
-versus "network").
+Go to [CUDA Toolkit
+Downloads](https://developer.nvidia.com/cuda-downloads), and use the
+target selection wizard to choose your operating system, hardware
+platform, and preferred installation method (e.g. "local" versus
+"network").
 
 This will provide you with a downloadable install file or, depending
 on your choices, a recipe for downloading and running a install shell
@@ -57,11 +57,35 @@ familiar with containerization technologies such as Docker.
 For downloads and instructions, visit the [NVIDIA CUDA Container
 Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 
+### cuDNN Installation for 40/30 Series Optimization* (Optional)
+
+1. Find the InvokeAI folder
+2. Click on .venv folder - e.g., YourInvokeFolderHere\\.venv
+3. Click on Lib folder - e.g., YourInvokeFolderHere\\.venv\Lib
+4. Click on site-packages folder - e.g., YourInvokeFolderHere\\.venv\Lib\site-packages
+5. Click on Torch directory - e.g., YourInvokeFolderHere\InvokeAI\\.venv\Lib\site-packages\torch
+6. Click on the lib folder - e.g., YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib
+7. Copy everything inside the folder and save it elsewhere as a backup.
+8. Go to __https://developer.nvidia.com/cudnn__
+9. Login or create an Account. 
+10. Choose the newer version of cuDNN. **Note:** 
+There are two versions, 11.x or 12.x for the differents architectures(Turing,Maxwell Etc...) of GPUs.
+You can find which version you should download from [this link](https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html).
+13. Download the latest version and extract it from the download location
+14. Find the bin folder E\cudnn-windows-x86_64-__Whatever Version__\bin
+15. Copy and paste the .dll files into YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
+16. If prompted, replace any existing files 
+
+**Notes:** 
+* If no change is seen or any issues are encountered, follow the same steps as above and paste the torch/lib backup folder you made earlier and replace it. If you didn't make a backup, you can also uninstall and reinstall torch through the command line to repair this folder. 
+* This optimization is  intended for the newer version of graphics card (40/30 series) but results have been seen with older graphics card.
+
+
 ### Torch Installation
 
 When installing torch and torchvision manually with `pip`, remember to provide
 the argument `--extra-index-url
-https://download.pytorch.org/whl/cu117` as described in the [Manual
+https://download.pytorch.org/whl/cu121` as described in the [Manual
 Installation Guide](020_INSTALL_MANUAL.md).
 
 ## :simple-amd: ROCm

@@ -1,161 +1,82 @@
-import { FieldType, FieldUIConfig } from './types';
+import { Node } from 'reactflow';
 
+/**
+ * How long to wait before showing a tooltip when hovering a field handle.
+ */
 export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
 
-export const FIELD_TYPE_MAP: Record<string, FieldType> = {
-  integer: 'integer',
-  float: 'float',
-  number: 'float',
-  string: 'string',
-  boolean: 'boolean',
-  enum: 'enum',
-  ImageField: 'image',
-  image_collection: 'image_collection',
-  LatentsField: 'latents',
-  ConditioningField: 'conditioning',
-  UNetField: 'unet',
-  ClipField: 'clip',
-  VaeField: 'vae',
-  model: 'model',
-  vae_model: 'vae_model',
-  lora_model: 'lora_model',
-  controlnet_model: 'controlnet_model',
-  ControlNetModelField: 'controlnet_model',
-  array: 'array',
-  item: 'item',
-  ColorField: 'color',
-  ControlField: 'control',
-  control: 'control',
-  cfg_scale: 'float',
-  control_weight: 'float',
+/**
+ * The width of a node in the UI in pixels.
+ */
+export const NODE_WIDTH = 320;
+
+/**
+ * This class name is special - reactflow uses it to identify the drag handle of a node,
+ * applying the appropriate listeners to it.
+ */
+export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
+
+/**
+ * reactflow-specifc properties shared between all node types.
+ */
+export const SHARED_NODE_PROPERTIES: Partial<Node> = {
+  dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
 };
 
-const COLOR_TOKEN_VALUE = 500;
-
-const getColorTokenCssVariable = (color: string) =>
-  `var(--invokeai-colors-${color}-${COLOR_TOKEN_VALUE})`;
-
-export const FIELDS: Record<FieldType, FieldUIConfig> = {
-  integer: {
-    color: 'red',
-    colorCssVar: getColorTokenCssVariable('red'),
-    title: 'Integer',
-    description: 'Integers are whole numbers, without a decimal point.',
-  },
-  float: {
-    color: 'orange',
-    colorCssVar: getColorTokenCssVariable('orange'),
-    title: 'Float',
-    description: 'Floats are numbers with a decimal point.',
-  },
-  string: {
-    color: 'yellow',
-    colorCssVar: getColorTokenCssVariable('yellow'),
-    title: 'String',
-    description: 'Strings are text.',
-  },
-  boolean: {
-    color: 'green',
-    colorCssVar: getColorTokenCssVariable('green'),
-    title: 'Boolean',
-    description: 'Booleans are true or false.',
-  },
-  enum: {
-    color: 'blue',
-    colorCssVar: getColorTokenCssVariable('blue'),
-    title: 'Enum',
-    description: 'Enums are values that may be one of a number of options.',
-  },
-  image: {
-    color: 'purple',
-    colorCssVar: getColorTokenCssVariable('purple'),
-    title: 'Image',
-    description: 'Images may be passed between nodes.',
-  },
-  image_collection: {
-    color: 'purple',
-    colorCssVar: getColorTokenCssVariable('purple'),
-    title: 'Image Collection',
-    description: 'A collection of images.',
-  },
-  latents: {
-    color: 'pink',
-    colorCssVar: getColorTokenCssVariable('pink'),
-    title: 'Latents',
-    description: 'Latents may be passed between nodes.',
-  },
-  conditioning: {
-    color: 'cyan',
-    colorCssVar: getColorTokenCssVariable('cyan'),
-    title: 'Conditioning',
-    description: 'Conditioning may be passed between nodes.',
-  },
-  unet: {
-    color: 'red',
-    colorCssVar: getColorTokenCssVariable('red'),
-    title: 'UNet',
-    description: 'UNet submodel.',
-  },
-  clip: {
-    color: 'green',
-    colorCssVar: getColorTokenCssVariable('green'),
-    title: 'Clip',
-    description: 'Tokenizer and text_encoder submodels.',
-  },
-  vae: {
-    color: 'blue',
-    colorCssVar: getColorTokenCssVariable('blue'),
-    title: 'Vae',
-    description: 'Vae submodel.',
-  },
-  control: {
-    color: 'cyan',
-    colorCssVar: getColorTokenCssVariable('cyan'), // TODO: no free color left
-    title: 'Control',
-    description: 'Control info passed between nodes.',
-  },
-  model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'Model',
-    description: 'Models are models.',
-  },
-  vae_model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'VAE',
-    description: 'Models are models.',
-  },
-  lora_model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'LoRA',
-    description: 'Models are models.',
-  },
-  controlnet_model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'ControlNet',
-    description: 'Models are models.',
-  },
-  array: {
-    color: 'gray',
-    colorCssVar: getColorTokenCssVariable('gray'),
-    title: 'Array',
-    description: 'TODO: Array type description.',
-  },
-  item: {
-    color: 'gray',
-    colorCssVar: getColorTokenCssVariable('gray'),
-    title: 'Collection Item',
-    description: 'TODO: Collection Item type description.',
-  },
-  color: {
-    color: 'gray',
-    colorCssVar: getColorTokenCssVariable('gray'),
-    title: 'Color',
-    description: 'A RGBA color.',
-  },
+/**
+ * Helper for getting the kind of a field.
+ */
+export const KIND_MAP = {
+  input: 'inputs' as const,
+  output: 'outputs' as const,
 };
 
-export const NODE_MIN_WIDTH = 250;
+/**
+ * Model types' handles are rendered as squares in the UI.
+ */
+export const MODEL_TYPES = [
+  'IPAdapterModelField',
+  'ControlNetModelField',
+  'LoRAModelField',
+  'MainModelField',
+  'ONNXModelField',
+  'SDXLMainModelField',
+  'SDXLRefinerModelField',
+  'VaeModelField',
+  'UNetField',
+  'VaeField',
+  'ClipField',
+  'T2IAdapterModelField',
+  'IPAdapterModelField',
+];
+
+/**
+ * Colors for each field type - applies to their handles and edges.
+ */
+export const FIELD_COLORS: { [key: string]: string } = {
+  BoardField: 'purple.500',
+  BooleanField: 'green.500',
+  ClipField: 'green.500',
+  ColorField: 'pink.300',
+  ConditioningField: 'cyan.500',
+  ControlField: 'teal.500',
+  ControlNetModelField: 'teal.500',
+  EnumField: 'blue.500',
+  FloatField: 'orange.500',
+  ImageField: 'purple.500',
+  IntegerField: 'red.500',
+  IPAdapterField: 'teal.500',
+  IPAdapterModelField: 'teal.500',
+  LatentsField: 'pink.500',
+  LoRAModelField: 'teal.500',
+  MainModelField: 'teal.500',
+  ONNXModelField: 'teal.500',
+  SDXLMainModelField: 'teal.500',
+  SDXLRefinerModelField: 'teal.500',
+  StringField: 'yellow.500',
+  T2IAdapterField: 'teal.500',
+  T2IAdapterModelField: 'teal.500',
+  UNetField: 'red.500',
+  VaeField: 'blue.500',
+  VaeModelField: 'teal.500',
+};

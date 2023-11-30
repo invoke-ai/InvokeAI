@@ -1,15 +1,16 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { logger } from 'app/logging/logger';
 
 function getCircularReplacer() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ancestors: Record<string, any>[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function (key: string, value: any) {
     if (typeof value !== 'object' || value === null) {
       return value;
     }
-    // `this` is the object that value is contained in,
-    // i.e., its direct parent.
-    // @ts-ignore
+    // `this` is the object that value is contained in, i.e., its direct parent.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore don't think it's possible to not have TS complain about this...
     while (ancestors.length > 0 && ancestors.at(-1) !== this) {
       ancestors.pop();
     }
@@ -23,13 +24,11 @@ function getCircularReplacer() {
 
 export const receivedOpenAPISchema = createAsyncThunk(
   'nodes/receivedOpenAPISchema',
-  async (_, { dispatch, rejectWithValue }) => {
-    const log = logger('system');
+  async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch(`openapi.json`);
+      const url = [window.location.origin, 'openapi.json'].join('/');
+      const response = await fetch(url);
       const openAPISchema = await response.json();
-
-      log.info({ openAPISchema }, 'Received OpenAPI schema');
 
       const schemaJSON = JSON.parse(
         JSON.stringify(openAPISchema, getCircularReplacer())

@@ -6,6 +6,7 @@ import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addCanvasMergedListener = () => {
   startAppListening({
@@ -20,8 +21,8 @@ export const addCanvasMergedListener = () => {
         moduleLog.error('Problem getting base layer blob');
         dispatch(
           addToast({
-            title: 'Problem Merging Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemMergingCanvas'),
+            description: t('toast.problemMergingCanvasDesc'),
             status: 'error',
           })
         );
@@ -34,8 +35,8 @@ export const addCanvasMergedListener = () => {
         moduleLog.error('Problem getting canvas base layer');
         dispatch(
           addToast({
-            title: 'Problem Merging Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemMergingCanvas'),
+            description: t('toast.problemMergingCanvasDesc'),
             status: 'error',
           })
         );
@@ -43,7 +44,7 @@ export const addCanvasMergedListener = () => {
       }
 
       const baseLayerRect = canvasBaseLayer.getClientRect({
-        relativeTo: canvasBaseLayer.getParent(),
+        relativeTo: canvasBaseLayer.getParent() ?? undefined,
       });
 
       const imageDTO = await dispatch(
@@ -55,7 +56,7 @@ export const addCanvasMergedListener = () => {
           is_intermediate: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: 'Canvas Merged' },
+            toastOptions: { title: t('toast.canvasMerged') },
           },
         })
       ).unwrap();

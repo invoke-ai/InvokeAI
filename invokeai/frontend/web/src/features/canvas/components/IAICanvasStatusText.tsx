@@ -5,8 +5,9 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import GenerationModeStatusText from 'features/parameters/components/Parameters/Canvas/GenerationModeStatusText';
 import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
-import roundToHundreth from '../util/roundToHundreth';
+import roundToHundreth from 'features/canvas/util/roundToHundreth';
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
+import { memo } from 'react';
 
 const warningColor = 'var(--invokeai-colors-warning-500)';
 
@@ -44,7 +45,7 @@ const selector = createSelector(
 
     return {
       activeLayerColor,
-      activeLayerString: layer.charAt(0).toUpperCase() + layer.slice(1),
+      layer,
       boundingBoxColor,
       boundingBoxCoordinatesString: `(${roundToHundreth(
         boxX
@@ -72,7 +73,7 @@ const selector = createSelector(
 const IAICanvasStatusText = () => {
   const {
     activeLayerColor,
-    activeLayerString,
+    layer,
     boundingBoxColor,
     boundingBoxCoordinatesString,
     boundingBoxDimensionsString,
@@ -115,7 +116,9 @@ const IAICanvasStatusText = () => {
         style={{
           color: activeLayerColor,
         }}
-      >{`${t('unifiedCanvas.activeLayer')}: ${activeLayerString}`}</Box>
+      >{`${t('unifiedCanvas.activeLayer')}: ${t(
+        `unifiedCanvas.${layer}`
+      )}`}</Box>
       <Box>{`${t('unifiedCanvas.canvasScale')}: ${canvasScaleString}%`}</Box>
       {shouldPreserveMaskedArea && (
         <Box
@@ -123,7 +126,7 @@ const IAICanvasStatusText = () => {
             color: warningColor,
           }}
         >
-          Preserve Masked Area: On
+          {t('unifiedCanvas.preserveMaskedArea')}: {t('common.on')}
         </Box>
       )}
       {shouldShowBoundingBox && (
@@ -162,4 +165,4 @@ const IAICanvasStatusText = () => {
   );
 };
 
-export default IAICanvasStatusText;
+export default memo(IAICanvasStatusText);

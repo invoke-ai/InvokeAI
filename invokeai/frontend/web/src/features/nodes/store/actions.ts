@@ -16,3 +16,11 @@ export const isAnyGraphBuilt = isAnyOf(
   canvasGraphBuilt,
   nodesGraphBuilt
 );
+
+export const workflowLoadRequested = createAction<unknown>(
+  'nodes/workflowLoadRequested'
+);
+
+export const updateAllNodesRequested = createAction(
+  'nodes/updateAllNodesRequested'
+);

@@ -4,7 +4,7 @@ import {
   CanvasLayerState,
   Dimensions,
   isCanvasMaskLine,
-} from '../store/canvasTypes';
+} from 'features/canvas/store/canvasTypes';
 import createMaskStage from './createMaskStage';
 import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';

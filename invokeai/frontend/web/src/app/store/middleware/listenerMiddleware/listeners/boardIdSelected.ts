@@ -10,6 +10,7 @@ import {
 } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { imagesSelectors } from 'services/api/util';
 
 export const addBoardIdSelectedListener = () => {
   startAppListening({
@@ -24,7 +25,7 @@ export const addBoardIdSelectedListener = () => {
       const state = getState();
 
       const board_id = boardIdSelected.match(action)
-        ? action.payload
+        ? action.payload.boardId
         : state.gallery.selectedBoardId;
 
       const galleryView = galleryViewChanged.match(action)
@@ -52,8 +53,14 @@ export const addBoardIdSelectedListener = () => {
           queryArgs
         )(getState());
 
-        if (boardImagesData?.ids.length) {
-          dispatch(imageSelected((boardImagesData.ids[0] as string) ?? null));
+        if (boardImagesData) {
+          const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
+          const selectedImage = imagesSelectors.selectById(
+            boardImagesData,
+            action.payload.selectedImageName
+          );
+
+          dispatch(imageSelected(selectedImage || firstImage || null));
         } else {
           // board has no images - deselect
           dispatch(imageSelected(null));

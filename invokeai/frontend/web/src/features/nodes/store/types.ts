@@ -1,16 +1,43 @@
-import { OpenAPIV3 } from 'openapi-types';
-import { Edge, Node, OnConnectStartParams, ReactFlowInstance } from 'reactflow';
-import { InvocationTemplate, InvocationValue } from '../types/types';
+import {
+  OnConnectStartParams,
+  SelectionMode,
+  Viewport,
+  XYPosition,
+} from 'reactflow';
+import { FieldIdentifier, FieldType } from 'features/nodes/types/field';
+import {
+  AnyNode,
+  InvocationNodeEdge,
+  InvocationTemplate,
+  NodeExecutionState,
+} from 'features/nodes/types/invocation';
+import { WorkflowV2 } from 'features/nodes/types/workflow';
 
 export type NodesState = {
-  nodes: Node<InvocationValue>[];
-  edges: Edge[];
-  schema: OpenAPIV3.Document | null;
-  invocationTemplates: Record<string, InvocationTemplate>;
+  nodes: AnyNode[];
+  edges: InvocationNodeEdge[];
+  nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
-  shouldShowGraphOverlay: boolean;
-  shouldShowFieldTypeLegend: boolean;
+  connectionStartFieldType: FieldType | null;
+  connectionMade: boolean;
+  modifyingEdge: boolean;
   shouldShowMinimapPanel: boolean;
-  editorInstance: ReactFlowInstance | undefined;
-  progressNodeSize: { width: number; height: number };
+  shouldValidateGraph: boolean;
+  shouldAnimateEdges: boolean;
+  nodeOpacity: number;
+  shouldSnapToGrid: boolean;
+  shouldColorEdges: boolean;
+  selectedNodes: string[];
+  selectedEdges: string[];
+  workflow: Omit<WorkflowV2, 'nodes' | 'edges'>;
+  nodeExecutionStates: Record<string, NodeExecutionState>;
+  viewport: Viewport;
+  isReady: boolean;
+  mouseOverField: FieldIdentifier | null;
+  mouseOverNode: string | null;
+  nodesToCopy: AnyNode[];
+  edgesToCopy: InvocationNodeEdge[];
+  isAddNodePopoverOpen: boolean;
+  addNewNodePosition: XYPosition | null;
+  selectionMode: SelectionMode;
 };

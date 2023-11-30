@@ -1,21 +1,24 @@
 import os
-import torch
 from typing import Optional
+
+import torch
+
+# TODO: naming
+from ..lora import TextualInversionModel as TextualInversionModelRaw
 from .base import (
+    BaseModelType,
+    InvalidModelException,
     ModelBase,
     ModelConfigBase,
-    BaseModelType,
+    ModelNotFoundException,
     ModelType,
     SubModelType,
     classproperty,
-    ModelNotFoundException,
-    InvalidModelException,
 )
-# TODO: naming
-from ..lora import TextualInversionModel as TextualInversionModelRaw
+
 
 class TextualInversionModel(ModelBase):
-    #model_size: int
+    # model_size: int
 
     class Config(ModelConfigBase):
         model_format: None
@@ -65,10 +68,10 @@ class TextualInversionModel(ModelBase):
 
         if os.path.isdir(path):
             if os.path.exists(os.path.join(path, "learned_embeds.bin")):
-                return None # diffusers-ti
+                return None  # diffusers-ti
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "bin"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "bin"]):
                 return None
 
         raise InvalidModelException(f"Not a valid model: {path}")

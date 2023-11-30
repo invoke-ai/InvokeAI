@@ -5,7 +5,8 @@ import requests
 from invokeai.version import __version__
 
 local_version = str(__version__).replace("-", "")
-package_name = 'InvokeAI'
+package_name = "InvokeAI"
+
 
 def get_pypi_versions(package_name=package_name) -> list[str]:
     """Get the versions of the package from PyPI"""

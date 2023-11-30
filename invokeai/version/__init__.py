@@ -1,10 +1,11 @@
 """
 initialization file for invokeai
 """
-from .invokeai_version import __version__
+from .invokeai_version import __version__  # noqa: F401
 
 __app_id__ = "invoke-ai/InvokeAI"
 __app_name__ = "InvokeAI"
+
 
 def _ignore_xformers_triton_message_on_windows():
     import logging

@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import ValidationError
 
-from invokeai.app.services.graph import Edge
+from invokeai.app.services.shared.graph import Edge
 
 
 def get_metadata_graph_from_raw_session(session_raw: str) -> Optional[dict]:
@@ -21,11 +21,11 @@ def get_metadata_graph_from_raw_session(session_raw: str) -> Optional[dict]:
 
     # sanity check make sure the graph is at least reasonably shaped
     if (
-        type(graph) is not dict
+        not isinstance(graph, dict)
         or "nodes" not in graph
-        or type(graph["nodes"]) is not dict
+        or not isinstance(graph["nodes"], dict)
         or "edges" not in graph
-        or type(graph["edges"]) is not list
+        or not isinstance(graph["edges"], list)
     ):
         # something has gone terribly awry, return an empty dict
         return None

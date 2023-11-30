@@ -1,17 +1,26 @@
-import { Box, Flex, Image, Text } from '@chakra-ui/react';
+import { Box, Flex, Image, Text, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { RemoveFromBoardDropData } from 'features/dnd/types';
+import {
+  autoAddBoardIdChanged,
+  boardIdSelected,
+} from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import AutoAddIcon from '../AutoAddIcon';
-import BoardContextMenu from '../BoardContextMenu';
+import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
+import {
+  useGetBoardAssetsTotalQuery,
+  useGetBoardImagesTotalQuery,
+} from 'services/api/endpoints/boards';
+import { useTranslation } from 'react-i18next';
+
 interface Props {
   isSelected: boolean;
 }
@@ -19,36 +28,51 @@ interface Props {
 const selector = createSelector(
   stateSelector,
   ({ gallery }) => {
-    const { autoAddBoardId } = gallery;
-    return { autoAddBoardId };
+    const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
+    return { autoAddBoardId, autoAssignBoardOnClick };
   },
   defaultSelectorOptions
 );
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId } = useAppSelector(selector);
-  const boardName = useBoardName(undefined);
+  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
+  const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected(undefined));
-  }, [dispatch]);
+    dispatch(boardIdSelected({ boardId: 'none' }));
+    if (autoAssignBoardOnClick) {
+      dispatch(autoAddBoardIdChanged('none'));
+    }
+  }, [dispatch, autoAssignBoardOnClick]);
   const [isHovered, setIsHovered] = useState(false);
+
+  const { data: imagesTotal } = useGetBoardImagesTotalQuery('none');
+  const { data: assetsTotal } = useGetBoardAssetsTotalQuery('none');
+  const tooltip = useMemo(() => {
+    if (imagesTotal?.total === undefined || assetsTotal?.total === undefined) {
+      return undefined;
+    }
+    return `${imagesTotal.total} image${imagesTotal.total === 1 ? '' : 's'}, ${
+      assetsTotal.total
+    } asset${assetsTotal.total === 1 ? '' : 's'}`;
+  }, [assetsTotal, imagesTotal]);
+
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
   }, []);
+
   const handleMouseOut = useCallback(() => {
     setIsHovered(false);
   }, []);
 
-  const droppableData: MoveBoardDropData = useMemo(
+  const droppableData: RemoveFromBoardDropData = useMemo(
     () => ({
       id: 'no_board',
-      actionType: 'MOVE_BOARD',
-      context: { boardId: undefined },
+      actionType: 'REMOVE_FROM_BOARD',
     }),
     []
   );
-
+  const { t } = useTranslation();
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
       <Flex
@@ -64,102 +88,86 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           h: 'full',
         }}
       >
-        <BoardContextMenu>
+        <BoardContextMenu board_id="none">
           {(ref) => (
-            <Flex
-              ref={ref}
-              onClick={handleSelectBoard}
-              sx={{
-                w: 'full',
-                h: 'full',
-                position: 'relative',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: 'base',
-                cursor: 'pointer',
-                bg: 'base.200',
-                _dark: {
-                  bg: 'base.800',
-                },
-              }}
-            >
+            <Tooltip label={tooltip} openDelay={1000} hasArrow>
               <Flex
+                ref={ref}
+                onClick={handleSelectBoard}
                 sx={{
                   w: 'full',
                   h: 'full',
+                  position: 'relative',
                   justifyContent: 'center',
                   alignItems: 'center',
+                  borderRadius: 'base',
+                  cursor: 'pointer',
+                  bg: 'base.200',
+                  _dark: {
+                    bg: 'base.800',
+                  },
                 }}
               >
-                {/* <Icon
-                  boxSize={12}
-                  as={FaBucket}
+                <Flex
                   sx={{
-                    opacity: 0.7,
-                    color: 'base.500',
+                    w: 'full',
+                    h: 'full',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Image
+                    src={InvokeAILogoImage}
+                    alt="invoke-ai-logo"
+                    sx={{
+                      opacity: 0.4,
+                      filter: 'grayscale(1)',
+                      mt: -6,
+                      w: 16,
+                      h: 16,
+                      minW: 16,
+                      minH: 16,
+                      userSelect: 'none',
+                    }}
+                  />
+                </Flex>
+                {autoAddBoardId === 'none' && <AutoAddIcon />}
+                <Flex
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    p: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    w: 'full',
+                    maxW: 'full',
+                    borderBottomRadius: 'base',
+                    bg: isSelected ? 'accent.400' : 'base.500',
+                    color: isSelected ? 'base.50' : 'base.100',
                     _dark: {
-                      color: 'base.500',
+                      bg: isSelected ? 'accent.500' : 'base.600',
+                      color: isSelected ? 'base.50' : 'base.100',
                     },
+                    lineHeight: 'short',
+                    fontSize: 'xs',
+                    fontWeight: isSelected ? 700 : 500,
                   }}
-                /> */}
-                <Image
-                  src={InvokeAILogoImage}
-                  alt="invoke-ai-logo"
-                  sx={{
-                    opacity: 0.4,
-                    filter: 'grayscale(1)',
-                    mt: -6,
-                    w: 16,
-                    h: 16,
-                    minW: 16,
-                    minH: 16,
-                    userSelect: 'none',
-                  }}
+                >
+                  {boardName}
+                </Flex>
+                <SelectionOverlay
+                  isSelected={isSelected}
+                  isHovered={isHovered}
+                />
+                <IAIDroppable
+                  data={droppableData}
+                  dropLabel={
+                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                  }
                 />
               </Flex>
-              {/* <Flex
-                sx={{
-                  position: 'absolute',
-                  insetInlineEnd: 0,
-                  top: 0,
-                  p: 1,
-                }}
-              >
-                <Badge variant="solid" sx={BASE_BADGE_STYLES}>
-                  {totalImages}/{totalAssets}
-                </Badge>
-              </Flex> */}
-              {!autoAddBoardId && <AutoAddIcon />}
-              <Flex
-                sx={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  p: 1,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  w: 'full',
-                  maxW: 'full',
-                  borderBottomRadius: 'base',
-                  bg: isSelected ? 'accent.400' : 'base.500',
-                  color: isSelected ? 'base.50' : 'base.100',
-                  _dark: {
-                    bg: isSelected ? 'accent.500' : 'base.600',
-                    color: isSelected ? 'base.50' : 'base.100',
-                  },
-                  lineHeight: 'short',
-                  fontSize: 'xs',
-                  fontWeight: isSelected ? 700 : 500,
-                }}
-              >
-                {boardName}
-              </Flex>
-              <SelectionOverlay isSelected={isSelected} isHovered={isHovered} />
-              <IAIDroppable
-                data={droppableData}
-                dropLabel={<Text fontSize="md">Move</Text>}
-              />
-            </Flex>
+            </Tooltip>
           )}
         </BoardContextMenu>
       </Flex>
@@ -169,4 +177,4 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
 
 NoBoardBoard.displayName = 'HoverableBoard';
 
-export default NoBoardBoard;
+export default memo(NoBoardBoard);

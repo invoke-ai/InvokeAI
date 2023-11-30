@@ -15,7 +15,7 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import { isEqual } from 'lodash-es';
 
 import { MutableRefObject, useCallback } from 'react';
-import getScaledCursorPosition from '../util/getScaledCursorPosition';
+import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
 
 const selector = createSelector(
@@ -38,7 +38,9 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
   return useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      if (!stageRef.current) return;
+      if (!stageRef.current) {
+        return;
+      }
 
       stageRef.current.container().focus();
 
@@ -54,7 +56,9 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-      if (!scaledCursorPosition) return;
+      if (!scaledCursorPosition) {
+        return;
+      }
 
       e.evt.preventDefault();
 

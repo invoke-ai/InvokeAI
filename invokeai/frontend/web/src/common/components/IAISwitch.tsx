@@ -1,10 +1,13 @@
 import {
+  Flex,
   FormControl,
   FormControlProps,
+  FormHelperText,
   FormLabel,
   FormLabelProps,
   Switch,
   SwitchProps,
+  Text,
   Tooltip,
 } from '@chakra-ui/react';
 import { memo } from 'react';
@@ -15,6 +18,7 @@ export interface IAISwitchProps extends SwitchProps {
   formControlProps?: FormControlProps;
   formLabelProps?: FormLabelProps;
   tooltip?: string;
+  helperText?: string;
 }
 
 /**
@@ -28,6 +32,7 @@ const IAISwitch = (props: IAISwitchProps) => {
     formControlProps,
     formLabelProps,
     tooltip,
+    helperText,
     ...rest
   } = props;
   return (
@@ -35,28 +40,38 @@ const IAISwitch = (props: IAISwitchProps) => {
       <FormControl
         isDisabled={isDisabled}
         width={width}
-        display="flex"
         alignItems="center"
         {...formControlProps}
       >
-        {label && (
-          <FormLabel
-            my={1}
-            flexGrow={1}
-            sx={{
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
-              ...formLabelProps?.sx,
-              pe: 4,
-            }}
-            {...formLabelProps}
-          >
-            {label}
-          </FormLabel>
-        )}
-        <Switch {...rest} />
+        <Flex sx={{ flexDir: 'column', w: 'full' }}>
+          <Flex sx={{ alignItems: 'center', w: 'full' }}>
+            {label && (
+              <FormLabel
+                my={1}
+                flexGrow={1}
+                sx={{
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  ...formLabelProps?.sx,
+                  pe: 4,
+                }}
+                {...formLabelProps}
+              >
+                {label}
+              </FormLabel>
+            )}
+            <Switch {...rest} />
+          </Flex>
+          {helperText && (
+            <FormHelperText>
+              <Text variant="subtext">{helperText}</Text>
+            </FormHelperText>
+          )}
+        </Flex>
       </FormControl>
     </Tooltip>
   );
 };
+
+IAISwitch.displayName = 'IAISwitch';
 
 export default memo(IAISwitch);

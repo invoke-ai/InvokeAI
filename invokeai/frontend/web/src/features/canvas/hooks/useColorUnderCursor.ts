@@ -3,11 +3,11 @@ import Konva from 'konva';
 import {
   commitColorPickerColor,
   setColorPickerColor,
-} from '../store/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import {
   getCanvasBaseLayer,
   getCanvasStage,
-} from '../util/konvaInstanceProvider';
+} from 'features/canvas/util/konvaInstanceProvider';
 
 const useColorPicker = () => {
   const dispatch = useAppDispatch();
@@ -16,11 +16,15 @@ const useColorPicker = () => {
 
   return {
     updateColorUnderCursor: () => {
-      if (!stage || !canvasBaseLayer) return;
+      if (!stage || !canvasBaseLayer) {
+        return;
+      }
 
       const position = stage.getPointerPosition();
 
-      if (!position) return;
+      if (!position) {
+        return;
+      }
 
       const pixelRatio = Konva.pixelRatio;
 
@@ -32,6 +36,15 @@ const useColorPicker = () => {
           1,
           1
         ).data;
+
+      if (
+        r === undefined ||
+        g === undefined ||
+        b === undefined ||
+        a === undefined
+      ) {
+        return;
+      }
 
       dispatch(setColorPickerColor({ r, g, b, a }));
     },

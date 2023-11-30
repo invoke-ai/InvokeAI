@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
 # General
-site_name: InvokeAI Stable Diffusion Toolkit Docs
+site_name: InvokeAI Documentation
 site_url: https://invoke-ai.github.io/InvokeAI
 site_author: mauwii
 dev_addr: '127.0.0.1:8080'
@@ -36,7 +36,6 @@ theme:
     - navigation.instant
     - navigation.tabs
     - navigation.tabs.sticky
-    - navigation.top
     - navigation.tracking
     - navigation.indexes
     - navigation.path
@@ -99,12 +98,21 @@ plugins:
           'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
           'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
 
+extra_javascript:
+  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
+  - javascripts/tablesort.js
+
+extra:
+  analytics:
+    provider: google
+    property: G-2X4JR4S4FB
+
 nav:
     - Home: 'index.md'
     - Installation:
-      - Overview: 'installation/index.md'
+      - Overview: 'installation/INSTALLATION.md'
       - Installing with the Automated Installer: 'installation/010_INSTALL_AUTOMATED.md'
-      - Installing manually: 'installation/020_INSTALL_MANUAL.md'
+      - Installing Manually: 'installation/020_INSTALL_MANUAL.md'
       - NVIDIA Cuda / AMD ROCm: 'installation/030_INSTALL_CUDA_AND_ROCM.md'
       - Installing with Docker: 'installation/040_INSTALL_DOCKER.md'
       - Installing Models: 'installation/050_INSTALLING_MODELS.md'
@@ -119,44 +127,63 @@ nav:
         - Manual Installation on Windows: 'installation/deprecated_documentation/INSTALL_WINDOWS.md'
         - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
         - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
-    - Community Nodes:
+    - Workflows & Nodes:
       - Community Nodes: 'nodes/communityNodes.md'
-      - Overview: 'nodes/overview.md'
+      - Example Workflows: 'nodes/exampleWorkflows.md'
+      - Nodes Overview: 'nodes/overview.md'
+      - List of Default Nodes: 'nodes/defaultNodes.md'
+      - Workflow Editor Usage: 'nodes/NODES.md'
+      - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
+      - Facetool Node: 'nodes/detailedNodes/faceTools.md'
+      - Contributing Nodes: 'nodes/contributingNodes.md'
     - Features:
       - Overview: 'features/index.md'
-      - Concepts: 'features/CONCEPTS.md'
+      - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Configuration: 'features/CONFIGURATION.md'
-      - ControlNet: 'features/CONTROLNET.md'
+      - Control Adapters: 'features/CONTROLNET.md'
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
+      - LoRAs & LCM-LoRAs: 'features/LORAS.md'
       - Model Merging: 'features/MODEL_MERGING.md'
-      - Nodes Editor (Experimental): 'features/NODES.md'
-      - NSFW Checker: 'features/NSFW.md'
+      - Nodes & Workflows: 'nodes/overview.md'
+      - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
-      - Training: 'features/TRAINING.md'
+      - Textual Inversions:
+        - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
+        - Textual Inversion Training: 'features/TRAINING.md'
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
-      - Variations: 'features/VARIATIONS.md'
       - InvokeAI Web Server: 'features/WEB.md'
       - WebUI Hotkeys: "features/WEBUIHOTKEYS.md"
+      - Maintenance Utilities: "features/UTILITIES.md"
       - Other: 'features/OTHER.md'
     - Contributing:
       - How to Contribute: 'contributing/CONTRIBUTING.md'
+      - InvokeAI Code of Conduct: 'CODE_OF_CONDUCT.md'
       - Development:
         - Overview: 'contributing/contribution_guides/development.md'
+        - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
         - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
-        - Frontend Documentation: 'contributing/contribution_guides/development_guides/contributingToFrontend.md'
+        - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
+        - Adding Tests: 'contributing/TESTS.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
+      - Nodes: 'contributing/INVOCATIONS.md'
       - Translation: 'contributing/contribution_guides/translation.md'
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
     - Changelog: 'CHANGELOG.md'
     - Deprecated:
       - Command Line Interface: 'deprecated/CLI.md'
+      - Variations: 'deprecated/VARIATIONS.md'
+      - Translations: 'deprecated/TRANSLATION.md'
       - Embiggen: 'deprecated/EMBIGGEN.md'
       - Inpainting: 'deprecated/INPAINTING.md'
       - Outpainting: 'deprecated/OUTPAINTING.md'
+      - Troubleshooting: 'help/deprecated/TROUBLESHOOT.md'
     - Help:
+      - Getting Started: 'help/gettingStartedWithAI.md'
+      - FAQs: 'help/FAQ.md'
+      - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:
       - Contributors: 'other/CONTRIBUTORS.md'

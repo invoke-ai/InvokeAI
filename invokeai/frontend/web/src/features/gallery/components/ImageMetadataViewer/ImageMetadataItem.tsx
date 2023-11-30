@@ -1,5 +1,6 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { Flex, IconButton, Link, Text, Tooltip } from '@chakra-ui/react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
@@ -25,6 +26,11 @@ const ImageMetadataItem = ({
   withCopy = false,
 }: MetadataItemProps) => {
   const { t } = useTranslation();
+
+  const handleCopy = useCallback(
+    () => navigator.clipboard.writeText(value.toString()),
+    [value]
+  );
 
   if (!value) {
     return null;
@@ -52,7 +58,7 @@ const ImageMetadataItem = ({
             size="xs"
             variant="ghost"
             fontSize={14}
-            onClick={() => navigator.clipboard.writeText(value.toString())}
+            onClick={handleCopy}
           />
         </Tooltip>
       )}
@@ -74,4 +80,4 @@ const ImageMetadataItem = ({
   );
 };
 
-export default ImageMetadataItem;
+export default memo(ImageMetadataItem);

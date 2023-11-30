@@ -1,34 +1,38 @@
 import os
-import torch
-import safetensors
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union, Literal
+from typing import Optional
+
+import safetensors
+import torch
+from omegaconf import OmegaConf
+
+from invokeai.app.services.config import InvokeAIAppConfig
+
 from .base import (
+    BaseModelType,
+    EmptyConfigLoader,
+    InvalidModelException,
     ModelBase,
     ModelConfigBase,
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelVariantType,
-    EmptyConfigLoader,
-    calc_model_size_by_fs,
-    calc_model_size_by_data,
-    classproperty,
-    InvalidModelException,
     ModelNotFoundException,
+    ModelType,
+    ModelVariantType,
+    SubModelType,
+    calc_model_size_by_data,
+    calc_model_size_by_fs,
+    classproperty,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
-from diffusers.utils import is_safetensors_available
-from omegaconf import OmegaConf
+
 
 class VaeModelFormat(str, Enum):
     Checkpoint = "checkpoint"
     Diffusers = "diffusers"
 
+
 class VaeModel(ModelBase):
-    #vae_class: Type
-    #model_size: int
+    # vae_class: Type
+    # model_size: int
 
     class Config(ModelConfigBase):
         model_format: VaeModelFormat
@@ -39,15 +43,15 @@ class VaeModel(ModelBase):
 
         try:
             config = EmptyConfigLoader.load_config(self.model_path, config_name="config.json")
-            #config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
+            # config = json.loads(os.path.join(self.model_path, "config.json"))
+        except Exception:
             raise Exception("Invalid vae model! (config.json not found or invalid)")
 
         try:
             vae_class_name = config.get("_class_name", "AutoencoderKL")
             self.vae_class = self._hf_definition_to_type(["diffusers", vae_class_name])
             self.model_size = calc_model_size_by_fs(self.model_path)
-        except:
+        except Exception:
             raise Exception("Invalid vae model! (Unkown vae type)")
 
     def get_size(self, child_type: Optional[SubModelType] = None):
@@ -78,14 +82,14 @@ class VaeModel(ModelBase):
     @classmethod
     def detect_format(cls, path: str):
         if not os.path.exists(path):
-            raise ModelNotFoundException()
+            raise ModelNotFoundException(f"Does not exist as local file: {path}")
 
         if os.path.isdir(path):
             if os.path.exists(os.path.join(path, "config.json")):
                 return VaeModelFormat.Diffusers
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]):
                 return VaeModelFormat.Checkpoint
 
         raise InvalidModelException(f"Not a valid model: {path}")
@@ -95,7 +99,7 @@ class VaeModel(ModelBase):
         cls,
         model_path: str,
         output_path: str,
-        config: ModelConfigBase, # empty config or config of parent model
+        config: ModelConfigBase,  # empty config or config of parent model
         base_model: BaseModelType,
     ) -> str:
         if cls.detect_format(model_path) == VaeModelFormat.Checkpoint:
@@ -107,6 +111,7 @@ class VaeModel(ModelBase):
             )
         else:
             return model_path
+
 
 # TODO: rework
 def _convert_vae_ckpt_and_cache(
@@ -138,13 +143,14 @@ def _convert_vae_ckpt_and_cache(
     2.1 - 768
     """
     image_size = 512
-        
+
     # return cached version if it exists
     if output_path.exists():
         return output_path
 
     if base_model in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
         from .stable_diffusion import _select_ckpt_config
+
         # all sd models use same vae settings
         config_file = _select_ckpt_config(base_model, ModelVariantType.Normal)
     else:
@@ -152,7 +158,8 @@ def _convert_vae_ckpt_and_cache(
 
     # this avoids circular import error
     from ..convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
-    if weights_path.suffix == '.safetensors':
+
+    if weights_path.suffix == ".safetensors":
         checkpoint = safetensors.torch.load_file(weights_path, device="cpu")
     else:
         checkpoint = torch.load(weights_path, map_location="cpu")
@@ -161,15 +168,12 @@ def _convert_vae_ckpt_and_cache(
     if "state_dict" in checkpoint:
         checkpoint = checkpoint["state_dict"]
 
-    config = OmegaConf.load(app_config.root_path/config_file)
+    config = OmegaConf.load(app_config.root_path / config_file)
 
     vae_model = convert_ldm_vae_to_diffusers(
-        checkpoint = checkpoint,
-        vae_config = config,
-        image_size = image_size,
+        checkpoint=checkpoint,
+        vae_config=config,
+        image_size=image_size,
     )
-    vae_model.save_pretrained(
-        output_path,
-        safe_serialization=is_safetensors_available()
-    )
+    vae_model.save_pretrained(output_path, safe_serialization=True)
     return output_path

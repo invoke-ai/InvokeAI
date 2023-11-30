@@ -1,23 +1,24 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { ImageConfig } from 'konva/lib/shapes/Image';
 import { isEqual } from 'lodash-es';
-
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
-import { canvasSelector } from '../store/canvasSelectors';
 
 const selector = createSelector(
-  [systemSelector, canvasSelector],
-  (system, canvas) => {
-    const { progressImage, sessionId } = system;
-    const { sessionId: canvasSessionId, boundingBox } =
-      canvas.layerState.stagingArea;
+  [stateSelector],
+  ({ system, canvas }) => {
+    const { denoiseProgress } = system;
+    const { boundingBox } = canvas.layerState.stagingArea;
+    const { batchIds } = canvas;
 
     return {
       boundingBox,
-      progressImage: sessionId === canvasSessionId ? progressImage : undefined,
+      progressImage:
+        denoiseProgress && batchIds.includes(denoiseProgress.batch_id)
+          ? denoiseProgress.progress_image
+          : undefined,
     };
   },
   {
@@ -66,4 +67,4 @@ const IAICanvasIntermediateImage = (props: Props) => {
   ) : null;
 };
 
-export default IAICanvasIntermediateImage;
+export default memo(IAICanvasIntermediateImage);

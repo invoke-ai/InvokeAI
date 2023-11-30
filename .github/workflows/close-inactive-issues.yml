@@ -1,11 +1,11 @@
 name: Close inactive issues
 on:
   schedule:
-    - cron: "00 6 * * *"
+    - cron: "00 4 * * *"
 
 env:
-  DAYS_BEFORE_ISSUE_STALE: 14
-  DAYS_BEFORE_ISSUE_CLOSE: 28
+  DAYS_BEFORE_ISSUE_STALE: 30
+  DAYS_BEFORE_ISSUE_CLOSE: 14
 
 jobs:
   close-issues:
@@ -14,7 +14,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/stale@v5
+      - uses: actions/stale@v8
         with:
           days-before-issue-stale: ${{ env.DAYS_BEFORE_ISSUE_STALE }}
           days-before-issue-close: ${{ env.DAYS_BEFORE_ISSUE_CLOSE }}
@@ -23,5 +23,6 @@ jobs:
           close-issue-message: "Due to inactivity, this issue was automatically closed. If you are still experiencing the issue, please recreate the issue."
           days-before-pr-stale: -1
           days-before-pr-close: -1
+          exempt-issue-labels: "Active Issue"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           operations-per-run: 500

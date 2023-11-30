@@ -40,17 +40,15 @@ experimental versions later.
     this, open up a command-line window ("Terminal" on Linux and
     Macintosh, "Command" or "Powershell" on Windows) and type `python
     --version`. If Python is installed, it will print out the version
-    number. If it is version `3.9.*` or `3.10.*`, you meet
-    requirements. We do not recommend using Python 3.11 or higher,
-    as not all the libraries that InvokeAI depends on work properly
-    with this version.
+    number. If it is version `3.10.*` or `3.11.*` you meet
+    requirements.
 
     !!! warning "What to do if you have an unsupported version"
 
         Go to [Python Downloads](https://www.python.org/downloads/)
         and download the appropriate installer package for your
         platform. We recommend [Version
-        3.10.9](https://www.python.org/downloads/release/python-3109/),
+        3.10.12](https://www.python.org/downloads/release/python-3109/),
         which has been extensively tested with InvokeAI.
 
     _Please select your platform in the section below for platform-specific
@@ -181,7 +179,7 @@ experimental versions later.
     you will have the choice of CUDA (NVidia cards), ROCm (AMD cards),
     or CPU (no graphics acceleration). On Windows, you'll have the
     choice of CUDA vs CPU, and on Macs you'll be offered CPU only. When
-    you select CPU on M1 or M2 Macintoshes, you will get MPS-based
+    you select CPU on M1/M2/M3 Macintoshes, you will get MPS-based
     graphics acceleration without installing additional drivers. If you
     are unsure what GPU you are using, you can ask the installer to
     guess.
@@ -215,17 +213,6 @@ experimental versions later.
     Generally the defaults are fine, and you can come back to this screen at
     any time to tweak your system. Here are the options you can adjust:
 
-    - ***Output directory for images***
-      This is the path to a directory in which InvokeAI will store all its
-      generated images.
-
-    - ***NSFW checker***
-      If checked, InvokeAI will test images for potential sexual content
-      and blur them out if found. Note that the NSFW checker consumes
-      an additional 0.6 GB of VRAM on top of the 2-3 GB of VRAM used
-      by most image models. If you have a low VRAM GPU (4-6 GB), you
-      can reduce out of memory errors by disabling the checker.
-
     - ***HuggingFace Access Token***
       InvokeAI has the ability to download embedded styles and subjects
       from the HuggingFace Concept Library on-demand. However, some of
@@ -257,20 +244,30 @@ experimental versions later.
 	and graphics cards. The "autocast" option is deprecated and
 	shouldn't be used unless you are asked to by a member of the team.
 
-    - ***Number of models to cache in CPU memory***
+    - **Size of the RAM cache used for fast model switching***
         This allows you to keep models in memory and switch rapidly among
 	them rather than having them load from disk each time. This slider
-	controls how many models to keep loaded at once. Each
-	model will use 2-4 GB of RAM, so use this cautiously
+	controls how many models to keep loaded at once. A typical SD-1 or SD-2 model
+	uses 2-3 GB of memory. A typical SDXL model uses 6-7 GB. Providing more
+	RAM will allow more models to be co-resident.
 
-    - ***Directory containing embedding/textual inversion files***
-        This is the directory in which you can place custom embedding
-	files (.pt or .bin). During startup, this directory will be
-	scanned and InvokeAI will print out the text terms that
-	are available to trigger the embeddings.
+    - ***Output directory for images***
+      This is the path to a directory in which InvokeAI will store all its
+      generated images.
+
+    - ***Autoimport Folder***
+      This is the directory in which you can place models you have
+	  downloaded and wish to load into InvokeAI. You can place a variety
+	  of models in this directory, including diffusers folders, .ckpt files,
+	  .safetensors files, as well as LoRAs, ControlNet and Textual Inversion
+	  files (both folder and file versions). To help organize this folder,
+	  you can create several levels of subfolders and drop your models into
+      whichever ones you want.
+	
+    - ***LICENSE***     
 
     At the bottom of the screen you will see a checkbox for accepting
-    the CreativeML Responsible AI License. You need to accept the license
+    the CreativeML Responsible AI Licenses. You need to accept the license
     in order to download Stable Diffusion models from the next screen.
 
     _You can come back to the startup options form_ as many times as you like.
@@ -375,7 +372,70 @@ experimental versions later.
         Once InvokeAI is installed, do not move or remove this directory."
 
 
+<a name="troubleshooting"></a>
 ## Troubleshooting
+
+### _OSErrors on Windows while installing dependencies_
+
+During a zip file installation or an online update, installation stops
+with an error like this:
+
+![broken-dependency-screenshot](../assets/troubleshooting/broken-dependency.png){:width="800px"}
+
+This seems to happen particularly often with the `pydantic` and
+`numpy` packages. The most reliable solution requires several manual
+steps to complete installation.
+
+Open up a Powershell window and navigate to the `invokeai` directory
+created by the installer. Then give the following series of commands:
+
+```cmd
+rm .\.venv -r -force
+python -mvenv .venv
+.\.venv\Scripts\activate
+pip install invokeai
+invokeai-configure --yes --root .
+```
+
+If you see anything marked as an error during this process please stop
+and seek help on the Discord [installation support
+channel](https://discord.com/channels/1020123559063990373/1041391462190956654). A
+few warning messages are OK.
+
+If you are updating from a previous version, this should restore your
+system to a working state. If you are installing from scratch, there
+is one additional command to give:
+
+```cmd
+wget -O invoke.bat https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/installer/templates/invoke.bat.in
+```
+
+This will create the `invoke.bat` script needed to launch InvokeAI and
+its related programs.
+
+
+### _Stable Diffusion XL Generation Fails after Trying to Load unet_
+
+InvokeAI is working in other respects, but when trying to generate
+images with Stable Diffusion XL you get a "Server Error". The text log
+in the launch window contains this log line above several more lines of
+error messages:
+
+```INFO --> Loading model:D:\LONG\PATH\TO\MODEL, type sdxl:main:unet```
+
+This failure mode occurs when there is a network glitch during
+downloading the very large SDXL model.
+
+To address this, first go to the Web Model Manager and delete the
+Stable-Diffusion-XL-base-1.X model. Then navigate to HuggingFace and
+manually download the .safetensors version of the model. The 1.0
+version is located at
+https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main
+and the file is named `sd_xl_base_1.0.safetensors`.
+
+Save this file to disk and then reenter the Model Manager. Navigate to
+Import Models->Add Model, then type (or drag-and-drop) the path to the
+.safetensors file. Press "Add Model".
 
 ### _Package dependency conflicts_
 
@@ -411,7 +471,7 @@ Then type the following commands:
 
 === "NVIDIA System"
     ```bash
-    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu117
+    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu121
     pip install xformers
     ```
 

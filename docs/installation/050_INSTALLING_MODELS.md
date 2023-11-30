@@ -84,7 +84,7 @@ InvokeAI root directory's `autoimport` folder.
 
 ### Installation via `invokeai-model-install`
 
-From the `invoke` launcher, choose option [5] "Download and install
+From the `invoke` launcher, choose option [4] "Download and install
 models." This will launch the same script that prompted you to select
 models at install time. You can use this to add models that you
 skipped the first time around. It is all right to specify a model that
@@ -124,7 +124,7 @@ installation. Examples:
 invokeai-model-install --list controlnet
 
 # (install the model at the indicated URL)
-invokeai-model-install --add http://civitai.com/2860
+invokeai-model-install --add https://civitai.com/api/download/models/128713
 
 # (delete the named model)
 invokeai-model-install --delete sd-1/main/analog-diffusion
@@ -171,3 +171,16 @@ subfolders and organize them as you wish.
 
 The location of the autoimport directories are controlled by settings
 in `invokeai.yaml`. See [Configuration](../features/CONFIGURATION.md).
+
+### Installing models that live in HuggingFace subfolders
+
+On rare occasions you may need to install a diffusers-style model that
+lives in a subfolder of a HuggingFace repo id. In this event, simply
+add ":_subfolder-name_" to the end of the repo id. For example, if the
+repo id is "monster-labs/control_v1p_sd15_qrcode_monster" and the model
+you wish to fetch lives in a subfolder named "v2", then the repo id to
+pass to the various model installers should be 
+
+```
+monster-labs/control_v1p_sd15_qrcode_monster:v2
+```

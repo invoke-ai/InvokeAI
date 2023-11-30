@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { GroupConfig } from 'konva/lib/Group';
 import { isEqual } from 'lodash-es';
-
+import { memo } from 'react';
 import { Group, Rect } from 'react-konva';
 import IAICanvasImage from './IAICanvasImage';
 
@@ -14,11 +14,11 @@ const selector = createSelector(
       layerState,
       shouldShowStagingImage,
       shouldShowStagingOutline,
-      boundingBoxCoordinates: { x, y },
-      boundingBoxDimensions: { width, height },
+      boundingBoxCoordinates: stageBoundingBoxCoordinates,
+      boundingBoxDimensions: stageBoundingBoxDimensions,
     } = canvas;
 
-    const { selectedImageIndex, images } = layerState.stagingArea;
+    const { selectedImageIndex, images, boundingBox } = layerState.stagingArea;
 
     return {
       currentStagingAreaImage:
@@ -29,10 +29,10 @@ const selector = createSelector(
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,
       shouldShowStagingOutline,
-      x,
-      y,
-      width,
-      height,
+      x: boundingBox?.x ?? stageBoundingBoxCoordinates.x,
+      y: boundingBox?.y ?? stageBoundingBoxCoordinates.y,
+      width: boundingBox?.width ?? stageBoundingBoxDimensions.width,
+      height: boundingBox?.height ?? stageBoundingBoxDimensions.height,
     };
   },
   {
@@ -88,4 +88,4 @@ const IAICanvasStagingArea = (props: Props) => {
   );
 };
 
-export default IAICanvasStagingArea;
+export default memo(IAICanvasStagingArea);

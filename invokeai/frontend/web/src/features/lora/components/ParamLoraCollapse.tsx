@@ -6,9 +6,10 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import { size } from 'lodash-es';
 import { memo } from 'react';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import ParamLoraList from './ParamLoraList';
 import ParamLoRASelect from './ParamLoraSelect';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -22,6 +23,7 @@ const selector = createSelector(
 );
 
 const ParamLoraCollapse = () => {
+  const { t } = useTranslation();
   const { activeLabel } = useAppSelector(selector);
 
   const isLoraEnabled = useFeatureStatus('lora').isFeatureEnabled;
@@ -31,7 +33,7 @@ const ParamLoraCollapse = () => {
   }
 
   return (
-    <IAICollapse label={'LoRA'} activeLabel={activeLabel}>
+    <IAICollapse label={t('modelManager.loraModels')} activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamLoRASelect />
         <ParamLoraList />

@@ -2,6 +2,7 @@ import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addStagingAreaImageSavedListener = () => {
   startAppListening({
@@ -20,7 +21,7 @@ export const addStagingAreaImageSavedListener = () => {
         // we may need to add it to the autoadd board
         const { autoAddBoardId } = getState().gallery;
 
-        if (autoAddBoardId) {
+        if (autoAddBoardId && autoAddBoardId !== 'none') {
           await dispatch(
             imagesApi.endpoints.addImageToBoard.initiate({
               imageDTO: newImageDTO,
@@ -28,11 +29,11 @@ export const addStagingAreaImageSavedListener = () => {
             })
           );
         }
-        dispatch(addToast({ title: 'Image Saved', status: 'success' }));
+        dispatch(addToast({ title: t('toast.imageSaved'), status: 'success' }));
       } catch (error) {
         dispatch(
           addToast({
-            title: 'Image Saving Failed',
+            title: t('toast.imageSavingFailed'),
             description: (error as Error)?.message,
             status: 'error',
           })

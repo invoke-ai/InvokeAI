@@ -4,6 +4,9 @@ title: Overview
 
 Here you can find the documentation for InvokeAI's various features.
 
+## The [Getting Started Guide](../help/gettingStartedWithAI) 
+A getting started guide for those new to AI image generation. 
+
 ## The Basics
 ### * The [Web User Interface](WEB.md)
 Guide to the Web interface. Also see the [WebUI Hotkeys Reference Guide](WEBUIHOTKEYS.md)
@@ -17,7 +20,7 @@ a single convenient digital artist-optimized user interface.
 ### * [Prompt Engineering](PROMPTS.md)
 Get the images you want with the InvokeAI  prompt engineering language.
 
-### * The [LoRA, LyCORIS and Textual Inversion Models](CONCEPTS.md)
+### * The [LoRA, LyCORIS, LCM-LoRA Models](CONCEPTS.md)
 Add custom subjects and styles using a variety of fine-tuned models.
 
 ### * [ControlNet](CONTROLNET.md)
@@ -25,11 +28,7 @@ Learn how to install and use ControlNet models for fine control over
 image output.
 
 ### * [Image-to-Image Guide](IMG2IMG.md)
-Use a seed image to build new creations in the CLI.
-
-### * [Generating Variations](VARIATIONS.md)
-Have an image you like and want to generate many more like it? Variations
-are the ticket.
+Use a seed image to build new creations.
 
 ## Model Management
 
@@ -41,16 +40,19 @@ guide also covers optimizing models to load quickly.
 Teach an old model new tricks. Merge 2-3 models together to create a
 new model that combines characteristics of the originals.
 
-### * [Textual Inversion](TRAINING.md)
+### * [Textual Inversion](TEXTUAL_INVERSIONS.md)
 Personalize models by adding your own style or subjects.
 
 ## Other Features
 
-### * [The NSFW Checker](NSFW.md)
+### * [The NSFW Checker](WATERMARK+NSFW.md)
 Prevent InvokeAI from displaying unwanted racy images.
 
 ### * [Controlling Logging](LOGGING.md)
 Control how InvokeAI logs status messages.
+
+### * [Command-line Utilities](UTILITIES.md)
+A list of the command-line utilities available with InvokeAI.
 
 <!-- OUT OF DATE
 ### * [Miscellaneous](OTHER.md)

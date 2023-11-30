@@ -4,14 +4,15 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
 import { useCallback } from 'react';
+import { boardsApi } from 'services/api/endpoints/boards';
 import {
-  ListImagesArgs,
-  imagesAdapter,
   imagesApi,
   useLazyListImagesQuery,
 } from 'services/api/endpoints/images';
-import { selectListImagesBaseQueryArgs } from '../store/gallerySelectors';
-import { IMAGE_LIMIT } from '../store/types';
+import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { IMAGE_LIMIT } from 'features/gallery/store/types';
+import { ListImagesArgs } from 'services/api/types';
+import { imagesAdapter } from 'services/api/util';
 
 export const nextPrevImageButtonsSelector = createSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
@@ -19,12 +20,21 @@ export const nextPrevImageButtonsSelector = createSelector(
     const { data, status } =
       imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
+    const { data: totalsData } =
+      state.gallery.galleryView === 'images'
+        ? boardsApi.endpoints.getBoardImagesTotal.select(
+            baseQueryArgs.board_id ?? 'none'
+          )(state)
+        : boardsApi.endpoints.getBoardAssetsTotal.select(
+            baseQueryArgs.board_id ?? 'none'
+          )(state);
+
     const lastSelectedImage =
       state.gallery.selection[state.gallery.selection.length - 1];
 
     const isFetching = status === 'pending';
 
-    if (!data || !lastSelectedImage || data.total === 0) {
+    if (!data || !lastSelectedImage || totalsData?.total === 0) {
       return {
         isFetching,
         queryArgs: baseQueryArgs,
@@ -44,30 +54,30 @@ export const nextPrevImageButtonsSelector = createSelector(
     const images = selectors.selectAll(data);
 
     const currentImageIndex = images.findIndex(
-      (i) => i.image_name === lastSelectedImage
+      (i) => i.image_name === lastSelectedImage.image_name
     );
     const nextImageIndex = clamp(currentImageIndex + 1, 0, images.length - 1);
-
     const prevImageIndex = clamp(currentImageIndex - 1, 0, images.length - 1);
 
     const nextImageId = images[nextImageIndex]?.image_name;
     const prevImageId = images[prevImageIndex]?.image_name;
 
-    const nextImage = selectors.selectById(data, nextImageId);
-    const prevImage = selectors.selectById(data, prevImageId);
+    const nextImage = nextImageId
+      ? selectors.selectById(data, nextImageId)
+      : undefined;
+    const prevImage = prevImageId
+      ? selectors.selectById(data, prevImageId)
+      : undefined;
 
     const imagesLength = images.length;
 
     return {
-      isOnFirstImage: currentImageIndex === 0,
-      isOnLastImage:
-        !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
-      areMoreImagesAvailable: (data?.total ?? 0) > imagesLength,
+      loadedImagesCount: images.length,
+      currentImageIndex,
+      areMoreImagesAvailable: (totalsData?.total ?? 0) > imagesLength,
       isFetching: status === 'pending',
       nextImage,
       prevImage,
-      nextImageId,
-      prevImageId,
       queryArgs,
     };
   },
@@ -82,22 +92,22 @@ export const useNextPrevImage = () => {
   const dispatch = useAppDispatch();
 
   const {
-    isOnFirstImage,
-    isOnLastImage,
-    nextImageId,
-    prevImageId,
+    nextImage,
+    prevImage,
     areMoreImagesAvailable,
     isFetching,
     queryArgs,
+    loadedImagesCount,
+    currentImageIndex,
   } = useAppSelector(nextPrevImageButtonsSelector);
 
   const handlePrevImage = useCallback(() => {
-    prevImageId && dispatch(imageSelected(prevImageId));
-  }, [dispatch, prevImageId]);
+    prevImage && dispatch(imageSelected(prevImage));
+  }, [dispatch, prevImage]);
 
   const handleNextImage = useCallback(() => {
-    nextImageId && dispatch(imageSelected(nextImageId));
-  }, [dispatch, nextImageId]);
+    nextImage && dispatch(imageSelected(nextImage));
+  }, [dispatch, nextImage]);
 
   const [listImages] = useLazyListImagesQuery();
 
@@ -108,10 +118,12 @@ export const useNextPrevImage = () => {
   return {
     handlePrevImage,
     handleNextImage,
-    isOnFirstImage,
-    isOnLastImage,
-    nextImageId,
-    prevImageId,
+    isOnFirstImage: currentImageIndex === 0,
+    isOnLastImage:
+      currentImageIndex !== undefined &&
+      currentImageIndex === loadedImagesCount - 1,
+    nextImage,
+    prevImage,
     areMoreImagesAvailable,
     handleLoadMoreImages,
     isFetching,

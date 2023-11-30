@@ -65,7 +65,6 @@ InvokeAI:
     esrgan: true
     internet_available: true
     log_tokenization: false
-    nsfw_checker: false
     patchmatch: true
     restore: true
 ...
@@ -83,7 +82,7 @@ format of YAML files can be found
 [here](https://circleci.com/blog/what-is-yaml-a-beginner-s-guide/).
 
 You can fix a broken `invokeai.yaml` by deleting it and running the
-configuration script again -- option [7] in the launcher, "Re-run the
+configuration script again -- option [6] in the launcher, "Re-run the
 configure script".
 
 #### Reading Environment Variables
@@ -136,19 +135,16 @@ command-line options by giving the `--help` argument:
 
 ```
 (.venv) > invokeai-web --help
-usage: InvokeAI [-h] [--host HOST] [--port PORT] [--allow_origins [ALLOW_ORIGINS ...]] [--allow_credentials | --no-allow_credentials]
-                [--allow_methods [ALLOW_METHODS ...]] [--allow_headers [ALLOW_HEADERS ...]] [--esrgan | --no-esrgan]
-                [--internet_available | --no-internet_available] [--log_tokenization | --no-log_tokenization]
-                [--nsfw_checker | --no-nsfw_checker] [--patchmatch | --no-patchmatch] [--restore | --no-restore]
-                [--always_use_cpu | --no-always_use_cpu] [--free_gpu_mem | --no-free_gpu_mem] [--max_cache_size MAX_CACHE_SIZE]
-                [--max_vram_cache_size MAX_VRAM_CACHE_SIZE] [--precision {auto,float16,float32,autocast}]
-                [--sequential_guidance | --no-sequential_guidance] [--xformers_enabled | --no-xformers_enabled]
-                [--tiled_decode | --no-tiled_decode] [--root ROOT] [--autoimport_dir AUTOIMPORT_DIR] [--lora_dir LORA_DIR]
-                [--embedding_dir EMBEDDING_DIR] [--controlnet_dir CONTROLNET_DIR] [--conf_path CONF_PATH] [--models_dir MODELS_DIR]
-                [--legacy_conf_dir LEGACY_CONF_DIR] [--db_dir DB_DIR] [--outdir OUTDIR] [--from_file FROM_FILE]
-                [--use_memory_db | --no-use_memory_db] [--model MODEL] [--log_handlers [LOG_HANDLERS ...]]
-                [--log_format {plain,color,syslog,legacy}] [--log_level {debug,info,warning,error,critical}]
-...
+usage: InvokeAI [-h] [--host HOST] [--port PORT] [--allow_origins [ALLOW_ORIGINS ...]] [--allow_credentials | --no-allow_credentials] [--allow_methods [ALLOW_METHODS ...]]
+                [--allow_headers [ALLOW_HEADERS ...]] [--esrgan | --no-esrgan] [--internet_available | --no-internet_available] [--log_tokenization | --no-log_tokenization]
+                [--patchmatch | --no-patchmatch] [--restore | --no-restore]
+                [--always_use_cpu | --no-always_use_cpu] [--free_gpu_mem | --no-free_gpu_mem] [--max_loaded_models MAX_LOADED_MODELS] [--max_cache_size MAX_CACHE_SIZE]
+                [--max_vram_cache_size MAX_VRAM_CACHE_SIZE] [--gpu_mem_reserved GPU_MEM_RESERVED] [--precision {auto,float16,float32,autocast}]
+                [--sequential_guidance | --no-sequential_guidance] [--xformers_enabled | --no-xformers_enabled] [--tiled_decode | --no-tiled_decode] [--root ROOT]
+                [--autoimport_dir AUTOIMPORT_DIR] [--lora_dir LORA_DIR] [--embedding_dir EMBEDDING_DIR] [--controlnet_dir CONTROLNET_DIR] [--conf_path CONF_PATH]
+                [--models_dir MODELS_DIR] [--legacy_conf_dir LEGACY_CONF_DIR] [--db_dir DB_DIR] [--outdir OUTDIR] [--from_file FROM_FILE]
+                [--use_memory_db | --no-use_memory_db] [--model MODEL] [--log_handlers [LOG_HANDLERS ...]] [--log_format {plain,color,syslog,legacy}]
+                [--log_level {debug,info,warning,error,critical}] [--version | --no-version]
 ```
 
 ## The Configuration Settings
@@ -163,7 +159,7 @@ groups in `invokeia.yaml`:
 | `host`     | `localhost`      | Name or IP address of the network interface that the web server will listen on  |
 | `port`     | `9090`           | Network port number that the web server will listen on  |
 | `allow_origins`  | `[]`       | A list of host names or IP addresses that are allowed to connect to the InvokeAI API in the format `['host1','host2',...]` |
-| `allow_credentials | `true`   | Require credentials for a foreign host to access the InvokeAI API (don't change this) |
+| `allow_credentials` | `true`   | Require credentials for a foreign host to access the InvokeAI API (don't change this) |
 | `allow_methods` | `*`         | List of HTTP methods ("GET", "POST") that the web server is allowed to use when accessing the API  |
 | `allow_headers` | `*`         | List of HTTP headers that the web server will accept when accessing the API  |
 
@@ -178,24 +174,28 @@ These configuration settings allow you to enable and disable various InvokeAI fe
 | `esrgan`     | `true`      | Activate the ESRGAN upscaling options|
 | `internet_available` | `true`     | When a resource is not available locally, try to fetch it via the internet |
 | `log_tokenization` | `false`      | Before each text2image generation, print a color-coded representation of the prompt to the console; this can help understand why a prompt is not working as expected |
-| `nsfw_checker` | `true`     | Activate the NSFW checker to blur out risque images |
 | `patchmatch` | `true`     | Activate the "patchmatch" algorithm for improved inpainting |
-| `restore`    | `true`     | Activate the facial restoration features (DEPRECATED; restoration features will be removed in 3.0.0) |
 
-### Memory/Performance
+### Generation
 
 These options tune InvokeAI's memory and performance characteristics.
 
-| Setting  | Default Value  |  Description |
-|----------|----------------|--------------|
-| `always_use_cpu`     | `false`      | Use the CPU to generate images, even if a GPU is available |
-| `free_gpu_mem`       | `false`      | Aggressively free up GPU memory after each operation; this will allow you to run in low-VRAM environments with some performance penalties |
-| `max_cache_size`       | `6`      | Amount of CPU RAM (in GB) to reserve for caching models in memory; more cache allows you to keep models in memory and switch among them quickly |
-| `max_vram_cache_size`  | `2.75`   | Amount of GPU VRAM (in GB) to reserve for caching models in VRAM; more cache speeds up generation but reduces the size of the images that can be generated. This can be set to zero to maximize the amount of memory available for generation. |
-| `precision`       | `auto`      | Floating point precision. One of `auto`, `float16` or `float32`. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system |
-| `sequential_guidance`     | `false`      | Calculate guidance in serial rather than in parallel, lowering memory requirements at the cost of some performance loss |
-| `xformers_enabled`        | `true`      | If the x-formers memory-efficient attention module is installed, activate it for better memory usage and generation speed|
-| `tiled_decode`            | `false`     | If true, then during the VAE decoding phase the image will be decoded a section at a time, reducing memory consumption at the cost of a performance hit |
+| Setting               | Default Value | Description                                                                                                                                                                                                                                                      |
+|-----------------------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `sequential_guidance` | `false`       | Calculate guidance in serial rather than in parallel, lowering memory requirements at the cost of some performance loss                                                                                                                                          |
+| `attention_type`      | `auto`        | Select the type of attention to use. One of `auto`,`normal`,`xformers`,`sliced`, or `torch-sdp`                                                                                                                                                                  |
+| `attention_slice_size` | `auto`       | When "sliced" attention is selected, set the slice size. One of `auto`, `balanced`, `max` or the integers 1-8|
+| `force_tiled_decode`  | `false`       | Force the VAE step to decode in tiles, reducing memory consumption at the cost of performance |
+
+### Device
+
+These options configure the generation execution device.
+
+| Setting               | Default Value | Description                                                                                                                                                                                                                                                      |
+|-----------------------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `device`           | `auto`        | Preferred execution device. One of `auto`, `cpu`, `cuda`, `cuda:1`, `mps`. `auto` will choose the device depending on the hardware platform and the installed torch capabilities. |
+| `precision`           | `auto`        | Floating point precision. One of `auto`, `float16` or `float32`. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system |
+
 
 ### Paths
 

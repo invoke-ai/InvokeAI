@@ -1,24 +1,24 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaRedo } from 'react-icons/fa';
 
 import { redo } from 'features/canvas/store/canvasSlice';
-import { systemSelector } from 'features/system/store/systemSelectors';
 
+import { stateSelector } from 'app/store/store';
 import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
+import { useCallback } from 'react';
 
 const canvasRedoSelector = createSelector(
-  [canvasSelector, activeTabNameSelector, systemSelector],
-  (canvas, activeTabName, system) => {
+  [stateSelector, activeTabNameSelector],
+  ({ canvas }, activeTabName) => {
     const { futureLayerStates } = canvas;
 
     return {
-      canRedo: futureLayerStates.length > 0 && !system.isProcessing,
+      canRedo: futureLayerStates.length > 0,
       activeTabName,
     };
   },
@@ -35,9 +35,9 @@ export default function IAICanvasRedoButton() {
 
   const { t } = useTranslation();
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     dispatch(redo());
-  };
+  }, [dispatch]);
 
   useHotkeys(
     ['meta+shift+z', 'ctrl+shift+z', 'control+y', 'meta+y'],

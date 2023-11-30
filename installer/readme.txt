@@ -4,28 +4,25 @@ Project homepage: https://github.com/invoke-ai/InvokeAI
 
 Preparations:
 
-  You will need to install Python 3.9 or higher for this installer
+  You will need to install Python 3.10 or higher for this installer
   to work. Instructions are given here:
   https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 
-  NOTE: At this time we do not recommend Python 3.11. We recommend 
-  Version 3.10.9, which has been extensively tested with InvokeAI.
-  
   Before you start the installer, please open up your system's command
   line window (Terminal or Command) and type the commands:
 
      python --version
 
   If all is well, it will print "Python 3.X.X", where the version number
-  is at least 3.9.1, and less than 3.11.
+  is at least 3.10.*, and not higher than 3.11.*.
 
   If this works, check the version of the Python package manager, pip:
 
      pip --version
 
   You should get a message that indicates that the pip package
-  installer was derived from Python 3.9 or 3.10. For example:
-  "pip 22.3.1 from /usr/bin/pip (python 3.9)"
+  installer was derived from Python 3.10 or 3.11. For example:
+  "pip 22.0.1 from /usr/bin/pip (python 3.10)"
 
 Long Paths on Windows:
 

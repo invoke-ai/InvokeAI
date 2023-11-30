@@ -14,6 +14,9 @@ const invokeAI = defineStyle((props) => {
       opacity: 0.4,
     },
     color: mode('base.700', 'base.300')(props),
+    _invalid: {
+      color: mode('error.500', 'error.300')(props),
+    },
   };
 });
 

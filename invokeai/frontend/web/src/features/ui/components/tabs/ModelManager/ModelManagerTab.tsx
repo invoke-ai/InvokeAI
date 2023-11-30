@@ -1,10 +1,10 @@
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
-import i18n from 'i18n';
-import { ReactNode, memo } from 'react';
-import ImportModelsPanel from './subpanels/ImportModelsPanel';
-import MergeModelsPanel from './subpanels/MergeModelsPanel';
-import ModelManagerPanel from './subpanels/ModelManagerPanel';
-import ModelManagerSettingsPanel from './subpanels/ModelManagerSettingsPanel';
+import { ReactNode, memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import ImportModelsPanel from 'features/modelManager/subpanels/ImportModelsPanel';
+import MergeModelsPanel from 'features/modelManager/subpanels/MergeModelsPanel';
+import ModelManagerPanel from 'features/modelManager/subpanels/ModelManagerPanel';
+import ModelManagerSettingsPanel from 'features/modelManager/subpanels/ModelManagerSettingsPanel';
 
 type ModelManagerTabName =
   | 'modelManager'
@@ -18,30 +18,34 @@ type ModelManagerTabInfo = {
   content: ReactNode;
 };
 
-const tabs: ModelManagerTabInfo[] = [
-  {
-    id: 'modelManager',
-    label: i18n.t('modelManager.modelManager'),
-    content: <ModelManagerPanel />,
-  },
-  {
-    id: 'importModels',
-    label: i18n.t('modelManager.importModels'),
-    content: <ImportModelsPanel />,
-  },
-  {
-    id: 'mergeModels',
-    label: i18n.t('modelManager.mergeModels'),
-    content: <MergeModelsPanel />,
-  },
-  {
-    id: 'settings',
-    label: i18n.t('modelManager.settings'),
-    content: <ModelManagerSettingsPanel />,
-  },
-];
-
 const ModelManagerTab = () => {
+  const { t } = useTranslation();
+
+  const tabs: ModelManagerTabInfo[] = useMemo(
+    () => [
+      {
+        id: 'modelManager',
+        label: t('modelManager.modelManager'),
+        content: <ModelManagerPanel />,
+      },
+      {
+        id: 'importModels',
+        label: t('modelManager.importModels'),
+        content: <ImportModelsPanel />,
+      },
+      {
+        id: 'mergeModels',
+        label: t('modelManager.mergeModels'),
+        content: <MergeModelsPanel />,
+      },
+      {
+        id: 'settings',
+        label: t('modelManager.settings'),
+        content: <ModelManagerSettingsPanel />,
+      },
+    ],
+    [t]
+  );
   return (
     <Tabs
       isLazy

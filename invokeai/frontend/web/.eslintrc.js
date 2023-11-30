@@ -9,8 +9,8 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:react/recommended',
     'plugin:react-hooks/recommended',
-    'plugin:prettier/recommended',
     'plugin:react/jsx-runtime',
+    'prettier',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -20,9 +20,23 @@ module.exports = {
     ecmaVersion: 2018,
     sourceType: 'module',
   },
-  plugins: ['react', '@typescript-eslint', 'eslint-plugin-react-hooks'],
+  plugins: [
+    'react',
+    '@typescript-eslint',
+    'eslint-plugin-react-hooks',
+    'i18next',
+    'path',
+  ],
   root: true,
   rules: {
+    'path/no-relative-imports': ['error', { maxDepth: 0 }],
+    curly: 'error',
+    'i18next/no-literal-string': 2,
+    'react/jsx-no-bind': ['error', { allowBind: true }],
+    'react/jsx-curly-brace-presence': [
+      'error',
+      { props: 'never', children: 'never' },
+    ],
     'react-hooks/exhaustive-deps': 'error',
     'no-var': 'error',
     'brace-style': 'error',
@@ -34,7 +48,6 @@ module.exports = {
       'warn',
       { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
     ],
-    'prettier/prettier': ['error', { endOfLine: 'auto' }],
     '@typescript-eslint/ban-ts-comment': 'warn',
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-empty-interface': [

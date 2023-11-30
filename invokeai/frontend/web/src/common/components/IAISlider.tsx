@@ -22,6 +22,7 @@ import {
   SliderTrackProps,
   Tooltip,
   TooltipProps,
+  forwardRef,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
@@ -71,7 +72,7 @@ export type IAIFullSliderProps = {
   sliderIAIIconButtonProps?: IAIIconButtonProps;
 };
 
-const IAISlider = (props: IAIFullSliderProps) => {
+const IAISlider = forwardRef((props: IAIFullSliderProps, ref) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const {
     label,
@@ -114,6 +115,11 @@ const IAISlider = (props: IAIFullSliderProps) => {
     setLocalInputValue(value);
   }, [value]);
 
+  const numberInputMin = useMemo(
+    () => (sliderNumberInputProps?.min ? sliderNumberInputProps.min : min),
+    [min, sliderNumberInputProps?.min]
+  );
+
   const numberInputMax = useMemo(
     () => (sliderNumberInputProps?.max ? sliderNumberInputProps.max : max),
     [max, sliderNumberInputProps?.max]
@@ -129,24 +135,23 @@ const IAISlider = (props: IAIFullSliderProps) => {
   const handleInputBlur = useCallback(
     (e: FocusEvent<HTMLInputElement>) => {
       if (e.target.value === '') {
-        e.target.value = String(min);
+        e.target.value = String(numberInputMin);
       }
       const clamped = clamp(
         isInteger
           ? Math.floor(Number(e.target.value))
           : Number(localInputValue),
-        min,
+        numberInputMin,
         numberInputMax
       );
       const quantized = roundDownToMultiple(clamped, step);
       onChange(quantized);
       setLocalInputValue(quantized);
     },
-    [isInteger, localInputValue, min, numberInputMax, onChange, step]
+    [isInteger, localInputValue, numberInputMin, numberInputMax, onChange, step]
   );
 
   const handleInputChange = useCallback((v: number | string) => {
-    console.log('input');
     setLocalInputValue(v);
   }, []);
 
@@ -181,8 +186,16 @@ const IAISlider = (props: IAIFullSliderProps) => {
     [dispatch]
   );
 
+  const handleMouseEnter = useCallback(() => setShowTooltip(true), []);
+  const handleMouseLeave = useCallback(() => setShowTooltip(false), []);
+  const handleStepperClick = useCallback(
+    () => onChange(Number(localInputValue)),
+    [localInputValue, onChange]
+  );
+
   return (
     <FormControl
+      ref={ref}
       onClick={forceInputBlur}
       sx={
         isCompact
@@ -213,8 +226,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
           max={max}
           step={step}
           onChange={handleSliderChange}
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
           focusThumbOnChange={false}
           isDisabled={isDisabled}
           {...rest}
@@ -310,7 +323,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
 
         {withInput && (
           <NumberInput
-            min={min}
+            min={numberInputMin}
             max={numberInputMax}
             step={step}
             value={localInputValue}
@@ -326,12 +339,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
               {...sliderNumberInputFieldProps}
             />
             <NumberInputStepper {...sliderNumberInputStepperProps}>
-              <NumberIncrementStepper
-                onClick={() => onChange(Number(localInputValue))}
-              />
-              <NumberDecrementStepper
-                onClick={() => onChange(Number(localInputValue))}
-              />
+              <NumberIncrementStepper onClick={handleStepperClick} />
+              <NumberDecrementStepper onClick={handleStepperClick} />
             </NumberInputStepper>
           </NumberInput>
         )}
@@ -350,6 +359,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
       </HStack>
     </FormControl>
   );
-};
+});
+
+IAISlider.displayName = 'IAISlider';
 
 export default memo(IAISlider);

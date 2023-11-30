@@ -8,7 +8,16 @@ const invokeAI = defineStyle((props) => {
   if (c === 'base') {
     const _disabled = {
       bg: mode('base.150', 'base.700')(props),
-      color: mode('base.500', 'base.500')(props),
+      color: mode('base.300', 'base.500')(props),
+      svg: {
+        fill: mode('base.300', 'base.500')(props),
+      },
+      opacity: 1,
+    };
+
+    const data_progress = {
+      bg: 'none',
+      color: mode('base.300', 'base.500')(props),
       svg: {
         fill: mode('base.500', 'base.500')(props),
       },
@@ -31,18 +40,19 @@ const invokeAI = defineStyle((props) => {
         _disabled,
       },
       _disabled,
+      '&[data-progress="true"]': { ...data_progress, _hover: data_progress },
     };
   }
 
   const _disabled = {
-    bg: mode(`${c}.250`, `${c}.700`)(props),
-    color: mode(`${c}.50`, `${c}.500`)(props),
+    bg: mode(`${c}.400`, `${c}.700`)(props),
+    color: mode(`${c}.600`, `${c}.500`)(props),
     svg: {
-      fill: mode(`${c}.50`, `${c}.500`)(props),
+      fill: mode(`${c}.600`, `${c}.500`)(props),
       filter: 'unset',
     },
-    opacity: 1,
-    filter: mode(undefined, 'saturate(65%)')(props),
+    opacity: 0.7,
+    filter: 'saturate(65%)',
   };
 
   return {
@@ -70,6 +80,13 @@ const invokeAIOutline = defineStyle((props) => {
   return {
     border: '1px solid',
     borderColor: c === 'gray' ? borderColor : 'currentColor',
+    _hover: {
+      bg: mode(`${c}.500`, `${c}.500`)(props),
+      color: mode('white', `base.50`)(props),
+      svg: {
+        fill: mode('white', `base.50`)(props),
+      },
+    },
     '.chakra-button__group[data-attached][data-orientation=horizontal] > &:not(:last-of-type)':
       {
         marginEnd: '-1px',

@@ -7,7 +7,7 @@ import os
 import platform
 from pathlib import Path
 
-from prompt_toolkit import prompt
+from prompt_toolkit import HTML, prompt
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.validation import Validator
 from rich import box, print
@@ -36,13 +36,15 @@ else:
 
 
 def welcome():
-
     @group()
     def text():
         if (platform_specific := _platform_specific_help()) != "":
             yield platform_specific
             yield ""
-        yield Text.from_markup("Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with [i]Control-C[/] and retry.", justify="center")
+        yield Text.from_markup(
+            "Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with [i]Control-C[/] and retry.",
+            justify="center",
+        )
 
     console.rule()
     print(
@@ -58,19 +60,53 @@ def welcome():
     )
     console.line()
 
+
 def confirm_install(dest: Path) -> bool:
     if dest.exists():
         print(f":exclamation: Directory {dest} already exists :exclamation:")
         dest_confirmed = Confirm.ask(
-            ":stop_sign: Are you sure you want to (re)install in this location?",
+            ":stop_sign: (re)install in this location?",
             default=False,
         )
     else:
         print(f"InvokeAI will be installed in {dest}")
-        dest_confirmed = not Confirm.ask(f"Would you like to pick a different location?", default=False)
+        dest_confirmed = Confirm.ask("Use this location?", default=True)
     console.line()
 
     return dest_confirmed
+
+
+def user_wants_auto_configuration() -> bool:
+    """Prompt the user to choose between manual and auto configuration."""
+    console.rule("InvokeAI Configuration Section")
+    console.print(
+        Panel(
+            Group(
+                "\n".join(
+                    [
+                        "Libraries are installed and InvokeAI will now set up its root directory and configuration. Choose between:",
+                        "",
+                        "  * AUTOMATIC configuration:  install reasonable defaults and a minimal set of starter models.",
+                        "  * MANUAL configuration: manually inspect and adjust configuration options and pick from a larger set of starter models.",
+                        "",
+                        "Later you can fine tune your configuration by selecting option [6] 'Change InvokeAI startup options' from the invoke.bat/invoke.sh launcher script.",
+                    ]
+                ),
+            ),
+            box=box.MINIMAL,
+            padding=(1, 1),
+        )
+    )
+    choice = (
+        prompt(
+            HTML("Choose <b>&lt;a&gt;</b>utomatic or <b>&lt;m&gt;</b>anual configuration [a/m] (a): "),
+            validator=Validator.from_callable(
+                lambda n: n == "" or n.startswith(("a", "A", "m", "M")), error_message="Please select 'a' or 'm'"
+            ),
+        )
+        or "a"
+    )
+    return choice.lower().startswith("a")
 
 
 def dest_path(dest=None) -> Path:
@@ -87,12 +123,11 @@ def dest_path(dest=None) -> Path:
         dest = Path(dest).expanduser().resolve()
     else:
         dest = Path.cwd().expanduser().resolve()
-    prev_dest = dest.expanduser().resolve()
+    prev_dest = init_path = dest
 
     dest_confirmed = confirm_install(dest)
 
     while not dest_confirmed:
-
         # if the given destination already exists, the starting point for browsing is its parent directory.
         # the user may have made a typo, or otherwise wants to place the root dir next to an existing one.
         # if the destination dir does NOT exist, then the user must have changed their mind about the selection.
@@ -102,19 +137,19 @@ def dest_path(dest=None) -> Path:
         path_completer = PathCompleter(
             only_directories=True,
             expanduser=True,
-            get_paths=lambda: [browse_start],
+            get_paths=lambda: [browse_start],  # noqa: B023
             # get_paths=lambda: [".."].extend(list(browse_start.iterdir()))
         )
 
         console.line()
-        print(f"[orange3]Please select the destination directory for the installation:[/] \[{browse_start}]: ")
+        console.print(f"[orange3]Please select the destination directory for the installation:[/] \\[{browse_start}]: ")
         selected = prompt(
-            f">>> ",
+            ">>> ",
             complete_in_thread=True,
             completer=path_completer,
             default=str(browse_start) + os.sep,
             vi_mode=True,
-            complete_while_typing=True
+            complete_while_typing=True,
             # Test that this is not needed on Windows
             # complete_style=CompleteStyle.READLINE_LIKE,
         )
@@ -132,14 +167,14 @@ def dest_path(dest=None) -> Path:
     try:
         dest.mkdir(exist_ok=True, parents=True)
         return dest
-    except PermissionError as exc:
-        print(
+    except PermissionError:
+        console.print(
             f"Failed to create directory {dest} due to insufficient permissions",
             style=Style(color="red"),
             highlight=True,
         )
-    except OSError as exc:
-        console.print_exception(exc)
+    except OSError:
+        console.print_exception()
 
     if Confirm.ask("Would you like to try again?"):
         dest_path(init_path)
@@ -165,6 +200,10 @@ def graphical_accelerator():
         "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
         "cuda",
     )
+    nvidia_with_dml = (
+        "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX) -- ALPHA",
+        "cuda_and_dml",
+    )
     amd = (
         "an [gold1 b]AMD[/] GPU (using ROCm™)",
         "rocm",
@@ -179,7 +218,7 @@ def graphical_accelerator():
     )
 
     if OS == "Windows":
-        options = [nvidia, cpu]
+        options = [nvidia, nvidia_with_dml, cpu]
     if OS == "Linux":
         options = [nvidia, amd, cpu]
     elif OS == "Darwin":
@@ -300,15 +339,20 @@ def introduction() -> None:
     )
     console.line(2)
 
-def _platform_specific_help()->str:
+
+def _platform_specific_help() -> str:
     if OS == "Darwin":
-        text = Text.from_markup("""[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/].""")
+        text = Text.from_markup(
+            """[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/]."""
+        )
     elif OS == "Windows":
-        text = Text.from_markup("""[b wheat1]Windows Users![/]\n\nBefore you start, please do the following:
+        text = Text.from_markup(
+            """[b wheat1]Windows Users![/]\n\nBefore you start, please do the following:
   1. Double-click on the file [b wheat1]WinLongPathsEnabled.reg[/] in order to
      enable long path support on your system.
   2. Make sure you have the [b wheat1]Visual C++ core libraries[/] installed. If not, install from
-     [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]""")
+     [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]"""
+        )
     else:
         text = ""
     return text

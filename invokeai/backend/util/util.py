@@ -1,11 +1,11 @@
+import base64
 import importlib
+import io
 import math
 import multiprocessing as mp
 import os
 import re
-import io
-import base64
-
+import warnings
 from collections import abc
 from inspect import isfunction
 from pathlib import Path
@@ -15,10 +15,13 @@ from threading import Thread
 import numpy as np
 import requests
 import torch
+from diffusers import logging as diffusers_logging
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
+from transformers import logging as transformers_logging
 
 import invokeai.backend.util.logging as logger
+
 from .devices import torch_dtype
 
 
@@ -26,15 +29,13 @@ def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
     # xc a list of captions to plot
     b = len(xc)
-    txts = list()
+    txts = []
     for bi in range(b):
         txt = Image.new("RGB", wh, color="white")
         draw = ImageDraw.Draw(txt)
         font = ImageFont.load_default()
         nc = int(40 * (wh[0] / 256))
-        lines = "\n".join(
-            xc[bi][start : start + nc] for start in range(0, len(xc[bi]), nc)
-        )
+        lines = "\n".join(xc[bi][start : start + nc] for start in range(0, len(xc[bi]), nc))
 
         try:
             draw.text((0, 0), lines, fill="black", font=font)
@@ -81,20 +82,18 @@ def mean_flat(tensor):
 def count_params(model, verbose=False):
     total_params = sum(p.numel() for p in model.parameters())
     if verbose:
-        logger.debug(
-            f"{model.__class__.__name__} has {total_params * 1.e-6:.2f} M params."
-        )
+        logger.debug(f"{model.__class__.__name__} has {total_params * 1.e-6:.2f} M params.")
     return total_params
 
 
 def instantiate_from_config(config, **kwargs):
-    if not "target" in config:
+    if "target" not in config:
         if config == "__is_first_stage__":
             return None
         elif config == "__is_unconditional__":
             return None
         raise KeyError("Expected key `target` to instantiate.")
-    return get_obj_from_str(config["target"])(**config.get("params", dict()), **kwargs)
+    return get_obj_from_str(config["target"])(**config.get("params", {}), **kwargs)
 
 
 def get_obj_from_str(string, reload=False):
@@ -154,21 +153,12 @@ def parallel_data_prefetch(
         proc = Thread
     # spawn processes
     if target_data_type == "ndarray":
-        arguments = [
-            [func, Q, part, i, use_worker_id]
-            for i, part in enumerate(np.array_split(data, n_proc))
-        ]
+        arguments = [[func, Q, part, i, use_worker_id] for i, part in enumerate(np.array_split(data, n_proc))]
     else:
-        step = (
-            int(len(data) / n_proc + 1)
-            if len(data) % n_proc != 0
-            else int(len(data) / n_proc)
-        )
+        step = int(len(data) / n_proc + 1) if len(data) % n_proc != 0 else int(len(data) / n_proc)
         arguments = [
             [func, Q, part, i, use_worker_id]
-            for i, part in enumerate(
-                [data[i : i + step] for i in range(0, len(data), step)]
-            )
+            for i, part in enumerate([data[i : i + step] for i in range(0, len(data), step)])
         ]
     processes = []
     for i in range(n_proc):
@@ -220,9 +210,7 @@ def parallel_data_prefetch(
         return gather_res
 
 
-def rand_perlin_2d(
-    shape, res, device, fade=lambda t: 6 * t**5 - 15 * t**4 + 10 * t**3
-):
+def rand_perlin_2d(shape, res, device, fade=lambda t: 6 * t**5 - 15 * t**4 + 10 * t**3):
     delta = (res[0] / shape[0], res[1] / shape[1])
     d = (shape[0] // res[0], shape[1] // res[1])
 
@@ -243,31 +231,33 @@ def rand_perlin_2d(
     angles = 2 * math.pi * rand_val
     gradients = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1).to(device)
 
-    tile_grads = (
-        lambda slice1, slice2: gradients[slice1[0] : slice1[1], slice2[0] : slice2[1]]
-        .repeat_interleave(d[0], 0)
-        .repeat_interleave(d[1], 1)
-    )
-
-    dot = lambda grad, shift: (
-        torch.stack(
-            (
-                grid[: shape[0], : shape[1], 0] + shift[0],
-                grid[: shape[0], : shape[1], 1] + shift[1],
-            ),
-            dim=-1,
+    def tile_grads(slice1, slice2):
+        return (
+            gradients[slice1[0] : slice1[1], slice2[0] : slice2[1]]
+            .repeat_interleave(d[0], 0)
+            .repeat_interleave(d[1], 1)
         )
-        * grad[: shape[0], : shape[1]]
-    ).sum(dim=-1)
+
+    def dot(grad, shift):
+        return (
+            torch.stack(
+                (
+                    grid[: shape[0], : shape[1], 0] + shift[0],
+                    grid[: shape[0], : shape[1], 1] + shift[1],
+                ),
+                dim=-1,
+            )
+            * grad[: shape[0], : shape[1]]
+        ).sum(dim=-1)
 
     n00 = dot(tile_grads([0, -1], [0, -1]), [0, 0]).to(device)
     n10 = dot(tile_grads([1, None], [0, -1]), [-1, 0]).to(device)
     n01 = dot(tile_grads([0, -1], [1, None]), [0, -1]).to(device)
     n11 = dot(tile_grads([1, None], [1, None]), [-1, -1]).to(device)
     t = fade(grid[: shape[0], : shape[1]])
-    noise = math.sqrt(2) * torch.lerp(
-        torch.lerp(n00, n10, t[..., 0]), torch.lerp(n01, n11, t[..., 0]), t[..., 1]
-    ).to(device)
+    noise = math.sqrt(2) * torch.lerp(torch.lerp(n00, n10, t[..., 0]), torch.lerp(n01, n11, t[..., 0]), t[..., 1]).to(
+        device
+    )
     return noise.to(dtype=torch_dtype(device))
 
 
@@ -276,9 +266,7 @@ def ask_user(question: str, answers: list):
 
     user_prompt = f"\n>> {question} {answers}: "
     invalid_answer_msg = "Invalid answer. Please try again."
-    pose_question = chain(
-        [user_prompt], repeat("\n".join([invalid_answer_msg, user_prompt]))
-    )
+    pose_question = chain([user_prompt], repeat("\n".join([invalid_answer_msg, user_prompt])))
     user_answers = map(input, pose_question)
     valid_response = next(filter(answers.__contains__, user_answers))
     return valid_response
@@ -303,10 +291,8 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
 
     if dest.is_dir():
         try:
-            file_name = re.search(
-                'filename="(.+)"', resp.headers.get("Content-Disposition")
-            ).group(1)
-        except:
+            file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition")).group(1)
+        except AttributeError:
             file_name = os.path.basename(url)
         dest = dest / file_name
     else:
@@ -322,7 +308,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
         logger.warning("corrupt existing file found. re-downloading")
         os.remove(dest)
         exist_size = 0
-        
+
     if resp.status_code == 416 or (content_length > 0 and exist_size == content_length):
         logger.warning(f"{dest}: complete file found. Skipping.")
         return dest
@@ -361,7 +347,7 @@ def url_attachment_name(url: str) -> dict:
         resp = requests.get(url, stream=True)
         match = re.search('filename="(.+)"', resp.headers.get("Content-Disposition"))
         return match.group(1)
-    except:
+    except Exception:
         return None
 
 
@@ -377,16 +363,16 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
     buffered = io.BytesIO()
     image.save(buffered, format=image_format)
     mime_type = Image.MIME.get(image_format.upper(), "image/" + image_format.lower())
-    image_base64 = f"data:{mime_type};base64," + base64.b64encode(
-        buffered.getvalue()
-    ).decode("UTF-8")
+    image_base64 = f"data:{mime_type};base64," + base64.b64encode(buffered.getvalue()).decode("UTF-8")
     return image_base64
 
+
 class Chdir(object):
-    '''Context manager to chdir to desired directory and change back after context exits:
+    """Context manager to chdir to desired directory and change back after context exits:
     Args:
         path (Path): The path to the cwd
-    '''
+    """
+
     def __init__(self, path: Path):
         self.path = path
         self.original = Path().absolute()
@@ -394,5 +380,23 @@ class Chdir(object):
     def __enter__(self):
         os.chdir(self.path)
 
-    def __exit__(self,*args):
+    def __exit__(self, *args):
         os.chdir(self.original)
+
+
+class SilenceWarnings(object):
+    """Context manager to temporarily lower verbosity of diffusers & transformers warning messages."""
+
+    def __enter__(self):
+        """Set verbosity to error."""
+        self.transformers_verbosity = transformers_logging.get_verbosity()
+        self.diffusers_verbosity = diffusers_logging.get_verbosity()
+        transformers_logging.set_verbosity_error()
+        diffusers_logging.set_verbosity_error()
+        warnings.simplefilter("ignore")
+
+    def __exit__(self, type, value, traceback):
+        """Restore logger verbosity to state before context was entered."""
+        transformers_logging.set_verbosity(self.transformers_verbosity)
+        diffusers_logging.set_verbosity(self.diffusers_verbosity)
+        warnings.simplefilter("default")

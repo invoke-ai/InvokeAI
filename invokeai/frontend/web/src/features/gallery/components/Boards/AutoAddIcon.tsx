@@ -1,6 +1,9 @@
 import { Badge, Flex } from '@chakra-ui/react';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const AutoAddIcon = () => {
+  const { t } = useTranslation();
   return (
     <Flex
       sx={{
@@ -14,10 +17,10 @@ const AutoAddIcon = () => {
         variant="solid"
         sx={{ bg: 'accent.400', _dark: { bg: 'accent.500' } }}
       >
-        auto
+        {t('common.auto')}
       </Badge>
     </Flex>
   );
 };
 
-export default AutoAddIcon;
+export default memo(AutoAddIcon);

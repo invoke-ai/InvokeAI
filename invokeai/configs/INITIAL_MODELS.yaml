@@ -4,30 +4,34 @@ sd-1/main/stable-diffusion-v1-5:
    repo_id: runwayml/stable-diffusion-v1-5
    recommended: True
    default: True
-sd-1/main/stable-diffusion-inpainting:
+sd-1/main/stable-diffusion-v1-5-inpainting:
    description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
    repo_id: runwayml/stable-diffusion-inpainting
    recommended: True
 sd-2/main/stable-diffusion-2-1:
    description: Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-1
-   recommended: True
+   recommended: False
 sd-2/main/stable-diffusion-2-inpainting:
    description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-inpainting
    recommended: False
-sdxl/main/stable-diffusion-xl-base-0-9:
-   description: Stable Diffusion XL base model (12 GB; access token required)
-   repo_id: stabilityai/stable-diffusion-xl-base-0.9
+sdxl/main/stable-diffusion-xl-base-1-0:
+   description: Stable Diffusion XL base model (12 GB)
+   repo_id: stabilityai/stable-diffusion-xl-base-1.0
+   recommended: True
+sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
+   description: Stable Diffusion XL refiner model (12 GB)
+   repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
    recommended: False
-sdxl-refiner/main/stable-diffusion-xl-refiner-0-9:
-   description: Stable Diffusion XL refiner model (12 GB; access token required)
-   repo_id: stabilityai/stable-diffusion-xl-refiner-0.9
-   recommended: False
+sdxl/vae/sdxl-1-0-vae-fix:
+   description: Fine tuned version of the SDXL-1.0 VAE
+   repo_id: madebyollin/sdxl-vae-fp16-fix
+   recommended: True
 sd-1/main/Analog-Diffusion:
    description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
    repo_id: wavymulder/Analog-Diffusion
-   recommended: false
+   recommended: False
 sd-1/main/Deliberate:
    description: Versatile model that produces detailed images up to 768px (4.27 GB)
    repo_id: XpucT/Deliberate
@@ -48,10 +52,6 @@ sd-1/main/openjourney:
    description: An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)
    repo_id: prompthero/openjourney
    recommended: False
-sd-1/main/portraitplus:
-   description: An SD-1.5 model trained on close range portraits of people; prompt with "portrait+" (2.13 GB)
-   repo_id: wavymulder/portraitplus
-   recommended: False
 sd-1/main/seek.art_MEGA:
    repo_id: coreco/seek.art_MEGA
    description: A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)
@@ -60,10 +60,9 @@ sd-1/main/trinart_stable_diffusion_v2:
    description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
    repo_id: naclbit/trinart_stable_diffusion_v2
    recommended: False
-sd-1/main/waifu-diffusion:
-   description: An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)
-   repo_id: hakurei/waifu-diffusion
-   recommended: False
+sd-1/controlnet/qrcode_monster:
+   repo_id: monster-labs/control_v1p_sd15_qrcode_monster
+   subfolder: v2
 sd-1/controlnet/canny:
    repo_id: lllyasviel/control_v11p_sd15_canny
    recommended: True
@@ -97,13 +96,58 @@ sd-1/controlnet/tile:
    repo_id: lllyasviel/control_v11f1e_sd15_tile
 sd-1/controlnet/ip2p:
    repo_id: lllyasviel/control_v11e_sd15_ip2p
+sd-1/t2i_adapter/canny-sd15:
+   repo_id: TencentARC/t2iadapter_canny_sd15v2
+sd-1/t2i_adapter/sketch-sd15:
+   repo_id: TencentARC/t2iadapter_sketch_sd15v2
+sd-1/t2i_adapter/depth-sd15:
+   repo_id: TencentARC/t2iadapter_depth_sd15v2
+sd-1/t2i_adapter/zoedepth-sd15:
+   repo_id: TencentARC/t2iadapter_zoedepth_sd15v1
+sdxl/t2i_adapter/canny-sdxl:
+   repo_id: TencentARC/t2i-adapter-canny-sdxl-1.0
+sdxl/t2i_adapter/zoedepth-sdxl:
+   repo_id: TencentARC/t2i-adapter-depth-zoe-sdxl-1.0
+sdxl/t2i_adapter/lineart-sdxl:
+   repo_id: TencentARC/t2i-adapter-lineart-sdxl-1.0
+sdxl/t2i_adapter/sketch-sdxl:
+   repo_id: TencentARC/t2i-adapter-sketch-sdxl-1.0
 sd-1/embedding/EasyNegative:
    path: https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
    recommended: True
 sd-1/embedding/ahx-beta-453407d:
    repo_id: sd-concepts-library/ahx-beta-453407d
-sd-1/lora/LowRA:
-   path: https://civitai.com/api/download/models/63006
-   recommended: True
 sd-1/lora/Ink scenery:
    path: https://civitai.com/api/download/models/83390
+sd-1/ip_adapter/ip_adapter_sd15:
+   repo_id: InvokeAI/ip_adapter_sd15
+   recommended: True
+   requires:
+      - InvokeAI/ip_adapter_sd_image_encoder
+   description: IP-Adapter for SD 1.5 models
+sd-1/ip_adapter/ip_adapter_plus_sd15:
+   repo_id: InvokeAI/ip_adapter_plus_sd15
+   recommended: False
+   requires:
+      - InvokeAI/ip_adapter_sd_image_encoder
+   description: Refined IP-Adapter for SD 1.5 models
+sd-1/ip_adapter/ip_adapter_plus_face_sd15:
+   repo_id: InvokeAI/ip_adapter_plus_face_sd15
+   recommended: False
+   requires:
+      - InvokeAI/ip_adapter_sd_image_encoder
+   description: Refined IP-Adapter for SD 1.5 models, adapted for faces
+sdxl/ip_adapter/ip_adapter_sdxl:
+   repo_id: InvokeAI/ip_adapter_sdxl
+   recommended: False
+   requires:
+      - InvokeAI/ip_adapter_sdxl_image_encoder
+   description: IP-Adapter for SDXL models
+any/clip_vision/ip_adapter_sd_image_encoder:
+   repo_id: InvokeAI/ip_adapter_sd_image_encoder
+   recommended: False
+   description: Required model for using IP-Adapters with SD-1/2 models
+any/clip_vision/ip_adapter_sdxl_image_encoder:
+   repo_id: InvokeAI/ip_adapter_sdxl_image_encoder
+   recommended: False
+   description: Required model for using IP-Adapters with SDXL models

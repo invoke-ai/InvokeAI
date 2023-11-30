@@ -9,13 +9,15 @@ import {
   Tabs,
   Text,
 } from '@chakra-ui/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { memo, useMemo } from 'react';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
-import { useDebounce } from 'use-debounce';
+import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
-import ImageMetadataJSON from './ImageMetadataJSON';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -27,108 +29,80 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // useHotkeys('esc', () => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
+  const { t } = useTranslation();
 
-  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
-    image.image_name,
-    500
-  );
-
-  const { currentData } = useGetImageMetadataQuery(
-    debounceState.isPending()
-      ? skipToken
-      : debouncedMetadataQueryArg ?? skipToken
-  );
-  const metadata = currentData?.metadata;
-  const graph = currentData?.graph;
-
-  const tabData = useMemo(() => {
-    const _tabData: { label: string; data: object; copyTooltip: string }[] = [];
-
-    if (metadata) {
-      _tabData.push({
-        label: 'Core Metadata',
-        data: metadata,
-        copyTooltip: 'Copy Core Metadata JSON',
-      });
-    }
-
-    if (image) {
-      _tabData.push({
-        label: 'Image Details',
-        data: image,
-        copyTooltip: 'Copy Image Details JSON',
-      });
-    }
-
-    if (graph) {
-      _tabData.push({
-        label: 'Graph',
-        data: graph,
-        copyTooltip: 'Copy Graph JSON',
-      });
-    }
-    return _tabData;
-  }, [metadata, graph, image]);
+  const { metadata } = useDebouncedMetadata(image.image_name);
+  const { workflow } = useDebouncedWorkflow(image.workflow_id);
 
   return (
     <Flex
+      layerStyle="first"
       sx={{
         padding: 4,
         gap: 1,
         flexDirection: 'column',
         width: 'full',
         height: 'full',
-        backdropFilter: 'blur(20px)',
-        bg: 'baseAlpha.200',
-        _dark: {
-          bg: 'blackAlpha.600',
-        },
         borderRadius: 'base',
         position: 'absolute',
         overflow: 'hidden',
       }}
     >
       <Flex gap={2}>
-        <Text fontWeight="semibold">File:</Text>
+        <Text fontWeight="semibold">{t('common.file')}:</Text>
         <Link href={image.image_url} isExternal maxW="calc(100% - 3rem)">
           {image.image_name}
           <ExternalLinkIcon mx="2px" />
         </Link>
       </Flex>
 
-      <ImageMetadataActions metadata={metadata} />
-
       <Tabs
         variant="line"
-        sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
+        sx={{
+          display: 'flex',
+          flexDir: 'column',
+          w: 'full',
+          h: 'full',
+        }}
       >
         <TabList>
-          {tabData.map((tab) => (
-            <Tab
-              key={tab.label}
-              sx={{
-                borderTopRadius: 'base',
-              }}
-            >
-              <Text sx={{ color: 'base.700', _dark: { color: 'base.300' } }}>
-                {tab.label}
-              </Text>
-            </Tab>
-          ))}
+          <Tab>{t('metadata.recallParameters')}</Tab>
+          <Tab>{t('metadata.metadata')}</Tab>
+          <Tab>{t('metadata.imageDetails')}</Tab>
+          <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
-        <TabPanels sx={{ w: 'full', h: 'full' }}>
-          {tabData.map((tab) => (
-            <TabPanel
-              key={tab.label}
-              sx={{ w: 'full', h: 'full', p: 0, pt: 4 }}
-            >
-              <ImageMetadataJSON
-                jsonObject={tab.data}
-                copyTooltip={tab.copyTooltip}
-              />
-            </TabPanel>
-          ))}
+        <TabPanels>
+          <TabPanel>
+            {metadata ? (
+              <ScrollableContent>
+                <ImageMetadataActions metadata={metadata} />
+              </ScrollableContent>
+            ) : (
+              <IAINoContentFallback label={t('metadata.noRecallParameters')} />
+            )}
+          </TabPanel>
+          <TabPanel>
+            {metadata ? (
+              <DataViewer data={metadata} label={t('metadata.metadata')} />
+            ) : (
+              <IAINoContentFallback label={t('metadata.noMetaData')} />
+            )}
+          </TabPanel>
+          <TabPanel>
+            {image ? (
+              <DataViewer data={image} label={t('metadata.imageDetails')} />
+            ) : (
+              <IAINoContentFallback label={t('metadata.noImageDetails')} />
+            )}
+          </TabPanel>
+          <TabPanel>
+            {workflow ? (
+              <DataViewer data={workflow} label={t('metadata.workflow')} />
+            ) : (
+              <IAINoContentFallback label={t('nodes.noWorkflow')} />
+            )}
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </Flex>

@@ -150,7 +150,7 @@ will do our best to help.
     To use an alternative model you may invoke the `!switch` command in
     the CLI, or pass `--model <model_name>` during `invoke.py` launch for
     either the CLI or the Web UI. See [Command Line
-    Client](../../features/CLI.md#model-selection-and-importation). The
+    Client](../../deprecated/CLI.md#model-selection-and-importation). The
     model names are defined in `configs/models.yaml`.
 
 ---

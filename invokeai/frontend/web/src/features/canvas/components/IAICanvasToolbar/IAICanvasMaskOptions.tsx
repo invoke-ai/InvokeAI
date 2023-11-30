@@ -1,11 +1,12 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
+import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
 import {
   canvasSelector,
   isStagingSelector,
@@ -19,10 +20,12 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { isEqual } from 'lodash-es';
+import { ChangeEvent, memo, useCallback } from 'react';
+import { RgbaColor } from 'react-colorful';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaMask, FaTrash } from 'react-icons/fa';
+import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -93,14 +96,35 @@ const IAICanvasMaskOptions = () => {
     [isMaskEnabled]
   );
 
-  const handleToggleMaskLayer = () => {
+  const handleToggleMaskLayer = useCallback(() => {
     dispatch(setLayer(layer === 'mask' ? 'base' : 'mask'));
-  };
+  }, [dispatch, layer]);
 
-  const handleClearMask = () => dispatch(clearMask());
+  const handleClearMask = useCallback(() => {
+    dispatch(clearMask());
+  }, [dispatch]);
 
-  const handleToggleEnableMask = () =>
+  const handleToggleEnableMask = useCallback(() => {
     dispatch(setIsMaskEnabled(!isMaskEnabled));
+  }, [dispatch, isMaskEnabled]);
+
+  const handleSaveMask = useCallback(async () => {
+    dispatch(canvasMaskSavedToGallery());
+  }, [dispatch]);
+
+  const handleChangePreserveMaskedArea = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldPreserveMaskedArea(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangeMaskColor = useCallback(
+    (newColor: RgbaColor) => {
+      dispatch(setMaskColor(newColor));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIPopover
@@ -125,21 +149,20 @@ const IAICanvasMaskOptions = () => {
         <IAISimpleCheckbox
           label={t('unifiedCanvas.preserveMaskedArea')}
           isChecked={shouldPreserveMaskedArea}
-          onChange={(e) =>
-            dispatch(setShouldPreserveMaskedArea(e.target.checked))
-          }
+          onChange={handleChangePreserveMaskedArea}
         />
-        <IAIColorPicker
-          sx={{ paddingTop: 2, paddingBottom: 2 }}
-          pickerColor={maskColor}
-          onChange={(newColor) => dispatch(setMaskColor(newColor))}
-        />
+        <Box sx={{ paddingTop: 2, paddingBottom: 2 }}>
+          <IAIColorPicker color={maskColor} onChange={handleChangeMaskColor} />
+        </Box>
+        <IAIButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
+          {t('unifiedCanvas.saveMask')}
+        </IAIButton>
         <IAIButton size="sm" leftIcon={<FaTrash />} onClick={handleClearMask}>
-          {t('unifiedCanvas.clearMask')} (Shift+C)
+          {t('unifiedCanvas.clearMask')}
         </IAIButton>
       </Flex>
     </IAIPopover>
   );
 };
 
-export default IAICanvasMaskOptions;
+export default memo(IAICanvasMaskOptions);
