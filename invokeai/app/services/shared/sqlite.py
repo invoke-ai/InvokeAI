@@ -41,7 +41,8 @@ class SqliteDatabase:
             self.conn.commit()
             final_db_size = Path(self.db_path).stat().st_size
             freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
-            self._logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
+            if freed_space_in_mb > 0:
+                self._logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
         except Exception as e:
             self._logger.error(f"Error cleaning database: {e}")
             raise e
