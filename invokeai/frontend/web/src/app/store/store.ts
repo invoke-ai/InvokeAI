@@ -32,7 +32,6 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
-import { $store } from './nanostores/store';
 import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 
 const allReducers = {
@@ -84,57 +83,58 @@ const idbKeyValDriver: Driver = {
   setItem: (key, value) => set(key, value, idbKeyValStore),
 };
 
-export const store = configureStore({
-  reducer: rememberedRootReducer,
-  enhancers: (existingEnhancers) => {
-    return existingEnhancers
-      .concat(
-        rememberEnhancer(idbKeyValDriver, rememberedKeys, {
-          persistDebounce: 300,
-          serialize,
-          unserialize,
-          prefix: STORAGE_PREFIX,
-        })
-      )
-      .concat(autoBatchEnhancer());
-  },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: false,
-      immutableCheck: false,
-    })
-      .concat(api.middleware)
-      .concat(dynamicMiddlewares)
-      .prepend(listenerMiddleware.middleware),
-  devTools: {
-    actionSanitizer,
-    stateSanitizer,
-    trace: true,
-    predicate: (state, action) => {
-      // TODO: hook up to the log level param in system slice
-      // manually type state, cannot type the arg
-      // const typedState = state as ReturnType<typeof rootReducer>;
-
-      // TODO: doing this breaks the rtk query devtools, commenting out for now
-      // if (action.type.startsWith('api/')) {
-      //   // don't log api actions, with manual cache updates they are extremely noisy
-      //   return false;
-      // }
-
-      if (actionsDenylist.includes(action.type)) {
-        // don't log other noisy actions
-        return false;
-      }
-
-      return true;
+export const createStore = (uniqueStoreKey?: string) =>
+  configureStore({
+    reducer: rememberedRootReducer,
+    enhancers: (existingEnhancers) => {
+      return existingEnhancers
+        .concat(
+          rememberEnhancer(idbKeyValDriver, rememberedKeys, {
+            persistDebounce: 300,
+            serialize,
+            unserialize,
+            prefix: uniqueStoreKey
+              ? `${STORAGE_PREFIX}-${uniqueStoreKey}-`
+              : STORAGE_PREFIX,
+          })
+        )
+        .concat(autoBatchEnhancer());
     },
-  },
-});
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: false,
+        immutableCheck: false,
+      })
+        .concat(api.middleware)
+        .concat(dynamicMiddlewares)
+        .prepend(listenerMiddleware.middleware),
+    devTools: {
+      actionSanitizer,
+      stateSanitizer,
+      trace: true,
+      predicate: (state, action) => {
+        // TODO: hook up to the log level param in system slice
+        // manually type state, cannot type the arg
+        // const typedState = state as ReturnType<typeof rootReducer>;
 
-export type AppGetState = typeof store.getState;
-export type RootState = ReturnType<typeof store.getState>;
+        // TODO: doing this breaks the rtk query devtools, commenting out for now
+        // if (action.type.startsWith('api/')) {
+        //   // don't log api actions, with manual cache updates they are extremely noisy
+        //   return false;
+        // }
+
+        if (actionsDenylist.includes(action.type)) {
+          // don't log other noisy actions
+          return false;
+        }
+
+        return true;
+      },
+    },
+  });
+
+export type RootState = ReturnType<typeof rootReducer>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
-export type AppDispatch = typeof store.dispatch;
+export type AppDispatch = ReturnType<typeof configureStore>['dispatch'];
 export const stateSelector = (state: RootState) => state;
-$store.set(store);
