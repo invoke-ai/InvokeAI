@@ -59,6 +59,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
   return (
     <ButtonGroup>
       <IAIIconButton
+        variant="ghost"
         onClick={handlePrevPage}
         isDisabled={page === 0}
         aria-label={t('common.prevPage')}
@@ -76,6 +77,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
         </IAIButton>
       ))}
       <IAIIconButton
+        variant="ghost"
         onClick={handleNextPage}
         isDisabled={page === data.pages - 1}
         aria-label={t('common.nextPage')}
