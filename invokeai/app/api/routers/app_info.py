@@ -1,7 +1,13 @@
+import sys
 import typing
 from enum import Enum
 from pathlib import Path
 
+import accelerate
+import diffusers
+import torch
+import torchvision
+import transformers
 from fastapi import Body
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
@@ -40,6 +46,18 @@ class AppVersion(BaseModel):
     version: str = Field(description="App version")
 
 
+class AppDependencyVersions(BaseModel):
+    """App depencency Versions Response"""
+
+    python: str = Field(description="Python version")
+    torch: str = Field(description="PyTorch version")
+    torchvision: str = Field(description="PyTorch Vision version")
+    cuda: str = Field(description="CUDA version")
+    accelerate: str = Field(description="accelerate version")
+    diffusers: str = Field(description="diffusers version")
+    transformers: str = Field(description="transformers version")
+
+
 class AppConfig(BaseModel):
     """App Config Response"""
 
@@ -52,6 +70,19 @@ class AppConfig(BaseModel):
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
 async def get_version() -> AppVersion:
     return AppVersion(version=__version__)
+
+
+@app_router.get("/app_deps", operation_id="get_app_deps", status_code=200, response_model=AppDependencyVersions)
+async def get_app_deps() -> AppVersion:
+    return AppDependencyVersions(
+        python_version=sys.version,
+        torch_version=torch.version.__version__,
+        cuda_version=torch.version.cuda,
+        torchvision_version=torchvision.version.__version__,
+        accelerate=accelerate.__version__,
+        diffusers=diffusers.__version__,
+        transformers=transformers.__version__,
+    )
 
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
