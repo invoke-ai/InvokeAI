@@ -29,6 +29,7 @@ const ImageMetadataActions = (props: Props) => {
     recallNegativePrompt,
     recallSeed,
     recallCfgScale,
+    recallCfgRescaleMultiplier,
     recallModel,
     recallScheduler,
     recallVaeModel,
@@ -84,6 +85,10 @@ const ImageMetadataActions = (props: Props) => {
   const handleRecallCfgScale = useCallback(() => {
     recallCfgScale(metadata?.cfg_scale);
   }, [metadata?.cfg_scale, recallCfgScale]);
+
+  const handleRecallCfgRescaleMultiplier = useCallback(() => {
+    recallCfgRescaleMultiplier(metadata?.cfg_rescale_multiplier);
+  }, [metadata?.cfg_rescale_multiplier, recallCfgRescaleMultiplier]);
 
   const handleRecallStrength = useCallback(() => {
     recallStrength(metadata?.strength);
@@ -243,6 +248,14 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallCfgScale}
         />
       )}
+      {metadata.cfg_rescale_multiplier !== undefined &&
+        metadata.cfg_rescale_multiplier !== null && (
+          <ImageMetadataItem
+            label={t('metadata.cfgRescaleMultiplier')}
+            value={metadata.cfg_rescale_multiplier}
+            onClick={handleRecallCfgRescaleMultiplier}
+          />
+        )}
       {metadata.strength && (
         <ImageMetadataItem
           label={t('metadata.strength')}

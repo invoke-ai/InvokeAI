@@ -599,6 +599,7 @@
     },
     "metadata": {
         "cfgScale": "CFG scale",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "createdBy": "Created By",
         "fit": "Image to image fit",
         "generationMode": "Generation Mode",
@@ -1032,6 +1033,8 @@
             "setType": "Set cancel type"
         },
         "cfgScale": "CFG Scale",
+        "cfgRescaleMultiplier": "CFG Rescale Multiplier",
+        "cfgRescale": "CFG Rescale",
         "clipSkip": "CLIP Skip",
         "clipSkipWithLayerCount": "CLIP Skip {{layerCount}}",
         "closeViewer": "Close Viewer",
@@ -1468,6 +1471,12 @@
             "heading": "CFG Scale",
             "paragraphs": [
                 "Controls how much your prompt influences the generation process."
+            ]
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "CFG Rescale Multiplier",
+            "paragraphs": [
+                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr). Suggested value 0.7."
             ]
         },
         "paramDenoisingStrength": {
