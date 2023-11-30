@@ -24,6 +24,7 @@ import {
   ParameterVAEModel,
   ParameterWidth,
   zParameterModel,
+  ParameterCFGRescaleMultiplier,
 } from 'features/parameters/types/parameterSchemas';
 
 export interface GenerationState {
@@ -31,6 +32,7 @@ export interface GenerationState {
   hrfStrength: ParameterStrength;
   hrfMethod: ParameterHRFMethod;
   cfgScale: ParameterCFGScale;
+  cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
   height: ParameterHeight;
   img2imgStrength: ParameterStrength;
   infillMethod: string;
@@ -76,6 +78,7 @@ export const initialGenerationState: GenerationState = {
   hrfEnabled: false,
   hrfMethod: 'ESRGAN',
   cfgScale: 7.5,
+  cfgRescaleMultiplier: 0,
   height: 512,
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
@@ -145,8 +148,14 @@ export const generationSlice = createSlice({
         state.steps
       );
     },
-    setCfgScale: (state, action: PayloadAction<number>) => {
+    setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
+    },
+    setCfgRescaleMultiplier: (
+      state,
+      action: PayloadAction<ParameterCFGRescaleMultiplier>
+    ) => {
+      state.cfgRescaleMultiplier = action.payload;
     },
     setThreshold: (state, action: PayloadAction<number>) => {
       state.threshold = action.payload;
@@ -336,6 +345,7 @@ export const {
   resetParametersState,
   resetSeed,
   setCfgScale,
+  setCfgRescaleMultiplier,
   setWidth,
   setHeight,
   toggleSize,

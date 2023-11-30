@@ -51,6 +51,7 @@ export const zCoreMetadata = z
     seed: z.number().int().nullish().catch(null),
     rand_device: z.string().nullish().catch(null),
     cfg_scale: z.number().nullish().catch(null),
+    cfg_rescale_multiplier: z.number().nullish().catch(null),
     steps: z.number().int().nullish().catch(null),
     scheduler: z.string().nullish().catch(null),
     clip_skip: z.number().int().nullish().catch(null),

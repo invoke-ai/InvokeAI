@@ -38,6 +38,7 @@ export const buildLinearTextToImageGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
     width,
@@ -84,6 +85,7 @@ export const buildLinearTextToImageGraph = (
           id: DENOISE_LATENTS,
           is_intermediate,
           cfg_scale,
+          cfg_rescale_multiplier,
           scheduler,
           steps,
           denoising_start: 0,
@@ -239,6 +241,7 @@ export const buildLinearTextToImageGraph = (
     {
       generation_mode: 'txt2img',
       cfg_scale,
+      cfg_rescale_multiplier,
       height,
       width,
       positive_prompt: positivePrompt,
