@@ -5,6 +5,8 @@ from typing import Union
 
 import torch
 
+from invokeai.app.services.invoker import Invoker
+
 from .latents_storage_base import LatentsStorageBase
 
 
@@ -16,6 +18,23 @@ class DiskLatentsStorage(LatentsStorageBase):
     def __init__(self, output_folder: Union[str, Path]):
         self.__output_folder = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__output_folder.mkdir(parents=True, exist_ok=True)
+
+    def start(self, invoker: Invoker) -> None:
+        self._invoker = invoker
+
+        # Delete all latents files on startup
+        deleted_latents_count = 0
+        freed_space = 0
+        for latents_file in Path(self.__output_folder).glob("*"):
+            if latents_file.is_file():
+                freed_space += latents_file.stat().st_size
+                deleted_latents_count += 1
+                latents_file.unlink()
+        if deleted_latents_count > 0:
+            freed_space_in_mb = round(freed_space / 1024 / 1024, 2)
+            self._invoker.services.logger.info(
+                f"Deleted {deleted_latents_count} latents files, freeing {freed_space_in_mb}MB"
+            )
 
     def get(self, name: str) -> torch.Tensor:
         latent_path = self.get_path(name)
