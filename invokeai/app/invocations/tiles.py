@@ -58,10 +58,10 @@ class CalculateImageTilesInvocation(BaseInvocation):
 
 @invocation_output("tile_to_properties_output")
 class TileToPropertiesOutput(BaseInvocationOutput):
-    coords_top: int = OutputField(description="Top coordinate of the tile relative to its parent image.")
-    coords_bottom: int = OutputField(description="Bottom coordinate of the tile relative to its parent image.")
     coords_left: int = OutputField(description="Left coordinate of the tile relative to its parent image.")
     coords_right: int = OutputField(description="Right coordinate of the tile relative to its parent image.")
+    coords_top: int = OutputField(description="Top coordinate of the tile relative to its parent image.")
+    coords_bottom: int = OutputField(description="Bottom coordinate of the tile relative to its parent image.")
 
     # HACK: The width and height fields are 'meta' fields that can easily be calculated from the other fields on this
     # object. Including redundant fields that can cheaply/easily be re-calculated goes against conventional API design
@@ -85,10 +85,10 @@ class TileToPropertiesInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> TileToPropertiesOutput:
         return TileToPropertiesOutput(
-            coords_top=self.tile.coords.top,
-            coords_bottom=self.tile.coords.bottom,
             coords_left=self.tile.coords.left,
             coords_right=self.tile.coords.right,
+            coords_top=self.tile.coords.top,
+            coords_bottom=self.tile.coords.bottom,
             width=self.tile.coords.right - self.tile.coords.left,
             height=self.tile.coords.bottom - self.tile.coords.top,
             overlap_top=self.tile.overlap.top,
