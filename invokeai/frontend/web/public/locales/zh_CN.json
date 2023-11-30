@@ -1137,8 +1137,7 @@
         "openPose": "Openpose",
         "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
-        "canny": "Canny",
-        "unstarImage": "取消收藏图像"
+        "canny": "Canny"
     },
     "queue": {
         "status": "状态",
