@@ -1194,12 +1194,12 @@ class CropLatentsCoreInvocation(BaseInvocation):
         description=FieldDescriptions.latents,
         input=Input.Connection,
     )
-    x_offset: int = InputField(
+    x: int = InputField(
         ge=0,
         multiple_of=LATENT_SCALE_FACTOR,
         description="The left x coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
     )
-    y_offset: int = InputField(
+    y: int = InputField(
         ge=0,
         multiple_of=LATENT_SCALE_FACTOR,
         description="The top y coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
@@ -1218,8 +1218,8 @@ class CropLatentsCoreInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
-        x1 = self.x_offset // LATENT_SCALE_FACTOR
-        y1 = self.y_offset // LATENT_SCALE_FACTOR
+        x1 = self.x // LATENT_SCALE_FACTOR
+        y1 = self.y // LATENT_SCALE_FACTOR
         x2 = x1 + (self.width // LATENT_SCALE_FACTOR)
         y2 = y1 + (self.height // LATENT_SCALE_FACTOR)
 
