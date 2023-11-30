@@ -11,13 +11,10 @@ const PER_PAGE = 10;
 const WorkflowLibraryContent = () => {
   const [page, setPage] = useState(0);
   const [category, setCategory] = useState<WorkflowCategory>('user');
-  const { data } = useListWorkflowsQuery(
-    {
-      page,
-      per_page: PER_PAGE,
-    },
-    { refetchOnMountOrArgChange: true }
-  );
+  const { data } = useListWorkflowsQuery({
+    page,
+    per_page: PER_PAGE,
+  });
 
   if (!data) {
     return null;

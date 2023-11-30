@@ -58,7 +58,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 VALUES (?, ?);
                 """,
                 (
-                    workflow_with_id.workflow_id,
+                    workflow_with_id.id,
                     workflow_with_id.model_dump_json(),
                 ),
             )
@@ -68,7 +68,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             raise
         finally:
             self._lock.release()
-        return self.get(workflow_with_id.workflow_id)
+        return self.get(workflow_with_id.id)
 
     def update(self, workflow: Workflow) -> WorkflowRecordDTO:
         try:
@@ -79,7 +79,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 SET workflow = ?
                 WHERE workflow_id = ?;
                 """,
-                (workflow.model_dump_json(), workflow.workflow_id),
+                (workflow.model_dump_json(), workflow.id),
             )
             self._conn.commit()
         except Exception:
@@ -87,7 +87,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             raise
         finally:
             self._lock.release()
-        return self.get(workflow.workflow_id)
+        return self.get(workflow.id)
 
     def delete(self, workflow_id: str) -> None:
         try:

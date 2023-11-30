@@ -48,7 +48,7 @@ WorkflowWithoutIDValidator = TypeAdapter(WorkflowWithoutID)
 
 
 class Workflow(WorkflowWithoutID):
-    workflow_id: str = Field(default_factory=uuid_string, description="The id of the workflow.")
+    id: str = Field(default_factory=uuid_string, description="The id of the workflow.")
 
 
 WorkflowValidator = TypeAdapter(Workflow)

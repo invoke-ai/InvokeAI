@@ -3,6 +3,7 @@ import { memo } from 'react';
 import DownloadWorkflowButton from './DownloadWorkflowButton';
 import LoadWorkflowButton from './LoadWorkflowButton';
 import ResetWorkflowButton from './ResetWorkflowButton';
+import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopCenterPanel/SaveWorkflowButton';
 
 const TopCenterPanel = () => {
   return (
@@ -17,6 +18,7 @@ const TopCenterPanel = () => {
     >
       <DownloadWorkflowButton />
       <LoadWorkflowButton />
+      <SaveWorkflowButton />
       <ResetWorkflowButton />
     </Flex>
   );

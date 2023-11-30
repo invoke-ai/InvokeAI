@@ -711,6 +711,9 @@ const nodesSlice = createSlice({
     workflowContactChanged: (state, action: PayloadAction<string>) => {
       state.workflow.contact = action.payload;
     },
+    workflowIDChanged: (state, action: PayloadAction<string>) => {
+      state.workflow.id = action.payload;
+    },
     workflowLoaded: (state, action: PayloadAction<WorkflowV2>) => {
       const { nodes, edges, ...workflow } = action.payload;
       state.workflow = workflow;
@@ -1003,6 +1006,7 @@ export const {
   workflowNotesChanged,
   workflowTagsChanged,
   workflowVersionChanged,
+  workflowIDChanged,
   edgeAdded,
 } = nodesSlice.actions;
 

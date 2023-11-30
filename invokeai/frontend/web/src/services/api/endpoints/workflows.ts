@@ -18,11 +18,14 @@ export const workflowsApi = api.injectEndpoints({
         url: `workflows/i/${workflow_id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'Workflow', id: LIST_TAG }],
+      invalidatesTags: (result, error, workflow_id) => [
+        { type: 'Workflow', id: LIST_TAG },
+        { type: 'Workflow', id: workflow_id },
+      ],
     }),
     createWorkflow: build.mutation<
       paths['/api/v1/workflows/']['post']['responses']['200']['content']['application/json'],
-      WorkflowV2
+      paths['/api/v1/workflows/']['post']['requestBody']['content']['application/json']['workflow']
     >({
       query: (workflow) => ({
         url: 'workflows',
@@ -33,16 +36,16 @@ export const workflowsApi = api.injectEndpoints({
     }),
     updateWorkflow: build.mutation<
       paths['/api/v1/workflows/i/{workflow_id}']['patch']['responses']['200']['content']['application/json'],
-      WorkflowV2
+      paths['/api/v1/workflows/i/{workflow_id}']['patch']['requestBody']['content']['application/json']['workflow']
     >({
       query: (workflow) => ({
         url: `workflows/i/${workflow.id}`,
         method: 'PATCH',
         body: workflow,
       }),
-      invalidatesTags: (response, error, arg) => [
+      invalidatesTags: (response, error, workflow) => [
         { type: 'Workflow', id: LIST_TAG },
-        { type: 'Workflow', id: arg.id },
+        { type: 'Workflow', id: workflow.id },
       ],
     }),
     listWorkflows: build.query<
@@ -53,10 +56,7 @@ export const workflowsApi = api.injectEndpoints({
         url: 'workflows/',
         params,
       }),
-      providesTags: (result, error, params) => [
-        { type: 'Workflow', id: LIST_TAG },
-        { type: 'Workflow', id: params?.page },
-      ],
+      providesTags: [{ type: 'Workflow', id: LIST_TAG }],
     }),
   }),
 });

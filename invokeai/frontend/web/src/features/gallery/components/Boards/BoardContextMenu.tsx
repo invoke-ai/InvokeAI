@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { FaDownload, FaPlus } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
-import { menuListMotionProps } from 'theme/components/menu';
+import { MENU_LIST_MOTION_PROPS } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -94,7 +94,7 @@ const BoardContextMenu = ({
     () => (
       <MenuList
         sx={{ visibility: 'visible !important' }}
-        motionProps={menuListMotionProps}
+        motionProps={MENU_LIST_MOTION_PROPS}
         onContextMenu={skipEvent}
       >
         <MenuGroup title={boardName}>

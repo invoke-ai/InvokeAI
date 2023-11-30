@@ -16,7 +16,7 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { FaMinus, FaPlus } from 'react-icons/fa';
-import { menuListMotionProps } from 'theme/components/menu';
+import { MENU_LIST_MOTION_PROPS } from 'theme/components/menu';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -110,7 +110,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
       !menuItems.length ? null : (
         <MenuList
           sx={{ visibility: 'visible !important' }}
-          motionProps={menuListMotionProps}
+          motionProps={MENU_LIST_MOTION_PROPS}
           onContextMenu={skipEvent}
         >
           <MenuGroup

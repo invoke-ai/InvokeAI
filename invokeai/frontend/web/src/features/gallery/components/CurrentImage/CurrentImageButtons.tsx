@@ -46,7 +46,7 @@ import {
   useLazyGetImageWorkflowQuery,
 } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
-import { menuListMotionProps } from 'theme/components/menu';
+import { MENU_LIST_MOTION_PROPS } from 'theme/components/menu';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -248,7 +248,7 @@ const CurrentImageButtons = () => {
               isDisabled={!imageDTO}
               icon={<FaEllipsis />}
             />
-            <MenuList motionProps={menuListMotionProps}>
+            <MenuList motionProps={MENU_LIST_MOTION_PROPS}>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
             </MenuList>
           </Menu>

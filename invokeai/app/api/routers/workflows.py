@@ -34,7 +34,7 @@ async def get_workflow(
     "/i/{workflow_id}",
     operation_id="update_workflow",
     responses={
-        200: {"model": Workflow},
+        200: {"model": WorkflowRecordDTO},
     },
 )
 async def update_workflow(

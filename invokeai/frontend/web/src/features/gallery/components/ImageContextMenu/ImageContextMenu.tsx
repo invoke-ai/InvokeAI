@@ -5,7 +5,7 @@ import {
 } from 'common/components/IAIContextMenu';
 import { MouseEvent, memo, useCallback } from 'react';
 import { ImageDTO } from 'services/api/types';
-import { menuListMotionProps } from 'theme/components/menu';
+import { MENU_LIST_MOTION_PROPS } from 'theme/components/menu';
 import SingleSelectionMenuItems from './SingleSelectionMenuItems';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
@@ -44,7 +44,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
       return (
         <MenuList
           sx={{ visibility: 'visible !important' }}
-          motionProps={menuListMotionProps}
+          motionProps={MENU_LIST_MOTION_PROPS}
           onContextMenu={skipEvent}
         >
           <MultipleSelectionMenuItems />
@@ -55,7 +55,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
     return (
       <MenuList
         sx={{ visibility: 'visible !important' }}
-        motionProps={menuListMotionProps}
+        motionProps={MENU_LIST_MOTION_PROPS}
         onContextMenu={skipEvent}
       >
         <SingleSelectionMenuItems imageDTO={imageDTO} />
