@@ -159,6 +159,7 @@ const CurrentImagePreview = () => {
               transition: { duration: 1.5 },
             }}
             style={{
+              display: 'flex',
               position: 'absolute',
               width: '100%',
               height: '100%',
@@ -171,13 +172,10 @@ const CurrentImagePreview = () => {
               draggable={false}
               data-testid="progress-image"
               sx={{
-                objectFit: 'contain',
-                maxWidth: 'full',
-                maxHeight: 'full',
-                width: 'auto',
-                height: '100%',
                 position: 'relative',
+                objectFit: 'contain',
                 margin: 'auto',
+                alignSelf: 'center',
                 borderRadius: 'base',
                 imageRendering: shouldAntialiasProgressImage
                   ? 'auto'
