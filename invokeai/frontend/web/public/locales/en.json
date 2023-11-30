@@ -1476,7 +1476,7 @@
         "paramCFGRescaleMultiplier": {
             "heading": "CFG Rescale Multiplier",
             "paragraphs": [
-                "Rescale multiplier for CFG guidance, used for models trained with zero-terminal SNRØ."
+                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr). Suggested value 0.7."
             ]
         },
         "paramDenoisingStrength": {
