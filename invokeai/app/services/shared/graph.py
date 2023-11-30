@@ -207,10 +207,12 @@ class IterateInvocationOutput(BaseInvocationOutput):
     item: Any = OutputField(
         description="The item being iterated over", title="Collection Item", ui_type=UIType._CollectionItem
     )
+    index: int = OutputField(description="The index of the item", title="Index")
+    total: int = OutputField(description="The total number of items", title="Total")
 
 
 # TODO: Fill this out and move to invocations
-@invocation("iterate", version="1.0.0")
+@invocation("iterate", version="1.1.0")
 class IterateInvocation(BaseInvocation):
     """Iterates over a list of items"""
 
@@ -221,7 +223,7 @@ class IterateInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IterateInvocationOutput:
         """Produces the outputs as values"""
-        return IterateInvocationOutput(item=self.collection[self.index])
+        return IterateInvocationOutput(item=self.collection[self.index], index=self.index, total=len(self.collection))
 
 
 @invocation_output("collect_output")
