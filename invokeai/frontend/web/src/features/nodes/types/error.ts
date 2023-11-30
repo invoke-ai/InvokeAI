@@ -43,27 +43,12 @@ export class NodeUpdateError extends Error {
 }
 
 /**
- * FieldTypeParseError
+ * FieldParseError
  * Raised when a field cannot be parsed from a field schema.
  */
-export class FieldTypeParseError extends Error {
+export class FieldParseError extends Error {
   /**
    * Create FieldTypeParseError
-   * @param {String} message
-   */
-  constructor(message: string) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
-
-/**
- * UnsupportedFieldTypeError
- * Raised when an unsupported field type is parsed.
- */
-export class UnsupportedFieldTypeError extends Error {
-  /**
-   * Create UnsupportedFieldTypeError
    * @param {String} message
    */
   constructor(message: string) {
