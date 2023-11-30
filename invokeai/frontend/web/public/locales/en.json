@@ -978,6 +978,7 @@
         "unsupportedAnyOfLength": "too many union members ({{count}})",
         "unsupportedMismatchedUnion": "mismatched CollectionOrScalar type with base types {{firstType}} and {{secondType}}",
         "unableToParseFieldType": "unable to parse field type",
+        "unableToExtractEnumOptions": "unable to extract enum options",
         "uNetField": "UNet",
         "uNetFieldDescription": "UNet submodel.",
         "unhandledInputProperty": "Unhandled input property",

@@ -1,12 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { t } from 'i18next';
-import { reduce } from 'lodash-es';
-import { OpenAPIV3_1 } from 'openapi-types';
-import {
-  FieldTypeParseError,
-  UnsupportedFieldTypeError,
-} from 'features/nodes/types/error';
+import { FieldParseError } from 'features/nodes/types/error';
 import {
   FieldInputTemplate,
   FieldOutputTemplate,
@@ -18,6 +12,9 @@ import {
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
 } from 'features/nodes/types/openapi';
+import { t } from 'i18next';
+import { reduce } from 'lodash-es';
+import { OpenAPIV3_1 } from 'openapi-types';
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
 import { parseFieldType } from './parseFieldType';
@@ -133,10 +130,7 @@ export const parseSchema = (
 
           inputsAccumulator[propertyName] = fieldInputTemplate;
         } catch (e) {
-          if (
-            e instanceof FieldTypeParseError ||
-            e instanceof UnsupportedFieldTypeError
-          ) {
+          if (e instanceof FieldParseError) {
             logger('nodes').warn(
               {
                 node: type,
@@ -225,10 +219,7 @@ export const parseSchema = (
 
           outputsAccumulator[propertyName] = fieldOutputTemplate;
         } catch (e) {
-          if (
-            e instanceof FieldTypeParseError ||
-            e instanceof UnsupportedFieldTypeError
-          ) {
+          if (e instanceof FieldParseError) {
             logger('nodes').warn(
               {
                 node: type,
