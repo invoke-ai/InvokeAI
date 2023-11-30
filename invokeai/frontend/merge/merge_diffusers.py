@@ -275,14 +275,14 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
             interp = self.interpolations[self.merge_method.value[0]]
 
         bases = ["sd-1", "sd-2", "sdxl"]
-        args = dict(
-            model_names=models,
-            base_model=BaseModelType(bases[self.base_select.value[0]]),
-            alpha=self.alpha.value,
-            interp=interp,
-            force=self.force.value,
-            merged_model_name=self.merged_model_name.value,
-        )
+        args = {
+            "model_names": models,
+            "base_model": BaseModelType(bases[self.base_select.value[0]]),
+            "alpha": self.alpha.value,
+            "interp": interp,
+            "force": self.force.value,
+            "merged_model_name": self.merged_model_name.value,
+        }
         return args
 
     def check_for_overwrite(self) -> bool:
@@ -297,7 +297,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
     def validate_field_values(self) -> bool:
         bad_fields = []
         model_names = self.model_names
-        selected_models = set((model_names[self.model1.value[0]], model_names[self.model2.value[0]]))
+        selected_models = {model_names[self.model1.value[0]], model_names[self.model2.value[0]]}
         if self.model3.value[0] > 0:
             selected_models.add(model_names[self.model3.value[0] - 1])
         if len(selected_models) < 2:

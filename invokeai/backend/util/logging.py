@@ -1,8 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein and The InvokeAI Development Team
 
-"""invokeai.backend.util.logging
-
-Logging class for InvokeAI that produces console messages
+"""
+Logging class for InvokeAI that produces console messages.
 
 Usage:
 
@@ -178,8 +177,8 @@ InvokeAI:
 import logging.handlers
 import socket
 import urllib.parse
-from abc import abstractmethod
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
@@ -192,97 +191,89 @@ except ImportError:
 
 
 # module level functions
-def debug(msg, *args, **kwargs):
+def debug(msg: str, *args: str, **kwargs: Any) -> None:  # noqa D103
     InvokeAILogger.get_logger().debug(msg, *args, **kwargs)
 
 
-def info(msg, *args, **kwargs):
+def info(msg: str, *args: str, **kwargs: Any) -> None:  # noqa D103
     InvokeAILogger.get_logger().info(msg, *args, **kwargs)
 
 
-def warning(msg, *args, **kwargs):
+def warning(msg: str, *args: str, **kwargs: Any) -> None:  # noqa D103
     InvokeAILogger.get_logger().warning(msg, *args, **kwargs)
 
 
-def error(msg, *args, **kwargs):
+def error(msg: str, *args: str, **kwargs: Any) -> None:  # noqa D103
     InvokeAILogger.get_logger().error(msg, *args, **kwargs)
 
 
-def critical(msg, *args, **kwargs):
+def critical(msg: str, *args: str, **kwargs: Any) -> None:  # noqa D103
     InvokeAILogger.get_logger().critical(msg, *args, **kwargs)
 
 
-def log(level, msg, *args, **kwargs):
+def log(level: int, msg: str, *args: str, **kwargs: Any) -> None:  # noqa D103
     InvokeAILogger.get_logger().log(level, msg, *args, **kwargs)
 
 
-def disable(level=logging.CRITICAL):
-    InvokeAILogger.get_logger().disable(level)
+def disable(level: int = logging.CRITICAL) -> None:  # noqa D103
+    logging.disable(level)
 
 
-def basicConfig(**kwargs):
-    InvokeAILogger.get_logger().basicConfig(**kwargs)
+def basicConfig(**kwargs: Any) -> None:  # noqa D103
+    logging.basicConfig(**kwargs)
 
 
 _FACILITY_MAP = (
-    dict(
-        LOG_KERN=syslog.LOG_KERN,
-        LOG_USER=syslog.LOG_USER,
-        LOG_MAIL=syslog.LOG_MAIL,
-        LOG_DAEMON=syslog.LOG_DAEMON,
-        LOG_AUTH=syslog.LOG_AUTH,
-        LOG_LPR=syslog.LOG_LPR,
-        LOG_NEWS=syslog.LOG_NEWS,
-        LOG_UUCP=syslog.LOG_UUCP,
-        LOG_CRON=syslog.LOG_CRON,
-        LOG_SYSLOG=syslog.LOG_SYSLOG,
-        LOG_LOCAL0=syslog.LOG_LOCAL0,
-        LOG_LOCAL1=syslog.LOG_LOCAL1,
-        LOG_LOCAL2=syslog.LOG_LOCAL2,
-        LOG_LOCAL3=syslog.LOG_LOCAL3,
-        LOG_LOCAL4=syslog.LOG_LOCAL4,
-        LOG_LOCAL5=syslog.LOG_LOCAL5,
-        LOG_LOCAL6=syslog.LOG_LOCAL6,
-        LOG_LOCAL7=syslog.LOG_LOCAL7,
-    )
+    {
+        "LOG_KERN": syslog.LOG_KERN,
+        "LOG_USER": syslog.LOG_USER,
+        "LOG_MAIL": syslog.LOG_MAIL,
+        "LOG_DAEMON": syslog.LOG_DAEMON,
+        "LOG_AUTH": syslog.LOG_AUTH,
+        "LOG_LPR": syslog.LOG_LPR,
+        "LOG_NEWS": syslog.LOG_NEWS,
+        "LOG_UUCP": syslog.LOG_UUCP,
+        "LOG_CRON": syslog.LOG_CRON,
+        "LOG_SYSLOG": syslog.LOG_SYSLOG,
+        "LOG_LOCAL0": syslog.LOG_LOCAL0,
+        "LOG_LOCAL1": syslog.LOG_LOCAL1,
+        "LOG_LOCAL2": syslog.LOG_LOCAL2,
+        "LOG_LOCAL3": syslog.LOG_LOCAL3,
+        "LOG_LOCAL4": syslog.LOG_LOCAL4,
+        "LOG_LOCAL5": syslog.LOG_LOCAL5,
+        "LOG_LOCAL6": syslog.LOG_LOCAL6,
+        "LOG_LOCAL7": syslog.LOG_LOCAL7,
+    }
     if SYSLOG_AVAILABLE
-    else dict()
+    else {}
 )
 
-_SOCK_MAP = dict(
-    SOCK_STREAM=socket.SOCK_STREAM,
-    SOCK_DGRAM=socket.SOCK_DGRAM,
-)
+_SOCK_MAP = {
+    "SOCK_STREAM": socket.SOCK_STREAM,
+    "SOCK_DGRAM": socket.SOCK_DGRAM,
+}
 
 
 class InvokeAIFormatter(logging.Formatter):
-    """
-    Base class for logging formatter
+    """Base class for logging formatter."""
 
-    """
-
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:  # noqa D102
         formatter = logging.Formatter(self.log_fmt(record.levelno))
         return formatter.format(record)
 
-    @abstractmethod
-    def log_fmt(self, levelno: int) -> str:
-        pass
+    def log_fmt(self, levelno: int) -> str:  # noqa D102
+        return "[%(asctime)s]::[%(name)s]::%(levelname)s --> %(message)s"
 
 
 class InvokeAISyslogFormatter(InvokeAIFormatter):
-    """
-    Formatting for syslog
-    """
+    """Formatting for syslog."""
 
-    def log_fmt(self, levelno: int) -> str:
+    def log_fmt(self, levelno: int) -> str:  # noqa D102
         return "%(name)s [%(process)d] <%(levelname)s> %(message)s"
 
 
-class InvokeAILegacyLogFormatter(InvokeAIFormatter):
-    """
-    Formatting for the InvokeAI Logger (legacy version)
-    """
+class InvokeAILegacyLogFormatter(InvokeAIFormatter):  # noqa D102
+    """Formatting for the InvokeAI Logger (legacy version)."""
 
     FORMATS = {
         logging.DEBUG: "   | %(message)s",
@@ -292,23 +283,21 @@ class InvokeAILegacyLogFormatter(InvokeAIFormatter):
         logging.CRITICAL: "### %(message)s",
     }
 
-    def log_fmt(self, levelno: int) -> str:
-        return self.FORMATS.get(levelno)
+    def log_fmt(self, levelno: int) -> str:  # noqa D102
+        format = self.FORMATS.get(levelno)
+        assert format is not None
+        return format
 
 
 class InvokeAIPlainLogFormatter(InvokeAIFormatter):
-    """
-    Custom Formatting for the InvokeAI Logger (plain version)
-    """
+    """Custom Formatting for the InvokeAI Logger (plain version)."""
 
-    def log_fmt(self, levelno: int) -> str:
+    def log_fmt(self, levelno: int) -> str:  # noqa D102
         return "[%(asctime)s]::[%(name)s]::%(levelname)s --> %(message)s"
 
 
 class InvokeAIColorLogFormatter(InvokeAIFormatter):
-    """
-    Custom Formatting for the InvokeAI Logger
-    """
+    """Custom Formatting for the InvokeAI Logger."""
 
     # Color Codes
     grey = "\x1b[38;20m"
@@ -331,8 +320,10 @@ class InvokeAIColorLogFormatter(InvokeAIFormatter):
         logging.CRITICAL: bold_red + log_format + reset,
     }
 
-    def log_fmt(self, levelno: int) -> str:
-        return self.FORMATS.get(levelno)
+    def log_fmt(self, levelno: int) -> str:  # noqa D102
+        format = self.FORMATS.get(levelno)
+        assert format is not None
+        return format
 
 
 LOG_FORMATTERS = {
@@ -343,13 +334,13 @@ LOG_FORMATTERS = {
 }
 
 
-class InvokeAILogger(object):
-    loggers = dict()
+class InvokeAILogger(object):  # noqa D102
+    loggers: Dict[str, logging.Logger] = {}
 
     @classmethod
     def get_logger(
         cls, name: str = "InvokeAI", config: InvokeAIAppConfig = InvokeAIAppConfig.get_config()
-    ) -> logging.Logger:
+    ) -> logging.Logger:  # noqa D102
         if name in cls.loggers:
             logger = cls.loggers[name]
             logger.handlers.clear()
@@ -362,9 +353,9 @@ class InvokeAILogger(object):
         return cls.loggers[name]
 
     @classmethod
-    def get_loggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
+    def get_loggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:  # noqa D102
         handler_strs = config.log_handlers
-        handlers = list()
+        handlers = []
         for handler in handler_strs:
             handler_name, *args = handler.split("=", 2)
             args = args[0] if len(args) > 0 else None
@@ -374,7 +365,7 @@ class InvokeAILogger(object):
             # http gets no custom formatter
             formatter = LOG_FORMATTERS[config.log_format]
             if handler_name == "console":
-                ch = logging.StreamHandler()
+                ch: logging.Handler = logging.StreamHandler()
                 ch.setFormatter(formatter())
                 handlers.append(ch)
 
@@ -393,18 +384,18 @@ class InvokeAILogger(object):
         return handlers
 
     @staticmethod
-    def _parse_syslog_args(args: str = None) -> logging.Handler:
+    def _parse_syslog_args(args: Optional[str] = None) -> logging.Handler:
         if not SYSLOG_AVAILABLE:
             raise ValueError("syslog is not available on this system")
         if not args:
             args = "/dev/log" if Path("/dev/log").exists() else "address:localhost:514"
-        syslog_args = dict()
+        syslog_args: Dict[str, Any] = {}
         try:
             for a in args.split(","):
                 arg_name, *arg_value = a.split(":", 2)
                 if arg_name == "address":
-                    host, *port = arg_value
-                    port = 514 if len(port) == 0 else int(port[0])
+                    host, *port_list = arg_value
+                    port = 514 if not port_list else int(port_list[0])
                     syslog_args["address"] = (host, port)
                 elif arg_name == "facility":
                     syslog_args["facility"] = _FACILITY_MAP[arg_value[0]]
@@ -417,13 +408,13 @@ class InvokeAILogger(object):
         return logging.handlers.SysLogHandler(**syslog_args)
 
     @staticmethod
-    def _parse_file_args(args: str = None) -> logging.Handler:
+    def _parse_file_args(args: Optional[str] = None) -> logging.Handler:  # noqa D102
         if not args:
             raise ValueError("please provide filename for file logging using format 'file=/path/to/logfile.txt'")
         return logging.FileHandler(args)
 
     @staticmethod
-    def _parse_http_args(args: str = None) -> logging.Handler:
+    def _parse_http_args(args: Optional[str] = None) -> logging.Handler:  # noqa D102
         if not args:
             raise ValueError("please provide destination for http logging using format 'http=url'")
         arg_list = args.split(",")
@@ -434,12 +425,12 @@ class InvokeAILogger(object):
         path = url.path
         port = url.port or 80
 
-        syslog_args = dict()
+        syslog_args: Dict[str, Any] = {}
         for a in arg_list:
             arg_name, *arg_value = a.split(":", 2)
             if arg_name == "method":
-                arg_value = arg_value[0] if len(arg_value) > 0 else "GET"
-                syslog_args[arg_name] = arg_value
+                method = arg_value[0] if len(arg_value) > 0 else "GET"
+                syslog_args[arg_name] = method
             else:  # TODO: Provide support for SSL context and credentials
                 pass
         return logging.handlers.HTTPHandler(f"{host}:{port}", path, **syslog_args)

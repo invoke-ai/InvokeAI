@@ -76,6 +76,13 @@ const ParamLoRASelect = () => {
     [dispatch, loraModels?.entities]
   );
 
+  const filterFunc = useCallback(
+    (value: string, item: SelectItem) =>
+      item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
+      item.value.toLowerCase().includes(value.toLowerCase().trim()),
+    []
+  );
+
   if (loraModels?.ids.length === 0) {
     return (
       <Flex sx={{ justifyContent: 'center', p: 2 }}>
@@ -88,16 +95,13 @@ const ParamLoRASelect = () => {
 
   return (
     <IAIMantineSearchableSelect
-      placeholder={data.length === 0 ? 'All LoRAs added' : 'Add LoRA'}
+      placeholder={data.length === 0 ? 'All LoRAs added' : t('models.addLora')}
       value={null}
       data={data}
       nothingFound="No matching LoRAs"
       itemComponent={IAIMantineSelectItemWithTooltip}
       disabled={data.length === 0}
-      filter={(value, item: SelectItem) =>
-        item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
-        item.value.toLowerCase().includes(value.toLowerCase().trim())
-      }
+      filter={filterFunc}
       onChange={handleChange}
       data-testid="add-lora"
     />

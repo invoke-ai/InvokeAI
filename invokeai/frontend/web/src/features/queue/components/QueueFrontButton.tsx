@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaBoltLightning } from 'react-icons/fa6';
-import { useQueueFront } from '../hooks/useQueueFront';
+import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
 import QueueButton from './common/QueueButton';
 import { ChakraProps } from '@chakra-ui/react';

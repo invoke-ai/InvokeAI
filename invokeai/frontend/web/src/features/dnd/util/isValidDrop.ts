@@ -1,4 +1,4 @@
-import { TypesafeActive, TypesafeDroppableData } from '../types';
+import { TypesafeActive, TypesafeDroppableData } from 'features/dnd/types';
 
 export const isValidDrop = (
   overData: TypesafeDroppableData | undefined,

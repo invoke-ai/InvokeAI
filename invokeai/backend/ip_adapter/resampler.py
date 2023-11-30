@@ -56,7 +56,7 @@ class PerceiverAttention(nn.Module):
         x = self.norm1(x)
         latents = self.norm2(latents)
 
-        b, l, _ = latents.shape
+        b, L, _ = latents.shape
 
         q = self.to_q(latents)
         kv_input = torch.cat((x, latents), dim=-2)
@@ -72,7 +72,7 @@ class PerceiverAttention(nn.Module):
         weight = torch.softmax(weight.float(), dim=-1).type(weight.dtype)
         out = weight @ v
 
-        out = out.permute(0, 2, 1, 3).reshape(b, l, -1)
+        out = out.permute(0, 2, 1, 3).reshape(b, L, -1)
 
         return self.to_out(out)
 

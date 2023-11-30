@@ -7,7 +7,7 @@ import SDXLTextToImageTabParameters from 'features/sdxl/components/SDXLTextToIma
 import SDXLUnifiedCanvasTabParameters from 'features/sdxl/components/SDXLUnifiedCanvasTabParameters';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { PropsWithChildren, memo } from 'react';
-import { activeTabNameSelector } from '../store/uiSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import ImageToImageTabParameters from './tabs/ImageToImage/ImageToImageTabParameters';
 import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
 import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameters';

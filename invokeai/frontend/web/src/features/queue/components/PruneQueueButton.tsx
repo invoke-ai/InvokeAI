@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsStars } from 'react-icons/bs';
-import { usePruneQueue } from '../hooks/usePruneQueue';
+import { usePruneQueue } from 'features/queue/hooks/usePruneQueue';
 import QueueButton from './common/QueueButton';
 
 type Props = {

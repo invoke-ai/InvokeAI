@@ -11,7 +11,6 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
@@ -67,7 +66,7 @@ class IPAdapterInvocation(BaseInvocation):
 
     # weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
     weight: Union[float, List[float]] = InputField(
-        default=1, ge=-1, description="The weight given to the IP-Adapter", ui_type=UIType.Float, title="Weight"
+        default=1, ge=-1, description="The weight given to the IP-Adapter", title="Weight"
     )
 
     begin_step_percent: float = InputField(

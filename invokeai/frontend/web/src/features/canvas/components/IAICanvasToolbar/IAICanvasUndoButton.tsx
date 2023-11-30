@@ -10,6 +10,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 import { stateSelector } from 'app/store/store';
+import { useCallback } from 'react';
 
 const canvasUndoSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -35,9 +36,9 @@ export default function IAICanvasUndoButton() {
 
   const { canUndo, activeTabName } = useAppSelector(canvasUndoSelector);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     dispatch(undo());
-  };
+  }, [dispatch]);
 
   useHotkeys(
     ['meta+z', 'ctrl+z'],

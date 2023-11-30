@@ -15,12 +15,12 @@ from invokeai.app.invocations.image import ImageField
 # Define test invocations before importing anything that uses invocations
 @invocation_output("test_list_output")
 class ListPassThroughInvocationOutput(BaseInvocationOutput):
-    collection: list[ImageField] = OutputField(default_factory=list)
+    collection: list[ImageField] = OutputField(default=[])
 
 
 @invocation("test_list")
 class ListPassThroughInvocation(BaseInvocation):
-    collection: list[ImageField] = InputField(default_factory=list)
+    collection: list[ImageField] = InputField(default=[])
 
     def invoke(self, context: InvocationContext) -> ListPassThroughInvocationOutput:
         return ListPassThroughInvocationOutput(collection=self.collection)
@@ -70,7 +70,7 @@ class ImageToImageTestInvocation(BaseInvocation):
 
 @invocation_output("test_prompt_collection_output")
 class PromptCollectionTestInvocationOutput(BaseInvocationOutput):
-    collection: list[str] = OutputField(default_factory=list)
+    collection: list[str] = OutputField(default=[])
 
 
 @invocation("test_prompt_collection")
@@ -130,7 +130,7 @@ class TestEventService(EventServiceBase):
 
     def __init__(self):
         super().__init__()
-        self.events = list()
+        self.events = []
 
     def dispatch(self, event_name: str, payload: Any) -> None:
         pass

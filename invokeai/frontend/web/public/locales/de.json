@@ -90,7 +90,16 @@
         "openInNewTab": "In einem neuem Tab öffnen",
         "statusProcessing": "wird bearbeitet",
         "linear": "Linear",
-        "imagePrompt": "Bild Prompt"
+        "imagePrompt": "Bild Prompt",
+        "checkpoint": "Checkpoint",
+        "inpaint": "inpaint",
+        "simple": "Einfach",
+        "template": "Vorlage",
+        "outputs": "Ausgabe",
+        "data": "Daten",
+        "safetensors": "Safetensors",
+        "outpaint": "outpaint",
+        "details": "Details"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -110,10 +119,17 @@
         "preparingDownload": "bereite Download vor",
         "preparingDownloadFailed": "Problem beim Download vorbereiten",
         "deleteImage": "Lösche Bild",
-        "images": "Bilder",
         "copy": "Kopieren",
         "download": "Runterladen",
-        "setCurrentImage": "Setze aktuelle Bild"
+        "setCurrentImage": "Setze aktuelle Bild",
+        "featuresWillReset": "Wenn Sie dieses Bild löschen, werden diese Funktionen sofort zurückgesetzt.",
+        "deleteImageBin": "Gelöschte Bilder werden an den Papierkorb Ihres Betriebssystems gesendet.",
+        "unableToLoad": "Galerie kann nicht geladen werden",
+        "downloadSelection": "Auswahl herunterladen",
+        "currentlyInUse": "Dieses Bild wird derzeit in den folgenden Funktionen verwendet:",
+        "deleteImagePermanent": "Gelöschte Bilder können nicht wiederhergestellt werden.",
+        "autoAssignBoardOnClick": "Board per Klick automatisch zuweisen",
+        "noImageSelected": "Kein Bild ausgewählt"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
@@ -323,7 +339,8 @@
         },
         "nodesHotkeys": "Knoten Tastenkürzel",
         "addNodes": {
-            "title": "Knotenpunkt hinzufügen"
+            "title": "Knotenpunkt hinzufügen",
+            "desc": "Öffnet das Menü zum Hinzufügen von Knoten"
         }
     },
     "modelManager": {
@@ -429,7 +446,46 @@
         "customConfigFileLocation": "Benutzerdefinierte Konfiguration Datei Speicherort",
         "baseModel": "Basis Modell",
         "convertToDiffusers": "Konvertiere zu Diffusers",
-        "diffusersModels": "Diffusers"
+        "diffusersModels": "Diffusers",
+        "noCustomLocationProvided": "Kein benutzerdefinierter Standort angegeben",
+        "onnxModels": "Onnx",
+        "vaeRepoID": "VAE-Repo-ID",
+        "weightedSum": "Gewichtete Summe",
+        "syncModelsDesc": "Wenn Ihre Modelle nicht mit dem Backend synchronisiert sind, können Sie sie mit dieser Option aktualisieren. Dies ist im Allgemeinen praktisch, wenn Sie Ihre models.yaml-Datei manuell aktualisieren oder Modelle zum InvokeAI-Stammordner hinzufügen, nachdem die Anwendung gestartet wurde.",
+        "vae": "VAE",
+        "noModels": "Keine Modelle gefunden",
+        "statusConverting": "Konvertieren",
+        "sigmoid": "Sigmoid",
+        "predictionType": "Vorhersagetyp (für Stable Diffusion 2.x-Modelle und gelegentliche Stable Diffusion 1.x-Modelle)",
+        "selectModel": "Wählen Sie Modell aus",
+        "repo_id": "Repo-ID",
+        "modelSyncFailed": "Modellsynchronisierung fehlgeschlagen",
+        "quickAdd": "Schnell hinzufügen",
+        "simpleModelDesc": "Geben Sie einen Pfad zu einem lokalen Diffusers-Modell, einem lokalen Checkpoint-/Safetensors-Modell, einer HuggingFace-Repo-ID oder einer Checkpoint-/Diffusers-Modell-URL an.",
+        "modelDeleted": "Modell gelöscht",
+        "inpainting": "v1 Inpainting",
+        "modelUpdateFailed": "Modellaktualisierung fehlgeschlagen",
+        "useCustomConfig": "Benutzerdefinierte Konfiguration verwenden",
+        "settings": "Einstellungen",
+        "modelConversionFailed": "Modellkonvertierung fehlgeschlagen",
+        "syncModels": "Modelle synchronisieren",
+        "mergedModelSaveLocation": "Speicherort",
+        "modelType": "Modelltyp",
+        "modelsMerged": "Modelle zusammengeführt",
+        "modelsMergeFailed": "Modellzusammenführung fehlgeschlagen",
+        "convertToDiffusersHelpText1": "Dieses Modell wird in das 🧨 Diffusers-Format konvertiert.",
+        "modelsSynced": "Modelle synchronisiert",
+        "vaePrecision": "VAE-Präzision",
+        "mergeModels": "Modelle zusammenführen",
+        "interpolationType": "Interpolationstyp",
+        "oliveModels": "Olives",
+        "variant": "Variante",
+        "loraModels": "LoRAs",
+        "modelDeleteFailed": "Modell konnte nicht gelöscht werden",
+        "mergedModelName": "Zusammengeführter Modellname",
+        "checkpointOrSafetensors": "$t(common.checkpoint) / $t(common.safetensors)",
+        "formMessageDiffusersModelLocation": "Diffusers Modell Speicherort",
+        "noModelSelected": "Kein Modell ausgewählt"
     },
     "parameters": {
         "images": "Bilder",
@@ -639,7 +695,8 @@
         "exitViewer": "Betrachten beenden",
         "menu": "Menü",
         "loadMore": "Mehr laden",
-        "invokeProgressBar": "Invoke Fortschrittsanzeige"
+        "invokeProgressBar": "Invoke Fortschrittsanzeige",
+        "mode": "Modus"
     },
     "boards": {
         "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
@@ -657,7 +714,11 @@
         "changeBoard": "Ordner wechseln",
         "loading": "Laden...",
         "clearSearch": "Suche leeren",
-        "bottomMessage": "Durch das Löschen dieses Ordners und seiner Bilder werden alle Funktionen zurückgesetzt, die sie derzeit verwenden."
+        "bottomMessage": "Durch das Löschen dieses Ordners und seiner Bilder werden alle Funktionen zurückgesetzt, die sie derzeit verwenden.",
+        "deleteBoardOnly": "Nur Ordner löschen",
+        "deleteBoard": "Löschen Ordner",
+        "deleteBoardAndImages": "Löschen Ordner und Bilder",
+        "deletedBoardsCannotbeRestored": "Gelöschte Ordner könnte nicht wiederhergestellt werden"
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
@@ -716,7 +777,34 @@
         "saveControlImage": "Speichere Referenz Bild",
         "safe": "Speichern",
         "ipAdapterImageFallback": "Kein IP Adapter Bild ausgewählt",
-        "resetIPAdapterImage": "Zurücksetzen vom IP Adapter Bild"
+        "resetIPAdapterImage": "Zurücksetzen vom IP Adapter Bild",
+        "pidi": "PIDI",
+        "normalBae": "Normales BAE",
+        "mlsdDescription": "Minimalistischer Liniensegmentdetektor",
+        "openPoseDescription": "Schätzung der menschlichen Pose mit Openpose",
+        "control": "Kontrolle",
+        "coarse": "Coarse",
+        "crop": "Zuschneiden",
+        "pidiDescription": "PIDI-Bildverarbeitung",
+        "mediapipeFace": "Mediapipe Gesichter",
+        "mlsd": "M-LSD",
+        "controlMode": "Steuermodus",
+        "cannyDescription": "Canny Ecken Erkennung",
+        "lineart": "Lineart",
+        "lineartAnimeDescription": "Lineart-Verarbeitung im Anime-Stil",
+        "minConfidence": "Minimales Vertrauen",
+        "megaControl": "Mega-Kontrolle",
+        "autoConfigure": "Prozessor automatisch konfigurieren",
+        "normalBaeDescription": "Normale BAE-Verarbeitung",
+        "noneDescription": "Es wurde keine Verarbeitung angewendet",
+        "openPose": "Openpose",
+        "lineartAnime": "Lineart Anime",
+        "mediapipeFaceDescription": "Gesichtserkennung mit Mediapipe",
+        "canny": "Canny",
+        "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
+        "scribble": "Scribble",
+        "maxFaces": "Maximal Anzahl Gesichter",
+        "unstarImage": "Markierung aufheben"
     },
     "queue": {
         "status": "Status",
@@ -758,7 +846,20 @@
         "enqueueing": "Stapel in der Warteschlange",
         "queueMaxExceeded": "Maximum von  {{max_queue_size}} Elementen erreicht, würde {{skip}} Elemente überspringen",
         "cancelBatchFailed": "Problem beim Abbruch vom Stapel",
-        "clearQueueAlertDialog2": "bist du sicher die Warteschlange zu leeren?"
+        "clearQueueAlertDialog2": "bist du sicher die Warteschlange zu leeren?",
+        "pruneSucceeded": "{{item_count}} abgeschlossene Elemente aus der Warteschlange entfernt",
+        "pauseSucceeded": "Prozessor angehalten",
+        "cancelFailed": "Problem beim Stornieren des Auftrags",
+        "pauseFailed": "Problem beim Anhalten des Prozessors",
+        "front": "Vorne",
+        "pruneTooltip": "Bereinigen Sie {{item_count}} abgeschlossene Aufträge",
+        "resumeFailed": "Problem beim wieder aufnehmen von Prozessor",
+        "pruneFailed": "Problem beim leeren der Warteschlange",
+        "pauseTooltip": "Pause von Prozessor",
+        "back": "Hinten",
+        "resumeSucceeded": "Prozessor wieder aufgenommen",
+        "resumeTooltip": "Prozessor wieder aufnehmen",
+        "time": "Zeit"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -773,7 +874,21 @@
         "noMetaData": "Keine Meta-Data gefunden",
         "width": "Breite",
         "createdBy": "Erstellt von",
-        "steps": "Schritte"
+        "steps": "Schritte",
+        "seamless": "Nahtlos",
+        "positivePrompt": "Positiver Prompt",
+        "generationMode": "Generierungsmodus",
+        "Threshold": "Noise Schwelle",
+        "seed": "Samen",
+        "perlin": "Perlin Noise",
+        "hiresFix": "Optimierung für hohe Auflösungen",
+        "initImage": "Erstes Bild",
+        "variations": "Samengewichtspaare",
+        "vae": "VAE",
+        "workflow": "Arbeitsablauf",
+        "scheduler": "Scheduler",
+        "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden",
+        "recallParameters": "Recall Parameters"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -811,11 +926,72 @@
         "misses": "Cache Nötig",
         "hits": "Cache Treffer",
         "enable": "Aktivieren",
-        "clear": "Leeren"
+        "clear": "Leeren",
+        "maxCacheSize": "Maximale Cache Größe",
+        "cacheSize": "Cache Größe"
     },
     "embedding": {
         "noMatchingEmbedding": "Keine passenden Embeddings",
         "addEmbedding": "Embedding hinzufügen",
         "incompatibleModel": "Inkompatibles Basismodell:"
+    },
+    "nodes": {
+        "booleanPolymorphicDescription": "Eine Sammlung boolescher Werte.",
+        "colorFieldDescription": "Eine RGBA-Farbe.",
+        "conditioningCollection": "Konditionierungssammlung",
+        "addNode": "Knoten hinzufügen",
+        "conditioningCollectionDescription": "Konditionierung kann zwischen Knoten weitergegeben werden.",
+        "colorPolymorphic": "Farbpolymorph",
+        "colorCodeEdgesHelp": "Farbkodieren Sie Kanten entsprechend ihren verbundenen Feldern",
+        "animatedEdges": "Animierte Kanten",
+        "booleanCollectionDescription": "Eine Sammlung boolescher Werte.",
+        "colorField": "Farbe",
+        "collectionItem": "Objekt in Sammlung",
+        "animatedEdgesHelp": "Animieren Sie ausgewählte Kanten und Kanten, die mit ausgewählten Knoten verbunden sind",
+        "cannotDuplicateConnection": "Es können keine doppelten Verbindungen erstellt werden",
+        "booleanPolymorphic": "Boolesche Polymorphie",
+        "colorPolymorphicDescription": "Eine Sammlung von Farben.",
+        "clipFieldDescription": "Tokenizer- und text_encoder-Untermodelle.",
+        "clipField": "Clip",
+        "colorCollection": "Eine Sammlung von Farben.",
+        "boolean": "Boolesche Werte",
+        "currentImage": "Aktuelles Bild",
+        "booleanDescription": "Boolesche Werte sind wahr oder falsch.",
+        "collection": "Sammlung",
+        "cannotConnectInputToInput": "Eingang kann nicht mit Eingang verbunden werden",
+        "conditioningField": "Konditionierung",
+        "cannotConnectOutputToOutput": "Ausgang kann nicht mit Ausgang verbunden werden",
+        "booleanCollection": "Boolesche Werte Sammlung",
+        "cannotConnectToSelf": "Es kann keine Verbindung zu sich selbst hergestellt werden",
+        "colorCodeEdges": "Farbkodierte Kanten",
+        "addNodeToolTip": "Knoten hinzufügen (Umschalt+A, Leertaste)",
+        "boardField": "Ordner",
+        "boardFieldDescription": "Ein Galerie Ordner"
+    },
+    "hrf": {
+        "enableHrf": "Aktivieren Sie die Korrektur für hohe Auflösungen",
+        "upscaleMethod": "Vergrößerungsmethoden",
+        "enableHrfTooltip": "Generieren Sie mit einer niedrigeren Anfangsauflösung, skalieren Sie auf die Basisauflösung hoch und führen Sie dann Image-to-Image aus.",
+        "metadata": {
+            "strength": "Hochauflösender Fix Stärke",
+            "enabled": "Hochauflösender Fix aktiviert",
+            "method": "Hochauflösender Fix Methode"
+        },
+        "hrf": "Hochauflösender Fix",
+        "hrfStrength": "Hochauflösende Fix Stärke",
+        "strengthTooltip": "Niedrigere Werte führen zu weniger Details, wodurch potenzielle Artefakte reduziert werden können."
+    },
+    "models": {
+        "noMatchingModels": "Keine passenden Modelle",
+        "loading": "lade",
+        "noMatchingLoRAs": "Keine passenden LoRAs",
+        "noLoRAsAvailable": "Keine LoRAs verfügbar",
+        "noModelsAvailable": "Keine Modelle verfügbar",
+        "selectModel": "Wählen ein Modell aus",
+        "noRefinerModelsInstalled": "Keine SDXL Refiner-Modelle installiert",
+        "noLoRAsInstalled": "Keine LoRAs installiert",
+        "selectLoRA": "Wählen ein LoRA aus",
+        "esrganModel": "ESRGAN Modell",
+        "addLora": "LoRA hinzufügen"
     }
 }

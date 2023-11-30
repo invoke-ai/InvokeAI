@@ -4,8 +4,10 @@ import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { useIsIntermediate } from 'features/nodes/hooks/useIsIntermediate';
 import { nodeIsIntermediateChanged } from 'features/nodes/store/nodesSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const hasImageOutput = useHasImageOutput(nodeId);
   const isIntermediate = useIsIntermediate(nodeId);
@@ -27,7 +29,9 @@ const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
 
   return (
     <FormControl as={Flex} sx={{ alignItems: 'center', gap: 2, w: 'auto' }}>
-      <FormLabel sx={{ fontSize: 'xs', mb: '1px' }}>Save to Gallery</FormLabel>
+      <FormLabel sx={{ fontSize: 'xs', mb: '1px' }}>
+        {t('hotkeys.saveToGallery.title')}
+      </FormLabel>
       <Checkbox
         className="nopan"
         size="sm"

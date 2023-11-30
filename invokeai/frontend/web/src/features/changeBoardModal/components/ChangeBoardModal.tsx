@@ -20,7 +20,10 @@ import {
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
 } from 'services/api/endpoints/images';
-import { changeBoardReset, isModalOpenChanged } from '../store/slice';
+import {
+  changeBoardReset,
+  isModalOpenChanged,
+} from 'features/changeBoardModal/store/slice';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -87,6 +90,11 @@ const ChangeBoardModal = () => {
     selectedBoard,
   ]);
 
+  const handleSetSelectedBoard = useCallback(
+    (v: string | null) => setSelectedBoard(v),
+    []
+  );
+
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   return (
@@ -105,15 +113,17 @@ const ChangeBoardModal = () => {
           <AlertDialogBody>
             <Flex sx={{ flexDir: 'column', gap: 4 }}>
               <Text>
-                Moving {`${imagesToChange.length}`} image
-                {`${imagesToChange.length > 1 ? 's' : ''}`} to board:
+                {t('boards.movingImagesToBoard', {
+                  count: imagesToChange.length,
+                })}
+                :
               </Text>
               <IAIMantineSearchableSelect
                 placeholder={
                   isFetching ? t('boards.loading') : t('boards.selectBoard')
                 }
                 disabled={isFetching}
-                onChange={(v) => setSelectedBoard(v)}
+                onChange={handleSetSelectedBoard}
                 value={selectedBoard}
                 data={data}
               />

@@ -1,6 +1,6 @@
 import { selectAnatomy as parts } from '@chakra-ui/anatomy';
 import { createMultiStyleConfigHelpers, defineStyle } from '@chakra-ui/react';
-import { getInputOutlineStyles } from '../util/getInputOutlineStyles';
+import { getInputOutlineStyles } from 'theme/util/getInputOutlineStyles';
 import { mode } from '@chakra-ui/theme-tools';
 
 const { definePartsStyle, defineMultiStyleConfig } =

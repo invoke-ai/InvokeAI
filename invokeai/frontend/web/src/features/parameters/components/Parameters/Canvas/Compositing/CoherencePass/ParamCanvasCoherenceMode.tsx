@@ -4,16 +4,9 @@ import IAIInformationalPopover from 'common/components/IAIInformationalPopover/I
 import { IAISelectDataType } from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
-import { CanvasCoherenceModeParam } from 'features/parameters/types/parameterSchemas';
-
-import { memo } from 'react';
+import { ParameterCanvasCoherenceMode } from 'features/parameters/types/parameterSchemas';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const coherenceModeSelectData: IAISelectDataType[] = [
-  { label: 'Unmasked', value: 'unmasked' },
-  { label: 'Mask', value: 'mask' },
-  { label: 'Mask Edge', value: 'edge' },
-];
 
 const ParamCanvasCoherenceMode = () => {
   const dispatch = useAppDispatch();
@@ -22,13 +15,25 @@ const ParamCanvasCoherenceMode = () => {
   );
   const { t } = useTranslation();
 
-  const handleCoherenceModeChange = (v: string | null) => {
-    if (!v) {
-      return;
-    }
+  const coherenceModeSelectData: IAISelectDataType[] = useMemo(
+    () => [
+      { label: t('parameters.unmasked'), value: 'unmasked' },
+      { label: t('unifiedCanvas.mask'), value: 'mask' },
+      { label: t('parameters.maskEdge'), value: 'edge' },
+    ],
+    [t]
+  );
 
-    dispatch(setCanvasCoherenceMode(v as CanvasCoherenceModeParam));
-  };
+  const handleCoherenceModeChange = useCallback(
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
+
+      dispatch(setCanvasCoherenceMode(v as ParameterCanvasCoherenceMode));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIInformationalPopover feature="compositingCoherenceMode">

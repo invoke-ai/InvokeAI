@@ -1,6 +1,5 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654), 2023 Kent Keirsey (https://github.com/hipsterusername), 2023 Lincoln D. Stein
 
-
 import pathlib
 from typing import Annotated, List, Literal, Optional, Union
 
@@ -55,7 +54,7 @@ async def list_models(
 ) -> ModelsList:
     """Gets a list of models"""
     if base_models and len(base_models) > 0:
-        models_raw = list()
+        models_raw = []
         for base_model in base_models:
             models_raw.extend(ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type))
     else:

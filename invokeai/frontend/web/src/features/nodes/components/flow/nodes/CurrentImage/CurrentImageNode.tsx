@@ -1,15 +1,16 @@
-import { useState, PropsWithChildren, memo } from 'react';
+import { useState, PropsWithChildren, memo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { Flex, Image, Text } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { NodeProps } from 'reactflow';
-import NodeWrapper from '../common/NodeWrapper';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { stateSelector } from 'app/store/store';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(stateSelector, ({ system, gallery }) => {
   const imageDTO = gallery.selection[gallery.selection.length - 1];
@@ -59,14 +60,14 @@ export default memo(CurrentImageNode);
 const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
   const [isHovering, setIsHovering] = useState(false);
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = useCallback(() => {
     setIsHovering(true);
-  };
+  }, []);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setIsHovering(false);
-  };
-
+  }, []);
+  const { t } = useTranslation();
   return (
     <NodeWrapper
       nodeId={props.nodeProps.id}
@@ -99,7 +100,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
               _dark: { color: 'base.200' },
             }}
           >
-            Current Image
+            {t('nodes.currentImage')}
           </Text>
         </Flex>
         <Flex

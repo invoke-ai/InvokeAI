@@ -7,8 +7,8 @@ import { MouseEvent, useCallback, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
-import { selectionChanged } from '../store/gallerySlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { selectionChanged } from 'features/gallery/store/gallerySlice';
 
 const selector = createSelector(
   [stateSelector, selectListImagesBaseQueryArgs],

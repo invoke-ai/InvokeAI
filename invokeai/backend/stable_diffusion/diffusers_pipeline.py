@@ -193,6 +193,7 @@ class InvokeAIStableDiffusionPipelineOutput(StableDiffusionPipelineOutput):
         attention_map_saver (`AttentionMapSaver`): Object containing attention maps that can be displayed to the user
          after generation completes. Optional.
     """
+
     attention_map_saver: Optional[AttentionMapSaver]
 
 

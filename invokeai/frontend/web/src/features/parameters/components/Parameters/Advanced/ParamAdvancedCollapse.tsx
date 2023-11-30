@@ -6,8 +6,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ParamCpuNoiseToggle } from '../Noise/ParamCpuNoise';
-import ParamSeamless from '../Seamless/ParamSeamless';
+import { ParamCpuNoiseToggle } from 'features/parameters/components/Parameters/Noise/ParamCpuNoise';
+import ParamSeamless from 'features/parameters/components/Parameters/Seamless/ParamSeamless';
 import ParamClipSkip from './ParamClipSkip';
 import ParamCFGRescaleMultiplier from './ParamCFGRescaleMultiplier';
 

@@ -14,9 +14,9 @@ import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectI
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
 import { PropsWithChildren, memo, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
-import { useTranslation } from 'react-i18next';
 
 type Props = PropsWithChildren & {
   onSelect: (v: string) => void;
@@ -78,6 +78,13 @@ const ParamEmbeddingPopover = (props: Props) => {
     [onSelect]
   );
 
+  const filterFunc = useCallback(
+    (value: string, item: SelectItem) =>
+      item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
+      item.value.toLowerCase().includes(value.toLowerCase().trim()),
+    []
+  );
+
   return (
     <Popover
       initialFocusRef={inputRef}
@@ -114,7 +121,7 @@ const ParamEmbeddingPopover = (props: Props) => {
                 _dark: { color: 'base.700' },
               }}
             >
-              <Text>No Embeddings Loaded</Text>
+              <Text>{t('embedding.noEmbeddingsLoaded')}</Text>
             </Flex>
           ) : (
             <IAIMantineSearchableSelect
@@ -127,12 +134,7 @@ const ParamEmbeddingPopover = (props: Props) => {
               itemComponent={IAIMantineSelectItemWithTooltip}
               disabled={data.length === 0}
               onDropdownClose={onClose}
-              filter={(value, item: SelectItem) =>
-                item.label
-                  ?.toLowerCase()
-                  .includes(value.toLowerCase().trim()) ||
-                item.value.toLowerCase().includes(value.toLowerCase().trim())
-              }
+              filter={filterFunc}
               onChange={handleChange}
             />
           )}

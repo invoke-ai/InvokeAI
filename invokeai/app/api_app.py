@@ -1,14 +1,17 @@
-from typing import Any
-
-from fastapi.responses import HTMLResponse
-
-from .services.config import InvokeAIAppConfig
-
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
+import sys
+
+from invokeai.version.invokeai_version import __version__
+
+from .services.config import InvokeAIAppConfig
+
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
+if app_config.version:
+    print(f"InvokeAI version {__version__}")
+    sys.exit(0)
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import asyncio
@@ -16,6 +19,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import socket
     from inspect import signature
     from pathlib import Path
+    from typing import Any
 
     import uvicorn
     from fastapi import FastAPI
@@ -23,7 +27,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
     from fastapi.openapi.utils import get_openapi
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, HTMLResponse
     from fastapi.staticfiles import StaticFiles
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
@@ -34,7 +38,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     # noinspection PyUnresolvedReferences
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
     import invokeai.frontend.web as web_dir
-    from invokeai.version.invokeai_version import __version__
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
@@ -43,6 +46,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         board_images,
         boards,
         images,
+        model_records,
         models,
         session_queue,
         sessions,
@@ -50,7 +54,12 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         workflows,
     )
     from .api.sockets import SocketIO
-    from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
+    from .invocations.baseinvocation import (
+        BaseInvocation,
+        InputFieldJSONSchemaExtra,
+        OutputFieldJSONSchemaExtra,
+        UIConfigBase,
+    )
 
     if is_mps_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
@@ -106,6 +115,7 @@ app.include_router(sessions.session_router, prefix="/api")
 
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(models.models_router, prefix="/api")
+app.include_router(model_records.model_records_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
@@ -130,7 +140,7 @@ def custom_openapi() -> dict[str, Any]:
     # Add all outputs
     all_invocations = BaseInvocation.get_invocations()
     output_types = set()
-    output_type_titles = dict()
+    output_type_titles = {}
     for invoker in all_invocations:
         output_type = signature(invoker.invoke).return_annotation
         output_types.add(output_type)
@@ -145,7 +155,11 @@ def custom_openapi() -> dict[str, Any]:
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = models_json_schema(
-        [(UIConfigBase, "serialization"), (_InputField, "serialization"), (_OutputField, "serialization")],
+        [
+            (UIConfigBase, "serialization"),
+            (InputFieldJSONSchemaExtra, "serialization"),
+            (OutputFieldJSONSchemaExtra, "serialization"),
+        ],
         ref_template="#/components/schemas/{model}",
     )
     for schema_key, ui_config_schema in ui_config_schemas[1]["$defs"].items():
@@ -153,7 +167,7 @@ def custom_openapi() -> dict[str, Any]:
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
-        invoker_name = invoker.__name__
+        invoker_name = invoker.__name__  # type: ignore [attr-defined] # this is a valid attribute
         output_type = signature(obj=invoker.invoke).return_annotation
         output_type_title = output_type_titles[output_type.__name__]
         invoker_schema = openapi_schema["components"]["schemas"][f"{invoker_name}"]
@@ -171,12 +185,12 @@ def custom_openapi() -> dict[str, Any]:
             # print(f"Config with name {name} already defined")
             continue
 
-        openapi_schema["components"]["schemas"][name] = dict(
-            title=name,
-            description="An enumeration.",
-            type="string",
-            enum=list(v.value for v in model_config_format_enum),
-        )
+        openapi_schema["components"]["schemas"][name] = {
+            "title": name,
+            "description": "An enumeration.",
+            "type": "string",
+            "enum": [v.value for v in model_config_format_enum],
+        }
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
@@ -271,7 +285,4 @@ def invoke_api() -> None:
 
 
 if __name__ == "__main__":
-    if app_config.version:
-        print(f"InvokeAI version {__version__}")
-    else:
-        invoke_api()
+    invoke_api()

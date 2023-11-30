@@ -28,7 +28,7 @@ class FastAPIEventService(EventServiceBase):
         self.__queue.put(None)
 
     def dispatch(self, event_name: str, payload: Any) -> None:
-        self.__queue.put(dict(event_name=event_name, payload=payload))
+        self.__queue.put({"event_name": event_name, "payload": payload})
 
     async def __dispatch_from_queue(self, stop_event: threading.Event):
         """Get events on from the queue and dispatch them, from the correct thread"""

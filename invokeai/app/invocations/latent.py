@@ -77,7 +77,7 @@ if choose_torch_device() == torch.device("mps"):
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
-SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
+SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
 
 
 @invocation_output("scheduler_output")
@@ -277,7 +277,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
     )
     latents: Optional[LatentsField] = InputField(
-        default=None, description=FieldDescriptions.latents, input=Input.Connection
+        default=None,
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+        ui_order=4,
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
         default=None,
@@ -710,7 +713,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
             with (
                 ExitStack() as exit_stack,
-                ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),
                 ModelPatcher.apply_freeu(unet_info.context.model, self.unet.freeu_config),
                 set_seamless(unet_info.context.model, self.unet.seamless_axes),
                 unet_info as unet,
@@ -794,7 +796,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
 )
 class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Generates an image from latents."""
@@ -1109,7 +1111,7 @@ class BlendLatentsInvocation(BaseInvocation):
         latents_b = context.services.latents.get(self.latents_b.latents_name)
 
         if latents_a.shape != latents_b.shape:
-            raise "Latents to blend must be the same size."
+            raise Exception("Latents to blend must be the same size.")
 
         # TODO:
         device = choose_torch_device()

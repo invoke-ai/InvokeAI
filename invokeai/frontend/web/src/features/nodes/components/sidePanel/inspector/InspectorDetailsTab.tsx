@@ -1,15 +1,28 @@
-import { Box, Flex } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  FormControl,
+  FormLabel,
+  HStack,
+  Text,
+} from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvocationTemplate, NodeData } from 'features/nodes/types/types';
-import { memo } from 'react';
-import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
-import NodeTitle from '../../flow/nodes/common/NodeTitle';
-import ScrollableContent from '../ScrollableContent';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import {
+  InvocationNodeData,
+  InvocationTemplate,
+  isInvocationNode,
+} from 'features/nodes/types/invocation';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Node } from 'reactflow';
+import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
+import EditableNodeTitle from './details/EditableNodeTitle';
 
 const selector = createSelector(
   stateSelector,
@@ -26,7 +39,7 @@ const selector = createSelector(
       : undefined;
 
     return {
-      data: lastSelectedNode?.data,
+      node: lastSelectedNode,
       template: lastSelectedNodeTemplate,
     };
   },
@@ -34,23 +47,31 @@ const selector = createSelector(
 );
 
 const InspectorDetailsTab = () => {
-  const { data, template } = useAppSelector(selector);
+  const { node, template } = useAppSelector(selector);
   const { t } = useTranslation();
 
-  if (!template || !data) {
+  if (!template || !isInvocationNode(node)) {
     return (
       <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
     );
   }
 
-  return <Content data={data} template={template} />;
+  return <Content node={node} template={template} />;
 };
 
 export default memo(InspectorDetailsTab);
 
-const Content = (props: { data: NodeData; template: InvocationTemplate }) => {
-  const { data } = props;
+type ContentProps = {
+  node: Node<InvocationNodeData>;
+  template: InvocationTemplate;
+};
 
+const Content = memo(({ node, template }: ContentProps) => {
+  const { t } = useTranslation();
+  const needsUpdate = useMemo(
+    () => getNeedsUpdate(node, template),
+    [node, template]
+  );
   return (
     <Box
       sx={{
@@ -69,10 +90,33 @@ const Content = (props: { data: NodeData; template: InvocationTemplate }) => {
             w: 'full',
           }}
         >
-          <NodeTitle nodeId={data.id} />
-          <NotesTextarea nodeId={data.id} />
+          <EditableNodeTitle nodeId={node.data.id} />
+          <HStack>
+            <FormControl>
+              <FormLabel>{t('nodes.nodeType')}</FormLabel>
+              <Text fontSize="sm" fontWeight={600}>
+                {template.title}
+              </Text>
+            </FormControl>
+            <Flex
+              flexDir="row"
+              alignItems="center"
+              justifyContent="space-between"
+              w="full"
+            >
+              <FormControl isInvalid={needsUpdate}>
+                <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
+                <Text fontSize="sm" fontWeight={600}>
+                  {node.data.version}
+                </Text>
+              </FormControl>
+            </Flex>
+          </HStack>
+          <NotesTextarea nodeId={node.data.id} />
         </Flex>
       </ScrollableContent>
     </Box>
   );
-};
+});
+
+Content.displayName = 'Content';

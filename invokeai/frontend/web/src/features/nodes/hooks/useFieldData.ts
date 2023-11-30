@@ -3,9 +3,9 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
-import { isInvocationNode } from '../types/types';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 
-export const useFieldData = (nodeId: string, fieldName: string) => {
+export const useFieldInstance = (nodeId: string, fieldName: string) => {
   const selector = useMemo(
     () =>
       createSelector(

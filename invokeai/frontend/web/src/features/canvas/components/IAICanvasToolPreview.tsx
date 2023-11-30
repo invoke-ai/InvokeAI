@@ -9,7 +9,7 @@ import { Circle, Group } from 'react-konva';
 import {
   COLOR_PICKER_SIZE,
   COLOR_PICKER_STROKE_RADIUS,
-} from '../util/constants';
+} from 'features/canvas/util/constants';
 import { memo } from 'react';
 
 const canvasBrushPreviewSelector = createSelector(

@@ -1,9 +1,9 @@
 import { Flex } from '@chakra-ui/react';
 import { memo } from 'react';
-import NodeCollapseButton from '../common/NodeCollapseButton';
-import NodeTitle from '../common/NodeTitle';
+import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
+import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import InvocationNodeCollapsedHandles from './InvocationNodeCollapsedHandles';
-import InvocationNodeNotes from './InvocationNodeNotes';
+import InvocationNodeInfoIcon from './InvocationNodeInfoIcon';
 import InvocationNodeStatusIndicator from './InvocationNodeStatusIndicator';
 
 type Props = {
@@ -34,7 +34,7 @@ const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
       <NodeTitle nodeId={nodeId} />
       <Flex alignItems="center">
         <InvocationNodeStatusIndicator nodeId={nodeId} />
-        <InvocationNodeNotes nodeId={nodeId} />
+        <InvocationNodeInfoIcon nodeId={nodeId} />
       </Flex>
       {!isOpen && <InvocationNodeCollapsedHandles nodeId={nodeId} />}
     </Flex>

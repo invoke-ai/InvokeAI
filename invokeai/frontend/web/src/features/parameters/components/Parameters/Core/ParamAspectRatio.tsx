@@ -7,7 +7,8 @@ import {
   setShouldLockAspectRatio,
 } from 'features/parameters/store/generationSlice';
 import i18next from 'i18next';
-import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useCallback } from 'react';
 
 const aspectRatios = [
   { name: i18next.t('parameters.aspectRatioFree'), value: null },
@@ -29,6 +30,14 @@ export default function ParamAspectRatio() {
   );
   const activeTabName = useAppSelector(activeTabNameSelector);
 
+  const handleClick = useCallback(
+    (ratio: (typeof aspectRatios)[number]) => {
+      dispatch(setAspectRatio(ratio.value));
+      dispatch(setShouldLockAspectRatio(false));
+    },
+    [dispatch]
+  );
+
   return (
     <ButtonGroup isAttached>
       {aspectRatios.map((ratio) => (
@@ -39,10 +48,7 @@ export default function ParamAspectRatio() {
           isDisabled={
             activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
           }
-          onClick={() => {
-            dispatch(setAspectRatio(ratio.value));
-            dispatch(setShouldLockAspectRatio(false));
-          }}
+          onClick={handleClick.bind(null, ratio)}
         >
           {ratio.name}
         </IAIButton>

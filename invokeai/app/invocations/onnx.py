@@ -54,7 +54,7 @@ ORT_TO_NP_TYPE = {
     "tensor(double)": np.float64,
 }
 
-PRECISION_VALUES = Literal[tuple(list(ORT_TO_NP_TYPE.keys()))]
+PRECISION_VALUES = Literal[tuple(ORT_TO_NP_TYPE.keys())]
 
 
 @invocation("prompt_onnx", title="ONNX Prompt (Raw)", tags=["prompt", "onnx"], category="conditioning", version="1.0.0")
@@ -252,7 +252,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
         scheduler.set_timesteps(self.steps)
         latents = latents * np.float64(scheduler.init_noise_sigma)
 
-        extra_step_kwargs = dict()
+        extra_step_kwargs = {}
         if "eta" in set(inspect.signature(scheduler.step).parameters.keys()):
             extra_step_kwargs.update(
                 eta=0.0,
@@ -326,7 +326,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     title="ONNX Latents to Image",
     tags=["latents", "image", "vae", "onnx"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
 )
 class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Generates an image from latents."""

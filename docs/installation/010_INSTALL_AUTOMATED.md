@@ -179,7 +179,7 @@ experimental versions later.
     you will have the choice of CUDA (NVidia cards), ROCm (AMD cards),
     or CPU (no graphics acceleration). On Windows, you'll have the
     choice of CUDA vs CPU, and on Macs you'll be offered CPU only. When
-    you select CPU on M1 or M2 Macintoshes, you will get MPS-based
+    you select CPU on M1/M2/M3 Macintoshes, you will get MPS-based
     graphics acceleration without installing additional drivers. If you
     are unsure what GPU you are using, you can ask the installer to
     guess.
@@ -471,7 +471,7 @@ Then type the following commands:
 
 === "NVIDIA System"
     ```bash
-    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu118
+    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu121
     pip install xformers
     ```
 

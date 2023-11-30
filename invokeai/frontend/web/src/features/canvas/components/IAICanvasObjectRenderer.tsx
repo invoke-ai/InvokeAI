@@ -10,7 +10,7 @@ import {
   isCanvasBaseLine,
   isCanvasEraseRect,
   isCanvasFillRect,
-} from '../store/canvasTypes';
+} from 'features/canvas/store/canvasTypes';
 import IAICanvasImage from './IAICanvasImage';
 import { memo } from 'react';
 

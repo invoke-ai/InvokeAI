@@ -263,7 +263,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             if categories is not None:
                 # Convert the enum values to unique list of strings
-                category_strings = list(map(lambda c: c.value, set(categories)))
+                category_strings = [c.value for c in set(categories)]
                 # Create the correct length of placeholders
                 placeholders = ",".join("?" * len(category_strings))
 
@@ -307,7 +307,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Build the list of images, deserializing each row
             self._cursor.execute(images_query, images_params)
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            images = list(map(lambda r: deserialize_image_record(dict(r)), result))
+            images = [deserialize_image_record(dict(r)) for r in result]
 
             # Set up and execute the count query, without pagination
             count_query += query_conditions + ";"
@@ -386,7 +386,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
             )
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            image_names = list(map(lambda r: r[0], result))
+            image_names = [r[0] for r in result]
             self._cursor.execute(
                 """--sql
                 DELETE FROM images

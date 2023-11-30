@@ -10,7 +10,7 @@ import {
   BoundingBoxScale,
 } from 'features/canvas/store/canvasTypes';
 
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -31,9 +31,12 @@ const ParamScaleBeforeProcessing = () => {
 
   const { t } = useTranslation();
 
-  const handleChangeBoundingBoxScaleMethod = (v: string) => {
-    dispatch(setBoundingBoxScaleMethod(v as BoundingBoxScale));
-  };
+  const handleChangeBoundingBoxScaleMethod = useCallback(
+    (v: string) => {
+      dispatch(setBoundingBoxScaleMethod(v as BoundingBoxScale));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIInformationalPopover feature="scaleBeforeProcessing">

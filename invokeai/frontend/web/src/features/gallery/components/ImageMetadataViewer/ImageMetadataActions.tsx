@@ -4,15 +4,15 @@ import {
   LoRAMetadataItem,
   IPAdapterMetadataItem,
   T2IAdapterMetadataItem,
-} from 'features/nodes/types/types';
+} from 'features/nodes/types/metadata';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  isValidControlNetModel,
-  isValidLoRAModel,
-  isValidT2IAdapterModel,
-} from '../../../parameters/types/parameterSchemas';
+  isParameterControlNetModel,
+  isParameterLoRAModel,
+  isParameterT2IAdapterModel,
+} from 'features/parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
@@ -32,6 +32,7 @@ const ImageMetadataActions = (props: Props) => {
     recallCfgRescaleMultiplier,
     recallModel,
     recallScheduler,
+    recallVaeModel,
     recallSteps,
     recallWidth,
     recallHeight,
@@ -72,6 +73,10 @@ const ImageMetadataActions = (props: Props) => {
   const handleRecallScheduler = useCallback(() => {
     recallScheduler(metadata?.scheduler);
   }, [metadata?.scheduler, recallScheduler]);
+
+  const handleRecallVaeModel = useCallback(() => {
+    recallVaeModel(metadata?.vae);
+  }, [metadata?.vae, recallVaeModel]);
 
   const handleRecallSteps = useCallback(() => {
     recallSteps(metadata?.steps);
@@ -132,7 +137,7 @@ const ImageMetadataActions = (props: Props) => {
   const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
     return metadata?.controlnets
       ? metadata.controlnets.filter((controlnet) =>
-          isValidControlNetModel(controlnet.control_model)
+          isParameterControlNetModel(controlnet.control_model)
         )
       : [];
   }, [metadata?.controlnets]);
@@ -140,7 +145,7 @@ const ImageMetadataActions = (props: Props) => {
   const validIPAdapters: IPAdapterMetadataItem[] = useMemo(() => {
     return metadata?.ipAdapters
       ? metadata.ipAdapters.filter((ipAdapter) =>
-          isValidControlNetModel(ipAdapter.ip_adapter_model)
+          isParameterControlNetModel(ipAdapter.ip_adapter_model)
         )
       : [];
   }, [metadata?.ipAdapters]);
@@ -148,7 +153,7 @@ const ImageMetadataActions = (props: Props) => {
   const validT2IAdapters: T2IAdapterMetadataItem[] = useMemo(() => {
     return metadata?.t2iAdapters
       ? metadata.t2iAdapters.filter((t2iAdapter) =>
-          isValidT2IAdapterModel(t2iAdapter.t2i_adapter_model)
+          isParameterT2IAdapterModel(t2iAdapter.t2i_adapter_model)
         )
       : [];
   }, [metadata?.t2iAdapters]);
@@ -224,6 +229,11 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallScheduler}
         />
       )}
+      <ImageMetadataItem
+        label={t('metadata.vae')}
+        value={metadata.vae?.model_name ?? 'Default'}
+        onClick={handleRecallVaeModel}
+      />
       {metadata.steps && (
         <ImageMetadataItem
           label={t('metadata.steps')}
@@ -276,13 +286,13 @@ const ImageMetadataActions = (props: Props) => {
       )}
       {metadata.loras &&
         metadata.loras.map((lora, index) => {
-          if (isValidLoRAModel(lora.lora)) {
+          if (isParameterLoRAModel(lora.lora)) {
             return (
               <ImageMetadataItem
                 key={index}
                 label="LoRA"
                 value={`${lora.lora.model_name} - ${lora.weight}`}
-                onClick={() => handleRecallLoRA(lora)}
+                onClick={handleRecallLoRA.bind(null, lora)}
               />
             );
           }
@@ -292,7 +302,7 @@ const ImageMetadataActions = (props: Props) => {
           key={index}
           label="ControlNet"
           value={`${controlnet.control_model?.model_name} - ${controlnet.control_weight}`}
-          onClick={() => handleRecallControlNet(controlnet)}
+          onClick={handleRecallControlNet.bind(null, controlnet)}
         />
       ))}
       {validIPAdapters.map((ipAdapter, index) => (
@@ -300,7 +310,7 @@ const ImageMetadataActions = (props: Props) => {
           key={index}
           label="IP Adapter"
           value={`${ipAdapter.ip_adapter_model?.model_name} - ${ipAdapter.weight}`}
-          onClick={() => handleRecallIPAdapter(ipAdapter)}
+          onClick={handleRecallIPAdapter.bind(null, ipAdapter)}
         />
       ))}
       {validT2IAdapters.map((t2iAdapter, index) => (
@@ -308,7 +318,7 @@ const ImageMetadataActions = (props: Props) => {
           key={index}
           label="T2I Adapter"
           value={`${t2iAdapter.t2i_adapter_model?.model_name} - ${t2iAdapter.weight}`}
-          onClick={() => handleRecallT2IAdapter(t2iAdapter)}
+          onClick={handleRecallT2IAdapter.bind(null, t2iAdapter)}
         />
       ))}
     </>

@@ -56,7 +56,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   );
 
   const mayExpose = useMemo(
-    () => ['any', 'direct'].includes(input ?? '__UNKNOWN_INPUT__'),
+    () => input && ['any', 'direct'].includes(input),
     [input]
   );
 
@@ -79,7 +79,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
           icon={<FaPlus />}
           onClick={handleExposeField}
         >
-          Add to Linear View
+          {t('nodes.addLinearView')}
         </MenuItem>
       );
     }
@@ -90,7 +90,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
           icon={<FaMinus />}
           onClick={handleUnexposeField}
         >
-          Remove from Linear View
+          {t('nodes.removeLinearView')}
         </MenuItem>
       );
     }
@@ -102,7 +102,26 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     isExposed,
     mayExpose,
     nodeId,
+    t,
   ]);
+
+  const renderMenuFunc = useCallback(
+    () =>
+      !menuItems.length ? null : (
+        <MenuList
+          sx={{ visibility: 'visible !important' }}
+          motionProps={menuListMotionProps}
+          onContextMenu={skipEvent}
+        >
+          <MenuGroup
+            title={label || fieldTemplateTitle || t('nodes.unknownField')}
+          >
+            {menuItems}
+          </MenuGroup>
+        </MenuList>
+      ),
+    [fieldTemplateTitle, label, menuItems, skipEvent, t]
+  );
 
   return (
     <IAIContextMenu<HTMLDivElement>
@@ -114,21 +133,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
         bg: 'transparent',
         _hover: { bg: 'transparent' },
       }}
-      renderMenu={() =>
-        !menuItems.length ? null : (
-          <MenuList
-            sx={{ visibility: 'visible !important' }}
-            motionProps={menuListMotionProps}
-            onContextMenu={skipEvent}
-          >
-            <MenuGroup
-              title={label || fieldTemplateTitle || t('nodes.unknownField')}
-            >
-              {menuItems}
-            </MenuGroup>
-          </MenuList>
-        )
-      }
+      renderMenu={renderMenuFunc}
     >
       {children}
     </IAIContextMenu>

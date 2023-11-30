@@ -13,7 +13,7 @@ import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
+import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
@@ -38,7 +38,10 @@ import {
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
-import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import {
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from 'features/gallery/store/actions';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -224,14 +227,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
-        Change Board
+        {t('boards.changeBoard')}
       </MenuItem>
       {imageDTO.starred ? (
         <MenuItem
           icon={customStarUi ? customStarUi.off.icon : <MdStar />}
           onClickCapture={handleUnstarImage}
         >
-          {customStarUi ? customStarUi.off.text : `Unstar Image`}
+          {customStarUi ? customStarUi.off.text : t('controlnet.unstarImage')}
         </MenuItem>
       ) : (
         <MenuItem

@@ -20,10 +20,19 @@ module.exports = {
     ecmaVersion: 2018,
     sourceType: 'module',
   },
-  plugins: ['react', '@typescript-eslint', 'eslint-plugin-react-hooks'],
+  plugins: [
+    'react',
+    '@typescript-eslint',
+    'eslint-plugin-react-hooks',
+    'i18next',
+    'path',
+  ],
   root: true,
   rules: {
+    'path/no-relative-imports': ['error', { maxDepth: 0 }],
     curly: 'error',
+    'i18next/no-literal-string': 2,
+    'react/jsx-no-bind': ['error', { allowBind: true }],
     'react/jsx-curly-brace-presence': [
       'error',
       { props: 'never', children: 'never' },

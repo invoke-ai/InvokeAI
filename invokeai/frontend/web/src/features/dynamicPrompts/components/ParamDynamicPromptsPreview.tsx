@@ -17,6 +17,7 @@ import IAIInformationalPopover from 'common/components/IAIInformationalPopover/I
 import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { memo } from 'react';
 import { FaCircleExclamation } from 'react-icons/fa6';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -38,6 +39,7 @@ const listItemStyles: ChakraProps['sx'] = {
 };
 
 const ParamDynamicPromptsPreview = () => {
+  const { t } = useTranslation();
   const { prompts, parsingError, isLoading, isError } =
     useAppSelector(selector);
 
@@ -69,7 +71,7 @@ const ParamDynamicPromptsPreview = () => {
           overflow="hidden"
           textOverflow="ellipsis"
         >
-          Prompts Preview ({prompts.length})
+          {t('dynamicPrompts.promptsPreview')} ({prompts.length})
           {parsingError && ` - ${parsingError}`}
         </FormLabel>
         <Flex
