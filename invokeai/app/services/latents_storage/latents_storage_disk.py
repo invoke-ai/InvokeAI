@@ -33,7 +33,7 @@ class DiskLatentsStorage(LatentsStorageBase):
         if deleted_latents_count > 0:
             freed_space_in_mb = round(freed_space / 1024 / 1024, 2)
             self._invoker.services.logger.info(
-                f"Deleted {deleted_latents_count} latents files, freeing {freed_space_in_mb}MB"
+                f"Deleted {deleted_latents_count} latents files (freed {freed_space_in_mb}MB)"
             )
 
     def get(self, name: str) -> torch.Tensor:
