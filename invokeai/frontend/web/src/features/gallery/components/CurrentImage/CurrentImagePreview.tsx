@@ -175,6 +175,7 @@ const CurrentImagePreview = () => {
                 position: 'relative',
                 objectFit: 'contain',
                 margin: 'auto',
+                height: '100%',
                 alignSelf: 'center',
                 borderRadius: 'base',
                 imageRendering: shouldAntialiasProgressImage
