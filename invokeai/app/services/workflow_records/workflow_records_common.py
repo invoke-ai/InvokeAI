@@ -97,6 +97,7 @@ WorkflowRecordDTOValidator = TypeAdapter(WorkflowRecordDTO)
 
 class WorkflowRecordListItemDTO(WorkflowRecordDTOBase):
     description: str = Field(description="The description of the workflow.")
+    category: WorkflowCategory = Field(description="The description of the workflow.")
 
 
 WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
