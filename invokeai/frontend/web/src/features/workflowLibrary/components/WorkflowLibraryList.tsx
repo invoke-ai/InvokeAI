@@ -1,8 +1,8 @@
 import { CloseIcon } from '@chakra-ui/icons';
 import {
+  ButtonGroup,
   Divider,
   Flex,
-  Heading,
   IconButton,
   Input,
   InputGroup,
@@ -10,12 +10,14 @@ import {
   Spacer,
 } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
+import IAIButton from 'common/components/IAIButton';
 import {
   IAINoContentFallback,
   IAINoContentFallbackWithSpinner,
 } from 'common/components/IAIImageFallback';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
+import { WorkflowCategory } from 'features/nodes/types/workflow';
 import WorkflowLibraryListItem from 'features/workflowLibrary/components/WorkflowLibraryListItem';
 import WorkflowLibraryPagination from 'features/workflowLibrary/components/WorkflowLibraryPagination';
 import { ChangeEvent, KeyboardEvent, memo, useCallback, useState } from 'react';
@@ -40,19 +42,19 @@ const DIRECTION_DATA: SelectItem[] = [
 
 const WorkflowLibraryList = () => {
   const { t } = useTranslation();
+  const [category, setCategory] = useState<WorkflowCategory>('user');
   const [page, setPage] = useState(0);
   const [filter_text, setFilterText] = useState('');
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
-  const [debouncedFilterText] = useDebounce(filter_text, 500, {
-    leading: true,
-  });
+  const [debouncedFilterText] = useDebounce(filter_text, 500);
   const { data, isLoading, isError, isFetching } = useListWorkflowsQuery({
     page,
     per_page: PER_PAGE,
     order_by,
     direction,
-    filter_name: debouncedFilterText,
+    category,
+    filter_text: debouncedFilterText,
   });
 
   const handleChangeOrderBy = useCallback(
@@ -102,6 +104,14 @@ const WorkflowLibraryList = () => {
     []
   );
 
+  const handleSetUserCategory = useCallback(() => {
+    setCategory('user');
+  }, []);
+
+  const handleSetSystemCategory = useCallback(() => {
+    setCategory('system');
+  }, []);
+
   if (isLoading) {
     return <IAINoContentFallbackWithSpinner label={t('workflows.loading')} />;
   }
@@ -113,7 +123,22 @@ const WorkflowLibraryList = () => {
   return (
     <>
       <Flex gap={4} alignItems="center" h={10} flexShrink={0} flexGrow={0}>
-        <Heading size="md">{t('workflows.userWorkflows')}</Heading>
+        <ButtonGroup>
+          <IAIButton
+            variant={category === 'user' ? undefined : 'ghost'}
+            onClick={handleSetUserCategory}
+            isChecked={category === 'user'}
+          >
+            {t('workflows.userWorkflows')}
+          </IAIButton>
+          <IAIButton
+            variant={category === 'system' ? undefined : 'ghost'}
+            onClick={handleSetSystemCategory}
+            isChecked={category === 'system'}
+          >
+            {t('workflows.systemWorkflows')}
+          </IAIButton>
+        </ButtonGroup>
         <Spacer />
         <InputGroup w="20rem">
           <Input
@@ -166,7 +191,7 @@ const WorkflowLibraryList = () => {
       <Divider />
       {data.items.length ? (
         <ScrollableContent>
-          <Flex w="full" h="full" gap={2} flexDir="column">
+          <Flex w="full" h="full" gap={2} px={1} flexDir="column">
             {data.items.map((w) => (
               <WorkflowLibraryListItem key={w.workflow_id} workflowDTO={w} />
             ))}

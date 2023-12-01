@@ -8,11 +8,15 @@ import {
 import { fromZodError } from 'zod-validation-error';
 import { parseify } from 'common/util/serialize';
 import i18n from 'i18next';
+import { cloneDeep } from 'lodash-es';
 
 export const buildWorkflow = (nodesState: NodesState): WorkflowV2 => {
-  const { workflow: workflowMeta, nodes, edges } = nodesState;
-  const workflow: WorkflowV2 = {
-    ...workflowMeta,
+  const workflow = cloneDeep(nodesState.workflow);
+  const nodes = cloneDeep(nodesState.nodes);
+  const edges = cloneDeep(nodesState.edges);
+
+  const newWorkflow: WorkflowV2 = {
+    ...workflow,
     nodes: [],
     edges: [],
   };
@@ -30,7 +34,7 @@ export const buildWorkflow = (nodesState: NodesState): WorkflowV2 => {
         logger('nodes').warn({ node: parseify(node) }, message);
         return;
       }
-      workflow.nodes.push(result.data);
+      newWorkflow.nodes.push(result.data);
     });
 
   edges.forEach((edge) => {
@@ -42,8 +46,8 @@ export const buildWorkflow = (nodesState: NodesState): WorkflowV2 => {
       logger('nodes').warn({ edge: parseify(edge) }, message);
       return;
     }
-    workflow.edges.push(result.data);
+    newWorkflow.edges.push(result.data);
   });
 
-  return workflow;
+  return newWorkflow;
 };

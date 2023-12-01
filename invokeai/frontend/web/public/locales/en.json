@@ -128,6 +128,8 @@
         "random": "Random",
         "reportBugLabel": "Report Bug",
         "safetensors": "Safetensors",
+        "save": "Save",
+        "saveAs": "Save As",
         "settingsLabel": "Settings",
         "simple": "Simple",
         "somethingWentWrong": "Something went wrong",
@@ -1625,7 +1627,7 @@
         "unnamedWorkflow": "Unnamed Workflow",
         "downloadWorkflow": "Download Workflow",
         "saveWorkflow": "Save Workflow",
-        "duplicateWorkflow": "Duplicate Workflow",
+        "saveWorkflowAs": "Save Workflow As",
         "problemSavingWorkflow": "Problem Saving Workflow",
         "workflowSaved": "Workflow Saved",
         "noRecentWorkflows": "No Recent Workflows",
@@ -1635,6 +1637,7 @@
         "loading": "Loading Workflows",
         "noDescription": "No description",
         "searchWorkflows": "Search Workflows",
-        "clearWorkflowSearchFilter": "Clear Workflow Search Filter"
+        "clearWorkflowSearchFilter": "Clear Workflow Search Filter",
+        "workflowName": "Workflow Name"
     }
 }

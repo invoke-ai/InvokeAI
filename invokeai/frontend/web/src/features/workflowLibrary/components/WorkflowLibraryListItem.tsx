@@ -72,14 +72,16 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
         >
           {t('common.load')}
         </IAIButton>
-        <IAIButton
-          colorScheme="error"
-          onClick={handleDeleteWorkflow}
-          isLoading={deleteWorkflowResult.isLoading}
-          aria-label={t('workflows.deleteWorkflow')}
-        >
-          {t('common.delete')}
-        </IAIButton>
+        {workflowDTO.category === 'user' && (
+          <IAIButton
+            colorScheme="error"
+            onClick={handleDeleteWorkflow}
+            isLoading={deleteWorkflowResult.isLoading}
+            aria-label={t('workflows.deleteWorkflow')}
+          >
+            {t('common.delete')}
+          </IAIButton>
+        )}
       </Flex>
     </Flex>
   );

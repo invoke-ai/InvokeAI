@@ -7,6 +7,7 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
+    WorkflowCategory,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
     WorkflowRecordListItemDTO,
@@ -40,6 +41,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 """,
                 (workflow_id,),
             )
+            self._conn.commit()
             self._cursor.execute(
                 """--sql
                 SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
@@ -60,6 +62,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
         try:
+            # Only user workflows may be created by this method
+            assert workflow.meta.category is WorkflowCategory.User
             workflow_with_id = WorkflowValidator.validate_python(workflow.model_dump())
             self._lock.acquire()
             self._cursor.execute(
@@ -70,10 +74,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 )
                 VALUES (?, ?);
                 """,
-                (
-                    workflow_with_id.id,
-                    workflow_with_id.model_dump_json(),
-                ),
+                (workflow_with_id.id, workflow_with_id.model_dump_json()),
             )
             self._conn.commit()
         except Exception:
@@ -90,7 +91,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 """--sql
                 UPDATE workflow_library
                 SET workflow = ?
-                WHERE workflow_id = ?;
+                WHERE workflow_id = ? AND category = "user";
                 """,
                 (workflow.model_dump_json(), workflow.id),
             )
@@ -108,7 +109,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._cursor.execute(
                 """--sql
                 DELETE from workflow_library
-                WHERE workflow_id = ?;
+                WHERE workflow_id = ? AND category = "user";
                 """,
                 (workflow_id,),
             )
@@ -126,6 +127,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         per_page: int,
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
+        category: WorkflowCategory,
         filter_text: Optional[str] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         try:
@@ -133,24 +135,27 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             # sanitize!
             assert order_by in WorkflowRecordOrderBy
             assert direction in SQLiteDirection
-            count_query = "SELECT COUNT(*) FROM workflow_library"
+            assert category in WorkflowCategory
+            count_query = "SELECT COUNT(*) FROM workflow_library WHERE category = ?"
             main_query = """
                 SELECT
                     workflow_id,
+                    category,
                     name,
                     description,
                     created_at,
                     updated_at,
                     opened_at
                 FROM workflow_library
+                WHERE category = ?
                 """
-            main_params = []
-            count_params = []
+            main_params = [category.value]
+            count_params = [category.value]
             stripped_filter_name = filter_text.strip() if filter_text else None
             if stripped_filter_name:
                 filter_string = "%" + stripped_filter_name + "%"
-                main_query += " WHERE name LIKE ? OR description LIKE ? "
-                count_query += " WHERE name LIKE ? OR description LIKE ?;"
+                main_query += " AND name LIKE ? OR description LIKE ? "
+                count_query += " AND name LIKE ? OR description LIKE ?;"
                 main_params.extend([filter_string, filter_string])
                 count_params.extend([filter_string, filter_string])
 
@@ -177,6 +182,28 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         finally:
             self._lock.release()
 
+    def _add_system_workflow(self, workflow: Workflow) -> None:
+        try:
+            self._lock.acquire()
+            # Only system workflows may be created by this method
+            assert workflow.meta.category is WorkflowCategory.System
+            self._cursor.execute(
+                """--sql
+                INSERT OR REPLACE INTO workflow_library (
+                    workflow_id,
+                    workflow
+                )
+                VALUES (?, ?);
+                """,
+                (workflow.id, workflow.model_dump_json()),
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+
     def _create_tables(self) -> None:
         try:
             self._lock.acquire()
@@ -191,6 +218,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     -- updated manually when retrieving workflow
                     opened_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                     -- Generated columns, needed for indexing and searching
+                    category TEXT GENERATED ALWAYS as (json_extract(workflow, '$.meta.category')) VIRTUAL NOT NULL,
                     name TEXT GENERATED ALWAYS as (json_extract(workflow, '$.name')) VIRTUAL NOT NULL,
                     description TEXT GENERATED ALWAYS as (json_extract(workflow, '$.description')) VIRTUAL NOT NULL
                 );
@@ -223,6 +251,11 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._cursor.execute(
                 """--sql
                 CREATE INDEX IF NOT EXISTS idx_workflow_library_opened_at ON workflow_library(opened_at);
+                """
+            )
+            self._cursor.execute(
+                """--sql
+                CREATE INDEX IF NOT EXISTS idx_workflow_library_category ON workflow_library(category);
                 """
             )
             self._cursor.execute(

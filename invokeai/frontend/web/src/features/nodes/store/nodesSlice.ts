@@ -1,33 +1,4 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
-  Connection,
-  Edge,
-  EdgeChange,
-  EdgeRemoveChange,
-  getConnectedEdges,
-  getIncomers,
-  getOutgoers,
-  Node,
-  NodeChange,
-  OnConnectStartParams,
-  SelectionMode,
-  updateEdge,
-  Viewport,
-  XYPosition,
-} from 'reactflow';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import {
-  appSocketGeneratorProgress,
-  appSocketInvocationComplete,
-  appSocketInvocationError,
-  appSocketInvocationStarted,
-  appSocketQueueItemStatusChanged,
-} from 'services/events/actions';
-import { v4 as uuidv4 } from 'uuid';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import {
   BoardFieldValue,
@@ -58,6 +29,35 @@ import {
   zNodeStatus,
 } from 'features/nodes/types/invocation';
 import { WorkflowV2 } from 'features/nodes/types/workflow';
+import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  Connection,
+  Edge,
+  EdgeChange,
+  EdgeRemoveChange,
+  getConnectedEdges,
+  getIncomers,
+  getOutgoers,
+  Node,
+  NodeChange,
+  OnConnectStartParams,
+  SelectionMode,
+  updateEdge,
+  Viewport,
+  XYPosition,
+} from 'reactflow';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import {
+  appSocketGeneratorProgress,
+  appSocketInvocationComplete,
+  appSocketInvocationError,
+  appSocketInvocationStarted,
+  appSocketQueueItemStatusChanged,
+} from 'services/events/actions';
+import { v4 as uuidv4 } from 'uuid';
 import { NodesState } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
@@ -81,7 +81,7 @@ const INITIAL_WORKFLOW: WorkflowV2 = {
   nodes: [],
   edges: [],
   exposedFields: [],
-  meta: { version: '2.0.0' },
+  meta: { version: '2.0.0', category: 'user' },
 };
 
 export const initialNodesState: NodesState = {

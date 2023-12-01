@@ -66,6 +66,7 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
   });
   // Bump version
   (workflowToMigrate as unknown as WorkflowV2).meta.version = '2.0.0';
+  (workflowToMigrate as unknown as WorkflowV2).meta.category = 'user';
   // Parsing strips out any extra properties not in the latest version
   return zWorkflowV2.parse(workflowToMigrate);
 };

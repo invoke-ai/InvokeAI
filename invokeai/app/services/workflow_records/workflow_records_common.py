@@ -16,8 +16,27 @@ class ExposedField(BaseModel):
     fieldName: str
 
 
+class WorkflowNotFoundError(Exception):
+    """Raised when a workflow is not found"""
+
+
+class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
+    """The order by options for workflow records"""
+
+    CreatedAt = "created_at"
+    UpdatedAt = "updated_at"
+    OpenedAt = "opened_at"
+    Name = "name"
+
+
+class WorkflowCategory(str, Enum, metaclass=MetaEnum):
+    User = "user"
+    System = "system"
+
+
 class WorkflowMeta(BaseModel):
     version: str = Field(description="The version of the workflow schema.")
+    category: WorkflowCategory = Field(description="The category of the workflow (user or system).")
 
     @field_validator("version")
     def validate_version(cls, version: str):
@@ -56,13 +75,16 @@ class Workflow(WorkflowWithoutID):
 WorkflowValidator = TypeAdapter(Workflow)
 
 
-class WorkflowRecordDTO(BaseModel):
+class WorkflowRecordDTOBase(BaseModel):
     workflow_id: str = Field(description="The id of the workflow.")
-    workflow: Workflow = Field(description="The workflow.")
     name: str = Field(description="The name of the workflow.")
     created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the workflow.")
     updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the workflow.")
     opened_at: Union[datetime.datetime, str] = Field(description="The opened timestamp of the workflow.")
+
+
+class WorkflowRecordDTO(WorkflowRecordDTOBase):
+    workflow: Workflow = Field(description="The workflow.")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "WorkflowRecordDTO":
@@ -73,26 +95,8 @@ class WorkflowRecordDTO(BaseModel):
 WorkflowRecordDTOValidator = TypeAdapter(WorkflowRecordDTO)
 
 
-class WorkflowRecordListItemDTO(BaseModel):
-    workflow_id: str = Field(description="The id of the workflow.")
-    name: str = Field(description="The name of the workflow.")
+class WorkflowRecordListItemDTO(WorkflowRecordDTOBase):
     description: str = Field(description="The description of the workflow.")
-    created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the workflow.")
-    updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the workflow.")
-    opened_at: Union[datetime.datetime, str] = Field(description="The opened timestamp of the workflow.")
 
 
 WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
-
-
-class WorkflowNotFoundError(Exception):
-    """Raised when a workflow is not found"""
-
-
-class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
-    """The order by options for workflow records"""
-
-    CreatedAt = "created_at"
-    UpdatedAt = "updated_at"
-    OpenedAt = "opened_at"
-    Name = "name"

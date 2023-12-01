@@ -4,7 +4,7 @@ import DownloadWorkflowButton from 'features/workflowLibrary/components/Download
 import UploadWorkflowButton from 'features/workflowLibrary/components/LoadWorkflowFromFileButton';
 import ResetWorkflowButton from 'features/workflowLibrary/components/ResetWorkflowButton';
 import SaveWorkflowButton from 'features/workflowLibrary/components/SaveWorkflowButton';
-import DuplicateWorkflowButton from 'features/workflowLibrary/components/DuplicateWorkflowButton';
+import SaveWorkflowAsButton from 'features/workflowLibrary/components/SaveWorkflowAsButton';
 
 const TopCenterPanel = () => {
   return (
@@ -20,7 +20,7 @@ const TopCenterPanel = () => {
       <DownloadWorkflowButton />
       <UploadWorkflowButton />
       <SaveWorkflowButton />
-      <DuplicateWorkflowButton />
+      <SaveWorkflowAsButton />
       <ResetWorkflowButton />
     </Flex>
   );

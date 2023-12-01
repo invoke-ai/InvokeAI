@@ -13,6 +13,9 @@ export type XYPosition = z.infer<typeof zXYPosition>;
 
 export const zDimension = z.number().gt(0).nullish();
 export type Dimension = z.infer<typeof zDimension>;
+
+export const zWorkflowCategory = z.enum(['user', 'system']);
+export type WorkflowCategory = z.infer<typeof zWorkflowCategory>;
 // #endregion
 
 // #region Workflow Nodes
@@ -85,6 +88,7 @@ export const zWorkflowV2 = z.object({
   edges: z.array(zWorkflowEdge),
   exposedFields: z.array(zFieldIdentifier),
   meta: z.object({
+    category: zWorkflowCategory.default('user'),
     version: z.literal('2.0.0'),
   }),
 });
