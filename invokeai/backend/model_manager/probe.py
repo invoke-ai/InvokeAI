@@ -422,6 +422,8 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
             return BaseModelType.StableDiffusion1
         elif token_dim == 1024:
             return BaseModelType.StableDiffusion2
+        elif token_dim == 1280:
+            return BaseModelType.StableDiffusionXL
         else:
             raise InvalidModelConfigException("Could not determine base type")
 
