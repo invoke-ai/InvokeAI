@@ -215,7 +215,7 @@ class ModelPatcher:
             text_encoder.resize_token_embeddings(init_tokens_count + new_tokens_added, pad_to_multiple_of)
             model_embeddings = text_encoder.get_input_embeddings()
 
-            for ti_name, ti in ti_list:
+            for ti_name, _ in ti_list:
                 ti_tokens = []
                 for i in range(ti_embedding.shape[0]):
                     embedding = ti_embedding[i]
@@ -537,7 +537,7 @@ class ONNXModelPatcher:
                 axis=0,
             )
 
-            for ti_name, ti in ti_list:
+            for ti_name, _ in ti_list:
                 ti_tokens = []
                 for i in range(ti_embedding.shape[0]):
                     embedding = ti_embedding[i].detach().numpy()
