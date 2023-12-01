@@ -112,7 +112,7 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.1")
+@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.2.0")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 
@@ -127,6 +127,9 @@ class CoreMetadataInvocation(BaseInvocation):
     seed: Optional[int] = InputField(default=None, description="The seed used for noise generation")
     rand_device: Optional[str] = InputField(default=None, description="The device used for random number generation")
     cfg_scale: Optional[float] = InputField(default=None, description="The classifier-free guidance scale parameter")
+    cfg_rescale_multiplier: Optional[float] = InputField(
+        default=None, description=FieldDescriptions.cfg_rescale_multiplier
+    )
     steps: Optional[int] = InputField(default=None, description="The number of steps used for inference")
     scheduler: Optional[str] = InputField(default=None, description="The scheduler used for inference")
     seamless_x: Optional[bool] = InputField(default=None, description="Whether seamless tiling was used on the X axis")

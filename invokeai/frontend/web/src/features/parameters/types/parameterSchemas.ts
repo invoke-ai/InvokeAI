@@ -77,6 +77,17 @@ export const isParameterCFGScale = (val: unknown): val is ParameterCFGScale =>
   zParameterCFGScale.safeParse(val).success;
 // #endregion
 
+// #region CFG Rescale Multiplier
+export const zParameterCFGRescaleMultiplier = z.number().gte(0).lt(1);
+export type ParameterCFGRescaleMultiplier = z.infer<
+  typeof zParameterCFGRescaleMultiplier
+>;
+export const isParameterCFGRescaleMultiplier = (
+  val: unknown
+): val is ParameterCFGRescaleMultiplier =>
+  zParameterCFGRescaleMultiplier.safeParse(val).success;
+// #endregion
+
 // #region Scheduler
 export const zParameterScheduler = zSchedulerField;
 export type ParameterScheduler = z.infer<typeof zParameterScheduler>;

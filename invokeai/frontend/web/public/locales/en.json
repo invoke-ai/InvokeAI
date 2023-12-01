@@ -252,7 +252,6 @@
         "setControlImageDimensions": "Set Control Image Dimensions To W/H",
         "showAdvanced": "Show Advanced",
         "toggleControlNet": "Toggle this ControlNet",
-        "unstarImage": "Unstar Image",
         "w": "W",
         "weight": "Weight",
         "enableIPAdapter": "Enable IP Adapter",
@@ -387,6 +386,8 @@
         "showGenerations": "Show Generations",
         "showUploads": "Show Uploads",
         "singleColumnLayout": "Single Column Layout",
+        "starImage": "Star Image",
+        "unstarImage": "Unstar Image",
         "unableToLoad": "Unable to load Gallery",
         "uploads": "Uploads",
         "deleteSelection": "Delete Selection",
@@ -608,6 +609,7 @@
     },
     "metadata": {
         "cfgScale": "CFG scale",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "createdBy": "Created By",
         "fit": "Image to image fit",
         "generationMode": "Generation Mode",
@@ -986,6 +988,7 @@
         "unsupportedAnyOfLength": "too many union members ({{count}})",
         "unsupportedMismatchedUnion": "mismatched CollectionOrScalar type with base types {{firstType}} and {{secondType}}",
         "unableToParseFieldType": "unable to parse field type",
+        "unableToExtractEnumOptions": "unable to extract enum options",
         "uNetField": "UNet",
         "uNetFieldDescription": "UNet submodel.",
         "unhandledInputProperty": "Unhandled input property",
@@ -1041,6 +1044,8 @@
             "setType": "Set cancel type"
         },
         "cfgScale": "CFG Scale",
+        "cfgRescaleMultiplier": "CFG Rescale Multiplier",
+        "cfgRescale": "CFG Rescale",
         "clipSkip": "CLIP Skip",
         "clipSkipWithLayerCount": "CLIP Skip {{layerCount}}",
         "closeViewer": "Close Viewer",
@@ -1480,6 +1485,12 @@
             "heading": "CFG Scale",
             "paragraphs": [
                 "Controls how much your prompt influences the generation process."
+            ]
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "CFG Rescale Multiplier",
+            "paragraphs": [
+                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr). Suggested value 0.7."
             ]
         },
         "paramDenoisingStrength": {

@@ -231,14 +231,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           icon={customStarUi ? customStarUi.off.icon : <MdStar />}
           onClickCapture={handleUnstarImage}
         >
-          {customStarUi ? customStarUi.off.text : t('controlnet.unstarImage')}
+          {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
         </MenuItem>
       ) : (
         <MenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleStarImage}
         >
-          {customStarUi ? customStarUi.on.text : `Star Image`}
+          {customStarUi ? customStarUi.on.text : t('gallery.starImage')}
         </MenuItem>
       )}
       <MenuItem

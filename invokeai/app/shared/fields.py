@@ -2,6 +2,7 @@ class FieldDescriptions:
     denoising_start = "When to start denoising, expressed a percentage of total steps"
     denoising_end = "When to stop denoising, expressed a percentage of total steps"
     cfg_scale = "Classifier-Free Guidance scale"
+    cfg_rescale_multiplier = "Rescale multiplier for CFG guidance, used for models trained with zero-terminal SNR"
     scheduler = "Scheduler to use during inference"
     positive_cond = "Positive conditioning tensor"
     negative_cond = "Negative conditioning tensor"
