@@ -30,8 +30,8 @@ from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from ..services.shared.default_graphs import create_system_graphs
 from ..services.shared.graph import GraphExecutionState, LibraryGraph
 from ..services.shared.sqlite.sqlite_database import SqliteDatabase
-from ..services.shared.system_workflows import create_system_workflows
 from ..services.urls.urls_default import LocalUrlService
+from ..services.workflow_records.sync_system_workflows import sync_system_workflows
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
 
@@ -124,7 +124,7 @@ class ApiDependencies:
         )
 
         create_system_graphs(services.graph_library)
-        create_system_workflows(workflow_records=services.workflow_records, logger=logger)
+        sync_system_workflows(workflow_records=services.workflow_records, logger=logger)
 
         db.clean()
         ApiDependencies.invoker = Invoker(services)

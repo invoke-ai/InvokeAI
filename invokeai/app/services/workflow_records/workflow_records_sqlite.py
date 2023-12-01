@@ -91,7 +91,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 """--sql
                 UPDATE workflow_library
                 SET workflow = ?
-                WHERE workflow_id = ? AND category = "user";
+                WHERE workflow_id = ? AND category = 'user';
                 """,
                 (workflow.model_dump_json(), workflow.id),
             )
@@ -109,7 +109,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._cursor.execute(
                 """--sql
                 DELETE from workflow_library
-                WHERE workflow_id = ? AND category = "user";
+                WHERE workflow_id = ? AND category = 'user';
                 """,
                 (workflow_id,),
             )
@@ -182,10 +182,10 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         finally:
             self._lock.release()
 
-    def _add_system_workflow(self, workflow: Workflow) -> None:
+    def _create_system_workflow(self, workflow: Workflow) -> None:
         try:
             self._lock.acquire()
-            # Only system workflows may be created by this method
+            # Only system workflows may be managed by this method
             assert workflow.meta.category is WorkflowCategory.System
             self._cursor.execute(
                 """--sql
@@ -198,6 +198,60 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 (workflow.id, workflow.model_dump_json()),
             )
             self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+
+    def _update_system_workflow(self, workflow: Workflow) -> None:
+        try:
+            self._lock.acquire()
+            # Only system workflows may be managed by this method
+            assert workflow.meta.category is WorkflowCategory.System
+            self._cursor.execute(
+                """--sql
+                UPDATE workflow_library
+                SET workflow = ?
+                WHERE workflow_id = ? AND category = 'system';
+                """,
+                (workflow.model_dump_json(), workflow.id),
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+
+    def _delete_system_workflow(self, workflow_id: str) -> None:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                DELETE FROM workflow_library
+                WHERE workflow_id = ? AND category = 'system';
+                """,
+                (workflow_id,),
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+
+    def _get_all_system_workflows(self) -> list[Workflow]:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT workflow FROM workflow_library
+                WHERE category = 'system';
+                """
+            )
+            rows = self._cursor.fetchall()
+            return [WorkflowValidator.validate_json(dict(row)["workflow"]) for row in rows]
         except Exception:
             self._conn.rollback()
             raise
