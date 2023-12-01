@@ -14,11 +14,11 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { VALID_LOG_LEVELS } from 'app/logging/logger';
-import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { useClearStorage } from 'common/hooks/useClearStorage';
 import {
   consoleLogLevelChanged,
   setEnableImageDebugging,
@@ -48,9 +48,9 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
-import { useFeatureStatus } from '../../hooks/useFeatureStatus';
-import { languageSelector } from '../../store/systemSelectors';
-import { languageChanged } from '../../store/systemSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { languageSelector } from 'features/system/store/systemSelectors';
+import { languageChanged } from 'features/system/store/systemSlice';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
@@ -164,20 +164,14 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldEnableInformationalPopovers,
   } = useAppSelector(selector);
 
+  const clearStorage = useClearStorage();
+
   const handleClickResetWebUI = useCallback(() => {
-    // Only remove our keys
-    Object.keys(window.localStorage).forEach((key) => {
-      if (
-        LOCALSTORAGE_KEYS.includes(key) ||
-        key.startsWith(LOCALSTORAGE_PREFIX)
-      ) {
-        localStorage.removeItem(key);
-      }
-    });
+    clearStorage();
     onSettingsModalClose();
     onRefreshModalOpen();
     setInterval(() => setCountdown((prev) => prev - 1), 1000);
-  }, [onSettingsModalClose, onRefreshModalOpen]);
+  }, [clearStorage, onSettingsModalClose, onRefreshModalOpen]);
 
   useEffect(() => {
     if (countdown <= 0) {

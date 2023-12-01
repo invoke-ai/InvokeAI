@@ -11,7 +11,7 @@ import { isEqual } from 'lodash-es';
 import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { setPositiveStylePromptSDXL } from '../store/sdxlSlice';
+import { setPositiveStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
 import SDXLConcatLink from './SDXLConcatLink';
 
 const promptInputSelector = createSelector(

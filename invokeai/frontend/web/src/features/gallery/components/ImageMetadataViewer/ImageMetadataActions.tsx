@@ -4,15 +4,15 @@ import {
   LoRAMetadataItem,
   IPAdapterMetadataItem,
   T2IAdapterMetadataItem,
-} from 'features/nodes/types/types';
+} from 'features/nodes/types/metadata';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  isValidControlNetModel,
-  isValidLoRAModel,
-  isValidT2IAdapterModel,
-} from '../../../parameters/types/parameterSchemas';
+  isParameterControlNetModel,
+  isParameterLoRAModel,
+  isParameterT2IAdapterModel,
+} from 'features/parameters/types/parameterSchemas';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
@@ -29,6 +29,7 @@ const ImageMetadataActions = (props: Props) => {
     recallNegativePrompt,
     recallSeed,
     recallCfgScale,
+    recallCfgRescaleMultiplier,
     recallModel,
     recallScheduler,
     recallVaeModel,
@@ -85,6 +86,10 @@ const ImageMetadataActions = (props: Props) => {
     recallCfgScale(metadata?.cfg_scale);
   }, [metadata?.cfg_scale, recallCfgScale]);
 
+  const handleRecallCfgRescaleMultiplier = useCallback(() => {
+    recallCfgRescaleMultiplier(metadata?.cfg_rescale_multiplier);
+  }, [metadata?.cfg_rescale_multiplier, recallCfgRescaleMultiplier]);
+
   const handleRecallStrength = useCallback(() => {
     recallStrength(metadata?.strength);
   }, [metadata?.strength, recallStrength]);
@@ -132,7 +137,7 @@ const ImageMetadataActions = (props: Props) => {
   const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
     return metadata?.controlnets
       ? metadata.controlnets.filter((controlnet) =>
-          isValidControlNetModel(controlnet.control_model)
+          isParameterControlNetModel(controlnet.control_model)
         )
       : [];
   }, [metadata?.controlnets]);
@@ -140,7 +145,7 @@ const ImageMetadataActions = (props: Props) => {
   const validIPAdapters: IPAdapterMetadataItem[] = useMemo(() => {
     return metadata?.ipAdapters
       ? metadata.ipAdapters.filter((ipAdapter) =>
-          isValidControlNetModel(ipAdapter.ip_adapter_model)
+          isParameterControlNetModel(ipAdapter.ip_adapter_model)
         )
       : [];
   }, [metadata?.ipAdapters]);
@@ -148,7 +153,7 @@ const ImageMetadataActions = (props: Props) => {
   const validT2IAdapters: T2IAdapterMetadataItem[] = useMemo(() => {
     return metadata?.t2iAdapters
       ? metadata.t2iAdapters.filter((t2iAdapter) =>
-          isValidT2IAdapterModel(t2iAdapter.t2i_adapter_model)
+          isParameterT2IAdapterModel(t2iAdapter.t2i_adapter_model)
         )
       : [];
   }, [metadata?.t2iAdapters]);
@@ -156,8 +161,6 @@ const ImageMetadataActions = (props: Props) => {
   if (!metadata || Object.keys(metadata).length === 0) {
     return null;
   }
-
-  console.log(metadata);
 
   return (
     <>
@@ -245,6 +248,14 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallCfgScale}
         />
       )}
+      {metadata.cfg_rescale_multiplier !== undefined &&
+        metadata.cfg_rescale_multiplier !== null && (
+          <ImageMetadataItem
+            label={t('metadata.cfgRescaleMultiplier')}
+            value={metadata.cfg_rescale_multiplier}
+            onClick={handleRecallCfgRescaleMultiplier}
+          />
+        )}
       {metadata.strength && (
         <ImageMetadataItem
           label={t('metadata.strength')}
@@ -275,7 +286,7 @@ const ImageMetadataActions = (props: Props) => {
       )}
       {metadata.loras &&
         metadata.loras.map((lora, index) => {
-          if (isValidLoRAModel(lora.lora)) {
+          if (isParameterLoRAModel(lora.lora)) {
             return (
               <ImageMetadataItem
                 key={index}

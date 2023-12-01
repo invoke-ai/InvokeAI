@@ -6,7 +6,7 @@ import IAISlider from 'common/components/IAISlider';
 import SubParametersWrapper from 'features/parameters/components/Parameters/SubParametersWrapper';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { setSDXLImg2ImgDenoisingStrength } from '../store/sdxlSlice';
+import { setSDXLImg2ImgDenoisingStrength } from 'features/sdxl/store/sdxlSlice';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 const selector = createSelector(

@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { stateSelector } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -9,25 +9,30 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { memo, useMemo } from 'react';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import { memo, useEffect, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selector = createSelector(
   [stateSelector],
   (state) => {
     const { initialImage } = state.generation;
+    const { isConnected } = state.system;
+
     return {
       initialImage,
       isResetButtonDisabled: !initialImage,
+      isConnected,
     };
   },
   defaultSelectorOptions
 );
 
 const InitialImage = () => {
-  const { initialImage } = useAppSelector(selector);
+  const dispatch = useAppDispatch();
+  const { initialImage, isConnected } = useAppSelector(selector);
 
-  const { currentData: imageDTO } = useGetImageDTOQuery(
+  const { currentData: imageDTO, isError } = useGetImageDTOQuery(
     initialImage?.imageName ?? skipToken
   );
 
@@ -48,6 +53,13 @@ const InitialImage = () => {
     }),
     []
   );
+
+  useEffect(() => {
+    if (isError && isConnected) {
+      // The image doesn't exist, reset init image
+      dispatch(clearInitialImage());
+    }
+  }, [dispatch, isConnected, isError]);
 
   return (
     <IAIDndImage

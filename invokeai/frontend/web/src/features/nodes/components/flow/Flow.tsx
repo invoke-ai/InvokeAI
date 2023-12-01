@@ -25,7 +25,7 @@ import {
   ReactFlowProps,
   XYPosition,
 } from 'reactflow';
-import { useIsValidConnection } from '../../hooks/useIsValidConnection';
+import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import {
   connectionEnded,
   connectionMade,
@@ -43,7 +43,7 @@ import {
   selectionCopied,
   selectionPasted,
   viewportChanged,
-} from '../../store/nodesSlice';
+} from 'features/nodes/store/nodesSlice';
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
 import InvocationDefaultEdge from './edges/InvocationDefaultEdge';

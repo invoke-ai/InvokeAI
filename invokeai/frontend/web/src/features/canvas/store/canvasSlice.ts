@@ -9,12 +9,12 @@ import { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
 import { ImageDTO } from 'services/api/types';
-import calculateCoordinates from '../util/calculateCoordinates';
-import calculateScale from '../util/calculateScale';
-import { STAGE_PADDING_PERCENTAGE } from '../util/constants';
-import floorCoordinates from '../util/floorCoordinates';
-import getScaledBoundingBoxDimensions from '../util/getScaledBoundingBoxDimensions';
-import roundDimensionsTo64 from '../util/roundDimensionsTo64';
+import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
+import calculateScale from 'features/canvas/util/calculateScale';
+import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
+import floorCoordinates from 'features/canvas/util/floorCoordinates';
+import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundingBoxDimensions';
+import roundDimensionsTo64 from 'features/canvas/util/roundDimensionsTo64';
 import {
   BoundingBoxScale,
   CanvasBaseLine,

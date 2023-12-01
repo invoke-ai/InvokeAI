@@ -37,6 +37,14 @@ def build_dummy_sd15_unet_input(torch_device):
             "unet_model_id": "runwayml/stable-diffusion-v1-5",
             "unet_model_name": "stable-diffusion-v1-5",
         },
+        # SD1.5, IPAdapterFull
+        {
+            "ip_adapter_model_id": "InvokeAI/ip-adapter-full-face_sd15",
+            "ip_adapter_model_name": "ip-adapter-full-face_sd15",
+            "base_model": BaseModelType.StableDiffusion1,
+            "unet_model_id": "runwayml/stable-diffusion-v1-5",
+            "unet_model_name": "stable-diffusion-v1-5",
+        },
     ],
 )
 @pytest.mark.slow

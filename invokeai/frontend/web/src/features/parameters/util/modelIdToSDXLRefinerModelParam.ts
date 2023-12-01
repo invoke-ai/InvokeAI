@@ -1,16 +1,16 @@
 import { logger } from 'app/logging/logger';
 import {
-  SDXLRefinerModelParam,
-  zSDXLRefinerModel,
+  ParameterSDXLRefinerModel,
+  zParameterSDXLRefinerModel,
 } from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToSDXLRefinerModelParam = (
   mainModelId: string
-): SDXLRefinerModelParam | undefined => {
+): ParameterSDXLRefinerModel | undefined => {
   const log = logger('models');
   const [base_model, model_type, model_name] = mainModelId.split('/');
 
-  const result = zSDXLRefinerModel.safeParse({
+  const result = zParameterSDXLRefinerModel.safeParse({
     base_model,
     model_name,
     model_type,

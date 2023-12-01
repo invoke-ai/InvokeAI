@@ -9,7 +9,7 @@ import {
   loraRemoved,
   loraWeightChanged,
   loraWeightReset,
-} from '../store/loraSlice';
+} from 'features/lora/store/loraSlice';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 type Props = {

@@ -12,10 +12,10 @@ import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import { isImageOutput } from 'services/api/guards';
 import { BatchConfig, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
+import { isImageOutput } from 'features/nodes/types/common';
 
 export const addControlNetImageProcessedListener = () => {
   startAppListening({

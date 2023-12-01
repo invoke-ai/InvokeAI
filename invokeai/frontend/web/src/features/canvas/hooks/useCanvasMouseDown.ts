@@ -15,7 +15,7 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import { isEqual } from 'lodash-es';
 
 import { MutableRefObject, useCallback } from 'react';
-import getScaledCursorPosition from '../util/getScaledCursorPosition';
+import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
 
 const selector = createSelector(

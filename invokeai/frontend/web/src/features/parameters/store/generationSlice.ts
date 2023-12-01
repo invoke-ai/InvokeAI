@@ -6,63 +6,64 @@ import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { clipSkipMap } from '../types/constants';
+import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import {
-  CanvasCoherenceModeParam,
-  CfgScaleParam,
-  HeightParam,
-  HrfMethodParam,
-  MainModelParam,
-  MaskBlurMethodParam,
-  NegativePromptParam,
-  OnnxModelParam,
-  PositivePromptParam,
-  PrecisionParam,
-  SchedulerParam,
-  SeedParam,
-  StepsParam,
-  StrengthParam,
-  VaeModelParam,
-  WidthParam,
-  zMainModel,
-} from '../types/parameterSchemas';
+  ParameterCanvasCoherenceMode,
+  ParameterCFGScale,
+  ParameterHeight,
+  ParameterHRFMethod,
+  ParameterModel,
+  ParameterMaskBlurMethod,
+  ParameterNegativePrompt,
+  ParameterPositivePrompt,
+  ParameterPrecision,
+  ParameterScheduler,
+  ParameterSeed,
+  ParameterSteps,
+  ParameterStrength,
+  ParameterVAEModel,
+  ParameterWidth,
+  zParameterModel,
+  ParameterCFGRescaleMultiplier,
+} from 'features/parameters/types/parameterSchemas';
 
 export interface GenerationState {
   hrfEnabled: boolean;
-  hrfStrength: StrengthParam;
-  hrfMethod: HrfMethodParam;
-  cfgScale: CfgScaleParam;
-  height: HeightParam;
-  img2imgStrength: StrengthParam;
+  hrfStrength: ParameterStrength;
+  hrfMethod: ParameterHRFMethod;
+  cfgScale: ParameterCFGScale;
+  cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
+  height: ParameterHeight;
+  img2imgStrength: ParameterStrength;
   infillMethod: string;
   initialImage?: { imageName: string; width: number; height: number };
   iterations: number;
   perlin: number;
-  positivePrompt: PositivePromptParam;
-  negativePrompt: NegativePromptParam;
-  scheduler: SchedulerParam;
+  positivePrompt: ParameterPositivePrompt;
+  negativePrompt: ParameterNegativePrompt;
+  scheduler: ParameterScheduler;
   maskBlur: number;
-  maskBlurMethod: MaskBlurMethodParam;
-  canvasCoherenceMode: CanvasCoherenceModeParam;
+  maskBlurMethod: ParameterMaskBlurMethod;
+  canvasCoherenceMode: ParameterCanvasCoherenceMode;
   canvasCoherenceSteps: number;
-  canvasCoherenceStrength: StrengthParam;
-  seed: SeedParam;
+  canvasCoherenceStrength: ParameterStrength;
+  seed: ParameterSeed;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   shouldRandomizeSeed: boolean;
-  steps: StepsParam;
+  steps: ParameterSteps;
   threshold: number;
   infillTileSize: number;
   infillPatchmatchDownscaleSize: number;
   variationAmount: number;
-  width: WidthParam;
+  width: ParameterWidth;
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelParam | OnnxModelParam | null;
-  vae: VaeModelParam | null;
-  vaePrecision: PrecisionParam;
+  model: ParameterModel | null;
+  vae: ParameterVAEModel | null;
+  vaePrecision: ParameterPrecision;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
@@ -77,6 +78,7 @@ export const initialGenerationState: GenerationState = {
   hrfEnabled: false,
   hrfMethod: 'ESRGAN',
   cfgScale: 7.5,
+  cfgRescaleMultiplier: 0,
   height: 512,
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
@@ -146,8 +148,14 @@ export const generationSlice = createSlice({
         state.steps
       );
     },
-    setCfgScale: (state, action: PayloadAction<number>) => {
+    setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
+    },
+    setCfgRescaleMultiplier: (
+      state,
+      action: PayloadAction<ParameterCFGRescaleMultiplier>
+    ) => {
+      state.cfgRescaleMultiplier = action.payload;
     },
     setThreshold: (state, action: PayloadAction<number>) => {
       state.threshold = action.payload;
@@ -166,7 +174,7 @@ export const generationSlice = createSlice({
       state.width = height;
       state.height = width;
     },
-    setScheduler: (state, action: PayloadAction<SchedulerParam>) => {
+    setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.scheduler = action.payload;
     },
     setSeed: (state, action: PayloadAction<number>) => {
@@ -214,12 +222,15 @@ export const generationSlice = createSlice({
     setMaskBlur: (state, action: PayloadAction<number>) => {
       state.maskBlur = action.payload;
     },
-    setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
+    setMaskBlurMethod: (
+      state,
+      action: PayloadAction<ParameterMaskBlurMethod>
+    ) => {
       state.maskBlurMethod = action.payload;
     },
     setCanvasCoherenceMode: (
       state,
-      action: PayloadAction<CanvasCoherenceModeParam>
+      action: PayloadAction<ParameterCanvasCoherenceMode>
     ) => {
       state.canvasCoherenceMode = action.payload;
     },
@@ -254,10 +265,7 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (
-      state,
-      action: PayloadAction<MainModelParam | OnnxModelParam | null>
-    ) => {
+    modelChanged: (state, action: PayloadAction<ParameterModel | null>) => {
       state.model = action.payload;
 
       if (state.model === null) {
@@ -265,14 +273,14 @@ export const generationSlice = createSlice({
       }
 
       // Clamp ClipSkip Based On Selected Model
-      const { maxClip } = clipSkipMap[state.model.base_model];
+      const { maxClip } = CLIP_SKIP_MAP[state.model.base_model];
       state.clipSkip = clamp(state.clipSkip, 0, maxClip);
     },
-    vaeSelected: (state, action: PayloadAction<VaeModelParam | null>) => {
+    vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
       state.vae = action.payload;
     },
-    vaePrecisionChanged: (state, action: PayloadAction<PrecisionParam>) => {
+    vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
     setClipSkip: (state, action: PayloadAction<number>) => {
@@ -284,7 +292,7 @@ export const generationSlice = createSlice({
     setHrfEnabled: (state, action: PayloadAction<boolean>) => {
       state.hrfEnabled = action.payload;
     },
-    setHrfMethod: (state, action: PayloadAction<HrfMethodParam>) => {
+    setHrfMethod: (state, action: PayloadAction<ParameterHRFMethod>) => {
       state.hrfMethod = action.payload;
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
@@ -308,7 +316,7 @@ export const generationSlice = createSlice({
       if (defaultModel && !state.model) {
         const [base_model, model_type, model_name] = defaultModel.split('/');
 
-        const result = zMainModel.safeParse({
+        const result = zParameterModel.safeParse({
           model_name,
           base_model,
           model_type,
@@ -337,6 +345,7 @@ export const {
   resetParametersState,
   resetSeed,
   setCfgScale,
+  setCfgRescaleMultiplier,
   setWidth,
   setHeight,
   toggleSize,

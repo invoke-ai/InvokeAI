@@ -59,7 +59,7 @@ dependencies = [
   "omegaconf",
   "onnx",
   "onnxruntime",
-  "opencv-python",
+  "opencv-python~=4.8.1.1",
   "pydantic~=2.5.0",
   "pydantic-settings~=2.0.3",
   "picklescan",

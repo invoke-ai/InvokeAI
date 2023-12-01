@@ -8,7 +8,7 @@ To use a node, add the node to the `nodes` folder found in your InvokeAI install
 
 The suggested method is to use `git clone` to clone the repository the node is found in. This allows for easy updates of the node in the future. 
 
-If you'd prefer, you can also just download the `.py` file from the linked repository and add it to the `nodes` folder. 
+If you'd prefer, you can also just download the whole node folder from the linked repository and add it to the `nodes` folder. 
 
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
@@ -26,6 +26,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Image Picker](#image-picker)
     + [Load Video Frame](#load-video-frame)
     + [Make 3D](#make-3d)
+    + [Match Histogram](#match-histogram)
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
@@ -209,6 +210,23 @@ This includes 15 Nodes:
 <img src="https://gitlab.com/srcrr/shift3d/-/raw/main/example-2.png" width="300" />
 
 --------------------------------
+### Match Histogram
+
+**Description:** An InvokeAI node to match a histogram from one image to another.  This is a bit like the `color correct` node in the main InvokeAI but this works in the YCbCr colourspace and can handle images of different sizes. Also does not require a mask input.
+- Option to only transfer luminance channel.
+- Option to save output as grayscale
+
+A good use case for this node is to normalize the colors of an image that has been through the tiled scaling workflow of my XYGrid Nodes. 
+
+See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md
+
+**Node Link:** https://github.com/skunkworxdark/match_histogram
+
+**Output Examples** 
+
+<img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" width="300" />
+
+--------------------------------
 ### Oobabooga
 
 **Description:** asks a local LLM running in Oobabooga's Text-Generation-Webui to write a prompt based on the user input.
@@ -237,21 +255,29 @@ This node works best with SDXL models, especially as the style can be described 
 --------------------------------
 ### Prompt Tools 
 
-**Description:** A set of InvokeAI nodes that add general prompt manipulation tools.  These were written to accompany the PromptsFromFile node and other prompt generation nodes.
+**Description:** A set of InvokeAI nodes that add general prompt (string) manipulation tools.  Designed to accompany the `Prompts From File` node and other prompt generation nodes.
 
-1. PromptJoin - Joins to prompts into one.
-2. PromptReplace - performs a search and replace on a prompt. With the option of using regex.
-3. PromptSplitNeg - splits a prompt into positive and negative using the old V2 method of [] for negative.
-4. PromptToFile - saves a prompt or collection of prompts to a file. one per line. There is an append/overwrite option.
-5. PTFieldsCollect - Converts image generation fields into a Json format string that can be passed to Prompt to file. 
-6. PTFieldsExpand - Takes Json string and converts it to individual generation parameters This can be fed from the Prompts to file node.
-7. PromptJoinThree -  Joins 3 prompt together.
-8. PromptStrength - This take a string and float and outputs another string in the format of (string)strength like the weighted format of compel. 
-9. PromptStrengthCombine - This takes a collection of prompt strength strings and outputs a string in the .and() or .blend() format that can be fed into a proper prompt node.
+1. `Prompt To File` - saves a prompt or collection of prompts to a file. one per line. There is an append/overwrite option.
+2. `PTFields Collect` - Converts image generation fields into a Json format string that can be passed to Prompt to file. 
+3. `PTFields Expand` - Takes Json string and converts it to individual generation parameters. This can be fed from the Prompts to file node.
+4. `Prompt Strength` - Formats prompt with strength like the weighted format of compel 
+5. `Prompt Strength Combine` - Combines weighted prompts for .and()/.blend()
+6. `CSV To Index String` - Gets a string from a CSV by index. Includes a Random index option
+
+The following Nodes are now included in v3.2 of Invoke and are nolonger in this set of tools.<br>
+- `Prompt Join` -> `String Join`
+- `Prompt Join Three` -> `String Join Three`
+- `Prompt Replace` -> `String Replace`
+- `Prompt Split Neg` -> `String Split Neg`
+
 
 See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md
 
 **Node Link:** https://github.com/skunkworxdark/Prompt-tools-nodes
+
+**Workflow Examples** 
+
+<img src="https://github.com/skunkworxdark/prompt-tools/blob/main/images/CSVToIndexStringNode.png" width="300" />
 
 --------------------------------
 ### Remote Image
@@ -339,14 +365,26 @@ Highlights/Midtones/Shadows (with LUT blur enabled):
 --------------------------------
 ### XY Image to Grid and Images to Grids nodes
 
-**Description:** Image to grid nodes and supporting tools.
+**Description:** These nodes add the following to InvokeAI:
+- Generate grids of images from multiple input images
+- Create XY grid images with labels from parameters
+- Split images into overlapping tiles for processing (for super-resolution workflows)
+- Recombine image tiles into a single output image blending the seams 
 
-1. "Images To Grids" node - Takes a collection of images and creates a grid(s) of images. If there are more images than the size of a single grid then multiple grids will be created until it runs out of images.
-2. "XYImage To Grid" node - Converts a collection of XYImages into a labeled Grid of images. The XYImages collection has to be built using the supporting nodes. See example node setups for more details.
+The nodes include:
+1. `Images To Grids` - Combine multiple images into a grid of images
+2. `XYImage To Grid` - Take X & Y params and creates a labeled image grid.
+3. `XYImage Tiles` - Super-resolution (embiggen) style tiled resizing
+4. `Image Tot XYImages` - Takes an image and cuts it up into a number of columns and rows.
+5. Multiple supporting nodes - Helper nodes for data wrangling and building `XYImage` collections
 
 See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/README.md
 
 **Node Link:** https://github.com/skunkworxdark/XYGrid_nodes
+
+**Output Examples** 
+
+<img src="https://github.com/skunkworxdark/XYGrid_nodes/blob/main/images/collage.png" width="300" />
 
 --------------------------------
 ### Example Node Template

@@ -20,7 +20,7 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 
 interface HoverableImageProps {
   imageName: string;

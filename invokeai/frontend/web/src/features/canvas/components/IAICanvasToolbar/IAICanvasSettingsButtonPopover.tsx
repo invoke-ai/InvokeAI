@@ -22,7 +22,7 @@ import { ChangeEvent, memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
-import ClearCanvasHistoryButtonModal from '../ClearCanvasHistoryButtonModal';
+import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],

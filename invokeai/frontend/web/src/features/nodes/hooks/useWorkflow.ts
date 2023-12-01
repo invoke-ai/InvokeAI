@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { buildWorkflow } from 'features/nodes/util/buildWorkflow';
+import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
 import { useMemo } from 'react';
 import { useDebounce } from 'use-debounce';
 

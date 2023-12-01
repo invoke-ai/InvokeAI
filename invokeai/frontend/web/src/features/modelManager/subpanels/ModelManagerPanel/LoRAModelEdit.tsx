@@ -16,7 +16,7 @@ import {
   useUpdateLoRAModelsMutation,
 } from 'services/api/endpoints/models';
 import { LoRAModelConfig } from 'services/api/types';
-import BaseModelSelect from '../shared/BaseModelSelect';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 
 type LoRAModelEditProps = {
   model: LoRAModelConfigEntity;

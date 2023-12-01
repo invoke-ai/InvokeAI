@@ -803,8 +803,7 @@
         "canny": "Canny",
         "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
         "scribble": "Scribble",
-        "maxFaces": "Maximal Anzahl Gesichter",
-        "unstarImage": "Markierung aufheben"
+        "maxFaces": "Maximal Anzahl Gesichter"
     },
     "queue": {
         "status": "Status",

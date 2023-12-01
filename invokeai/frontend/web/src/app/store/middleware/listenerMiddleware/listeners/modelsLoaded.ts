@@ -11,9 +11,9 @@ import {
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
 import {
-  zMainOrOnnxModel,
-  zSDXLRefinerModel,
-  zVaeModel,
+  zParameterModel,
+  zParameterSDXLRefinerModel,
+  zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import {
   refinerModelChanged,
@@ -67,7 +67,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const result = zMainOrOnnxModel.safeParse(models[0]);
+      const result = zParameterModel.safeParse(models[0]);
 
       if (!result.success) {
         log.error(
@@ -119,7 +119,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const result = zSDXLRefinerModel.safeParse(models[0]);
+      const result = zParameterSDXLRefinerModel.safeParse(models[0]);
 
       if (!result.success) {
         log.error(
@@ -170,7 +170,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const result = zVaeModel.safeParse(firstModel);
+      const result = zParameterVAEModel.safeParse(firstModel);
 
       if (!result.success) {
         log.error(

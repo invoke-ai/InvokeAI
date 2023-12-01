@@ -25,9 +25,11 @@ module.exports = {
     '@typescript-eslint',
     'eslint-plugin-react-hooks',
     'i18next',
+    'path',
   ],
   root: true,
   rules: {
+    'path/no-relative-imports': ['error', { maxDepth: 0 }],
     curly: 'error',
     'i18next/no-literal-string': 2,
     'react/jsx-no-bind': ['error', { allowBind: true }],

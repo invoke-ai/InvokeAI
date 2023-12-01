@@ -7,7 +7,7 @@ import { memo, useCallback } from 'react';
 import {
   maxPromptsChanged,
   maxPromptsReset,
-} from '../store/dynamicPromptsSlice';
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { useTranslation } from 'react-i18next';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
