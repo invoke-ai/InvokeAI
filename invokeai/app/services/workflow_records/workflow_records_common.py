@@ -1,9 +1,11 @@
 import datetime
+from enum import Enum
 from typing import Any, Union
 
 import semver
 from pydantic import BaseModel, Field, JsonValue, TypeAdapter, field_validator
 
+from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
 
 __workflow_meta_version__ = semver.Version.parse("1.0.0")
@@ -57,8 +59,10 @@ WorkflowValidator = TypeAdapter(Workflow)
 class WorkflowRecordDTO(BaseModel):
     workflow_id: str = Field(description="The id of the workflow.")
     workflow: Workflow = Field(description="The workflow.")
+    name: str = Field(description="The name of the workflow.")
     created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the workflow.")
     updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the workflow.")
+    opened_at: Union[datetime.datetime, str] = Field(description="The opened timestamp of the workflow.")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "WorkflowRecordDTO":
@@ -75,6 +79,7 @@ class WorkflowRecordListItemDTO(BaseModel):
     description: str = Field(description="The description of the workflow.")
     created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the workflow.")
     updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the workflow.")
+    opened_at: Union[datetime.datetime, str] = Field(description="The opened timestamp of the workflow.")
 
 
 WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
@@ -82,3 +87,12 @@ WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
 
 class WorkflowNotFoundError(Exception):
     """Raised when a workflow is not found"""
+
+
+class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
+    """The order by options for workflow records"""
+
+    CreatedAt = "created_at"
+    UpdatedAt = "updated_at"
+    OpenedAt = "opened_at"
+    Name = "name"

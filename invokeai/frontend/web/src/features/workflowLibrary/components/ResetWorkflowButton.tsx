@@ -10,8 +10,7 @@ import {
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
@@ -25,10 +24,6 @@ const ResetWorkflowButton = () => {
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-
-  const nodesCount = useAppSelector(
-    (state: RootState) => state.nodes.nodes.length
-  );
 
   const handleConfirmClear = useCallback(() => {
     dispatch(nodeEditorReset());
@@ -52,7 +47,6 @@ const ResetWorkflowButton = () => {
         tooltip={t('nodes.resetWorkflow')}
         aria-label={t('nodes.resetWorkflow')}
         onClick={onOpen}
-        isDisabled={!nodesCount}
         colorScheme="error"
       />
 

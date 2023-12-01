@@ -1,5 +1,8 @@
+from typing import Optional
+
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 from invokeai.app.services.workflow_records.workflow_records_common import (
@@ -8,6 +11,7 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowRecordDTO,
     WorkflowRecordListItemDTO,
     WorkflowRecordListItemDTOValidator,
+    WorkflowRecordOrderBy,
     WorkflowValidator,
     WorkflowWithoutID,
 )
@@ -25,11 +29,20 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self._invoker = invoker
 
     def get(self, workflow_id: str) -> WorkflowRecordDTO:
+        """Gets a workflow by ID. Updates the opened_at column."""
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT workflow_id, workflow, created_at, updated_at
+                UPDATE workflow_library
+                SET opened_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+                WHERE workflow_id = ?;
+                """,
+                (workflow_id,),
+            )
+            self._cursor.execute(
+                """--sql
+                SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
                 FROM workflow_library
                 WHERE workflow_id = ?;
                 """,
@@ -107,34 +120,50 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._lock.release()
         return None
 
-    def get_many(self, page: int, per_page: int) -> PaginatedResults[WorkflowRecordListItemDTO]:
+    def get_many(
+        self,
+        page: int,
+        per_page: int,
+        order_by: WorkflowRecordOrderBy,
+        direction: SQLiteDirection,
+        filter_text: Optional[str] = None,
+    ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         try:
             self._lock.acquire()
-
-            self._cursor.execute(
-                """--sql
+            # sanitize!
+            assert order_by in WorkflowRecordOrderBy
+            assert direction in SQLiteDirection
+            count_query = "SELECT COUNT(*) FROM workflow_library"
+            main_query = """
                 SELECT
                     workflow_id,
-                    json_extract(workflow, '$.name') AS name,
-                    json_extract(workflow, '$.description') AS description,
+                    name,
+                    description,
                     created_at,
-                    updated_at
+                    updated_at,
+                    opened_at
                 FROM workflow_library
-                ORDER BY name ASC
-                LIMIT ? OFFSET ?;
-                """,
-                (per_page, page * per_page),
-            )
+                """
+            main_params = []
+            count_params = []
+            stripped_filter_name = filter_text.strip() if filter_text else None
+            if stripped_filter_name:
+                filter_string = "%" + stripped_filter_name + "%"
+                main_query += " WHERE name LIKE ? OR description LIKE ? "
+                count_query += " WHERE name LIKE ? OR description LIKE ?;"
+                main_params.extend([filter_string, filter_string])
+                count_params.extend([filter_string, filter_string])
+
+            main_query += f" ORDER BY {order_by.value} {direction.value} LIMIT ? OFFSET ?;"
+            main_params.extend([per_page, page * per_page])
+            self._cursor.execute(main_query, main_params)
             rows = self._cursor.fetchall()
             workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
-            self._cursor.execute(
-                """--sql
-                SELECT COUNT(*)
-                FROM workflow_library;
-                """
-            )
+
+            self._cursor.execute(count_query, count_params)
             total = self._cursor.fetchone()[0]
             pages = int(total / per_page) + 1
+
             return PaginatedResults(
                 items=workflows,
                 page=page,
@@ -154,10 +183,16 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             self._cursor.execute(
                 """--sql
                 CREATE TABLE IF NOT EXISTS workflow_library (
-                    workflow_id TEXT NOT NULL PRIMARY KEY, -- gets implicit index
+                    workflow_id TEXT NOT NULL PRIMARY KEY,
                     workflow TEXT NOT NULL,
                     created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                    updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')) -- updated via trigger
+                    -- updated via trigger
+                    updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                    -- updated manually when retrieving workflow
+                    opened_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                    -- Generated columns, needed for indexing and searching
+                    name TEXT GENERATED ALWAYS as (json_extract(workflow, '$.name')) VIRTUAL NOT NULL,
+                    description TEXT GENERATED ALWAYS as (json_extract(workflow, '$.description')) VIRTUAL NOT NULL
                 );
                 """
             )
@@ -172,6 +207,32 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
                     WHERE workflow_id = old.workflow_id;
                 END;
+                """
+            )
+
+            self._cursor.execute(
+                """--sql
+                CREATE INDEX IF NOT EXISTS idx_workflow_library_created_at ON workflow_library(created_at);
+                """
+            )
+            self._cursor.execute(
+                """--sql
+                CREATE INDEX IF NOT EXISTS idx_workflow_library_updated_at ON workflow_library(updated_at);
+                """
+            )
+            self._cursor.execute(
+                """--sql
+                CREATE INDEX IF NOT EXISTS idx_workflow_library_opened_at ON workflow_library(opened_at);
+                """
+            )
+            self._cursor.execute(
+                """--sql
+                CREATE INDEX IF NOT EXISTS idx_workflow_library_name ON workflow_library(name);
+                """
+            )
+            self._cursor.execute(
+                """--sql
+                CREATE INDEX IF NOT EXISTS idx_workflow_library_description ON workflow_library(description);
                 """
             )
 

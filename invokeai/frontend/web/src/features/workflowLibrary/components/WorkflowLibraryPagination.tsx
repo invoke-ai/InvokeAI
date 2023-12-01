@@ -52,10 +52,6 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
     return pages;
   }, [data.pages, page, setPage]);
 
-  if (data.items.length === 0) {
-    return null;
-  }
-
   return (
     <ButtonGroup>
       <IAIIconButton
@@ -68,6 +64,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
       {pages.map((p) => (
         <IAIButton
           w={10}
+          isDisabled={data.pages === 1}
           onClick={p.page === page ? undefined : p.onClick}
           variant={p.page === page ? 'invokeAI' : 'ghost'}
           key={p.page}

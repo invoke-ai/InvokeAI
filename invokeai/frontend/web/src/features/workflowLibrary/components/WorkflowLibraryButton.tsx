@@ -1,17 +1,17 @@
 import { useDisclosure } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { WorkflowLibraryContext } from 'features/nodes/components/flow/WorkflowLibrary/context';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaFolderOpen } from 'react-icons/fa';
 import WorkflowLibraryModal from './WorkflowLibraryModal';
+import { WorkflowLibraryModalContext } from 'features/workflowLibrary/context/WorkflowLibraryModalContext';
 
 const WorkflowLibraryButton = () => {
   const { t } = useTranslation();
   const disclosure = useDisclosure();
 
   return (
-    <WorkflowLibraryContext.Provider value={disclosure}>
+    <WorkflowLibraryModalContext.Provider value={disclosure}>
       <IAIIconButton
         icon={<FaFolderOpen />}
         onClick={disclosure.onOpen}
@@ -19,7 +19,7 @@ const WorkflowLibraryButton = () => {
         aria-label={t('workflows.workflowLibrary')}
       />
       <WorkflowLibraryModal />
-    </WorkflowLibraryContext.Provider>
+    </WorkflowLibraryModalContext.Provider>
   );
 };
 

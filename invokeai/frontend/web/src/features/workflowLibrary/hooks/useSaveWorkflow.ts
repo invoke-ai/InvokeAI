@@ -4,12 +4,14 @@ import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { zWorkflowV2 } from 'features/nodes/types/workflow';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   useCreateWorkflowMutation,
   useUpdateWorkflowMutation,
 } from 'services/api/endpoints/workflows';
 
-export const useSaveWorkflow = () => {
+export const useSaveLibraryWorkflow = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const workflow = useWorkflow();
   const [updateWorkflow, updateWorkflowResult] = useUpdateWorkflowMutation();
@@ -18,29 +20,32 @@ export const useSaveWorkflow = () => {
   const saveWorkflow = useCallback(async () => {
     try {
       if (workflow.id) {
-        console.log('update workflow');
         const data = await updateWorkflow(workflow).unwrap();
         const updatedWorkflow = zWorkflowV2.parse(data.workflow);
         dispatch(workflowLoaded(updatedWorkflow));
+        toaster({
+          title: t('workflows.workflowSaved'),
+          status: 'success',
+        });
       } else {
-        console.log('create workflow');
         const data = await createWorkflow(workflow).unwrap();
         const createdWorkflow = zWorkflowV2.parse(data.workflow);
         dispatch(workflowLoaded(createdWorkflow));
+        toaster({
+          title: t('workflows.workflowSaved'),
+          status: 'success',
+        });
       }
-      toaster({
-        title: 'Workflow saved',
-        status: 'success',
-        duration: 3000,
-      });
     } catch (e) {
       toaster({
-        title: 'Failed to save workflow',
-        // description: e.message,
+        title: t('workflows.problemSavingWorkflow'),
         status: 'error',
-        duration: 3000,
       });
     }
-  }, [workflow, toaster, updateWorkflow, dispatch, createWorkflow]);
-  return saveWorkflow;
+  }, [workflow, updateWorkflow, dispatch, toaster, t, createWorkflow]);
+  return {
+    saveWorkflow,
+    isLoading: updateWorkflowResult.isLoading || createWorkflowResult.isLoading,
+    isError: updateWorkflowResult.isError || createWorkflowResult.isError,
+  };
 };

@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
     WorkflowRecordDTO,
     WorkflowRecordListItemDTO,
+    WorkflowRecordOrderBy,
     WorkflowWithoutID,
 )
 
@@ -33,6 +36,13 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_many(self, page: int, per_page: int) -> PaginatedResults[WorkflowRecordListItemDTO]:
+    def get_many(
+        self,
+        page: int,
+        per_page: int,
+        order_by: WorkflowRecordOrderBy,
+        direction: SQLiteDirection,
+        filter_text: Optional[str],
+    ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass

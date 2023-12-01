@@ -1,12 +1,16 @@
+from typing import Optional
+
 from fastapi import APIRouter, Body, HTTPException, Path, Query
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
     WorkflowRecordListItemDTO,
+    WorkflowRecordOrderBy,
     WorkflowWithoutID,
 )
 
@@ -79,6 +83,11 @@ async def create_workflow(
 async def list_workflows(
     page: int = Query(default=0, description="The page to get"),
     per_page: int = Query(default=10, description="The number of workflows per page"),
+    order_by: WorkflowRecordOrderBy = Query(default=WorkflowRecordOrderBy.Name, description="The order by"),
+    direction: SQLiteDirection = Query(default=SQLiteDirection.Ascending, description="The order by"),
+    filter_text: Optional[str] = Query(default=None, description="The name to filter by"),
 ) -> PaginatedResults[WorkflowRecordListItemDTO]:
     """Gets a page of workflows"""
-    return ApiDependencies.invoker.services.workflow_records.get_many(page=page, per_page=per_page)
+    return ApiDependencies.invoker.services.workflow_records.get_many(
+        page=page, per_page=per_page, order_by=order_by, direction=direction, filter_text=filter_text
+    )

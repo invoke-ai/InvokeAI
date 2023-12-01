@@ -41,6 +41,7 @@ export const tagTypes = [
   'LoRAModel',
   'SDXLRefinerModel',
   'Workflow',
+  'WorkflowsRecent',
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
