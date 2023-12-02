@@ -188,8 +188,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         """Syncs default workflows to the database. Internal use only."""
 
         """
-        An enhancment might be to only update workflows that have changed. This would require we
-        ensure workflow IDs don't change, and the workflow version is incremented.
+        An enhancement might be to only update workflows that have changed. This would require stable
+        default workflow IDs, and properly incrementing the workflow version.
 
         It's much simpler to just replace them all with whichever workflows are in the directory.
 
