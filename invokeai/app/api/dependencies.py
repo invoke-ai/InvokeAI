@@ -124,8 +124,8 @@ class ApiDependencies:
 
         create_system_graphs(services.graph_library)
 
-        db.clean()
         ApiDependencies.invoker = Invoker(services)
+        db.clean()
 
     @staticmethod
     def shutdown():
