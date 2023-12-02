@@ -1,0 +1,156 @@
+# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
+"""Model download service."""
+
+from abc import ABC, abstractmethod
+from enum import Enum
+from functools import total_ordering
+from pathlib import Path
+from typing import List, Optional, Callable
+
+from pydantic import BaseModel, Field, PrivateAttr
+from pydantic.networks import AnyHttpUrl
+from invokeai.app.services.events.events_base import EventServiceBase
+
+
+class DownloadJobStatus(str, Enum):
+    """State of a download job."""
+
+    WAITING = "waiting"  # not enqueued, will not run
+    RUNNING = "running"  # actively downloading
+    COMPLETED = "completed"  # finished running
+    ERROR = "error"  # terminated with an error message
+
+
+class DownloadJobCancelledException(Exception):
+    """This exception is raised when a download job is cancelled."""
+
+
+class UnknownJobIDException(Exception):
+    """This exception is raised when an invalid job id is referened."""
+
+
+DownloadEventHandler = Callable[
+    [
+        "DownloadJob",
+    ],
+    None,
+]
+
+
+@total_ordering
+class DownloadJob(BaseModel):
+    """Class to monitor and control a model download request."""
+
+    # required variables to be passed in on creation
+    source       : AnyHttpUrl = Field(description="Where to download from. Specific types specified in child classes.")
+    dest         : Path = Field(description="Destination of downloaded model on local disk; a directory or file path")
+    access_token : Optional[str] = Field(default=None, description="authorization token for protected resources")
+
+    # optional event handlers passed in on creation
+    on_start     : Optional[DownloadEventHandler] = Field(default=None, description="handler for download start event")
+    on_progress  : Optional[DownloadEventHandler] = Field(default=None, description="handler for download progress events")
+    on_complete  : Optional[DownloadEventHandler] = Field(default=None, description="handler for download completion events")
+    on_error     : Optional[DownloadEventHandler] = Field(default=None, description="handler for download error events")
+
+    # automatically assigned on creation
+    id           : int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
+    priority     : int = Field(default=10, description="Queue priority; lower values are higher priority")
+
+    # set internally during download process
+    status       : DownloadJobStatus = Field(default=DownloadJobStatus.WAITING, description="Status of the download")
+    download_path: Optional[Path] = Field(default=None, description="Final location of downloaded file")
+    job_started  : Optional[str] = Field(default=None, description="Timestamp for when the download job started")
+    job_ended    : Optional[str] = Field(default=None, description="Timestamp for when the download job ende1d (completed or errored)")
+    bytes        : int = Field(default=0, description="Bytes downloaded so far")
+    total_bytes  : int = Field(default=0, description="Total file size (bytes)")
+
+    # set when an error occurs
+    error_type   : Optional[str] = Field(default=None, description="Name of exception that caused an error")
+    error        : Optional[str] = Field(default=None, description="Traceback of the exception that caused an error")
+
+    # internal flag
+    _cancelled   : bool = PrivateAttr(default=False)
+
+    def __le__(self, other: "DownloadJob") -> bool:
+        """Return True if this job's priority is less than another's."""
+        return self.priority <= other.priority
+
+
+class DownloadQueueServiceBase(ABC):
+    """Multithreaded queue for downloading models via URL."""
+
+    @abstractmethod
+    def download(
+        self,
+        source: AnyHttpUrl,
+        dest: Path,
+        priority: int = 10,
+        access_token: Optional[str] = None,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadEventHandler] = None,
+    ) -> DownloadJob:
+        """
+        Create a download job.
+
+        :param source: Source of the download as a URL.
+        :param destdir: Path to download to. See below.
+        :param on_start, on_progress, on_complete, on_error: Callbacks for the indicated
+         events.
+        :returns: A DownloadJob object for monitoring the state of the download.
+
+        The `dest` argument is a Path object. Its behavior is:
+
+        1. If the path exists and is a directory, then the URL contents will be downloaded
+            into that directory using the filename indicated in the response's `Content-Disposition` field.
+            If no content-disposition is present, then the last component of the URL will be used (similar to
+            wget's behavior).
+        2. If the path does not exist, then it is taken as the name of a new file to create with the downloaded
+           content.
+        3. If the path exists and is an existing file, then the downloader will try to resume the download from
+           the end of the existing file.
+
+        """
+        pass
+
+    @abstractmethod
+    def list_jobs(self) -> List[DownloadJob]:
+        """
+        List active DownloadJobBases.
+
+        :returns List[DownloadJobBase]: List of download jobs whose state is not "completed."
+        """
+        pass
+
+    @abstractmethod
+    def id_to_job(self, id: int) -> DownloadJob:
+        """
+        Return the DownloadJobBase corresponding to the integer ID.
+
+        :param id: ID of the DownloadJobBase.
+
+        Exceptions:
+        * UnknownJobIDException
+        """
+        pass
+
+    @abstractmethod
+    def cancel_all_jobs(self):
+        """Cancel all active and enquedjobs."""
+        pass
+
+    @abstractmethod
+    def prune_jobs(self):
+        """Prune completed and errored queue items from the job list."""
+        pass
+
+    @abstractmethod
+    def cancel_job(self, job: DownloadJob):
+        """Cancel the job, clearing partial downloads and putting it into ERROR state."""
+        pass
+
+    @abstractmethod
+    def join(self):
+        """Wait until all jobs are off the queue."""
+        pass
