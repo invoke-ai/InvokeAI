@@ -48,23 +48,3 @@ class WorkflowRecordsStorageBase(ABC):
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass
-
-    @abstractmethod
-    def _create_system_workflow(self, workflow: Workflow) -> None:
-        """Creates a system workflow. Internal use only."""
-        pass
-
-    @abstractmethod
-    def _update_system_workflow(self, workflow: Workflow) -> None:
-        """Updates a system workflow. Internal use only."""
-        pass
-
-    @abstractmethod
-    def _delete_system_workflow(self, workflow_id: str) -> None:
-        """Deletes a system workflow. Internal use only."""
-        pass
-
-    @abstractmethod
-    def _get_all_system_workflows(self) -> list[Workflow]:
-        """Gets all system workflows. Internal use only."""
-        pass

@@ -31,12 +31,12 @@ class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
 
 class WorkflowCategory(str, Enum, metaclass=MetaEnum):
     User = "user"
-    System = "system"
+    Default = "default"
 
 
 class WorkflowMeta(BaseModel):
     version: str = Field(description="The version of the workflow schema.")
-    category: WorkflowCategory = Field(description="The category of the workflow (user or system).")
+    category: WorkflowCategory = Field(description="The category of the workflow (user or default).")
 
     @field_validator("version")
     def validate_version(cls, version: str):

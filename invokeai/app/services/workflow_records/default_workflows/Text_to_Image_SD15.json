@@ -1,5 +1,4 @@
 {
-  "id": "af7030e2-c64f-4f03-b387-9634bb54ae5f",
   "name": "Text to Image - SD1.5",
   "author": "InvokeAI",
   "description": "Sample text to image workflow for Stable Diffusion 1.5/2",
@@ -30,7 +29,7 @@
     }
   ],
   "meta": {
-    "category": "system",
+    "category": "default",
     "version": "2.0.0"
   },
   "nodes": [
@@ -394,7 +393,7 @@
         "notes": "",
         "isIntermediate": true,
         "useCache": true,
-        "version": "1.4.0",
+        "version": "1.5.0",
         "nodePack": "invokeai",
         "inputs": {
           "positive_conditioning": {
@@ -534,6 +533,18 @@
               "name": "T2IAdapterField"
             }
           },
+          "cfg_rescale_multiplier": {
+            "id": "9101f0a6-5fe0-4826-b7b3-47e5d506826c",
+            "name": "cfg_rescale_multiplier",
+            "fieldKind": "input",
+            "label": "",
+            "type": {
+              "isCollection": false,
+              "isCollectionOrScalar": false,
+              "name": "FloatField"
+            },
+            "value": 0
+          },
           "latents": {
             "id": "334d4ba3-5a99-4195-82c5-86fb3f4f7d43",
             "name": "latents",
@@ -591,7 +602,7 @@
         }
       },
       "width": 320,
-      "height": 646,
+      "height": 703,
       "position": {
         "x": 1400,
         "y": 25

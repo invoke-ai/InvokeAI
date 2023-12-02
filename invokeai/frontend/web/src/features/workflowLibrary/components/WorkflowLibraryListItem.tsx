@@ -36,11 +36,13 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
             <Spacer />
-            <Text fontSize="sm" variant="subtext">
-              {t('common.updated')}:{' '}
-              {dateFormat(workflowDTO.updated_at, masks.shortDate)}{' '}
-              {dateFormat(workflowDTO.updated_at, masks.shortTime)}
-            </Text>
+            {workflowDTO.category === 'user' && (
+              <Text fontSize="sm" variant="subtext">
+                {t('common.updated')}:{' '}
+                {dateFormat(workflowDTO.updated_at, masks.shortDate)}{' '}
+                {dateFormat(workflowDTO.updated_at, masks.shortTime)}
+              </Text>
+            )}
           </Flex>
           <Flex alignItems="center" w="full">
             {workflowDTO.description ? (
@@ -58,11 +60,13 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
               </Text>
             )}
             <Spacer />
-            <Text fontSize="sm" variant="subtext">
-              {t('common.created')}:{' '}
-              {dateFormat(workflowDTO.created_at, masks.shortDate)}{' '}
-              {dateFormat(workflowDTO.created_at, masks.shortTime)}
-            </Text>
+            {workflowDTO.category === 'user' && (
+              <Text fontSize="sm" variant="subtext">
+                {t('common.created')}:{' '}
+                {dateFormat(workflowDTO.created_at, masks.shortDate)}{' '}
+                {dateFormat(workflowDTO.created_at, masks.shortTime)}
+              </Text>
+            )}
           </Flex>
         </Flex>
         <IAIButton

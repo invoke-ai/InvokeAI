@@ -41,7 +41,7 @@ export const validateWorkflow = (
 
   // System workflows are only allowed to be used as templates.
   // If a system workflow is loaded, change its category to user and remove its ID so that we can save it as a user workflow.
-  if (_workflow.meta.category === 'system') {
+  if (_workflow.meta.category === 'default') {
     _workflow.meta.category = 'user';
     _workflow.id = undefined;
   }

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 
 from invokeai.app.services.invoker import Invoker
@@ -28,6 +29,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
+        self._sync_default_workflows()
 
     def get(self, workflow_id: str) -> WorkflowRecordDTO:
         """Gets a workflow by ID. Updates the opened_at column."""
@@ -182,76 +184,48 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         finally:
             self._lock.release()
 
-    def _create_system_workflow(self, workflow: Workflow) -> None:
-        try:
-            self._lock.acquire()
-            # Only system workflows may be managed by this method
-            assert workflow.meta.category is WorkflowCategory.System
-            self._cursor.execute(
-                """--sql
-                INSERT OR REPLACE INTO workflow_library (
-                    workflow_id,
-                    workflow
-                )
-                VALUES (?, ?);
-                """,
-                (workflow.id, workflow.model_dump_json()),
-            )
-            self._conn.commit()
-        except Exception:
-            self._conn.rollback()
-            raise
-        finally:
-            self._lock.release()
+    def _sync_default_workflows(self) -> None:
+        """Syncs default workflows to the database. Internal use only."""
 
-    def _update_system_workflow(self, workflow: Workflow) -> None:
-        try:
-            self._lock.acquire()
-            # Only system workflows may be managed by this method
-            assert workflow.meta.category is WorkflowCategory.System
-            self._cursor.execute(
-                """--sql
-                UPDATE workflow_library
-                SET workflow = ?
-                WHERE workflow_id = ? AND category = 'system';
-                """,
-                (workflow.model_dump_json(), workflow.id),
-            )
-            self._conn.commit()
-        except Exception:
-            self._conn.rollback()
-            raise
-        finally:
-            self._lock.release()
+        """
+        An enhancment might be to only update workflows that have changed. This would require we
+        ensure workflow IDs don't change, and the workflow version is incremented.
 
-    def _delete_system_workflow(self, workflow_id: str) -> None:
+        It's much simpler to just replace them all with whichever workflows are in the directory.
+
+        The downside is that the `updated_at` and `opened_at` timestamps for default workflows are
+        meaningless, as they are overwritten every time the server starts.
+        """
+
         try:
             self._lock.acquire()
+            workflows: list[Workflow] = []
+            workflows_dir = Path(__file__).parent / Path("default_workflows")
+            workflow_paths = workflows_dir.glob("*.json")
+            for path in workflow_paths:
+                bytes_ = path.read_bytes()
+                workflow = WorkflowValidator.validate_json(bytes_)
+                workflows.append(workflow)
+            # Only default workflows may be managed by this method
+            assert all(w.meta.category is WorkflowCategory.Default for w in workflows)
             self._cursor.execute(
                 """--sql
                 DELETE FROM workflow_library
-                WHERE workflow_id = ? AND category = 'system';
-                """,
-                (workflow_id,),
-            )
-            self._conn.commit()
-        except Exception:
-            self._conn.rollback()
-            raise
-        finally:
-            self._lock.release()
-
-    def _get_all_system_workflows(self) -> list[Workflow]:
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                SELECT workflow FROM workflow_library
-                WHERE category = 'system';
+                WHERE category = 'default';
                 """
             )
-            rows = self._cursor.fetchall()
-            return [WorkflowValidator.validate_json(dict(row)["workflow"]) for row in rows]
+            for w in workflows:
+                self._cursor.execute(
+                    """--sql
+                    INSERT OR REPLACE INTO workflow_library (
+                        workflow_id,
+                        workflow
+                    )
+                    VALUES (?, ?);
+                    """,
+                    (w.id, w.model_dump_json()),
+                )
+            self._conn.commit()
         except Exception:
             self._conn.rollback()
             raise

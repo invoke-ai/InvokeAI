@@ -20,7 +20,14 @@ import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableCon
 import { WorkflowCategory } from 'features/nodes/types/workflow';
 import WorkflowLibraryListItem from 'features/workflowLibrary/components/WorkflowLibraryListItem';
 import WorkflowLibraryPagination from 'features/workflowLibrary/components/WorkflowLibraryPagination';
-import { ChangeEvent, KeyboardEvent, memo, useCallback, useState } from 'react';
+import {
+  ChangeEvent,
+  KeyboardEvent,
+  memo,
+  useCallback,
+  useMemo,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
@@ -29,7 +36,7 @@ import { useDebounce } from 'use-debounce';
 const PER_PAGE = 10;
 
 const ORDER_BY_DATA: SelectItem[] = [
-  { value: 'opened_at', label: 'Recently Opened' },
+  { value: 'opened_at', label: 'Opened' },
   { value: 'created_at', label: 'Created' },
   { value: 'updated_at', label: 'Updated' },
   { value: 'name', label: 'Name' },
@@ -48,14 +55,29 @@ const WorkflowLibraryList = () => {
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
   const [debouncedFilterText] = useDebounce(filter_text, 500);
-  const { data, isLoading, isError, isFetching } = useListWorkflowsQuery({
-    page,
-    per_page: PER_PAGE,
-    order_by,
-    direction,
-    category,
-    filter_text: debouncedFilterText,
-  });
+
+  const query = useMemo(() => {
+    if (category === 'user') {
+      return {
+        page,
+        per_page: PER_PAGE,
+        order_by,
+        direction,
+        category,
+        filter_text: debouncedFilterText,
+      };
+    }
+    return {
+      page,
+      per_page: PER_PAGE,
+      order_by: 'name' as const,
+      direction: 'ASC' as const,
+      category,
+      filter_text: debouncedFilterText,
+    };
+  }, [category, debouncedFilterText, direction, order_by, page]);
+
+  const { data, isLoading, isError, isFetching } = useListWorkflowsQuery(query);
 
   const handleChangeOrderBy = useCallback(
     (value: string | null) => {
@@ -106,10 +128,12 @@ const WorkflowLibraryList = () => {
 
   const handleSetUserCategory = useCallback(() => {
     setCategory('user');
+    setPage(0);
   }, []);
 
-  const handleSetSystemCategory = useCallback(() => {
-    setCategory('system');
+  const handleSetDefaultCategory = useCallback(() => {
+    setCategory('default');
+    setPage(0);
   }, []);
 
   if (isLoading) {
@@ -132,14 +156,44 @@ const WorkflowLibraryList = () => {
             {t('workflows.userWorkflows')}
           </IAIButton>
           <IAIButton
-            variant={category === 'system' ? undefined : 'ghost'}
-            onClick={handleSetSystemCategory}
-            isChecked={category === 'system'}
+            variant={category === 'default' ? undefined : 'ghost'}
+            onClick={handleSetDefaultCategory}
+            isChecked={category === 'default'}
           >
-            {t('workflows.systemWorkflows')}
+            {t('workflows.defaultWorkflows')}
           </IAIButton>
         </ButtonGroup>
         <Spacer />
+        {category === 'user' && (
+          <>
+            <IAIMantineSelect
+              label={t('common.orderBy')}
+              value={order_by}
+              data={ORDER_BY_DATA}
+              onChange={handleChangeOrderBy}
+              formControlProps={{
+                w: '12rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}
+              disabled={isFetching}
+            />
+            <IAIMantineSelect
+              label={t('common.direction')}
+              value={direction}
+              data={DIRECTION_DATA}
+              onChange={handleChangeDirection}
+              formControlProps={{
+                w: '12rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}
+              disabled={isFetching}
+            />
+          </>
+        )}
         <InputGroup w="20rem">
           <Input
             placeholder={t('workflows.searchWorkflows')}
@@ -161,32 +215,6 @@ const WorkflowLibraryList = () => {
             </InputRightElement>
           )}
         </InputGroup>
-        <IAIMantineSelect
-          label={t('common.orderBy')}
-          value={order_by}
-          data={ORDER_BY_DATA}
-          onChange={handleChangeOrderBy}
-          formControlProps={{
-            w: '15rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-          }}
-          disabled={isFetching}
-        />
-        <IAIMantineSelect
-          label={t('common.direction')}
-          value={direction}
-          data={DIRECTION_DATA}
-          onChange={handleChangeDirection}
-          formControlProps={{
-            w: '12rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-          }}
-          disabled={isFetching}
-        />
       </Flex>
       <Divider />
       {data.items.length ? (
