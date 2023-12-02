@@ -946,9 +946,9 @@
         "problemSettingTitle": "Problem Setting Title",
         "reloadNodeTemplates": "Reload Node Templates",
         "removeLinearView": "Remove from Linear View",
-        "resetWorkflow": "Reset Workflow",
-        "resetWorkflowDesc": "Are you sure you want to reset this workflow?",
-        "resetWorkflowDesc2": "Resetting the workflow will clear all nodes, edges and workflow details.",
+        "resetWorkflow": "Reset Workflow Editor",
+        "resetWorkflowDesc": "Are you sure you want to reset the Workflow Editor?",
+        "resetWorkflowDesc2": "Resetting the Workflow Editor will clear all nodes, edges and workflow details. Saved workflows will not be affected.",
         "scheduler": "Scheduler",
         "schedulerDescription": "TODO",
         "sDXLMainModelField": "SDXL Model",
@@ -1275,7 +1275,6 @@
         "modelAddedSimple": "Model Added",
         "modelAddFailed": "Model Add Failed",
         "nodesBrokenConnections": "Cannot load. Some connections are broken.",
-        "nodesCleared": "Nodes Cleared",
         "nodesCorruptedGraph": "Cannot load. Graph seems to be corrupted.",
         "nodesLoaded": "Nodes Loaded",
         "nodesLoadedFailed": "Failed To Load Nodes",
@@ -1645,6 +1644,7 @@
         "noDescription": "No description",
         "searchWorkflows": "Search Workflows",
         "clearWorkflowSearchFilter": "Clear Workflow Search Filter",
-        "workflowName": "Workflow Name"
+        "workflowName": "Workflow Name",
+        "workflowEditorReset": "Workflow Editor Reset"
     }
 }

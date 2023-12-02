@@ -2,7 +2,7 @@ import { Flex } from '@chakra-ui/layout';
 import { memo } from 'react';
 import DownloadWorkflowButton from 'features/workflowLibrary/components/DownloadWorkflowButton';
 import UploadWorkflowButton from 'features/workflowLibrary/components/LoadWorkflowFromFileButton';
-import ResetWorkflowButton from 'features/workflowLibrary/components/ResetWorkflowButton';
+import ResetWorkflowEditorButton from 'features/workflowLibrary/components/ResetWorkflowButton';
 import SaveWorkflowButton from 'features/workflowLibrary/components/SaveWorkflowButton';
 import SaveWorkflowAsButton from 'features/workflowLibrary/components/SaveWorkflowAsButton';
 
@@ -21,7 +21,7 @@ const TopCenterPanel = () => {
       <UploadWorkflowButton />
       <SaveWorkflowButton />
       <SaveWorkflowAsButton />
-      <ResetWorkflowButton />
+      <ResetWorkflowEditorButton />
     </Flex>
   );
 };

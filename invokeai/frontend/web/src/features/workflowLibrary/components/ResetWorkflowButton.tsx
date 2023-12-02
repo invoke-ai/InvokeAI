@@ -19,7 +19,7 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
-const ResetWorkflowButton = () => {
+const ResetWorkflowEditorButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -31,7 +31,7 @@ const ResetWorkflowButton = () => {
     dispatch(
       addToast(
         makeToast({
-          title: t('toast.nodesCleared'),
+          title: t('workflows.workflowEditorReset'),
           status: 'success',
         })
       )
@@ -84,4 +84,4 @@ const ResetWorkflowButton = () => {
   );
 };
 
-export default memo(ResetWorkflowButton);
+export default memo(ResetWorkflowEditorButton);
