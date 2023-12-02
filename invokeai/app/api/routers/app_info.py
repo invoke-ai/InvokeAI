@@ -1,13 +1,11 @@
-import sys
 import typing
 from enum import Enum
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from platform import python_version
+from typing import Optional
 
-import accelerate
-import diffusers
 import torch
-import torchvision
-import transformers
 from fastapi import Body
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
@@ -49,13 +47,19 @@ class AppVersion(BaseModel):
 class AppDependencyVersions(BaseModel):
     """App depencency Versions Response"""
 
+    accelerate: str = Field(description="accelerate version")
+    compel: str = Field(description="compel version")
+    cuda: Optional[str] = Field(description="CUDA version")
+    diffusers: str = Field(description="diffusers version")
+    numpy: str = Field(description="Numpy version")
+    opencv: str = Field(description="OpenCV version")
+    onnx: str = Field(description="ONNX version")
+    pillow: str = Field(description="Pillow (PIL) version")
     python: str = Field(description="Python version")
     torch: str = Field(description="PyTorch version")
     torchvision: str = Field(description="PyTorch Vision version")
-    cuda: str = Field(description="CUDA version")
-    accelerate: str = Field(description="accelerate version")
-    diffusers: str = Field(description="diffusers version")
     transformers: str = Field(description="transformers version")
+    xformers: Optional[str] = Field(description="xformers version")
 
 
 class AppConfig(BaseModel):
@@ -73,15 +77,25 @@ async def get_version() -> AppVersion:
 
 
 @app_router.get("/app_deps", operation_id="get_app_deps", status_code=200, response_model=AppDependencyVersions)
-async def get_app_deps() -> AppVersion:
+async def get_app_deps() -> AppDependencyVersions:
+    try:
+        xformers = version("xformers")
+    except PackageNotFoundError:
+        xformers = None
     return AppDependencyVersions(
-        python_version=sys.version,
-        torch_version=torch.version.__version__,
-        cuda_version=torch.version.cuda,
-        torchvision_version=torchvision.version.__version__,
-        accelerate=accelerate.__version__,
-        diffusers=diffusers.__version__,
-        transformers=transformers.__version__,
+        accelerate=version("accelerate"),
+        compel=version("compel"),
+        cuda=torch.version.cuda,
+        diffusers=version("diffusers"),
+        numpy=version("numpy"),
+        opencv=version("opencv-python"),
+        onnx=version("onnx"),
+        pillow=version("pillow"),
+        python=python_version(),
+        torch=torch.version.__version__,
+        torchvision=version("torchvision"),
+        transformers=version("transformers"),
+        xformers=xformers,
     )
 
 
