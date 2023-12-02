@@ -21,20 +21,7 @@ class DiskLatentsStorage(LatentsStorageBase):
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
-
-        # Delete all latents files on startup
-        deleted_latents_count = 0
-        freed_space = 0
-        for latents_file in Path(self.__output_folder).glob("*"):
-            if latents_file.is_file():
-                freed_space += latents_file.stat().st_size
-                deleted_latents_count += 1
-                latents_file.unlink()
-        if deleted_latents_count > 0:
-            freed_space_in_mb = round(freed_space / 1024 / 1024, 2)
-            self._invoker.services.logger.info(
-                f"Deleted {deleted_latents_count} latents files (freed {freed_space_in_mb}MB)"
-            )
+        self._delete_all_latents()
 
     def get(self, name: str) -> torch.Tensor:
         latent_path = self.get_path(name)
@@ -51,3 +38,21 @@ class DiskLatentsStorage(LatentsStorageBase):
 
     def get_path(self, name: str) -> Path:
         return self.__output_folder / name
+
+    def _delete_all_latents(self) -> None:
+        """
+        Deletes all latents from disk.
+        Must be called after we have access to `self._invoker` (e.g. in `start()`).
+        """
+        deleted_latents_count = 0
+        freed_space = 0
+        for latents_file in Path(self.__output_folder).glob("*"):
+            if latents_file.is_file():
+                freed_space += latents_file.stat().st_size
+                deleted_latents_count += 1
+                latents_file.unlink()
+        if deleted_latents_count > 0:
+            freed_space_in_mb = round(freed_space / 1024 / 1024, 2)
+            self._invoker.services.logger.info(
+                f"Deleted {deleted_latents_count} latents files (freed {freed_space_in_mb}MB)"
+            )
