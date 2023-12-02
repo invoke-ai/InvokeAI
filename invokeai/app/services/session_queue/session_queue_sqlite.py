@@ -43,7 +43,8 @@ class SqliteSessionQueue(SessionQueueBase):
         self._set_in_progress_to_canceled()
         prune_result = self.prune(DEFAULT_QUEUE_ID)
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_session_event)
-        self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
+        if prune_result.deleted > 0:
+            self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
     def _match_event_name(self, event: FastAPIEvent, match_in: list[str]) -> bool:
         return event[1]["event"] in match_in
