@@ -136,14 +136,6 @@ const WorkflowLibraryList = () => {
     setPage(0);
   }, []);
 
-  if (isLoading) {
-    return <IAINoContentFallbackWithSpinner label={t('workflows.loading')} />;
-  }
-
-  if (!data || isError) {
-    return <IAINoContentFallback label={t('workflows.problemLoading')} />;
-  }
-
   return (
     <>
       <Flex gap={4} alignItems="center" h={10} flexShrink={0} flexGrow={0}>
@@ -172,7 +164,7 @@ const WorkflowLibraryList = () => {
               data={ORDER_BY_DATA}
               onChange={handleChangeOrderBy}
               formControlProps={{
-                w: '12rem',
+                w: 48,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 2,
@@ -185,7 +177,7 @@ const WorkflowLibraryList = () => {
               data={DIRECTION_DATA}
               onChange={handleChangeDirection}
               formControlProps={{
-                w: '12rem',
+                w: 48,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 2,
@@ -217,7 +209,11 @@ const WorkflowLibraryList = () => {
         </InputGroup>
       </Flex>
       <Divider />
-      {data.items.length ? (
+      {isLoading ? (
+        <IAINoContentFallbackWithSpinner label={t('workflows.loading')} />
+      ) : !data || isError ? (
+        <IAINoContentFallback label={t('workflows.problemLoading')} />
+      ) : data.items.length ? (
         <ScrollableContent>
           <Flex w="full" h="full" gap={2} px={1} flexDir="column">
             {data.items.map((w) => (
@@ -229,9 +225,15 @@ const WorkflowLibraryList = () => {
         <IAINoContentFallback label={t('workflows.noUserWorkflows')} />
       )}
       <Divider />
-      <Flex w="full" justifyContent="space-around">
-        <WorkflowLibraryPagination data={data} page={page} setPage={setPage} />
-      </Flex>
+      {data && (
+        <Flex w="full" justifyContent="space-around">
+          <WorkflowLibraryPagination
+            data={data}
+            page={page}
+            setPage={setPage}
+          />
+        </Flex>
+      )}
     </>
   );
 };

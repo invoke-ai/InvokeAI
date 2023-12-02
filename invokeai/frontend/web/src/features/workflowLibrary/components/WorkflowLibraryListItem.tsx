@@ -29,9 +29,9 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
 
   return (
     <Flex key={workflowDTO.workflow_id} w="full">
-      <Flex w="full" alignItems="center" gap={2}>
-        <Flex flexDir="column" flexGrow={1}>
-          <Flex alignItems="center" w="full">
+      <Flex w="full" alignItems="center" gap={2} h={12}>
+        <Flex flexDir="column" flexGrow={1} h="full">
+          <Flex alignItems="center" w="full" h="50%">
             <Heading size="sm">
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
@@ -44,7 +44,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
               </Text>
             )}
           </Flex>
-          <Flex alignItems="center" w="full">
+          <Flex alignItems="center" w="full" h="50%">
             {workflowDTO.description ? (
               <Text fontSize="sm" noOfLines={1}>
                 {workflowDTO.description}
