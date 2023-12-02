@@ -13,7 +13,7 @@ import {
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useSaveWorkflowAs } from 'features/workflowLibrary/hooks/useDuplicateWorkflow';
+import { useSaveWorkflowAs } from 'features/workflowLibrary/hooks/useSaveWorkflowAs';
 import { ChangeEvent, memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaClone } from 'react-icons/fa';

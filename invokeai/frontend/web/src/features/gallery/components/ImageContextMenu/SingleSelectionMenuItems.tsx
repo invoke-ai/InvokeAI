@@ -14,11 +14,11 @@ import {
   sentImageToCanvas,
   sentImageToImg2Img,
 } from 'features/gallery/store/actions';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +36,6 @@ import {
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
-  useLazyGetImageWorkflowQuery,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
@@ -62,12 +61,12 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     imageDTO?.image_name
   );
 
-  const [getWorkflow, getWorkflowResult] = useLazyGetImageWorkflowQuery();
+  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } =
+    useGetAndLoadEmbeddedWorkflow({});
+
   const handleLoadWorkflow = useCallback(() => {
-    getWorkflow(imageDTO.image_name).then((workflow) => {
-      dispatch(workflowLoadRequested(workflow.data));
-    });
-  }, [dispatch, getWorkflow, imageDTO]);
+    getAndLoadEmbeddedWorkflow(imageDTO.image_name);
+  }, [getAndLoadEmbeddedWorkflow, imageDTO.image_name]);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
@@ -176,7 +175,13 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('parameters.downloadImage')}
       </MenuItem>
       <MenuItem
-        icon={getWorkflowResult.isLoading ? <SpinnerIcon /> : <FaCircleNodes />}
+        icon={
+          getAndLoadEmbeddedWorkflowResult.isLoading ? (
+            <SpinnerIcon />
+          ) : (
+            <FaCircleNodes />
+          )
+        }
         onClickCapture={handleLoadWorkflow}
         isDisabled={!imageDTO.has_workflow}
       >

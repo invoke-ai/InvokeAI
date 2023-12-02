@@ -10,7 +10,15 @@ import {
   useUpdateWorkflowMutation,
 } from 'services/api/endpoints/workflows';
 
-export const useSaveLibraryWorkflow = () => {
+type UseSaveLibraryWorkflowReturn = {
+  saveWorkflow: () => Promise<void>;
+  isLoading: boolean;
+  isError: boolean;
+};
+
+type UseSaveLibraryWorkflow = () => UseSaveLibraryWorkflowReturn;
+
+export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const workflow = useWorkflow();

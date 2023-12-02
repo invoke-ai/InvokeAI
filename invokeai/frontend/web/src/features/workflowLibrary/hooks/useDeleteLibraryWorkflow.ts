@@ -3,15 +3,24 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeleteWorkflowMutation } from 'services/api/endpoints/workflows';
 
-type UseDeleteLibraryWorkflowArg = {
+type UseDeleteLibraryWorkflowOptions = {
   onSuccess?: () => void;
   onError?: () => void;
 };
 
-export const useDeleteLibraryWorkflow = ({
+type UseDeleteLibraryWorkflowReturn = {
+  deleteWorkflow: (workflow_id: string) => Promise<void>;
+  deleteWorkflowResult: ReturnType<typeof useDeleteWorkflowMutation>[1];
+};
+
+type UseDeleteLibraryWorkflow = (
+  arg: UseDeleteLibraryWorkflowOptions
+) => UseDeleteLibraryWorkflowReturn;
+
+export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
   onSuccess,
   onError,
-}: UseDeleteLibraryWorkflowArg) => {
+}) => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
   const [_deleteWorkflow, deleteWorkflowResult] = useDeleteWorkflowMutation();

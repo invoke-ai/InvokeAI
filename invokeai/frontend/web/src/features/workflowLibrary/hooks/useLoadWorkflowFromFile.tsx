@@ -1,15 +1,22 @@
-import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { RefObject, memo, useCallback } from 'react';
+import { RefObject, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ZodError } from 'zod';
-import { fromZodIssue } from 'zod-validation-error';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
 
-export const useLoadWorkflowFromFile = (resetRef: RefObject<() => void>) => {
+type useLoadWorkflowFromFileOptions = {
+  resetRef: RefObject<() => void>;
+};
+
+type UseLoadWorkflowFromFile = (
+  options: useLoadWorkflowFromFileOptions
+) => (file: File | null) => void;
+
+export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({
+  resetRef,
+}) => {
   const dispatch = useAppDispatch();
   const logger = useLogger('nodes');
   const { t } = useTranslation();
@@ -41,6 +48,7 @@ export const useLoadWorkflowFromFile = (resetRef: RefObject<() => void>) => {
       };
 
       reader.readAsText(file);
+
       // Reset the file picker internal state so that the same file can be loaded again
       resetRef.current?.();
     },
@@ -49,24 +57,3 @@ export const useLoadWorkflowFromFile = (resetRef: RefObject<() => void>) => {
 
   return loadWorkflowFromFile;
 };
-
-const WorkflowValidationErrorContent = memo((props: { error: ZodError }) => {
-  if (props.error.issues[0]) {
-    return (
-      <Text>
-        {fromZodIssue(props.error.issues[0], { prefix: null }).toString()}
-      </Text>
-    );
-  }
-  return (
-    <UnorderedList>
-      {props.error.issues.map((issue, i) => (
-        <ListItem key={i}>
-          <Text>{fromZodIssue(issue, { prefix: null }).toString()}</Text>
-        </ListItem>
-      ))}
-    </UnorderedList>
-  );
-});
-
-WorkflowValidationErrorContent.displayName = 'WorkflowValidationErrorContent';

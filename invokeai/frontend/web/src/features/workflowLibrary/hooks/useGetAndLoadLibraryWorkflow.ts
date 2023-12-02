@@ -5,15 +5,24 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLazyGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
-type UseGetAndLoadLibraryWorkflowArg = {
+type UseGetAndLoadLibraryWorkflowOptions = {
   onSuccess?: () => void;
   onError?: () => void;
 };
 
-export const useGetAndLoadLibraryWorkflow = ({
+type UseGetAndLoadLibraryWorkflowReturn = {
+  getAndLoadWorkflow: (workflow_id: string) => Promise<void>;
+  getAndLoadWorkflowResult: ReturnType<typeof useLazyGetWorkflowQuery>[1];
+};
+
+type UseGetAndLoadLibraryWorkflow = (
+  arg: UseGetAndLoadLibraryWorkflowOptions
+) => UseGetAndLoadLibraryWorkflowReturn;
+
+export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({
   onSuccess,
   onError,
-}: UseGetAndLoadLibraryWorkflowArg) => {
+}) => {
   const dispatch = useAppDispatch();
   const toaster = useAppToaster();
   const { t } = useTranslation();

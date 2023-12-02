@@ -7,20 +7,28 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateWorkflowMutation } from 'services/api/endpoints/workflows';
 
-type Arg = {
+type SaveWorkflowAsArg = {
   name: string;
   onSuccess?: () => void;
   onError?: () => void;
 };
 
-export const useSaveWorkflowAs = () => {
+type UseSaveWorkflowAsReturn = {
+  saveWorkflowAs: (arg: SaveWorkflowAsArg) => Promise<void>;
+  isLoading: boolean;
+  isError: boolean;
+};
+
+type UseSaveWorkflowAs = () => UseSaveWorkflowAsReturn;
+
+export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const workflow = useWorkflow();
   const [createWorkflow, createWorkflowResult] = useCreateWorkflowMutation();
   const toaster = useAppToaster();
   const saveWorkflowAs = useCallback(
-    async ({ name: newName, onSuccess, onError }: Arg) => {
+    async ({ name: newName, onSuccess, onError }: SaveWorkflowAsArg) => {
       try {
         workflow.id = undefined;
         workflow.name = newName;

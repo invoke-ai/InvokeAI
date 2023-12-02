@@ -8,7 +8,7 @@ import { FaUpload } from 'react-icons/fa';
 const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const loadWorkflowFromFile = useLoadWorkflowFromFile(resetRef);
+  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef });
   return (
     <FileButton
       resetRef={resetRef}
