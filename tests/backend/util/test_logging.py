@@ -6,7 +6,7 @@ import logging
 import re
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util.logging import InvokeAILogger, LOG_FORMATTERS
+from invokeai.backend.util.logging import LOG_FORMATTERS, InvokeAILogger
 
 
 # test formatting
