@@ -29,7 +29,7 @@ import {
   zNodeStatus,
 } from 'features/nodes/types/invocation';
 import { WorkflowV2 } from 'features/nodes/types/workflow';
-import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
+import { cloneDeep, forEach } from 'lodash-es';
 import {
   addEdge,
   applyEdgeChanges,
@@ -70,20 +70,6 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
   outputs: [],
 };
 
-const INITIAL_WORKFLOW: WorkflowV2 = {
-  name: '',
-  author: '',
-  description: '',
-  version: '',
-  contact: '',
-  tags: '',
-  notes: '',
-  nodes: [],
-  edges: [],
-  exposedFields: [],
-  meta: { version: '2.0.0', category: 'user' },
-};
-
 export const initialNodesState: NodesState = {
   nodes: [],
   edges: [],
@@ -103,7 +89,7 @@ export const initialNodesState: NodesState = {
   nodeOpacity: 1,
   selectedNodes: [],
   selectedEdges: [],
-  workflow: INITIAL_WORKFLOW,
+  // workflow: INITIAL_WORKFLOW,
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
   mouseOverField: null,
@@ -308,23 +294,6 @@ const nodesSlice = createSlice({
       }
       state.modifyingEdge = false;
     },
-    workflowExposedFieldAdded: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
-      state.workflow.exposedFields = uniqBy(
-        state.workflow.exposedFields.concat(action.payload),
-        (field) => `${field.nodeId}-${field.fieldName}`
-      );
-    },
-    workflowExposedFieldRemoved: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
-      state.workflow.exposedFields = state.workflow.exposedFields.filter(
-        (field) => !isEqual(field, action.payload)
-      );
-    },
     fieldLabelChanged: (
       state,
       action: PayloadAction<{
@@ -508,9 +477,6 @@ const nodesSlice = createSlice({
     },
     nodesDeleted: (state, action: PayloadAction<AnyNode[]>) => {
       action.payload.forEach((node) => {
-        state.workflow.exposedFields = state.workflow.exposedFields.filter(
-          (f) => f.nodeId !== node.id
-        );
         if (!isInvocationNode(node)) {
           return;
         }
@@ -673,7 +639,6 @@ const nodesSlice = createSlice({
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
-      state.workflow = cloneDeep(INITIAL_WORKFLOW);
     },
     shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldValidateGraph = action.payload;
@@ -690,34 +655,8 @@ const nodesSlice = createSlice({
     nodeOpacityChanged: (state, action: PayloadAction<number>) => {
       state.nodeOpacity = action.payload;
     },
-    workflowNameChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.name = action.payload;
-    },
-    workflowDescriptionChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.description = action.payload;
-    },
-    workflowTagsChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.tags = action.payload;
-    },
-    workflowAuthorChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.author = action.payload;
-    },
-    workflowNotesChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.notes = action.payload;
-    },
-    workflowVersionChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.version = action.payload;
-    },
-    workflowContactChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.contact = action.payload;
-    },
-    workflowIDChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.id = action.payload;
-    },
     workflowLoaded: (state, action: PayloadAction<WorkflowV2>) => {
-      const { nodes, edges, ...workflow } = action.payload;
-      state.workflow = workflow;
-
+      const { nodes, edges } = action.payload;
       state.nodes = applyNodeChanges(
         nodes.map((node) => ({
           item: { ...node, ...SHARED_NODE_PROPERTIES },
@@ -739,9 +678,6 @@ const nodesSlice = createSlice({
         };
         return acc;
       }, {});
-    },
-    workflowReset: (state) => {
-      state.workflow = cloneDeep(INITIAL_WORKFLOW);
     },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
@@ -996,17 +932,7 @@ export const {
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
   viewportChanged,
-  workflowAuthorChanged,
-  workflowContactChanged,
-  workflowDescriptionChanged,
-  workflowExposedFieldAdded,
-  workflowExposedFieldRemoved,
   workflowLoaded,
-  workflowNameChanged,
-  workflowNotesChanged,
-  workflowTagsChanged,
-  workflowVersionChanged,
-  workflowIDChanged,
   edgeAdded,
 } = nodesSlice.actions;
 

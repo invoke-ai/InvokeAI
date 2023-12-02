@@ -11,12 +11,18 @@ export const addEnqueueRequestedNodes = () => {
       enqueueRequested.match(action) && action.payload.tabName === 'nodes',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
+      const { nodes, edges } = state.nodes;
+      const workflow = state.workflow;
       const graph = buildNodesGraph(state.nodes);
-      const workflow = buildWorkflow(state.nodes);
+      const builtWorkflow = buildWorkflow({
+        nodes,
+        edges,
+        workflow,
+      });
       const batchConfig: BatchConfig = {
         batch: {
           graph,
-          workflow,
+          workflow: builtWorkflow,
           runs: state.generation.iterations,
         },
         prepend: action.payload.prepend,

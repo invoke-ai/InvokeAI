@@ -1,5 +1,4 @@
 import { $store } from 'app/store/nanostores/store';
-import { RootState } from 'app/store/store';
 import {
   WorkflowMigrationError,
   WorkflowVersionError,
@@ -32,8 +31,12 @@ const zWorkflowMetaVersion = z.object({
  * - Workflow schema version bumped to 2.0.0
  */
 const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
-  const invocationTemplates = ($store.get()?.getState() as RootState).nodes
-    .nodeTemplates;
+  const invocationTemplates = $store.get()?.getState().nodes.nodeTemplates;
+
+  if (!invocationTemplates) {
+    throw new Error(t('app.storeNotInitialized'));
+  }
+
   workflowToMigrate.nodes.forEach((node) => {
     if (node.type === 'invocation') {
       // Migrate field types
@@ -66,6 +69,7 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
   });
   // Bump version
   (workflowToMigrate as unknown as WorkflowV2).meta.version = '2.0.0';
+  // Add category - should always be 'user', 'default' workflows are only created by the backend
   (workflowToMigrate as unknown as WorkflowV2).meta.category = 'user';
   // Parsing strips out any extra properties not in the latest version
   return zWorkflowV2.parse(workflowToMigrate);

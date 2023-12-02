@@ -5,12 +5,16 @@ import { useMemo } from 'react';
 import { useDebounce } from 'use-debounce';
 
 export const useWorkflow = () => {
-  const nodes = useAppSelector((state: RootState) => state.nodes);
-  const [debouncedNodes] = useDebounce(nodes, 300);
-  const workflow = useMemo(
-    () => buildWorkflow(debouncedNodes),
-    [debouncedNodes]
+  const nodes_ = useAppSelector((state: RootState) => state.nodes.nodes);
+  const edges_ = useAppSelector((state: RootState) => state.nodes.edges);
+  const workflow_ = useAppSelector((state: RootState) => state.workflow);
+  const [nodes] = useDebounce(nodes_, 300);
+  const [edges] = useDebounce(edges_, 300);
+  const [workflow] = useDebounce(workflow_, 300);
+  const builtWorkflow = useMemo(
+    () => buildWorkflow({ nodes, edges, workflow }),
+    [nodes, edges, workflow]
   );
 
-  return workflow;
+  return builtWorkflow;
 };

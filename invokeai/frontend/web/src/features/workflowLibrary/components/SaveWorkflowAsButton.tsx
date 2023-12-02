@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { FaClone } from 'react-icons/fa';
 
 const SaveWorkflowAsButton = () => {
-  const currentName = useAppSelector((state) => state.nodes.workflow.name);
+  const currentName = useAppSelector((state) => state.workflow.name);
   const { t } = useTranslation();
   const { saveWorkflowAs, isLoading } = useSaveWorkflowAs();
   const [name, setName] = useState(currentName.trim());
