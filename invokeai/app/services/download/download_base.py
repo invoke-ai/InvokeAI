@@ -5,11 +5,10 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import Callable, List, Optional
 
 from pydantic import BaseModel, Field, PrivateAttr
 from pydantic.networks import AnyHttpUrl
-from invokeai.app.services.events.events_base import EventServiceBase
 
 
 class DownloadJobStatus(str, Enum):
@@ -42,34 +41,40 @@ class DownloadJob(BaseModel):
     """Class to monitor and control a model download request."""
 
     # required variables to be passed in on creation
-    source       : AnyHttpUrl = Field(description="Where to download from. Specific types specified in child classes.")
-    dest         : Path = Field(description="Destination of downloaded model on local disk; a directory or file path")
-    access_token : Optional[str] = Field(default=None, description="authorization token for protected resources")
+    source: AnyHttpUrl = Field(description="Where to download from. Specific types specified in child classes.")
+    dest: Path = Field(description="Destination of downloaded model on local disk; a directory or file path")
+    access_token: Optional[str] = Field(default=None, description="authorization token for protected resources")
 
     # optional event handlers passed in on creation
-    on_start     : Optional[DownloadEventHandler] = Field(default=None, description="handler for download start event")
-    on_progress  : Optional[DownloadEventHandler] = Field(default=None, description="handler for download progress events")
-    on_complete  : Optional[DownloadEventHandler] = Field(default=None, description="handler for download completion events")
-    on_error     : Optional[DownloadEventHandler] = Field(default=None, description="handler for download error events")
+    on_start: Optional[DownloadEventHandler] = Field(default=None, description="handler for download start event")
+    on_progress: Optional[DownloadEventHandler] = Field(
+        default=None, description="handler for download progress events"
+    )
+    on_complete: Optional[DownloadEventHandler] = Field(
+        default=None, description="handler for download completion events"
+    )
+    on_error: Optional[DownloadEventHandler] = Field(default=None, description="handler for download error events")
 
     # automatically assigned on creation
-    id           : int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
-    priority     : int = Field(default=10, description="Queue priority; lower values are higher priority")
+    id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
+    priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
 
     # set internally during download process
-    status       : DownloadJobStatus = Field(default=DownloadJobStatus.WAITING, description="Status of the download")
+    status: DownloadJobStatus = Field(default=DownloadJobStatus.WAITING, description="Status of the download")
     download_path: Optional[Path] = Field(default=None, description="Final location of downloaded file")
-    job_started  : Optional[str] = Field(default=None, description="Timestamp for when the download job started")
-    job_ended    : Optional[str] = Field(default=None, description="Timestamp for when the download job ende1d (completed or errored)")
-    bytes        : int = Field(default=0, description="Bytes downloaded so far")
-    total_bytes  : int = Field(default=0, description="Total file size (bytes)")
+    job_started: Optional[str] = Field(default=None, description="Timestamp for when the download job started")
+    job_ended: Optional[str] = Field(
+        default=None, description="Timestamp for when the download job ende1d (completed or errored)"
+    )
+    bytes: int = Field(default=0, description="Bytes downloaded so far")
+    total_bytes: int = Field(default=0, description="Total file size (bytes)")
 
     # set when an error occurs
-    error_type   : Optional[str] = Field(default=None, description="Name of exception that caused an error")
-    error        : Optional[str] = Field(default=None, description="Traceback of the exception that caused an error")
+    error_type: Optional[str] = Field(default=None, description="Name of exception that caused an error")
+    error: Optional[str] = Field(default=None, description="Traceback of the exception that caused an error")
 
     # internal flag
-    _cancelled   : bool = PrivateAttr(default=False)
+    _cancelled: bool = PrivateAttr(default=False)
 
     def __le__(self, other: "DownloadJob") -> bool:
         """Return True if this job's priority is less than another's."""
