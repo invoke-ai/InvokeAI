@@ -18,7 +18,6 @@ import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteIm
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
@@ -29,6 +28,7 @@ import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
+import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -41,10 +41,7 @@ import {
   FaSeedling,
 } from 'react-icons/fa';
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
-import {
-  useGetImageDTOQuery,
-  useLazyGetImageWorkflowQuery,
-} from 'services/api/endpoints/images';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import { menuListMotionProps } from 'theme/components/menu';
 
@@ -113,15 +110,15 @@ const CurrentImageButtons = () => {
     lastSelectedImage?.image_name
   );
 
-  const [getWorkflow, getWorkflowResult] = useLazyGetImageWorkflowQuery();
+  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } =
+    useGetAndLoadEmbeddedWorkflow({});
+
   const handleLoadWorkflow = useCallback(() => {
-    if (!lastSelectedImage) {
+    if (!lastSelectedImage || !lastSelectedImage.has_workflow) {
       return;
     }
-    getWorkflow(lastSelectedImage?.image_name).then((workflow) => {
-      dispatch(workflowLoadRequested(workflow.data));
-    });
-  }, [dispatch, getWorkflow, lastSelectedImage]);
+    getAndLoadEmbeddedWorkflow(lastSelectedImage.image_name);
+  }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
 
   useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
 
@@ -261,7 +258,7 @@ const CurrentImageButtons = () => {
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
             isDisabled={!imageDTO?.has_workflow}
             onClick={handleLoadWorkflow}
-            isLoading={getWorkflowResult.isLoading}
+            isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
           />
           <IAIIconButton
             isLoading={isLoadingMetadata}
