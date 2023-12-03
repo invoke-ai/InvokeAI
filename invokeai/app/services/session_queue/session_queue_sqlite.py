@@ -1,4 +1,5 @@
 import sqlite3
+import threading
 from typing import Optional, Union, cast
 
 from fastapi_events.handlers.local import local_handler
@@ -31,12 +32,10 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class SqliteSessionQueue(SessionQueueBase):
-    def __init__(self, db: SqliteDatabase) -> None:
-        super().__init__()
-        self.__lock = db.lock
-        self.__conn = db.conn
-        self.__cursor = self.__conn.cursor()
-        self._create_tables()
+    __invoker: Invoker
+    __conn: sqlite3.Connection
+    __cursor: sqlite3.Cursor
+    __lock: threading.RLock
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
@@ -45,6 +44,13 @@ class SqliteSessionQueue(SessionQueueBase):
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_session_event)
         if prune_result.deleted > 0:
             self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
+
+    def __init__(self, db: SqliteDatabase) -> None:
+        super().__init__()
+        self.__lock = db.lock
+        self.__conn = db.conn
+        self.__cursor = self.__conn.cursor()
+        self._create_tables()
 
     def _match_event_name(self, event: FastAPIEvent, match_in: list[str]) -> bool:
         return event[1]["event"] in match_in
