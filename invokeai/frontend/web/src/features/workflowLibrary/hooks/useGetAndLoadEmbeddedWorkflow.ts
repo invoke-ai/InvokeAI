@@ -34,7 +34,9 @@ export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = ({
     async (imageName: string) => {
       try {
         const workflow = await _getAndLoadEmbeddedWorkflow(imageName);
-        dispatch(workflowLoadRequested(workflow.data));
+        dispatch(
+          workflowLoadRequested({ workflow: workflow.data, asCopy: true })
+        );
         // No toast - the listener for this action does that after the workflow is loaded
         onSuccess && onSuccess();
       } catch {

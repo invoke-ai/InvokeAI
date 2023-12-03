@@ -17,9 +17,10 @@ export const isAnyGraphBuilt = isAnyOf(
   nodesGraphBuilt
 );
 
-export const workflowLoadRequested = createAction<unknown>(
-  'nodes/workflowLoadRequested'
-);
+export const workflowLoadRequested = createAction<{
+  workflow: unknown;
+  asCopy: boolean;
+}>('nodes/workflowLoadRequested');
 
 export const updateAllNodesRequested = createAction(
   'nodes/updateAllNodesRequested'

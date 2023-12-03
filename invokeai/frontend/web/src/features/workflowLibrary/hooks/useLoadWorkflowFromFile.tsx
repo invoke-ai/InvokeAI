@@ -31,7 +31,9 @@ export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({
 
         try {
           const parsedJSON = JSON.parse(String(rawJSON));
-          dispatch(workflowLoadRequested(parsedJSON));
+          dispatch(
+            workflowLoadRequested({ workflow: parsedJSON, asCopy: true })
+          );
         } catch (e) {
           // There was a problem reading the file
           logger.error(t('nodes.unableToLoadWorkflow'));

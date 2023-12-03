@@ -32,7 +32,9 @@ export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({
     async (workflow_id: string) => {
       try {
         const data = await _getAndLoadWorkflow(workflow_id).unwrap();
-        dispatch(workflowLoadRequested(data.workflow));
+        dispatch(
+          workflowLoadRequested({ workflow: data.workflow, asCopy: false })
+        );
         // No toast - the listener for this action does that after the workflow is loaded
         onSuccess && onSuccess();
       } catch {

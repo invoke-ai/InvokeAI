@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
+import { workflowLoaded } from 'features/nodes/store/workflowSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import {
   WorkflowMigrationError,
@@ -21,7 +21,7 @@ export const addWorkflowLoadRequestedListener = () => {
     actionCreator: workflowLoadRequested,
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
-      const workflow = action.payload;
+      const { workflow, asCopy } = action.payload;
       const nodeTemplates = getState().nodes.nodeTemplates;
 
       try {
@@ -29,6 +29,12 @@ export const addWorkflowLoadRequestedListener = () => {
           workflow,
           nodeTemplates
         );
+
+        if (asCopy) {
+          // If we're loading a copy, we need to remove the ID so that the backend will create a new workflow
+          delete validatedWorkflow.id;
+        }
+
         dispatch(workflowLoaded(validatedWorkflow));
         if (!warnings.length) {
           dispatch(

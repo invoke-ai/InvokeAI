@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { workflowLoaded } from 'features/nodes/store/workflowSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import {
   BoardFieldValue,
@@ -28,7 +29,6 @@ import {
   NodeExecutionState,
   zNodeStatus,
 } from 'features/nodes/types/invocation';
-import { WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, forEach } from 'lodash-es';
 import {
   addEdge,
@@ -654,30 +654,6 @@ const nodesSlice = createSlice({
     nodeOpacityChanged: (state, action: PayloadAction<number>) => {
       state.nodeOpacity = action.payload;
     },
-    workflowLoaded: (state, action: PayloadAction<WorkflowV2>) => {
-      const { nodes, edges } = action.payload;
-      state.nodes = applyNodeChanges(
-        nodes.map((node) => ({
-          item: { ...node, ...SHARED_NODE_PROPERTIES },
-          type: 'add',
-        })),
-        []
-      );
-      state.edges = applyEdgeChanges(
-        edges.map((edge) => ({ item: edge, type: 'add' })),
-        []
-      );
-
-      state.nodeExecutionStates = nodes.reduce<
-        Record<string, NodeExecutionState>
-      >((acc, node) => {
-        acc[node.id] = {
-          nodeId: node.id,
-          ...initialNodeExecutionState,
-        };
-        return acc;
-      }, {});
-    },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
     },
@@ -823,6 +799,32 @@ const nodesSlice = createSlice({
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
       state.isReady = false;
     });
+
+    builder.addCase(workflowLoaded, (state, action) => {
+      const { nodes, edges } = action.payload;
+      state.nodes = applyNodeChanges(
+        nodes.map((node) => ({
+          item: { ...node, ...SHARED_NODE_PROPERTIES },
+          type: 'add',
+        })),
+        []
+      );
+      state.edges = applyEdgeChanges(
+        edges.map((edge) => ({ item: edge, type: 'add' })),
+        []
+      );
+
+      state.nodeExecutionStates = nodes.reduce<
+        Record<string, NodeExecutionState>
+      >((acc, node) => {
+        acc[node.id] = {
+          nodeId: node.id,
+          ...initialNodeExecutionState,
+        };
+        return acc;
+      }, {});
+    });
+
     builder.addCase(appSocketInvocationStarted, (state, action) => {
       const { source_node_id } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
@@ -931,7 +933,6 @@ export const {
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
   viewportChanged,
-  workflowLoaded,
   edgeAdded,
 } = nodesSlice.actions;
 
