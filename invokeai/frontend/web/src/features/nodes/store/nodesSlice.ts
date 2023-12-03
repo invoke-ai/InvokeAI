@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { workflowLoaded } from 'features/nodes/store/workflowSlice';
+import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import {
   BoardFieldValue,

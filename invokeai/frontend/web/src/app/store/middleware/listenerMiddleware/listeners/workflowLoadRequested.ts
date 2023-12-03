@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
-import { workflowLoaded } from 'features/nodes/store/workflowSlice';
+import { workflowLoaded } from 'features/nodes/store/actions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import {
   WorkflowMigrationError,

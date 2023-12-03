@@ -1,7 +1,7 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
-import { workflowLoaded } from 'features/nodes/store/workflowSlice';
+import { workflowLoaded } from 'features/nodes/store/actions';
 import { zWorkflowV2 } from 'features/nodes/types/workflow';
 import { getWorkflowCopyName } from 'features/workflowLibrary/util/getWorkflowCopyName';
 import { useCallback } from 'react';

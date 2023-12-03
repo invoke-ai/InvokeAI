@@ -1,8 +1,8 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import { workflowLoaded } from 'features/nodes/store/actions';
 import { nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
 import { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import { FieldIdentifier } from 'features/nodes/types/field';
-import { WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
 
 export const initialWorkflowState: WorkflowState = {
@@ -62,13 +62,14 @@ const workflowSlice = createSlice({
     workflowIDChanged: (state, action: PayloadAction<string>) => {
       state.id = action.payload;
     },
-    workflowLoaded: (state, action: PayloadAction<WorkflowV2>) => {
-      const { nodes: _nodes, edges: _edges, ...workflow } = action.payload;
-      return cloneDeep(workflow);
-    },
     workflowReset: () => cloneDeep(initialWorkflowState),
   },
   extraReducers: (builder) => {
+    builder.addCase(workflowLoaded, (state, action) => {
+      const { nodes: _nodes, edges: _edges, ...workflow } = action.payload;
+      return cloneDeep(workflow);
+    });
+
     builder.addCase(nodesDeleted, (state, action) => {
       action.payload.forEach((node) => {
         state.exposedFields = state.exposedFields.filter(
@@ -92,7 +93,6 @@ export const {
   workflowVersionChanged,
   workflowContactChanged,
   workflowIDChanged,
-  workflowLoaded,
   workflowReset,
 } = workflowSlice.actions;
 
