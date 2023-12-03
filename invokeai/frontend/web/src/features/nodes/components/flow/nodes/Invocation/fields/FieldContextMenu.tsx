@@ -16,7 +16,7 @@ import {
 } from 'features/nodes/store/workflowSlice';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { FaMinus, FaPlus } from 'react-icons/fa';
-import { MENU_LIST_MOTION_PROPS } from 'theme/components/menu';
+import { menuListMotionProps } from 'theme/components/menu';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -110,7 +110,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
       !menuItems.length ? null : (
         <MenuList
           sx={{ visibility: 'visible !important' }}
-          motionProps={MENU_LIST_MOTION_PROPS}
+          motionProps={menuListMotionProps}
           onContextMenu={skipEvent}
         >
           <MenuGroup

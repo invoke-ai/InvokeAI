@@ -56,7 +56,7 @@ export const menuTheme = defineMultiStyleConfig({
   },
 });
 
-export const MENU_LIST_MOTION_PROPS: MotionProps = {
+export const menuListMotionProps: MotionProps = {
   variants: {
     enter: {
       visibility: 'visible',

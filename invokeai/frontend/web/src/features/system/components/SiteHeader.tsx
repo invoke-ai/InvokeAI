@@ -18,7 +18,7 @@ import {
   FaGithub,
   FaKeyboard,
 } from 'react-icons/fa';
-import { MENU_LIST_MOTION_PROPS } from 'theme/components/menu';
+import { menuListMotionProps } from 'theme/components/menu';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 import InvokeAILogoComponent from './InvokeAILogoComponent';
@@ -54,7 +54,7 @@ const SiteHeader = () => {
           icon={<FaBars />}
           sx={{ boxSize: 8 }}
         />
-        <MenuList motionProps={MENU_LIST_MOTION_PROPS}>
+        <MenuList motionProps={menuListMotionProps}>
           <MenuGroup title={t('common.communityLabel')}>
             {isGithubLinkEnabled && (
               <MenuItem

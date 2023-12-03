@@ -75,55 +75,13 @@ export const workflowsApi = api.injectEndpoints({
       }),
       providesTags: [{ type: 'Workflow', id: LIST_TAG }],
     }),
-    listRecentWorkflows: build.query<
-      paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
-      void
-    >({
-      query: () => ({
-        url: 'workflows/',
-        params: {
-          page: 0,
-          per_page: 10,
-          order_by: 'opened_at',
-          direction: 'DESC',
-        },
-      }),
-      providesTags: [{ type: 'WorkflowsRecent', id: LIST_TAG }],
-    }),
-    listSystemWorkflows: build.query<
-      paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
-      void
-    >({
-      query: () => ({
-        url: 'workflows/',
-        params: {
-          page: 0,
-          per_page: 10,
-          order_by: 'opened_at',
-          direction: 'DESC',
-        },
-      }),
-      transformResponse: () => {
-        return {
-          page: 0,
-          per_page: 10,
-          items: [],
-          total: 0,
-          pages: 0,
-        };
-      },
-      providesTags: [{ type: 'WorkflowsRecent', id: LIST_TAG }],
-    }),
   }),
 });
 
 export const {
-  useGetWorkflowQuery,
   useLazyGetWorkflowQuery,
   useCreateWorkflowMutation,
   useDeleteWorkflowMutation,
   useUpdateWorkflowMutation,
   useListWorkflowsQuery,
-  useListRecentWorkflowsQuery,
-  useListSystemWorkflowsQuery,
 } = workflowsApi;

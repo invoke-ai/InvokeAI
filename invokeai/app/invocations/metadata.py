@@ -112,7 +112,7 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.2.0")
+@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.1")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 
