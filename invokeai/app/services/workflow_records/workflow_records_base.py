@@ -44,7 +44,7 @@ class WorkflowRecordsStorageBase(ABC):
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
         category: WorkflowCategory,
-        filter_text: Optional[str],
+        query: Optional[str],
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass

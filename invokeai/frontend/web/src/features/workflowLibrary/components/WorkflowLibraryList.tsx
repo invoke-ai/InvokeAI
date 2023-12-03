@@ -51,12 +51,12 @@ const WorkflowLibraryList = () => {
   const { t } = useTranslation();
   const [category, setCategory] = useState<WorkflowCategory>('user');
   const [page, setPage] = useState(0);
-  const [filter_text, setFilterText] = useState('');
+  const [query, setQuery] = useState('');
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
-  const [debouncedFilterText] = useDebounce(filter_text, 500);
+  const [debouncedQuery] = useDebounce(query, 500);
 
-  const query = useMemo(() => {
+  const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
     if (category === 'user') {
       return {
         page,
@@ -64,7 +64,7 @@ const WorkflowLibraryList = () => {
         order_by,
         direction,
         category,
-        filter_text: debouncedFilterText,
+        query: debouncedQuery,
       };
     }
     return {
@@ -73,11 +73,12 @@ const WorkflowLibraryList = () => {
       order_by: 'name' as const,
       direction: 'ASC' as const,
       category,
-      filter_text: debouncedFilterText,
+      query: debouncedQuery,
     };
-  }, [category, debouncedFilterText, direction, order_by, page]);
+  }, [category, debouncedQuery, direction, order_by, page]);
 
-  const { data, isLoading, isError, isFetching } = useListWorkflowsQuery(query);
+  const { data, isLoading, isError, isFetching } =
+    useListWorkflowsQuery(queryArg);
 
   const handleChangeOrderBy = useCallback(
     (value: string | null) => {
@@ -102,7 +103,7 @@ const WorkflowLibraryList = () => {
   );
 
   const resetFilterText = useCallback(() => {
-    setFilterText('');
+    setQuery('');
     setPage(0);
   }, []);
 
@@ -120,7 +121,7 @@ const WorkflowLibraryList = () => {
 
   const handleChangeFilterText = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      setFilterText(e.target.value);
+      setQuery(e.target.value);
       setPage(0);
     },
     []
@@ -189,12 +190,12 @@ const WorkflowLibraryList = () => {
         <InputGroup w="20rem">
           <Input
             placeholder={t('workflows.searchWorkflows')}
-            value={filter_text}
+            value={query}
             onKeyDown={handleKeydownFilterText}
             onChange={handleChangeFilterText}
             data-testid="workflow-search-input"
           />
-          {filter_text.trim().length && (
+          {query.trim().length && (
             <InputRightElement>
               <IconButton
                 onClick={resetFilterText}

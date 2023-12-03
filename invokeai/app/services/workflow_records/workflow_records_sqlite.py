@@ -130,7 +130,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
         category: WorkflowCategory,
-        filter_text: Optional[str] = None,
+        query: Optional[str] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         try:
             self._lock.acquire()
@@ -151,15 +151,15 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 FROM workflow_library
                 WHERE category = ?
                 """
-            main_params = [category.value]
-            count_params = [category.value]
-            stripped_filter_name = filter_text.strip() if filter_text else None
-            if stripped_filter_name:
-                filter_string = "%" + stripped_filter_name + "%"
+            main_params: list[int | str] = [category.value]
+            count_params: list[int | str] = [category.value]
+            stripped_query = query.strip() if query else None
+            if stripped_query:
+                wildcard_query = "%" + stripped_query + "%"
                 main_query += " AND name LIKE ? OR description LIKE ? "
                 count_query += " AND name LIKE ? OR description LIKE ?;"
-                main_params.extend([filter_string, filter_string])
-                count_params.extend([filter_string, filter_string])
+                main_params.extend([wildcard_query, wildcard_query])
+                count_params.extend([wildcard_query, wildcard_query])
 
             main_query += f" ORDER BY {order_by.value} {direction.value} LIMIT ? OFFSET ?;"
             main_params.extend([per_page, page * per_page])
