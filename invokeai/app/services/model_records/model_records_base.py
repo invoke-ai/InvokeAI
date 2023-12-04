@@ -9,9 +9,6 @@ from typing import List, Optional, Union
 
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType
 
-# should match the InvokeAI version when this is first released.
-CONFIG_FILE_VERSION = "3.2.0"
-
 
 class DuplicateModelException(Exception):
     """Raised on an attempt to add a model with the same key twice."""
@@ -31,12 +28,6 @@ class ConfigFileVersionMismatchException(Exception):
 
 class ModelRecordServiceBase(ABC):
     """Abstract base class for storage and retrieval of model configs."""
-
-    @property
-    @abstractmethod
-    def version(self) -> str:
-        """Return the config file/database schema version."""
-        pass
 
     @abstractmethod
     def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
