@@ -264,8 +264,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     self._signal_job_progress(job)
 
     def _validate_filename(self, directory: str, filename: str) -> bool:
-        pc_name_max = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 260   # hardcoded for windows
-        pc_path_max = os.pathconf(directory, "PC_PATH_MAX") if hasattr(os, "pathconf") else 32767 # hardcoded for windows with long names enabled
+        pc_name_max = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 260  # hardcoded for windows
+        pc_path_max = (
+            os.pathconf(directory, "PC_PATH_MAX") if hasattr(os, "pathconf") else 32767
+        )  # hardcoded for windows with long names enabled
         if "/" in filename:
             return False
         if filename.startswith(".."):
