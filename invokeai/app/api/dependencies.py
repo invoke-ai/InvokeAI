@@ -11,6 +11,7 @@ from ..services.board_images.board_images_default import BoardImagesService
 from ..services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from ..services.boards.boards_default import BoardService
 from ..services.config import InvokeAIAppConfig
+from ..services.download import DownloadQueueService
 from ..services.image_files.image_files_disk import DiskImageFileStorage
 from ..services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from ..services.images.images_default import ImageService
@@ -25,7 +26,6 @@ from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
-from ..services.download import DownloadQueueService
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue

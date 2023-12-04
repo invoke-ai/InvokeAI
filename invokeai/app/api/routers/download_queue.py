@@ -12,6 +12,7 @@ from invokeai.app.services.download import (
     DownloadJob,
     UnknownJobIDException,
 )
+
 from ..dependencies import ApiDependencies
 
 download_queue_router = APIRouter(prefix="/v1/download_queue", tags=["download_queue"])
