@@ -186,23 +186,9 @@ async def add_model_record(
     status_code=201,
 )
 async def import_model(
-    source: ModelSource = Body(
-        description="A model path, repo_id or URL to import. NOTE: only model path is implemented currently!"
-    ),
+    source: ModelSource,
     config: Optional[Dict[str, Any]] = Body(
         description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
-        default=None,
-    ),
-    variant: Optional[str] = Body(
-        description="When fetching a repo_id, force variant type to fetch such as 'fp16'",
-        default=None,
-    ),
-    subfolder: Optional[str] = Body(
-        description="When fetching a repo_id, specify subfolder to fetch model from",
-        default=None,
-    ),
-    access_token: Optional[str] = Body(
-        description="When fetching a repo_id or URL, access token for web access",
         default=None,
     ),
 ) -> ModelInstallJob:
@@ -211,6 +197,38 @@ async def import_model(
     Models will be downloaded, probed, configured and installed in a
     series of background threads. The return object has `status` attribute
     that can be used to monitor progress.
+
+    The source object is a discriminated Union of LocalModelSource,
+    HFModelSource and URLModelSource. Set the "type" field to the
+    appropriate value:
+
+    * To install a local path using LocalModelSource, pass a source of form:
+      `{
+        "type": "local",
+        "path": "/path/to/model",
+        "inplace": false
+      }`
+       The "inplace" flag, if true, will register the model in place in its
+       current filesystem location. Otherwise, the model will be copied
+       into the InvokeAI models directory.
+
+    * To install a HuggingFace repo_id using HFModelSource, pass a source of form:
+      `{
+        "type": "hf",
+        "repo_id": "stabilityai/stable-diffusion-2.0",
+        "variant": "fp16",
+        "subfolder": "vae",
+        "access_token": "f5820a918aaf01"
+      }`
+     The `variant`, `subfolder` and `access_token` fields are optional.
+
+    * To install a remote model using an arbitrary URL, pass:
+      `{
+        "type": "url",
+        "url": "http://www.civitai.com/models/123456",
+        "access_token": "f5820a918aaf01"
+      }`
+    The `access_token` field is optonal
 
     The model's configuration record will be probed and filled in
     automatically.  To override the default guesses, pass "metadata"
@@ -234,11 +252,8 @@ async def import_model(
     try:
         installer = ApiDependencies.invoker.services.model_install
         result: ModelInstallJob = installer.import_model(
-            source,
+            source=source,
             config=config,
-            variant=variant,
-            subfolder=subfolder,
-            access_token=access_token,
         )
         logger.info(f"Started installation of {source}")
     except UnknownModelException as e:

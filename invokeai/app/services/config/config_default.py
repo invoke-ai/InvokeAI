@@ -383,17 +383,17 @@ class InvokeAIAppConfig(InvokeAISettings):
         return db_dir / DB_FILE
 
     @property
-    def model_conf_path(self) -> Optional[Path]:
+    def model_conf_path(self) -> Path:
         """Path to models configuration file."""
         return self._resolve(self.conf_path)
 
     @property
-    def legacy_conf_path(self) -> Optional[Path]:
+    def legacy_conf_path(self) -> Path:
         """Path to directory of legacy configuration files (e.g. v1-inference.yaml)."""
         return self._resolve(self.legacy_conf_dir)
 
     @property
-    def models_path(self) -> Optional[Path]:
+    def models_path(self) -> Path:
         """Path to the models directory."""
         return self._resolve(self.models_dir)
 

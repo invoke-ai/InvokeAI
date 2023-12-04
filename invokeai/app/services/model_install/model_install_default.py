@@ -2,6 +2,7 @@
 
 import threading
 from hashlib import sha256
+from logging import Logger
 from pathlib import Path
 from queue import Queue
 from random import randbytes
@@ -24,6 +25,7 @@ from invokeai.backend.util import Chdir, InvokeAILogger
 
 from .model_install_base import (
     InstallStatus,
+    LocalModelSource,
     ModelInstallJob,
     ModelInstallServiceBase,
     ModelSource,
@@ -31,7 +33,10 @@ from .model_install_base import (
 )
 
 # marker that the queue is done and that thread should exit
-STOP_JOB = ModelInstallJob(source="stop", local_path=Path("/dev/null"))
+STOP_JOB = ModelInstallJob(
+    source=LocalModelSource(path="stop"),
+    local_path=Path("/dev/null"),
+)
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -42,7 +47,7 @@ class ModelInstallService(ModelInstallServiceBase):
     _event_bus: Optional[EventServiceBase] = None
     _install_queue: Queue[ModelInstallJob]
     _install_jobs: Dict[ModelSource, ModelInstallJob]
-    _logger: InvokeAILogger
+    _logger: Logger
     _cached_model_paths: Set[Path]
     _models_installed: Set[str]
 
@@ -109,11 +114,16 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_running(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.RUNNING
+        self._logger.info(f"{job.source}: model installation started")
         if self._event_bus:
             self._event_bus.emit_model_install_started(str(job.source))
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.COMPLETED
+        assert job.config_out
+        self._logger.info(
+            f"{job.source}: model installation completed. {job.local_path} registered key {job.config_out.key}"
+        )
         if self._event_bus:
             assert job.local_path is not None
             assert job.config_out is not None
@@ -122,6 +132,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_errored(self, job: ModelInstallJob, excp: Exception) -> None:
         job.set_error(excp)
+        self._logger.info(f"{job.source}: model installation encountered an exception: {job.error_type}")
         if self._event_bus:
             error_type = job.error_type
             error = job.error
@@ -151,7 +162,6 @@ class ModelInstallService(ModelInstallServiceBase):
             config["source"] = model_path.resolve().as_posix()
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
-
         old_hash = info.original_hash
         dest_path = self.app_config.models_path / info.base.value / info.type.value / model_path.name
         new_path = self._copy_model(model_path, dest_path)
@@ -167,26 +177,17 @@ class ModelInstallService(ModelInstallServiceBase):
     def import_model(
         self,
         source: ModelSource,
-        inplace: bool = False,
-        variant: Optional[str] = None,
-        subfolder: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
-        access_token: Optional[str] = None,
     ) -> ModelInstallJob:  # noqa D102
-        # Clean up a common source of error. Doesn't work with Paths.
-        if isinstance(source, str):
-            source = source.strip()
-
         if not config:
             config = {}
 
         # Installing a local path
-        if isinstance(source, (str, Path)) and Path(source).exists():  # a path that is already on disk
+        if isinstance(source, LocalModelSource) and Path(source.path).exists():  # a path that is already on disk
             job = ModelInstallJob(
-                config_in=config,
                 source=source,
-                inplace=inplace,
-                local_path=Path(source),
+                config_in=config,
+                local_path=Path(source.path),
             )
             self._install_jobs[source] = job
             self._install_queue.put(job)
@@ -195,13 +196,12 @@ class ModelInstallService(ModelInstallServiceBase):
         else:  # here is where we'd download a URL or repo_id. Implementation pending download queue.
             raise UnknownModelException("File or directory not found")
 
-    def list_jobs(self, source: Optional[ModelSource] = None) -> List[ModelInstallJob]:  # noqa D102
+    def list_jobs(self, source: Optional[ModelSource | str] = None) -> List[ModelInstallJob]:  # noqa D102
         jobs = self._install_jobs
         if not source:
             return list(jobs.values())
         else:
-            source = str(source)
-            return [jobs[x] for x in jobs if source in str(x)]
+            return [jobs[x] for x in jobs if str(source) in str(x)]
 
     def get_job(self, source: ModelSource) -> ModelInstallJob:  # noqa D102
         try:
@@ -343,6 +343,10 @@ class ModelInstallService(ModelInstallServiceBase):
         else:
             path.unlink()
         self.unregister(key)
+
+    def release(self) -> None:
+        """Stop the install thread and release its resources."""
+        self._install_queue.put(STOP_JOB)
 
     def _copy_model(self, old_path: Path, new_path: Path) -> Path:
         if old_path == new_path:

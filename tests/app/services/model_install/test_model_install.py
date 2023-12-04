@@ -12,6 +12,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.model_install import (
     InstallStatus,
+    LocalModelSource,
     ModelInstallJob,
     ModelInstallService,
     ModelInstallServiceBase,
@@ -124,9 +125,10 @@ def test_install(installer: ModelInstallServiceBase, test_file: Path, app_config
 
 def test_background_install(installer: ModelInstallServiceBase, test_file: Path, app_config: InvokeAIAppConfig) -> None:
     """Note: may want to break this down into several smaller unit tests."""
-    source = test_file
+    path = test_file
     description = "Test of metadata assignment"
-    job = installer.import_model(source, inplace=False, config={"description": description})
+    source = LocalModelSource(path=path, inplace=False)
+    job = installer.import_model(source, config={"description": description})
     assert job is not None
     assert isinstance(job, ModelInstallJob)
 
@@ -147,8 +149,8 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
     event_names = [x.event_name for x in bus.events]
     assert "model_install_started" in event_names
     assert "model_install_completed" in event_names
-    assert Path(bus.events[0].payload["source"]) == Path(source)
-    assert Path(bus.events[1].payload["source"]) == Path(source)
+    assert Path(bus.events[0].payload["source"]) == source
+    assert Path(bus.events[1].payload["source"]) == source
     key = bus.events[1].payload["key"]
     assert key is not None
 

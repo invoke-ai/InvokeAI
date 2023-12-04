@@ -1,11 +1,14 @@
+import re
 import traceback
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from fastapi import Body
+from pydantic import BaseModel, Field, TypeAdapter, field_validator
 from pydantic.networks import AnyHttpUrl
+from typing_extensions import Annotated
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
@@ -27,7 +30,74 @@ class UnknownInstallJobException(Exception):
     """Raised when the status of an unknown job is requested."""
 
 
-ModelSource = Union[str, Path, AnyHttpUrl]
+class StringLikeSource(BaseModel):
+    """Base class for model sources, implements functions that lets the source be sorted and indexed."""
+
+    def __hash__(self) -> int:
+        """Return hash of the path field, for indexing."""
+        return hash(str(self))
+
+    def __lt__(self, other: Any) -> int:
+        """Return comparison of the stringified version, for sorting."""
+        return str(self) < str(other)
+
+    def __eq__(self, other: Any) -> bool:
+        """Return equality on the stringified version."""
+        return str(self) == str(other)
+
+
+class LocalModelSource(StringLikeSource):
+    """A local file or directory path."""
+
+    path: str | Path
+    inplace: Optional[bool] = False
+    type: Literal["local"] = "local"
+
+    # these methods allow the source to be used in a string-like way,
+    # for example as an index into a dict
+    def __str__(self) -> str:
+        """Return string version of path when string rep needed."""
+        return Path(self.path).as_posix()
+
+
+class HFModelSource(StringLikeSource):
+    """A HuggingFace repo_id, with optional variant and sub-folder."""
+
+    repo_id: str
+    variant: Optional[str] = None
+    subfolder: Optional[str | Path] = None
+    access_token: Optional[str] = None
+    type: Literal["hf"] = "hf"
+
+    @field_validator("repo_id")
+    @classmethod
+    def proper_repo_id(cls, v: str) -> str:  # noqa D102
+        if not re.match(r"^([.\w-]+/[.\w-]+)$", v):
+            raise ValueError(f"{v}: invalid repo_id format")
+        return v
+
+    def __str__(self) -> str:
+        """Return string version of repoid when string rep needed."""
+        base: str = self.repo_id
+        base += f":{self.subfolder}" if self.subfolder else ""
+        base += f" ({self.variant})" if self.variant else ""
+        return base
+
+
+class URLModelSource(StringLikeSource):
+    """A generic URL point to a checkpoint file."""
+
+    url: AnyHttpUrl
+    access_token: Optional[str] = None
+    type: Literal["generic_url"] = "generic_url"
+
+    def __str__(self) -> str:
+        """Return string version of the url when string rep needed."""
+        return str(self.url)
+
+
+ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Body(discriminator="type")]
+ModelSourceValidator = TypeAdapter(ModelSource)
 
 
 class ModelInstallJob(BaseModel):
@@ -74,6 +144,7 @@ class ModelInstallServiceBase(ABC):
         """
 
     def start(self, invoker: Invoker) -> None:
+        """Call at InvokeAI startup time."""
         self.sync_to_config()
 
     @property
@@ -139,34 +210,18 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def import_model(
         self,
-        source: Union[str, Path, AnyHttpUrl],
-        inplace: bool = False,
-        variant: Optional[str] = None,
-        subfolder: Optional[str] = None,
+        source: ModelSource,
         config: Optional[Dict[str, Any]] = None,
-        access_token: Optional[str] = None,
     ) -> ModelInstallJob:
         """Install the indicated model.
 
-        :param source: Either a URL or a HuggingFace repo_id.
-
-        :param inplace: If True, local paths will not be moved into
-         the models directory, but registered in place (the default).
-
-        :param variant: For HuggingFace models, this optional parameter
-         specifies which variant to download (e.g. 'fp16')
-
-        :param subfolder: When downloading HF repo_ids this can be used to
-         specify a subfolder of the HF repository to download from.
+        :param source: ModelSource object
 
         :param config: Optional dict. Any fields in this dict
          will override corresponding autoassigned probe fields in the
          model's config record. Use it to override
          `name`, `description`, `base_type`, `model_type`, `format`,
          `prediction_type`, `image_size`, and/or `ztsnr_training`.
-
-        :param access_token: Access token for use in downloading remote
-         models.
 
         This will download the model located at `source`,
         probe it, and install it into the models directory.
@@ -196,7 +251,7 @@ class ModelInstallServiceBase(ABC):
         """Return the ModelInstallJob corresponding to the provided source."""
 
     @abstractmethod
-    def list_jobs(self, source: Optional[ModelSource] = None) -> List[ModelInstallJob]:  # noqa D102
+    def list_jobs(self, source: Optional[ModelSource | str] = None) -> List[ModelInstallJob]:  # noqa D102
         """
         List active and complete install jobs.
 
@@ -208,11 +263,11 @@ class ModelInstallServiceBase(ABC):
         """Prune all completed and errored jobs."""
 
     @abstractmethod
-    def wait_for_installs(self) -> Dict[Union[str, Path, AnyHttpUrl], ModelInstallJob]:
+    def wait_for_installs(self) -> Dict[ModelSource, ModelInstallJob]:
         """
         Wait for all pending installs to complete.
 
-        This will block until all pending downloads have
+        This will block until all pending installs have
         completed, been cancelled, or errored out. It will
         block indefinitely if one or more jobs are in the
         paused state.
@@ -234,3 +289,12 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def sync_to_config(self) -> None:
         """Synchronize models on disk to those in the model record database."""
+
+    @abstractmethod
+    def release(self) -> None:
+        """
+        Signal the install thread to exit.
+
+        This is useful if you are done with the installer and wish to
+        release its resources.
+        """

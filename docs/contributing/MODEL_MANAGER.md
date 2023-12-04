@@ -455,17 +455,23 @@ The `import_model()` method is the core of the installer. The
 following illustrates basic usage:
 
 ```
-sources = [
-	Path('/opt/models/sushi.safetensors'),   # a local safetensors file
-	Path('/opt/models/sushi_diffusers/'),    # a local diffusers folder
-	'runwayml/stable-diffusion-v1-5',        # a repo_id
-    'runwayml/stable-diffusion-v1-5:vae',    # a subfolder within a repo_id
-	'https://civitai.com/api/download/models/63006', # a civitai direct download link
-	'https://civitai.com/models/8765?modelVersionId=10638',  # civitai model page
-	'https://s3.amazon.com/fjacks/sd-3.safetensors', # arbitrary URL
-]
+from invokeai.app.services.model_install import (
+	LocalModelSource,
+	HFModelSource,
+	URLModelSource,
+)
 
-for source in sources:
+source1 = LocalModelSource(path='/opt/models/sushi.safetensors')   # a local safetensors file
+source2 = LocalModelSource(path='/opt/models/sushi_diffusers')     # a local diffusers folder
+
+source3 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5')  # a repo_id
+source4 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', subfolder='vae')  # a subfolder within a repo_id
+source5 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', variant='fp16')   # a named variant of a HF model
+
+source6 = URLModelSource(url='https://civitai.com/api/download/models/63006')       # model located at a URL
+source7 = URLModelSource(url='https://civitai.com/api/download/models/63006', access_token='letmein') # with an access token
+
+for source in [source1, source2, source3, source4, source5, source6, source7]:
    install_job = installer.install_model(source)
    
 source2job = installer.wait_for_installs()
