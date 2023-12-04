@@ -14,8 +14,6 @@ for url in ['https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/assets/a-p
             'https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/assets/birdhouse.png?raw=true',
             'https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/assets/missing.png',
             'https://civitai.com/api/download/models/152309?type=Model&format=SafeTensor',
-            'https://civitai.com/api/download/models/181674?type=Model&format=SafeTensor',
-            'https://civitai.com/api/download/models/163652?type=Model&format=SafeTensor',
             ]:
 
     # urls start downloading as soon as download() is called
@@ -26,7 +24,7 @@ for url in ['https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/assets/a-p
 
 download_queue.join()  # wait for all downloads to finish
 for job in download_queue.list_jobs():
-    print(job.model_dump_json(),"\n")
+    print(job.model_dump_json(exclude_none=True, indent=4),"\n")
 ```
 
 Output:
@@ -35,121 +33,54 @@ Output:
 {
     "source": "https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/assets/a-painting-of-a-fire.png?raw=true",
     "dest": "/tmp/downloads",
-    "access_token": null,
-    "on_start": null,
-    "on_progress": null,
-    "on_complete": null,
-    "on_error": null,
     "id": 0,
     "priority": 10,
     "status": "completed",
     "download_path": "/tmp/downloads/a-painting-of-a-fire.png",
-    "job_started": "2023-12-03T19:42:57.475980",
-    "job_ended": "2023-12-03T19:42:58.520346",
+    "job_started": "2023-12-04T05:34:41.742174",
+    "job_ended": "2023-12-04T05:34:42.592035",
     "bytes": 666734,
-    "total_bytes": 666734,
-    "error_type": null,
-    "error": null
+    "total_bytes": 666734
 } 
 
 {
     "source": "https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/assets/birdhouse.png?raw=true",
     "dest": "/tmp/downloads",
-    "access_token": null,
-    "on_start": null,
-    "on_progress": null,
-    "on_complete": null,
-    "on_error": null,
     "id": 1,
     "priority": 10,
     "status": "completed",
     "download_path": "/tmp/downloads/birdhouse.png",
-    "job_started": "2023-12-03T19:42:57.475787",
-    "job_ended": "2023-12-03T19:42:58.339164",
+    "job_started": "2023-12-04T05:34:41.741975",
+    "job_ended": "2023-12-04T05:34:42.652841",
     "bytes": 774949,
-    "total_bytes": 774949,
-    "error_type": null,
-    "error": null
-} 
+    "total_bytes": 774949
+}
 
 {
     "source": "https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/assets/missing.png",
     "dest": "/tmp/downloads",
-    "access_token": null,
-    "on_start": null,
-    "on_progress": null,
-    "on_complete": null,
-    "on_error": null,
     "id": 2,
     "priority": 10,
     "status": "error",
-    "download_path": null,
-    "job_started": "2023-12-03T19:42:57.475885",
-    "job_ended": "2023-12-03T19:42:57.908310",
+    "job_started": "2023-12-04T05:34:41.742079",
+    "job_ended": "2023-12-04T05:34:42.147625",
     "bytes": 0,
     "total_bytes": 0,
     "error_type": "HTTPError(Not Found)",
-    "error": "Traceback (most recent call last):\n  File \"/home/lstein/Projects/InvokeAI/invokeai/app/services/download/download_default.py\", line 180, in _download_next_item\n    self._do_download(job)\n  File \"/home/lstein/Projects/InvokeAI/invokeai/app/services/download/download_default.py\", line 204, in _do_download\n    raise HTTPError(resp.reason)\nrequests.exceptions.HTTPError: Not Found\n"
-} 
+    "error": "Traceback (most recent call last):\n  File \"/home/lstein/Projects/InvokeAI/invokeai/app/services/download/download_default.py\", line 182, in _download_next_item\n    self._do_download(job)\n  File \"/home/lstein/Projects/InvokeAI/invokeai/app/services/download/download_default.py\", line 206, in _do_download\n    raise HTTPError(resp.reason)\nrequests.exceptions.HTTPError: Not Found\n"
+}
 
 {
     "source": "https://civitai.com/api/download/models/152309?type=Model&format=SafeTensor",
     "dest": "/tmp/downloads",
-    "access_token": null,
-    "on_start": null,
-    "on_progress": null,
-    "on_complete": null,
-    "on_error": null,
     "id": 3,
     "priority": 10,
     "status": "completed",
     "download_path": "/tmp/downloads/xl_more_art-full_v1.safetensors",
-    "job_started": "2023-12-03T19:42:57.908331",
-    "job_ended": "2023-12-03T19:43:00.100814",
+    "job_started": "2023-12-04T05:34:42.147645",
+    "job_ended": "2023-12-04T05:34:43.735990",
     "bytes": 719020768,
-    "total_bytes": 719020768,
-    "error_type": null,
-    "error": null
-} 
-
-{
-    "source": "https://civitai.com/api/download/models/181674?type=Model&format=SafeTensor",
-    "dest": "/tmp/downloads",
-    "access_token": null,
-    "on_start": null,
-    "on_progress": null,
-    "on_complete": null,
-    "on_error": null,
-    "id": 4,
-    "priority": 10,
-    "status": "completed",
-    "download_path": "/tmp/downloads/gotou_hitori_xl.safetensors",
-    "job_started": "2023-12-03T19:42:57.477617",
-    "job_ended": "2023-12-03T19:42:59.069100",
-    "bytes": 228463764,
-    "total_bytes": 228463764,
-    "error_type": null,
-    "error": null
-} 
-
-{
-    "source": "https://civitai.com/api/download/models/163652?type=Model&format=SafeTensor",
-    "dest": "/tmp/downloads",
-    "access_token": null,
-    "on_start": null,
-    "on_progress": null,
-    "on_complete": null,
-    "on_error": null,
-    "id": 5,
-    "priority": 10,
-    "status": "completed",
-    "download_path": "/tmp/downloads/ClassipeintXL1.9.safetensors",
-    "job_started": "2023-12-03T19:42:57.475322",
-    "job_ended": "2023-12-03T19:42:58.727123",
-    "bytes": 106732960,
-    "total_bytes": 106732960,
-    "error_type": null,
-    "error": null
+    "total_bytes": 719020768
 } 
 ```
 
@@ -180,6 +111,16 @@ queue = DownloadQueueService(event_bus=events)
 | `max_parallel_dl`  | int                         | 5    | Maximum number of simultaneous downloads allowed |
 | `event_bus` | EventServiceBase   | None | System-wide FastAPI event bus for reporting download events |
 | `requests_session` | requests.sessions.Session   | None | An alternative requests Session object to use for the download |
+
+`max_parallel_dl` specifies how many download jobs are allowed to run
+simultaneously. Each will run in a different thread of execution.
+
+`event_bus` is an EventServiceBase, typically the one created at
+InvokeAI startup. If present, download events are periodically emitted
+on this bus to allow clients to follow download progress.
+
+`requests_session` is a url library requests Session object. It is
+used for testing.
 
 ### The Job object
 
