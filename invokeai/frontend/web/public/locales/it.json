@@ -91,7 +91,19 @@
         "controlNet": "ControlNet",
         "auto": "Automatico",
         "simple": "Semplice",
-        "details": "Dettagli"
+        "details": "Dettagli",
+        "format": "formato",
+        "unknown": "Sconosciuto",
+        "folder": "Cartella",
+        "error": "Errore",
+        "installed": "Installato",
+        "template": "Schema",
+        "outputs": "Uscite",
+        "data": "Dati",
+        "somethingWentWrong": "Qualcosa è andato storto",
+        "copyError": "$t(gallery.copy) Errore",
+        "input": "Ingresso",
+        "notInstalled": "Non $t(common.installed)"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -122,7 +134,14 @@
         "preparingDownload": "Preparazione del download",
         "preparingDownloadFailed": "Problema durante la preparazione del download",
         "downloadSelection": "Scarica gli elementi selezionati",
-        "noImageSelected": "Nessuna immagine selezionata"
+        "noImageSelected": "Nessuna immagine selezionata",
+        "deleteSelection": "Elimina la selezione",
+        "image": "immagine",
+        "drop": "Rilascia",
+        "unstarImage": "Rimuovi preferenza immagine",
+        "dropOrUpload": "$t(gallery.drop) o carica",
+        "starImage": "Immagine preferita",
+        "dropToUpload": "$t(gallery.drop) per aggiornare"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti rapidi",
@@ -477,7 +496,8 @@
         "modelType": "Tipo di modello",
         "customConfigFileLocation": "Posizione del file di configurazione personalizzato",
         "vaePrecision": "Precisione VAE",
-        "noModelSelected": "Nessun modello selezionato"
+        "noModelSelected": "Nessun modello selezionato",
+        "conversionNotSupported": "Conversione non supportata"
     },
     "parameters": {
         "images": "Immagini",
@@ -838,7 +858,8 @@
         "menu": "Menu",
         "showGalleryPanel": "Mostra il pannello Galleria",
         "loadMore": "Carica altro",
-        "mode": "Modalità"
+        "mode": "Modalità",
+        "resetUI": "$t(accessibility.reset) l'Interfaccia Utente"
     },
     "ui": {
         "hideProgressImages": "Nascondi avanzamento immagini",
@@ -1040,7 +1061,15 @@
         "updateAllNodes": "Aggiorna tutti i nodi",
         "unableToUpdateNodes_one": "Impossibile aggiornare {{count}} nodo",
         "unableToUpdateNodes_many": "Impossibile aggiornare {{count}} nodi",
-        "unableToUpdateNodes_other": "Impossibile aggiornare {{count}} nodi"
+        "unableToUpdateNodes_other": "Impossibile aggiornare {{count}} nodi",
+        "addLinearView": "Aggiungi alla vista Lineare",
+        "outputFieldInInput": "Campo di uscita in ingresso",
+        "unableToMigrateWorkflow": "Impossibile migrare il flusso di lavoro",
+        "unableToUpdateNode": "Impossibile aggiornare nodo",
+        "unknownErrorValidatingWorkflow": "Errore sconosciuto durante la convalida del flusso di lavoro",
+        "collectionFieldType": "{{name}} Raccolta",
+        "collectionOrScalarFieldType": "{{name}} Raccolta|Scalare",
+        "nodeVersion": "Versione Nodo"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1062,7 +1091,10 @@
         "deleteBoardOnly": "Elimina solo la Bacheca",
         "deleteBoard": "Elimina Bacheca",
         "deleteBoardAndImages": "Elimina Bacheca e Immagini",
-        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate"
+        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate",
+        "movingImagesToBoard_one": "Spostare {{count}} immagine nella bacheca:",
+        "movingImagesToBoard_many": "Spostare {{count}} immagini nella bacheca:",
+        "movingImagesToBoard_other": "Spostare {{count}} immagini nella bacheca:"
     },
     "controlnet": {
         "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
@@ -1136,7 +1168,8 @@
         "megaControl": "Mega ControlNet",
         "minConfidence": "Confidenza minima",
         "scribble": "Scribble",
-        "amult": "Angolo di illuminazione"
+        "amult": "Angolo di illuminazione",
+        "coarse": "Approssimativo"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1204,7 +1237,8 @@
     "embedding": {
         "noMatchingEmbedding": "Nessun Incorporamento corrispondente",
         "addEmbedding": "Aggiungi Incorporamento",
-        "incompatibleModel": "Modello base incompatibile:"
+        "incompatibleModel": "Modello base incompatibile:",
+        "noEmbeddingsLoaded": "Nessun incorporamento caricato"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1217,7 +1251,8 @@
         "noRefinerModelsInstalled": "Nessun modello SDXL Refiner installato",
         "noLoRAsInstalled": "Nessun LoRA installato",
         "esrganModel": "Modello ESRGAN",
-        "addLora": "Aggiungi LoRA"
+        "addLora": "Aggiungi LoRA",
+        "noLoRAsLoaded": "Nessuna LoRA caricata"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1233,7 +1268,8 @@
         "enable": "Abilita",
         "clear": "Svuota",
         "maxCacheSize": "Dimensione max cache",
-        "cacheSize": "Dimensione cache"
+        "cacheSize": "Dimensione cache",
+        "useCache": "Usa Cache"
     },
     "dynamicPrompts": {
         "seedBehaviour": {

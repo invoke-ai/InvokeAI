@@ -120,7 +120,7 @@ Generate an image with a given prompt, record the seed of the image, and then
 use the `prompt2prompt` syntax to substitute words in the original prompt for
 words in a new prompt. This works for `img2img` as well.
 
-For example, consider the prompt `a cat.swap(dog) playing with a ball in the forest`. Normally, because of the word words interact with each other when doing a stable diffusion image generation, these two prompts would generate different compositions:
+For example, consider the prompt `a cat.swap(dog) playing with a ball in the forest`. Normally, because the words interact with each other when doing a stable diffusion image generation, these two prompts would generate different compositions:
   - `a cat playing with a ball in the forest`
   - `a dog playing with a ball in the forest`
 
