@@ -45,19 +45,22 @@ const makeSocketOptions = (): Partial<ManagerOptions & SocketOptions> => {
 const makeSocketUrl = (): string => {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   let socketUrl = `${wsProtocol}://${window.location.host}`;
-  if (['nodes', 'package'].includes(import.meta.env.MODE)) {
-    const baseUrl = $baseUrl.get();
-    if (baseUrl) {
-      //eslint-disable-next-line
-      socketUrl = baseUrl.replace(/^https?\:\/\//i, '');
-    }
+  // if (['nodes', 'package'].includes(import.meta.env.MODE)) {
+  const baseUrl = $baseUrl.get();
+  console.log({ baseUrl });
+  if (baseUrl) {
+    //eslint-disable-next-line
+    socketUrl = baseUrl.replace(/^https?\:\/\//i, '');
   }
+  // }
+  console.log({ socketUrl });
   return socketUrl;
 };
 
-const makeSocket = (): Socket<ServerToClientEvents, ClientToServerEvents> => {
+const makeSocket = (
+  socketUrl: string
+): Socket<ServerToClientEvents, ClientToServerEvents> => {
   const socketOptions = makeSocketOptions();
-  const socketUrl = $socketUrl.get();
   const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
     socketUrl,
     { ...socketOptions, ...$socketOptions.get() }
@@ -66,7 +69,6 @@ const makeSocket = (): Socket<ServerToClientEvents, ClientToServerEvents> => {
 };
 
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
-export const $socketUrl = atom<string>(makeSocketUrl());
 export const $isSocketInitialized = atom<boolean>(false);
 
 /**
@@ -75,7 +77,7 @@ export const $isSocketInitialized = atom<boolean>(false);
 export const useSocketIO = () => {
   const dispatch = useAppDispatch();
   const socketOptions = useStore($socketOptions);
-  const socketUrl = useStore($socketUrl);
+  const socketUrl = makeSocketUrl();
   const baseUrl = useStore($baseUrl);
   const authToken = useStore($authToken);
 
@@ -84,13 +86,13 @@ export const useSocketIO = () => {
       // Singleton!
       return;
     }
-    const socket = makeSocket();
+    const socket = makeSocket(socketUrl);
     setEventListeners({ dispatch, socket });
     socket.connect();
 
     if ($isDebugging.get()) {
       window.$socketOptions = $socketOptions;
-      window.$socketUrl = $socketUrl;
+      // window.$socketUrl = socketUrl;
       console.log('Socket initialized', socket);
     }
 
