@@ -38,7 +38,10 @@ import {
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
-import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import {
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from 'features/gallery/store/actions';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -231,14 +234,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           icon={customStarUi ? customStarUi.off.icon : <MdStar />}
           onClickCapture={handleUnstarImage}
         >
-          {customStarUi ? customStarUi.off.text : t('controlnet.unstarImage')}
+          {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
         </MenuItem>
       ) : (
         <MenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleStarImage}
         >
-          {customStarUi ? customStarUi.on.text : `Star Image`}
+          {customStarUi ? customStarUi.on.text : t('gallery.starImage')}
         </MenuItem>
       )}
       <MenuItem

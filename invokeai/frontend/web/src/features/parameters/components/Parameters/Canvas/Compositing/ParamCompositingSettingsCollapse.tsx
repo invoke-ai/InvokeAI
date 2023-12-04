@@ -2,7 +2,7 @@ import { Divider, Flex } from '@chakra-ui/react';
 import IAICollapse from 'common/components/IAICollapse';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubParametersWrapper from '../../SubParametersWrapper';
+import SubParametersWrapper from 'features/parameters/components/Parameters/SubParametersWrapper';
 import ParamCanvasCoherenceMode from './CoherencePass/ParamCanvasCoherenceMode';
 import ParamCanvasCoherenceSteps from './CoherencePass/ParamCanvasCoherenceSteps';
 import ParamCanvasCoherenceStrength from './CoherencePass/ParamCanvasCoherenceStrength';

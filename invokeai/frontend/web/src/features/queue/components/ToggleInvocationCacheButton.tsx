@@ -2,8 +2,8 @@ import IAIButton from 'common/components/IAIButton';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
-import { useDisableInvocationCache } from '../hooks/useDisableInvocationCache';
-import { useEnableInvocationCache } from '../hooks/useEnableInvocationCache';
+import { useDisableInvocationCache } from 'features/queue/hooks/useDisableInvocationCache';
+import { useEnableInvocationCache } from 'features/queue/hooks/useEnableInvocationCache';
 
 const ToggleInvocationCacheButton = () => {
   const { t } = useTranslation();

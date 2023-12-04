@@ -4,13 +4,13 @@ import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdap
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import IAIButton from '../../../../common/components/IAIButton';
+import IAIButton from 'common/components/IAIButton';
 import {
   useClearIntermediatesMutation,
   useGetIntermediatesCountQuery,
-} from '../../../../services/api/endpoints/images';
-import { resetCanvas } from '../../../canvas/store/canvasSlice';
-import { addToast } from '../../store/systemSlice';
+} from 'services/api/endpoints/images';
+import { resetCanvas } from 'features/canvas/store/canvasSlice';
+import { addToast } from 'features/system/store/systemSlice';
 import StyledFlex from './StyledFlex';
 
 export default function SettingsClearIntermediates() {

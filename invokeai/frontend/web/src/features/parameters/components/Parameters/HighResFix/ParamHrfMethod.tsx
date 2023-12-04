@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setHrfMethod } from 'features/parameters/store/generationSlice';
-import { HrfMethodParam } from 'features/parameters/types/parameterSchemas';
+import { ParameterHRFMethod } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,7 +26,7 @@ const ParamHrfMethodSelect = () => {
   const { hrfMethod, hrfEnabled } = useAppSelector(selector);
 
   const handleChange = useCallback(
-    (v: HrfMethodParam | null) => {
+    (v: ParameterHRFMethod | null) => {
       if (!v) {
         return;
       }

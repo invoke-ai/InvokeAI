@@ -2,8 +2,8 @@ import { Flex, Icon, Text, Tooltip } from '@chakra-ui/react';
 import { compare } from 'compare-versions';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
-import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
-import { isInvocationNodeData } from 'features/nodes/types/types';
+import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
+import { isInvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaInfoCircle } from 'react-icons/fa';
@@ -13,7 +13,7 @@ interface Props {
 }
 
 const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
-  const { needsUpdate } = useNodeVersion(nodeId);
+  const needsUpdate = useNodeNeedsUpdate(nodeId);
 
   return (
     <Tooltip
@@ -24,6 +24,7 @@ const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
       <Icon
         as={FaInfoCircle}
         sx={{
+          display: 'block',
           boxSize: 4,
           w: 8,
           color: needsUpdate ? 'error.400' : 'base.400',
@@ -109,6 +110,11 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
       <Text as="span" sx={{ fontWeight: 600 }}>
         {title}
       </Text>
+      {nodeTemplate?.nodePack && (
+        <Text opacity={0.7}>
+          {t('nodes.nodePack')}: {nodeTemplate.nodePack}
+        </Text>
+      )}
       <Text sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
         {nodeTemplate?.description}
       </Text>

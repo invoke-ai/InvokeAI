@@ -11,7 +11,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { NodeExecutionState, NodeStatus } from 'features/nodes/types/types';
+import {
+  NodeExecutionState,
+  zNodeStatus,
+} from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -74,10 +77,10 @@ type TooltipLabelProps = {
 const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
   const { status, progress, progressImage } = nodeExecutionState;
   const { t } = useTranslation();
-  if (status === NodeStatus.PENDING) {
+  if (status === zNodeStatus.enum.PENDING) {
     return <Text>{t('queue.pending')}</Text>;
   }
-  if (status === NodeStatus.IN_PROGRESS) {
+  if (status === zNodeStatus.enum.IN_PROGRESS) {
     if (progressImage) {
       return (
         <Flex sx={{ pos: 'relative', pt: 1.5, pb: 0.5 }}>
@@ -108,11 +111,11 @@ const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
     return <Text>{t('nodes.executionStateInProgress')}</Text>;
   }
 
-  if (status === NodeStatus.COMPLETED) {
+  if (status === zNodeStatus.enum.COMPLETED) {
     return <Text>{t('nodes.executionStateCompleted')}</Text>;
   }
 
-  if (status === NodeStatus.FAILED) {
+  if (status === zNodeStatus.enum.FAILED) {
     return <Text>{t('nodes.executionStateError')}</Text>;
   }
 
@@ -127,7 +130,7 @@ type StatusIconProps = {
 
 const StatusIcon = memo((props: StatusIconProps) => {
   const { progress, status } = props.nodeExecutionState;
-  if (status === NodeStatus.PENDING) {
+  if (status === zNodeStatus.enum.PENDING) {
     return (
       <Icon
         as={FaEllipsisH}
@@ -139,7 +142,7 @@ const StatusIcon = memo((props: StatusIconProps) => {
       />
     );
   }
-  if (status === NodeStatus.IN_PROGRESS) {
+  if (status === zNodeStatus.enum.IN_PROGRESS) {
     return progress === null ? (
       <CircularProgress
         isIndeterminate
@@ -158,7 +161,7 @@ const StatusIcon = memo((props: StatusIconProps) => {
       />
     );
   }
-  if (status === NodeStatus.COMPLETED) {
+  if (status === zNodeStatus.enum.COMPLETED) {
     return (
       <Icon
         as={FaCheck}
@@ -170,7 +173,7 @@ const StatusIcon = memo((props: StatusIconProps) => {
       />
     );
   }
-  if (status === NodeStatus.FAILED) {
+  if (status === zNodeStatus.enum.FAILED) {
     return (
       <Icon
         as={FaExclamation}

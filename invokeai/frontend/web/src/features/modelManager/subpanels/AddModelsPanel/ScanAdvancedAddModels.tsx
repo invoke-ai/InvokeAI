@@ -6,7 +6,7 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { motion } from 'framer-motion';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { FaTimes } from 'react-icons/fa';
-import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
+import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 import { ManualAddMode } from './AdvancedAddModels';

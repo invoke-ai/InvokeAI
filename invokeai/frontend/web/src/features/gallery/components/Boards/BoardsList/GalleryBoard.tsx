@@ -30,8 +30,8 @@ import {
 } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
-import AutoAddIcon from '../AutoAddIcon';
-import BoardContextMenu from '../BoardContextMenu';
+import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { useTranslation } from 'react-i18next';
 
 interface GalleryBoardProps {

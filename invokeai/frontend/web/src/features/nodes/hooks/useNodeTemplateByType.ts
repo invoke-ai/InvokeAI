@@ -3,16 +3,14 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
-import { AnyInvocationType } from 'services/events/types';
+import { InvocationTemplate } from 'features/nodes/types/invocation';
 
-export const useNodeTemplateByType = (
-  type: AnyInvocationType | 'current_image' | 'notes'
-) => {
+export const useNodeTemplateByType = (type: string) => {
   const selector = useMemo(
     () =>
       createSelector(
         stateSelector,
-        ({ nodes }) => {
+        ({ nodes }): InvocationTemplate | undefined => {
           const nodeTemplate = nodes.nodeTemplates[type];
           return nodeTemplate;
         },

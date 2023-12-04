@@ -1,6 +1,7 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { EntityState } from '@reduxjs/toolkit';
 import { components, paths } from './schema';
+import { O } from 'ts-toolbelt';
 
 type s = components['schemas'];
 
@@ -27,8 +28,9 @@ export type BatchConfig =
 
 export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
 
-export type _InputField = s['_InputField'];
-export type _OutputField = s['_OutputField'];
+export type InputFieldJSONSchemaExtra = s['InputFieldJSONSchemaExtra'];
+export type OutputFieldJSONSchemaExtra = s['OutputFieldJSONSchemaExtra'];
+export type InvocationJSONSchemaExtra = s['UIConfigBase'];
 
 // App Info
 export type AppVersion = s['AppVersion'];
@@ -57,6 +59,7 @@ export type MainModelField = s['MainModelField'];
 export type OnnxModelField = s['OnnxModelField'];
 export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
+export type LoRAModelFormat = s['LoRAModelFormat'];
 export type ControlNetModelField = s['ControlNetModelField'];
 export type IPAdapterModelField = s['IPAdapterModelField'];
 export type T2IAdapterModelField = s['T2IAdapterModelField'];
@@ -105,6 +108,7 @@ export type ImportModelConfig = s['Body_import_model'];
 
 // Graphs
 export type Graph = s['Graph'];
+export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 export type Edge = s['Edge'];
 export type GraphExecutionState = s['GraphExecutionState'];
 export type Batch = s['Batch'];

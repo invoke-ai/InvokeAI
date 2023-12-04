@@ -54,12 +54,13 @@ dependencies = [
   "invisible-watermark~=0.2.0",            # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                            # needed for plotting of Penner easing functions
   "mediapipe",                             # needed for "mediapipeface" controlnet model
-  "numpy",
+  # Minimum numpy version of 1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal().
+  "numpy>=1.24.0",
   "npyscreen",
   "omegaconf",
   "onnx",
   "onnxruntime",
-  "opencv-python",
+  "opencv-python~=4.8.1.1",
   "pydantic~=2.5.0",
   "pydantic-settings~=2.0.3",
   "picklescan",

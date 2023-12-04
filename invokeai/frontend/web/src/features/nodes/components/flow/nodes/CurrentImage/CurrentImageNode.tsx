@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { Flex, Image, Text } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { NodeProps } from 'reactflow';
-import NodeWrapper from '../common/NodeWrapper';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';

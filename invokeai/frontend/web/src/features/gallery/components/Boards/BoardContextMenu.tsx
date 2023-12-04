@@ -17,9 +17,9 @@ import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
-import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
-import { useBulkDownloadImagesMutation } from '../../../../services/api/endpoints/images';
-import { addToast } from '../../../system/store/systemSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
+import { addToast } from 'features/system/store/systemSlice';
 
 type Props = {
   board?: BoardDTO;

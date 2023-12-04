@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 
 from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
 from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
@@ -154,17 +154,17 @@ class InfillColorInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         )
 
 
-@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.1.0")
+@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.1.1")
 class InfillTileInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Infills transparent areas of an image with tiles of the image"""
 
     image: ImageField = InputField(description="The image to infill")
     tile_size: int = InputField(default=32, ge=1, description="The tile size (px)")
     seed: int = InputField(
+        default=0,
         ge=0,
         le=SEED_MAX,
         description="The seed to use for tile generation (omit for random)",
-        default_factory=get_random_seed,
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:

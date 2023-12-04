@@ -1,15 +1,14 @@
 import { Flex, Text } from '@chakra-ui/react';
-import { useFieldData } from 'features/nodes/hooks/useFieldData';
+import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
-import { FIELDS } from 'features/nodes/types/constants';
+import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import {
-  isInputFieldTemplate,
-  isInputFieldValue,
-} from 'features/nodes/types/types';
+  isFieldInputInstance,
+  isFieldInputTemplate,
+} from 'features/nodes/types/field';
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
 interface Props {
   nodeId: string;
   fieldName: string;
@@ -17,12 +16,13 @@ interface Props {
 }
 
 const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
-  const field = useFieldData(nodeId, fieldName);
+  const field = useFieldInstance(nodeId, fieldName);
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, kind);
-  const isInputTemplate = isInputFieldTemplate(fieldTemplate);
+  const isInputTemplate = isFieldInputTemplate(fieldTemplate);
+  const fieldTypeName = useFieldTypeName(fieldTemplate?.type);
   const { t } = useTranslation();
   const fieldTitle = useMemo(() => {
-    if (isInputFieldValue(field)) {
+    if (isFieldInputInstance(field)) {
       if (field.label && fieldTemplate?.title) {
         return `${field.label} (${fieldTemplate.title})`;
       }
@@ -49,9 +49,9 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
           {fieldTemplate.description}
         </Text>
       )}
-      {fieldTemplate && (
+      {fieldTypeName && (
         <Text>
-          {t('parameters.type')}: {FIELDS[fieldTemplate.type].title}
+          {t('parameters.type')}: {fieldTypeName}
         </Text>
       )}
       {isInputTemplate && (

@@ -1,8 +1,8 @@
 import { EntityState } from '@reduxjs/toolkit';
 import {
-  ControlNetModelParam,
-  IPAdapterModelParam,
-  T2IAdapterModelParam,
+  ParameterControlNetModel,
+  ParameterIPAdapterModel,
+  ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
 import { isObject } from 'lodash-es';
 import { components } from 'services/api/schema';
@@ -378,7 +378,7 @@ export type ControlNetConfig = {
   type: 'controlnet';
   id: string;
   isEnabled: boolean;
-  model: ControlNetModelParam | null;
+  model: ParameterControlNetModel | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -395,7 +395,7 @@ export type T2IAdapterConfig = {
   type: 't2i_adapter';
   id: string;
   isEnabled: boolean;
-  model: T2IAdapterModelParam | null;
+  model: ParameterT2IAdapterModel | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -412,7 +412,7 @@ export type IPAdapterConfig = {
   id: string;
   isEnabled: boolean;
   controlImage: string | null;
-  model: IPAdapterModelParam | null;
+  model: ParameterIPAdapterModel | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;

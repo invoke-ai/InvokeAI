@@ -3,8 +3,8 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
-import { selectControlAdapterById } from '../store/controlAdaptersSlice';
-import { isControlNetOrT2IAdapter } from '../store/types';
+import { selectControlAdapterById } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 
 export const useControlAdapterResizeMode = (id: string) => {
   const selector = useMemo(

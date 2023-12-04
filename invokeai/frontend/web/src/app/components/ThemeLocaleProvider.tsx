@@ -9,9 +9,9 @@ import { TOAST_OPTIONS, theme as invokeAITheme } from 'theme/theme';
 
 import '@fontsource-variable/inter';
 import { MantineProvider } from '@mantine/core';
+import { useMantineTheme } from 'mantine-theme/theme';
 import 'overlayscrollbars/overlayscrollbars.css';
 import 'theme/css/overlayscrollbars.css';
-import { useMantineTheme } from 'mantine-theme/theme';
 
 type ThemeLocaleProviderProps = {
   children: ReactNode;

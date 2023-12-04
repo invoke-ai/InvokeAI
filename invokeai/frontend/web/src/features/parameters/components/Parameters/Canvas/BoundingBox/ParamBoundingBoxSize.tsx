@@ -16,7 +16,7 @@ import { FaLock } from 'react-icons/fa';
 import { MdOutlineSwapVert } from 'react-icons/md';
 import ParamAspectRatio, {
   mappedAspectRatios,
-} from '../../Core/ParamAspectRatio';
+} from 'features/parameters/components/Parameters/Core/ParamAspectRatio';
 import ParamBoundingBoxHeight from './ParamBoundingBoxHeight';
 import ParamBoundingBoxWidth from './ParamBoundingBoxWidth';
 

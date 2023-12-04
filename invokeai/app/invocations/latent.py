@@ -79,6 +79,12 @@ DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
 
+# HACK: Many nodes are currently hard-coded to use a fixed latent scale factor of 8. This is fragile, and will need to
+# be addressed if future models use a different latent scale factor. Also, note that there may be places where the scale
+# factor is hard-coded to a literal '8' rather than using this constant.
+# The ratio of image:latent dimensions is LATENT_SCALE_FACTOR:1, or 8:1.
+LATENT_SCALE_FACTOR = 8
+
 
 @invocation_output("scheduler_output")
 class SchedulerOutput(BaseInvocationOutput):
@@ -215,7 +221,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.4.0",
+    version="1.5.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -273,8 +279,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
         input=Input.Connection,
         ui_order=7,
     )
+    cfg_rescale_multiplier: float = InputField(
+        default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
+    )
     latents: Optional[LatentsField] = InputField(
-        default=None, description=FieldDescriptions.latents, input=Input.Connection
+        default=None,
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+        ui_order=4,
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
         default=None,
@@ -329,6 +341,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             unconditioned_embeddings=uc,
             text_embeddings=c,
             guidance_scale=self.cfg_scale,
+            guidance_rescale_multiplier=self.cfg_rescale_multiplier,
             extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,  # threshold,
@@ -387,9 +400,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         exit_stack: ExitStack,
         do_classifier_free_guidance: bool = True,
     ) -> List[ControlNetData]:
-        # assuming fixed dimensional scaling of 8:1 for image:latents
-        control_height_resize = latents_shape[2] * 8
-        control_width_resize = latents_shape[3] * 8
+        # Assuming fixed dimensional scaling of LATENT_SCALE_FACTOR.
+        control_height_resize = latents_shape[2] * LATENT_SCALE_FACTOR
+        control_width_resize = latents_shape[3] * LATENT_SCALE_FACTOR
         if control_input is None:
             control_list = None
         elif isinstance(control_input, list) and len(control_input) == 0:
@@ -902,12 +915,12 @@ class ResizeLatentsInvocation(BaseInvocation):
     )
     width: int = InputField(
         ge=64,
-        multiple_of=8,
+        multiple_of=LATENT_SCALE_FACTOR,
         description=FieldDescriptions.width,
     )
     height: int = InputField(
         ge=64,
-        multiple_of=8,
+        multiple_of=LATENT_SCALE_FACTOR,
         description=FieldDescriptions.width,
     )
     mode: LATENTS_INTERPOLATION_MODE = InputField(default="bilinear", description=FieldDescriptions.interp_mode)
@@ -921,7 +934,7 @@ class ResizeLatentsInvocation(BaseInvocation):
 
         resized_latents = torch.nn.functional.interpolate(
             latents.to(device),
-            size=(self.height // 8, self.width // 8),
+            size=(self.height // LATENT_SCALE_FACTOR, self.width // LATENT_SCALE_FACTOR),
             mode=self.mode,
             antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
         )
@@ -1159,3 +1172,60 @@ class BlendLatentsInvocation(BaseInvocation):
         # context.services.latents.set(name, resized_latents)
         context.services.latents.save(name, blended_latents)
         return build_latents_output(latents_name=name, latents=blended_latents)
+
+
+# The Crop Latents node was copied from @skunkworxdark's implementation here:
+# https://github.com/skunkworxdark/XYGrid_nodes/blob/74647fa9c1fa57d317a94bd43ca689af7f0aae5e/images_to_grids.py#L1117C1-L1167C80
+@invocation(
+    "crop_latents",
+    title="Crop Latents",
+    tags=["latents", "crop"],
+    category="latents",
+    version="1.0.0",
+)
+# TODO(ryand): Named `CropLatentsCoreInvocation` to prevent a conflict with custom node `CropLatentsInvocation`.
+# Currently, if the class names conflict then 'GET /openapi.json' fails.
+class CropLatentsCoreInvocation(BaseInvocation):
+    """Crops a latent-space tensor to a box specified in image-space. The box dimensions and coordinates must be
+    divisible by the latent scale factor of 8.
+    """
+
+    latents: LatentsField = InputField(
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    x: int = InputField(
+        ge=0,
+        multiple_of=LATENT_SCALE_FACTOR,
+        description="The left x coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
+    )
+    y: int = InputField(
+        ge=0,
+        multiple_of=LATENT_SCALE_FACTOR,
+        description="The top y coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
+    )
+    width: int = InputField(
+        ge=1,
+        multiple_of=LATENT_SCALE_FACTOR,
+        description="The width (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
+    )
+    height: int = InputField(
+        ge=1,
+        multiple_of=LATENT_SCALE_FACTOR,
+        description="The height (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
+    )
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents = context.services.latents.get(self.latents.latents_name)
+
+        x1 = self.x // LATENT_SCALE_FACTOR
+        y1 = self.y // LATENT_SCALE_FACTOR
+        x2 = x1 + (self.width // LATENT_SCALE_FACTOR)
+        y2 = y1 + (self.height // LATENT_SCALE_FACTOR)
+
+        cropped_latents = latents[..., y1:y2, x1:x2]
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.save(name, cropped_latents)
+
+        return build_latents_output(latents_name=name, latents=cropped_latents)

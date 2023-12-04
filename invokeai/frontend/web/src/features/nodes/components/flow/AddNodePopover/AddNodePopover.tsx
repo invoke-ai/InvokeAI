@@ -11,7 +11,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-import { useBuildNodeData } from 'features/nodes/hooks/useBuildNodeData';
+import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   addNodePopoverClosed,
   addNodePopoverOpened,
@@ -24,7 +24,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
 import { useTranslation } from 'react-i18next';
 import 'reactflow/dist/style.css';
-import { AnyInvocationType } from 'services/events/types';
 import { AddNodePopoverSelectItem } from './AddNodePopoverSelectItem';
 
 type NodeTemplate = {
@@ -52,12 +51,12 @@ const selectFilter = (value: string, item: NodeTemplate) => {
 
 const AddNodePopover = () => {
   const dispatch = useAppDispatch();
-  const buildInvocation = useBuildNodeData();
+  const buildInvocation = useBuildNode();
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
   const fieldFilter = useAppSelector(
-    (state) => state.nodes.currentConnectionFieldType
+    (state) => state.nodes.connectionStartFieldType
   );
   const handleFilter = useAppSelector(
     (state) => state.nodes.connectionStartParams?.handleType
@@ -111,7 +110,7 @@ const AddNodePopover = () => {
 
       data.sort((a, b) => a.label.localeCompare(b.label));
 
-      return { data, t };
+      return { data };
     },
     defaultSelectorOptions
   );
@@ -121,7 +120,7 @@ const AddNodePopover = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addNode = useCallback(
-    (nodeType: AnyInvocationType) => {
+    (nodeType: string) => {
       const invocation = buildInvocation(nodeType);
       if (!invocation) {
         const errorMessage = t('nodes.unknownNode', {
@@ -145,7 +144,7 @@ const AddNodePopover = () => {
         return;
       }
 
-      addNode(v as AnyInvocationType);
+      addNode(v);
     },
     [addNode]
   );

@@ -20,7 +20,10 @@ import {
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
 } from 'services/api/endpoints/images';
-import { changeBoardReset, isModalOpenChanged } from '../store/slice';
+import {
+  changeBoardReset,
+  isModalOpenChanged,
+} from 'features/changeBoardModal/store/slice';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(

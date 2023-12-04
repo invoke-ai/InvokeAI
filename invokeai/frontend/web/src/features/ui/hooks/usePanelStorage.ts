@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
-import { panelsChanged } from '../store/uiSlice';
+import { panelsChanged } from 'features/ui/store/uiSlice';
 
 export const usePanelStorage = () => {
   const dispatch = useAppDispatch();

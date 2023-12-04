@@ -6,7 +6,7 @@ import IAISlider from 'common/components/IAISlider';
 import { setImg2imgStrength } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import SubParametersWrapper from '../SubParametersWrapper';
+import SubParametersWrapper from 'features/parameters/components/Parameters/SubParametersWrapper';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
 const selector = createSelector(
