@@ -31,19 +31,18 @@ class SqliteDatabase:
         self.conn.execute("PRAGMA foreign_keys = ON;")
 
     def clean(self) -> None:
-        try:
-            if self.db_path == sqlite_memory:
-                return
-            initial_db_size = Path(self.db_path).stat().st_size
-            self.lock.acquire()
-            self.conn.execute("VACUUM;")
-            self.conn.commit()
-            final_db_size = Path(self.db_path).stat().st_size
-            freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
-            if freed_space_in_mb > 0:
-                self._logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
-        except Exception as e:
-            self._logger.error(f"Error cleaning database: {e}")
-            raise
-        finally:
-            self.lock.release()
+        with self.lock:
+            try:
+                if self.db_path == sqlite_memory:
+                    return
+                initial_db_size = Path(self.db_path).stat().st_size
+                self.lock.acquire()
+                self.conn.execute("VACUUM;")
+                self.conn.commit()
+                final_db_size = Path(self.db_path).stat().st_size
+                freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
+                if freed_space_in_mb > 0:
+                    self._logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
+            except Exception as e:
+                self._logger.error(f"Error cleaning database: {e}")
+                raise
