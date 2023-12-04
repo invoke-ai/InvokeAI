@@ -1,7 +1,11 @@
 import typing
 from enum import Enum
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from platform import python_version
+from typing import Optional
 
+import torch
 from fastapi import Body
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
@@ -40,6 +44,24 @@ class AppVersion(BaseModel):
     version: str = Field(description="App version")
 
 
+class AppDependencyVersions(BaseModel):
+    """App depencency Versions Response"""
+
+    accelerate: str = Field(description="accelerate version")
+    compel: str = Field(description="compel version")
+    cuda: Optional[str] = Field(description="CUDA version")
+    diffusers: str = Field(description="diffusers version")
+    numpy: str = Field(description="Numpy version")
+    opencv: str = Field(description="OpenCV version")
+    onnx: str = Field(description="ONNX version")
+    pillow: str = Field(description="Pillow (PIL) version")
+    python: str = Field(description="Python version")
+    torch: str = Field(description="PyTorch version")
+    torchvision: str = Field(description="PyTorch Vision version")
+    transformers: str = Field(description="transformers version")
+    xformers: Optional[str] = Field(description="xformers version")
+
+
 class AppConfig(BaseModel):
     """App Config Response"""
 
@@ -52,6 +74,29 @@ class AppConfig(BaseModel):
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
 async def get_version() -> AppVersion:
     return AppVersion(version=__version__)
+
+
+@app_router.get("/app_deps", operation_id="get_app_deps", status_code=200, response_model=AppDependencyVersions)
+async def get_app_deps() -> AppDependencyVersions:
+    try:
+        xformers = version("xformers")
+    except PackageNotFoundError:
+        xformers = None
+    return AppDependencyVersions(
+        accelerate=version("accelerate"),
+        compel=version("compel"),
+        cuda=torch.version.cuda,
+        diffusers=version("diffusers"),
+        numpy=version("numpy"),
+        opencv=version("opencv-python"),
+        onnx=version("onnx"),
+        pillow=version("pillow"),
+        python=python_version(),
+        torch=torch.version.__version__,
+        torchvision=version("torchvision"),
+        transformers=version("transformers"),
+        xformers=xformers,
+    )
 
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
