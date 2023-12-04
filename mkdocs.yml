@@ -169,6 +169,8 @@ nav:
         - Adding Tests: 'contributing/TESTS.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
+      - Model Manager: 'contributing/MODEL_MANAGER.md'
+      - Download Queue: 'contributing/DOWNLOAD_QUEUE.md'
       - Translation: 'contributing/contribution_guides/translation.md'
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
     - Changelog: 'CHANGELOG.md'

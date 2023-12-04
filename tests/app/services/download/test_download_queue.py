@@ -1,11 +1,16 @@
 """Test the queued download facility"""
+import re
+import time
 from pathlib import Path
+from typing import Any, Dict, List
 
 import pytest
 import requests
+from pydantic import BaseModel
 from requests_testadapter import TestAdapter
 
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService
+from invokeai.app.services.events.events_base import EventServiceBase
 
 # Prevent pytest deprecation warnings
 TestAdapter.__test__ = False
@@ -46,11 +51,32 @@ def session() -> requests.sessions.Session:
     return sess
 
 
+class DummyEvent(BaseModel):
+    """Dummy Event to use with Dummy Event service."""
+
+    event_name: str
+    payload: Dict[str, Any]
+
+
+# A dummy event service for testing event issuing
+class DummyEventService(EventServiceBase):
+    """Dummy event service for testing."""
+
+    events: List[DummyEvent]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.events = []
+
+    def dispatch(self, event_name: str, payload: Any) -> None:
+        """Dispatch an event by appending it to self.events."""
+        self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
+
+
 def test_basic_queue_download(datadir, session):
     events = set()
 
     def event_handler(job: DownloadJob):
-        print(job, "\n")
         events.add(job.status)
 
     queue = DownloadQueueService(
@@ -88,6 +114,86 @@ def test_errors(datadir, session):
     assert len(jobs) == 2
     jobs_dict = {str(x.source): x for x in jobs}
     assert jobs_dict["http://www.civitai.com/models/broken"].status == DownloadJobStatus.ERROR
-    assert jobs_dict["http://www.civitai.com/models/broken"].error_type == "HTTPError"
+    assert jobs_dict["http://www.civitai.com/models/broken"].error_type == "HTTPError(NOT FOUND)"
     assert jobs_dict["http://www.civitai.com/models/missing"].status == DownloadJobStatus.COMPLETED
     assert jobs_dict["http://www.civitai.com/models/missing"].total_bytes == 0
+
+
+def test_event_bus(datadir, session):
+    event_bus = DummyEventService()
+
+    queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
+    queue.download(
+        source="http://www.civitai.com/models/12345",
+        dest=datadir,
+    )
+    queue.join()
+    events = event_bus.events
+    assert len(events) == 3
+    assert events[0].payload["timestamp"] <= events[1].payload["timestamp"]
+    assert events[1].payload["timestamp"] <= events[2].payload["timestamp"]
+    assert events[0].event_name == "download_started"
+    assert events[1].event_name == "download_progress"
+    assert events[1].payload["total_bytes"] > 0
+    assert events[1].payload["current_bytes"] <= events[1].payload["total_bytes"]
+    assert events[2].event_name == "download_complete"
+    assert events[2].payload["total_bytes"] == 32029
+
+    # test a failure
+    event_bus.events = []  # reset our accumulator
+    queue.download(source="http://www.civitai.com/models/broken", dest=datadir)
+    queue.join()
+    events = event_bus.events
+    print("\n".join([x.model_dump_json() for x in events]))
+    assert len(events) == 1
+    assert events[0].event_name == "download_error"
+    assert events[0].payload["error_type"] == "HTTPError(NOT FOUND)"
+    assert events[0].payload["error"] is not None
+    assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].payload["error"])
+
+
+def test_broken_callbacks(datadir, session, capsys):
+    queue = DownloadQueueService(
+        requests_session=session,
+    )
+
+    callback_ran = False
+
+    def broken_callback(job: DownloadJob) -> None:
+        nonlocal callback_ran
+        callback_ran = True
+        print(1 / 0)  # deliberate error here
+
+    job = queue.download(
+        source="http://www.civitai.com/models/12345",
+        dest=datadir,
+        on_progress=broken_callback,
+    )
+
+    queue.join()
+    assert job.status == DownloadJobStatus.COMPLETED  # should complete even though the callback is borked
+    assert Path(datadir, "mock12345.safetensors").exists()
+    assert callback_ran
+    captured = capsys.readouterr()
+    assert re.search("division by zero", captured.err)
+
+
+def test_cancel(datadir, session):
+    queue = DownloadQueueService(
+        requests_session=session,
+    )
+
+    def slow_callback(job: DownloadJob) -> None:
+        time.sleep(2)
+
+    job = queue.download(
+        source="http://www.civitai.com/models/12345",
+        dest=datadir,
+        on_start=slow_callback,
+    )
+    queue.cancel_job(job)
+    queue.join()
+
+    assert job.status == DownloadJobStatus.ERROR
+    print(job.error_type)
+    assert job.error_type.startswith("DownloadJobCancelledException")

@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 
 from pydantic import BaseModel, Field, PrivateAttr
 from pydantic.networks import AnyHttpUrl
@@ -44,17 +44,6 @@ class DownloadJob(BaseModel):
     source: AnyHttpUrl = Field(description="Where to download from. Specific types specified in child classes.")
     dest: Path = Field(description="Destination of downloaded model on local disk; a directory or file path")
     access_token: Optional[str] = Field(default=None, description="authorization token for protected resources")
-
-    # optional event handlers passed in on creation
-    on_start: Optional[DownloadEventHandler] = Field(default=None, description="handler for download start event")
-    on_progress: Optional[DownloadEventHandler] = Field(
-        default=None, description="handler for download progress events"
-    )
-    on_complete: Optional[DownloadEventHandler] = Field(
-        default=None, description="handler for download completion events"
-    )
-    on_error: Optional[DownloadEventHandler] = Field(default=None, description="handler for download error events")
-
     # automatically assigned on creation
     id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
     priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
@@ -76,9 +65,59 @@ class DownloadJob(BaseModel):
     # internal flag
     _cancelled: bool = PrivateAttr(default=False)
 
+    # optional event handlers passed in on creation
+    _on_start: Optional[DownloadEventHandler] = PrivateAttr(default=None)
+    _on_progress: Optional[DownloadEventHandler] = PrivateAttr(default=None)
+    _on_complete: Optional[DownloadEventHandler] = PrivateAttr(default=None)
+    _on_error: Optional[DownloadEventHandler] = PrivateAttr(default=None)
+
     def __le__(self, other: "DownloadJob") -> bool:
         """Return True if this job's priority is less than another's."""
         return self.priority <= other.priority
+
+    def cancel(self) -> None:
+        """Call to cancel the job."""
+        self._cancelled = True
+
+    # cancelled and the callbacks are private attributes in order to prevent
+    # them from being serialized and/or used in the Json Schema
+    @property
+    def cancelled(self) -> bool:
+        """Call to cancel the job."""
+        return self._cancelled
+
+    @property
+    def on_start(self) -> Optional[DownloadEventHandler]:
+        """Return the on_start event handler."""
+        return self._on_start
+
+    @property
+    def on_progress(self) -> Optional[DownloadEventHandler]:
+        """Return the on_progress event handler."""
+        return self._on_progress
+
+    @property
+    def on_complete(self) -> Optional[DownloadEventHandler]:
+        """Return the on_complete event handler."""
+        return self._on_complete
+
+    @property
+    def on_error(self) -> Optional[DownloadEventHandler]:
+        """Return the on_error event handler."""
+        return self._on_error
+
+    def set_callbacks(
+        self,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadEventHandler] = None,
+    ) -> None:
+        """Set the callbacks for download events."""
+        self._on_start = on_start
+        self._on_progress = on_progress
+        self._on_complete = on_complete
+        self._on_error = on_error
 
 
 class DownloadQueueServiceBase(ABC):
@@ -87,8 +126,8 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def download(
         self,
-        source: AnyHttpUrl,
-        dest: Path,
+        source: Union[str, AnyHttpUrl],
+        dest: Union[str, Path],
         priority: int = 10,
         access_token: Optional[str] = None,
         on_start: Optional[DownloadEventHandler] = None,

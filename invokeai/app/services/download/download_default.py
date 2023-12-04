@@ -50,7 +50,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def __init__(
         self,
         max_parallel_dl: int = 5,
-        events: Optional[EventServiceBase] = None,
+        event_bus: Optional[EventServiceBase] = None,
         requests_session: Optional[requests.sessions.Session] = None,
     ):
         """
@@ -65,7 +65,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._worker_pool = set()
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
-        self._events = events
+        self._event_bus = event_bus
         self._requests = requests_session or requests.Session()
 
         self._start_workers(max_parallel_dl)
@@ -93,6 +93,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 dest=Path(dest),
                 priority=priority,
                 access_token=access_token,
+            )
+            job.set_callbacks(
                 on_start=on_start,
                 on_progress=on_progress,
                 on_complete=on_complete,
@@ -144,7 +146,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         job.status will be set to DownloadJobStatus.CANCELLED
         """
         with self._lock:
-            job._cancelled = True
+            job.cancel()
 
     def cancel_all_jobs(self, preserve_partial: bool = False):
         """Cancel all jobs (those not in enqueued, running or paused state)."""
@@ -181,7 +183,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 self._signal_job_complete(job)
 
             except (DownloadJobCancelledException, OSError, HTTPError) as excp:
-                job.error_type = excp.__class__.__name__
+                job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
                 self._signal_job_error(job)
                 if isinstance(excp, DownloadJobCancelledException):
@@ -199,7 +201,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         # Make a streaming request. This will retrieve headers including
         # content-length and content-disposition, but not fetch any content itself
-        resp = self._requests.get(url, headers=header, stream=True)
+        resp = self._requests.get(str(url), headers=header, stream=True)
         if not resp.ok:
             raise HTTPError(resp.reason)
         content_length = int(resp.headers.get("content-length", 0))
@@ -226,7 +228,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             job.bytes = job.download_path.stat().st_size
             header["Range"] = f"bytes={job.bytes}-"
             open_mode = "ab"
-            resp = self._requests.get(url, headers=header, stream=True)  # new range request
+            resp = self._requests.get(str(url), headers=header, stream=True)  # new range request
 
         # signal caller that the download is starting. At this point, key fields such as
         # download_path and total_bytes will be populated. We call it here because the might
@@ -253,7 +255,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         # DOWNLOAD LOOP
         with open(job.download_path, open_mode) as file:
             for data in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-                if job._cancelled:
+                if job.cancelled:
                     raise DownloadJobCancelledException("Job was cancelled at caller's request")
 
                 job.bytes += file.write(data)
@@ -280,9 +282,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job.on_start(job)
             except Exception as e:
                 self._logger.error(e)
-        if self._events:
+        if self._event_bus:
             assert job.download_path
-            self._events.emit_download_started(str(job.source), job.download_path.as_posix())
+            self._event_bus.emit_download_started(str(job.source), job.download_path.as_posix())
 
     def _signal_job_progress(self, job: DownloadJob) -> None:
         if job.on_progress:
@@ -290,9 +292,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job.on_progress(job)
             except Exception as e:
                 self._logger.error(e)
-        if self._events:
+        if self._event_bus:
             assert job.download_path
-            self._events.emit_download_progress(
+            self._event_bus.emit_download_progress(
                 str(job.source),
                 download_path=job.download_path.as_posix(),
                 current_bytes=job.bytes,
@@ -306,24 +308,23 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job.on_complete(job)
             except Exception as e:
                 self._logger.error(e)
-        if self._events:
+        if self._event_bus:
             assert job.download_path
-            self._events.emit_download_complete(
+            self._event_bus.emit_download_complete(
                 str(job.source), download_path=job.download_path.as_posix(), total_bytes=job.total_bytes
             )
 
     def _signal_job_error(self, job: DownloadJob) -> None:
         job.status = DownloadJobStatus.ERROR
-        print(f"DEBUG: job.status={job.status}")
         if job.on_error:
             try:
                 job.on_error(job)
             except Exception as e:
                 self._logger.error(e)
-        if self._events:
+        if self._event_bus:
             assert job.error_type
             assert job.error
-            self._events.emit_download_error(str(job.source), error_type=job.error_type, error=job.error)
+            self._event_bus.emit_download_error(str(job.source), error_type=job.error_type, error=job.error)
 
     def _cleanup_cancelled_job(self, job: DownloadJob):
         self._logger.warning(f"Cleaning up leftover files from cancelled download job {job.download_path}")

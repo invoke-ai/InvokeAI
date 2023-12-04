@@ -25,6 +25,7 @@ from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
+from ..services.download import DownloadQueueService
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
@@ -87,6 +88,7 @@ class ApiDependencies:
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
+        download_queue_service = DownloadQueueService(event_bus=events)
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         processor = DefaultInvocationProcessor()
@@ -114,6 +116,7 @@ class ApiDependencies:
             logger=logger,
             model_manager=model_manager,
             model_records=model_record_service,
+            download_queue=download_queue_service,
             names=names,
             performance_statistics=performance_statistics,
             processor=processor,

@@ -335,7 +335,7 @@ class EventServiceBase:
 
     def emit_download_progress(self, source: str, download_path: str, current_bytes: int, total_bytes: int) -> None:
         """
-        Emit at intervals during a download job.
+        Emit "download_progress" events at regular intervals during a download job.
 
         :param source: The downloaded source
         :param download_path: The local downloaded file
@@ -343,7 +343,7 @@ class EventServiceBase:
         :param total_bytes: The size of the file being downloaded (if known)
         """
         self.__emit_download_event(
-            event_name="download_started",
+            event_name="download_progress",
             payload={
                 "source": source,
                 "download_path": download_path,
@@ -354,14 +354,14 @@ class EventServiceBase:
 
     def emit_download_complete(self, source: str, download_path: str, total_bytes: int) -> None:
         """
-        Emit at the end of a successful download.
+        Emit a "download_complete" event at the end of a successful download.
 
         :param source: Source URL
         :param download_path: Path to the locally downloaded file
         :param total_bytes: The size of the downloaded file
         """
         self.__emit_download_event(
-            event_name="download_started",
+            event_name="download_complete",
             payload={
                 "source": source,
                 "download_path": download_path,
@@ -376,14 +376,14 @@ class EventServiceBase:
         error: str,
     ) -> None:
         """
-        Emit when an download job encounters an exception.
+        Emit a "download_error" event when an download job encounters an exception.
 
         :param source: Source URL
         :param error_type: The name of the exception that raised the error
         :param error: The traceback from this error
         """
         self.__emit_download_event(
-            event_name="model_install_error",
+            event_name="download_error",
             payload={
                 "source": source,
                 "error_type": error_type,

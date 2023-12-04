@@ -69,6 +69,7 @@ def mock_services() -> InvocationServices:
         logger=logging,  # type: ignore
         model_manager=None,  # type: ignore
         model_records=None,  # type: ignore
+        download_queue=None,  # type: ignore
         names=None,  # type: ignore
         performance_statistics=InvocationStatsService(),
         processor=DefaultInvocationProcessor(),
