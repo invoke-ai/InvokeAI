@@ -33,12 +33,11 @@ export const useSocketIO = () => {
 
   const socketUrl = useMemo(() => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    let builtUrl = `${wsProtocol}://${window.location.host}`;
     if (baseUrl) {
-      builtUrl = baseUrl.replace(/^https?:\/\//i, '');
+      return baseUrl.replace(/^https?:\/\//i, '');
     }
 
-    return builtUrl;
+    return `${wsProtocol}://${window.location.host}`;
   }, [baseUrl]);
 
   const socketOptions = useMemo(() => {
