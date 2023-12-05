@@ -167,6 +167,7 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
     installer.prune_jobs()
     assert not installer.get_job(source)
 
+
 def test_delete_install(installer: ModelInstallServiceBase, test_file: Path, app_config: InvokeAIAppConfig):
     store = installer.record_store
     key = installer.install_path(test_file)
