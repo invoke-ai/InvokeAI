@@ -1,5 +1,3 @@
-from typing import Literal
-
 import numpy as np
 from PIL import Image
 from pydantic import BaseModel
@@ -7,7 +5,6 @@ from pydantic import BaseModel
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
     InputField,
     InvocationContext,
     OutputField,
@@ -18,13 +15,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.backend.tiles.tiles import (
-    calc_tiles_even_split,
-    calc_tiles_min_overlap,
-    calc_tiles_with_overlap,
-    merge_tiles_with_linear_blending,
-    merge_tiles_with_seam_blending,
-)
+from invokeai.backend.tiles.tiles import calc_tiles_with_overlap, merge_tiles_with_linear_blending
 from invokeai.backend.tiles.utils import Tile
 
 
@@ -65,92 +56,12 @@ class CalculateImageTilesInvocation(BaseInvocation):
         return CalculateImageTilesOutput(tiles=tiles)
 
 
-@invocation(
-    "calculate_image_tiles_Even_Split",
-    title="Calculate Image Tiles Even Split",
-    tags=["tiles"],
-    category="tiles",
-    version="1.0.0",
-)
-class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
-    """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
-
-    image_width: int = InputField(ge=1, default=1024, description="The image width, in pixels, to calculate tiles for.")
-    image_height: int = InputField(
-        ge=1, default=1024, description="The image height, in pixels, to calculate tiles for."
-    )
-    num_tiles_x: int = InputField(
-        default=2,
-        ge=1,
-        description="Number of tiles to divide image into on the x axis",
-    )
-    num_tiles_y: int = InputField(
-        default=2,
-        ge=1,
-        description="Number of tiles to divide image into on the y axis",
-    )
-    overlap: float = InputField(
-        default=0.25,
-        ge=0,
-        lt=1,
-        description="Overlap amount of tile size (0-1)",
-    )
-
-    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
-        tiles = calc_tiles_even_split(
-            image_height=self.image_height,
-            image_width=self.image_width,
-            num_tiles_x=self.num_tiles_x,
-            num_tiles_y=self.num_tiles_y,
-            overlap=self.overlap,
-        )
-        return CalculateImageTilesOutput(tiles=tiles)
-
-
-@invocation(
-    "calculate_image_tiles_min_overlap",
-    title="Calculate Image Tiles Minimum Overlap",
-    tags=["tiles"],
-    category="tiles",
-    version="1.0.0",
-)
-class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
-    """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
-
-    image_width: int = InputField(ge=1, default=1024, description="The image width, in pixels, to calculate tiles for.")
-    image_height: int = InputField(
-        ge=1, default=1024, description="The image height, in pixels, to calculate tiles for."
-    )
-    tile_width: int = InputField(ge=1, default=576, description="The tile width, in pixels.")
-    tile_height: int = InputField(ge=1, default=576, description="The tile height, in pixels.")
-    min_overlap: int = InputField(
-        default=128,
-        ge=0,
-        description="minimum tile overlap size (must be a multiple of 8)",
-    )
-    round_to_8: bool = InputField(
-        default=False,
-        description="Round outputs down to the nearest 8 (for pulling from a large noise field)",
-    )
-
-    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
-        tiles = calc_tiles_min_overlap(
-            image_height=self.image_height,
-            image_width=self.image_width,
-            tile_height=self.tile_height,
-            tile_width=self.tile_width,
-            min_overlap=self.min_overlap,
-            round_to_8=self.round_to_8,
-        )
-        return CalculateImageTilesOutput(tiles=tiles)
-
-
 @invocation_output("tile_to_properties_output")
 class TileToPropertiesOutput(BaseInvocationOutput):
-    coords_top: int = OutputField(description="Top coordinate of the tile relative to its parent image.")
-    coords_bottom: int = OutputField(description="Bottom coordinate of the tile relative to its parent image.")
     coords_left: int = OutputField(description="Left coordinate of the tile relative to its parent image.")
     coords_right: int = OutputField(description="Right coordinate of the tile relative to its parent image.")
+    coords_top: int = OutputField(description="Top coordinate of the tile relative to its parent image.")
+    coords_bottom: int = OutputField(description="Bottom coordinate of the tile relative to its parent image.")
 
     # HACK: The width and height fields are 'meta' fields that can easily be calculated from the other fields on this
     # object. Including redundant fields that can cheaply/easily be re-calculated goes against conventional API design
@@ -174,10 +85,10 @@ class TileToPropertiesInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> TileToPropertiesOutput:
         return TileToPropertiesOutput(
-            coords_top=self.tile.coords.top,
-            coords_bottom=self.tile.coords.bottom,
             coords_left=self.tile.coords.left,
             coords_right=self.tile.coords.right,
+            coords_top=self.tile.coords.top,
+            coords_bottom=self.tile.coords.bottom,
             width=self.tile.coords.right - self.tile.coords.left,
             height=self.tile.coords.bottom - self.tile.coords.top,
             overlap_top=self.tile.overlap.top,
@@ -211,22 +122,13 @@ class PairTileImageInvocation(BaseInvocation):
         )
 
 
-BLEND_MODES = Literal["Linear", "Seam"]
-
-
-@invocation("merge_tiles_to_image", title="Merge Tiles to Image", tags=["tiles"], category="tiles", version="1.1.0")
+@invocation("merge_tiles_to_image", title="Merge Tiles to Image", tags=["tiles"], category="tiles", version="1.0.0")
 class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     """Merge multiple tile images into a single image."""
 
     # Inputs
     tiles_with_images: list[TileWithImage] = InputField(description="A list of tile images with tile properties.")
-    blend_mode: BLEND_MODES = InputField(
-        default="Seam",
-        description="blending type Linear or Seam",
-        input=Input.Direct,
-    )
     blend_amount: int = InputField(
-        default=32,
         ge=0,
         description="The amount to blend adjacent tiles in pixels. Must be <= the amount of overlap between adjacent tiles.",
     )
@@ -256,16 +158,10 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
         channels = tile_np_images[0].shape[-1]
         dtype = tile_np_images[0].dtype
         np_image = np.zeros(shape=(height, width, channels), dtype=dtype)
-        if self.blend_mode == "Linear":
-            merge_tiles_with_linear_blending(
-                dst_image=np_image, tiles=tiles, tile_images=tile_np_images, blend_amount=self.blend_amount
-            )
-        else:
-            merge_tiles_with_seam_blending(
-                dst_image=np_image, tiles=tiles, tile_images=tile_np_images, blend_amount=self.blend_amount
-            )
 
-        # Convert into a PIL image and save
+        merge_tiles_with_linear_blending(
+            dst_image=np_image, tiles=tiles, tile_images=tile_np_images, blend_amount=self.blend_amount
+        )
         pil_image = Image.fromarray(np_image)
 
         image_dto = context.services.images.create(

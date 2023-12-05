@@ -23,7 +23,12 @@ import {
   VAEModelFieldInputTemplate,
   isStatefulFieldType,
 } from 'features/nodes/types/field';
-import { InvocationFieldSchema } from 'features/nodes/types/openapi';
+import {
+  InvocationFieldSchema,
+  isSchemaObject,
+} from 'features/nodes/types/openapi';
+import { t } from 'i18next';
+import { FieldParseError } from 'features/nodes/types/error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!
@@ -321,7 +326,28 @@ const buildImageFieldInputTemplate: FieldInputTemplateBuilder<
 const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<
   EnumFieldInputTemplate
 > = ({ schemaObject, baseField, isCollection, isCollectionOrScalar }) => {
-  const options = schemaObject.enum ?? [];
+  let options: EnumFieldInputTemplate['options'] = [];
+  if (schemaObject.anyOf) {
+    const filteredAnyOf = schemaObject.anyOf.filter((i) => {
+      if (isSchemaObject(i)) {
+        if (i.type === 'null') {
+          return false;
+        }
+      }
+      return true;
+    });
+    const firstAnyOf = filteredAnyOf[0];
+    if (filteredAnyOf.length !== 1 || !isSchemaObject(firstAnyOf)) {
+      options = [];
+    } else {
+      options = firstAnyOf.enum ?? [];
+    }
+  } else {
+    options = schemaObject.enum ?? [];
+  }
+  if (options.length === 0) {
+    throw new FieldParseError(t('nodes.unableToExtractEnumOptions'));
+  }
   const template: EnumFieldInputTemplate = {
     ...baseField,
     type: {

@@ -1,6 +1,6 @@
 import { Flex, Text } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import {
@@ -13,7 +13,7 @@ import {
   ImageFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { FieldComponentProps } from './types';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -24,8 +24,8 @@ const ImageFieldInputComponent = (
 ) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-
-  const { currentData: imageDTO } = useGetImageDTOQuery(
+  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const { currentData: imageDTO, isError } = useGetImageDTOQuery(
     field.value?.image_name ?? skipToken
   );
 
@@ -66,6 +66,12 @@ const ImageFieldInputComponent = (
     }),
     [nodeId, field.name]
   );
+
+  useEffect(() => {
+    if (isConnected && isError) {
+      handleReset();
+    }
+  }, [handleReset, isConnected, isError]);
 
   return (
     <Flex

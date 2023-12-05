@@ -67,13 +67,17 @@ class IPAdapterConditioningInfo:
 class ConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
     text_embeddings: BasicConditioningInfo
-    guidance_scale: Union[float, List[float]]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
     Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
     images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
     """
+    guidance_scale: Union[float, List[float]]
+    """ for models trained using zero-terminal SNR ("ztsnr"), it's suggested to use guidance_rescale_multiplier of 0.7 .
+     ref [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf)
+    """
+    guidance_rescale_multiplier: float = 0
     extra: Optional[ExtraConditioningInfo] = None
     scheduler_args: dict[str, Any] = field(default_factory=dict)
     """

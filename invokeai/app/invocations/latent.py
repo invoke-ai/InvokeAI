@@ -221,7 +221,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.4.0",
+    version="1.5.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -278,6 +278,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         default=None,
         input=Input.Connection,
         ui_order=7,
+    )
+    cfg_rescale_multiplier: float = InputField(
+        default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
     )
     latents: Optional[LatentsField] = InputField(
         default=None,
@@ -338,6 +341,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             unconditioned_embeddings=uc,
             text_embeddings=c,
             guidance_scale=self.cfg_scale,
+            guidance_rescale_multiplier=self.cfg_rescale_multiplier,
             extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,  # threshold,
@@ -1190,12 +1194,12 @@ class CropLatentsCoreInvocation(BaseInvocation):
         description=FieldDescriptions.latents,
         input=Input.Connection,
     )
-    x_offset: int = InputField(
+    x: int = InputField(
         ge=0,
         multiple_of=LATENT_SCALE_FACTOR,
         description="The left x coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
     )
-    y_offset: int = InputField(
+    y: int = InputField(
         ge=0,
         multiple_of=LATENT_SCALE_FACTOR,
         description="The top y coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
@@ -1214,8 +1218,8 @@ class CropLatentsCoreInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
-        x1 = self.x_offset // LATENT_SCALE_FACTOR
-        y1 = self.y_offset // LATENT_SCALE_FACTOR
+        x1 = self.x // LATENT_SCALE_FACTOR
+        y1 = self.y // LATENT_SCALE_FACTOR
         x2 = x1 + (self.width // LATENT_SCALE_FACTOR)
         y2 = y1 + (self.height // LATENT_SCALE_FACTOR)
 

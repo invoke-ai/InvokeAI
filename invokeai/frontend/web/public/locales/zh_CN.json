@@ -99,7 +99,17 @@
         "data": "数据",
         "safetensors": "Safetensors",
         "outpaint": "外扩绘制",
-        "details": "详情"
+        "details": "详情",
+        "format": "格式",
+        "unknown": "未知",
+        "folder": "文件夹",
+        "error": "错误",
+        "installed": "已安装",
+        "file": "文件",
+        "somethingWentWrong": "出了点问题",
+        "copyError": "$t(gallery.copy) 错误",
+        "input": "输入",
+        "notInstalled": "非 $t(common.installed)"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -130,7 +140,12 @@
         "preparingDownload": "准备下载",
         "preparingDownloadFailed": "准备下载时出现问题",
         "downloadSelection": "下载所选内容",
-        "noImageSelected": "无选中的图像"
+        "noImageSelected": "无选中的图像",
+        "deleteSelection": "删除所选内容",
+        "image": "图像",
+        "drop": "弃用",
+        "dropOrUpload": "$t(gallery.drop) 或上传",
+        "dropToUpload": "$t(gallery.drop) 以上传"
     },
     "hotkeys": {
         "keyboardShortcuts": "键盘快捷键",
@@ -486,7 +501,8 @@
         "alpha": "Alpha",
         "vaePrecision": "VAE 精度",
         "checkpointOrSafetensors": "$t(common.checkpoint) / $t(common.safetensors)",
-        "noModelSelected": "无选中的模型"
+        "noModelSelected": "无选中的模型",
+        "conversionNotSupported": "转换尚未支持"
     },
     "parameters": {
         "images": "图像",
@@ -615,7 +631,10 @@
         "seamlessX": "无缝 X",
         "seamlessY": "无缝 Y",
         "maskEdge": "遮罩边缘",
-        "unmasked": "取消遮罩"
+        "unmasked": "取消遮罩",
+        "cfgRescaleMultiplier": "CFG 重缩放倍数",
+        "cfgRescale": "CFG 重缩放",
+        "useSize": "使用尺寸"
     },
     "settings": {
         "models": "模型",
@@ -655,7 +674,8 @@
         "clearIntermediatesDisabled": "队列为空才能清理中间产物",
         "enableNSFWChecker": "启用成人内容检测器",
         "enableInvisibleWatermark": "启用不可见水印",
-        "enableInformationalPopovers": "启用信息弹窗"
+        "enableInformationalPopovers": "启用信息弹窗",
+        "reloadingIn": "重新加载中"
     },
     "toast": {
         "tempFoldersEmptied": "临时文件夹已清空",
@@ -739,7 +759,8 @@
         "imageUploadFailed": "图像上传失败",
         "problemImportingMask": "导入遮罩时出现问题",
         "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{count}} 个不兼容的子模型",
-        "setAsCanvasInitialImage": "设为画布初始图像"
+        "setAsCanvasInitialImage": "设为画布初始图像",
+        "invalidUpload": "无效的上传"
     },
     "unifiedCanvas": {
         "layer": "图层",
@@ -748,7 +769,7 @@
         "maskingOptions": "遮罩选项",
         "enableMask": "启用遮罩",
         "preserveMaskedArea": "保留遮罩区域",
-        "clearMask": "清除遮罩",
+        "clearMask": "清除遮罩 (Shift+C)",
         "brush": "刷子",
         "eraser": "橡皮擦",
         "fillBoundingBox": "填充选择区域",
@@ -801,7 +822,8 @@
         "betaPreserveMasked": "保留遮罩层",
         "antialiasing": "抗锯齿",
         "showResultsOn": "显示结果 (开)",
-        "showResultsOff": "显示结果 (关)"
+        "showResultsOff": "显示结果 (关)",
+        "saveMask": "保存 $t(unifiedCanvas.mask)"
     },
     "accessibility": {
         "modelSelect": "模型选择",
@@ -826,7 +848,9 @@
         "menu": "菜单",
         "showGalleryPanel": "显示图库浮窗",
         "loadMore": "加载更多",
-        "mode": "模式"
+        "mode": "模式",
+        "resetUI": "$t(accessibility.reset) UI",
+        "createIssue": "创建问题"
     },
     "ui": {
         "showProgressImages": "显示处理中的图片",
@@ -877,7 +901,7 @@
         "animatedEdges": "边缘动效",
         "nodeTemplate": "节点模板",
         "pickOne": "选择一个",
-        "unableToLoadWorkflow": "无法验证工作流",
+        "unableToLoadWorkflow": "无法加载工作流",
         "snapToGrid": "对齐网格",
         "noFieldsLinearview": "线性视图中未添加任何字段",
         "nodeSearch": "检索节点",
@@ -929,7 +953,7 @@
         "skippingUnknownOutputType": "跳过未知类型的输出",
         "latentsFieldDescription": "Latents 可以在节点间传递。",
         "denoiseMaskFieldDescription": "去噪遮罩可以在节点间传递",
-        "missingTemplate": "缺失模板",
+        "missingTemplate": "无效的节点：类型为 {{type}} 的节点 {{node}} 缺失模板（无已安装模板？）",
         "outputSchemaNotFound": "未找到输出模式",
         "latentsPolymorphicDescription": "Latents 可以在节点间传递。",
         "colorFieldDescription": "一种 RGBA 颜色。",
@@ -957,7 +981,7 @@
         "collectionItem": "项目合集",
         "controlCollectionDescription": "节点间传递的控制信息。",
         "skippedReservedInput": "跳过保留的输入",
-        "outputFields": "输出",
+        "outputFields": "输出区域",
         "edge": "边缘",
         "inputNode": "输入节点",
         "enumDescription": "枚举 (Enums) 可能是多个选项的一个数值。",
@@ -992,7 +1016,7 @@
         "string": "字符串",
         "inputFields": "输入",
         "uNetFieldDescription": "UNet 子模型。",
-        "mismatchedVersion": "不匹配的版本",
+        "mismatchedVersion": "无效的节点：类型为 {{type}} 的节点 {{node}} 版本不匹配（是否尝试更新？）",
         "vaeFieldDescription": "Vae 子模型。",
         "imageFieldDescription": "图像可以在节点间传递。",
         "outputNode": "输出节点",
@@ -1050,8 +1074,36 @@
         "latentsPolymorphic": "Latents 多态",
         "conditioningField": "条件",
         "latentsField": "Latents",
-        "updateAllNodes": "更新所有节点",
-        "unableToUpdateNodes_other": "{{count}} 个节点无法完成更新"
+        "updateAllNodes": "更新节点",
+        "unableToUpdateNodes_other": "{{count}} 个节点无法完成更新",
+        "inputFieldTypeParseError": "无法解析 {{node}} 的输入类型 {{field}}。({{message}})",
+        "unsupportedArrayItemType": "不支持的数组类型 \"{{type}}\"",
+        "addLinearView": "添加到线性视图",
+        "targetNodeFieldDoesNotExist": "无效的边缘：{{node}} 的目标/输入区域 {{field}} 不存在",
+        "unsupportedMismatchedUnion": "合集或标量类型与基类 {{firstType}} 和 {{secondType}} 不匹配",
+        "allNodesUpdated": "已更新所有节点",
+        "sourceNodeDoesNotExist": "无效的边缘：{{node}} 的源/输出节点不存在",
+        "unableToExtractEnumOptions": "无法提取枚举选项",
+        "unableToParseFieldType": "无法解析类型",
+        "outputFieldInInput": "输入中的输出区域",
+        "unrecognizedWorkflowVersion": "无法识别的工作流架构版本：{{version}}",
+        "outputFieldTypeParseError": "无法解析 {{node}} 的输出类型 {{field}}。({{message}})",
+        "sourceNodeFieldDoesNotExist": "无效的边缘：{{node}} 的源/输出区域 {{field}} 不存在",
+        "unableToGetWorkflowVersion": "无法获取工作流架构版本",
+        "nodePack": "节点包",
+        "unableToExtractSchemaNameFromRef": "无法从参考中提取架构名",
+        "unableToMigrateWorkflow": "无法迁移工作流",
+        "unknownOutput": "未知输出：{{name}}",
+        "unableToUpdateNode": "无法更新节点",
+        "unknownErrorValidatingWorkflow": "验证工作流时出现未知错误",
+        "collectionFieldType": "{{name}} 合集",
+        "unknownNodeType": "未知节点类型",
+        "targetNodeDoesNotExist": "无效的边缘：{{node}} 的目标/输入节点不存在",
+        "unknownFieldType": "$t(nodes.unknownField) 类型：{{type}}",
+        "collectionOrScalarFieldType": "{{name}} 合集 | 标量",
+        "nodeVersion": "节点版本",
+        "deletedInvalidEdge": "已删除无效的边缘 {{source}} -> {{target}}",
+        "unknownInput": "未知输入：{{name}}"
     },
     "controlnet": {
         "resize": "直接缩放",
@@ -1137,8 +1189,7 @@
         "openPose": "Openpose",
         "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
-        "canny": "Canny",
-        "unstarImage": "取消收藏图像"
+        "canny": "Canny"
     },
     "queue": {
         "status": "状态",
@@ -1246,7 +1297,8 @@
         "fit": "图生图匹配",
         "recallParameters": "召回参数",
         "noRecallParameters": "未找到要召回的参数",
-        "vae": "VAE"
+        "vae": "VAE",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
     },
     "models": {
         "noMatchingModels": "无相匹配的模型",
@@ -1259,7 +1311,8 @@
         "noRefinerModelsInstalled": "无已安装的 SDXL Refiner 模型",
         "noLoRAsInstalled": "无已安装的 LoRA",
         "esrganModel": "ESRGAN 模型",
-        "addLora": "添加 LoRA"
+        "addLora": "添加 LoRA",
+        "noLoRAsLoaded": "无已加载的 LoRA"
     },
     "boards": {
         "autoAddBoard": "自动添加面板",
@@ -1281,12 +1334,14 @@
         "deleteBoardOnly": "仅删除面板",
         "deleteBoard": "删除面板",
         "deleteBoardAndImages": "删除面板和图像",
-        "deletedBoardsCannotbeRestored": "已删除的面板无法被恢复"
+        "deletedBoardsCannotbeRestored": "已删除的面板无法被恢复",
+        "movingImagesToBoard_other": "移动 {{count}} 张图像到面板："
     },
     "embedding": {
         "noMatchingEmbedding": "不匹配的 Embedding",
         "addEmbedding": "添加 Embedding",
-        "incompatibleModel": "不兼容的基础模型："
+        "incompatibleModel": "不兼容的基础模型：",
+        "noEmbeddingsLoaded": "无已加载的 Embedding"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -1515,6 +1570,12 @@
                 "ControlNet 为生成过程提供引导，为生成具有受控构图、结构、样式的图像提供帮助，具体的功能由所选的模型决定。"
             ],
             "heading": "ControlNet"
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "CFG 重缩放倍数",
+            "paragraphs": [
+                "CFG 引导的重缩放倍率，用于通过 zero-terminal SNR (ztsnr) 训练的模型。推荐设为 0.7。"
+            ]
         }
     },
     "invocationCache": {
@@ -1531,7 +1592,8 @@
         "enable": "启用",
         "clear": "清除",
         "maxCacheSize": "最大缓存大小",
-        "cacheSize": "缓存大小"
+        "cacheSize": "缓存大小",
+        "useCache": "使用缓存"
     },
     "hrf": {
         "enableHrf": "启用高分辨率修复",
