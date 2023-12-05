@@ -107,10 +107,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(appSocketInvocationStarted, (state, action) => {
-      if (action.payload.data.node.type === 'denoise_latents') {
-        state.denoiseProgress = null;
-      }
+    builder.addCase(appSocketInvocationStarted, (state) => {
       state.status = 'PROCESSING';
     });
 
@@ -144,7 +141,10 @@ export const systemSlice = createSlice({
      * Invocation Complete
      */
     builder.addCase(appSocketInvocationComplete, (state, action) => {
-      if (action.payload.data.node.type === 'l2i') {
+      if (
+        action.payload.data.node.type === 'l2i' ||
+        action.payload.data.result.type === 'image_output'
+      ) {
         state.denoiseProgress = null;
       }
       state.status = 'CONNECTED';
