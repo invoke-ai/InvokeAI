@@ -5,8 +5,12 @@ import UploadWorkflowButton from 'features/workflowLibrary/components/LoadWorkfl
 import ResetWorkflowEditorButton from 'features/workflowLibrary/components/ResetWorkflowButton';
 import SaveWorkflowButton from 'features/workflowLibrary/components/SaveWorkflowButton';
 import SaveWorkflowAsButton from 'features/workflowLibrary/components/SaveWorkflowAsButton';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const TopCenterPanel = () => {
+  const isWorkflowLibraryEnabled =
+    useFeatureStatus('workflowLibrary').isFeatureEnabled;
+
   return (
     <Flex
       sx={{
@@ -19,8 +23,12 @@ const TopCenterPanel = () => {
     >
       <DownloadWorkflowButton />
       <UploadWorkflowButton />
-      <SaveWorkflowButton />
-      <SaveWorkflowAsButton />
+      {isWorkflowLibraryEnabled && (
+        <>
+          <SaveWorkflowButton />
+          <SaveWorkflowAsButton />
+        </>
+      )}
       <ResetWorkflowEditorButton />
     </Flex>
   );
