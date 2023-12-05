@@ -1,10 +1,4 @@
-import { t } from 'i18next';
-import { isArray } from 'lodash-es';
-import { OpenAPIV3_1 } from 'openapi-types';
-import {
-  FieldTypeParseError,
-  UnsupportedFieldTypeError,
-} from 'features/nodes/types/error';
+import { FieldParseError } from 'features/nodes/types/error';
 import { FieldType } from 'features/nodes/types/field';
 import {
   OpenAPIV3_1SchemaOrRef,
@@ -14,6 +8,9 @@ import {
   isRefObject,
   isSchemaObject,
 } from 'features/nodes/types/openapi';
+import { t } from 'i18next';
+import { isArray } from 'lodash-es';
+import { OpenAPIV3_1 } from 'openapi-types';
 
 /**
  * Transforms an invocation output ref object to field type.
@@ -70,7 +67,7 @@ export const parseFieldType = (
           // This is a single ref type
           const name = refObjectToSchemaName(allOf[0]);
           if (!name) {
-            throw new FieldTypeParseError(
+            throw new FieldParseError(
               t('nodes.unableToExtractSchemaNameFromRef')
             );
           }
@@ -95,7 +92,7 @@ export const parseFieldType = (
           if (isRefObject(filteredAnyOf[0])) {
             const name = refObjectToSchemaName(filteredAnyOf[0]);
             if (!name) {
-              throw new FieldTypeParseError(
+              throw new FieldParseError(
                 t('nodes.unableToExtractSchemaNameFromRef')
               );
             }
@@ -120,7 +117,7 @@ export const parseFieldType = (
 
         if (filteredAnyOf.length !== 2) {
           // This is a union of more than 2 types, which we don't support
-          throw new UnsupportedFieldTypeError(
+          throw new FieldParseError(
             t('nodes.unsupportedAnyOfLength', {
               count: filteredAnyOf.length,
             })
@@ -167,7 +164,7 @@ export const parseFieldType = (
           };
         }
 
-        throw new UnsupportedFieldTypeError(
+        throw new FieldParseError(
           t('nodes.unsupportedMismatchedUnion', {
             firstType,
             secondType,
@@ -186,7 +183,7 @@ export const parseFieldType = (
         if (isSchemaObject(schemaObject.items)) {
           const itemType = schemaObject.items.type;
           if (!itemType || isArray(itemType)) {
-            throw new UnsupportedFieldTypeError(
+            throw new FieldParseError(
               t('nodes.unsupportedArrayItemType', {
                 type: itemType,
               })
@@ -196,7 +193,7 @@ export const parseFieldType = (
           const name = OPENAPI_TO_FIELD_TYPE_MAP[itemType];
           if (!name) {
             // it's 'null', 'object', or 'array' - skip
-            throw new UnsupportedFieldTypeError(
+            throw new FieldParseError(
               t('nodes.unsupportedArrayItemType', {
                 type: itemType,
               })
@@ -212,7 +209,7 @@ export const parseFieldType = (
         // This is a ref object, extract the type name
         const name = refObjectToSchemaName(schemaObject.items);
         if (!name) {
-          throw new FieldTypeParseError(
+          throw new FieldParseError(
             t('nodes.unableToExtractSchemaNameFromRef')
           );
         }
@@ -226,7 +223,7 @@ export const parseFieldType = (
         const name = OPENAPI_TO_FIELD_TYPE_MAP[schemaObject.type];
         if (!name) {
           // it's 'null', 'object', or 'array' - skip
-          throw new UnsupportedFieldTypeError(
+          throw new FieldParseError(
             t('nodes.unsupportedArrayItemType', {
               type: schemaObject.type,
             })
@@ -242,9 +239,7 @@ export const parseFieldType = (
   } else if (isRefObject(schemaObject)) {
     const name = refObjectToSchemaName(schemaObject);
     if (!name) {
-      throw new FieldTypeParseError(
-        t('nodes.unableToExtractSchemaNameFromRef')
-      );
+      throw new FieldParseError(t('nodes.unableToExtractSchemaNameFromRef'));
     }
     return {
       name,
@@ -252,5 +247,5 @@ export const parseFieldType = (
       isCollectionOrScalar: false,
     };
   }
-  throw new FieldTypeParseError(t('nodes.unableToParseFieldType'));
+  throw new FieldParseError(t('nodes.unableToParseFieldType'));
 };

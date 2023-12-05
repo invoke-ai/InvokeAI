@@ -45,6 +45,7 @@ export const buildCanvasSDXLImageToImageGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     seed,
     steps,
@@ -327,6 +328,7 @@ export const buildCanvasSDXLImageToImageGraph = (
     {
       generation_mode: 'img2img',
       cfg_scale,
+      cfg_rescale_multiplier,
       width: !isUsingScaledDimensions
         ? width
         : scaledBoundingBoxDimensions.width,
