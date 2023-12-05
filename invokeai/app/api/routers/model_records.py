@@ -150,7 +150,7 @@ async def del_model_record(
     status_code=201,
 )
 async def add_model_record(
-    config: Annotated[AnyModelConfig, Body(description="Model config", discriminator="type")]
+    config: Annotated[AnyModelConfig, Body(description="Model config", discriminator="type")],
 ) -> AnyModelConfig:
     """
     Add a model using the configuration information appropriate for its type.
