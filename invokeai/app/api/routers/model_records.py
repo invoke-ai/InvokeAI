@@ -178,7 +178,6 @@ async def add_model_record(
     operation_id="import_model_record",
     responses={
         201: {"description": "The model imported successfully"},
-        404: {"description": "The model could not be found"},
         415: {"description": "Unrecognized file/folder format"},
         424: {"description": "The model appeared to import successfully, but could not be found in the model manager"},
         409: {"description": "There is already a model corresponding to this path or repo_id"},
@@ -258,7 +257,7 @@ async def import_model(
         logger.info(f"Started installation of {source}")
     except UnknownModelException as e:
         logger.error(str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=424, detail=str(e))
     except InvalidModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=415)

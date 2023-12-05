@@ -643,11 +643,10 @@ install_job = installer.import_model(
 
 This section describes additional methods provided by the installer class.
 
-#### source2job = installer.wait_for_installs()
+#### jobs = installer.wait_for_installs()
 
-Block until all pending installs are completed or errored and return a
-dictionary that maps the model `source` to the completed
-`ModelInstallJob`.
+Block until all pending installs are completed or errored and then
+returns a list of completed jobs.
 
 #### jobs = installer.list_jobs([source])
 
@@ -655,9 +654,10 @@ Return a list of all active and complete `ModelInstallJobs`. An
 optional `source` argument allows you to filter the returned list by a
 model source string pattern using a partial string match.
 
-#### job = installer.get_job(source)
+#### jobs = installer.get_job(source)
 
-Return the `ModelInstallJob` corresponding to the indicated model source.
+Return a list of `ModelInstallJob` corresponding to the indicated
+model source.
 
 #### installer.prune_jobs
 

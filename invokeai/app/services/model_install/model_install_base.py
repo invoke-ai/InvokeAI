@@ -112,6 +112,16 @@ class URLModelSource(StringLikeSource):
         return str(self.url)
 
 
+# Body() is being applied here rather than Field() because otherwise FastAPI will
+# refuse to generate a schema. Relevant links:
+#
+# "Model Manager Refactor Phase 1 - SQL-based config storage
+#        https://github.com/invoke-ai/InvokeAI/pull/5039#discussion_r1389752119 (comment)
+# Param: xyz can only be a request body, using Body() when using discriminated unions
+#        https://github.com/tiangolo/fastapi/discussions/9761
+# Body parameter cannot be a pydantic union anymore sinve v0.95
+#       https://github.com/tiangolo/fastapi/discussions/9287
+
 ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Body(discriminator="type")]
 ModelSourceValidator = TypeAdapter(ModelSource)
 
@@ -263,8 +273,8 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def get_job(self, source: ModelSource) -> ModelInstallJob:
-        """Return the ModelInstallJob corresponding to the provided source."""
+    def get_job(self, source: ModelSource) -> List[ModelInstallJob]:
+        """Return the ModelInstallJob(s) corresponding to the provided source."""
 
     @abstractmethod
     def list_jobs(self, source: Optional[ModelSource | str] = None) -> List[ModelInstallJob]:  # noqa D102
@@ -279,7 +289,7 @@ class ModelInstallServiceBase(ABC):
         """Prune all completed and errored jobs."""
 
     @abstractmethod
-    def wait_for_installs(self) -> Dict[ModelSource, ModelInstallJob]:
+    def wait_for_installs(self) -> List[ModelInstallJob]:
         """
         Wait for all pending installs to complete.
 
@@ -288,8 +298,7 @@ class ModelInstallServiceBase(ABC):
         block indefinitely if one or more jobs are in the
         paused state.
 
-        It will return a dict that maps the source model
-        path, URL or repo_id to the ID of the installed model.
+        It will return the current list of jobs.
         """
 
     @abstractmethod
@@ -305,12 +314,3 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def sync_to_config(self) -> None:
         """Synchronize models on disk to those in the model record database."""
-
-    @abstractmethod
-    def release(self) -> None:
-        """
-        Signal the install thread to exit.
-
-        This is useful if you are done with the installer and wish to
-        release its resources.
-        """

@@ -29,7 +29,6 @@ from .model_install_base import (
     ModelInstallJob,
     ModelInstallServiceBase,
     ModelSource,
-    UnknownInstallJobException,
 )
 
 # marker that the queue is done and that thread should exit
@@ -46,7 +45,7 @@ class ModelInstallService(ModelInstallServiceBase):
     _record_store: ModelRecordServiceBase
     _event_bus: Optional[EventServiceBase] = None
     _install_queue: Queue[ModelInstallJob]
-    _install_jobs: Dict[ModelSource, ModelInstallJob]
+    _install_jobs: List[ModelInstallJob]
     _logger: Logger
     _cached_model_paths: Set[Path]
     _models_installed: Set[str]
@@ -68,11 +67,15 @@ class ModelInstallService(ModelInstallServiceBase):
         self._record_store = record_store
         self._event_bus = event_bus
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
-        self._install_jobs = {}
+        self._install_jobs = []
         self._install_queue = Queue()
         self._cached_model_paths = set()
         self._models_installed = set()
         self._start_installer_thread()
+
+    def __del__(self) -> None:
+        """At GC time, we stop the install thread and release its resources."""
+        self._install_queue.put(STOP_JOB)
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -189,7 +192,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 config_in=config,
                 local_path=Path(source.path),
             )
-            self._install_jobs[source] = job
+            self._install_jobs.append(job)
             self._install_queue.put(job)
             return job
 
@@ -199,29 +202,23 @@ class ModelInstallService(ModelInstallServiceBase):
     def list_jobs(self, source: Optional[ModelSource | str] = None) -> List[ModelInstallJob]:  # noqa D102
         jobs = self._install_jobs
         if not source:
-            return list(jobs.values())
+            return jobs
         else:
-            return [jobs[x] for x in jobs if str(source) in str(x)]
+            return [x for x in jobs if str(source) in str(x)]
 
-    def get_job(self, source: ModelSource) -> ModelInstallJob:  # noqa D102
-        try:
-            return self._install_jobs[source]
-        except KeyError:
-            raise UnknownInstallJobException(f"{source}: unknown install job")
+    def get_job(self, source: ModelSource) -> List[ModelInstallJob]:  # noqa D102
+        return [x for x in self._install_jobs if x.source == source]
 
-    def wait_for_installs(self) -> Dict[ModelSource, ModelInstallJob]:  # noqa D102
+    def wait_for_installs(self) -> List[ModelInstallJob]:  # noqa D102
         self._install_queue.join()
         return self._install_jobs
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
-        finished_jobs = [
-            source
-            for source in self._install_jobs
-            if self._install_jobs[source].status in [InstallStatus.COMPLETED, InstallStatus.ERROR]
+        unfinished_jobs = [
+            x for x in self._install_jobs if x.status not in [InstallStatus.COMPLETED, InstallStatus.ERROR]
         ]
-        for source in finished_jobs:
-            del self._install_jobs[source]
+        self._install_jobs = unfinished_jobs
 
     def sync_to_config(self) -> None:
         """Synchronize models on disk to those in the config record store database."""
@@ -343,10 +340,6 @@ class ModelInstallService(ModelInstallServiceBase):
         else:
             path.unlink()
         self.unregister(key)
-
-    def release(self) -> None:
-        """Stop the install thread and release its resources."""
-        self._install_queue.put(STOP_JOB)
 
     def _copy_model(self, old_path: Path, new_path: Path) -> Path:
         if old_path == new_path:

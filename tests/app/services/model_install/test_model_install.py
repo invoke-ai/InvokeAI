@@ -16,7 +16,6 @@ from invokeai.app.services.model_install import (
     ModelInstallJob,
     ModelInstallService,
     ModelInstallServiceBase,
-    UnknownInstallJobException,
 )
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL, UnknownModelException
 from invokeai.app.services.shared.sqlite import SqliteDatabase
@@ -133,13 +132,14 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
     assert isinstance(job, ModelInstallJob)
 
     # See if job is registered properly
-    assert installer.get_job(source) == job
+    assert job in installer.get_job(source)
 
     # test that the job object tracked installation correctly
     jobs = installer.wait_for_installs()
-    assert jobs[source] is not None
-    assert jobs[source] == job
-    assert jobs[source].status == InstallStatus.COMPLETED
+    assert len(jobs) > 0
+    my_job = [x for x in jobs if x.source == source]
+    assert len(my_job) == 1
+    assert my_job[0].status == InstallStatus.COMPLETED
 
     # test that the expected events were issued
     bus = installer.event_bus
@@ -165,9 +165,7 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
 
     # see if prune works properly
     installer.prune_jobs()
-    with pytest.raises(UnknownInstallJobException):
-        assert installer.get_job(source)
-
+    assert not installer.get_job(source)
 
 def test_delete_install(installer: ModelInstallServiceBase, test_file: Path, app_config: InvokeAIAppConfig):
     store = installer.record_store

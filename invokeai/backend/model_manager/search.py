@@ -115,7 +115,6 @@ class ModelSearch(ModelSearchBase):
        # returns all models that have 'anime' in the path
     """
 
-    directory: Path = Field(default=None)
     models_found: Set[Path] = Field(default=None)
     scanned_dirs: Set[Path] = Field(default=None)
     pruned_paths: Set[Path] = Field(default=None)
