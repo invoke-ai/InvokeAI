@@ -42,8 +42,6 @@ def test_register_migration(migrator: SQLiteMigrator, good_migration: Migration)
     migration = good_migration
     migrator.register_migration(migration)
     assert migration in migrator._migrations
-    with pytest.raises(MigrationError, match="Invalid migration version"):
-        migrator.register_migration(Migration(db_version=0, app_version="0.0.0", migrate=lambda cursor: None))
 
 
 def test_register_invalid_migration_version(migrator: SQLiteMigrator):
