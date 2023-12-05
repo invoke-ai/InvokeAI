@@ -36,7 +36,9 @@ class WorkflowCategory(str, Enum, metaclass=MetaEnum):
 
 class WorkflowMeta(BaseModel):
     version: str = Field(description="The version of the workflow schema.")
-    category: WorkflowCategory = Field(description="The category of the workflow (user or default).")
+    category: WorkflowCategory = Field(
+        default=WorkflowCategory.User, description="The category of the workflow (user or default)."
+    )
 
     @field_validator("version")
     def validate_version(cls, version: str):
