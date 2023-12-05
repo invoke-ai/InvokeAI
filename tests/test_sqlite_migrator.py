@@ -99,22 +99,34 @@ def test_run_migrations(migrator: SQLiteMigrator):
     assert migrator._get_current_version() == 3
 
 
-def test_backup_and_restore_db(migrator: SQLiteMigrator):
+def test_backup_and_restore_db():
+    # must do this with a file database - we don't backup/restore for memory
     with TemporaryDirectory() as tempdir:
-        # must do this with a file database - we don't backup/restore for memory
+        # create test DB w/ some data
         database = Path(tempdir) / "test.db"
-        migrator._database = database
-        migrator._cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
-        migrator._conn.commit()
+        conn = sqlite3.connect(database, check_same_thread=False)
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
+        conn.commit()
+
+        migrator = SQLiteMigrator(conn=conn, database=database, lock=threading.RLock(), logger=Logger("test"))
         backup_path = migrator._backup_db(migrator._database)
+
+        # mangle the db
         migrator._cursor.execute("DROP TABLE test;")
         migrator._conn.commit()
-        migrator._restore_db(backup_path)  # this closes the connection
-        # reconnect to db
+        migrator._cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
+        assert migrator._cursor.fetchone() is None
+
+        # restore (closes the connection - must create a new one)
+        migrator._restore_db(backup_path)
         restored_conn = sqlite3.connect(database)
         restored_cursor = restored_conn.cursor()
         restored_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
         assert restored_cursor.fetchone() is not None
+
+        # must manually close else tempfile throws on cleanup on windows
+        restored_conn.close()
 
 
 def test_no_backup_and_restore_for_memory_db(migrator: SQLiteMigrator):
