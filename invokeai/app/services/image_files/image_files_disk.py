@@ -79,6 +79,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 [cv2.IMWRITE_PNG_COMPRESSION, self.__invoker.services.configuration.png_compress_level],
             )
 
+            # write png info using PIL
+            Image.open(image_path.as_posix()).save(image_path.as_posix(), pnginfo=pnginfo)
+
             thumbnail_name = get_thumbnail_name(image_name)
             thumbnail_path = self.get_path(thumbnail_name, thumbnail=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
