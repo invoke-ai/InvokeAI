@@ -73,7 +73,13 @@ const BoardContextMenu = ({
         addToast({
           title: t('gallery.preparingDownload'),
           status: 'success',
-          ...(response.response ? { description: response.response } : {}),
+          ...(response.response
+            ? {
+                description: response.response,
+                duration: null,
+                isClosable: true,
+              }
+            : {}),
         })
       );
     } catch {
