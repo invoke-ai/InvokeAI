@@ -32,6 +32,7 @@ class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
 class WorkflowCategory(str, Enum, metaclass=MetaEnum):
     User = "user"
     Default = "default"
+    Project = "project"
 
 
 class WorkflowMeta(BaseModel):

@@ -10,6 +10,8 @@ import {
   Spacer,
 } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
+import { useStore } from '@nanostores/react';
+import { $projectId } from 'app/store/nanostores/projectId';
 import IAIButton from 'common/components/IAIButton';
 import {
   IAINoContentFallback,
@@ -35,11 +37,14 @@ import { useDebounce } from 'use-debounce';
 
 const PER_PAGE = 10;
 
-const ORDER_BY_DATA: SelectItem[] = [
-  { value: 'opened_at', label: 'Opened' },
+const BASE_ORDER_BY_DATA: SelectItem[] = [
   { value: 'created_at', label: 'Created' },
   { value: 'updated_at', label: 'Updated' },
   { value: 'name', label: 'Name' },
+];
+
+const OPENED_AT_ORDER_BY_EXTRAS: SelectItem[] = [
+  { value: 'opened_at', label: 'Opened' },
 ];
 
 const DIRECTION_DATA: SelectItem[] = [
@@ -55,14 +60,21 @@ const WorkflowLibraryList = () => {
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
   const [debouncedQuery] = useDebounce(query, 500);
+  const projectId = useStore($projectId);
+  const orderByData = useMemo<SelectItem[]>(() => {
+    if (category === 'project') {
+      return BASE_ORDER_BY_DATA;
+    }
+    return [...BASE_ORDER_BY_DATA, ...OPENED_AT_ORDER_BY_EXTRAS];
+  }, [category]);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
-    if (category === 'user') {
+    if (category === 'default') {
       return {
         page,
         per_page: PER_PAGE,
-        order_by,
-        direction,
+        order_by: 'name' as const,
+        direction: 'ASC' as const,
         category,
         query: debouncedQuery,
       };
@@ -70,8 +82,8 @@ const WorkflowLibraryList = () => {
     return {
       page,
       per_page: PER_PAGE,
-      order_by: 'name' as const,
-      direction: 'ASC' as const,
+      order_by,
+      direction,
       category,
       query: debouncedQuery,
     };
@@ -137,6 +149,15 @@ const WorkflowLibraryList = () => {
     setPage(0);
   }, []);
 
+  const handleSetProjectCategory = useCallback(() => {
+    setCategory('project');
+    setPage(0);
+    // Projects can't be sorted by opened_at
+    if (order_by === 'opened_at') {
+      setOrderBy('name');
+    }
+  }, [order_by]);
+
   return (
     <>
       <Flex gap={4} alignItems="center" h={10} flexShrink={0} flexGrow={0}>
@@ -148,6 +169,15 @@ const WorkflowLibraryList = () => {
           >
             {t('workflows.userWorkflows')}
           </IAIButton>
+          {projectId && (
+            <IAIButton
+              variant={category === 'project' ? undefined : 'ghost'}
+              onClick={handleSetProjectCategory}
+              isChecked={category === 'project'}
+            >
+              {t('workflows.projectWorkflows')}
+            </IAIButton>
+          )}
           <IAIButton
             variant={category === 'default' ? undefined : 'ghost'}
             onClick={handleSetDefaultCategory}
@@ -157,12 +187,12 @@ const WorkflowLibraryList = () => {
           </IAIButton>
         </ButtonGroup>
         <Spacer />
-        {category === 'user' && (
+        {category !== 'default' && (
           <>
             <IAIMantineSelect
               label={t('common.orderBy')}
               value={order_by}
-              data={ORDER_BY_DATA}
+              data={orderByData}
               onChange={handleChangeOrderBy}
               formControlProps={{
                 w: 48,
@@ -223,7 +253,7 @@ const WorkflowLibraryList = () => {
           </Flex>
         </ScrollableContent>
       ) : (
-        <IAINoContentFallback label={t('workflows.noUserWorkflows')} />
+        <IAINoContentFallback label={t('workflows.noWorkflows')} />
       )}
       <Divider />
       {data && (

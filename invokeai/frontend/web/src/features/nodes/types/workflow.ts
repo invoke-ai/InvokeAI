@@ -14,7 +14,7 @@ export type XYPosition = z.infer<typeof zXYPosition>;
 export const zDimension = z.number().gt(0).nullish();
 export type Dimension = z.infer<typeof zDimension>;
 
-export const zWorkflowCategory = z.enum(['user', 'default']);
+export const zWorkflowCategory = z.enum(['user', 'default', 'project']);
 export type WorkflowCategory = z.infer<typeof zWorkflowCategory>;
 // #endregion
 
