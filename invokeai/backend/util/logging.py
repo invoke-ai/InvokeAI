@@ -343,12 +343,12 @@ class InvokeAILogger(object):  # noqa D102
     ) -> logging.Logger:  # noqa D102
         if name in cls.loggers:
             return cls.loggers[name]
-        else:
-            logger = logging.getLogger(name)
+
+        logger = logging.getLogger(name)
         logger.setLevel(config.log_level.upper())  # yes, strings work here
         for ch in cls.get_loggers(config):
             logger.addHandler(ch)
-            cls.loggers[name] = logger
+        cls.loggers[name] = logger
         return cls.loggers[name]
 
     @classmethod
