@@ -70,6 +70,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         self._start_workers(max_parallel_dl)
 
+    def __del__(self) -> None:
+        if any(thread.is_alive for thread in self._worker_pool):
+            self._queue.put(STOP_JOB)
+
     def download(
         self,
         source: Union[str, AnyHttpUrl],
@@ -103,12 +107,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
             self._jobs[id] = job
             self._queue.put(job)
         return job
-
-    def release(self):
-        """Signal our threads to exit when queue done."""
-        for thread in self._worker_pool:
-            if thread.is_alive():
-                self._queue.put(STOP_JOB)
 
     def join(self):
         """Wait for all jobs to complete."""
