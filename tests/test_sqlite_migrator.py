@@ -163,9 +163,16 @@ def test_db_version_gt_last_migration(migrator: SQLiteMigrator, good_migration: 
     assert migrator._get_current_version() == 2
 
 
-def test_idempotent_migrations(migrator: SQLiteMigrator, good_migration: Migration):
+def test_idempotent_migrations(migrator: SQLiteMigrator):
     migrator._create_version_table()
-    migrator.register_migration(good_migration)
+
+    def create_test_table(cursor: sqlite3.Cursor) -> None:
+        # This SQL throws if run twice
+        cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
+
+    migration = Migration(db_version=1, app_version="1.0.0", migrate=create_test_table)
+
+    migrator.register_migration(migration)
     migrator.run_migrations()
+    # not throwing is sufficient
     migrator.run_migrations()
-    assert migrator._get_current_version() == 1
