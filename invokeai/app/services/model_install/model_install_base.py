@@ -199,7 +199,7 @@ class ModelInstallServiceBase(ABC):
         """Remove model with indicated key from the database."""
 
     @abstractmethod
-    def delete(self, key: str) -> None:  # noqa D102
+    def delete(self, key: str) -> None:
         """Remove model with indicated key from the database. Delete its files only if they are within our models directory."""
 
     @abstractmethod
