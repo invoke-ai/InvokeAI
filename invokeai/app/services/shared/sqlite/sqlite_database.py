@@ -36,7 +36,6 @@ class SqliteDatabase:
                 if self.db_path == sqlite_memory:
                     return
                 initial_db_size = Path(self.db_path).stat().st_size
-                self.lock.acquire()
                 self.conn.execute("VACUUM;")
                 self.conn.commit()
                 final_db_size = Path(self.db_path).stat().st_size
