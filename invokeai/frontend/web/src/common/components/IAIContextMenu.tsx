@@ -22,7 +22,7 @@ import {
   PortalProps,
   useEventListener,
 } from '@chakra-ui/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import * as React from 'react';
 import {
   MutableRefObject,
@@ -49,10 +49,6 @@ export function IAIContextMenu<T extends HTMLElement = HTMLElement>(
   const [position, setPosition] = useState<[number, number]>([0, 0]);
   const targetRef = useRef<T>(null);
 
-  const globalContextMenuCloseTrigger = useAppSelector(
-    (state) => state.ui.globalContextMenuCloseTrigger
-  );
-
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
@@ -70,11 +66,12 @@ export function IAIContextMenu<T extends HTMLElement = HTMLElement>(
     }
   }, [isOpen]);
 
-  useEffect(() => {
+  const onClose = useCallback(() => {
     setIsOpen(false);
     setIsDeferredOpen(false);
     setIsRendered(false);
-  }, [globalContextMenuCloseTrigger]);
+  }, []);
+  useGlobalMenuCloseTrigger(onClose);
 
   useEventListener('contextmenu', (e) => {
     if (

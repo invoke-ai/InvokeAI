@@ -15,7 +15,7 @@ import {
   NODE_WIDTH,
 } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { contextMenusClosed } from 'features/ui/store/uiSlice';
+import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import {
   MouseEvent,
   PropsWithChildren,
@@ -70,7 +70,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
         dispatch(nodeExclusivelySelected(nodeId));
       }
-      dispatch(contextMenusClosed());
+      dispatch(bumpGlobalMenuCloseTrigger());
     },
     [dispatch, nodeId]
   );
