@@ -94,7 +94,7 @@
     "react-icons": "^4.11.0",
     "react-konva": "^18.2.10",
     "react-redux": "^8.1.3",
-    "react-resizable-panels": "^0.0.55",
+    "react-resizable-panels": "^0.0.63",
     "react-use": "^17.4.0",
     "react-virtuoso": "^4.6.2",
     "reactflow": "^11.9.4",

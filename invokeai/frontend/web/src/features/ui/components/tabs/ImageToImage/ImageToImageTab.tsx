@@ -17,7 +17,10 @@ const ImageToImageTab = () => {
     if (!panelGroupRef.current) {
       return;
     }
-    panelGroupRef.current.setLayout([50, 50]);
+    panelGroupRef.current.setLayout([
+      { sizePercentage: 50 },
+      { sizePercentage: 50 },
+    ]);
   }, []);
 
   const panelStorage = usePanelStorage();
@@ -30,13 +33,12 @@ const ImageToImageTab = () => {
         direction="horizontal"
         style={{ height: '100%', width: '100%' }}
         storage={panelStorage}
-        units="percentages"
       >
         <Panel
           id="imageTab.content.initImage"
           order={0}
-          defaultSize={50}
-          minSize={25}
+          defaultSizePercentage={50}
+          minSizePercentage={25}
           style={{ position: 'relative' }}
         >
           <InitialImageDisplay />
@@ -45,8 +47,8 @@ const ImageToImageTab = () => {
         <Panel
           id="imageTab.content.selectedImage"
           order={1}
-          defaultSize={50}
-          minSize={25}
+          defaultSizePercentage={50}
+          minSizePercentage={25}
         >
           <TextToImageTabMain />
         </Panel>

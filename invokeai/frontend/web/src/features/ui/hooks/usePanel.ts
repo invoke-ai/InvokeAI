@@ -1,16 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
-import { ImperativePanelHandle, Units } from 'react-resizable-panels';
+import { ImperativePanelHandle, MixedSizes } from 'react-resizable-panels';
 
-export const usePanel = (minSize: number, units: Units) => {
+export const usePanel = (minSize: Partial<MixedSizes>) => {
   const ref = useRef<ImperativePanelHandle>(null);
 
-  const [isCollapsed, setIsCollapsed] = useState(() =>
-    Boolean(ref.current?.getCollapsed())
-  );
-
   const toggle = useCallback(() => {
-    if (ref.current?.getCollapsed()) {
+    if (ref.current?.isCollapsed()) {
       flushSync(() => {
         ref.current?.expand();
       });
@@ -35,15 +31,12 @@ export const usePanel = (minSize: number, units: Units) => {
 
   const reset = useCallback(() => {
     flushSync(() => {
-      ref.current?.resize(minSize, units);
+      ref.current?.resize(minSize);
     });
-  }, [minSize, units]);
+  }, [minSize]);
 
   return {
     ref,
-    minSize,
-    isCollapsed,
-    setIsCollapsed,
     reset,
     toggle,
     expand,

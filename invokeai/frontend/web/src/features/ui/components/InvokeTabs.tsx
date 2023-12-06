@@ -14,7 +14,13 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import { usePanel } from 'features/ui/hooks/usePanel';
+import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { InvokeTabName } from 'features/ui/store/tabMap';
+import {
+  activeTabIndexSelector,
+  activeTabNameSelector,
+} from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -25,12 +31,6 @@ import { FaCube, FaFont, FaImage, FaStream } from 'react-icons/fa';
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
-import { usePanel } from 'features/ui/hooks/usePanel';
-import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
-import {
-  activeTabIndexSelector,
-  activeTabNameSelector,
-} from 'features/ui/store/uiSelectors';
 import FloatingGalleryButton from './FloatingGalleryButton';
 import FloatingSidePanelButtons from './FloatingParametersPanelButtons';
 import ParametersPanel from './ParametersPanel';
@@ -160,31 +160,28 @@ const InvokeTabs = () => {
   );
 
   const {
-    minSize: sidePanelMinSize,
-    isCollapsed: isSidePanelCollapsed,
-    setIsCollapsed: setIsSidePanelCollapsed,
     ref: sidePanelRef,
     reset: resetSidePanel,
     expand: expandSidePanel,
     collapse: collapseSidePanel,
     toggle: toggleSidePanel,
-  } = usePanel(SIDE_PANEL_MIN_SIZE_PX, 'pixels');
+  } = usePanel({ sizePixels: SIDE_PANEL_MIN_SIZE_PX });
 
   const {
     ref: galleryPanelRef,
-    minSize: galleryPanelMinSize,
-    isCollapsed: isGalleryPanelCollapsed,
-    setIsCollapsed: setIsGalleryPanelCollapsed,
     reset: resetGalleryPanel,
     expand: expandGalleryPanel,
     collapse: collapseGalleryPanel,
     toggle: toggleGalleryPanel,
-  } = usePanel(GALLERY_PANEL_MIN_SIZE_PX, 'pixels');
+  } = usePanel({ sizePixels: GALLERY_PANEL_MIN_SIZE_PX });
 
   useHotkeys(
     'f',
     () => {
-      if (isGalleryPanelCollapsed || isSidePanelCollapsed) {
+      if (
+        sidePanelRef.current?.isCollapsed() ||
+        galleryPanelRef.current?.isCollapsed()
+      ) {
         expandGalleryPanel();
         expandSidePanel();
       } else {
@@ -192,7 +189,7 @@ const InvokeTabs = () => {
         collapseGalleryPanel();
       }
     },
-    [dispatch, isGalleryPanelCollapsed, isSidePanelCollapsed]
+    [dispatch, sidePanelRef, galleryPanelRef]
   );
 
   useHotkeys(
@@ -212,6 +209,22 @@ const InvokeTabs = () => {
   );
 
   const panelStorage = usePanelStorage();
+
+  console.log({
+    sidePanelRef,
+    resetSidePanel,
+    expandSidePanel,
+    collapseSidePanel,
+    toggleSidePanel,
+  });
+
+  console.log({
+    galleryPanelRef,
+    resetGalleryPanel,
+    expandGalleryPanel,
+    collapseGalleryPanel,
+    toggleGalleryPanel,
+  });
 
   return (
     <Tabs
@@ -241,7 +254,6 @@ const InvokeTabs = () => {
         direction="horizontal"
         style={{ height: '100%', width: '100%' }}
         storage={panelStorage}
-        units="pixels"
       >
         {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
           <>
@@ -249,9 +261,8 @@ const InvokeTabs = () => {
               order={0}
               id="side"
               ref={sidePanelRef}
-              defaultSize={sidePanelMinSize}
-              minSize={sidePanelMinSize}
-              onCollapse={setIsSidePanelCollapsed}
+              defaultSizePixels={SIDE_PANEL_MIN_SIZE_PX}
+              minSizePixels={SIDE_PANEL_MIN_SIZE_PX}
               collapsible
             >
               {activeTabName === 'nodes' ? (
@@ -262,15 +273,19 @@ const InvokeTabs = () => {
             </Panel>
             <ResizeHandle
               onDoubleClick={resetSidePanel}
-              collapsedDirection={isSidePanelCollapsed ? 'left' : undefined}
+              collapsedDirection={
+                sidePanelRef.current?.isCollapsed() ? 'left' : undefined
+              }
             />
             <FloatingSidePanelButtons
-              isSidePanelCollapsed={isSidePanelCollapsed}
+              isSidePanelCollapsed={Boolean(
+                sidePanelRef.current?.isCollapsed()
+              )}
               sidePanelRef={sidePanelRef}
             />
           </>
         )}
-        <Panel id="main" order={1} minSize={MAIN_PANEL_MIN_SIZE_PX}>
+        <Panel id="main" order={1} minSizePixels={MAIN_PANEL_MIN_SIZE_PX}>
           <TabPanels style={{ height: '100%', width: '100%' }}>
             {tabPanels}
           </TabPanels>
@@ -279,21 +294,24 @@ const InvokeTabs = () => {
           <>
             <ResizeHandle
               onDoubleClick={resetGalleryPanel}
-              collapsedDirection={isGalleryPanelCollapsed ? 'right' : undefined}
+              collapsedDirection={
+                galleryPanelRef.current?.isCollapsed() ? 'right' : undefined
+              }
             />
             <Panel
               id="gallery"
               ref={galleryPanelRef}
               order={2}
-              defaultSize={galleryPanelMinSize}
-              minSize={galleryPanelMinSize}
-              onCollapse={setIsGalleryPanelCollapsed}
+              defaultSizePixels={GALLERY_PANEL_MIN_SIZE_PX}
+              minSizePixels={GALLERY_PANEL_MIN_SIZE_PX}
               collapsible
             >
               <ImageGalleryContent />
             </Panel>
             <FloatingGalleryButton
-              isGalleryCollapsed={isGalleryPanelCollapsed}
+              isGalleryCollapsed={Boolean(
+                galleryPanelRef.current?.isCollapsed()
+              )}
               galleryPanelRef={galleryPanelRef}
             />
           </>

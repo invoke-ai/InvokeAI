@@ -1,4 +1,5 @@
 import { Flex } from '@chakra-ui/react';
+import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
 import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
@@ -11,7 +12,6 @@ import {
 import 'reactflow/dist/style.css';
 import InspectorPanel from './inspector/InspectorPanel';
 import WorkflowPanel from './workflow/WorkflowPanel';
-import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
 
 const NodeEditorPanelGroup = () => {
   const [isTopPanelCollapsed, setIsTopPanelCollapsed] = useState(false);
@@ -22,7 +22,23 @@ const NodeEditorPanelGroup = () => {
     if (!panelGroupRef.current) {
       return;
     }
-    panelGroupRef.current.setLayout([50, 50]);
+    panelGroupRef.current.setLayout([
+      { sizePercentage: 50 },
+      { sizePercentage: 50 },
+    ]);
+  }, []);
+
+  const onCollapseTopPanel = useCallback(() => {
+    setIsTopPanelCollapsed(true);
+  }, []);
+  const onExpandTopPanel = useCallback(() => {
+    setIsTopPanelCollapsed(false);
+  }, []);
+  const onCollapseBottomPanel = useCallback(() => {
+    setIsBottomPanelCollapsed(true);
+  }, []);
+  const onExpandBottomPanel = useCallback(() => {
+    setIsBottomPanelCollapsed(false);
   }, []);
 
   return (
@@ -53,8 +69,9 @@ const NodeEditorPanelGroup = () => {
         <Panel
           id="workflow"
           collapsible
-          onCollapse={setIsTopPanelCollapsed}
-          minSize={25}
+          onCollapse={onCollapseTopPanel}
+          onExpand={onExpandTopPanel}
+          minSizePercentage={25}
         >
           <WorkflowPanel />
         </Panel>
@@ -72,8 +89,9 @@ const NodeEditorPanelGroup = () => {
         <Panel
           id="inspector"
           collapsible
-          onCollapse={setIsBottomPanelCollapsed}
-          minSize={25}
+          onCollapse={onCollapseBottomPanel}
+          onExpand={onExpandBottomPanel}
+          minSizePercentage={25}
         >
           <InspectorPanel />
         </Panel>
