@@ -3,7 +3,6 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { zWorkflowV2 } from 'features/nodes/types/workflow';
-import { getWorkflowCopyName } from 'features/workflowLibrary/util/getWorkflowCopyName';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -39,7 +38,6 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
       } else {
         const data = await createWorkflow(workflow).unwrap();
         const createdWorkflow = zWorkflowV2.parse(data.workflow);
-        createdWorkflow.name = getWorkflowCopyName(createdWorkflow.name);
         dispatch(workflowLoaded(createdWorkflow));
         toaster({
           title: t('workflows.workflowSaved'),
