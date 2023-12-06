@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { NodesState } from 'features/nodes/store/types';
+import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import {
   WorkflowV2,
   zWorkflowEdge,
@@ -34,9 +35,7 @@ export const buildWorkflow: BuildWorkflowFunction = ({
   };
 
   clonedNodes
-    .filter((n) =>
-      ['invocation', 'notes'].includes(n.type ?? '__UNKNOWN_NODE_TYPE__')
-    )
+    .filter((n) => isInvocationNode(n) || isNotesNode(n)) // Workflows only contain invocation and notes nodes
     .forEach((node) => {
       const result = zWorkflowNode.safeParse(node);
       if (!result.success) {
