@@ -3,6 +3,25 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
+import {
+  connectionEnded,
+  connectionMade,
+  connectionStarted,
+  edgeAdded,
+  edgeChangeStarted,
+  edgeDeleted,
+  edgesChanged,
+  edgesDeleted,
+  nodesChanged,
+  nodesDeleted,
+  selectedAll,
+  selectedEdgesChanged,
+  selectedNodesChanged,
+  selectionCopied,
+  selectionPasted,
+  viewportChanged,
+} from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import { MouseEvent, useCallback, useRef } from 'react';
@@ -25,25 +44,6 @@ import {
   ReactFlowProps,
   XYPosition,
 } from 'reactflow';
-import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
-import {
-  connectionEnded,
-  connectionMade,
-  connectionStarted,
-  edgeAdded,
-  edgeChangeStarted,
-  edgeDeleted,
-  edgesChanged,
-  edgesDeleted,
-  nodesChanged,
-  nodesDeleted,
-  selectedAll,
-  selectedEdgesChanged,
-  selectedNodesChanged,
-  selectionCopied,
-  selectionPasted,
-  viewportChanged,
-} from 'features/nodes/store/nodesSlice';
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
 import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
