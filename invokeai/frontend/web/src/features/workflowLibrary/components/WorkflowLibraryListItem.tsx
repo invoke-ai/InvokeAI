@@ -4,9 +4,10 @@ import dateFormat, { masks } from 'dateformat';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { WorkflowRecordListItemDTO } from 'services/api/types';
+import { useAppSelector } from 'app/store/storeHooks';
 
 type Props = {
   workflowDTO: WorkflowRecordListItemDTO;
@@ -14,6 +15,7 @@ type Props = {
 
 const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
   const { t } = useTranslation();
+  const workflowId = useAppSelector((state) => state.workflow.id);
   const { onClose } = useWorkflowLibraryModalContext();
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow({});
   const { getAndLoadWorkflow, getAndLoadWorkflowResult } =
@@ -27,12 +29,17 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
     getAndLoadWorkflow(workflowDTO.workflow_id);
   }, [getAndLoadWorkflow, workflowDTO.workflow_id]);
 
+  const isOpen = useMemo(
+    () => workflowId === workflowDTO.workflow_id,
+    [workflowId, workflowDTO.workflow_id]
+  );
+
   return (
     <Flex key={workflowDTO.workflow_id} w="full">
       <Flex w="full" alignItems="center" gap={2} h={12}>
         <Flex flexDir="column" flexGrow={1} h="full">
           <Flex alignItems="center" w="full" h="50%">
-            <Heading size="sm">
+            <Heading size="sm" variant={isOpen ? 'accent' : undefined}>
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
             <Spacer />
@@ -70,6 +77,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
           </Flex>
         </Flex>
         <IAIButton
+          isDisabled={isOpen}
           onClick={handleGetAndLoadWorkflow}
           isLoading={getAndLoadWorkflowResult.isLoading}
           aria-label={t('workflows.openWorkflow')}
@@ -79,6 +87,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
         {workflowDTO.category === 'user' && (
           <IAIButton
             colorScheme="error"
+            isDisabled={isOpen}
             onClick={handleDeleteWorkflow}
             isLoading={deleteWorkflowResult.isLoading}
             aria-label={t('workflows.deleteWorkflow')}

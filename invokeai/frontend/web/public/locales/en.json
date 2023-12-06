@@ -1651,7 +1651,8 @@
         "clearWorkflowSearchFilter": "Clear Workflow Search Filter",
         "workflowName": "Workflow Name",
         "workflowEditorReset": "Workflow Editor Reset",
-        "workflowEditorMenu": "Workflow Editor Menu"
+        "workflowEditorMenu": "Workflow Editor Menu",
+        "workflowIsOpen": "Workflow is Open"
     },
     "app": {
         "storeNotInitialized": "Store is not initialized"
