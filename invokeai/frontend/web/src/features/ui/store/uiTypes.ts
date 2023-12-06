@@ -24,6 +24,6 @@ export interface UIState {
   shouldShowEmbeddingPicker: boolean;
   shouldAutoChangeDimensions: boolean;
   favoriteSchedulers: ParameterScheduler[];
-  globalContextMenuCloseTrigger: number;
+  globalMenuCloseTrigger: number;
   panels: Record<string, string>;
 }

@@ -4,7 +4,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
-import { contextMenusClosed } from 'features/ui/store/uiSlice';
+import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import { MouseEvent, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
@@ -153,7 +153,7 @@ export const Flow = () => {
   );
 
   const handlePaneClick = useCallback(() => {
-    dispatch(contextMenusClosed());
+    dispatch(bumpGlobalMenuCloseTrigger());
   }, [dispatch]);
 
   const onInit: OnInit = useCallback((flow) => {
