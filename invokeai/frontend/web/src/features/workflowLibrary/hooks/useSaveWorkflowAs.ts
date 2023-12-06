@@ -1,8 +1,11 @@
 import { ToastId, useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
-import { workflowLoaded } from 'features/nodes/store/actions';
-import { zWorkflowV2 } from 'features/nodes/types/workflow';
+import {
+  workflowIDChanged,
+  workflowNameChanged,
+  workflowSaved,
+} from 'features/nodes/store/workflowSlice';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateWorkflowMutation } from 'services/api/endpoints/workflows';
@@ -40,8 +43,9 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         workflow.id = undefined;
         workflow.name = newName;
         const data = await createWorkflow(workflow).unwrap();
-        const createdWorkflow = zWorkflowV2.parse(data.workflow);
-        dispatch(workflowLoaded(createdWorkflow));
+        dispatch(workflowIDChanged(data.workflow.id));
+        dispatch(workflowNameChanged(data.workflow.name));
+        dispatch(workflowSaved());
         onSuccess && onSuccess();
         toast.update(toastRef.current, {
           title: t('workflows.workflowSaved'),

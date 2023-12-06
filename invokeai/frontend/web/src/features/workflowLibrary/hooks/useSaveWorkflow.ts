@@ -1,14 +1,18 @@
 import { ToastId, useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
-import { workflowLoaded } from 'features/nodes/store/actions';
-import { zWorkflowV2 } from 'features/nodes/types/workflow';
+import {
+  workflowIDChanged,
+  workflowSaved,
+} from 'features/nodes/store/workflowSlice';
+import { WorkflowV2 } from 'features/nodes/types/workflow';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useCreateWorkflowMutation,
   useUpdateWorkflowMutation,
 } from 'services/api/endpoints/workflows';
+import { O } from 'ts-toolbelt';
 
 type UseSaveLibraryWorkflowReturn = {
   saveWorkflow: () => Promise<void>;
@@ -17,6 +21,10 @@ type UseSaveLibraryWorkflowReturn = {
 };
 
 type UseSaveLibraryWorkflow = () => UseSaveLibraryWorkflowReturn;
+
+const isWorkflowWithID = (
+  workflow: WorkflowV2
+): workflow is O.Required<WorkflowV2, 'id'> => Boolean(workflow.id);
 
 export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const { t } = useTranslation();
@@ -34,15 +42,13 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
       isClosable: false,
     });
     try {
-      if (workflow.id) {
-        const data = await updateWorkflow(workflow).unwrap();
-        const updatedWorkflow = zWorkflowV2.parse(data.workflow);
-        dispatch(workflowLoaded(updatedWorkflow));
+      if (isWorkflowWithID(workflow)) {
+        await updateWorkflow(workflow).unwrap();
       } else {
         const data = await createWorkflow(workflow).unwrap();
-        const createdWorkflow = zWorkflowV2.parse(data.workflow);
-        dispatch(workflowLoaded(createdWorkflow));
+        dispatch(workflowIDChanged(data.workflow.id));
       }
+      dispatch(workflowSaved());
       toast.update(toastRef.current, {
         title: t('workflows.workflowSaved'),
         status: 'success',

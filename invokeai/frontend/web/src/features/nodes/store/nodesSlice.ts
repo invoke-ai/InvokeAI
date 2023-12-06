@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf, PayloadAction } from '@reduxjs/toolkit';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import {
@@ -935,5 +935,43 @@ export const {
   viewportChanged,
   edgeAdded,
 } = nodesSlice.actions;
+
+// This is used for tracking `state.workflow.isTouched`
+export const isAnyNodeOrEdgeMutation = isAnyOf(
+  connectionEnded,
+  connectionMade,
+  edgeDeleted,
+  edgesChanged,
+  edgesDeleted,
+  edgeUpdated,
+  fieldBoardValueChanged,
+  fieldBooleanValueChanged,
+  fieldColorValueChanged,
+  fieldControlNetModelValueChanged,
+  fieldEnumModelValueChanged,
+  fieldImageValueChanged,
+  fieldIPAdapterModelValueChanged,
+  fieldT2IAdapterModelValueChanged,
+  fieldLabelChanged,
+  fieldLoRAModelValueChanged,
+  fieldMainModelValueChanged,
+  fieldNumberValueChanged,
+  fieldRefinerModelValueChanged,
+  fieldSchedulerValueChanged,
+  fieldStringValueChanged,
+  fieldVaeModelValueChanged,
+  nodeAdded,
+  nodeReplaced,
+  nodeIsIntermediateChanged,
+  nodeIsOpenChanged,
+  nodeLabelChanged,
+  nodeNotesChanged,
+  nodesChanged,
+  nodesDeleted,
+  nodeUseCacheChanged,
+  notesNodeValueChanged,
+  selectionPasted,
+  edgeAdded
+);
 
 export default nodesSlice.reducer;
