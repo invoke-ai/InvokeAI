@@ -14,6 +14,7 @@ def calc_overlap(tiles: list[Tile], num_tiles_x, num_tiles_y) -> list[Tile]:
         num_tiles_x: the number of tiles on the x axis.
         num_tiles_y: the number of tiles on the y axis.
     """
+
     def get_tile_or_none(idx_y: int, idx_x: int) -> Union[Tile, None]:
         if idx_y < 0 or idx_y > num_tiles_y or idx_x < 0 or idx_x > num_tiles_x:
             return None
@@ -405,4 +406,4 @@ def merge_tiles_with_seam_blending(
             dst_image[overlap_coords_bottom : first_tile_in_row.coords.bottom, :] = row_image[row_overlap_size:, :]
         else:
             # no overlap just paste the row
-            dst_image[first_tile_in_row.coords.top:first_tile_in_row.coords.bottom, :] = row_image
+            dst_image[first_tile_in_row.coords.top : first_tile_in_row.coords.bottom, :] = row_image

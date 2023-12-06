@@ -49,7 +49,7 @@ def paste(dst_image: np.ndarray, src_image: np.ndarray, box: TBLR, mask: Optiona
         dst_image[box.top : box.bottom, box.left : box.right] = src_image * mask + dst_image_box * (1.0 - mask)
 
 
-def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool,) -> np.ndarray:
+def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool) -> np.ndarray:
     """Blend two overlapping tile sections using a seams to find a path.
 
     It is assumed that input images will be RGB np arrays and are the same size.
@@ -94,7 +94,7 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
     # Calc the energy in the difference
     energy = np.abs(np.gradient(ia, axis=0)) + np.abs(np.gradient(ia, axis=1))
 
-    #Find the starting position of the seam
+    # Find the starting position of the seam
     res = np.copy(energy)
     for y in range(1, max_y):
         row = res[y, :]
@@ -106,7 +106,7 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
     lowest_energy_line = np.empty([max_y], dtype="uint16")
     lowest_energy_line[max_y - 1] = np.argmin(res[max_y - 1, min_x : max_x - 1])
 
-    #Calc the path of the seam
+    # Calc the path of the seam
     for ypos in range(max_y - 2, -1, -1):
         lowest_pos = lowest_energy_line[ypos + 1]
         lpos = lowest_pos - 1
@@ -130,18 +130,18 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
         mask = cv2.blur(mask, (blend_amount, blend_amount))
 
     # for visual debugging
-    #from PIL import Image
-    #m_image = Image.fromarray((mask * 255.0).astype("uint8"))
+    # from PIL import Image
+    # m_image = Image.fromarray((mask * 255.0).astype("uint8"))
 
     # copy ia2 over ia1 while applying the seam mask
     mask = np.expand_dims(mask, -1)
     blended_image = ia1 * mask + ia2 * (1.0 - mask)
 
     # for visual debugging
-    #i1 = Image.fromarray(ia1.astype("uint8"))
-    #i2 = Image.fromarray(ia2.astype("uint8"))
-    #b_image = Image.fromarray(blended_image.astype("uint8"))
-    #print(f"{ia1.shape}, {ia2.shape}, {mask.shape}, {blended_image.shape}")
-    #print(f"{i1.size}, {i2.size}, {m_image.size}, {b_image.size}")
+    # i1 = Image.fromarray(ia1.astype("uint8"))
+    # i2 = Image.fromarray(ia2.astype("uint8"))
+    # b_image = Image.fromarray(blended_image.astype("uint8"))
+    # print(f"{ia1.shape}, {ia2.shape}, {mask.shape}, {blended_image.shape}")
+    # print(f"{i1.size}, {i2.size}, {m_image.size}, {b_image.size}")
 
     return blended_image
