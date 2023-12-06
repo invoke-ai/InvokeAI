@@ -29,6 +29,11 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
         description="The workflow that generated this image.",
     )
     """The workflow that generated this image."""
+    actions: Optional[dict[str, bool]] = Field(
+        default=None,
+        description="Allowed actions on image."
+    )
+    """Allowed actions on image."""
 
 
 def image_record_to_dto(
@@ -37,6 +42,7 @@ def image_record_to_dto(
     thumbnail_url: str,
     board_id: Optional[str],
     workflow_id: Optional[str],
+    actions: Optional[dict[str, bool]]
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(
@@ -45,4 +51,5 @@ def image_record_to_dto(
         thumbnail_url=thumbnail_url,
         board_id=board_id,
         workflow_id=workflow_id,
+        actions=actions
     )
