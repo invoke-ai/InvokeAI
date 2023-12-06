@@ -113,11 +113,11 @@ class ImageCropInvocation(BaseInvocation, WithMetadata):
 
 
 @invocation(
-    "img_paste",
-    title="Paste Image",
-    tags=["image", "paste"],
+    invocation_type="img_pad_crop",
+    title="Center Pad or Crop Image",
     category="image",
-    version="1.2.0",
+    tags=["image", "pad", "crop"],
+    version="1.0.0",
 )
 class CenterPadCropInvocation(BaseInvocation):
     """Pad or crop an image's sides from the center by specified pixels. Positive values are outside of the image."""
@@ -168,11 +168,11 @@ class CenterPadCropInvocation(BaseInvocation):
 
 
 @invocation(
-    invocation_type="img_pad_crop",
-    title="Center Pad or Crop Image",
+    "img_paste",
+    title="Paste Image",
+    tags=["image", "paste"],
     category="image",
-    tags=["image", "pad", "crop"],
-    version="1.0.0",
+    version="1.2.0",
 )
 class ImagePasteInvocation(BaseInvocation, WithMetadata):
     """Pastes an image into another image."""
