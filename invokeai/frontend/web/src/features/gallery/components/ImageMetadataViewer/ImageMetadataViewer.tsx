@@ -63,12 +63,13 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
           w: 'full',
           h: 'full',
         }}
+        isLazy={true}
       >
         <TabList>
           <Tab>{t('metadata.recallParameters')}</Tab>
-          <Tab isDisabled={!metadata}>{t('metadata.metadata')}</Tab>
+          <Tab>{t('metadata.metadata')}</Tab>
           <Tab>{t('metadata.imageDetails')}</Tab>
-          <Tab isDisabled={!image.has_workflow}>{t('metadata.workflow')}</Tab>
+          <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
