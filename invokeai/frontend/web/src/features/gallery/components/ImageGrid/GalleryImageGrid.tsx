@@ -20,7 +20,8 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-import { EntityId } from '@reduxjs/toolkit';
+import { EntityId, createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -35,6 +36,16 @@ const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   },
 };
 
+const selector = createSelector(stateSelector, (state) => {
+  const selection = state.gallery.selection;
+  console.log(selection);
+
+  if (selection.length !== 1) {
+    return undefined;
+  }
+  return selection[0]?.image_name;
+});
+
 const GalleryImageGrid = () => {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -47,6 +58,8 @@ const GalleryImageGrid = () => {
   );
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
+
+  const lastSingleSelectionImage = useAppSelector(selector);
 
   const { currentData, isFetching, isSuccess, isError } =
     useListImagesQuery(queryArgs);
