@@ -14,9 +14,10 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowRecordListItemDTO,
     WorkflowRecordListItemDTOValidator,
     WorkflowRecordOrderBy,
-    WorkflowValidator,
     WorkflowWithoutID,
+    WorkflowWithoutIDValidator,
 )
+from invokeai.app.util.misc import uuid_string
 
 
 class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
@@ -66,7 +67,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         try:
             # Only user workflows may be created by this method
             assert workflow.meta.category is WorkflowCategory.User
-            workflow_with_id = WorkflowValidator.validate_python(workflow.model_dump())
+            workflow_with_id = Workflow(**workflow.model_dump(), id=uuid_string())
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
@@ -204,7 +205,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             workflow_paths = workflows_dir.glob("*.json")
             for path in workflow_paths:
                 bytes_ = path.read_bytes()
-                workflow = WorkflowValidator.validate_json(bytes_)
+                workflow_without_id = WorkflowWithoutIDValidator.validate_json(bytes_)
+                workflow = Workflow(**workflow_without_id.model_dump(), id=uuid_string())
                 workflows.append(workflow)
             # Only default workflows may be managed by this method
             assert all(w.meta.category is WorkflowCategory.Default for w in workflows)

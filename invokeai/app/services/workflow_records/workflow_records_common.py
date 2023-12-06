@@ -3,10 +3,9 @@ from enum import Enum
 from typing import Any, Union
 
 import semver
-from pydantic import BaseModel, Field, JsonValue, TypeAdapter, field_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, field_validator
 
 from invokeai.app.util.metaenum import MetaEnum
-from invokeai.app.util.misc import uuid_string
 
 __workflow_meta_version__ = semver.Version.parse("1.0.0")
 
@@ -66,12 +65,14 @@ class WorkflowWithoutID(BaseModel):
     nodes: list[dict[str, JsonValue]] = Field(description="The nodes of the workflow.")
     edges: list[dict[str, JsonValue]] = Field(description="The edges of the workflow.")
 
+    model_config = ConfigDict(extra="forbid")
+
 
 WorkflowWithoutIDValidator = TypeAdapter(WorkflowWithoutID)
 
 
 class Workflow(WorkflowWithoutID):
-    id: str = Field(default_factory=uuid_string, description="The id of the workflow.")
+    id: str = Field(description="The id of the workflow.")
 
 
 WorkflowValidator = TypeAdapter(Workflow)
