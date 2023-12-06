@@ -45,6 +45,9 @@ const invokeAI = definePartsStyle((props) => ({
       fontSize: 14,
     },
   },
+  divider: {
+    borderColor: mode('base.400', 'base.700')(props),
+  },
 }));
 
 export const menuTheme = defineMultiStyleConfig({
