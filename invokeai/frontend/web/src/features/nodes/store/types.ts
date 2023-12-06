@@ -41,4 +41,6 @@ export type NodesState = {
   selectionMode: SelectionMode;
 };
 
-export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'>;
+export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
+  isTouched: boolean;
+};

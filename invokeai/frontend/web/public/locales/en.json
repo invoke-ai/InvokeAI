@@ -171,7 +171,8 @@
         "created": "Created",
         "prevPage": "Previous Page",
         "nextPage": "Next Page",
-        "unknownError": "Unknown Error"
+        "unknownError": "Unknown Error",
+        "unsaved": "Unsaved"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
