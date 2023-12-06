@@ -86,6 +86,12 @@ export const validateWorkflow = (
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
     const sourceNode = keyedNodes[edge.source];
     const targetNode = keyedNodes[edge.target];
+    const sourceTemplate = sourceNode
+      ? invocationTemplates[sourceNode.data.type]
+      : undefined;
+    const targetTemplate = targetNode
+      ? invocationTemplates[targetNode.data.type]
+      : undefined;
     const issues: string[] = [];
 
     if (!sourceNode) {
@@ -95,9 +101,23 @@ export const validateWorkflow = (
           node: edge.source,
         })
       );
-    } else if (
+    }
+
+    if (!sourceTemplate) {
+      // The edge's source/output node template does not exist
+      issues.push(
+        t('nodes.missingTemplate', {
+          node: edge.source,
+          type: sourceNode?.data.type,
+        })
+      );
+    }
+
+    if (
+      sourceNode &&
+      sourceTemplate &&
       edge.type === 'default' &&
-      !(edge.sourceHandle in sourceNode.data.outputs)
+      !(edge.sourceHandle in sourceTemplate.outputs)
     ) {
       // The edge's source/output node field does not exist
       issues.push(
@@ -115,34 +135,29 @@ export const validateWorkflow = (
           node: edge.target,
         })
       );
-    } else if (
+    }
+
+    if (!targetTemplate) {
+      // The edge's target/input node template does not exist
+      issues.push(
+        t('nodes.missingTemplate', {
+          node: edge.target,
+          type: targetNode?.data.type,
+        })
+      );
+    }
+
+    if (
+      targetNode &&
+      targetTemplate &&
       edge.type === 'default' &&
-      !(edge.targetHandle in targetNode.data.inputs)
+      !(edge.targetHandle in targetTemplate.inputs)
     ) {
       // The edge's target/input node field does not exist
       issues.push(
         t('nodes.targetNodeFieldDoesNotExist', {
           node: edge.target,
           field: edge.targetHandle,
-        })
-      );
-    }
-
-    if (!sourceNode?.data.type || !invocationTemplates[sourceNode.data.type]) {
-      // The edge's source/output node template does not exist
-      issues.push(
-        t('nodes.missingTemplate', {
-          node: edge.source,
-          type: sourceNode?.data.type,
-        })
-      );
-    }
-    if (!targetNode?.data.type || !invocationTemplates[targetNode?.data.type]) {
-      // The edge's target/input node template does not exist
-      issues.push(
-        t('nodes.missingTemplate', {
-          node: edge.target,
-          type: targetNode?.data.type,
         })
       );
     }
