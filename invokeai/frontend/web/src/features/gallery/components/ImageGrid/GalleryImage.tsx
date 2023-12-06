@@ -112,6 +112,14 @@ const GalleryImage = (props: HoverableImageProps) => {
     return '';
   }, [imageDTO?.starred, customStarUi]);
 
+  const isUnstarDisabled = useMemo(() => {
+    if (imageDTO?.actions) {
+      return imageDTO?.starred && imageDTO.actions.unstar === false;
+    } else {
+      return false;
+    }
+  }, [imageDTO]);
+
   if (!imageDTO) {
     return <IAIFillSkeleton />;
   }
@@ -149,6 +157,13 @@ const GalleryImage = (props: HoverableImageProps) => {
               onClick={toggleStarredState}
               icon={starIcon}
               tooltip={starTooltip}
+              isDisabled={isUnstarDisabled}
+              styleOverrides={{
+                _disabled: {
+                  cursor: 'not-allowed',
+                  opacity: 1,
+                },
+              }}
             />
 
             {isHovered && shift && (

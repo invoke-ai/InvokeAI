@@ -15,7 +15,7 @@ import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -153,6 +153,22 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     }
   }, [unstarImages, imageDTO]);
 
+  const isDeleteDisabled = useMemo(() => {
+    if (imageDTO?.actions) {
+      return imageDTO.actions.delete === false;
+    } else {
+      return false;
+    }
+  }, [imageDTO]);
+
+  const isUnstarDisabled = useMemo(() => {
+    if (imageDTO?.actions) {
+      return imageDTO.actions.unstar === false;
+    } else {
+      return false;
+    }
+  }, [imageDTO]);
+
   return (
     <>
       <MenuItem
@@ -233,6 +249,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         <MenuItem
           icon={customStarUi ? customStarUi.off.icon : <MdStar />}
           onClickCapture={handleUnstarImage}
+          isDisabled={isUnstarDisabled}
         >
           {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
         </MenuItem>
@@ -248,6 +265,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
         onClickCapture={handleDelete}
+        isDisabled={isDeleteDisabled}
       >
         {t('gallery.deleteImage')}
       </MenuItem>

@@ -1,5 +1,5 @@
 import { MenuItem } from '@chakra-ui/react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { FaTrash } from 'react-icons/fa';
 import { BoardDTO } from 'services/api/types';
 import { useTranslation } from 'react-i18next';
@@ -17,23 +17,21 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
     setBoardToDelete(board);
   }, [board, setBoardToDelete]);
 
+  const isDeleteDisabled = useMemo(() => {
+    if (board?.actions) {
+      return board.actions.delete === false;
+    } else {
+      return false;
+    }
+  }, [board]);
+
   return (
     <>
-      {board.image_count > 0 && (
-        <>
-          {/* <MenuItem
-                    isDisabled={!board.image_count}
-                    icon={<FaImages />}
-                    onClickCapture={handleAddBoardToBatch}
-                  >
-                    Add Board to Batch
-                  </MenuItem> */}
-        </>
-      )}
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
         onClick={handleDelete}
+        isDisabled={isDeleteDisabled}
       >
         {t('boards.deleteBoard')}
       </MenuItem>

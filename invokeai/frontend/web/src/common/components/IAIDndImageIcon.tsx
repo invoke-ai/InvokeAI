@@ -7,10 +7,11 @@ type Props = {
   tooltip: string;
   icon?: ReactElement;
   styleOverrides?: SystemStyleObject;
+  isDisabled?: boolean;
 };
 
 const IAIDndImageIcon = (props: Props) => {
-  const { onClick, tooltip, icon, styleOverrides } = props;
+  const { onClick, tooltip, icon, styleOverrides, isDisabled = false } = props;
 
   const resetIconShadow = useColorModeValue(
     `drop-shadow(0px 0px 0.1rem var(--invokeai-colors-base-600))`,
@@ -18,6 +19,7 @@ const IAIDndImageIcon = (props: Props) => {
   );
   return (
     <IAIIconButton
+      isDisabled={isDisabled}
       onClick={onClick}
       aria-label={tooltip}
       tooltip={tooltip}
