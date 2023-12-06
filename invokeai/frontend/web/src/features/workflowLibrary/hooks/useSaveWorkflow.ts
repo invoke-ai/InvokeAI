@@ -1,9 +1,9 @@
-import { useAppToaster } from 'app/components/Toaster';
+import { ToastId, useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { zWorkflowV2 } from 'features/nodes/types/workflow';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useCreateWorkflowMutation,
@@ -24,33 +24,40 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const workflow = useWorkflow();
   const [updateWorkflow, updateWorkflowResult] = useUpdateWorkflowMutation();
   const [createWorkflow, createWorkflowResult] = useCreateWorkflowMutation();
-  const toaster = useAppToaster();
+  const toast = useToast();
+  const toastRef = useRef<ToastId | undefined>();
   const saveWorkflow = useCallback(async () => {
+    toastRef.current = toast({
+      title: t('workflows.savingWorkflow'),
+      status: 'loading',
+      duration: null,
+      isClosable: false,
+    });
     try {
       if (workflow.id) {
         const data = await updateWorkflow(workflow).unwrap();
         const updatedWorkflow = zWorkflowV2.parse(data.workflow);
         dispatch(workflowLoaded(updatedWorkflow));
-        toaster({
-          title: t('workflows.workflowSaved'),
-          status: 'success',
-        });
       } else {
         const data = await createWorkflow(workflow).unwrap();
         const createdWorkflow = zWorkflowV2.parse(data.workflow);
         dispatch(workflowLoaded(createdWorkflow));
-        toaster({
-          title: t('workflows.workflowSaved'),
-          status: 'success',
-        });
       }
+      toast.update(toastRef.current, {
+        title: t('workflows.workflowSaved'),
+        status: 'success',
+        duration: 1000,
+        isClosable: true,
+      });
     } catch (e) {
-      toaster({
+      toast.update(toastRef.current, {
         title: t('workflows.problemSavingWorkflow'),
         status: 'error',
+        duration: 1000,
+        isClosable: true,
       });
     }
-  }, [workflow, updateWorkflow, dispatch, toaster, t, createWorkflow]);
+  }, [workflow, updateWorkflow, dispatch, toast, t, createWorkflow]);
   return {
     saveWorkflow,
     isLoading: updateWorkflowResult.isLoading || createWorkflowResult.isLoading,
