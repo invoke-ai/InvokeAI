@@ -161,6 +161,7 @@
         "txt2img": "Text To Image",
         "unifiedCanvas": "Unified Canvas",
         "unknown": "Unknown",
+        "unknownError": "Unknown Error",
         "upload": "Upload"
     },
     "controlnet": {

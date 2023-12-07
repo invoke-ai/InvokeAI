@@ -74,18 +74,12 @@ export const addBatchEnqueuedListener = () => {
             ),
           });
         });
-      } else {
-        const detail = 'Unknown Error';
-        const duration = undefined;
-        if (response.status !== 403) {
-          toast({
-            title: t('queue.batchFailedToQueue'),
-            status: 'error',
-            description: detail,
-            ...(duration ? { duration } : {}),
-          });
-        }
-
+      } else if (response.status !== 403) {
+        toast({
+          title: t('queue.batchFailedToQueue'),
+          description: t('common.unknownError'),
+          status: 'error',
+        });
       }
       logger('queue').error(
         { batchConfig: parseify(arg), error: parseify(response) },
