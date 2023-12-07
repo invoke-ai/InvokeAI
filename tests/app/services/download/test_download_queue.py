@@ -6,7 +6,6 @@ from typing import Any, Dict, List
 
 import pytest
 import requests
-import sys
 from pydantic import BaseModel
 from requests_testadapter import TestAdapter
 
