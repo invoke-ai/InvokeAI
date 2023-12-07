@@ -277,11 +277,9 @@ class ModelInstallServiceBase(ABC):
         """Return the ModelInstallJob(s) corresponding to the provided source."""
 
     @abstractmethod
-    def list_jobs(self, source: Optional[ModelSource | str] = None) -> List[ModelInstallJob]:  # noqa D102
+    def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         """
         List active and complete install jobs.
-
-        :param source: Filter by jobs whose sources are a partial match to the argument.
         """
 
     @abstractmethod

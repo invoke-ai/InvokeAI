@@ -199,12 +199,8 @@ class ModelInstallService(ModelInstallServiceBase):
         else:  # here is where we'd download a URL or repo_id. Implementation pending download queue.
             raise UnknownModelException("File or directory not found")
 
-    def list_jobs(self, source: Optional[ModelSource | str] = None) -> List[ModelInstallJob]:  # noqa D102
-        jobs = self._install_jobs
-        if not source:
-            return jobs
-        else:
-            return [x for x in jobs if str(source) in str(x)]
+    def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
+        return self._install_jobs
 
     def get_job(self, source: ModelSource) -> List[ModelInstallJob]:  # noqa D102
         return [x for x in self._install_jobs if x.source == source]

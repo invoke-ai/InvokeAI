@@ -271,19 +271,14 @@ async def import_model(
     "/import",
     operation_id="list_model_install_jobs",
 )
-async def list_model_install_jobs(
-    source: Optional[str] = Query(
-        description="Filter list by install source, partial string match.",
-        default=None,
-    ),
-) -> List[ModelInstallJob]:
+async def list_model_install_jobs() -> List[ModelInstallJob]:
     """
     Return list of model install jobs.
 
     If the optional 'source' argument is provided, then the list will be filtered
     for partial string matches against the install source.
     """
-    jobs: List[ModelInstallJob] = ApiDependencies.invoker.services.model_install.list_jobs(source)
+    jobs: List[ModelInstallJob] = ApiDependencies.invoker.services.model_install.list_jobs()
     return jobs
 
 
