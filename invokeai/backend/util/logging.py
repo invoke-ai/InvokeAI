@@ -342,14 +342,13 @@ class InvokeAILogger(object):  # noqa D102
         cls, name: str = "InvokeAI", config: InvokeAIAppConfig = InvokeAIAppConfig.get_config()
     ) -> logging.Logger:  # noqa D102
         if name in cls.loggers:
-            logger = cls.loggers[name]
-            logger.handlers.clear()
-        else:
-            logger = logging.getLogger(name)
+            return cls.loggers[name]
+
+        logger = logging.getLogger(name)
         logger.setLevel(config.log_level.upper())  # yes, strings work here
         for ch in cls.get_loggers(config):
             logger.addHandler(ch)
-            cls.loggers[name] = logger
+        cls.loggers[name] = logger
         return cls.loggers[name]
 
     @classmethod
@@ -358,7 +357,7 @@ class InvokeAILogger(object):  # noqa D102
         handlers = []
         for handler in handler_strs:
             handler_name, *args = handler.split("=", 2)
-            args = args[0] if len(args) > 0 else None
+            arg = args[0] if len(args) > 0 else None
 
             # console and file get the fancy formatter.
             # syslog gets a simple one
@@ -370,16 +369,16 @@ class InvokeAILogger(object):  # noqa D102
                 handlers.append(ch)
 
             elif handler_name == "syslog":
-                ch = cls._parse_syslog_args(args)
+                ch = cls._parse_syslog_args(arg)
                 handlers.append(ch)
 
             elif handler_name == "file":
-                ch = cls._parse_file_args(args)
+                ch = cls._parse_file_args(arg)
                 ch.setFormatter(formatter())
                 handlers.append(ch)
 
             elif handler_name == "http":
-                ch = cls._parse_http_args(args)
+                ch = cls._parse_http_args(arg)
                 handlers.append(ch)
         return handlers
 
