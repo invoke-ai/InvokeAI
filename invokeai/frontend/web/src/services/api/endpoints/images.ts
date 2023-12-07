@@ -212,9 +212,8 @@ export const imagesApi = api.injectEndpoints({
           if (data.deleted_images.length < imageDTOs.length) {
             dispatch(
               addToast({
-                title: 'One or more images were not deleted',
+                title: 'One or more images could not be deleted',
                 status: 'warning',
-                description: "You are not authorized to delete all of the selected images",
               })
             );
           }
