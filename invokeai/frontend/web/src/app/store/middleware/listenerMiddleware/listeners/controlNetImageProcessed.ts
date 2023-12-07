@@ -72,7 +72,7 @@ export const addControlNetImageProcessedListener = () => {
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
             action.payload.data.queue_batch_id ===
-            enqueueResult.batch.batch_id &&
+              enqueueResult.batch.batch_id &&
             action.payload.data.source_node_id === nodeId
         );
 
@@ -114,7 +114,7 @@ export const addControlNetImageProcessedListener = () => {
             if (error.status === 403) {
               dispatch(pendingControlImagesCleared());
               dispatch(controlAdapterImageChanged({ id, controlImage: null }));
-              return
+              return;
             }
           }
         }

@@ -75,8 +75,12 @@ export const addUpscaleRequestedListener = () => {
           t('queue.graphFailedToQueue')
         );
 
-        if (error instanceof Object && 'status' in error && error.status === 403) {
-          return
+        if (
+          error instanceof Object &&
+          'status' in error &&
+          error.status === 403
+        ) {
+          return;
         } else {
           dispatch(
             addToast({
