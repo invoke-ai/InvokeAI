@@ -72,5 +72,13 @@
     },
     "unifiedCanvas": {
         "betaPreserveMasked": "마스크 레이어 유지"
+    },
+    "accessibility": {
+        "previousImage": "이전 이미지",
+        "modifyConfig": "Config 수정",
+        "nextImage": "다음 이미지",
+        "mode": "모드",
+        "menu": "메뉴",
+        "modelSelect": "모델 선택"
     }
 }

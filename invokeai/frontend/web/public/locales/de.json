@@ -99,7 +99,18 @@
         "data": "Daten",
         "safetensors": "Safetensors",
         "outpaint": "outpaint",
-        "details": "Details"
+        "details": "Details",
+        "format": "Format",
+        "unknown": "Unbekannt",
+        "folder": "Ordner",
+        "error": "Fehler",
+        "installed": "Installiert",
+        "ai": "KI",
+        "file": "Datei",
+        "somethingWentWrong": "Etwas ist schief gelaufen",
+        "copyError": "$t(gallery.copy) Fehler",
+        "input": "Eingabe",
+        "notInstalled": "Nicht $t(common.installed)"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -696,7 +707,9 @@
         "menu": "Menü",
         "loadMore": "Mehr laden",
         "invokeProgressBar": "Invoke Fortschrittsanzeige",
-        "mode": "Modus"
+        "mode": "Modus",
+        "resetUI": "$t(accessibility.reset) von UI",
+        "createIssue": "Ticket erstellen"
     },
     "boards": {
         "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
@@ -718,7 +731,9 @@
         "deleteBoardOnly": "Nur Ordner löschen",
         "deleteBoard": "Löschen Ordner",
         "deleteBoardAndImages": "Löschen Ordner und Bilder",
-        "deletedBoardsCannotbeRestored": "Gelöschte Ordner könnte nicht wiederhergestellt werden"
+        "deletedBoardsCannotbeRestored": "Gelöschte Ordner könnte nicht wiederhergestellt werden",
+        "movingImagesToBoard_one": "Verschiebe {{count}} Bild zu Ordner",
+        "movingImagesToBoard_other": "Verschiebe {{count}} Bilder in Ordner"
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
@@ -843,7 +858,7 @@
         "cancelBatchSucceeded": "Stapel abgebrochen",
         "cancelBatch": "Stapel stoppen",
         "enqueueing": "Stapel in der Warteschlange",
-        "queueMaxExceeded": "Maximum von  {{max_queue_size}} Elementen erreicht, würde {{skip}} Elemente überspringen",
+        "queueMaxExceeded": "Maximum von {{max_queue_size}} Elementen erreicht, würde {{skip}} Elemente überspringen",
         "cancelBatchFailed": "Problem beim Abbruch vom Stapel",
         "clearQueueAlertDialog2": "bist du sicher die Warteschlange zu leeren?",
         "pruneSucceeded": "{{item_count}} abgeschlossene Elemente aus der Warteschlange entfernt",
@@ -932,7 +947,8 @@
     "embedding": {
         "noMatchingEmbedding": "Keine passenden Embeddings",
         "addEmbedding": "Embedding hinzufügen",
-        "incompatibleModel": "Inkompatibles Basismodell:"
+        "incompatibleModel": "Inkompatibles Basismodell:",
+        "noEmbeddingsLoaded": "Kein Embedding geladen"
     },
     "nodes": {
         "booleanPolymorphicDescription": "Eine Sammlung boolescher Werte.",
