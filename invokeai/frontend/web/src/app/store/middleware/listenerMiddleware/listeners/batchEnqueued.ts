@@ -3,7 +3,7 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';
 import { t } from 'i18next';
-import { get, truncate, upperFirst } from 'lodash-es';
+import { truncate, upperFirst } from 'lodash-es';
 import { queueApi } from 'services/api/endpoints/queue';
 import { TOAST_OPTIONS, theme } from 'theme/theme';
 import { startAppListening } from '..';
@@ -75,8 +75,8 @@ export const addBatchEnqueuedListener = () => {
           });
         });
       } else {
-        let detail = 'Unknown Error';
-        let duration = undefined;
+        const detail = 'Unknown Error';
+        const duration = undefined;
         if (response.status !== 403) {
           toast({
             title: t('queue.batchFailedToQueue'),

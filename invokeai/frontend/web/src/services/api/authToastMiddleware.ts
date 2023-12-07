@@ -1,6 +1,6 @@
 import { isRejectedWithValue } from '@reduxjs/toolkit'
 import type { MiddlewareAPI, Middleware } from '@reduxjs/toolkit'
-import { addToast } from '../../features/system/store/systemSlice';
+import { addToast } from 'features/system/store/systemSlice';
 
 export const authToastMiddleware: Middleware =
     (api: MiddlewareAPI) => (next) => (action) => {

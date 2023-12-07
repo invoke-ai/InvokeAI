@@ -33,7 +33,7 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
-import { authToastMiddleware } from '../../services/api/authToastMiddleware';
+import { authToastMiddleware } from 'services/api/authToastMiddleware';
 
 const allReducers = {
   canvas: canvasReducer,
