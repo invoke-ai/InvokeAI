@@ -37,9 +37,6 @@ x-invokeai: &invokeai
     #     invokeai-nodes-web --host 0.0.0.0
 
 services:
-  invokeai-cpu:
-    <<: *invokeai
-
   invokeai-nvidia:
     <<: *invokeai
     deploy:
@@ -50,8 +47,15 @@ services:
               count: 1
               capabilities: [gpu]
 
+  invokeai-cpu:
+    <<: *invokeai
+    profiles:
+      - cpu
+
   invokeai-rocm:
     <<: *invokeai
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
+    profiles:
+      - rocm
