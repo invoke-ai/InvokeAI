@@ -28,6 +28,7 @@ import {
 } from 'services/api/util';
 import { boardsApi } from './boards';
 import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -212,7 +213,8 @@ export const imagesApi = api.injectEndpoints({
           if (data.deleted_images.length < imageDTOs.length) {
             dispatch(
               addToast({
-                title: 'One or more images could not be deleted',
+                title: t('gallery.problemDeletingImages'),
+                description: t('gallery.problemDeletingImagesDesc'),
                 status: 'warning',
               })
             );
@@ -365,11 +367,11 @@ export const imagesApi = api.injectEndpoints({
 
           const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
             ? boardsApi.endpoints.getBoardImagesTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState())
+                imageDTO.board_id ?? 'none'
+              )(getState())
             : boardsApi.endpoints.getBoardAssetsTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState());
+                imageDTO.board_id ?? 'none'
+              )(getState());
 
           // IF it eligible for insertion into existing $cache
           // "eligible" means either:
@@ -534,11 +536,11 @@ export const imagesApi = api.injectEndpoints({
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                boardId ?? 'none'
-              )(getState())
+                  boardId ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                boardId ?? 'none'
-              )(getState());
+                  boardId ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data &&
@@ -649,11 +651,11 @@ export const imagesApi = api.injectEndpoints({
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                boardId ?? 'none'
-              )(getState())
+                  boardId ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                boardId ?? 'none'
-              )(getState());
+                  boardId ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data &&
@@ -1081,11 +1083,11 @@ export const imagesApi = api.injectEndpoints({
 
           const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
             ? boardsApi.endpoints.getBoardImagesTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState())
+                imageDTO.board_id ?? 'none'
+              )(getState())
             : boardsApi.endpoints.getBoardAssetsTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState());
+                imageDTO.board_id ?? 'none'
+              )(getState());
 
           const isCacheFullyPopulated =
             currentCache.data &&
@@ -1223,11 +1225,11 @@ export const imagesApi = api.injectEndpoints({
 
         const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
           ? boardsApi.endpoints.getBoardImagesTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState())
+              imageDTO.board_id ?? 'none'
+            )(getState())
           : boardsApi.endpoints.getBoardAssetsTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState());
+              imageDTO.board_id ?? 'none'
+            )(getState());
 
         const isCacheFullyPopulated =
           currentCache.data &&
@@ -1364,11 +1366,11 @@ export const imagesApi = api.injectEndpoints({
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                new_board_id ?? 'none'
-              )(getState())
+                  new_board_id ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                new_board_id ?? 'none'
-              )(getState());
+                  new_board_id ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data &&
@@ -1512,11 +1514,11 @@ export const imagesApi = api.injectEndpoints({
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                imageDTO.board_id ?? 'none'
-              )(getState())
+                  imageDTO.board_id ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                imageDTO.board_id ?? 'none'
-              )(getState());
+                  imageDTO.board_id ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data &&
