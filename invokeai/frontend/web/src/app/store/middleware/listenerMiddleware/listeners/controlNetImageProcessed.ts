@@ -72,7 +72,7 @@ export const addControlNetImageProcessedListener = () => {
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
             action.payload.data.queue_batch_id ===
-              enqueueResult.batch.batch_id &&
+            enqueueResult.batch.batch_id &&
             action.payload.data.source_node_id === nodeId
         );
 
@@ -109,23 +109,12 @@ export const addControlNetImageProcessedListener = () => {
           t('queue.graphFailedToQueue')
         );
 
-        // handle usage-related errors
         if (error instanceof Object) {
           if ('data' in error && 'status' in error) {
             if (error.status === 403) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const detail = (error.data as any)?.detail || 'Unknown Error';
-              dispatch(
-                addToast({
-                  title: t('queue.graphFailedToQueue'),
-                  status: 'error',
-                  description: detail,
-                  duration: 15000,
-                })
-              );
               dispatch(pendingControlImagesCleared());
               dispatch(controlAdapterImageChanged({ id, controlImage: null }));
-              return;
+              return
             }
           }
         }

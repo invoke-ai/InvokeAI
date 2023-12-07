@@ -77,20 +77,15 @@ export const addBatchEnqueuedListener = () => {
       } else {
         let detail = 'Unknown Error';
         let duration = undefined;
-        if (response.status === 403 && 'body' in response) {
-          detail = get(response, 'body.detail', 'Unknown Error');
-        } else if (response.status === 403 && 'error' in response) {
-          detail = get(response, 'error.detail', 'Unknown Error');
-        } else if (response.status === 403 && 'data' in response) {
-          detail = get(response, 'data.detail', 'Unknown Error');
-          duration = 15000;
+        if (response.status !== 403) {
+          toast({
+            title: t('queue.batchFailedToQueue'),
+            status: 'error',
+            description: detail,
+            ...(duration ? { duration } : {}),
+          });
         }
-        toast({
-          title: t('queue.batchFailedToQueue'),
-          status: 'error',
-          description: detail,
-          ...(duration ? { duration } : {}),
-        });
+
       }
       logger('queue').error(
         { batchConfig: parseify(arg), error: parseify(response) },
