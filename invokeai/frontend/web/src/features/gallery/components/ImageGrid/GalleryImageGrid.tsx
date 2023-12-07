@@ -11,7 +11,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExclamationCircle, FaImage } from 'react-icons/fa';
-import { VirtuosoGrid } from 'react-virtuoso';
+import { VirtuosoGrid, VirtuosoGridHandle } from 'react-virtuoso';
 import {
   useLazyListImagesQuery,
   useListImagesQuery,
@@ -61,6 +61,8 @@ const GalleryImageGrid = () => {
 
   const lastSingleSelectionImage = useAppSelector(selector);
 
+  const imgRef = useRef<VirtuosoGridHandle>(null);
+
   const { currentData, isFetching, isSuccess, isError } =
     useListImagesQuery(queryArgs);
 
@@ -105,6 +107,14 @@ const GalleryImageGrid = () => {
     }
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
+
+  useEffect(() => {
+    if (lastSingleSelectionImage) {
+      imgRef.current?.scrollToIndex({
+        index: 0,
+      });
+    }
+  });
 
   if (!currentData) {
     return (
@@ -153,6 +163,7 @@ const GalleryImageGrid = () => {
             }}
             scrollerRef={setScroller}
             itemContent={itemContentFunc}
+            ref={imgRef}
           />
         </Box>
         <IAIButton
