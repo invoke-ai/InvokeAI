@@ -33,7 +33,9 @@
     "preinstall": "npx only-allow pnpm",
     "postinstall": "patch-package && pnpm run theme",
     "theme": "chakra-cli tokens src/theme/theme.ts",
-    "theme:watch": "chakra-cli tokens src/theme/theme.ts --watch"
+    "theme:watch": "chakra-cli tokens src/theme/theme.ts --watch",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "madge": {
     "detectiveOptions": {
@@ -116,6 +118,13 @@
   },
   "devDependencies": {
     "@chakra-ui/cli": "^2.4.1",
+    "@storybook/addon-essentials": "^7.6.4",
+    "@storybook/addon-interactions": "^7.6.4",
+    "@storybook/addon-links": "^7.6.4",
+    "@storybook/blocks": "^7.6.4",
+    "@storybook/react": "^7.6.4",
+    "@storybook/react-vite": "^7.6.4",
+    "@storybook/test": "^7.6.4",
     "@types/dateformat": "^5.0.2",
     "@types/lodash-es": "^4.17.11",
     "@types/node": "^20.9.0",
@@ -133,11 +142,13 @@
     "eslint-plugin-path": "^1.2.2",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-storybook": "^0.6.15",
     "madge": "^6.1.0",
     "openapi-types": "^12.1.3",
     "openapi-typescript": "^6.7.0",
     "prettier": "^3.0.3",
     "rollup-plugin-visualizer": "^5.9.2",
+    "storybook": "^7.6.4",
     "ts-toolbelt": "^9.6.0",
     "typescript": "^5.2.2",
     "vite": "^4.5.1",

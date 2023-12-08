@@ -87,12 +87,13 @@ const idbKeyValDriver: Driver = {
   setItem: (key, value) => set(key, value, idbKeyValStore),
 };
 
-export const createStore = (uniqueStoreKey?: string) =>
+export const createStore = (uniqueStoreKey?: string, persist = true) =>
   configureStore({
     reducer: rememberedRootReducer,
     enhancers: (existingEnhancers) => {
-      return existingEnhancers
-        .concat(
+      const _enhancers = existingEnhancers.concat(autoBatchEnhancer());
+      if (persist) {
+        _enhancers.push(
           rememberEnhancer(idbKeyValDriver, rememberedKeys, {
             persistDebounce: 300,
             serialize,
@@ -101,8 +102,9 @@ export const createStore = (uniqueStoreKey?: string) =>
               ? `${STORAGE_PREFIX}${uniqueStoreKey}-`
               : STORAGE_PREFIX,
           })
-        )
-        .concat(autoBatchEnhancer());
+        );
+      }
+      return _enhancers;
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
