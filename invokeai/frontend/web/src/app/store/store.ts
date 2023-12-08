@@ -27,6 +27,7 @@ import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import { Driver, rememberEnhancer, rememberReducer } from 'redux-remember';
 import { api } from 'services/api';
+import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import { STORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
@@ -110,6 +111,7 @@ export const createStore = (uniqueStoreKey?: string) =>
       })
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
+        .concat(authToastMiddleware)
         .prepend(listenerMiddleware.middleware),
     devTools: {
       actionSanitizer,

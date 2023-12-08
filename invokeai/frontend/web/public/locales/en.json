@@ -170,7 +170,8 @@
         "updated": "Updated",
         "created": "Created",
         "prevPage": "Previous Page",
-        "nextPage": "Next Page"
+        "nextPage": "Next Page",
+        "unknownError": "Unknown Error"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -393,7 +394,9 @@
         "deleteSelection": "Delete Selection",
         "downloadSelection": "Download Selection",
         "preparingDownload": "Preparing Download",
-        "preparingDownloadFailed": "Problem Preparing Download"
+        "preparingDownloadFailed": "Problem Preparing Download",
+        "problemDeletingImages": "Problem Deleting Images",
+        "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
     "hotkeys": {
         "acceptStagingImage": {
