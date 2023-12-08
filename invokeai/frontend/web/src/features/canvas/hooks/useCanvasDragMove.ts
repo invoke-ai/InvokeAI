@@ -7,7 +7,6 @@ import {
   setStageCoordinates,
 } from 'features/canvas/store/canvasSlice';
 import { KonvaEventObject } from 'konva/lib/Node';
-import { isEqual } from 'lodash-es';
 import { useCallback } from 'react';
 
 const selector = createMemoizedSelector(
@@ -19,8 +18,7 @@ const selector = createMemoizedSelector(
       isStaging,
       isMovingBoundingBox,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasDrag = () => {

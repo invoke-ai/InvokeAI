@@ -38,7 +38,6 @@ import {
   setShouldShowProgressInViewer,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
-import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
   ReactElement,
@@ -56,44 +55,38 @@ import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
 import StyledFlex from './StyledFlex';
 
-const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ system, ui }) => {
-    const {
-      shouldConfirmOnDelete,
-      enableImageDebugging,
-      consoleLogLevel,
-      shouldLogToConsole,
-      shouldAntialiasProgressImage,
-      shouldUseNSFWChecker,
-      shouldUseWatermarker,
-      shouldEnableInformationalPopovers,
-    } = system;
+const selector = createMemoizedSelector([stateSelector], ({ system, ui }) => {
+  const {
+    shouldConfirmOnDelete,
+    enableImageDebugging,
+    consoleLogLevel,
+    shouldLogToConsole,
+    shouldAntialiasProgressImage,
+    shouldUseNSFWChecker,
+    shouldUseWatermarker,
+    shouldEnableInformationalPopovers,
+  } = system;
 
-    const {
-      shouldUseSliders,
-      shouldShowProgressInViewer,
-      shouldAutoChangeDimensions,
-    } = ui;
+  const {
+    shouldUseSliders,
+    shouldShowProgressInViewer,
+    shouldAutoChangeDimensions,
+  } = ui;
 
-    return {
-      shouldConfirmOnDelete,
-      enableImageDebugging,
-      shouldUseSliders,
-      shouldShowProgressInViewer,
-      consoleLogLevel,
-      shouldLogToConsole,
-      shouldAntialiasProgressImage,
-      shouldUseNSFWChecker,
-      shouldUseWatermarker,
-      shouldAutoChangeDimensions,
-      shouldEnableInformationalPopovers,
-    };
-  },
-  {
-    memoizeOptions: { resultEqualityCheck: isEqual },
-  }
-);
+  return {
+    shouldConfirmOnDelete,
+    enableImageDebugging,
+    shouldUseSliders,
+    shouldShowProgressInViewer,
+    consoleLogLevel,
+    shouldLogToConsole,
+    shouldAntialiasProgressImage,
+    shouldUseNSFWChecker,
+    shouldUseWatermarker,
+    shouldAutoChangeDimensions,
+    shouldEnableInformationalPopovers,
+  };
+});
 
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;

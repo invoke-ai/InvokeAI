@@ -11,7 +11,6 @@ import {
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
-import { isEqual } from 'lodash-es';
 import { MutableRefObject, useCallback } from 'react';
 
 const selector = createMemoizedSelector(
@@ -24,8 +23,7 @@ const selector = createMemoizedSelector(
       activeTabName,
       isStaging,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasMouseUp = (
