@@ -156,8 +156,8 @@ dependencies:
     specifier: ^2.2.0
     version: 2.2.0
   redux-remember:
-    specifier: ^4.2.2
-    version: 4.2.2(redux@5.0.0)
+    specifier: ^5.0.0
+    version: 5.0.0(redux@5.0.0)
   roarr:
     specifier: ^7.21.0
     version: 7.21.0
@@ -11309,10 +11309,10 @@ packages:
     resolution: {integrity: sha512-GHESQC+Y0PV98ZBoaC6br6cDOsNiM1Cu4UleGMqMWCXX03jIr3BoozYVrRkLVVAl4sC216chakMnZOu6SwNdGA==}
     dev: false
 
-  /redux-remember@4.2.2(redux@5.0.0):
-    resolution: {integrity: sha512-1pY3FNk70uZ7Djya/SXkwL13hu0T6iVYSVMFqUApR4n3BDoGYmmaSouX8T3Y1Rg2pmZFaWw7e8ZaOAH82s8IiA==}
+  /redux-remember@5.0.0(redux@5.0.0):
+    resolution: {integrity: sha512-WBqAhms/7tXTr/iREBBmVmWjwFoVD06QLZ+jumcfBGD7xcdXCqhK0joR/n6/B0jFfkemRm4gIs7eh7ZNQ8WzHQ==}
     peerDependencies:
-      redux: '*'
+      redux: '>=5.0.0'
     dependencies:
       redux: 5.0.0
     dev: false
