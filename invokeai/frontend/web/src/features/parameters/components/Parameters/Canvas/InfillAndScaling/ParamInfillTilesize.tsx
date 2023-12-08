@@ -1,25 +1,19 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setInfillTileSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
-
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [generationSelector],
-  (parameters) => {
-    const { infillTileSize, infillMethod } = parameters;
+const selector = createMemoizedSelector([stateSelector], ({ generation }) => {
+  const { infillTileSize, infillMethod } = generation;
 
-    return {
-      infillTileSize,
-      infillMethod,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    infillTileSize,
+    infillMethod,
+  };
+});
 
 const ParamInfillTileSize = () => {
   const dispatch = useAppDispatch();

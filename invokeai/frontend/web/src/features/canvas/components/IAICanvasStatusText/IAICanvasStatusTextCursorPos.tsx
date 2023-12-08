@@ -1,15 +1,13 @@
 import { Box } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
-import { isEqual } from 'lodash-es';
-
 import { useTranslation } from 'react-i18next';
 
-const cursorPositionSelector = createSelector(
-  [canvasSelector],
-  (canvas) => {
+const cursorPositionSelector = createMemoizedSelector(
+  [stateSelector],
+  ({ canvas }) => {
     const { cursorPosition } = canvas;
 
     const { cursorX, cursorY } = cursorPosition
@@ -21,11 +19,6 @@ const cursorPositionSelector = createSelector(
         cursorY
       )})`,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

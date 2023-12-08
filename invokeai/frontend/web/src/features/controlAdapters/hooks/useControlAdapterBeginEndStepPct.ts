@@ -1,26 +1,21 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
-import { useMemo } from 'react';
-import { selectControlAdapterById } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectControlAdapterById } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { useMemo } from 'react';
 
 export const useControlAdapterBeginEndStepPct = (id: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ controlAdapters }) => {
-          const cn = selectControlAdapterById(controlAdapters, id);
-          return cn
-            ? {
-                beginStepPct: cn.beginStepPct,
-                endStepPct: cn.endStepPct,
-              }
-            : undefined;
-        },
-        defaultSelectorOptions
-      ),
+      createMemoizedSelector(stateSelector, ({ controlAdapters }) => {
+        const cn = selectControlAdapterById(controlAdapters, id);
+        return cn
+          ? {
+              beginStepPct: cn.beginStepPct,
+              endStepPct: cn.endStepPct,
+            }
+          : undefined;
+      }),
     [id]
   );
 

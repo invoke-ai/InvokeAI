@@ -1,4 +1,4 @@
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { memo } from 'react';
 import { Image } from 'react-konva';

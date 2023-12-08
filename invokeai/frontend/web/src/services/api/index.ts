@@ -1,8 +1,8 @@
-import { TagDescription } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import {
   BaseQueryFn,
   FetchArgs,
   FetchBaseQueryError,
+  TagDescription,
   createApi,
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';

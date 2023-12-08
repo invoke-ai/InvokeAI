@@ -8,6 +8,8 @@ import {
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
 import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/metadata';
+import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
 import { components, paths } from 'services/api/schema';
 import {
@@ -27,15 +29,13 @@ import {
 } from 'services/api/util';
 import { ApiTagDescription, LIST_TAG, api } from '..';
 import { boardsApi } from './boards';
-import { addToast } from 'features/system/store/systemSlice';
-import { t } from 'i18next';
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
     /**
      * Image Queries
      */
-    listImages: build.query<EntityState<ImageDTO>, ListImagesArgs>({
+    listImages: build.query<EntityState<ImageDTO, string>, ListImagesArgs>({
       query: (queryArgs) => ({
         // Use the helper to create the URL.
         url: getListImagesUrl(queryArgs),
@@ -872,7 +872,7 @@ export const imagesApi = api.injectEndpoints({
             },
           ];
 
-          const updates: Update<ImageDTO>[] = deleted_board_images.map(
+          const updates: Update<ImageDTO, string>[] = deleted_board_images.map(
             (image_name) => ({
               id: image_name,
               changes: { board_id: undefined },

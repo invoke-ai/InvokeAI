@@ -8,31 +8,26 @@ import {
   Spinner,
   Text,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { memo } from 'react';
-import { FaCircleExclamation } from 'react-icons/fa6';
 import { useTranslation } from 'react-i18next';
+import { FaCircleExclamation } from 'react-icons/fa6';
 
-const selector = createSelector(
-  stateSelector,
-  (state) => {
-    const { isLoading, isError, prompts, parsingError } = state.dynamicPrompts;
+const selector = createMemoizedSelector(stateSelector, (state) => {
+  const { isLoading, isError, prompts, parsingError } = state.dynamicPrompts;
 
-    return {
-      prompts,
-      parsingError,
-      isError,
-      isLoading,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    prompts,
+    parsingError,
+    isError,
+    isLoading,
+  };
+});
 
 const listItemStyles: ChakraProps['sx'] = {
   '&::marker': { color: 'base.500', _dark: { color: 'base.500' } },

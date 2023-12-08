@@ -1,6 +1,6 @@
 import {
-  AnyAction,
   ThunkDispatch,
+  UnknownAction,
   autoBatchEnhancer,
   combineReducers,
   configureStore,
@@ -27,7 +27,6 @@ import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import { Driver, rememberEnhancer, rememberReducer } from 'redux-remember';
 import { api } from 'services/api';
-import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import { STORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
@@ -90,8 +89,16 @@ const idbKeyValDriver: Driver = {
 export const createStore = (uniqueStoreKey?: string, persist = true) =>
   configureStore({
     reducer: rememberedRootReducer,
-    enhancers: (existingEnhancers) => {
-      const _enhancers = existingEnhancers.concat(autoBatchEnhancer());
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: false,
+        immutableCheck: false,
+      })
+        .concat(api.middleware)
+        .concat(dynamicMiddlewares)
+        .prepend(listenerMiddleware.middleware),
+    enhancers: (getDefaultEnhancers) => {
+      const _enhancers = getDefaultEnhancers().concat(autoBatchEnhancer());
       if (persist) {
         _enhancers.push(
           rememberEnhancer(idbKeyValDriver, rememberedKeys, {
@@ -106,15 +113,6 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
       }
       return _enhancers;
     },
-    middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware({
-        serializableCheck: false,
-        immutableCheck: false,
-      })
-        .concat(api.middleware)
-        .concat(dynamicMiddlewares)
-        .concat(authToastMiddleware)
-        .prepend(listenerMiddleware.middleware),
     devTools: {
       actionSanitizer,
       stateSanitizer,
@@ -145,6 +143,6 @@ export type AppGetState = ReturnType<
 >;
 export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
+export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;
 export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
 export const stateSelector = (state: RootState) => state;

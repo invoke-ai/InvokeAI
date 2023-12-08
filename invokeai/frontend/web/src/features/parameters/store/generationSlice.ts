@@ -4,7 +4,6 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
-
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import {

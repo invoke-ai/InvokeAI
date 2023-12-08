@@ -1,7 +1,6 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
@@ -18,14 +17,10 @@ type ParamControlAdapterModelProps = {
   id: string;
 };
 
-const selector = createSelector(
-  stateSelector,
-  ({ generation }) => {
-    const { model } = generation;
-    return { mainModel: model };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
+  const { model } = generation;
+  return { mainModel: model };
+});
 
 const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);

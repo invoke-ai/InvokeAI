@@ -24,7 +24,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
           queueItemsAdapter.updateOne(draft, {
-            id: queue_item.item_id,
+            id: String(queue_item.item_id),
             changes: queue_item,
           });
         })

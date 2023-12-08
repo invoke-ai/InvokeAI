@@ -1,6 +1,6 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
@@ -9,19 +9,18 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
+import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
+import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { AnimatePresence, motion } from 'framer-motion';
-import { isEqual } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
-import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { useTranslation } from 'react-i18next';
 
-export const imagesSelector = createSelector(
+export const imagesSelector = createMemoizedSelector(
   [stateSelector, selectLastSelectedImage],
   ({ ui, system }, lastSelectedImage) => {
     const {
@@ -38,11 +37,6 @@ export const imagesSelector = createSelector(
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

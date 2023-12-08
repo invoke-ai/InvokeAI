@@ -4,7 +4,7 @@ import {
   useColorModeValue,
   useToken,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
@@ -37,7 +37,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const selectIsInProgress = useMemo(
     () =>
-      createSelector(
+      createMemoizedSelector(
         stateSelector,
         ({ nodes }) =>
           nodes.nodeExecutionStates[nodeId]?.status ===
