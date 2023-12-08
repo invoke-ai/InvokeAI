@@ -19,21 +19,21 @@
     "dist"
   ],
   "scripts": {
-    "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
-    "dev:host": "concurrently \"vite dev --host\" \"yarn run theme:watch\"",
-    "build": "yarn run lint && vite build",
+    "dev": "concurrently \"vite dev\" \"pnpm run theme:watch\"",
+    "dev:host": "concurrently \"vite dev --host\" \"pnpm run theme:watch\"",
+    "build": "pnpm run lint && vite build",
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",
     "lint:eslint": "eslint --max-warnings=0 .",
     "lint:prettier": "prettier --check .",
     "lint:tsc": "tsc --noEmit",
-    "lint": "concurrently -g -n eslint,prettier,tsc,madge -c cyan,green,magenta,yellow \"yarn run lint:eslint\" \"yarn run lint:prettier\" \"yarn run lint:tsc\" \"yarn run lint:madge\"",
+    "lint": "concurrently -g -n eslint,prettier,tsc,madge -c cyan,green,magenta,yellow \"pnpm run lint:eslint\" \"pnpm run lint:prettier\" \"pnpm run lint:tsc\" \"pnpm run lint:madge\"",
     "fix": "eslint --fix . && prettier --log-level warn --write .",
-    "postinstall": "patch-package && yarn run theme",
+    "preinstall": "npx only-allow pnpm",
+    "postinstall": "patch-package && pnpm run theme",
     "theme": "chakra-cli tokens src/theme/theme.ts",
-    "theme:watch": "chakra-cli tokens src/theme/theme.ts --watch",
-    "up": "yarn upgrade-interactive --latest"
+    "theme:watch": "chakra-cli tokens src/theme/theme.ts --watch"
   },
   "madge": {
     "detectiveOptions": {
@@ -48,6 +48,8 @@
   "dependencies": {
     "@chakra-ui/anatomy": "^2.2.2",
     "@chakra-ui/icons": "^2.1.1",
+    "@chakra-ui/layout": "^2.3.1",
+    "@chakra-ui/portal": "^2.1.0",
     "@chakra-ui/react": "^2.8.2",
     "@chakra-ui/styled-system": "^2.9.2",
     "@chakra-ui/theme-tools": "^2.1.2",
@@ -63,6 +65,8 @@
     "@nanostores/react": "^0.7.1",
     "@reduxjs/toolkit": "^1.9.7",
     "@roarr/browser-log-writer": "^1.3.0",
+    "@storybook/manager-api": "^7.6.4",
+    "@storybook/theming": "^7.6.4",
     "compare-versions": "^6.1.0",
     "dateformat": "^5.0.3",
     "framer-motion": "^10.16.4",
@@ -140,7 +144,6 @@
     "vite-plugin-css-injected-by-js": "^3.3.0",
     "vite-plugin-dts": "^3.6.3",
     "vite-plugin-eslint": "^1.8.1",
-    "vite-tsconfig-paths": "^4.2.1",
-    "yarn": "^1.22.19"
+    "vite-tsconfig-paths": "^4.2.1"
   }
 }

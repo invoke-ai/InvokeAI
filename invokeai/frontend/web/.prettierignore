@@ -12,3 +12,4 @@ index.html
 src/services/api/schema.d.ts
 static/
 src/theme/css/overlayscrollbars.css
+pnpm-lock.yaml

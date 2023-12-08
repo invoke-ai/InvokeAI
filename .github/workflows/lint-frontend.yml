@@ -21,13 +21,13 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - name: Setup Node 18
-        uses: actions/setup-node@v3
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - uses: actions/checkout@v3
-      - run: 'yarn install --frozen-lockfile'
-      - run: 'yarn run lint:tsc'
-      - run: 'yarn run lint:madge'
-      - run: 'yarn run lint:eslint'
-      - run: 'yarn run lint:prettier'
+          node-version: '20'
+      - uses: actions/checkout@v4
+      - run: 'pnpm install --prefer-frozen-lockfile'
+      - run: 'pnpm run lint:tsc'
+      - run: 'pnpm run lint:madge'
+      - run: 'pnpm run lint:eslint'
+      - run: 'pnpm run lint:prettier'
