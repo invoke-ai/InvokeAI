@@ -16,10 +16,15 @@ from invokeai.backend.tiles.utils import TBLR, Tile
 
 def test_calc_tiles_with_overlap_single_tile():
     """Test calc_tiles_with_overlap() behavior when a single tile covers the image."""
-    tiles = calc_tiles_with_overlap(image_height=512, image_width=1024, tile_height=512, tile_width=1024, overlap=64)
+    tiles = calc_tiles_with_overlap(
+        image_height=512, image_width=1024, tile_height=512, tile_width=1024, overlap=64
+    )
 
     expected_tiles = [
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=1024), overlap=TBLR(top=0, bottom=0, left=0, right=0))
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=1024),
+            overlap=TBLR(top=0, bottom=0, left=0, right=0),
+        )
     ]
 
     assert tiles == expected_tiles
@@ -28,17 +33,37 @@ def test_calc_tiles_with_overlap_single_tile():
 def test_calc_tiles_with_overlap_evenly_divisible():
     """Test calc_tiles_with_overlap() behavior when the image is evenly covered by multiple tiles."""
     # Parameters chosen so that image is evenly covered by 2 rows, 3 columns of tiles.
-    tiles = calc_tiles_with_overlap(image_height=576, image_width=1600, tile_height=320, tile_width=576, overlap=64)
+    tiles = calc_tiles_with_overlap(
+        image_height=576, image_width=1600, tile_height=320, tile_width=576, overlap=64
+    )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=320, left=0, right=576), overlap=TBLR(top=0, bottom=64, left=0, right=64)),
-        Tile(coords=TBLR(top=0, bottom=320, left=512, right=1088), overlap=TBLR(top=0, bottom=64, left=64, right=64)),
-        Tile(coords=TBLR(top=0, bottom=320, left=1024, right=1600), overlap=TBLR(top=0, bottom=64, left=64, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=0, right=576),
+            overlap=TBLR(top=0, bottom=64, left=0, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=512, right=1088),
+            overlap=TBLR(top=0, bottom=64, left=64, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=1024, right=1600),
+            overlap=TBLR(top=0, bottom=64, left=64, right=0),
+        ),
         # Row 1
-        Tile(coords=TBLR(top=256, bottom=576, left=0, right=576), overlap=TBLR(top=64, bottom=0, left=0, right=64)),
-        Tile(coords=TBLR(top=256, bottom=576, left=512, right=1088), overlap=TBLR(top=64, bottom=0, left=64, right=64)),
-        Tile(coords=TBLR(top=256, bottom=576, left=1024, right=1600), overlap=TBLR(top=64, bottom=0, left=64, right=0)),
+        Tile(
+            coords=TBLR(top=256, bottom=576, left=0, right=576),
+            overlap=TBLR(top=64, bottom=0, left=0, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=256, bottom=576, left=512, right=1088),
+            overlap=TBLR(top=64, bottom=0, left=64, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=256, bottom=576, left=1024, right=1600),
+            overlap=TBLR(top=64, bottom=0, left=64, right=0),
+        ),
     ]
 
     assert tiles == expected_tiles
@@ -47,20 +72,36 @@ def test_calc_tiles_with_overlap_evenly_divisible():
 def test_calc_tiles_with_overlap_not_evenly_divisible():
     """Test calc_tiles_with_overlap() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters chosen so that image is covered by 2 rows and 3 columns of tiles, with uneven overlaps.
-    tiles = calc_tiles_with_overlap(image_height=400, image_width=1200, tile_height=256, tile_width=512, overlap=64)
+    tiles = calc_tiles_with_overlap(
+        image_height=400, image_width=1200, tile_height=256, tile_width=512, overlap=64
+    )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=256, left=0, right=512), overlap=TBLR(top=0, bottom=112, left=0, right=64)),
-        Tile(coords=TBLR(top=0, bottom=256, left=448, right=960), overlap=TBLR(top=0, bottom=112, left=64, right=272)),
-        Tile(coords=TBLR(top=0, bottom=256, left=688, right=1200), overlap=TBLR(top=0, bottom=112, left=272, right=0)),
-        # Row 1
-        Tile(coords=TBLR(top=144, bottom=400, left=0, right=512), overlap=TBLR(top=112, bottom=0, left=0, right=64)),
         Tile(
-            coords=TBLR(top=144, bottom=400, left=448, right=960), overlap=TBLR(top=112, bottom=0, left=64, right=272)
+            coords=TBLR(top=0, bottom=256, left=0, right=512),
+            overlap=TBLR(top=0, bottom=112, left=0, right=64),
         ),
         Tile(
-            coords=TBLR(top=144, bottom=400, left=688, right=1200), overlap=TBLR(top=112, bottom=0, left=272, right=0)
+            coords=TBLR(top=0, bottom=256, left=448, right=960),
+            overlap=TBLR(top=0, bottom=112, left=64, right=272),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=256, left=688, right=1200),
+            overlap=TBLR(top=0, bottom=112, left=272, right=0),
+        ),
+        # Row 1
+        Tile(
+            coords=TBLR(top=144, bottom=400, left=0, right=512),
+            overlap=TBLR(top=112, bottom=0, left=0, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=144, bottom=400, left=448, right=960),
+            overlap=TBLR(top=112, bottom=0, left=64, right=272),
+        ),
+        Tile(
+            coords=TBLR(top=144, bottom=400, left=688, right=1200),
+            overlap=TBLR(top=112, bottom=0, left=272, right=0),
         ),
     ]
 
@@ -80,14 +121,23 @@ def test_calc_tiles_with_overlap_not_evenly_divisible():
     ],
 )
 def test_calc_tiles_with_overlap_input_validation(
-    image_height: int, image_width: int, tile_height: int, tile_width: int, overlap: int, raises: bool
+    image_height: int,
+    image_width: int,
+    tile_height: int,
+    tile_width: int,
+    overlap: int,
+    raises: bool,
 ):
     """Test that calc_tiles_with_overlap() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(AssertionError):
-            calc_tiles_with_overlap(image_height, image_width, tile_height, tile_width, overlap)
+            calc_tiles_with_overlap(
+                image_height, image_width, tile_height, tile_width, overlap
+            )
     else:
-        calc_tiles_with_overlap(image_height, image_width, tile_height, tile_width, overlap)
+        calc_tiles_with_overlap(
+            image_height, image_width, tile_height, tile_width, overlap
+        )
 
 
 ####################################
@@ -98,11 +148,19 @@ def test_calc_tiles_with_overlap_input_validation(
 def test_calc_tiles_min_overlap_single_tile():
     """Test calc_tiles_min_overlap() behavior when a single tile covers the image."""
     tiles = calc_tiles_min_overlap(
-        image_height=512, image_width=1024, tile_height=512, tile_width=1024, min_overlap=64, round_to_8=False
+        image_height=512,
+        image_width=1024,
+        tile_height=512,
+        tile_width=1024,
+        min_overlap=64,
+        round_to_8=False,
     )
 
     expected_tiles = [
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=1024), overlap=TBLR(top=0, bottom=0, left=0, right=0))
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=1024),
+            overlap=TBLR(top=0, bottom=0, left=0, right=0),
+        )
     ]
 
     assert tiles == expected_tiles
@@ -112,18 +170,41 @@ def test_calc_tiles_min_overlap_evenly_divisible():
     """Test calc_tiles_min_overlap() behavior when the image is evenly covered by multiple tiles."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
     tiles = calc_tiles_min_overlap(
-        image_height=576, image_width=1600, tile_height=320, tile_width=576, min_overlap=64, round_to_8=False
+        image_height=576,
+        image_width=1600,
+        tile_height=320,
+        tile_width=576,
+        min_overlap=64,
+        round_to_8=False,
     )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=320, left=0, right=576), overlap=TBLR(top=0, bottom=64, left=0, right=64)),
-        Tile(coords=TBLR(top=0, bottom=320, left=512, right=1088), overlap=TBLR(top=0, bottom=64, left=64, right=64)),
-        Tile(coords=TBLR(top=0, bottom=320, left=1024, right=1600), overlap=TBLR(top=0, bottom=64, left=64, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=0, right=576),
+            overlap=TBLR(top=0, bottom=64, left=0, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=512, right=1088),
+            overlap=TBLR(top=0, bottom=64, left=64, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=1024, right=1600),
+            overlap=TBLR(top=0, bottom=64, left=64, right=0),
+        ),
         # Row 1
-        Tile(coords=TBLR(top=256, bottom=576, left=0, right=576), overlap=TBLR(top=64, bottom=0, left=0, right=64)),
-        Tile(coords=TBLR(top=256, bottom=576, left=512, right=1088), overlap=TBLR(top=64, bottom=0, left=64, right=64)),
-        Tile(coords=TBLR(top=256, bottom=576, left=1024, right=1600), overlap=TBLR(top=64, bottom=0, left=64, right=0)),
+        Tile(
+            coords=TBLR(top=256, bottom=576, left=0, right=576),
+            overlap=TBLR(top=64, bottom=0, left=0, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=256, bottom=576, left=512, right=1088),
+            overlap=TBLR(top=64, bottom=0, left=64, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=256, bottom=576, left=1024, right=1600),
+            overlap=TBLR(top=64, bottom=0, left=64, right=0),
+        ),
     ]
 
     assert tiles == expected_tiles
@@ -133,21 +214,40 @@ def test_calc_tiles_min_overlap_not_evenly_divisible():
     """Test calc_tiles_min_overlap() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
     tiles = calc_tiles_min_overlap(
-        image_height=400, image_width=1200, tile_height=512, tile_width=512, min_overlap=64, round_to_8=False
+        image_height=400,
+        image_width=1200,
+        tile_height=256,
+        tile_width=512,
+        min_overlap=64,
+        round_to_8=False,
     )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=256, left=0, right=512), overlap=TBLR(top=0, bottom=112, left=0, right=168)),
-        Tile(coords=TBLR(top=0, bottom=256, left=344, right=856), overlap=TBLR(top=0, bottom=112, left=168, right=168)),
-        Tile(coords=TBLR(top=0, bottom=256, left=688, right=1200), overlap=TBLR(top=0, bottom=112, left=168, right=0)),
-        # Row 1
-        Tile(coords=TBLR(top=144, bottom=400, left=0, right=512), overlap=TBLR(top=112, bottom=0, left=0, right=168)),
         Tile(
-            coords=TBLR(top=144, bottom=400, left=344, right=856), overlap=TBLR(top=112, bottom=0, left=168, right=168)
+            coords=TBLR(top=0, bottom=256, left=0, right=512),
+            overlap=TBLR(top=0, bottom=112, left=0, right=168),
         ),
         Tile(
-            coords=TBLR(top=144, bottom=400, left=688, right=1200), overlap=TBLR(top=112, bottom=0, left=168, right=0)
+            coords=TBLR(top=0, bottom=256, left=344, right=856),
+            overlap=TBLR(top=0, bottom=112, left=168, right=168),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=256, left=688, right=1200),
+            overlap=TBLR(top=0, bottom=112, left=168, right=0),
+        ),
+        # Row 1
+        Tile(
+            coords=TBLR(top=144, bottom=400, left=0, right=512),
+            overlap=TBLR(top=112, bottom=0, left=0, right=168),
+        ),
+        Tile(
+            coords=TBLR(top=144, bottom=400, left=344, right=856),
+            overlap=TBLR(top=112, bottom=0, left=168, right=168),
+        ),
+        Tile(
+            coords=TBLR(top=144, bottom=400, left=688, right=1200),
+            overlap=TBLR(top=112, bottom=0, left=168, right=0),
         ),
     ]
 
@@ -158,30 +258,53 @@ def test_calc_tiles_min_overlap_difficult_size():
     """Test calc_tiles_min_overlap() behavior when the image is a difficult size to spilt evenly and keep div8."""
     # Parameters are a difficult size for other tile gen routines to calculate
     tiles = calc_tiles_min_overlap(
-        image_height=1000, image_width=1000, tile_height=512, tile_width=512, min_overlap=64, round_to_8=False
+        image_height=1000,
+        image_width=1000,
+        tile_height=512,
+        tile_width=512,
+        min_overlap=64,
+        round_to_8=False,
     )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=268, left=0, right=268)),
-        Tile(coords=TBLR(top=0, bottom=512, left=244, right=756), overlap=TBLR(top=0, bottom=268, left=268, right=268)),
-        Tile(coords=TBLR(top=0, bottom=512, left=488, right=1000), overlap=TBLR(top=0, bottom=268, left=268, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=268, left=0, right=268),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=244, right=756),
+            overlap=TBLR(top=0, bottom=268, left=268, right=268),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=488, right=1000),
+            overlap=TBLR(top=0, bottom=268, left=268, right=0),
+        ),
         # Row 1
-        Tile(coords=TBLR(top=244, bottom=756, left=0, right=512), overlap=TBLR(top=268, bottom=268, left=0, right=0)),
+        Tile(
+            coords=TBLR(top=244, bottom=756, left=0, right=512),
+            overlap=TBLR(top=268, bottom=268, left=0, right=268),
+        ),
         Tile(
             coords=TBLR(top=244, bottom=756, left=244, right=756),
             overlap=TBLR(top=268, bottom=268, left=268, right=268),
         ),
         Tile(
-            coords=TBLR(top=244, bottom=756, left=488, right=1000), overlap=TBLR(top=268, bottom=268, left=268, right=0)
+            coords=TBLR(top=244, bottom=756, left=488, right=1000),
+            overlap=TBLR(top=268, bottom=268, left=268, right=0),
         ),
         # Row 2
-        Tile(coords=TBLR(top=488, bottom=1000, left=0, right=512), overlap=TBLR(top=268, bottom=0, left=0, right=268)),
         Tile(
-            coords=TBLR(top=488, bottom=1000, left=244, right=756), overlap=TBLR(top=268, bottom=0, left=268, right=268)
+            coords=TBLR(top=488, bottom=1000, left=0, right=512),
+            overlap=TBLR(top=268, bottom=0, left=0, right=268),
         ),
         Tile(
-            coords=TBLR(top=488, bottom=1000, left=488, right=1000), overlap=TBLR(top=268, bottom=0, left=268, right=0)
+            coords=TBLR(top=488, bottom=1000, left=244, right=756),
+            overlap=TBLR(top=268, bottom=0, left=268, right=268),
+        ),
+        Tile(
+            coords=TBLR(top=488, bottom=1000, left=488, right=1000),
+            overlap=TBLR(top=268, bottom=0, left=268, right=0),
         ),
     ]
 
@@ -192,30 +315,53 @@ def test_calc_tiles_min_overlap_difficult_size_div8():
     """Test calc_tiles_min_overlap() behavior when the image is a difficult size to spilt evenly and keep div8."""
     # Parameters are a difficult size for other tile gen routines to calculate
     tiles = calc_tiles_min_overlap(
-        image_height=1000, image_width=1000, tile_height=256, tile_width=512, min_overlap=64, round_to_8=True
+        image_height=1000,
+        image_width=1000,
+        tile_height=512,
+        tile_width=512,
+        min_overlap=64,
+        round_to_8=True,
     )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=560), overlap=TBLR(top=0, bottom=272, left=0, right=272)),
-        Tile(coords=TBLR(top=0, bottom=512, left=240, right=752), overlap=TBLR(top=0, bottom=272, left=272, right=264)),
-        Tile(coords=TBLR(top=0, bottom=512, left=488, right=1000), overlap=TBLR(top=0, bottom=272, left=264, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=272, left=0, right=272),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=240, right=752),
+            overlap=TBLR(top=0, bottom=272, left=272, right=264),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=488, right=1000),
+            overlap=TBLR(top=0, bottom=272, left=264, right=0),
+        ),
         # Row 1
-        Tile(coords=TBLR(top=240, bottom=752, left=0, right=512), overlap=TBLR(top=272, bottom=264, left=0, right=272)),
+        Tile(
+            coords=TBLR(top=240, bottom=752, left=0, right=512),
+            overlap=TBLR(top=272, bottom=264, left=0, right=272),
+        ),
         Tile(
             coords=TBLR(top=240, bottom=752, left=240, right=752),
             overlap=TBLR(top=272, bottom=264, left=272, right=264),
         ),
         Tile(
-            coords=TBLR(top=240, bottom=752, left=488, right=1000), overlap=TBLR(top=272, bottom=264, left=264, right=0)
+            coords=TBLR(top=240, bottom=752, left=488, right=1000),
+            overlap=TBLR(top=272, bottom=264, left=264, right=0),
         ),
         # Row 2
-        Tile(coords=TBLR(top=488, bottom=1000, left=0, right=512), overlap=TBLR(top=264, bottom=0, left=0, right=272)),
         Tile(
-            coords=TBLR(top=488, bottom=1000, left=240, right=752), overlap=TBLR(top=264, bottom=0, left=272, right=264)
+            coords=TBLR(top=488, bottom=1000, left=0, right=512),
+            overlap=TBLR(top=264, bottom=0, left=0, right=272),
         ),
         Tile(
-            coords=TBLR(top=488, bottom=1000, left=488, right=1000), overlap=TBLR(top=264, bottom=0, left=264, right=0)
+            coords=TBLR(top=488, bottom=1000, left=240, right=752),
+            overlap=TBLR(top=264, bottom=0, left=272, right=264),
+        ),
+        Tile(
+            coords=TBLR(top=488, bottom=1000, left=488, right=1000),
+            overlap=TBLR(top=264, bottom=0, left=264, right=0),
         ),
     ]
 
@@ -223,7 +369,14 @@ def test_calc_tiles_min_overlap_difficult_size_div8():
 
 
 @pytest.mark.parametrize(
-    ["image_height", "image_width", "tile_height", "tile_width", "min_overlap", "raises"],
+    [
+        "image_height",
+        "image_width",
+        "tile_height",
+        "tile_width",
+        "min_overlap",
+        "raises",
+    ],
     [
         (128, 128, 128, 128, 127, False),  # OK
         (128, 128, 128, 128, 0, False),  # OK
@@ -245,9 +398,13 @@ def test_calc_tiles_min_overlap_input_validation(
     """Test that calc_tiles_min_overlap() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(AssertionError):
-            calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap)
+            calc_tiles_min_overlap(
+                image_height, image_width, tile_height, tile_width, min_overlap
+            )
     else:
-        calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap)
+        calc_tiles_min_overlap(
+            image_height, image_width, tile_height, tile_width, min_overlap
+        )
 
 
 ####################################
@@ -257,10 +414,15 @@ def test_calc_tiles_min_overlap_input_validation(
 
 def test_calc_tiles_even_split_single_tile():
     """Test calc_tiles_even_split() behavior when a single tile covers the image."""
-    tiles = calc_tiles_even_split(image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap=0.25
+    )
 
     expected_tiles = [
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=1024), overlap=TBLR(top=0, bottom=0, left=0, right=0))
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=1024),
+            overlap=TBLR(top=0, bottom=0, left=0, right=0),
+        )
     ]
 
     assert tiles == expected_tiles
@@ -269,19 +431,37 @@ def test_calc_tiles_even_split_single_tile():
 def test_calc_tiles_even_split_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image is evenly covered by multiple tiles."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap=0.25
+    )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=320, left=0, right=624), overlap=TBLR(top=0, bottom=72, left=0, right=136)),
-        Tile(coords=TBLR(top=0, bottom=320, left=488, right=1112), overlap=TBLR(top=0, bottom=72, left=136, right=136)),
-        Tile(coords=TBLR(top=0, bottom=320, left=976, right=1600), overlap=TBLR(top=0, bottom=72, left=136, right=0)),
-        # Row 1
-        Tile(coords=TBLR(top=248, bottom=576, left=0, right=624), overlap=TBLR(top=72, bottom=0, left=0, right=136)),
         Tile(
-            coords=TBLR(top=248, bottom=576, left=488, right=1112), overlap=TBLR(top=72, bottom=0, left=136, right=136)
+            coords=TBLR(top=0, bottom=320, left=0, right=624),
+            overlap=TBLR(top=0, bottom=72, left=0, right=136),
         ),
-        Tile(coords=TBLR(top=248, bottom=576, left=976, right=1600), overlap=TBLR(top=72, bottom=0, left=136, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=488, right=1112),
+            overlap=TBLR(top=0, bottom=72, left=136, right=136),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=320, left=976, right=1600),
+            overlap=TBLR(top=0, bottom=72, left=136, right=0),
+        ),
+        # Row 1
+        Tile(
+            coords=TBLR(top=248, bottom=576, left=0, right=624),
+            overlap=TBLR(top=72, bottom=0, left=0, right=136),
+        ),
+        Tile(
+            coords=TBLR(top=248, bottom=576, left=488, right=1112),
+            overlap=TBLR(top=72, bottom=0, left=136, right=136),
+        ),
+        Tile(
+            coords=TBLR(top=248, bottom=576, left=976, right=1600),
+            overlap=TBLR(top=72, bottom=0, left=136, right=0),
+        ),
     ]
     assert tiles == expected_tiles
 
@@ -289,19 +469,37 @@ def test_calc_tiles_even_split_evenly_divisible():
 def test_calc_tiles_even_split_not_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap=0.25
+    )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=224, left=0, right=464), overlap=TBLR(top=0, bottom=56, left=0, right=104)),
-        Tile(coords=TBLR(top=0, bottom=224, left=360, right=824), overlap=TBLR(top=0, bottom=56, left=104, right=104)),
-        Tile(coords=TBLR(top=0, bottom=224, left=720, right=1200), overlap=TBLR(top=0, bottom=56, left=104, right=0)),
-        # Row 1
-        Tile(coords=TBLR(top=168, bottom=400, left=0, right=464), overlap=TBLR(top=56, bottom=0, left=0, right=104)),
         Tile(
-            coords=TBLR(top=168, bottom=400, left=360, right=824), overlap=TBLR(top=56, bottom=0, left=104, right=104)
+            coords=TBLR(top=0, bottom=224, left=0, right=464),
+            overlap=TBLR(top=0, bottom=56, left=0, right=104),
         ),
-        Tile(coords=TBLR(top=168, bottom=400, left=720, right=1200), overlap=TBLR(top=56, bottom=0, left=104, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=224, left=360, right=824),
+            overlap=TBLR(top=0, bottom=56, left=104, right=104),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=224, left=720, right=1200),
+            overlap=TBLR(top=0, bottom=56, left=104, right=0),
+        ),
+        # Row 1
+        Tile(
+            coords=TBLR(top=168, bottom=400, left=0, right=464),
+            overlap=TBLR(top=56, bottom=0, left=0, right=104),
+        ),
+        Tile(
+            coords=TBLR(top=168, bottom=400, left=360, right=824),
+            overlap=TBLR(top=56, bottom=0, left=104, right=104),
+        ),
+        Tile(
+            coords=TBLR(top=168, bottom=400, left=720, right=1200),
+            overlap=TBLR(top=56, bottom=0, left=104, right=0),
+        ),
     ]
 
     assert tiles == expected_tiles
@@ -310,16 +508,28 @@ def test_calc_tiles_even_split_not_evenly_divisible():
 def test_calc_tiles_even_split_difficult_size():
     """Test calc_tiles_even_split() behavior when the image is a difficult size to spilt evenly and keep div8."""
     # Parameters are a difficult size for other tile gen routines to calculate
-    tiles = calc_tiles_even_split(image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap=0.25
+    )
 
     expected_tiles = [
         # Row 0
-        Tile(coords=TBLR(top=0, bottom=560, left=0, right=560), overlap=TBLR(top=0, bottom=128, left=0, right=128)),
-        Tile(coords=TBLR(top=0, bottom=560, left=432, right=1000), overlap=TBLR(top=0, bottom=128, left=128, right=0)),
-        # Row 1
-        Tile(coords=TBLR(top=432, bottom=1000, left=0, right=560), overlap=TBLR(top=128, bottom=0, left=0, right=128)),
         Tile(
-            coords=TBLR(top=432, bottom=1000, left=432, right=1000), overlap=TBLR(top=128, bottom=0, left=128, right=0)
+            coords=TBLR(top=0, bottom=560, left=0, right=560),
+            overlap=TBLR(top=0, bottom=128, left=0, right=128),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=560, left=432, right=1000),
+            overlap=TBLR(top=0, bottom=128, left=128, right=0),
+        ),
+        # Row 1
+        Tile(
+            coords=TBLR(top=432, bottom=1000, left=0, right=560),
+            overlap=TBLR(top=128, bottom=0, left=0, right=128),
+        ),
+        Tile(
+            coords=TBLR(top=432, bottom=1000, left=432, right=1000),
+            overlap=TBLR(top=128, bottom=0, left=128, right=0),
         ),
     ]
 
@@ -336,14 +546,23 @@ def test_calc_tiles_even_split_difficult_size():
     ],
 )
 def test_calc_tiles_even_split_input_validation(
-    image_height: int, image_width: int, num_tiles_x: int, num_tiles_y: int, overlap: float, raises: bool
+    image_height: int,
+    image_width: int,
+    num_tiles_x: int,
+    num_tiles_y: int,
+    overlap: float,
+    raises: bool,
 ):
     """Test that calc_tiles_even_split() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(ValueError):
-            calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
+            calc_tiles_even_split(
+                image_height, image_width, num_tiles_x, num_tiles_y, overlap
+            )
     else:
-        calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
+        calc_tiles_even_split(
+            image_height, image_width, num_tiles_x, num_tiles_y, overlap
+        )
 
 
 #############################################
@@ -356,8 +575,14 @@ def test_merge_tiles_with_linear_blending_horizontal(blend_amount: int):
     """Test merge_tiles_with_linear_blending(...) behavior when merging horizontally."""
     # Initialize 2 tiles side-by-side.
     tiles = [
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=64)),
-        Tile(coords=TBLR(top=0, bottom=512, left=448, right=960), overlap=TBLR(top=0, bottom=0, left=64, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=0, left=0, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=448, right=960),
+            overlap=TBLR(top=0, bottom=0, left=64, right=0),
+        ),
     ]
 
     dst_image = np.zeros((512, 960, 3), dtype=np.uint8)
@@ -372,12 +597,19 @@ def test_merge_tiles_with_linear_blending_horizontal(blend_amount: int):
     expected_output = np.zeros((512, 960, 3), dtype=np.uint8)
     expected_output[:, : 480 - (blend_amount // 2), :] = 64
     if blend_amount > 0:
-        gradient = np.linspace(start=64, stop=128, num=blend_amount, dtype=np.uint8).reshape((1, blend_amount, 1))
-        expected_output[:, 480 - (blend_amount // 2) : 480 + (blend_amount // 2), :] = gradient
+        gradient = np.linspace(
+            start=64, stop=128, num=blend_amount, dtype=np.uint8
+        ).reshape((1, blend_amount, 1))
+        expected_output[
+            :, 480 - (blend_amount // 2) : 480 + (blend_amount // 2), :
+        ] = gradient
     expected_output[:, 480 + (blend_amount // 2) :, :] = 128
 
     merge_tiles_with_linear_blending(
-        dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=blend_amount
+        dst_image=dst_image,
+        tiles=tiles,
+        tile_images=tile_images,
+        blend_amount=blend_amount,
     )
 
     np.testing.assert_array_equal(dst_image, expected_output, strict=True)
@@ -388,8 +620,14 @@ def test_merge_tiles_with_linear_blending_vertical(blend_amount: int):
     """Test merge_tiles_with_linear_blending(...) behavior when merging vertically."""
     # Initialize 2 tiles stacked vertically.
     tiles = [
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=64, left=0, right=0)),
-        Tile(coords=TBLR(top=448, bottom=960, left=0, right=512), overlap=TBLR(top=64, bottom=0, left=0, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=64, left=0, right=0),
+        ),
+        Tile(
+            coords=TBLR(top=448, bottom=960, left=0, right=512),
+            overlap=TBLR(top=64, bottom=0, left=0, right=0),
+        ),
     ]
 
     dst_image = np.zeros((960, 512, 3), dtype=np.uint8)
@@ -404,12 +642,19 @@ def test_merge_tiles_with_linear_blending_vertical(blend_amount: int):
     expected_output = np.zeros((960, 512, 3), dtype=np.uint8)
     expected_output[: 480 - (blend_amount // 2), :, :] = 64
     if blend_amount > 0:
-        gradient = np.linspace(start=64, stop=128, num=blend_amount, dtype=np.uint8).reshape((blend_amount, 1, 1))
-        expected_output[480 - (blend_amount // 2) : 480 + (blend_amount // 2), :, :] = gradient
+        gradient = np.linspace(
+            start=64, stop=128, num=blend_amount, dtype=np.uint8
+        ).reshape((blend_amount, 1, 1))
+        expected_output[
+            480 - (blend_amount // 2) : 480 + (blend_amount // 2), :, :
+        ] = gradient
     expected_output[480 + (blend_amount // 2) :, :, :] = 128
 
     merge_tiles_with_linear_blending(
-        dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=blend_amount
+        dst_image=dst_image,
+        tiles=tiles,
+        tile_images=tile_images,
+        blend_amount=blend_amount,
     )
 
     np.testing.assert_array_equal(dst_image, expected_output, strict=True)
@@ -421,8 +666,14 @@ def test_merge_tiles_with_linear_blending_blend_amount_exceeds_vertical_overlap(
     """
     # Initialize 2 tiles stacked vertically.
     tiles = [
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=64, left=0, right=0)),
-        Tile(coords=TBLR(top=448, bottom=960, left=0, right=512), overlap=TBLR(top=64, bottom=0, left=0, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=64, left=0, right=0),
+        ),
+        Tile(
+            coords=TBLR(top=448, bottom=960, left=0, right=512),
+            overlap=TBLR(top=64, bottom=0, left=0, right=0),
+        ),
     ]
 
     dst_image = np.zeros((960, 512, 3), dtype=np.uint8)
@@ -432,7 +683,9 @@ def test_merge_tiles_with_linear_blending_blend_amount_exceeds_vertical_overlap(
 
     # blend_amount=128 exceeds overlap of 64, so should raise exception.
     with pytest.raises(AssertionError):
-        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128)
+        merge_tiles_with_linear_blending(
+            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128
+        )
 
 
 def test_merge_tiles_with_linear_blending_blend_amount_exceeds_horizontal_overlap():
@@ -441,8 +694,14 @@ def test_merge_tiles_with_linear_blending_blend_amount_exceeds_horizontal_overla
     """
     # Initialize 2 tiles side-by-side.
     tiles = [
-        Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=64)),
-        Tile(coords=TBLR(top=0, bottom=512, left=448, right=960), overlap=TBLR(top=0, bottom=0, left=64, right=0)),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=0, left=0, right=64),
+        ),
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=448, right=960),
+            overlap=TBLR(top=0, bottom=0, left=64, right=0),
+        ),
     ]
 
     dst_image = np.zeros((512, 960, 3), dtype=np.uint8)
@@ -452,14 +711,21 @@ def test_merge_tiles_with_linear_blending_blend_amount_exceeds_horizontal_overla
 
     # blend_amount=128 exceeds overlap of 64, so should raise exception.
     with pytest.raises(AssertionError):
-        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128)
+        merge_tiles_with_linear_blending(
+            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128
+        )
 
 
 def test_merge_tiles_with_linear_blending_tiles_overflow_dst_image():
     """Test that merge_tiles_with_linear_blending(...) raises an exception if any of the tiles overflows the
     dst_image.
     """
-    tiles = [Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=0))]
+    tiles = [
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=0, left=0, right=0),
+        )
+    ]
 
     dst_image = np.zeros((256, 512, 3), dtype=np.uint8)
 
@@ -467,14 +733,21 @@ def test_merge_tiles_with_linear_blending_tiles_overflow_dst_image():
     tile_images = [np.zeros((512, 512, 3))]
 
     with pytest.raises(ValueError):
-        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0)
+        merge_tiles_with_linear_blending(
+            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0
+        )
 
 
 def test_merge_tiles_with_linear_blending_mismatched_list_lengths():
     """Test that merge_tiles_with_linear_blending(...) raises an exception if the lengths of 'tiles' and 'tile_images'
     do not match.
     """
-    tiles = [Tile(coords=TBLR(top=0, bottom=512, left=0, right=512), overlap=TBLR(top=0, bottom=0, left=0, right=0))]
+    tiles = [
+        Tile(
+            coords=TBLR(top=0, bottom=512, left=0, right=512),
+            overlap=TBLR(top=0, bottom=0, left=0, right=0),
+        )
+    ]
 
     dst_image = np.zeros((256, 512, 3), dtype=np.uint8)
 
@@ -482,4 +755,6 @@ def test_merge_tiles_with_linear_blending_mismatched_list_lengths():
     tile_images = [np.zeros((512, 512, 3)), np.zeros((512, 512, 3))]
 
     with pytest.raises(ValueError):
-        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0)
+        merge_tiles_with_linear_blending(
+            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0
+        )
