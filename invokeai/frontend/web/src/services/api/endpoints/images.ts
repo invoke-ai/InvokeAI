@@ -27,6 +27,8 @@ import {
   imagesSelectors,
 } from 'services/api/util';
 import { boardsApi } from './boards';
+import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -207,6 +209,16 @@ export const imagesApi = api.injectEndpoints({
          */
         try {
           const { data } = await queryFulfilled;
+
+          if (data.deleted_images.length < imageDTOs.length) {
+            dispatch(
+              addToast({
+                title: t('gallery.problemDeletingImages'),
+                description: t('gallery.problemDeletingImagesDesc'),
+                status: 'warning',
+              })
+            );
+          }
 
           // convert to an object so we can access the successfully delete image DTOs by name
           const groupedImageDTOs = keyBy(imageDTOs, 'image_name');

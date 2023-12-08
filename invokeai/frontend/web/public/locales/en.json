@@ -161,6 +161,7 @@
         "txt2img": "Text To Image",
         "unifiedCanvas": "Unified Canvas",
         "unknown": "Unknown",
+        "unknownError": "Unknown Error",
         "upload": "Upload"
     },
     "controlnet": {
@@ -384,7 +385,9 @@
         "deleteSelection": "Delete Selection",
         "downloadSelection": "Download Selection",
         "preparingDownload": "Preparing Download",
-        "preparingDownloadFailed": "Problem Preparing Download"
+        "preparingDownloadFailed": "Problem Preparing Download",
+        "problemDeletingImages": "Problem Deleting Images",
+        "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
     "hotkeys": {
         "acceptStagingImage": {
