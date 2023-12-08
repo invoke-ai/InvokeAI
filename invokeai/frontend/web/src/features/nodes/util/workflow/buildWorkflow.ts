@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { NodesState } from 'features/nodes/store/types';
+import { NodesState, WorkflowsState } from 'features/nodes/store/types';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import {
   WorkflowV2,
@@ -8,13 +8,13 @@ import {
   zWorkflowNode,
 } from 'features/nodes/types/workflow';
 import i18n from 'i18next';
-import { cloneDeep } from 'lodash-es';
+import { cloneDeep, omit } from 'lodash-es';
 import { fromZodError } from 'zod-validation-error';
 
 type BuildWorkflowArg = {
   nodes: NodesState['nodes'];
   edges: NodesState['edges'];
-  workflow: Omit<WorkflowV2, 'nodes' | 'edges'>;
+  workflow: WorkflowsState;
 };
 
 type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV2;
@@ -29,7 +29,7 @@ export const buildWorkflow: BuildWorkflowFunction = ({
   const clonedEdges = cloneDeep(edges);
 
   const newWorkflow: WorkflowV2 = {
-    ...clonedWorkflow,
+    ...omit(clonedWorkflow, 'isTouched', 'id'),
     nodes: [],
     edges: [],
   };
