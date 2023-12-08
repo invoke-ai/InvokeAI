@@ -23,7 +23,7 @@
       "*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "*.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.d.ts", ".ladle"],
   "exclude": ["src/services/fixtures/*", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }],
   "ts-node": {
