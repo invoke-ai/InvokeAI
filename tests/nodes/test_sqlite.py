@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
 
 

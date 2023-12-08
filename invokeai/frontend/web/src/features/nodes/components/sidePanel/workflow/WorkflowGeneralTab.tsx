@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIInput from 'common/components/IAIInput';
 import IAITextarea from 'common/components/IAITextarea';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import {
   workflowAuthorChanged,
   workflowContactChanged,
@@ -13,16 +14,15 @@ import {
   workflowNotesChanged,
   workflowTagsChanged,
   workflowVersionChanged,
-} from 'features/nodes/store/nodesSlice';
+} from 'features/nodes/store/workflowSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
-  ({ nodes }) => {
+  ({ workflow }) => {
     const { author, name, description, tags, version, contact, notes } =
-      nodes.workflow;
+      workflow;
 
     return {
       name,

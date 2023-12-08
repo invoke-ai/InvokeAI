@@ -52,7 +52,7 @@ from invokeai.backend.model_manager.config import (
     ModelType,
 )
 
-from ..shared.sqlite import SqliteDatabase
+from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
     CONFIG_FILE_VERSION,
     DuplicateModelException,

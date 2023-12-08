@@ -1,23 +1,39 @@
 import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { NodesState } from 'features/nodes/store/types';
 import {
   WorkflowV2,
   zWorkflowEdge,
   zWorkflowNode,
 } from 'features/nodes/types/workflow';
-import { fromZodError } from 'zod-validation-error';
-import { parseify } from 'common/util/serialize';
 import i18n from 'i18next';
+import { cloneDeep } from 'lodash-es';
+import { fromZodError } from 'zod-validation-error';
 
-export const buildWorkflow = (nodesState: NodesState): WorkflowV2 => {
-  const { workflow: workflowMeta, nodes, edges } = nodesState;
-  const workflow: WorkflowV2 = {
-    ...workflowMeta,
+type BuildWorkflowArg = {
+  nodes: NodesState['nodes'];
+  edges: NodesState['edges'];
+  workflow: Omit<WorkflowV2, 'nodes' | 'edges'>;
+};
+
+type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV2;
+
+export const buildWorkflow: BuildWorkflowFunction = ({
+  nodes,
+  edges,
+  workflow,
+}) => {
+  const clonedWorkflow = cloneDeep(workflow);
+  const clonedNodes = cloneDeep(nodes);
+  const clonedEdges = cloneDeep(edges);
+
+  const newWorkflow: WorkflowV2 = {
+    ...clonedWorkflow,
     nodes: [],
     edges: [],
   };
 
-  nodes
+  clonedNodes
     .filter((n) =>
       ['invocation', 'notes'].includes(n.type ?? '__UNKNOWN_NODE_TYPE__')
     )
@@ -30,10 +46,10 @@ export const buildWorkflow = (nodesState: NodesState): WorkflowV2 => {
         logger('nodes').warn({ node: parseify(node) }, message);
         return;
       }
-      workflow.nodes.push(result.data);
+      newWorkflow.nodes.push(result.data);
     });
 
-  edges.forEach((edge) => {
+  clonedEdges.forEach((edge) => {
     const result = zWorkflowEdge.safeParse(edge);
     if (!result.success) {
       const { message } = fromZodError(result.error, {
@@ -42,8 +58,8 @@ export const buildWorkflow = (nodesState: NodesState): WorkflowV2 => {
       logger('nodes').warn({ edge: parseify(edge) }, message);
       return;
     }
-    workflow.edges.push(result.data);
+    newWorkflow.edges.push(result.data);
   });
 
-  return workflow;
+  return newWorkflow;
 };

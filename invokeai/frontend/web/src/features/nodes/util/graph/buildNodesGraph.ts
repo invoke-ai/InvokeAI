@@ -1,14 +1,13 @@
 import { NodesState } from 'features/nodes/store/types';
+import {
+  FieldInputInstance,
+  isColorFieldInputInstance,
+} from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { cloneDeep, omit, reduce } from 'lodash-es';
 import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
-import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
-import {
-  FieldInputInstance,
-  isColorFieldInputInstance,
-} from 'features/nodes/types/field';
 
 /**
  * We need to do special handling for some fields
@@ -44,7 +43,7 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
     (nodesAccumulator, node) => {
       const { id, data } = node;
-      const { type, inputs, isIntermediate, embedWorkflow } = data;
+      const { type, inputs, isIntermediate } = data;
 
       // Transform each node's inputs to simple key-value pairs
       const transformedInputs = reduce(
@@ -68,11 +67,6 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
         ...transformedInputs,
         is_intermediate: isIntermediate,
       };
-
-      if (embedWorkflow) {
-        // add the workflow to the node
-        Object.assign(graphNode, { workflow: buildWorkflow(nodesState) });
-      }
 
       // Add it to the nodes object
       Object.assign(nodesAccumulator, {

@@ -13,7 +13,7 @@ import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitl
 import {
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
-} from 'features/nodes/store/nodesSlice';
+} from 'features/nodes/store/workflowSlice';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { FaMinus, FaPlus } from 'react-icons/fa';
 import { menuListMotionProps } from 'theme/components/menu';
@@ -41,9 +41,9 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     () =>
       createSelector(
         stateSelector,
-        ({ nodes }) => {
+        ({ workflow }) => {
           const isExposed = Boolean(
-            nodes.workflow.exposedFields.find(
+            workflow.exposedFields.find(
               (f) => f.nodeId === nodeId && f.fieldName === fieldName
             )
           );

@@ -1,14 +1,14 @@
 import { FileButton } from '@mantine/core';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useLoadWorkflowFromFile } from 'features/nodes/hooks/useLoadWorkflowFromFile';
+import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUpload } from 'react-icons/fa';
 
-const LoadWorkflowButton = () => {
+const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const loadWorkflowFromFile = useLoadWorkflowFromFile(resetRef);
+  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef });
   return (
     <FileButton
       resetRef={resetRef}
@@ -18,8 +18,8 @@ const LoadWorkflowButton = () => {
       {(props) => (
         <IAIIconButton
           icon={<FaUpload />}
-          tooltip={t('nodes.loadWorkflow')}
-          aria-label={t('nodes.loadWorkflow')}
+          tooltip={t('workflows.uploadWorkflow')}
+          aria-label={t('workflows.uploadWorkflow')}
           {...props}
         />
       )}
@@ -27,4 +27,4 @@ const LoadWorkflowButton = () => {
   );
 };
 
-export default memo(LoadWorkflowButton);
+export default memo(UploadWorkflowButton);

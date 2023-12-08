@@ -19,8 +19,8 @@ const DownloadWorkflowButton = () => {
   return (
     <IAIIconButton
       icon={<FaDownload />}
-      tooltip={t('nodes.downloadWorkflow')}
-      aria-label={t('nodes.downloadWorkflow')}
+      tooltip={t('workflows.downloadWorkflow')}
+      aria-label={t('workflows.downloadWorkflow')}
       onClick={handleDownload}
     />
   );

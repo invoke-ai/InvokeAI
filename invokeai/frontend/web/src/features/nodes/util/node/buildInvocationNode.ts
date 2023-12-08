@@ -67,7 +67,6 @@ export const buildInvocationNode = (
       label: '',
       notes: '',
       isOpen: true,
-      embedWorkflow: false,
       isIntermediate: type === 'save_image' ? false : true,
       useCache: template.useCache,
       inputs,

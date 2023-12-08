@@ -9,7 +9,6 @@ import {
 } from 'features/gallery/store/types';
 import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/metadata';
 import { keyBy } from 'lodash-es';
-import { ApiTagDescription, LIST_TAG, api } from '..';
 import { components, paths } from 'services/api/schema';
 import {
   DeleteBoardResult,
@@ -26,6 +25,7 @@ import {
   imagesAdapter,
   imagesSelectors,
 } from 'services/api/util';
+import { ApiTagDescription, LIST_TAG, api } from '..';
 import { boardsApi } from './boards';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
@@ -128,6 +128,16 @@ export const imagesApi = api.injectEndpoints({
         }
         return;
       },
+      keepUnusedDataFor: 86400, // 24 hours
+    }),
+    getImageWorkflow: build.query<
+      paths['/api/v1/images/i/{image_name}/workflow']['get']['responses']['200']['content']['application/json'],
+      string
+    >({
+      query: (image_name) => ({ url: `images/i/${image_name}/workflow` }),
+      providesTags: (result, error, image_name) => [
+        { type: 'ImageWorkflow', id: image_name },
+      ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
     deleteImage: build.mutation<void, ImageDTO>({
@@ -1572,6 +1582,8 @@ export const {
   useLazyListImagesQuery,
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
+  useGetImageWorkflowQuery,
+  useLazyGetImageWorkflowQuery,
   useDeleteImageMutation,
   useDeleteImagesMutation,
   useUploadImageMutation,

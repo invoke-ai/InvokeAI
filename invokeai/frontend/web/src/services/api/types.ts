@@ -114,6 +114,10 @@ export type GraphExecutionState = s['GraphExecutionState'];
 export type Batch = s['Batch'];
 export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
 export type SessionQueueItem = s['SessionQueueItem'];
+export type WorkflowRecordOrderBy = s['WorkflowRecordOrderBy'];
+export type SQLiteDirection = s['SQLiteDirection'];
+export type WorkflowDTO = s['WorkflowRecordDTO'];
+export type WorkflowRecordListItemDTO = s['WorkflowRecordListItemDTO'];
 
 // General nodes
 export type CollectInvocation = s['CollectInvocation'];

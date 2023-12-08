@@ -14,10 +14,10 @@ import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableCon
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
-import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
 import { ImageDTO } from 'services/api/types';
 import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
+import ImageMetadataWorkflowTabContent from './ImageMetadataWorkflowTabContent';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -32,7 +32,6 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   const { t } = useTranslation();
 
   const { metadata } = useDebouncedMetadata(image.image_name);
-  const { workflow } = useDebouncedWorkflow(image.workflow_id);
 
   return (
     <Flex
@@ -67,9 +66,9 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
       >
         <TabList>
           <Tab>{t('metadata.recallParameters')}</Tab>
-          <Tab>{t('metadata.metadata')}</Tab>
+          <Tab isDisabled={!metadata}>{t('metadata.metadata')}</Tab>
           <Tab>{t('metadata.imageDetails')}</Tab>
-          <Tab>{t('metadata.workflow')}</Tab>
+          <Tab isDisabled={!image.has_workflow}>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
@@ -97,11 +96,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
             )}
           </TabPanel>
           <TabPanel>
-            {workflow ? (
-              <DataViewer data={workflow} label={t('metadata.workflow')} />
-            ) : (
-              <IAINoContentFallback label={t('nodes.noWorkflow')} />
-            )}
+            <ImageMetadataWorkflowTabContent image={image} />
           </TabPanel>
         </TabPanels>
       </Tabs>

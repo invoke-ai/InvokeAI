@@ -14,6 +14,7 @@ import galleryReducer from 'features/gallery/store/gallerySlice';
 import loraReducer from 'features/lora/store/loraSlice';
 import modelmanagerReducer from 'features/modelManager/store/modelManagerSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
+import workflowReducer from 'features/nodes/store/workflowSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import queueReducer from 'features/queue/store/queueSlice';
@@ -22,9 +23,11 @@ import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
+import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import { Driver, rememberEnhancer, rememberReducer } from 'redux-remember';
 import { api } from 'services/api';
+import { authToastMiddleware } from 'services/api/authToastMiddleware';
 import { STORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
@@ -32,8 +35,6 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
-import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
-import { authToastMiddleware } from 'services/api/authToastMiddleware';
 
 const allReducers = {
   canvas: canvasReducer,
@@ -53,6 +54,7 @@ const allReducers = {
   modelmanager: modelmanagerReducer,
   sdxl: sdxlReducer,
   queue: queueReducer,
+  workflow: workflowReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -66,6 +68,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'generation',
   'sdxl',
   'nodes',
+  'workflow',
   'postprocessing',
   'system',
   'ui',

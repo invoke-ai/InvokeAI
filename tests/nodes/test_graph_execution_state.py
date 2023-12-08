@@ -28,7 +28,7 @@ from invokeai.app.services.shared.graph import (
     IterateInvocation,
     LibraryGraph,
 )
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .test_invoker import create_edge
@@ -77,7 +77,6 @@ def mock_services() -> InvocationServices:
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
         workflow_records=None,  # type: ignore
-        workflow_image_records=None,  # type: ignore
     )
 
 
@@ -94,6 +93,7 @@ def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[B
             queue_id=DEFAULT_QUEUE_ID,
             services=services,
             graph_execution_state_id="1",
+            workflow=None,
         )
     )
     g.complete(n.id, o)

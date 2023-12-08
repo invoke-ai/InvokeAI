@@ -10,8 +10,7 @@ import {
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
@@ -20,15 +19,11 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
-const ResetWorkflowButton = () => {
+const ResetWorkflowEditorButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-
-  const nodesCount = useAppSelector(
-    (state: RootState) => state.nodes.nodes.length
-  );
 
   const handleConfirmClear = useCallback(() => {
     dispatch(nodeEditorReset());
@@ -36,7 +31,7 @@ const ResetWorkflowButton = () => {
     dispatch(
       addToast(
         makeToast({
-          title: t('toast.nodesCleared'),
+          title: t('workflows.workflowEditorReset'),
           status: 'success',
         })
       )
@@ -52,7 +47,6 @@ const ResetWorkflowButton = () => {
         tooltip={t('nodes.resetWorkflow')}
         aria-label={t('nodes.resetWorkflow')}
         onClick={onOpen}
-        isDisabled={!nodesCount}
         colorScheme="error"
       />
 
@@ -90,4 +84,4 @@ const ResetWorkflowButton = () => {
   );
 };
 
-export default memo(ResetWorkflowButton);
+export default memo(ResetWorkflowEditorButton);

@@ -67,7 +67,9 @@
         "controlNet": "ControlNet",
         "controlAdapter": "Control Adapter",
         "data": "Data",
+        "delete": "Delete",
         "details": "Details",
+        "direction": "Direction",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
         "darkMode": "Dark Mode",
@@ -115,6 +117,7 @@
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
+        "orderBy": "Order By",
         "outpaint": "outpaint",
         "outputs": "Outputs",
         "postProcessDesc1": "Invoke AI offers a wide variety of post processing features. Image Upscaling and Face Restoration are already available in the WebUI. You can access them from the Advanced Options menu of the Text To Image and Image To Image tabs. You can also process images directly, using the image action buttons above the current image display or in the viewer.",
@@ -125,6 +128,8 @@
         "random": "Random",
         "reportBugLabel": "Report Bug",
         "safetensors": "Safetensors",
+        "save": "Save",
+        "saveAs": "Save As",
         "settingsLabel": "Settings",
         "simple": "Simple",
         "somethingWentWrong": "Something went wrong",
@@ -161,8 +166,12 @@
         "txt2img": "Text To Image",
         "unifiedCanvas": "Unified Canvas",
         "unknown": "Unknown",
-        "unknownError": "Unknown Error",
-        "upload": "Upload"
+        "upload": "Upload",
+        "updated": "Updated",
+        "created": "Created",
+        "prevPage": "Previous Page",
+        "nextPage": "Next Page",
+        "unknownError": "Unknown Error"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -940,9 +949,9 @@
         "problemSettingTitle": "Problem Setting Title",
         "reloadNodeTemplates": "Reload Node Templates",
         "removeLinearView": "Remove from Linear View",
-        "resetWorkflow": "Reset Workflow",
-        "resetWorkflowDesc": "Are you sure you want to reset this workflow?",
-        "resetWorkflowDesc2": "Resetting the workflow will clear all nodes, edges and workflow details.",
+        "resetWorkflow": "Reset Workflow Editor",
+        "resetWorkflowDesc": "Are you sure you want to reset the Workflow Editor?",
+        "resetWorkflowDesc2": "Resetting the Workflow Editor will clear all nodes, edges and workflow details. Saved workflows will not be affected.",
         "scheduler": "Scheduler",
         "schedulerDescription": "TODO",
         "sDXLMainModelField": "SDXL Model",
@@ -1269,7 +1278,6 @@
         "modelAddedSimple": "Model Added",
         "modelAddFailed": "Model Add Failed",
         "nodesBrokenConnections": "Cannot load. Some connections are broken.",
-        "nodesCleared": "Nodes Cleared",
         "nodesCorruptedGraph": "Cannot load. Graph seems to be corrupted.",
         "nodesLoaded": "Nodes Loaded",
         "nodesLoadedFailed": "Failed To Load Nodes",
@@ -1318,7 +1326,10 @@
         "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "uploadFailedUnableToLoadDesc": "Unable to load file",
         "upscalingFailed": "Upscaling Failed",
-        "workflowLoaded": "Workflow Loaded"
+        "workflowLoaded": "Workflow Loaded",
+        "problemRetrievingWorkflow": "Problem Retrieving Workflow",
+        "workflowDeleted": "Workflow Deleted",
+        "problemDeletingWorkflow": "Problem Deleting Workflow"
     },
     "tooltip": {
         "feature": {
@@ -1613,5 +1624,33 @@
         "showIntermediates": "Show Intermediates",
         "snapToGrid": "Snap to Grid",
         "undo": "Undo"
+    },
+    "workflows": {
+        "workflows": "Workflows",
+        "workflowLibrary": "Workflow Library",
+        "userWorkflows": "My Workflows",
+        "defaultWorkflows": "Default Workflows",
+        "openWorkflow": "Open Workflow",
+        "uploadWorkflow": "Upload Workflow",
+        "deleteWorkflow": "Delete Workflow",
+        "unnamedWorkflow": "Unnamed Workflow",
+        "downloadWorkflow": "Download Workflow",
+        "saveWorkflow": "Save Workflow",
+        "saveWorkflowAs": "Save Workflow As",
+        "problemSavingWorkflow": "Problem Saving Workflow",
+        "workflowSaved": "Workflow Saved",
+        "noRecentWorkflows": "No Recent Workflows",
+        "noUserWorkflows": "No User Workflows",
+        "noSystemWorkflows": "No System Workflows",
+        "problemLoading": "Problem Loading Workflows",
+        "loading": "Loading Workflows",
+        "noDescription": "No description",
+        "searchWorkflows": "Search Workflows",
+        "clearWorkflowSearchFilter": "Clear Workflow Search Filter",
+        "workflowName": "Workflow Name",
+        "workflowEditorReset": "Workflow Editor Reset"
+    },
+    "app": {
+        "storeNotInitialized": "Store is not initialized"
     }
 }

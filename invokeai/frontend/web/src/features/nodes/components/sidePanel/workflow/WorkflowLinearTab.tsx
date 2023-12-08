@@ -11,9 +11,9 @@ import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
-  ({ nodes }) => {
+  ({ workflow }) => {
     return {
-      fields: nodes.workflow.exposedFields,
+      fields: workflow.exposedFields,
     };
   },
   defaultSelectorOptions

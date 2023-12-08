@@ -1,33 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
-  Connection,
-  Edge,
-  EdgeChange,
-  EdgeRemoveChange,
-  getConnectedEdges,
-  getIncomers,
-  getOutgoers,
-  Node,
-  NodeChange,
-  OnConnectStartParams,
-  SelectionMode,
-  updateEdge,
-  Viewport,
-  XYPosition,
-} from 'reactflow';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import {
-  appSocketGeneratorProgress,
-  appSocketInvocationComplete,
-  appSocketInvocationError,
-  appSocketInvocationStarted,
-  appSocketQueueItemStatusChanged,
-} from 'services/events/actions';
-import { v4 as uuidv4 } from 'uuid';
+import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import {
   BoardFieldValue,
@@ -57,7 +29,35 @@ import {
   NodeExecutionState,
   zNodeStatus,
 } from 'features/nodes/types/invocation';
-import { WorkflowV2 } from 'features/nodes/types/workflow';
+import { cloneDeep, forEach } from 'lodash-es';
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  Connection,
+  Edge,
+  EdgeChange,
+  EdgeRemoveChange,
+  getConnectedEdges,
+  getIncomers,
+  getOutgoers,
+  Node,
+  NodeChange,
+  OnConnectStartParams,
+  SelectionMode,
+  updateEdge,
+  Viewport,
+  XYPosition,
+} from 'reactflow';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import {
+  appSocketGeneratorProgress,
+  appSocketInvocationComplete,
+  appSocketInvocationError,
+  appSocketInvocationStarted,
+  appSocketQueueItemStatusChanged,
+} from 'services/events/actions';
+import { v4 as uuidv4 } from 'uuid';
 import { NodesState } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
@@ -68,20 +68,6 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
   progress: null,
   progressImage: null,
   outputs: [],
-};
-
-const INITIAL_WORKFLOW: WorkflowV2 = {
-  name: '',
-  author: '',
-  description: '',
-  version: '',
-  contact: '',
-  tags: '',
-  notes: '',
-  nodes: [],
-  edges: [],
-  exposedFields: [],
-  meta: { version: '2.0.0' },
 };
 
 export const initialNodesState: NodesState = {
@@ -103,7 +89,6 @@ export const initialNodesState: NodesState = {
   nodeOpacity: 1,
   selectedNodes: [],
   selectedEdges: [],
-  workflow: INITIAL_WORKFLOW,
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
   mouseOverField: null,
@@ -308,23 +293,6 @@ const nodesSlice = createSlice({
       }
       state.modifyingEdge = false;
     },
-    workflowExposedFieldAdded: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
-      state.workflow.exposedFields = uniqBy(
-        state.workflow.exposedFields.concat(action.payload),
-        (field) => `${field.nodeId}-${field.fieldName}`
-      );
-    },
-    workflowExposedFieldRemoved: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
-      state.workflow.exposedFields = state.workflow.exposedFields.filter(
-        (field) => !isEqual(field, action.payload)
-      );
-    },
     fieldLabelChanged: (
       state,
       action: PayloadAction<{
@@ -343,20 +311,6 @@ const nodesSlice = createSlice({
         return;
       }
       field.label = label;
-    },
-    nodeEmbedWorkflowChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; embedWorkflow: boolean }>
-    ) => {
-      const { nodeId, embedWorkflow } = action.payload;
-      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-
-      const node = state.nodes?.[nodeIndex];
-
-      if (!isInvocationNode(node)) {
-        return;
-      }
-      node.data.embedWorkflow = embedWorkflow;
     },
     nodeUseCacheChanged: (
       state,
@@ -522,9 +476,6 @@ const nodesSlice = createSlice({
     },
     nodesDeleted: (state, action: PayloadAction<AnyNode[]>) => {
       action.payload.forEach((node) => {
-        state.workflow.exposedFields = state.workflow.exposedFields.filter(
-          (f) => f.nodeId !== node.id
-        );
         if (!isInvocationNode(node)) {
           return;
         }
@@ -687,7 +638,6 @@ const nodesSlice = createSlice({
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
-      state.workflow = cloneDeep(INITIAL_WORKFLOW);
     },
     shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldValidateGraph = action.payload;
@@ -703,56 +653,6 @@ const nodesSlice = createSlice({
     },
     nodeOpacityChanged: (state, action: PayloadAction<number>) => {
       state.nodeOpacity = action.payload;
-    },
-    workflowNameChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.name = action.payload;
-    },
-    workflowDescriptionChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.description = action.payload;
-    },
-    workflowTagsChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.tags = action.payload;
-    },
-    workflowAuthorChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.author = action.payload;
-    },
-    workflowNotesChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.notes = action.payload;
-    },
-    workflowVersionChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.version = action.payload;
-    },
-    workflowContactChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.contact = action.payload;
-    },
-    workflowLoaded: (state, action: PayloadAction<WorkflowV2>) => {
-      const { nodes, edges, ...workflow } = action.payload;
-      state.workflow = workflow;
-
-      state.nodes = applyNodeChanges(
-        nodes.map((node) => ({
-          item: { ...node, ...SHARED_NODE_PROPERTIES },
-          type: 'add',
-        })),
-        []
-      );
-      state.edges = applyEdgeChanges(
-        edges.map((edge) => ({ item: edge, type: 'add' })),
-        []
-      );
-
-      state.nodeExecutionStates = nodes.reduce<
-        Record<string, NodeExecutionState>
-      >((acc, node) => {
-        acc[node.id] = {
-          nodeId: node.id,
-          ...initialNodeExecutionState,
-        };
-        return acc;
-      }, {});
-    },
-    workflowReset: (state) => {
-      state.workflow = cloneDeep(INITIAL_WORKFLOW);
     },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
@@ -899,6 +799,32 @@ const nodesSlice = createSlice({
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
       state.isReady = false;
     });
+
+    builder.addCase(workflowLoaded, (state, action) => {
+      const { nodes, edges } = action.payload;
+      state.nodes = applyNodeChanges(
+        nodes.map((node) => ({
+          item: { ...node, ...SHARED_NODE_PROPERTIES },
+          type: 'add',
+        })),
+        []
+      );
+      state.edges = applyEdgeChanges(
+        edges.map((edge) => ({ item: edge, type: 'add' })),
+        []
+      );
+
+      state.nodeExecutionStates = nodes.reduce<
+        Record<string, NodeExecutionState>
+      >((acc, node) => {
+        acc[node.id] = {
+          nodeId: node.id,
+          ...initialNodeExecutionState,
+        };
+        return acc;
+      }, {});
+    });
+
     builder.addCase(appSocketInvocationStarted, (state, action) => {
       const { source_node_id } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
@@ -984,7 +910,6 @@ export const {
   nodeAdded,
   nodeReplaced,
   nodeEditorReset,
-  nodeEmbedWorkflowChanged,
   nodeExclusivelySelected,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -1008,16 +933,6 @@ export const {
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
   viewportChanged,
-  workflowAuthorChanged,
-  workflowContactChanged,
-  workflowDescriptionChanged,
-  workflowExposedFieldAdded,
-  workflowExposedFieldRemoved,
-  workflowLoaded,
-  workflowNameChanged,
-  workflowNotesChanged,
-  workflowTagsChanged,
-  workflowVersionChanged,
   edgeAdded,
 } = nodesSlice.actions;
 

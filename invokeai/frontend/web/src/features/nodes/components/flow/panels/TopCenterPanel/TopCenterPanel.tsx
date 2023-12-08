@@ -1,10 +1,16 @@
 import { Flex } from '@chakra-ui/layout';
 import { memo } from 'react';
-import LoadWorkflowButton from './LoadWorkflowButton';
-import ResetWorkflowButton from './ResetWorkflowButton';
-import DownloadWorkflowButton from './DownloadWorkflowButton';
+import DownloadWorkflowButton from 'features/workflowLibrary/components/DownloadWorkflowButton';
+import UploadWorkflowButton from 'features/workflowLibrary/components/LoadWorkflowFromFileButton';
+import ResetWorkflowEditorButton from 'features/workflowLibrary/components/ResetWorkflowButton';
+import SaveWorkflowButton from 'features/workflowLibrary/components/SaveWorkflowButton';
+import SaveWorkflowAsButton from 'features/workflowLibrary/components/SaveWorkflowAsButton';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const TopCenterPanel = () => {
+  const isWorkflowLibraryEnabled =
+    useFeatureStatus('workflowLibrary').isFeatureEnabled;
+
   return (
     <Flex
       sx={{
@@ -16,8 +22,14 @@ const TopCenterPanel = () => {
       }}
     >
       <DownloadWorkflowButton />
-      <LoadWorkflowButton />
-      <ResetWorkflowButton />
+      <UploadWorkflowButton />
+      {isWorkflowLibraryEnabled && (
+        <>
+          <SaveWorkflowButton />
+          <SaveWorkflowAsButton />
+        </>
+      )}
+      <ResetWorkflowEditorButton />
     </Flex>
   );
 };
