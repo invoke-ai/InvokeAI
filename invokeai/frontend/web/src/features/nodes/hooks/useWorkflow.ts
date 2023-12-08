@@ -1,6 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
-import { omit } from 'lodash-es';
 import { useMemo } from 'react';
 import { useDebounce } from 'use-debounce';
 
@@ -12,8 +11,7 @@ export const useWorkflow = () => {
   const [edges] = useDebounce(edges_, 300);
   const [workflow] = useDebounce(workflow_, 300);
   const builtWorkflow = useMemo(
-    () =>
-      buildWorkflow({ nodes, edges, workflow: omit(workflow, 'isTouched') }),
+    () => buildWorkflow({ nodes, edges, workflow }),
     [nodes, edges, workflow]
   );
 
