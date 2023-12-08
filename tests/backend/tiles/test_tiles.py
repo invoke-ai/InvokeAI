@@ -16,9 +16,7 @@ from invokeai.backend.tiles.utils import TBLR, Tile
 
 def test_calc_tiles_with_overlap_single_tile():
     """Test calc_tiles_with_overlap() behavior when a single tile covers the image."""
-    tiles = calc_tiles_with_overlap(
-        image_height=512, image_width=1024, tile_height=512, tile_width=1024, overlap=64
-    )
+    tiles = calc_tiles_with_overlap(image_height=512, image_width=1024, tile_height=512, tile_width=1024, overlap=64)
 
     expected_tiles = [
         Tile(
@@ -33,9 +31,7 @@ def test_calc_tiles_with_overlap_single_tile():
 def test_calc_tiles_with_overlap_evenly_divisible():
     """Test calc_tiles_with_overlap() behavior when the image is evenly covered by multiple tiles."""
     # Parameters chosen so that image is evenly covered by 2 rows, 3 columns of tiles.
-    tiles = calc_tiles_with_overlap(
-        image_height=576, image_width=1600, tile_height=320, tile_width=576, overlap=64
-    )
+    tiles = calc_tiles_with_overlap(image_height=576, image_width=1600, tile_height=320, tile_width=576, overlap=64)
 
     expected_tiles = [
         # Row 0
@@ -72,9 +68,7 @@ def test_calc_tiles_with_overlap_evenly_divisible():
 def test_calc_tiles_with_overlap_not_evenly_divisible():
     """Test calc_tiles_with_overlap() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters chosen so that image is covered by 2 rows and 3 columns of tiles, with uneven overlaps.
-    tiles = calc_tiles_with_overlap(
-        image_height=400, image_width=1200, tile_height=256, tile_width=512, overlap=64
-    )
+    tiles = calc_tiles_with_overlap(image_height=400, image_width=1200, tile_height=256, tile_width=512, overlap=64)
 
     expected_tiles = [
         # Row 0
@@ -131,13 +125,9 @@ def test_calc_tiles_with_overlap_input_validation(
     """Test that calc_tiles_with_overlap() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(AssertionError):
-            calc_tiles_with_overlap(
-                image_height, image_width, tile_height, tile_width, overlap
-            )
+            calc_tiles_with_overlap(image_height, image_width, tile_height, tile_width, overlap)
     else:
-        calc_tiles_with_overlap(
-            image_height, image_width, tile_height, tile_width, overlap
-        )
+        calc_tiles_with_overlap(image_height, image_width, tile_height, tile_width, overlap)
 
 
 ####################################
@@ -398,13 +388,9 @@ def test_calc_tiles_min_overlap_input_validation(
     """Test that calc_tiles_min_overlap() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(AssertionError):
-            calc_tiles_min_overlap(
-                image_height, image_width, tile_height, tile_width, min_overlap
-            )
+            calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap)
     else:
-        calc_tiles_min_overlap(
-            image_height, image_width, tile_height, tile_width, min_overlap
-        )
+        calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap)
 
 
 ####################################
@@ -414,9 +400,7 @@ def test_calc_tiles_min_overlap_input_validation(
 
 def test_calc_tiles_even_split_single_tile():
     """Test calc_tiles_even_split() behavior when a single tile covers the image."""
-    tiles = calc_tiles_even_split(
-        image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap=0.25)
 
     expected_tiles = [
         Tile(
@@ -431,9 +415,7 @@ def test_calc_tiles_even_split_single_tile():
 def test_calc_tiles_even_split_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image is evenly covered by multiple tiles."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(
-        image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap=0.25)
 
     expected_tiles = [
         # Row 0
@@ -469,9 +451,7 @@ def test_calc_tiles_even_split_evenly_divisible():
 def test_calc_tiles_even_split_not_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(
-        image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap=0.25)
 
     expected_tiles = [
         # Row 0
@@ -508,9 +488,7 @@ def test_calc_tiles_even_split_not_evenly_divisible():
 def test_calc_tiles_even_split_difficult_size():
     """Test calc_tiles_even_split() behavior when the image is a difficult size to spilt evenly and keep div8."""
     # Parameters are a difficult size for other tile gen routines to calculate
-    tiles = calc_tiles_even_split(
-        image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap=0.25)
 
     expected_tiles = [
         # Row 0
@@ -556,13 +534,9 @@ def test_calc_tiles_even_split_input_validation(
     """Test that calc_tiles_even_split() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(ValueError):
-            calc_tiles_even_split(
-                image_height, image_width, num_tiles_x, num_tiles_y, overlap
-            )
+            calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
     else:
-        calc_tiles_even_split(
-            image_height, image_width, num_tiles_x, num_tiles_y, overlap
-        )
+        calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
 
 
 #############################################
@@ -597,12 +571,8 @@ def test_merge_tiles_with_linear_blending_horizontal(blend_amount: int):
     expected_output = np.zeros((512, 960, 3), dtype=np.uint8)
     expected_output[:, : 480 - (blend_amount // 2), :] = 64
     if blend_amount > 0:
-        gradient = np.linspace(
-            start=64, stop=128, num=blend_amount, dtype=np.uint8
-        ).reshape((1, blend_amount, 1))
-        expected_output[
-            :, 480 - (blend_amount // 2) : 480 + (blend_amount // 2), :
-        ] = gradient
+        gradient = np.linspace(start=64, stop=128, num=blend_amount, dtype=np.uint8).reshape((1, blend_amount, 1))
+        expected_output[:, 480 - (blend_amount // 2) : 480 + (blend_amount // 2), :] = gradient
     expected_output[:, 480 + (blend_amount // 2) :, :] = 128
 
     merge_tiles_with_linear_blending(
@@ -642,12 +612,8 @@ def test_merge_tiles_with_linear_blending_vertical(blend_amount: int):
     expected_output = np.zeros((960, 512, 3), dtype=np.uint8)
     expected_output[: 480 - (blend_amount // 2), :, :] = 64
     if blend_amount > 0:
-        gradient = np.linspace(
-            start=64, stop=128, num=blend_amount, dtype=np.uint8
-        ).reshape((blend_amount, 1, 1))
-        expected_output[
-            480 - (blend_amount // 2) : 480 + (blend_amount // 2), :, :
-        ] = gradient
+        gradient = np.linspace(start=64, stop=128, num=blend_amount, dtype=np.uint8).reshape((blend_amount, 1, 1))
+        expected_output[480 - (blend_amount // 2) : 480 + (blend_amount // 2), :, :] = gradient
     expected_output[480 + (blend_amount // 2) :, :, :] = 128
 
     merge_tiles_with_linear_blending(
@@ -683,9 +649,7 @@ def test_merge_tiles_with_linear_blending_blend_amount_exceeds_vertical_overlap(
 
     # blend_amount=128 exceeds overlap of 64, so should raise exception.
     with pytest.raises(AssertionError):
-        merge_tiles_with_linear_blending(
-            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128
-        )
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128)
 
 
 def test_merge_tiles_with_linear_blending_blend_amount_exceeds_horizontal_overlap():
@@ -711,9 +675,7 @@ def test_merge_tiles_with_linear_blending_blend_amount_exceeds_horizontal_overla
 
     # blend_amount=128 exceeds overlap of 64, so should raise exception.
     with pytest.raises(AssertionError):
-        merge_tiles_with_linear_blending(
-            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128
-        )
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=128)
 
 
 def test_merge_tiles_with_linear_blending_tiles_overflow_dst_image():
@@ -733,9 +695,7 @@ def test_merge_tiles_with_linear_blending_tiles_overflow_dst_image():
     tile_images = [np.zeros((512, 512, 3))]
 
     with pytest.raises(ValueError):
-        merge_tiles_with_linear_blending(
-            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0
-        )
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0)
 
 
 def test_merge_tiles_with_linear_blending_mismatched_list_lengths():
@@ -755,6 +715,4 @@ def test_merge_tiles_with_linear_blending_mismatched_list_lengths():
     tile_images = [np.zeros((512, 512, 3)), np.zeros((512, 512, 3))]
 
     with pytest.raises(ValueError):
-        merge_tiles_with_linear_blending(
-            dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0
-        )
+        merge_tiles_with_linear_blending(dst_image=dst_image, tiles=tiles, tile_images=tile_images, blend_amount=0)
