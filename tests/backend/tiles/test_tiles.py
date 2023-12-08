@@ -223,7 +223,7 @@ def test_calc_tiles_min_overlap_difficult_size_div8():
 
 
 @pytest.mark.parametrize(
-    ["image_height", "image_width", "tile_height", "tile_width", "overlap", "raises"],
+    ["image_height", "image_width", "tile_height", "tile_width", "min_overlap", "raises"],
     [
         (128, 128, 128, 128, 127, False),  # OK
         (128, 128, 128, 128, 0, False),  # OK
@@ -240,15 +240,14 @@ def test_calc_tiles_min_overlap_input_validation(
     tile_height: int,
     tile_width: int,
     min_overlap: int,
-    round_to_8: bool,
     raises: bool,
 ):
-    """Test that calc_tiles_with_overlap() raises an exception if the inputs are invalid."""
+    """Test that calc_tiles_min_overlap() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(AssertionError):
-            calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap, round_to_8)
+            calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap)
     else:
-        calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap, round_to_8)
+        calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap)
 
 
 ####################################
@@ -333,13 +332,13 @@ def test_calc_tiles_even_split_difficult_size():
         (128, 128, 1, 1, 0.25, False),  # OK
         (128, 128, 1, 1, 0, False),  # OK
         (128, 128, 2, 1, 0, False),  # OK
-        (127, 127, 1, 1, 0, True),  # image size must be drivable by 8
+        (127, 127, 1, 1, 0, True),  # image size must be dividable by 8
     ],
 )
 def test_calc_tiles_even_split_input_validation(
     image_height: int, image_width: int, num_tiles_x: int, num_tiles_y: int, overlap: float, raises: bool
 ):
-    """Test that calc_tiles_with_overlap() raises an exception if the inputs are invalid."""
+    """Test that calc_tiles_even_split() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(AssertionError):
             calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)

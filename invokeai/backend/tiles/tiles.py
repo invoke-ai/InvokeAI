@@ -159,7 +159,12 @@ def calc_tiles_even_split(
 
 
 def calc_tiles_min_overlap(
-    image_height: int, image_width: int, tile_height: int, tile_width: int, min_overlap: int = 0, round_to_8: bool = False
+    image_height: int,
+    image_width: int,
+    tile_height: int,
+    tile_width: int,
+    min_overlap: int = 0,
+    round_to_8: bool = False,
 ) -> list[Tile]:
     """Calculate the tile coordinates for a given image shape under a simple tiling scheme with overlaps.
 
