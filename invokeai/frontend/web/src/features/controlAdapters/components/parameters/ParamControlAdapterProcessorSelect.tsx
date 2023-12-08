@@ -34,8 +34,8 @@ const selector = createSelector(
         a.value === 'none'
           ? -1
           : b.value === 'none'
-          ? 1
-          : a.label.localeCompare(b.label)
+            ? 1
+            : a.label.localeCompare(b.label)
       )
       .filter(
         (d) =>

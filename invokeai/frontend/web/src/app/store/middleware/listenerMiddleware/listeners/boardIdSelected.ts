@@ -49,9 +49,8 @@ export const addBoardIdSelectedListener = () => {
 
       if (isSuccess) {
         // the board was just changed - we can select the first image
-        const { data: boardImagesData } = imagesApi.endpoints.listImages.select(
-          queryArgs
-        )(getState());
+        const { data: boardImagesData } =
+          imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
         if (boardImagesData) {
           const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
