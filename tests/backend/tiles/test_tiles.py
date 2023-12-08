@@ -133,7 +133,7 @@ def test_calc_tiles_min_overlap_not_evenly_divisible():
     """Test calc_tiles_min_overlap() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
     tiles = calc_tiles_min_overlap(
-        image_height=400, image_width=1200, tile_height=256, tile_width=512, min_overlap=64, round_to_8=False
+        image_height=400, image_width=1200, tile_height=512, tile_width=512, min_overlap=64, round_to_8=False
     )
 
     expected_tiles = [
@@ -144,7 +144,7 @@ def test_calc_tiles_min_overlap_not_evenly_divisible():
         # Row 1
         Tile(coords=TBLR(top=144, bottom=400, left=0, right=512), overlap=TBLR(top=112, bottom=0, left=0, right=168)),
         Tile(
-            coords=TBLR(top=144, bottom=400, left=448, right=960), overlap=TBLR(top=112, bottom=0, left=168, right=168)
+            coords=TBLR(top=144, bottom=400, left=344, right=856), overlap=TBLR(top=112, bottom=0, left=168, right=168)
         ),
         Tile(
             coords=TBLR(top=144, bottom=400, left=688, right=1200), overlap=TBLR(top=112, bottom=0, left=168, right=0)
@@ -158,7 +158,7 @@ def test_calc_tiles_min_overlap_difficult_size():
     """Test calc_tiles_min_overlap() behavior when the image is a difficult size to spilt evenly and keep div8."""
     # Parameters are a difficult size for other tile gen routines to calculate
     tiles = calc_tiles_min_overlap(
-        image_height=1000, image_width=1000, tile_height=256, tile_width=512, min_overlap=64, round_to_8=False
+        image_height=1000, image_width=1000, tile_height=512, tile_width=512, min_overlap=64, round_to_8=False
     )
 
     expected_tiles = [
@@ -340,7 +340,7 @@ def test_calc_tiles_even_split_input_validation(
 ):
     """Test that calc_tiles_even_split() raises an exception if the inputs are invalid."""
     if raises:
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
     else:
         calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
