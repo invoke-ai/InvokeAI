@@ -60,7 +60,7 @@ const GalleryImageGrid = () => {
 
   const lastSingleSelectionImage = useAppSelector(selector);
 
-  const imgRef = useRef<VirtuosoGridHandle>(null);
+  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
 
   const { currentData, isFetching, isSuccess, isError } =
     useListImagesQuery(queryArgs);
@@ -110,8 +110,9 @@ const GalleryImageGrid = () => {
   useEffect(() => {
     if (lastSingleSelectionImage && currentData) {
       const index = currentData.ids.indexOf(lastSingleSelectionImage);
-      imgRef.current?.scrollToIndex({
+      virtuosoRef.current?.scrollToIndex({
         index: index,
+        align: 'end',
       });
     }
   });
@@ -163,7 +164,7 @@ const GalleryImageGrid = () => {
             }}
             scrollerRef={setScroller}
             itemContent={itemContentFunc}
-            ref={imgRef}
+            ref={virtuosoRef}
           />
         </Box>
         <IAIButton
