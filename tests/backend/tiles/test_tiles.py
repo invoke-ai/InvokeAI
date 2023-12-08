@@ -168,12 +168,21 @@ def test_calc_tiles_min_overlap_difficult_size():
         Tile(coords=TBLR(top=0, bottom=512, left=488, right=1000), overlap=TBLR(top=0, bottom=268, left=268, right=0)),
         # Row 1
         Tile(coords=TBLR(top=244, bottom=756, left=0, right=512), overlap=TBLR(top=268, bottom=268, left=0, right=0)),
-        Tile(coords=TBLR(top=244, bottom=756, left=244, right=756),overlap=TBLR(top=268, bottom=268, left=268, right=268)),
-        Tile(coords=TBLR(top=244, bottom=756, left=488, right=1000), overlap=TBLR(top=268, bottom=268, left=268, right=0)),
+        Tile(
+            coords=TBLR(top=244, bottom=756, left=244, right=756),
+            overlap=TBLR(top=268, bottom=268, left=268, right=268),
+        ),
+        Tile(
+            coords=TBLR(top=244, bottom=756, left=488, right=1000), overlap=TBLR(top=268, bottom=268, left=268, right=0)
+        ),
         # Row 2
         Tile(coords=TBLR(top=488, bottom=1000, left=0, right=512), overlap=TBLR(top=268, bottom=0, left=0, right=268)),
-        Tile(coords=TBLR(top=488, bottom=1000, left=244, right=756),overlap=TBLR(top=268, bottom=0, left=268, right=268)),
-        Tile(coords=TBLR(top=488, bottom=1000, left=488, right=1000), overlap=TBLR(top=268, bottom=0, left=268, right=0)),
+        Tile(
+            coords=TBLR(top=488, bottom=1000, left=244, right=756), overlap=TBLR(top=268, bottom=0, left=268, right=268)
+        ),
+        Tile(
+            coords=TBLR(top=488, bottom=1000, left=488, right=1000), overlap=TBLR(top=268, bottom=0, left=268, right=0)
+        ),
     ]
 
     assert tiles == expected_tiles
@@ -193,12 +202,21 @@ def test_calc_tiles_min_overlap_difficult_size_div8():
         Tile(coords=TBLR(top=0, bottom=512, left=488, right=1000), overlap=TBLR(top=0, bottom=272, left=264, right=0)),
         # Row 1
         Tile(coords=TBLR(top=240, bottom=752, left=0, right=512), overlap=TBLR(top=272, bottom=264, left=0, right=272)),
-        Tile(coords=TBLR(top=240, bottom=752, left=240, right=752),overlap=TBLR(top=272, bottom=264, left=272, right=264)),
-        Tile(coords=TBLR(top=240, bottom=752, left=488, right=1000), overlap=TBLR(top=272, bottom=264, left=264, right=0)),
+        Tile(
+            coords=TBLR(top=240, bottom=752, left=240, right=752),
+            overlap=TBLR(top=272, bottom=264, left=272, right=264),
+        ),
+        Tile(
+            coords=TBLR(top=240, bottom=752, left=488, right=1000), overlap=TBLR(top=272, bottom=264, left=264, right=0)
+        ),
         # Row 2
         Tile(coords=TBLR(top=488, bottom=1000, left=0, right=512), overlap=TBLR(top=264, bottom=0, left=0, right=272)),
-        Tile(coords=TBLR(top=488, bottom=1000, left=240, right=752),overlap=TBLR(top=264, bottom=0, left=272, right=264)),
-        Tile(coords=TBLR(top=488, bottom=1000, left=488, right=1000), overlap=TBLR(top=264, bottom=0, left=264, right=0)),
+        Tile(
+            coords=TBLR(top=488, bottom=1000, left=240, right=752), overlap=TBLR(top=264, bottom=0, left=272, right=264)
+        ),
+        Tile(
+            coords=TBLR(top=488, bottom=1000, left=488, right=1000), overlap=TBLR(top=264, bottom=0, left=264, right=0)
+        ),
     ]
 
     assert tiles == expected_tiles
@@ -217,7 +235,13 @@ def test_calc_tiles_min_overlap_difficult_size_div8():
     ],
 )
 def test_calc_tiles_min_overlap_input_validation(
-    image_height: int, image_width: int, tile_height: int, tile_width: int, min_overlap: int, round_to_8: bool , raises: bool
+    image_height: int,
+    image_width: int,
+    tile_height: int,
+    tile_width: int,
+    min_overlap: int,
+    round_to_8: bool,
+    raises: bool,
 ):
     """Test that calc_tiles_with_overlap() raises an exception if the inputs are invalid."""
     if raises:
@@ -225,6 +249,7 @@ def test_calc_tiles_min_overlap_input_validation(
             calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap, round_to_8)
     else:
         calc_tiles_min_overlap(image_height, image_width, tile_height, tile_width, min_overlap, round_to_8)
+
 
 ####################################
 # Test calc_tiles_even_split(...)
@@ -300,6 +325,7 @@ def test_calc_tiles_even_split_difficult_size():
     ]
 
     assert tiles == expected_tiles
+
 
 @pytest.mark.parametrize(
     ["image_height", "image_width", "num_tiles_x", "num_tiles_y", "overlap", "raises"],
