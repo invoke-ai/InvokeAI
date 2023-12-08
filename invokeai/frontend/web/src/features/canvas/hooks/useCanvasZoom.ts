@@ -12,20 +12,16 @@ import {
 } from 'features/canvas/util/constants';
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
-import { clamp, isEqual } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import { MutableRefObject, useCallback } from 'react';
 
-const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas }) => {
-    const { isMoveStageKeyHeld, stageScale } = canvas;
-    return {
-      isMoveStageKeyHeld,
-      stageScale,
-    };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
-);
+const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+  const { isMoveStageKeyHeld, stageScale } = canvas;
+  return {
+    isMoveStageKeyHeld,
+    stageScale,
+  };
+});
 
 const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();

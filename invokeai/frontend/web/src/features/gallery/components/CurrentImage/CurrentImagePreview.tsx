@@ -1,4 +1,4 @@
-import { Box, Flex, Image } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
@@ -9,6 +9,7 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
+import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
@@ -28,14 +29,13 @@ export const imagesSelector = createMemoizedSelector(
       shouldHidePreview,
       shouldShowProgressInViewer,
     } = ui;
-    const { denoiseProgress, shouldAntialiasProgressImage } = system;
+    const { denoiseProgress } = system;
     return {
       shouldShowImageDetails,
       shouldHidePreview,
       imageName: lastSelectedImage?.image_name,
-      denoiseProgress,
+      hasDenoiseProgress: Boolean(denoiseProgress),
       shouldShowProgressInViewer,
-      shouldAntialiasProgressImage,
     };
   }
 );
@@ -44,9 +44,8 @@ const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
     imageName,
-    denoiseProgress,
+    hasDenoiseProgress,
     shouldShowProgressInViewer,
-    shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
   const {
@@ -137,23 +136,8 @@ const CurrentImagePreview = () => {
         position: 'relative',
       }}
     >
-      {denoiseProgress?.progress_image && shouldShowProgressInViewer ? (
-        <Image
-          src={denoiseProgress.progress_image.dataURL}
-          width={denoiseProgress.progress_image.width}
-          height={denoiseProgress.progress_image.height}
-          draggable={false}
-          data-testid="progress-image"
-          sx={{
-            objectFit: 'contain',
-            maxWidth: 'full',
-            maxHeight: 'full',
-            height: 'auto',
-            position: 'absolute',
-            borderRadius: 'base',
-            imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
-          }}
-        />
+      {hasDenoiseProgress && shouldShowProgressInViewer ? (
+        <ProgressImage />
       ) : (
         <IAIDndImage
           imageDTO={imageDTO}

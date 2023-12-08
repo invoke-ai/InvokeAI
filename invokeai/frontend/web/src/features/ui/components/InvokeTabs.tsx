@@ -23,7 +23,6 @@ import {
 } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
-import { isEqual } from 'lodash-es';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -96,9 +95,6 @@ const enabledTabsSelector = createMemoizedSelector(
     const { disabledTabs } = config;
     const enabledTabs = tabs.filter((tab) => !disabledTabs.includes(tab.id));
     return enabledTabs;
-  },
-  {
-    memoizeOptions: { resultEqualityCheck: isEqual },
   }
 );
 

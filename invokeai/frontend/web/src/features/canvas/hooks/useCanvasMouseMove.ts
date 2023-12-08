@@ -10,7 +10,6 @@ import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPositio
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
 import { Vector2d } from 'konva/lib/types';
-import { isEqual } from 'lodash-es';
 import { MutableRefObject, useCallback } from 'react';
 import useColorPicker from './useColorUnderCursor';
 
@@ -24,8 +23,7 @@ const selector = createMemoizedSelector(
       activeTabName,
       isStaging,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasMouseMove = (
