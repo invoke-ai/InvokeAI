@@ -1,9 +1,10 @@
 import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
 import {
@@ -25,8 +26,6 @@ import {
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
-import { isEqual } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +45,7 @@ import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
 
-export const selector = createSelector(
+export const selector = createMemoizedSelector(
   [stateSelector, isStagingSelector],
   ({ canvas }, isStaging) => {
     const { tool, shouldCropToBoundingBoxOnSave, layer, isMaskEnabled } =
@@ -59,11 +58,6 @@ export const selector = createSelector(
       layer,
       shouldCropToBoundingBoxOnSave,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

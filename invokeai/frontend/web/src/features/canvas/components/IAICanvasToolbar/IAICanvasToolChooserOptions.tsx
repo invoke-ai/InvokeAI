@@ -1,5 +1,5 @@
-import { ButtonGroup, Flex, Box } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
@@ -14,10 +14,9 @@ import {
   setBrushSize,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { clamp, isEqual } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { RgbaColor } from 'react-colorful';
-
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -29,7 +28,7 @@ import {
   FaSlidersH,
 } from 'react-icons/fa';
 
-export const selector = createSelector(
+export const selector = createMemoizedSelector(
   [stateSelector, isStagingSelector],
   ({ canvas }, isStaging) => {
     const { tool, brushColor, brushSize } = canvas;
@@ -40,11 +39,6 @@ export const selector = createSelector(
       brushColor,
       brushSize,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

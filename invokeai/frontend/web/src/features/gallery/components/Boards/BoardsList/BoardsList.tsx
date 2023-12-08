@@ -1,26 +1,21 @@
 import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { BoardDTO } from 'services/api/types';
-import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
 import NoBoardBoard from './NoBoardBoard';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const { selectedBoardId, boardSearchText } = gallery;
-    return { selectedBoardId, boardSearchText };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
+  const { selectedBoardId, boardSearchText } = gallery;
+  return { selectedBoardId, boardSearchText };
+});
 
 type Props = {
   isOpen: boolean;

@@ -7,7 +7,7 @@ import {
   Text,
   Tooltip,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
@@ -16,8 +16,8 @@ import {
   zNodeStatus,
 } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
-import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
 
 type Props = {
   nodeId: string;
@@ -35,7 +35,7 @@ const circleStyles = {
 const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
   const selectNodeExecutionState = useMemo(
     () =>
-      createSelector(
+      createMemoizedSelector(
         stateSelector,
         ({ nodes }) => nodes.nodeExecutionStates[nodeId]
       ),

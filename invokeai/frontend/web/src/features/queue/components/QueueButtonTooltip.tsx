@@ -1,23 +1,21 @@
 import { Divider, Flex, ListItem, Text, UnorderedList } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const tooltipSelector = createSelector(
+const tooltipSelector = createMemoizedSelector(
   [stateSelector],
   ({ gallery }) => {
     const { autoAddBoardId } = gallery;
     return {
       autoAddBoardId,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 type Props = {

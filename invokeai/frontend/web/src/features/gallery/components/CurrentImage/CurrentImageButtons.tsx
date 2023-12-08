@@ -1,6 +1,3 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash-es';
-
 import {
   ButtonGroup,
   Flex,
@@ -8,8 +5,9 @@ import {
   MenuButton,
   MenuList,
 } from '@chakra-ui/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -45,7 +43,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import { menuListMotionProps } from 'theme/components/menu';
 
-const currentImageButtonsSelector = createSelector(
+const currentImageButtonsSelector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
   ({ gallery, system, ui, config }, activeTabName) => {
     const { isConnected, shouldConfirmOnDelete, denoiseProgress } = system;
@@ -72,11 +70,6 @@ const currentImageButtonsSelector = createSelector(
       lastSelectedImage,
       shouldFetchMetadataFromApi,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

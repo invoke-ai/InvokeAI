@@ -425,7 +425,7 @@ export type ControlAdapterConfig =
 
 export type ControlAdapterType = ControlAdapterConfig['type'];
 
-export type ControlAdaptersState = EntityState<ControlAdapterConfig> & {
+export type ControlAdaptersState = EntityState<ControlAdapterConfig, string> & {
   pendingControlImages: string[];
 };
 

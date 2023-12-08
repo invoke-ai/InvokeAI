@@ -12,7 +12,6 @@
  * - increment it in `onPaneClick`
  * - `useEffect()` to close the menu when `globalContextMenuCloseTrigger` changes
  */
-
 import {
   Menu,
   MenuButton,
