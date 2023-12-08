@@ -25,9 +25,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - uses: actions/checkout@v4
-      - run: 'pnpm install --prefer-frozen-lockfile'
-      - run: 'pnpm run lint:tsc'
-      - run: 'pnpm run lint:madge'
-      - run: 'pnpm run lint:eslint'
-      - run: 'pnpm run lint:prettier'
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Install dependencies
+        run: 'pnpm install --prefer-frozen-lockfile'
+      - name: Typescript
+        run: 'pnpm run lint:tsc'
+      - name: Madge
+        run: 'pnpm run lint:madge'
+      - name: ESLint
+        run: 'pnpm run lint:eslint'
+      - name: Prettier
+        run: 'pnpm run lint:prettier'
