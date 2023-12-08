@@ -98,7 +98,7 @@
     "react-virtuoso": "^4.6.2",
     "reactflow": "^11.10.1",
     "redux-dynamic-middlewares": "^2.2.0",
-    "redux-remember": "^4.2.2",
+    "redux-remember": "^5.0.0",
     "roarr": "^7.21.0",
     "serialize-error": "^11.0.3",
     "socket.io-client": "^4.7.2",
