@@ -605,7 +605,6 @@
         "nodesSaved": "Nodos guardados",
         "nodesLoadedFailed": "Error al cargar los nodos",
         "nodesLoaded": "Nodos cargados",
-        "nodesCleared": "Nodos borrados",
         "problemCopyingImage": "No se puede copiar la imagen",
         "nodesNotValidJSON": "JSON no válido",
         "nodesCorruptedGraph": "No se puede cargar. El gráfico parece estar dañado.",

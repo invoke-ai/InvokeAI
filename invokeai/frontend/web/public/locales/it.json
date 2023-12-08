@@ -720,7 +720,6 @@
         "nodesLoadedFailed": "Impossibile caricare i nodi",
         "nodesSaved": "Nodi salvati",
         "nodesLoaded": "Nodi caricati",
-        "nodesCleared": "Nodi cancellati",
         "problemCopyingImage": "Impossibile copiare l'immagine",
         "nodesNotValidGraph": "Grafico del nodo InvokeAI non valido",
         "nodesCorruptedGraph": "Impossibile caricare. Il grafico sembra essere danneggiato.",
