@@ -2,8 +2,8 @@ import math
 from typing import Union
 
 import numpy as np
-from invokeai.app.invocations.latent import LATENT_SCALE_FACTOR
 
+from invokeai.app.invocations.latent import LATENT_SCALE_FACTOR
 from invokeai.backend.tiles.utils import TBLR, Tile, paste, seam_blend
 
 

@@ -121,8 +121,8 @@ class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
     image_height: int = InputField(
         ge=1, default=1024, description="The image height, in pixels, to calculate tiles for."
     )
-    tile_width: int = InputField(ge=1, default=576, description="The tile width, in pixels.")
-    tile_height: int = InputField(ge=1, default=576, description="The tile height, in pixels.")
+    tile_width: int = InputField(ge=1, default=576, multiple_of=8, description="The tile width, in pixels.")
+    tile_height: int = InputField(ge=1, default=576, multiple_of=8, description="The tile height, in pixels.")
     min_overlap: int = InputField(
         default=128,
         ge=0,
