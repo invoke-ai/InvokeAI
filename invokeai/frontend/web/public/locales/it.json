@@ -103,7 +103,8 @@
         "somethingWentWrong": "Qualcosa è andato storto",
         "copyError": "$t(gallery.copy) Errore",
         "input": "Ingresso",
-        "notInstalled": "Non $t(common.installed)"
+        "notInstalled": "Non $t(common.installed)",
+        "unknownError": "Errore sconosciuto"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -141,7 +142,9 @@
         "unstarImage": "Rimuovi preferenza immagine",
         "dropOrUpload": "$t(gallery.drop) o carica",
         "starImage": "Immagine preferita",
-        "dropToUpload": "$t(gallery.drop) per aggiornare"
+        "dropToUpload": "$t(gallery.drop) per aggiornare",
+        "problemDeletingImagesDesc": "Impossibile eliminare una o più immagini",
+        "problemDeletingImages": "Problema durante l'eliminazione delle immagini"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti rapidi",
@@ -626,7 +629,10 @@
         "imageActions": "Azioni Immagine",
         "aspectRatioFree": "Libere",
         "maskEdge": "Maschera i bordi",
-        "unmasked": "No maschera"
+        "unmasked": "No maschera",
+        "cfgRescaleMultiplier": "Moltiplicatore riscala CFG",
+        "cfgRescale": "Riscala CFG",
+        "useSize": "Usa Dimensioni"
     },
     "settings": {
         "models": "Modelli",
@@ -670,7 +676,8 @@
         "clearIntermediatesDisabled": "La coda deve essere vuota per cancellare le immagini intermedie",
         "enableNSFWChecker": "Abilita controllo NSFW",
         "enableInvisibleWatermark": "Abilita filigrana invisibile",
-        "enableInformationalPopovers": "Abilita testo informativo a comparsa"
+        "enableInformationalPopovers": "Abilita testo informativo a comparsa",
+        "reloadingIn": "Ricaricando in"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -713,7 +720,6 @@
         "nodesLoadedFailed": "Impossibile caricare i nodi",
         "nodesSaved": "Nodi salvati",
         "nodesLoaded": "Nodi caricati",
-        "nodesCleared": "Nodi cancellati",
         "problemCopyingImage": "Impossibile copiare l'immagine",
         "nodesNotValidGraph": "Grafico del nodo InvokeAI non valido",
         "nodesCorruptedGraph": "Impossibile caricare. Il grafico sembra essere danneggiato.",
@@ -752,11 +758,12 @@
         "setNodeField": "Imposta come campo nodo",
         "problemSavingMask": "Problema nel salvataggio della maschera",
         "problemSavingCanvasDesc": "Impossibile salvare la tela",
-        "setCanvasInitialImage": "Imposta come immagine iniziale della tela",
+        "setCanvasInitialImage": "Imposta l'immagine iniziale della tela",
         "workflowLoaded": "Flusso di lavoro caricato",
         "setIPAdapterImage": "Imposta come immagine per l'Adattatore IP",
         "problemSavingMaskDesc": "Impossibile salvare la maschera",
-        "setAsCanvasInitialImage": "Imposta come immagine iniziale della tela"
+        "setAsCanvasInitialImage": "Imposta come immagine iniziale della tela",
+        "invalidUpload": "Caricamento non valido"
     },
     "tooltip": {
         "feature": {
@@ -780,7 +787,7 @@
         "maskingOptions": "Opzioni di mascheramento",
         "enableMask": "Abilita maschera",
         "preserveMaskedArea": "Mantieni area mascherata",
-        "clearMask": "Elimina la maschera",
+        "clearMask": "Cancella maschera (Shift+C)",
         "brush": "Pennello",
         "eraser": "Cancellino",
         "fillBoundingBox": "Riempi rettangolo di selezione",
@@ -833,7 +840,8 @@
         "betaPreserveMasked": "Conserva quanto mascherato",
         "antialiasing": "Anti aliasing",
         "showResultsOn": "Mostra i risultati (attivato)",
-        "showResultsOff": "Mostra i risultati (disattivato)"
+        "showResultsOff": "Mostra i risultati (disattivato)",
+        "saveMask": "Salva $t(unifiedCanvas.mask)"
     },
     "accessibility": {
         "modelSelect": "Seleziona modello",
@@ -859,7 +867,8 @@
         "showGalleryPanel": "Mostra il pannello Galleria",
         "loadMore": "Carica altro",
         "mode": "Modalità",
-        "resetUI": "$t(accessibility.reset) l'Interfaccia Utente"
+        "resetUI": "$t(accessibility.reset) l'Interfaccia Utente",
+        "createIssue": "Segnala un problema"
     },
     "ui": {
         "hideProgressImages": "Nascondi avanzamento immagini",
@@ -940,7 +949,7 @@
         "unknownNode": "Nodo sconosciuto",
         "vaeFieldDescription": "Sotto modello VAE.",
         "booleanPolymorphicDescription": "Una raccolta di booleani.",
-        "missingTemplate": "Modello mancante",
+        "missingTemplate": "Nodo non valido: nodo {{node}} di tipo {{type}} modello mancante (non installato?)",
         "outputSchemaNotFound": "Schema di output non trovato",
         "colorFieldDescription": "Un colore RGBA.",
         "maybeIncompatible": "Potrebbe essere incompatibile con quello installato",
@@ -979,7 +988,7 @@
         "cannotConnectOutputToOutput": "Impossibile collegare Output ad Output",
         "booleanCollection": "Raccolta booleana",
         "cannotConnectToSelf": "Impossibile connettersi a se stesso",
-        "mismatchedVersion": "Ha una versione non corrispondente",
+        "mismatchedVersion": "Nodo non valido: il nodo {{node}} di tipo {{type}} ha una versione non corrispondente (provare ad aggiornare?)",
         "outputNode": "Nodo di Output",
         "loadingNodes": "Caricamento nodi...",
         "oNNXModelFieldDescription": "Campo del modello ONNX.",
@@ -1058,7 +1067,7 @@
         "latentsCollectionDescription": "Le immagini latenti possono essere passate tra i nodi.",
         "imageCollection": "Raccolta Immagini",
         "loRAModelField": "LoRA",
-        "updateAllNodes": "Aggiorna tutti i nodi",
+        "updateAllNodes": "Aggiorna i nodi",
         "unableToUpdateNodes_one": "Impossibile aggiornare {{count}} nodo",
         "unableToUpdateNodes_many": "Impossibile aggiornare {{count}} nodi",
         "unableToUpdateNodes_other": "Impossibile aggiornare {{count}} nodi",
@@ -1069,7 +1078,27 @@
         "unknownErrorValidatingWorkflow": "Errore sconosciuto durante la convalida del flusso di lavoro",
         "collectionFieldType": "{{name}} Raccolta",
         "collectionOrScalarFieldType": "{{name}} Raccolta|Scalare",
-        "nodeVersion": "Versione Nodo"
+        "nodeVersion": "Versione Nodo",
+        "inputFieldTypeParseError": "Impossibile analizzare il tipo di campo di input {{node}}.{{field}} ({{message}})",
+        "unsupportedArrayItemType": "tipo di elemento dell'array non supportato \"{{type}}\"",
+        "targetNodeFieldDoesNotExist": "Connessione non valida: il campo di destinazione/input {{node}}.{{field}} non esiste",
+        "unsupportedMismatchedUnion": "tipo CollectionOrScalar non corrispondente con tipi di base {{firstType}} e {{secondType}}",
+        "allNodesUpdated": "Tutti i nodi sono aggiornati",
+        "sourceNodeDoesNotExist": "Connessione non valida: il nodo di origine/output {{node}} non esiste",
+        "unableToExtractEnumOptions": "impossibile estrarre le opzioni enum",
+        "unableToParseFieldType": "impossibile analizzare il tipo di campo",
+        "unrecognizedWorkflowVersion": "Versione dello schema del flusso di lavoro non riconosciuta {{version}}",
+        "outputFieldTypeParseError": "Impossibile analizzare il tipo di campo di output {{node}}.{{field}} ({{message}})",
+        "sourceNodeFieldDoesNotExist": "Connessione non valida: il campo di origine/output {{node}}.{{field}} non esiste",
+        "unableToGetWorkflowVersion": "Impossibile ottenere la versione dello schema del flusso di lavoro",
+        "nodePack": "Pacchetto di nodi",
+        "unableToExtractSchemaNameFromRef": "impossibile estrarre il nome dello schema dal riferimento",
+        "unknownOutput": "Output sconosciuto: {{name}}",
+        "unknownNodeType": "Tipo di nodo sconosciuto",
+        "targetNodeDoesNotExist": "Connessione non valida: il nodo di destinazione/input {{node}} non esiste",
+        "unknownFieldType": "$t(nodes.unknownField) tipo: {{type}}",
+        "deletedInvalidEdge": "Eliminata connessione non valida {{source}} -> {{target}}",
+        "unknownInput": "Input sconosciuto: {{name}}"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1088,9 +1117,9 @@
         "selectBoard": "Seleziona una Bacheca",
         "uncategorized": "Non categorizzato",
         "downloadBoard": "Scarica la bacheca",
-        "deleteBoardOnly": "Elimina solo la Bacheca",
+        "deleteBoardOnly": "solo la Bacheca",
         "deleteBoard": "Elimina Bacheca",
-        "deleteBoardAndImages": "Elimina Bacheca e Immagini",
+        "deleteBoardAndImages": "Bacheca e Immagini",
         "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate",
         "movingImagesToBoard_one": "Spostare {{count}} immagine nella bacheca:",
         "movingImagesToBoard_many": "Spostare {{count}} immagini nella bacheca:",
@@ -1499,6 +1528,12 @@
                 "ControlNet fornisce una guida al processo di generazione, aiutando a creare immagini con composizione, struttura o stile controllati, a seconda del modello selezionato."
             ],
             "heading": "ControlNet"
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "Moltiplicatore di riscala CFG",
+            "paragraphs": [
+                "Moltiplicatore di riscala per la guida CFG, utilizzato per modelli addestrati utilizzando SNR a terminale zero (ztsnr). Valore suggerito 0.7."
+            ]
         }
     },
     "sdxl": {

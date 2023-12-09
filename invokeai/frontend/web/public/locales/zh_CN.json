@@ -723,7 +723,6 @@
         "nodesUnrecognizedTypes": "无法加载。节点图有无法识别的节点类型",
         "nodesNotValidJSON": "无效的 JSON",
         "nodesNotValidGraph": "无效的 InvokeAi 节点图",
-        "nodesCleared": "节点已清空",
         "nodesLoadedFailed": "节点图加载失败",
         "modelAddedSimple": "已添加模型",
         "modelAdded": "已添加模型: {{modelName}}",
