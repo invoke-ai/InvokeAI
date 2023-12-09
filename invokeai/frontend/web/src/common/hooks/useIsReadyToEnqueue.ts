@@ -1,7 +1,6 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -10,7 +9,7 @@ import i18n from 'i18next';
 import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
   (
     { controlAdapters, generation, system, nodes, dynamicPrompts },
@@ -125,8 +124,7 @@ const selector = createSelector(
     }
 
     return { isReady: !reasons.length, reasons };
-  },
-  defaultSelectorOptions
+  }
 );
 
 export const useIsReadyToEnqueue = () => {

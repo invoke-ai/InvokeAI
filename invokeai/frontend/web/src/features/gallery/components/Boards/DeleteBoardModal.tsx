@@ -9,8 +9,8 @@ import {
   Skeleton,
   Text,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -43,7 +43,7 @@ const DeleteBoardModal = (props: Props) => {
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createSelector([stateSelector], (state) => {
+      createMemoizedSelector([stateSelector], (state) => {
         const allImageUsage = (boardImageNames ?? []).map((imageName) =>
           getImageUsage(state, imageName)
         );

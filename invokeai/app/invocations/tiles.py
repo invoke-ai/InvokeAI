@@ -12,7 +12,6 @@ from invokeai.app.invocations.baseinvocation import (
     InvocationContext,
     OutputField,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -279,7 +278,7 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
         return ImageOutput(
             image=ImageField(image_name=image_dto.image_name),

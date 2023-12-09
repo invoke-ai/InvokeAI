@@ -35,7 +35,9 @@ import {
   isT2IAdapter,
 } from './types';
 
-export const caAdapter = createEntityAdapter<ControlAdapterConfig>();
+export const caAdapter = createEntityAdapter<ControlAdapterConfig, string>({
+  selectId: (ca) => ca.id,
+});
 
 export const {
   selectById: selectControlAdapterById,
@@ -259,7 +261,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const update: Update<ControlNetConfig | T2IAdapterConfig> = {
+      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
         id,
         changes: { model },
       };
@@ -398,7 +400,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const update: Update<ControlNetConfig | T2IAdapterConfig> = {
+      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
         id,
         changes: { shouldAutoConfig: !cn.shouldAutoConfig },
       };

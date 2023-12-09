@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
@@ -16,6 +17,7 @@ from pydantic.fields import FieldInfo, _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
@@ -452,6 +454,7 @@ class InvocationContext:
     queue_id: str
     queue_item_id: int
     queue_batch_id: str
+    workflow: Optional[WorkflowWithoutID]
 
     def __init__(
         self,
@@ -460,12 +463,14 @@ class InvocationContext:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
+        workflow: Optional[WorkflowWithoutID],
     ):
         self.services = services
         self.graph_execution_state_id = graph_execution_state_id
         self.queue_id = queue_id
         self.queue_item_id = queue_item_id
         self.queue_batch_id = queue_batch_id
+        self.workflow = workflow
 
 
 class BaseInvocationOutput(BaseModel):
@@ -705,8 +710,10 @@ class _Model(BaseModel):
     pass
 
 
-# Get all pydantic model attrs, methods, etc
-RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", category=DeprecationWarning)
+    # Get all pydantic model attrs, methods, etc
+    RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
 
 
 def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None:
@@ -807,9 +814,9 @@ def invocation(
         cls.UIConfig.category = category
 
         # Grab the node pack's name from the module name, if it's a custom node
-        module_name = cls.__module__.split(".")[0]
-        if module_name.endswith(CUSTOM_NODE_PACK_SUFFIX):
-            cls.UIConfig.node_pack = module_name.split(CUSTOM_NODE_PACK_SUFFIX)[0]
+        is_custom_node = cls.__module__.rsplit(".", 1)[0] == "invokeai.app.invocations"
+        if is_custom_node:
+            cls.UIConfig.node_pack = cls.__module__.split(".")[0]
         else:
             cls.UIConfig.node_pack = None
 
@@ -903,24 +910,6 @@ def invocation_output(
     return wrapper
 
 
-class WorkflowField(RootModel):
-    """
-    Pydantic model for workflows with custom root of type dict[str, Any].
-    Workflows are stored without a strict schema.
-    """
-
-    root: dict[str, Any] = Field(description="The workflow")
-
-
-WorkflowFieldValidator = TypeAdapter(WorkflowField)
-
-
-class WithWorkflow(BaseModel):
-    workflow: Optional[WorkflowField] = Field(
-        default=None, description=FieldDescriptions.workflow, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
-    )
-
-
 class MetadataField(RootModel):
     """
     Pydantic model for metadata with custom root of type dict[str, Any].
@@ -943,3 +932,13 @@ class WithMetadata(BaseModel):
             orig_required=False,
         ).model_dump(exclude_none=True),
     )
+
+
+class WithWorkflow:
+    workflow = None
+
+    def __init_subclass__(cls) -> None:
+        logger.warn(
+            f"{cls.__module__.split('.')[0]}.{cls.__name__}: WithWorkflow is deprecated. Use `context.workflow` to access the workflow."
+        )
+        super().__init_subclass__()

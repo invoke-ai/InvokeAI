@@ -1,10 +1,28 @@
 import { useToken } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
+import {
+  connectionEnded,
+  connectionMade,
+  connectionStarted,
+  edgeAdded,
+  edgeChangeStarted,
+  edgeDeleted,
+  edgesChanged,
+  edgesDeleted,
+  nodesChanged,
+  nodesDeleted,
+  selectedAll,
+  selectedEdgesChanged,
+  selectedNodesChanged,
+  selectionCopied,
+  selectionPasted,
+  viewportChanged,
+} from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
-import { contextMenusClosed } from 'features/ui/store/uiSlice';
+import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import { MouseEvent, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
@@ -25,25 +43,6 @@ import {
   ReactFlowProps,
   XYPosition,
 } from 'reactflow';
-import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
-import {
-  connectionEnded,
-  connectionMade,
-  connectionStarted,
-  edgeAdded,
-  edgeChangeStarted,
-  edgeDeleted,
-  edgesChanged,
-  edgesDeleted,
-  nodesChanged,
-  nodesDeleted,
-  selectedAll,
-  selectedEdgesChanged,
-  selectedNodesChanged,
-  selectionCopied,
-  selectionPasted,
-  viewportChanged,
-} from 'features/nodes/store/nodesSlice';
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
 import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
@@ -67,17 +66,13 @@ const nodeTypes = {
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
 const proOptions: ProOptions = { hideAttribution: true };
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const { shouldSnapToGrid, selectionMode } = nodes;
-    return {
-      shouldSnapToGrid,
-      selectionMode,
-    };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+  const { shouldSnapToGrid, selectionMode } = nodes;
+  return {
+    shouldSnapToGrid,
+    selectionMode,
+  };
+});
 
 export const Flow = () => {
   const dispatch = useAppDispatch();
@@ -153,7 +148,7 @@ export const Flow = () => {
   );
 
   const handlePaneClick = useCallback(() => {
-    dispatch(contextMenusClosed());
+    dispatch(bumpGlobalMenuCloseTrigger());
   }, [dispatch]);
 
   const onInit: OnInit = useCallback((flow) => {

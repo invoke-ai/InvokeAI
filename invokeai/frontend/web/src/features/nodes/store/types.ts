@@ -29,7 +29,6 @@ export type NodesState = {
   shouldColorEdges: boolean;
   selectedNodes: string[];
   selectedEdges: string[];
-  workflow: Omit<WorkflowV2, 'nodes' | 'edges'>;
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
   isReady: boolean;
@@ -40,4 +39,8 @@ export type NodesState = {
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
+};
+
+export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
+  isTouched: boolean;
 };

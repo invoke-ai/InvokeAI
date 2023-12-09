@@ -1,11 +1,10 @@
 import type { TypedAddListener, TypedStartListening } from '@reduxjs/toolkit';
 import {
-  AnyAction,
+  UnknownAction,
   ListenerEffect,
   addListener,
   createListenerMiddleware,
 } from '@reduxjs/toolkit';
-
 import type { AppDispatch, RootState } from 'app/store/store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
@@ -87,7 +86,7 @@ export const addAppListener = addListener as TypedAddListener<
 >;
 
 export type AppListenerEffect = ListenerEffect<
-  AnyAction,
+  UnknownAction,
   RootState,
   AppDispatch
 >;

@@ -1,11 +1,11 @@
 import { Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAICollapse from 'common/components/IAICollapse';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
 import ParamDynamicPromptsSeedBehaviour from './ParamDynamicPromptsSeedBehaviour';
@@ -14,7 +14,7 @@ const ParamDynamicPromptsCollapse = () => {
   const { t } = useTranslation();
   const selectActiveLabel = useMemo(
     () =>
-      createSelector(stateSelector, ({ dynamicPrompts }) => {
+      createMemoizedSelector(stateSelector, ({ dynamicPrompts }) => {
         const count = dynamicPrompts.prompts.length;
         if (count > 1) {
           return t('dynamicPrompts.promptsWithCount_other', {

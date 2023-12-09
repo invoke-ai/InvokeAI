@@ -606,7 +606,6 @@
         "nodesLoaded": "Узлы загружены",
         "problemCopyingImage": "Не удается скопировать изображение",
         "nodesLoadedFailed": "Не удалось загрузить Узлы",
-        "nodesCleared": "Узлы очищены",
         "nodesBrokenConnections": "Не удается загрузить. Некоторые соединения повреждены.",
         "nodesUnrecognizedTypes": "Не удается загрузить. Граф имеет нераспознанные типы",
         "nodesNotValidJSON": "Недопустимый JSON",

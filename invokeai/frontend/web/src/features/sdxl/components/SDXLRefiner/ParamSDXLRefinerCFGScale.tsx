@@ -1,7 +1,6 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
@@ -9,7 +8,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector],
   ({ sdxl, ui, hotkeys }) => {
     const { refinerCFGScale } = sdxl;
@@ -21,8 +20,7 @@ const selector = createSelector(
       shouldUseSliders,
       shift,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ParamSDXLRefinerCFGScale = () => {

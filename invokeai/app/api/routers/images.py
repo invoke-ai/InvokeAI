@@ -8,10 +8,11 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, ValidationError
 
-from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator, WorkflowFieldValidator
+from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID, WorkflowWithoutIDValidator
 
 from ..dependencies import ApiDependencies
 
@@ -73,7 +74,7 @@ async def upload_image(
     workflow_raw = pil_image.info.get("invokeai_workflow", None)
     if workflow_raw is not None:
         try:
-            workflow = WorkflowFieldValidator.validate_json(workflow_raw)
+            workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw)
         except ValidationError:
             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
             pass
@@ -180,6 +181,18 @@ async def get_image_metadata(
 
     try:
         return ApiDependencies.invoker.services.images.get_metadata(image_name)
+    except Exception:
+        raise HTTPException(status_code=404)
+
+
+@images_router.get(
+    "/i/{image_name}/workflow", operation_id="get_image_workflow", response_model=Optional[WorkflowWithoutID]
+)
+async def get_image_workflow(
+    image_name: str = Path(description="The name of image whose workflow to get"),
+) -> Optional[WorkflowWithoutID]:
+    try:
+        return ApiDependencies.invoker.services.images.get_workflow(image_name)
     except Exception:
         raise HTTPException(status_code=404)
 

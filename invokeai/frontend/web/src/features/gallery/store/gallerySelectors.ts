@@ -1,6 +1,5 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { ListImagesArgs } from 'services/api/types';
 import {
   ASSETS_CATEGORIES,
@@ -10,13 +9,12 @@ import {
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
-export const selectLastSelectedImage = createSelector(
+export const selectLastSelectedImage = createMemoizedSelector(
   (state: RootState) => state,
-  (state) => state.gallery.selection[state.gallery.selection.length - 1],
-  defaultSelectorOptions
+  (state) => state.gallery.selection[state.gallery.selection.length - 1]
 );
 
-export const selectListImagesBaseQueryArgs = createSelector(
+export const selectListImagesBaseQueryArgs = createMemoizedSelector(
   [(state: RootState) => state],
   (state) => {
     const { selectedBoardId, galleryView } = state.gallery;
@@ -32,6 +30,5 @@ export const selectListImagesBaseQueryArgs = createSelector(
     };
 
     return listImagesBaseQueryArgs;
-  },
-  defaultSelectorOptions
+  }
 );
