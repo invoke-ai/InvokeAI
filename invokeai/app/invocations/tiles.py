@@ -66,7 +66,7 @@ class CalculateImageTilesInvocation(BaseInvocation):
 
 
 @invocation(
-    "calculate_image_tiles_Even_Split",
+    "calculate_image_tiles_even_split",
     title="Calculate Image Tiles Even Split",
     tags=["tiles"],
     category="tiles",
@@ -93,7 +93,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
         default=0.25,
         ge=0,
         lt=1,
-        description="Overlap amount of tile size (0-1)",
+        description="Overlap between adjacent tiles as a fraction of the tile's dimensions (0-1)",
     )
 
     def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
@@ -126,7 +126,8 @@ class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
     min_overlap: int = InputField(
         default=128,
         ge=0,
-        description="minimum tile overlap size (must be a multiple of 8)",
+        multiple_of=8,
+        description="Minimum overlap between adjacent tiles, in pixels(must be a multiple of 8).",
     )
     round_to_8: bool = InputField(
         default=False,
@@ -260,10 +261,12 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             merge_tiles_with_linear_blending(
                 dst_image=np_image, tiles=tiles, tile_images=tile_np_images, blend_amount=self.blend_amount
             )
-        else:
+        elif self.blend_mode == "Seam":
             merge_tiles_with_seam_blending(
                 dst_image=np_image, tiles=tiles, tile_images=tile_np_images, blend_amount=self.blend_amount
             )
+        else:
+            raise ValueError(f"Unsupported blend mode: '{self.blend_mode}'.")
 
         # Convert into a PIL image and save
         pil_image = Image.fromarray(np_image)

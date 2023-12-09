@@ -33,10 +33,10 @@ def paste(dst_image: np.ndarray, src_image: np.ndarray, box: TBLR, mask: Optiona
     """Paste a source image into a destination image.
 
     Args:
-        dst_image (torch.Tensor): The destination image to paste into. Shape: (H, W, C).
-        src_image (torch.Tensor): The source image to paste. Shape: (H, W, C). H and W must be compatible with 'box'.
+        dst_image (np.array): The destination image to paste into. Shape: (H, W, C).
+        src_image (np.array): The source image to paste. Shape: (H, W, C). H and W must be compatible with 'box'.
         box (TBLR): Box defining the region in the 'dst_image' where 'src_image' will be pasted.
-        mask (Optional[torch.Tensor]): A mask that defines the blending between 'src_image' and 'dst_image'.
+        mask (Optional[np.array]): A mask that defines the blending between 'src_image' and 'dst_image'.
             Range: [0.0, 1.0], Shape: (H, W). The output is calculate per-pixel according to
             `src * mask + dst * (1 - mask)`.
     """
@@ -55,8 +55,8 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
     It is assumed that input images will be RGB np arrays and are the same size.
 
     Args:
-        ia1 (torch.Tensor): Image array 1 Shape: (H, W, C).
-        ia2 (torch.Tensor): Image array 2 Shape: (H, W, C).
+        ia1 (np.array): Image array 1 Shape: (H, W, C).
+        ia2 (np.array): Image array 2 Shape: (H, W, C).
         x_seam (bool): If the images should be blended on the x axis or not.
         blend_amount (int): The size of the blur to use on the seam. Half of this value will be used to avoid the edges of the image.
     """
@@ -74,7 +74,7 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
         return result
 
     # Assume RGB and convert to grey
-    iag1 = np.dot(ia1, [0.2989, 0.5870, 0.1140])
+    iag1 = np.dot(ia1, [0.2989, 0.5870, 0.1140])  # BT.601 perceived brightness
     iag2 = np.dot(ia2, [0.2989, 0.5870, 0.1140])
 
     # Calc Difference between the images

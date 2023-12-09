@@ -2,11 +2,12 @@ import math
 from typing import Union
 
 import numpy as np
+from invokeai.app.invocations.latent import LATENT_SCALE_FACTOR
 
 from invokeai.backend.tiles.utils import TBLR, Tile, paste, seam_blend
 
 
-def calc_overlap(tiles: list[Tile], num_tiles_x, num_tiles_y) -> list[Tile]:
+def calc_overlap(tiles: list[Tile], num_tiles_x: int, num_tiles_y: int) -> list[Tile]:
     """Calculate and update the overlap of a list of tiles.
 
     Args:
@@ -110,23 +111,27 @@ def calc_tiles_even_split(
         image_width (int): The image width in px.
         num_x_tiles (int): The number of tile to split the image into on the X-axis.
         num_y_tiles (int): The number of tile to split the image into on the Y-axis.
-        overlap (int, optional): The target overlap amount of the tiles size. Defaults to 0.
+        overlap (float, optional): The target overlap amount of the tiles size. Defaults to 0.
 
     Returns:
         list[Tile]: A list of tiles that cover the image shape. Ordered from left-to-right, top-to-bottom.
     """
 
     # Ensure tile size is divisible by 8
-    if image_width % 8 != 0 or image_height % 8 != 0:
+    if image_width % LATENT_SCALE_FACTOR != 0 or image_height % LATENT_SCALE_FACTOR != 0:
         raise ValueError(f"image size (({image_width}, {image_height})) must be divisible by 8")
 
     # Calculate the overlap size based on the percentage and adjust it to be divisible by 8 (rounding up)
-    overlap_x = 8 * math.ceil(int((image_width / num_tiles_x) * overlap) / 8)
-    overlap_y = 8 * math.ceil(int((image_height / num_tiles_y) * overlap) / 8)
+    overlap_x = LATENT_SCALE_FACTOR * math.ceil(int((image_width / num_tiles_x) * overlap) / LATENT_SCALE_FACTOR)
+    overlap_y = LATENT_SCALE_FACTOR * math.ceil(int((image_height / num_tiles_y) * overlap) / LATENT_SCALE_FACTOR)
 
     # Calculate the tile size based on the number of tiles and overlap, and ensure it's divisible by 8 (rounding down)
-    tile_size_x = 8 * math.floor(((image_width + overlap_x * (num_tiles_x - 1)) // num_tiles_x) / 8)
-    tile_size_y = 8 * math.floor(((image_height + overlap_y * (num_tiles_y - 1)) // num_tiles_y) / 8)
+    tile_size_x = LATENT_SCALE_FACTOR * math.floor(
+        ((image_width + overlap_x * (num_tiles_x - 1)) // num_tiles_x) / LATENT_SCALE_FACTOR
+    )
+    tile_size_y = LATENT_SCALE_FACTOR * math.floor(
+        ((image_height + overlap_y * (num_tiles_y - 1)) // num_tiles_y) / LATENT_SCALE_FACTOR
+    )
 
     # tiles[y * num_tiles_x + x] is the tile for the y'th row, x'th column.
     tiles: list[Tile] = []
@@ -196,13 +201,13 @@ def calc_tiles_min_overlap(
     for tile_idx_y in range(num_tiles_y):
         top = (tile_idx_y * (image_height - tile_height)) // (num_tiles_y - 1) if num_tiles_y > 1 else 0
         if round_to_8:
-            top = 8 * (top // 8)
+            top = LATENT_SCALE_FACTOR * (top // LATENT_SCALE_FACTOR)
         bottom = top + tile_height
 
         for tile_idx_x in range(num_tiles_x):
             left = (tile_idx_x * (image_width - tile_width)) // (num_tiles_x - 1) if num_tiles_x > 1 else 0
             if round_to_8:
-                left = 8 * (left // 8)
+                left = LATENT_SCALE_FACTOR * (left // LATENT_SCALE_FACTOR)
             right = left + tile_width
 
             tile = Tile(
