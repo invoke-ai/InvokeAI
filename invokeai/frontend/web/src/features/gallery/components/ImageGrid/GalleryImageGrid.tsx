@@ -67,6 +67,12 @@ const GalleryImageGrid = () => {
 
   const [listImages] = useLazyListImagesQuery();
 
+  const [visibleRange, setVisibleRange] = useState({
+    startIndex: 0,
+    endIndex: 0,
+  });
+  console.log(visibleRange);
+
   const areMoreAvailable = useMemo(() => {
     if (!currentData || !currentViewTotal) {
       return false;
@@ -110,12 +116,14 @@ const GalleryImageGrid = () => {
   useEffect(() => {
     if (lastSingleSelectionImage && currentData) {
       const index = currentData.ids.indexOf(lastSingleSelectionImage);
-      virtuosoRef.current?.scrollToIndex({
-        index: index,
-        align: 'end',
-      });
+      if (index >= visibleRange.startIndex && index <= visibleRange.endIndex) {
+        virtuosoRef.current?.scrollToIndex({
+          index: index,
+          align: 'center',
+        });
+      }
     }
-  });
+  }, [visibleRange, lastSingleSelectionImage, currentData]);
 
   if (!currentData) {
     return (
@@ -165,6 +173,7 @@ const GalleryImageGrid = () => {
             scrollerRef={setScroller}
             itemContent={itemContentFunc}
             ref={virtuosoRef}
+            rangeChanged={setVisibleRange}
           />
         </Box>
         <IAIButton
