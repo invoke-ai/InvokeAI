@@ -84,9 +84,7 @@ if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build"
     pip install --user build
 fi
 
-if [ -d ../build ]; then
-    rm -Rf ../build
-fi
+rm -rf ../build
 
 python -m build --wheel --outdir dist/ ../.
 
