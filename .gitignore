@@ -16,7 +16,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-# dist/
+dist/
 downloads/
 eggs/
 .eggs/
@@ -187,3 +187,4 @@ installer/install.bat
 installer/install.sh
 installer/update.bat
 installer/update.sh
+installer/InvokeAI-Installer/
