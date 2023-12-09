@@ -1,11 +1,13 @@
 import { Flex, FormControl, FormLabel, Spacer } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { flipBoundingBoxAxes } from 'features/canvas/store/canvasSlice';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
+import ParamAspectRatio, {
+  mappedAspectRatios,
+} from 'features/parameters/components/Parameters/Core/ParamAspectRatio';
 import {
   setAspectRatio,
   setShouldLockAspectRatio,
@@ -14,15 +16,12 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaLock } from 'react-icons/fa';
 import { MdOutlineSwapVert } from 'react-icons/md';
-import ParamAspectRatio, {
-  mappedAspectRatios,
-} from 'features/parameters/components/Parameters/Core/ParamAspectRatio';
 import ParamBoundingBoxHeight from './ParamBoundingBoxHeight';
 import ParamBoundingBoxWidth from './ParamBoundingBoxWidth';
 
-const sizeOptsSelector = createSelector(
-  [generationSelector, canvasSelector],
-  (generation, canvas) => {
+const sizeOptsSelector = createMemoizedSelector(
+  [stateSelector],
+  ({ generation, canvas }) => {
     const { shouldFitToWidthHeight, shouldLockAspectRatio } = generation;
     const { boundingBoxDimensions } = canvas;
 

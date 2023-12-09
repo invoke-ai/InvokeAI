@@ -1,8 +1,7 @@
 import { useToken } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import {
   connectionEnded,
@@ -67,17 +66,13 @@ const nodeTypes = {
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
 const proOptions: ProOptions = { hideAttribution: true };
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const { shouldSnapToGrid, selectionMode } = nodes;
-    return {
-      shouldSnapToGrid,
-      selectionMode,
-    };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+  const { shouldSnapToGrid, selectionMode } = nodes;
+  return {
+    shouldSnapToGrid,
+    selectionMode,
+  };
+});
 
 export const Flow = () => {
   const dispatch = useAppDispatch();

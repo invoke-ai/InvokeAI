@@ -1,8 +1,7 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import {
   controlAdapterRecalled,
@@ -18,6 +17,7 @@ import {
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
+import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
 import {
   ControlNetMetadataItem,
   CoreMetadata,
@@ -25,33 +25,6 @@ import {
   LoRAMetadataItem,
   T2IAdapterMetadataItem,
 } from 'features/nodes/types/metadata';
-import {
-  refinerModelChanged,
-  setNegativeStylePromptSDXL,
-  setPositiveStylePromptSDXL,
-  setRefinerCFGScale,
-  setRefinerNegativeAestheticScore,
-  setRefinerPositiveAestheticScore,
-  setRefinerScheduler,
-  setRefinerStart,
-  setRefinerSteps,
-} from 'features/sdxl/store/sdxlSlice';
-import { isNil } from 'lodash-es';
-import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ImageDTO } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
-import {
-  controlNetModelsAdapter,
-  ipAdapterModelsAdapter,
-  loraModelsAdapter,
-  t2iAdapterModelsAdapter,
-  useGetControlNetModelsQuery,
-  useGetIPAdapterModelsQuery,
-  useGetLoRAModelsQuery,
-  useGetT2IAdapterModelsQuery,
-} from 'services/api/endpoints/models';
-import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
 import {
   initialImageSelected,
   modelSelected,
@@ -73,17 +46,18 @@ import {
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
 import {
-  isParameterHRFEnabled,
+  isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
   isParameterControlNetModel,
-  isParameterHeight,
+  isParameterHRFEnabled,
   isParameterHRFMethod,
+  isParameterHeight,
   isParameterIPAdapterModel,
   isParameterLoRAModel,
   isParameterModel,
   isParameterNegativePrompt,
-  isParameterPositivePrompt,
   isParameterNegativeStylePromptSDXL,
+  isParameterPositivePrompt,
   isParameterPositiveStylePromptSDXL,
   isParameterSDXLRefinerModel,
   isParameterSDXLRefinerNegativeAestheticScore,
@@ -95,13 +69,37 @@ import {
   isParameterStrength,
   isParameterVAEModel,
   isParameterWidth,
-  isParameterCFGRescaleMultiplier,
 } from 'features/parameters/types/parameterSchemas';
+import {
+  refinerModelChanged,
+  setNegativeStylePromptSDXL,
+  setPositiveStylePromptSDXL,
+  setRefinerCFGScale,
+  setRefinerNegativeAestheticScore,
+  setRefinerPositiveAestheticScore,
+  setRefinerScheduler,
+  setRefinerStart,
+  setRefinerSteps,
+} from 'features/sdxl/store/sdxlSlice';
+import { isNil } from 'lodash-es';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  controlNetModelsAdapter,
+  ipAdapterModelsAdapter,
+  loraModelsAdapter,
+  t2iAdapterModelsAdapter,
+  useGetControlNetModelsQuery,
+  useGetIPAdapterModelsQuery,
+  useGetLoRAModelsQuery,
+  useGetT2IAdapterModelsQuery,
+} from 'services/api/endpoints/models';
+import { ImageDTO } from 'services/api/types';
+import { v4 as uuidv4 } from 'uuid';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   stateSelector,
-  ({ generation }) => generation.model,
-  defaultSelectorOptions
+  ({ generation }) => generation.model
 );
 
 export const useRecallParameters = () => {

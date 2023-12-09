@@ -1,29 +1,24 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setIsMovingStage,
   setStageCoordinates,
 } from 'features/canvas/store/canvasSlice';
 import { KonvaEventObject } from 'konva/lib/Node';
-import { isEqual } from 'lodash-es';
-
 import { useCallback } from 'react';
 
-const selector = createSelector(
-  [canvasSelector, isStagingSelector],
-  (canvas, isStaging) => {
+const selector = createMemoizedSelector(
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     const { tool, isMovingBoundingBox } = canvas;
     return {
       tool,
       isStaging,
       isMovingBoundingBox,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasDrag = () => {

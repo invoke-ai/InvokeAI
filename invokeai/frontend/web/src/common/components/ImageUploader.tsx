@@ -1,9 +1,8 @@
 import { Box } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -20,7 +19,7 @@ import { useUploadImageMutation } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import ImageUploadOverlay from './ImageUploadOverlay';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
   ({ gallery }, activeTabName) => {
     let postUploadAction: PostUploadAction = { type: 'TOAST' };
@@ -39,8 +38,7 @@ const selector = createSelector(
       autoAddBoardId,
       postUploadAction,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 type ImageUploaderProps = {

@@ -10,6 +10,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 class TestModel(BaseModel):
     id: str = Field(description="ID")
     name: str = Field(description="Name")
+    __test__ = False  # not a pytest test case
 
 
 @pytest.fixture

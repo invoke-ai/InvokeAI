@@ -1,25 +1,20 @@
 import { Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import ParamHrfMethod from './ParamHrfMethod';
 import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
-import ParamHrfMethod from './ParamHrfMethod';
 
-const selector = createSelector(
-  stateSelector,
-  (state: RootState) => {
-    const { hrfEnabled } = state.generation;
+const selector = createMemoizedSelector(stateSelector, (state: RootState) => {
+  const { hrfEnabled } = state.generation;
 
-    return { hrfEnabled };
-  },
-  defaultSelectorOptions
-);
+  return { hrfEnabled };
+});
 
 export default function ParamHrfCollapse() {
   const { t } = useTranslation();

@@ -1,12 +1,12 @@
 import type { Modifier } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 
-const selectZoom = createSelector(
+const selectZoom = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
   ({ nodes }, activeTabName) =>
     activeTabName === 'nodes' ? nodes.viewport.zoom : 1

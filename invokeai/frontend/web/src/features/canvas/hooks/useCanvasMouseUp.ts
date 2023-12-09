@@ -1,25 +1,21 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   // addPointToCurrentEraserLine,
   addPointToCurrentLine,
   setIsDrawing,
   setIsMovingStage,
 } from 'features/canvas/store/canvasSlice';
+import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
-import { isEqual } from 'lodash-es';
-
 import { MutableRefObject, useCallback } from 'react';
-import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 
-const selector = createSelector(
-  [activeTabNameSelector, canvasSelector, isStagingSelector],
-  (activeTabName, canvas, isStaging) => {
+const selector = createMemoizedSelector(
+  [activeTabNameSelector, stateSelector, isStagingSelector],
+  (activeTabName, { canvas }, isStaging) => {
     const { tool, isDrawing } = canvas;
     return {
       tool,
@@ -27,8 +23,7 @@ const selector = createSelector(
       activeTabName,
       isStaging,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasMouseUp = (
