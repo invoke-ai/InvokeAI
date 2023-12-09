@@ -1,14 +1,13 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { setRefinerNegativeAestheticScore } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
-import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 import { useTranslation } from 'react-i18next';
+import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector],
   ({ sdxl, hotkeys }) => {
     const { refinerNegativeAestheticScore } = sdxl;
@@ -18,8 +17,7 @@ const selector = createSelector(
       refinerNegativeAestheticScore,
       shift,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ParamSDXLRefinerNegativeAestheticScore = () => {

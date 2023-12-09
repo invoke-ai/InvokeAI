@@ -1,10 +1,8 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState, stateSelector } from 'app/store/store';
-import { CanvasImage, CanvasState, isCanvasBaseImage } from './canvasTypes';
+import { CanvasImage, isCanvasBaseImage } from './canvasTypes';
 
-export const canvasSelector = (state: RootState): CanvasState => state.canvas;
-
-export const isStagingSelector = createSelector(
+export const isStagingSelector = createMemoizedSelector(
   [stateSelector],
   ({ canvas }) =>
     canvas.batchIds.length > 0 ||

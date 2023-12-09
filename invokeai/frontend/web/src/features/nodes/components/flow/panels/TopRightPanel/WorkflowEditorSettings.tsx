@@ -11,10 +11,9 @@ import {
   ModalOverlay,
   useDisclosure,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopCenterPanel/ReloadSchemaButton';
 import {
@@ -32,26 +31,22 @@ const formLabelProps: FormLabelProps = {
   fontWeight: 600,
 };
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const {
-      shouldAnimateEdges,
-      shouldValidateGraph,
-      shouldSnapToGrid,
-      shouldColorEdges,
-      selectionMode,
-    } = nodes;
-    return {
-      shouldAnimateEdges,
-      shouldValidateGraph,
-      shouldSnapToGrid,
-      shouldColorEdges,
-      selectionModeIsChecked: selectionMode === SelectionMode.Full,
-    };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+  const {
+    shouldAnimateEdges,
+    shouldValidateGraph,
+    shouldSnapToGrid,
+    shouldColorEdges,
+    selectionMode,
+  } = nodes;
+  return {
+    shouldAnimateEdges,
+    shouldValidateGraph,
+    shouldSnapToGrid,
+    shouldColorEdges,
+    selectionModeIsChecked: selectionMode === SelectionMode.Full,
+  };
+});
 
 type Props = {
   children: (props: { onOpen: () => void }) => ReactNode;

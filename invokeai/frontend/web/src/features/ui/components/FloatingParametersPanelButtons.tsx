@@ -5,7 +5,6 @@ import ClearQueueButton from 'features/queue/components/ClearQueueButton';
 import QueueBackButton from 'features/queue/components/QueueBackButton';
 import { RefObject, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { FaSlidersH } from 'react-icons/fa';
 import { ImperativePanelHandle } from 'react-resizable-panels';
 

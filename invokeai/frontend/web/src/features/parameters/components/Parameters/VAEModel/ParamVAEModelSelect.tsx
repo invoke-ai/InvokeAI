@@ -1,30 +1,22 @@
-import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-
 import { SelectItem } from '@mantine/core';
-import { forEach } from 'lodash-es';
-import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
-
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { vaeSelected } from 'features/parameters/store/generationSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToVAEModelParam } from 'features/parameters/util/modelIdToVAEModelParam';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
+import { forEach } from 'lodash-es';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createSelector(
-  stateSelector,
-  ({ generation }) => {
-    const { model, vae } = generation;
-    return { model, vae };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
+  const { model, vae } = generation;
+  return { model, vae };
+});
 
 const ParamVAEModelSelect = () => {
   const dispatch = useAppDispatch();

@@ -9,7 +9,6 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
-
 import { ChevronUpIcon } from '@chakra-ui/icons';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';

@@ -5,7 +5,7 @@ import { O } from 'ts-toolbelt';
 
 type s = components['schemas'];
 
-export type ImageCache = EntityState<ImageDTO>;
+export type ImageCache = EntityState<ImageDTO, string>;
 
 export type ListImagesArgs = NonNullable<
   paths['/api/v1/images/']['get']['parameters']['query']

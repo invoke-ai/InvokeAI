@@ -1,4 +1,4 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
@@ -9,20 +9,14 @@ import {
   shiftKeyPressed,
 } from 'features/ui/store/hotkeysSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import { isEqual } from 'lodash-es';
 import React, { memo } from 'react';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
-const globalHotkeysSelector = createSelector(
+const globalHotkeysSelector = createMemoizedSelector(
   [stateSelector],
   ({ hotkeys }) => {
     const { shift, ctrl, meta } = hotkeys;
     return { shift, ctrl, meta };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

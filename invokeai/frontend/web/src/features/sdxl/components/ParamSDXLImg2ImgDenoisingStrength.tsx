@@ -1,25 +1,20 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import SubParametersWrapper from 'features/parameters/components/Parameters/SubParametersWrapper';
+import { setSDXLImg2ImgDenoisingStrength } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { setSDXLImg2ImgDenoisingStrength } from 'features/sdxl/store/sdxlSlice';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ sdxl }) => {
-    const { sdxlImg2ImgDenoisingStrength } = sdxl;
+const selector = createMemoizedSelector([stateSelector], ({ sdxl }) => {
+  const { sdxlImg2ImgDenoisingStrength } = sdxl;
 
-    return {
-      sdxlImg2ImgDenoisingStrength,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    sdxlImg2ImgDenoisingStrength,
+  };
+});
 
 const ParamSDXLImg2ImgDenoisingStrength = () => {
   const { sdxlImg2ImgDenoisingStrength } = useAppSelector(selector);

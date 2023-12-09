@@ -1,5 +1,4 @@
 // https://stackoverflow.com/a/73731908
-
 import { useEffect, useState } from 'react';
 
 export function useSingleAndDoubleClick(

@@ -125,8 +125,8 @@ and go to http://localhost:9090.
 
 You must have Python 3.10 through 3.11 installed on your machine. Earlier or
 later versions are not supported.
-Node.js also needs to be installed along with yarn (can be installed with
-the command `npm install -g yarn` if needed)
+Node.js also needs to be installed along with `pnpm` (can be installed with
+the command `npm install -g pnpm` if needed)
 
 1. Open a command-line window on your machine. The PowerShell is recommended for Windows.
 2. Create a directory to install InvokeAI into. You'll need at least 15 GB of free space:

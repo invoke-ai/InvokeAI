@@ -1,4 +1,7 @@
 import { MenuList } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import {
   IAIContextMenu,
   IAIContextMenuProps,
@@ -6,27 +9,19 @@ import {
 import { MouseEvent, memo, useCallback } from 'react';
 import { ImageDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
-import SingleSelectionMenuItems from './SingleSelectionMenuItems';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useAppSelector } from 'app/store/storeHooks';
 import MultipleSelectionMenuItems from './MultipleSelectionMenuItems';
+import SingleSelectionMenuItems from './SingleSelectionMenuItems';
 
 type Props = {
   imageDTO: ImageDTO | undefined;
   children: IAIContextMenuProps<HTMLDivElement>['children'];
 };
 
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const selectionCount = gallery.selection.length;
+const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
+  const selectionCount = gallery.selection.length;
 
-    return { selectionCount };
-  },
-  defaultSelectorOptions
-);
+  return { selectionCount };
+});
 
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
   const { selectionCount } = useAppSelector(selector);

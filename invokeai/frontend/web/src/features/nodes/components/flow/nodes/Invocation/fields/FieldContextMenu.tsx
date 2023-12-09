@@ -1,8 +1,7 @@
 import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   IAIContextMenu,
   IAIContextMenuProps,
@@ -15,9 +14,9 @@ import {
   workflowExposedFieldRemoved,
 } from 'features/nodes/store/workflowSlice';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaMinus, FaPlus } from 'react-icons/fa';
 import { menuListMotionProps } from 'theme/components/menu';
-import { useTranslation } from 'react-i18next';
 
 type Props = {
   nodeId: string;
@@ -39,19 +38,15 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
 
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ workflow }) => {
-          const isExposed = Boolean(
-            workflow.exposedFields.find(
-              (f) => f.nodeId === nodeId && f.fieldName === fieldName
-            )
-          );
+      createMemoizedSelector(stateSelector, ({ workflow }) => {
+        const isExposed = Boolean(
+          workflow.exposedFields.find(
+            (f) => f.nodeId === nodeId && f.fieldName === fieldName
+          )
+        );
 
-          return { isExposed };
-        },
-        defaultSelectorOptions
-      ),
+        return { isExposed };
+      }),
     [fieldName, nodeId]
   );
 

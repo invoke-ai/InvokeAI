@@ -1,8 +1,6 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCallback } from 'react';
-import { Node, useReactFlow } from 'reactflow';
 import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,
@@ -11,8 +9,10 @@ import { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
+import { useCallback } from 'react';
+import { Node, useReactFlow } from 'reactflow';
 
-const templatesSelector = createSelector(
+const templatesSelector = createMemoizedSelector(
   [(state: RootState) => state.nodes],
   (nodes) => nodes.nodeTemplates
 );
