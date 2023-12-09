@@ -119,6 +119,7 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
 class TestEvent:
     event_name: str
     payload: Any
+    __test__ = False  # not a pytest test case
 
     def __init__(self, event_name: str, payload: Any):
         self.event_name = event_name
@@ -127,6 +128,7 @@ class TestEvent:
 
 class TestEventService(EventServiceBase):
     events: list
+    __test__ = False  # not a pytest test case
 
     def __init__(self):
         super().__init__()
