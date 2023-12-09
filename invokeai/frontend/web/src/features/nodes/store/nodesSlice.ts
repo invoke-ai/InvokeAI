@@ -20,6 +20,22 @@ import {
   StringFieldValue,
   T2IAdapterModelFieldValue,
   VAEModelFieldValue,
+  zBoardFieldValue,
+  zBooleanFieldValue,
+  zColorFieldValue,
+  zControlNetModelFieldValue,
+  zEnumFieldValue,
+  zFloatFieldValue,
+  zImageFieldValue,
+  zIntegerFieldValue,
+  zIPAdapterModelFieldValue,
+  zLoRAModelFieldValue,
+  zMainModelFieldValue,
+  zSchedulerFieldValue,
+  zSDXLRefinerModelFieldValue,
+  zStringFieldValue,
+  zT2IAdapterModelFieldValue,
+  zVAEModelFieldValue,
 } from 'features/nodes/types/field';
 import {
   AnyNode,
@@ -58,6 +74,7 @@ import {
   appSocketQueueItemStatusChanged,
 } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 import { NodesState } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
@@ -106,7 +123,8 @@ type FieldValueAction<T extends FieldValue> = PayloadAction<{
 
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
-  action: FieldValueAction<T>
+  action: FieldValueAction<T>,
+  schema: z.ZodTypeAny
 ) => {
   const { nodeId, fieldName, value } = action.payload;
   const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -115,12 +133,10 @@ const fieldValueReducer = <T extends FieldValue>(
     return;
   }
   const input = node.data?.inputs[fieldName];
-  if (!input) {
+  if (!input || nodeIndex < 0 || !schema.safeParse(value).success) {
     return;
   }
-  if (nodeIndex > -1) {
-    input.value = value;
-  }
+  input.value = value;
 };
 
 const nodesSlice = createSlice({
@@ -527,91 +543,91 @@ const nodesSlice = createSlice({
       state,
       action: FieldValueAction<StringFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zStringFieldValue);
     },
     fieldNumberValueChanged: (
       state,
       action: FieldValueAction<IntegerFieldValue | FloatFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
     },
     fieldBooleanValueChanged: (
       state,
       action: FieldValueAction<BooleanFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zBooleanFieldValue);
     },
     fieldBoardValueChanged: (
       state,
       action: FieldValueAction<BoardFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zBoardFieldValue);
     },
     fieldImageValueChanged: (
       state,
       action: FieldValueAction<ImageFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zImageFieldValue);
     },
     fieldColorValueChanged: (
       state,
       action: FieldValueAction<ColorFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zColorFieldValue);
     },
     fieldMainModelValueChanged: (
       state,
       action: FieldValueAction<MainModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zMainModelFieldValue);
     },
     fieldRefinerModelValueChanged: (
       state,
       action: FieldValueAction<SDXLRefinerModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zSDXLRefinerModelFieldValue);
     },
     fieldVaeModelValueChanged: (
       state,
       action: FieldValueAction<VAEModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zVAEModelFieldValue);
     },
     fieldLoRAModelValueChanged: (
       state,
       action: FieldValueAction<LoRAModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zLoRAModelFieldValue);
     },
     fieldControlNetModelValueChanged: (
       state,
       action: FieldValueAction<ControlNetModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zControlNetModelFieldValue);
     },
     fieldIPAdapterModelValueChanged: (
       state,
       action: FieldValueAction<IPAdapterModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zIPAdapterModelFieldValue);
     },
     fieldT2IAdapterModelValueChanged: (
       state,
       action: FieldValueAction<T2IAdapterModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
     },
     fieldEnumModelValueChanged: (
       state,
       action: FieldValueAction<EnumFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zEnumFieldValue);
     },
     fieldSchedulerValueChanged: (
       state,
       action: FieldValueAction<SchedulerFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zSchedulerFieldValue);
     },
     notesNodeValueChanged: (
       state,
