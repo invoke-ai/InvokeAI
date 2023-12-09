@@ -24,12 +24,12 @@ export const buildWorkflow: BuildWorkflowFunction = ({
   edges,
   workflow,
 }) => {
-  const clonedWorkflow = cloneDeep(workflow);
+  const clonedWorkflow = omit(cloneDeep(workflow), 'isTouched');
   const clonedNodes = cloneDeep(nodes);
   const clonedEdges = cloneDeep(edges);
 
   const newWorkflow: WorkflowV2 = {
-    ...omit(clonedWorkflow, 'isTouched', 'id'),
+    ...clonedWorkflow,
     nodes: [],
     edges: [],
   };

@@ -1,9 +1,9 @@
 import { enqueueRequested } from 'app/store/actions';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
+import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
 import { BatchConfig } from 'services/api/types';
 import { startAppListening } from '..';
-import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
 
 export const addEnqueueRequestedNodes = () => {
   startAppListening({
@@ -19,6 +19,10 @@ export const addEnqueueRequestedNodes = () => {
         edges,
         workflow,
       });
+
+      // embedded workflows don't have an id
+      delete builtWorkflow.id;
+
       const batchConfig: BatchConfig = {
         batch: {
           graph,
