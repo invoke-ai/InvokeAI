@@ -55,7 +55,7 @@ const GalleryImage = (props: HoverableImageProps) => {
       selectionCount !== 1 ||
       !virtuosoContext.rootRef.current ||
       !virtuosoContext.virtuosoRef.current ||
-      !virtuosoContext.rangeRef.current ||
+      !virtuosoContext.virtuosoRangeRef.current ||
       !imageContainerRef.current
     ) {
       return;
@@ -64,7 +64,7 @@ const GalleryImage = (props: HoverableImageProps) => {
     const root = virtuosoContext.rootRef.current;
     const virtuoso = virtuosoContext.virtuosoRef.current;
     const item = imageContainerRef.current;
-    const range = virtuosoContext.rangeRef.current;
+    const range = virtuosoContext.virtuosoRangeRef.current;
     const itemRect = item.getBoundingClientRect();
     const rootRect = root.getBoundingClientRect();
     const itemIsVisible =
@@ -88,7 +88,7 @@ const GalleryImage = (props: HoverableImageProps) => {
     isSelected,
     props.index,
     selectionCount,
-    virtuosoContext.rangeRef,
+    virtuosoContext.virtuosoRangeRef,
     virtuosoContext.rootRef,
     virtuosoContext.virtuosoRef,
   ]);

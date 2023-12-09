@@ -4,6 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
+import { $useNextPrevImageState } from 'features/gallery/hooks/useNextPrevImage';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import {
@@ -62,8 +63,7 @@ const GalleryImageGrid = () => {
   );
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
-  const rangeRef = useRef<ListRange | null>(null);
-  // const lastSingleSelectionImage = useAppSelector(selector);
+  const virtuosoRangeRef = useRef<ListRange | null>(null);
 
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
 
@@ -71,11 +71,6 @@ const GalleryImageGrid = () => {
     useListImagesQuery(queryArgs);
 
   const [listImages] = useLazyListImagesQuery();
-
-  // const [visibleRange, setVisibleRange] = useState({
-  //   startIndex: 0,
-  //   endIndex: 0,
-  // });
 
   const areMoreAvailable = useMemo(() => {
     if (!currentData || !currentViewTotal) {
@@ -100,7 +95,7 @@ const GalleryImageGrid = () => {
     return {
       virtuosoRef,
       rootRef,
-      rangeRef,
+      virtuosoRangeRef,
     };
   }, []);
 
@@ -132,20 +127,13 @@ const GalleryImageGrid = () => {
   }, [scroller, initialize, osInstance]);
 
   const onRangeChanged = useCallback((range: ListRange) => {
-    rangeRef.current = range;
+    virtuosoRangeRef.current = range;
   }, []);
 
-  // useEffect(() => {
-  //   if (lastSingleSelectionImage && currentData) {
-  //     const index = currentData.ids.indexOf(lastSingleSelectionImage);
-  //     if (index >= visibleRange.startIndex && index <= visibleRange.endIndex) {
-  //       virtuosoRef.current?.scrollToIndex({
-  //         index: index,
-  //         align: 'center',
-  //       });
-  //     }
-  //   }
-  // }, [visibleRange, lastSingleSelectionImage, currentData]);
+  useEffect(() => {
+    $useNextPrevImageState.setKey('virtuosoRef', virtuosoRef);
+    $useNextPrevImageState.setKey('virtuosoRangeRef', virtuosoRangeRef);
+  }, []);
 
   if (!currentData) {
     return (
@@ -197,6 +185,7 @@ const GalleryImageGrid = () => {
             ref={virtuosoRef}
             rangeChanged={onRangeChanged}
             context={virtuosoContext}
+            overscan={10}
           />
         </Box>
         <IAIButton
