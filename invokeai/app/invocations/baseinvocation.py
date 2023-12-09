@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
@@ -709,8 +710,10 @@ class _Model(BaseModel):
     pass
 
 
-# Get all pydantic model attrs, methods, etc
-RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", category=DeprecationWarning)
+    # Get all pydantic model attrs, methods, etc
+    RESERVED_PYDANTIC_FIELD_NAMES = {m[0] for m in inspect.getmembers(_Model())}
 
 
 def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None:
