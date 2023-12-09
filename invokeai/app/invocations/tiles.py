@@ -215,7 +215,7 @@ BLEND_MODES = Literal["Linear", "Seam"]
 
 
 @invocation("merge_tiles_to_image", title="Merge Tiles to Image", tags=["tiles"], category="tiles", version="1.1.0")
-class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
     """Merge multiple tile images into a single image."""
 
     # Inputs
