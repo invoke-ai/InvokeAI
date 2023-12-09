@@ -4,6 +4,17 @@ set -e
 
 cd "$(dirname "$0")"
 
+function is_bin_in_path {
+    builtin type -P "$1" &>/dev/null
+}
+
+if ! is_bin_in_path python && is_bin_in_path python3; then
+    echo "Aliasing python3 to python..."
+    function python {
+        python3 "$@"
+    }
+fi
+
 if [[ -v "VIRTUAL_ENV" ]]; then
     # we can't just call 'deactivate' because this function is not exported
     # to the environment of this script from the bash process that runs the script
@@ -11,23 +22,27 @@ if [[ -v "VIRTUAL_ENV" ]]; then
     exit -1
 fi
 
-VERSION=$(cd ..; python -c "from invokeai.version import __version__ as version; print(version)")
+VERSION=$(
+    cd ..
+    python -c "from invokeai.version import __version__ as version; print(version)"
+)
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
 LATEST_TAG="v3-latest"
 
 echo Building installer for version $VERSION
 echo "Be certain that you're in the 'installer' directory before continuing."
+echo "Currently in '$(pwd)'"
 read -p "Press any key to continue, or CTRL-C to exit..."
 
-read -e -p "Tag this repo with '${VERSION}' and '${LATEST_TAG}'? [n]: " input
+read -e -p "Tag this repo with '${VERSION}' and '${LATEST_TAG}'? Immediately pushes! [n]: " input
 RESPONSE=${input:='n'}
 if [ "$RESPONSE" == 'y' ]; then
 
     git push origin :refs/tags/$VERSION
-    if ! git tag -fa $VERSION ; then
-	    echo "Existing/invalid tag"
-	    exit -1
+    if ! git tag -fa $VERSION; then
+        echo "Existing/invalid tag"
+        exit -1
     fi
 
     git push origin :refs/tags/$LATEST_TAG
@@ -36,7 +51,27 @@ if [ "$RESPONSE" == 'y' ]; then
     echo "remember to push --tags!"
 fi
 
-# ----------------------
+# ---------------------- FRONTEND ----------------------
+
+function build_frontend {
+    echo Building frontend
+    pushd ../invokeai/frontend/web
+    pnpm i --frozen-lockfile
+    pnpm build
+    popd
+}
+
+if [ -d ../invokeai/frontend/web/dist ]; then
+    read -e -p "Frontend build exists. Rebuild? [n]: " input
+    RESPONSE=${input:='n'}
+    if [ "$RESPONSE" == 'y' ]; then
+        build_frontend
+    fi
+else
+    build_frontend
+fi
+
+# ---------------------- BACKEND ----------------------
 
 echo Building the wheel
 
@@ -46,12 +81,15 @@ if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build"
     pip install --user build
 fi
 
-rm -r ../build
+if [ -d ../build ]; then
+    rm -Rf ../build
+fi
+
 python -m build --wheel --outdir dist/ ../.
 
 # ----------------------
 
-echo Building installer zip fles for InvokeAI $VERSION
+echo Building installer zip files for InvokeAI $VERSION
 
 # get rid of any old ones
 rm -f *.zip
@@ -72,7 +110,7 @@ cp install.sh.in InvokeAI-Installer/install.sh
 chmod a+x InvokeAI-Installer/install.sh
 
 # Windows
-perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in > InvokeAI-Installer/install.bat
+perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in >InvokeAI-Installer/install.bat
 cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
 # Zip everything up
