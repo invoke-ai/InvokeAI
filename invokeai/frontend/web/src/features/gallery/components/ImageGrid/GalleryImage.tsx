@@ -10,8 +10,17 @@ import {
   ImageDraggableData,
   TypesafeDraggableData,
 } from 'features/dnd/types';
+import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
-import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
+import {
+  MouseEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
@@ -24,19 +33,65 @@ import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
 
 interface HoverableImageProps {
   imageName: string;
+  index: number;
+  virtuosoContext: VirtuosoGalleryContext;
 }
 
 const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { imageName } = props;
+  const { imageName, virtuosoContext } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
   const shift = useAppSelector((state) => state.hotkeys.shift);
   const { t } = useTranslation();
-
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   const customStarUi = useStore($customStarUI);
+
+  useEffect(() => {
+    if (
+      !isSelected ||
+      selectionCount !== 1 ||
+      !virtuosoContext.rootRef.current ||
+      !virtuosoContext.virtuosoRef.current ||
+      !virtuosoContext.rangeRef.current ||
+      !imageContainerRef.current
+    ) {
+      return;
+    }
+
+    const root = virtuosoContext.rootRef.current;
+    const virtuoso = virtuosoContext.virtuosoRef.current;
+    const item = imageContainerRef.current;
+    const range = virtuosoContext.rangeRef.current;
+    const itemRect = item.getBoundingClientRect();
+    const rootRect = root.getBoundingClientRect();
+    const itemIsVisible =
+      itemRect.top >= rootRect.top &&
+      itemRect.bottom <= rootRect.bottom &&
+      itemRect.left >= rootRect.left &&
+      itemRect.right <= rootRect.right;
+
+    if (!itemIsVisible) {
+      virtuoso.scrollToIndex({
+        index: props.index,
+        behavior: 'smooth',
+        align:
+          props.index >
+          (range.endIndex - range.startIndex) / 2 + range.startIndex
+            ? 'end'
+            : 'start',
+      });
+    }
+  }, [
+    isSelected,
+    props.index,
+    selectionCount,
+    virtuosoContext.rangeRef,
+    virtuosoContext.rootRef,
+    virtuosoContext.virtuosoRef,
+  ]);
 
   const handleDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -122,6 +177,7 @@ const GalleryImage = (props: HoverableImageProps) => {
       data-testid={`image-${imageDTO.image_name}`}
     >
       <Flex
+        ref={imageContainerRef}
         userSelect="none"
         sx={{
           position: 'relative',

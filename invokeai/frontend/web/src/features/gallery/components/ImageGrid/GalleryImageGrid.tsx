@@ -1,7 +1,9 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { EntityId } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import {
@@ -11,7 +13,12 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExclamationCircle, FaImage } from 'react-icons/fa';
-import { VirtuosoGrid, VirtuosoGridHandle } from 'react-virtuoso';
+import {
+  ItemContent,
+  ListRange,
+  VirtuosoGrid,
+  VirtuosoGridHandle,
+} from 'react-virtuoso';
 import {
   useLazyListImagesQuery,
   useListImagesQuery,
@@ -20,8 +27,6 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-import { EntityId, createSelector, current } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -36,14 +41,14 @@ const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   },
 };
 
-const selector = createSelector(stateSelector, (state) => {
-  const selection = state.gallery.selection;
+// const selector = createSelector(stateSelector, (state) => {
+//   const selection = state.gallery.selection;
 
-  if (selection.length !== 1) {
-    return undefined;
-  }
-  return selection[0]?.image_name;
-});
+//   if (selection.length !== 1) {
+//     return undefined;
+//   }
+//   return selection[0]?.image_name;
+// });
 
 const GalleryImageGrid = () => {
   const { t } = useTranslation();
@@ -57,8 +62,8 @@ const GalleryImageGrid = () => {
   );
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
-
-  const lastSingleSelectionImage = useAppSelector(selector);
+  const rangeRef = useRef<ListRange | null>(null);
+  // const lastSingleSelectionImage = useAppSelector(selector);
 
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
 
@@ -67,11 +72,10 @@ const GalleryImageGrid = () => {
 
   const [listImages] = useLazyListImagesQuery();
 
-  const [visibleRange, setVisibleRange] = useState({
-    startIndex: 0,
-    endIndex: 0,
-  });
-  console.log(visibleRange);
+  // const [visibleRange, setVisibleRange] = useState({
+  //   startIndex: 0,
+  //   endIndex: 0,
+  // });
 
   const areMoreAvailable = useMemo(() => {
     if (!currentData || !currentViewTotal) {
@@ -92,12 +96,26 @@ const GalleryImageGrid = () => {
     });
   }, [areMoreAvailable, listImages, queryArgs, currentData?.ids.length]);
 
-  const itemContentFunc = useCallback(
-    (index: number, imageName: EntityId) => (
-      <GalleryImage key={imageName} imageName={imageName as string} />
-    ),
-    []
-  );
+  const virtuosoContext = useMemo<VirtuosoGalleryContext>(() => {
+    return {
+      virtuosoRef,
+      rootRef,
+      rangeRef,
+    };
+  }, []);
+
+  const itemContentFunc: ItemContent<EntityId, VirtuosoGalleryContext> =
+    useCallback(
+      (index, imageName, virtuosoContext) => (
+        <GalleryImage
+          key={imageName}
+          index={index}
+          imageName={imageName as string}
+          virtuosoContext={virtuosoContext}
+        />
+      ),
+      []
+    );
 
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
@@ -113,17 +131,21 @@ const GalleryImageGrid = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  useEffect(() => {
-    if (lastSingleSelectionImage && currentData) {
-      const index = currentData.ids.indexOf(lastSingleSelectionImage);
-      if (index >= visibleRange.startIndex && index <= visibleRange.endIndex) {
-        virtuosoRef.current?.scrollToIndex({
-          index: index,
-          align: 'center',
-        });
-      }
-    }
-  }, [visibleRange, lastSingleSelectionImage, currentData]);
+  const onRangeChanged = useCallback((range: ListRange) => {
+    rangeRef.current = range;
+  }, []);
+
+  // useEffect(() => {
+  //   if (lastSingleSelectionImage && currentData) {
+  //     const index = currentData.ids.indexOf(lastSingleSelectionImage);
+  //     if (index >= visibleRange.startIndex && index <= visibleRange.endIndex) {
+  //       virtuosoRef.current?.scrollToIndex({
+  //         index: index,
+  //         align: 'center',
+  //       });
+  //     }
+  //   }
+  // }, [visibleRange, lastSingleSelectionImage, currentData]);
 
   if (!currentData) {
     return (
@@ -173,7 +195,8 @@ const GalleryImageGrid = () => {
             scrollerRef={setScroller}
             itemContent={itemContentFunc}
             ref={virtuosoRef}
-            rangeChanged={setVisibleRange}
+            rangeChanged={onRangeChanged}
+            context={virtuosoContext}
           />
         </Box>
         <IAIButton
