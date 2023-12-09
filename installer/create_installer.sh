@@ -8,6 +8,8 @@ function is_bin_in_path {
     builtin type -P "$1" &>/dev/null
 }
 
+# Some machines only have `python3`, others have `python` - make an alias.
+# We can use a function to approximate an alias within a non-interactive shell.
 if ! is_bin_in_path python && is_bin_in_path python3; then
     echo "Aliasing python3 to python..."
     function python {
@@ -31,14 +33,14 @@ VERSION="v${VERSION}${PATCH}"
 LATEST_TAG="v3-latest"
 
 echo Building installer for version $VERSION
-echo "Be certain that you're in the 'installer' directory before continuing."
-echo "Currently in '$(pwd)'"
+echo "Be certain that you're in the 'installer' directory before continuing. Currently in '$(pwd)'."
 read -p "Press any key to continue, or CTRL-C to exit..."
 
-read -e -p "Tag this repo with '${VERSION}' and '${LATEST_TAG}'? Immediately pushes! [n]: " input
+read -e -p "Tag this repo with '${VERSION}' and '${LATEST_TAG}'? Immediately deletes the existing tags! [n]: " input
 RESPONSE=${input:='n'}
 if [ "$RESPONSE" == 'y' ]; then
 
+    echo "Deleting '$VERSION' and '$LATEST_TAG' tags..."
     git push origin :refs/tags/$VERSION
     if ! git tag -fa $VERSION; then
         echo "Existing/invalid tag"
@@ -48,7 +50,7 @@ if [ "$RESPONSE" == 'y' ]; then
     git push origin :refs/tags/$LATEST_TAG
     git tag -fa $LATEST_TAG
 
-    echo "remember to push --tags!"
+    echo "Remember to push --tags!"
 fi
 
 # ---------------------- FRONTEND ----------------------
@@ -61,6 +63,7 @@ function build_frontend {
     popd
 }
 
+# Build frontend if needed - offer to rebuild if there is already a build
 if [ -d ../invokeai/frontend/web/dist ]; then
     read -e -p "Frontend build exists. Rebuild? [n]: " input
     RESPONSE=${input:='n'}
