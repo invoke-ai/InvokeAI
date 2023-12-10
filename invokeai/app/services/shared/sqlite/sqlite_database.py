@@ -37,6 +37,7 @@ class SqliteDatabase:
 
     def reinitialize(self) -> None:
         """Reinitializes the database. Needed after migration."""
+        self.close()
         self.initialize(self._config, self._logger)
 
     def close(self) -> None:
