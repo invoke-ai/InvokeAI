@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from fastapi import Body
-from pydantic import BaseModel, Field, TypeAdapter, field_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
 
@@ -123,6 +123,7 @@ class URLModelSource(StringLikeSource):
 #       https://github.com/tiangolo/fastapi/discussions/9287
 
 ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Body(discriminator="type")]
+
 
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""

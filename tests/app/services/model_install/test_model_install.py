@@ -18,7 +18,7 @@ from invokeai.app.services.model_install import (
     ModelInstallServiceBase,
 )
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL, UnknownModelException
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import BaseModelType, ModelType
 from invokeai.backend.util.logging import InvokeAILogger
 
