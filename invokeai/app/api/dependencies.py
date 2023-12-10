@@ -73,7 +73,7 @@ class ApiDependencies:
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
         db = SqliteDatabase(config, logger)
-        migrator = SQLiteMigrator(db=db, image_files=image_files)
+        migrator = SQLiteMigrator(database=db.database, lock=db.lock, image_files=image_files, logger=logger)
         migrator.register_migration(migration_1)
         migrator.register_migration(migration_2)
         migrator.run_migrations()

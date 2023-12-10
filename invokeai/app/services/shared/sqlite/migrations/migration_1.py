@@ -1,14 +1,13 @@
 import sqlite3
+from logging import Logger
 
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite.sqlite_migrator import Migration
 
 
-def _migrate(db: SqliteDatabase, image_files: ImageFileStorageBase) -> None:
+def _migrate(cursor: sqlite3.Cursor, image_files: ImageFileStorageBase, logger: Logger) -> None:
     """Migration callback for database version 1."""
 
-    cursor = db.conn.cursor()
     _create_board_images(cursor)
     _create_boards(cursor)
     _create_images(cursor)

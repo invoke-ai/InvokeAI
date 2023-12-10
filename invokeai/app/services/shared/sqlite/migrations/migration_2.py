@@ -4,20 +4,18 @@ from logging import Logger
 from tqdm import tqdm
 
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite.sqlite_migrator import Migration
 
 
-def _migrate(db: SqliteDatabase, image_files: ImageFileStorageBase) -> None:
+def _migrate(cursor: sqlite3.Cursor, image_files: ImageFileStorageBase, logger: Logger) -> None:
     """Migration callback for database version 2."""
 
-    cursor = db.conn.cursor()
     _add_images_has_workflow(cursor)
     _add_session_queue_workflow(cursor)
     _drop_old_workflow_tables(cursor)
     _add_workflow_library(cursor)
     _drop_model_manager_metadata(cursor)
-    _migrate_embedded_workflows(cursor=cursor, image_files=image_files, logger=db._logger)
+    _migrate_embedded_workflows(cursor=cursor, image_files=image_files, logger=logger)
 
 
 def _add_images_has_workflow(cursor: sqlite3.Cursor) -> None:
