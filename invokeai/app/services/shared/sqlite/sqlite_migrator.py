@@ -283,7 +283,7 @@ class SQLiteMigrator:
                 raise MigrationError(msg) from e
 
     def _get_current_version(self, cursor: sqlite3.Cursor) -> int:
-        """Gets the current version of the database, or 0 if the version table does not exist."""
+        """Gets the current version of the database, or 0 if the migrations table does not exist."""
         with self._lock:
             try:
                 cursor.execute("SELECT MAX(version) FROM migrations;")
