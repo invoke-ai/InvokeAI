@@ -168,7 +168,7 @@ class SQLiteMigrator:
         self._migrations.register(migration)
         self._logger.debug(f"Registered migration {migration.from_version} -> {migration.to_version}")
 
-    def run_migrations(self) -> None:
+    def run_migrations(self) -> bool:
         """Migrates the database to the latest version."""
         with self._lock:
             # This throws if there is a problem.
@@ -177,11 +177,11 @@ class SQLiteMigrator:
 
             if self._migrations.count == 0:
                 self._logger.debug("No migrations registered")
-                return
+                return False
 
             if self._get_current_version(self._cursor) == self._migrations.latest_version:
                 self._logger.debug("Database is up to date, no migrations to run")
-                return
+                return False
 
             self._logger.info("Database update needed")
 
@@ -204,10 +204,9 @@ class SQLiteMigrator:
             else:
                 # We are using a memory database. No special backup or special handling needed.
                 self._run_migrations(self._cursor)
-                return
 
             self._logger.info("Database updated successfully")
-            return
+            return True
 
     def _run_migrations(self, temp_db_cursor: sqlite3.Cursor) -> None:
         next_migration = self._migrations.get(from_version=self._get_current_version(temp_db_cursor))
