@@ -117,8 +117,14 @@ class MigrationSet:
 
 
 def get_temp_db_path(original_db_path: Path) -> Path:
-    """Gets the path to the migrated database."""
+    """Gets the path to the temp database."""
     return original_db_path.parent / original_db_path.name.replace(".db", ".db.temp")
+
+
+def get_backup_db_path(original_db_path: Path) -> Path:
+    """Gets the path to the final backup database."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return original_db_path.parent / f"{original_db_path.stem}_backup_{timestamp}.db"
 
 
 class SQLiteMigrator:
@@ -297,11 +303,10 @@ class SQLiteMigrator:
         return temp_db_path
 
     def _finalize_migration(self, temp_db_conn: sqlite3.Connection, temp_db_path: Path, original_db_path: Path) -> None:
-        """Closes connections, renames the original database as a backup and renames the migrated database to the original db path."""
+        """Closes connections, renames the original database as a backup and renames the migrated database to the original name."""
         self._conn.close()
         temp_db_conn.close()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_db_path = original_db_path.parent / f"{original_db_path.stem}_backup_{timestamp}.db"
+        backup_db_path = get_backup_db_path(original_db_path)
         original_db_path.rename(backup_db_path)
         temp_db_path.rename(original_db_path)
         self._logger.info(f"Migration successful. Original DB backed up to {backup_db_path}")
