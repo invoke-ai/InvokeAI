@@ -13,6 +13,10 @@ function is_bin_in_path {
     builtin type -P "$1" &>/dev/null
 }
 
+function does_tag_exist {
+    git rev-parse --quiet --verify "refs/tags/$1" >/dev/null
+}
+
 function git_show_ref {
     git show-ref --dereference $1 --abbrev 7
 }
@@ -54,17 +58,22 @@ LATEST_TAG="v3-latest"
 echo "Building installer for version $VERSION..."
 echo
 
-echo -e "${BCYAN}$VERSION${RESET}"
-git_show_ref tags/$VERSION
-echo
-echo -e "${BCYAN}$LATEST_TAG${RESET}"
-git_show_ref tags/$LATEST_TAG
-echo
-echo -e "${BGREEN}HEAD${RESET}"
+if does_tag_exist $VERSION; then
+    echo -e "${BCYAN}${VERSION}${RESET} already exists:"
+    git_show_ref tags/$VERSION
+    echo
+fi
+if does_tag_exist $LATEST_TAG; then
+    echo -e "${BCYAN}${LATEST_TAG}${RESET} already exists:"
+    git_show_ref tags/$LATEST_TAG
+    echo
+fi
+
+echo -e "${BGREEN}HEAD${RESET}:"
 git_show
 echo
 
-echo -e -n "Tag ${BGREEN}HEAD${RESET} with ${BCYAN}${VERSION}${RESET} and ${BCYAN}${LATEST_TAG}${RESET}, ${RED}deleting existing tags on remote${RESET}? "
+echo -e -n "Create tags ${BCYAN}${VERSION}${RESET} and ${BCYAN}${LATEST_TAG}${RESET} @ ${BGREEN}HEAD${RESET}, ${RED}deleting existing tags on remote${RESET}? "
 read -e -p 'y/n [n]: ' input
 RESPONSE=${input:='n'}
 if [ "$RESPONSE" == 'y' ]; then
