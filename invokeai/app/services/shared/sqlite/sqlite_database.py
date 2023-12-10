@@ -10,18 +10,21 @@ from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
 class SqliteDatabase:
     database: Path | str  # Must declare this here to satisfy type checker
 
-    def __init__(self, config: InvokeAIAppConfig, logger: Logger):
+    def __init__(self, config: InvokeAIAppConfig, logger: Logger) -> None:
+        self.initialize(config, logger)
+
+    def initialize(self, config: InvokeAIAppConfig, logger: Logger) -> None:
         self._logger = logger
         self._config = config
         self.is_memory = False
         if self._config.use_memory_db:
             self.database = sqlite_memory
             self.is_memory = True
-            logger.info("Using in-memory database")
+            logger.info("Initializing in-memory database")
         else:
             self.database = self._config.db_path
             self.database.parent.mkdir(parents=True, exist_ok=True)
-            self._logger.info(f"Using database at {self.database}")
+            self._logger.info(f"Initializing database at {self.database}")
 
         self.conn = sqlite3.connect(database=self.database, check_same_thread=False)
         self.lock = threading.RLock()
@@ -31,6 +34,13 @@ class SqliteDatabase:
             self.conn.set_trace_callback(self._logger.debug)
 
         self.conn.execute("PRAGMA foreign_keys = ON;")
+
+    def reinitialize(self) -> None:
+        """Reinitializes the database. Needed after migration."""
+        self.initialize(self._config, self._logger)
+
+    def close(self) -> None:
+        self.conn.close()
 
     def clean(self) -> None:
         with self.lock:

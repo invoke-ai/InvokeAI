@@ -2,6 +2,7 @@
 
 from functools import partial
 from logging import Logger
+from pathlib import Path
 
 from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
 from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
@@ -75,11 +76,21 @@ class ApiDependencies:
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
         db = SqliteDatabase(config, logger)
-        migrator = SQLiteMigrator(database=db.database, lock=db.lock, logger=logger)
+
+        migrator = SQLiteMigrator(
+            db_path=db.database if isinstance(db.database, Path) else None,
+            conn=db.conn,
+            lock=db.lock,
+            logger=logger,
+            log_sql=config.log_sql,
+        )
         migration_2.register_post_callback(partial(migrate_embedded_workflows, logger=logger, image_files=image_files))
         migrator.register_migration(migration_1)
         migrator.register_migration(migration_2)
         migrator.run_migrations()
+
+        if not db.is_memory:
+            db.reinitialize()
 
         configuration = config
         logger = logger
