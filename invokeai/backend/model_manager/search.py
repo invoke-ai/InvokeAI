@@ -128,11 +128,7 @@ class ModelSearch(ModelSearchBase):
 
     def model_found(self, model: Path) -> None:
         self.stats.models_found += 1
-        if not self.on_model_found:
-            self.stats.models_filtered += 1
-            self.models_found.add(model)
-            return
-        if self.on_model_found(model):
+        if not self.on_model_found or self.on_model_found(model):
             self.stats.models_filtered += 1
             self.models_found.add(model)
 
