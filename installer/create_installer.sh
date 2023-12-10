@@ -3,7 +3,6 @@
 set -e
 
 BCYAN="\e[1;36m"
-BBLUE="\e[1;34m"
 BYELLOW="\e[1;33m"
 BGREEN="\e[1;32m"
 BRED="\e[1;31m"
@@ -29,10 +28,9 @@ echo "The current working directory is $(pwd)"
 read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
 echo
 
-# Some machines only have `python3`, others have `python` - make an alias.
+# Some machines only have `python3` in PATH, others have `python` - make an alias.
 # We can use a function to approximate an alias within a non-interactive shell.
 if ! is_bin_in_path python && is_bin_in_path python3; then
-    echo -e "Aliasing ${BBLUE}python3${RESET} to ${BBLUE}python${RESET}..."
     function python {
         python3 "$@"
     }
