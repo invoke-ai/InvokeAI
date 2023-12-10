@@ -4,10 +4,7 @@ from logging import Logger
 from pathlib import Path
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
-from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
 
 
 class SqliteDatabase:
@@ -32,11 +29,6 @@ class SqliteDatabase:
             self.conn.set_trace_callback(self._logger.debug)
 
         self.conn.execute("PRAGMA foreign_keys = ON;")
-
-        migrator = SQLiteMigrator(conn=self.conn, database=self.database, lock=self.lock, logger=self._logger)
-        migrator.register_migration(migration_1)
-        migrator.register_migration(migration_2)
-        migrator.run_migrations()
 
     def clean(self) -> None:
         with self.lock:

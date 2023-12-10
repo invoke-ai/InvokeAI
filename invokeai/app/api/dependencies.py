@@ -2,6 +2,9 @@
 
 from logging import Logger
 
+from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
+from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -69,6 +72,10 @@ class ApiDependencies:
         output_folder = config.output_path
 
         db = SqliteDatabase(config, logger)
+        migrator = SQLiteMigrator(conn=db.conn, database=db.database, lock=db.lock, logger=logger)
+        migrator.register_migration(migration_1)
+        migrator.register_migration(migration_2)
+        migrator.run_migrations()
 
         configuration = config
         logger = logger
