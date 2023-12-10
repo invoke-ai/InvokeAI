@@ -21,6 +21,7 @@ import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
 import { reactflowStyles } from './custom/reactflow';
+import { headingTheme } from 'theme/components/heading';
 
 export const theme: ThemeOverride = {
   config: {
@@ -146,6 +147,7 @@ export const theme: ThemeOverride = {
     Menu: menuTheme,
     Text: textTheme,
     Tooltip: tooltipTheme,
+    Heading: headingTheme,
   },
 };
 

@@ -16,7 +16,7 @@ export const initialUIState: UIState = {
   shouldShowEmbeddingPicker: false,
   shouldAutoChangeDimensions: false,
   favoriteSchedulers: [],
-  globalContextMenuCloseTrigger: 0,
+  globalMenuCloseTrigger: 0,
   panels: {},
 };
 
@@ -60,8 +60,8 @@ export const uiSlice = createSlice({
     setShouldAutoChangeDimensions: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoChangeDimensions = action.payload;
     },
-    contextMenusClosed: (state) => {
-      state.globalContextMenuCloseTrigger += 1;
+    bumpGlobalMenuCloseTrigger: (state) => {
+      state.globalMenuCloseTrigger += 1;
     },
     panelsChanged: (
       state,
@@ -88,7 +88,7 @@ export const {
   favoriteSchedulersChanged,
   toggleEmbeddingPicker,
   setShouldAutoChangeDimensions,
-  contextMenusClosed,
+  bumpGlobalMenuCloseTrigger,
   panelsChanged,
 } = uiSlice.actions;
 

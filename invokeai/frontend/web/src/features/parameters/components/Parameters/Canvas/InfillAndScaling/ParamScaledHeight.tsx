@@ -1,17 +1,15 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [generationSelector, canvasSelector],
-  (generation, canvas) => {
+const selector = createMemoizedSelector(
+  [stateSelector],
+  ({ generation, canvas }) => {
     const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = canvas;
     const { model, aspectRatio } = generation;
 
@@ -21,8 +19,7 @@ const selector = createSelector(
       isManual: boundingBoxScaleMethod === 'manual',
       aspectRatio,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ParamScaledHeight = () => {

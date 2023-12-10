@@ -5,7 +5,7 @@ from typing import Optional, Union, cast
 
 from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 from .image_records_base import ImageRecordStorageBase
 from .image_records_common import (
@@ -116,6 +116,16 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             END;
             """
         )
+
+        self._cursor.execute("PRAGMA table_info(images)")
+        columns = [column[1] for column in self._cursor.fetchall()]
+        if "has_workflow" not in columns:
+            self._cursor.execute(
+                """--sql
+                ALTER TABLE images
+                ADD COLUMN has_workflow BOOLEAN DEFAULT FALSE;
+                """
+            )
 
     def get(self, image_name: str) -> ImageRecord:
         try:
@@ -408,6 +418,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_category: ImageCategory,
         width: int,
         height: int,
+        has_workflow: bool,
         is_intermediate: Optional[bool] = False,
         starred: Optional[bool] = False,
         session_id: Optional[str] = None,
@@ -429,9 +440,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata,
                     is_intermediate,
-                    starred
+                    starred,
+                    has_workflow
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -444,6 +456,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     metadata_json,
                     is_intermediate,
                     starred,
+                    has_workflow,
                 ),
             )
             self._conn.commit()

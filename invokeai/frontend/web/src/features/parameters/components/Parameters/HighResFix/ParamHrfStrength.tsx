@@ -1,14 +1,13 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector, useAppDispatch } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { memo, useCallback } from 'react';
-import { stateSelector } from 'app/store/store';
-import { setHrfStrength } from 'features/parameters/store/generationSlice';
-import IAISlider from 'common/components/IAISlider';
 import { Tooltip } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAISlider from 'common/components/IAISlider';
+import { setHrfStrength } from 'features/parameters/store/generationSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector],
   ({ generation, hotkeys, config }) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
@@ -25,8 +24,7 @@ const selector = createSelector(
       step,
       hrfEnabled,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ParamHrfStrength = () => {

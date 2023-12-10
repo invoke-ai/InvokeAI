@@ -1,8 +1,7 @@
 import { Flex, Spacer, Text } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
@@ -14,17 +13,13 @@ import { FaRulerVertical, FaUndo, FaUpload } from 'react-icons/fa';
 import { PostUploadAction } from 'services/api/types';
 import InitialImage from './InitialImage';
 
-const selector = createSelector(
-  [stateSelector],
-  (state) => {
-    const { initialImage } = state.generation;
-    return {
-      isResetButtonDisabled: !initialImage,
-      initialImage,
-    };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector([stateSelector], (state) => {
+  const { initialImage } = state.generation;
+  return {
+    isResetButtonDisabled: !initialImage,
+    initialImage,
+  };
+});
 
 const postUploadAction: PostUploadAction = {
   type: 'SET_INITIAL_IMAGE',

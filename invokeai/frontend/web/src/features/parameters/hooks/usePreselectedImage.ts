@@ -1,4 +1,3 @@
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { t } from 'i18next';
 import { useCallback, useEffect } from 'react';
 import { useAppToaster } from 'app/components/Toaster';
@@ -11,6 +10,7 @@ import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useRecallParameters } from './useRecallParameters';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 export const usePreselectedImage = (selectedImage?: {
   imageName: string;

@@ -66,7 +66,7 @@ export const getCategories = (imageDTO: ImageDTO) => {
 
 // The adapter is not actually the data store - it just provides helper functions to interact
 // with some other store of data. We will use the RTK Query cache as that store.
-export const imagesAdapter = createEntityAdapter<ImageDTO>({
+export const imagesAdapter = createEntityAdapter<ImageDTO, string>({
   selectId: (image) => image.image_name,
   sortComparer: (a, b) => {
     // Compare starred images first

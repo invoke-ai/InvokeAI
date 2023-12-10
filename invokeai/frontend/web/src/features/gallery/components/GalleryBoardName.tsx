@@ -1,21 +1,16 @@
 import { ChevronUpIcon } from '@chakra-ui/icons';
 import { Button, Flex, Text } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo, useMemo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const selector = createSelector(
-  [stateSelector],
-  (state) => {
-    const { selectedBoardId } = state.gallery;
+const selector = createMemoizedSelector([stateSelector], (state) => {
+  const { selectedBoardId } = state.gallery;
 
-    return { selectedBoardId };
-  },
-  defaultSelectorOptions
-);
+  return { selectedBoardId };
+});
 
 type Props = {
   isOpen: boolean;

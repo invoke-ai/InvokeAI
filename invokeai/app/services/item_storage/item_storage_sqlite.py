@@ -5,7 +5,7 @@ from typing import Generic, Optional, TypeVar, get_args
 from pydantic import BaseModel, TypeAdapter
 
 from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 from .item_storage_base import ItemStorageABC
 

@@ -75,6 +75,7 @@ class ImageRecordStorageBase(ABC):
         image_category: ImageCategory,
         width: int,
         height: int,
+        has_workflow: bool,
         is_intermediate: Optional[bool] = False,
         starred: Optional[bool] = False,
         session_id: Optional[str] = None,

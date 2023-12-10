@@ -5,10 +5,9 @@ import {
   InputGroup,
   InputRightElement,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import {
   ChangeEvent,
@@ -20,14 +19,10 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const { boardSearchText } = gallery;
-    return { boardSearchText };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
+  const { boardSearchText } = gallery;
+  return { boardSearchText };
+});
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();

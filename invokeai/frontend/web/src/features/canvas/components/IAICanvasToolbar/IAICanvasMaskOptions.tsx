@@ -1,5 +1,6 @@
 import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIColorPicker from 'common/components/IAIColorPicker';
@@ -7,10 +8,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
   setIsMaskEnabled,
@@ -19,17 +17,15 @@ import {
   setShouldPreserveMaskedArea,
 } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { isEqual } from 'lodash-es';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { RgbaColor } from 'react-colorful';
-
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
 
-export const selector = createSelector(
-  [canvasSelector, isStagingSelector],
-  (canvas, isStaging) => {
+export const selector = createMemoizedSelector(
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } =
       canvas;
 
@@ -41,11 +37,6 @@ export const selector = createSelector(
       shouldPreserveMaskedArea,
       isStaging,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 const IAICanvasMaskOptions = () => {

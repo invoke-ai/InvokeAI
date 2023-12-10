@@ -18,7 +18,7 @@ class ListPassThroughInvocationOutput(BaseInvocationOutput):
     collection: list[ImageField] = OutputField(default=[])
 
 
-@invocation("test_list")
+@invocation("test_list", version="1.0.0")
 class ListPassThroughInvocation(BaseInvocation):
     collection: list[ImageField] = InputField(default=[])
 
@@ -31,7 +31,7 @@ class PromptTestInvocationOutput(BaseInvocationOutput):
     prompt: str = OutputField(default="")
 
 
-@invocation("test_prompt")
+@invocation("test_prompt", version="1.0.0")
 class PromptTestInvocation(BaseInvocation):
     prompt: str = InputField(default="")
 
@@ -39,7 +39,7 @@ class PromptTestInvocation(BaseInvocation):
         return PromptTestInvocationOutput(prompt=self.prompt)
 
 
-@invocation("test_error")
+@invocation("test_error", version="1.0.0")
 class ErrorInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
         raise Exception("This invocation is supposed to fail")
@@ -50,7 +50,7 @@ class ImageTestInvocationOutput(BaseInvocationOutput):
     image: ImageField = OutputField()
 
 
-@invocation("test_text_to_image")
+@invocation("test_text_to_image", version="1.0.0")
 class TextToImageTestInvocation(BaseInvocation):
     prompt: str = InputField(default="")
     prompt2: str = InputField(default="")
@@ -59,7 +59,7 @@ class TextToImageTestInvocation(BaseInvocation):
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
 
 
-@invocation("test_image_to_image")
+@invocation("test_image_to_image", version="1.0.0")
 class ImageToImageTestInvocation(BaseInvocation):
     prompt: str = InputField(default="")
     image: Union[ImageField, None] = InputField(default=None)
@@ -73,7 +73,7 @@ class PromptCollectionTestInvocationOutput(BaseInvocationOutput):
     collection: list[str] = OutputField(default=[])
 
 
-@invocation("test_prompt_collection")
+@invocation("test_prompt_collection", version="1.0.0")
 class PromptCollectionTestInvocation(BaseInvocation):
     collection: list[str] = InputField()
 
@@ -86,7 +86,7 @@ class AnyTypeTestInvocationOutput(BaseInvocationOutput):
     value: Any = OutputField()
 
 
-@invocation("test_any")
+@invocation("test_any", version="1.0.0")
 class AnyTypeTestInvocation(BaseInvocation):
     value: Any = InputField(default=None)
 
@@ -94,7 +94,7 @@ class AnyTypeTestInvocation(BaseInvocation):
         return AnyTypeTestInvocationOutput(value=self.value)
 
 
-@invocation("test_polymorphic")
+@invocation("test_polymorphic", version="1.0.0")
 class PolymorphicStringTestInvocation(BaseInvocation):
     value: Union[str, list[str]] = InputField(default="")
 
@@ -119,6 +119,7 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
 class TestEvent:
     event_name: str
     payload: Any
+    __test__ = False  # not a pytest test case
 
     def __init__(self, event_name: str, payload: Any):
         self.event_name = event_name
@@ -127,6 +128,7 @@ class TestEvent:
 
 class TestEventService(EventServiceBase):
     events: list
+    __test__ = False  # not a pytest test case
 
     def __init__(self):
         super().__init__()

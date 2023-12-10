@@ -5,7 +5,7 @@ import { O } from 'ts-toolbelt';
 
 type s = components['schemas'];
 
-export type ImageCache = EntityState<ImageDTO>;
+export type ImageCache = EntityState<ImageDTO, string>;
 
 export type ListImagesArgs = NonNullable<
   paths['/api/v1/images/']['get']['parameters']['query']
@@ -114,6 +114,10 @@ export type GraphExecutionState = s['GraphExecutionState'];
 export type Batch = s['Batch'];
 export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
 export type SessionQueueItem = s['SessionQueueItem'];
+export type WorkflowRecordOrderBy = s['WorkflowRecordOrderBy'];
+export type SQLiteDirection = s['SQLiteDirection'];
+export type WorkflowDTO = s['WorkflowRecordDTO'];
+export type WorkflowRecordListItemDTO = s['WorkflowRecordListItemDTO'];
 
 // General nodes
 export type CollectInvocation = s['CollectInvocation'];

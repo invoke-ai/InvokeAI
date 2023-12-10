@@ -1,39 +1,34 @@
 import { Divider, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
-import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import { ParamCpuNoiseToggle } from 'features/parameters/components/Parameters/Noise/ParamCpuNoise';
 import ParamSeamless from 'features/parameters/components/Parameters/Seamless/ParamSeamless';
-import ParamClipSkip from './ParamClipSkip';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import ParamCFGRescaleMultiplier from './ParamCFGRescaleMultiplier';
+import ParamClipSkip from './ParamClipSkip';
 
-const selector = createSelector(
-  stateSelector,
-  (state: RootState) => {
-    const {
-      clipSkip,
-      model,
-      seamlessXAxis,
-      seamlessYAxis,
-      shouldUseCpuNoise,
-      cfgRescaleMultiplier,
-    } = state.generation;
+const selector = createMemoizedSelector(stateSelector, (state: RootState) => {
+  const {
+    clipSkip,
+    model,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldUseCpuNoise,
+    cfgRescaleMultiplier,
+  } = state.generation;
 
-    return {
-      clipSkip,
-      model,
-      seamlessXAxis,
-      seamlessYAxis,
-      shouldUseCpuNoise,
-      cfgRescaleMultiplier,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    clipSkip,
+    model,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldUseCpuNoise,
+    cfgRescaleMultiplier,
+  };
+});
 
 export default function ParamAdvancedCollapse() {
   const {

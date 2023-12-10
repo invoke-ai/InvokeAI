@@ -3,13 +3,14 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
 
 
 class TestModel(BaseModel):
     id: str = Field(description="ID")
     name: str = Field(description="Name")
+    __test__ = False  # not a pytest test case
 
 
 @pytest.fixture

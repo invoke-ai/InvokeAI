@@ -1,11 +1,11 @@
 import { ButtonGroup, Divider, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import IAICollapse from 'common/components/IAICollapse';
 import ControlAdapterConfig from 'features/controlAdapters/components/ControlAdapterConfig';
+import { useAddControlAdapter } from 'features/controlAdapters/hooks/useAddControlAdapter';
 import {
   selectAllControlNets,
   selectAllIPAdapters,
@@ -19,9 +19,8 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPlus } from 'react-icons/fa';
-import { useAddControlAdapter } from 'features/controlAdapters/hooks/useAddControlAdapter';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector],
   ({ controlAdapters }) => {
     const activeLabel: string[] = [];
@@ -68,8 +67,7 @@ const selector = createSelector(
       activeLabel: activeLabel.join(', '),
       isError, // TODO: Add some visual indicator that the control adapters are in an error state
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ControlAdaptersCollapse = () => {

@@ -85,14 +85,14 @@ The server must be started and available at <http://127.0.0.1:9090>.
 # from the repo root, start the server
 python scripts/invokeai-web.py
 # from invokeai/frontend/web/, run the script
-yarn typegen
+pnpm typegen
 ```
 
 ## Package Scripts
 
 See `package.json` for all scripts.
 
-Run with `yarn <script name>`.
+Run with `pnpm <script name>`.
 
 - `dev`: run the frontend in dev mode, enabling hot reloading
 - `build`: run all checks (madge, eslint, prettier, tsc) and then build the frontend
@@ -112,13 +112,13 @@ We encourage you to ping @psychedelicious and @blessedcoolant on [discord] if yo
 
 ### Dev Environment
 
-Install [node] and [yarn classic].
+Install [node] and [pnpm].
 
-From `invokeai/frontend/web/` run `yarn install` to get everything set up.
+From `invokeai/frontend/web/` run `pnpm i` to get everything set up.
 
 Start everything in dev mode:
 
-1. Start the dev server: `yarn dev`
+1. Start the dev server: `pnpm dev`
 2. Start the InvokeAI Nodes backend: `python scripts/invokeai-web.py # run from the repo root`
 3. Point your browser to the dev server address e.g. <http://localhost:5173/>
 
@@ -134,10 +134,10 @@ For a number of technical and logistical reasons, we need to commit UI build art
 
 If you submit a PR, there is a good chance we will ask you to include a separate commit with a build of the app.
 
-To build for production, run `yarn build`.
+To build for production, run `pnpm build`.
 
 [node]: https://nodejs.org/en/download/
-[yarn classic]: https://classic.yarnpkg.com/lang/en/
+[pnpm]: https://github.com/pnpm/pnpm
 [discord]: https://discord.gg/ZmtBAhwWhy
 [Redux Toolkit]: https://github.com/reduxjs/redux-toolkit
 [redux-remember]: https://github.com/zewish/redux-remember

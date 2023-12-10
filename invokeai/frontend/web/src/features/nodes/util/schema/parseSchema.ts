@@ -83,7 +83,6 @@ export const parseSchema = (
     const description = schema.description ?? '';
     const version = schema.version;
     const nodePack = schema.node_pack;
-    let withWorkflow = false;
 
     const inputs = reduce(
       schema.properties,
@@ -110,12 +109,6 @@ export const parseSchema = (
 
         try {
           const fieldType = parseFieldType(property);
-
-          if (fieldType.name === 'WorkflowField') {
-            // This supports workflows, set the flag and skip to next field
-            withWorkflow = true;
-            return inputsAccumulator;
-          }
 
           if (isReservedFieldType(fieldType.name)) {
             // Skip processing this reserved field
@@ -251,7 +244,6 @@ export const parseSchema = (
       inputs,
       outputs,
       useCache,
-      withWorkflow,
       nodePack,
     };
 

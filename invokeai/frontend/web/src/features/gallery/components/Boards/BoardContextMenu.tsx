@@ -1,25 +1,24 @@
 import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   IAIContextMenu,
   IAIContextMenuProps,
 } from 'common/components/IAIContextMenu';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { BoardId } from 'features/gallery/store/types';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { addToast } from 'features/system/store/systemSlice';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaDownload, FaPlus } from 'react-icons/fa';
+import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
-import { addToast } from 'features/system/store/systemSlice';
 
 type Props = {
   board?: BoardDTO;
@@ -39,15 +38,11 @@ const BoardContextMenu = ({
 
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ gallery }) => {
-          const isAutoAdd = gallery.autoAddBoardId === board_id;
-          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-          return { isAutoAdd, autoAssignBoardOnClick };
-        },
-        defaultSelectorOptions
-      ),
+      createMemoizedSelector(stateSelector, ({ gallery }) => {
+        const isAutoAdd = gallery.autoAddBoardId === board_id;
+        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+        return { isAutoAdd, autoAssignBoardOnClick };
+      }),
     [board_id]
   );
 

@@ -1,14 +1,13 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import { setCfgRescaleMultiplier } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector],
   ({ generation, hotkeys }) => {
     const { cfgRescaleMultiplier } = generation;
@@ -18,8 +17,7 @@ const selector = createSelector(
       cfgRescaleMultiplier,
       shift,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ParamCFGRescaleMultiplier = () => {

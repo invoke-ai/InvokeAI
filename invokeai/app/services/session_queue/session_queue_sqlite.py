@@ -28,7 +28,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     prepare_values_to_insert,
 )
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class SqliteSessionQueue(SessionQueueBase):
@@ -199,6 +199,15 @@ class SqliteSessionQueue(SessionQueueBase):
                 """
             )
 
+            self.__cursor.execute("PRAGMA table_info(session_queue)")
+            columns = [column[1] for column in self.__cursor.fetchall()]
+            if "workflow" not in columns:
+                self.__cursor.execute(
+                    """--sql
+                    ALTER TABLE session_queue ADD COLUMN workflow TEXT;
+                    """
+                )
+
             self.__conn.commit()
         except Exception:
             self.__conn.rollback()
@@ -281,8 +290,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             self.__cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )
