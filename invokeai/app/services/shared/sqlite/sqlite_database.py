@@ -8,13 +8,15 @@ from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
 
 
 class SqliteDatabase:
-    database: Path | str
+    database: Path | str  # Must declare this here to satisfy type checker
 
     def __init__(self, config: InvokeAIAppConfig, logger: Logger):
         self._logger = logger
         self._config = config
+        self.is_memory = False
         if self._config.use_memory_db:
             self.database = sqlite_memory
+            self.is_memory = True
             logger.info("Using in-memory database")
         else:
             self.database = self._config.db_path

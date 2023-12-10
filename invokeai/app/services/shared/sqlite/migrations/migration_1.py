@@ -1,11 +1,14 @@
 import sqlite3
 
+from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite.sqlite_migrator import Migration
 
 
-def _migrate(cursor: sqlite3.Cursor) -> None:
+def _migrate(db: SqliteDatabase, image_files: ImageFileStorageBase) -> None:
     """Migration callback for database version 1."""
 
+    cursor = db.conn.cursor()
     _create_board_images(cursor)
     _create_boards(cursor)
     _create_images(cursor)
@@ -350,7 +353,11 @@ def _create_workflows(cursor: sqlite3.Cursor) -> None:
         cursor.execute(stmt)
 
 
-migration_1 = Migration(db_version=1, app_version="3.4.0", migrate=_migrate)
+migration_1 = Migration(
+    from_version=0,
+    to_version=1,
+    migrate=_migrate,
+)
 """
 Database version 1 (initial state).
 

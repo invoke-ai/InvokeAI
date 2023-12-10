@@ -70,9 +70,10 @@ class ApiDependencies:
         logger.debug(f"Internet connectivity is {config.internet_available}")
 
         output_folder = config.output_path
+        image_files = DiskImageFileStorage(f"{output_folder}/images")
 
         db = SqliteDatabase(config, logger)
-        migrator = SQLiteMigrator(conn=db.conn, database=db.database, lock=db.lock, logger=logger)
+        migrator = SQLiteMigrator(db=db, image_files=image_files)
         migrator.register_migration(migration_1)
         migrator.register_migration(migration_2)
         migrator.run_migrations()
@@ -87,7 +88,6 @@ class ApiDependencies:
         events = FastAPIEventService(event_handler_id)
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
         graph_library = SqliteItemStorage[LibraryGraph](db=db, table_name="graphs")
-        image_files = DiskImageFileStorage(f"{output_folder}/images")
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
