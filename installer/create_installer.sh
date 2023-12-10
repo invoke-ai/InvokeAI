@@ -6,6 +6,7 @@ BCYAN="\e[1;36m"
 BBLUE="\e[1;34m"
 BYELLOW="\e[1;33m"
 BGREEN="\e[1;32m"
+BRED="\e[1;31m"
 RED="\e[31m"
 RESET="\e[0m"
 
@@ -40,7 +41,7 @@ fi
 if [[ -v "VIRTUAL_ENV" ]]; then
     # we can't just call 'deactivate' because this function is not exported
     # to the environment of this script from the bash process that runs the script
-    echo -e "${BYELLOW}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
+    echo -e "${BRED}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
     exit -1
 fi
 
