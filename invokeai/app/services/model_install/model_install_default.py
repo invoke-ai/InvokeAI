@@ -73,10 +73,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self._models_installed = set()
         self._start_installer_thread()
 
-    def __del__(self) -> None:
-        """At GC time, we stop the install thread and release its resources."""
-        self._install_queue.put(STOP_JOB)
-
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
         return self._app_config
@@ -88,6 +84,10 @@ class ModelInstallService(ModelInstallServiceBase):
     @property
     def event_bus(self) -> Optional[EventServiceBase]:  # noqa D102
         return self._event_bus
+
+    def stop(self) -> None:
+        """Stop the install thread; after this the object can be deleted and garbage collected."""
+        self._install_queue.put(STOP_JOB)
 
     def _start_installer_thread(self) -> None:
         threading.Thread(target=self._install_next_item, daemon=True).start()
@@ -114,6 +114,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._signal_job_errored(job, excp)
             finally:
                 self._install_queue.task_done()
+        self._logger.info("Install thread exiting")
 
     def _signal_job_running(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.RUNNING

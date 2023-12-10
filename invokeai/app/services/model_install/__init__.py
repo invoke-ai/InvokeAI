@@ -7,7 +7,6 @@ from .model_install_base import (
     ModelInstallJob,
     ModelInstallServiceBase,
     ModelSource,
-    ModelSourceValidator,
     UnknownInstallJobException,
     URLModelSource,
 )
@@ -20,7 +19,6 @@ __all__ = [
     "ModelInstallJob",
     "UnknownInstallJobException",
     "ModelSource",
-    "ModelSourceValidator",
     "LocalModelSource",
     "HFModelSource",
     "URLModelSource",

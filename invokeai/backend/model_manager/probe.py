@@ -425,7 +425,7 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
         elif token_dim == 1280:
             return BaseModelType.StableDiffusionXL
         else:
-            raise InvalidModelConfigException("Could not determine base type")
+            raise InvalidModelConfigException(f"{self.model_path}: Could not determine base type")
 
 
 class ControlNetCheckpointProbe(CheckpointProbeBase):
@@ -443,7 +443,7 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
                 return BaseModelType.StableDiffusion1
             elif checkpoint[key_name].shape[-1] == 1024:
                 return BaseModelType.StableDiffusion2
-        raise InvalidModelConfigException("Unable to determine base type for {self.checkpoint_path}")
+        raise InvalidModelConfigException("{self.model_path}: Unable to determine base type")
 
 
 class IPAdapterCheckpointProbe(CheckpointProbeBase):

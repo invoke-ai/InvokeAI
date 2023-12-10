@@ -123,8 +123,6 @@ class URLModelSource(StringLikeSource):
 #       https://github.com/tiangolo/fastapi/discussions/9287
 
 ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Body(discriminator="type")]
-ModelSourceValidator = TypeAdapter(ModelSource)
-
 
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""
@@ -147,7 +145,7 @@ class ModelInstallJob(BaseModel):
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
         self.error_type = e.__class__.__name__
-        self.error = traceback.format_exc()
+        self.error = "".join(traceback.format_exception(e))
         self.status = InstallStatus.ERROR
 
 
@@ -172,6 +170,10 @@ class ModelInstallServiceBase(ABC):
     def start(self, invoker: Invoker) -> None:
         """Call at InvokeAI startup time."""
         self.sync_to_config()
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Stop the model install service. After this the objection can be safely deleted."""
 
     @property
     @abstractmethod
