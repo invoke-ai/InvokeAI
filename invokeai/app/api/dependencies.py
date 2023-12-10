@@ -1,9 +1,11 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from functools import partial
 from logging import Logger
 
 from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
 from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
+from invokeai.app.services.shared.sqlite.migrations.migration_2_post import migrate_embedded_workflows
 from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
@@ -73,7 +75,8 @@ class ApiDependencies:
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
         db = SqliteDatabase(config, logger)
-        migrator = SQLiteMigrator(database=db.database, lock=db.lock, image_files=image_files, logger=logger)
+        migrator = SQLiteMigrator(database=db.database, lock=db.lock, logger=logger)
+        migration_2.register_post_callback(partial(migrate_embedded_workflows, logger=logger, image_files=image_files))
         migrator.register_migration(migration_1)
         migrator.register_migration(migration_2)
         migrator.run_migrations()

@@ -8,10 +8,9 @@ from typing import Callable, Optional, TypeAlias
 
 from pydantic import BaseModel, Field, model_validator
 
-from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
 
-MigrateCallback: TypeAlias = Callable[[sqlite3.Cursor, ImageFileStorageBase, Logger], None]
+MigrateCallback: TypeAlias = Callable[[sqlite3.Cursor], None]
 
 
 class MigrationError(Exception):
@@ -49,6 +48,14 @@ class Migration(BaseModel):
     def __hash__(self) -> int:
         # Callables are not hashable, so we need to implement our own __hash__ function to use this class in a set.
         return hash((self.from_version, self.to_version))
+
+    def register_pre_callback(self, callback: MigrateCallback) -> None:
+        """Registers a pre-migration callback."""
+        self.pre_migrate.append(callback)
+
+    def register_post_callback(self, callback: MigrateCallback) -> None:
+        """Registers a post-migration callback."""
+        self.post_migrate.append(callback)
 
 
 class MigrationSet:
@@ -102,12 +109,10 @@ class SQLiteMigrator:
         database: Path | str,
         lock: threading.RLock,
         logger: Logger,
-        image_files: ImageFileStorageBase,
     ) -> None:
         self._lock = lock
         self._database = database
         self._is_memory = database == sqlite_memory
-        self._image_files = image_files
         self._logger = logger
         self._conn = sqlite3.connect(database)
         self._cursor = self._conn.cursor()
@@ -168,17 +173,24 @@ class SQLiteMigrator:
                         f"Database is at version {self._get_current_version()}, expected {migration.from_version}"
                     )
                 self._logger.debug(f"Running migration from {migration.from_version} to {migration.to_version}")
+
+                # Run pre-migration callbacks
                 if migration.pre_migrate:
                     self._logger.debug(f"Running {len(migration.pre_migrate)} pre-migration callbacks")
                     for callback in migration.pre_migrate:
-                        callback(self._cursor, self._image_files, self._logger)
-                migration.migrate(self._cursor, self._image_files, self._logger)
+                        callback(self._cursor)
+
+                # Run the actual migration
+                migration.migrate(self._cursor)
                 self._cursor.execute("INSERT INTO migrations (version) VALUES (?);", (migration.to_version,))
+
+                # Run post-migration callbacks
                 if migration.post_migrate:
                     self._logger.debug(f"Running {len(migration.post_migrate)} post-migration callbacks")
                     for callback in migration.post_migrate:
-                        callback(self._cursor, self._image_files, self._logger)
-                # Migration callbacks only get a cursor; they cannot commit the transaction.
+                        callback(self._cursor)
+
+                # Migration callbacks only get a cursor. Commit this migration.
                 self._conn.commit()
                 self._logger.debug(
                     f"Successfully migrated database from {migration.from_version} to {migration.to_version}"
