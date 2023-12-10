@@ -215,6 +215,7 @@ class SQLiteMigrator:
             return True
 
     def _run_migrations(self, temp_db_cursor: sqlite3.Cursor) -> None:
+        """Runs all migrations in a loop."""
         next_migration = self._migrations.get(from_version=self._get_current_version(temp_db_cursor))
         while next_migration is not None:
             self._run_migration(next_migration, temp_db_cursor)
