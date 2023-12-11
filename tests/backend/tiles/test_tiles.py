@@ -406,7 +406,7 @@ def test_calc_tiles_even_split_difficult_size():
 
 
 @pytest.mark.parametrize(
-    ["image_height", "image_width", "num_tiles_x", "num_tiles_y", "overlap", "raises"],
+    ["image_height", "image_width", "num_tiles_x", "num_tiles_y", "overlap_fraction", "raises"],
     [
         (128, 128, 1, 1, 0.25, False),  # OK
         (128, 128, 1, 1, 0, False),  # OK
