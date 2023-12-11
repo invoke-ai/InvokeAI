@@ -143,7 +143,6 @@ def test_calc_tiles_min_overlap_single_tile():
         tile_height=512,
         tile_width=1024,
         min_overlap=64,
-        round_to_8=False,
     )
 
     expected_tiles = [
@@ -165,7 +164,6 @@ def test_calc_tiles_min_overlap_evenly_divisible():
         tile_height=320,
         tile_width=576,
         min_overlap=64,
-        round_to_8=False,
     )
 
     expected_tiles = [
@@ -209,7 +207,6 @@ def test_calc_tiles_min_overlap_not_evenly_divisible():
         tile_height=256,
         tile_width=512,
         min_overlap=64,
-        round_to_8=False,
     )
 
     expected_tiles = [
@@ -238,120 +235,6 @@ def test_calc_tiles_min_overlap_not_evenly_divisible():
         Tile(
             coords=TBLR(top=144, bottom=400, left=688, right=1200),
             overlap=TBLR(top=112, bottom=0, left=168, right=0),
-        ),
-    ]
-
-    assert tiles == expected_tiles
-
-
-def test_calc_tiles_min_overlap_difficult_size():
-    """Test calc_tiles_min_overlap() behavior when the image is a difficult size to spilt evenly and keep div8."""
-    # Parameters are a difficult size for other tile gen routines to calculate
-    tiles = calc_tiles_min_overlap(
-        image_height=1000,
-        image_width=1000,
-        tile_height=512,
-        tile_width=512,
-        min_overlap=64,
-        round_to_8=False,
-    )
-
-    expected_tiles = [
-        # Row 0
-        Tile(
-            coords=TBLR(top=0, bottom=512, left=0, right=512),
-            overlap=TBLR(top=0, bottom=268, left=0, right=268),
-        ),
-        Tile(
-            coords=TBLR(top=0, bottom=512, left=244, right=756),
-            overlap=TBLR(top=0, bottom=268, left=268, right=268),
-        ),
-        Tile(
-            coords=TBLR(top=0, bottom=512, left=488, right=1000),
-            overlap=TBLR(top=0, bottom=268, left=268, right=0),
-        ),
-        # Row 1
-        Tile(
-            coords=TBLR(top=244, bottom=756, left=0, right=512),
-            overlap=TBLR(top=268, bottom=268, left=0, right=268),
-        ),
-        Tile(
-            coords=TBLR(top=244, bottom=756, left=244, right=756),
-            overlap=TBLR(top=268, bottom=268, left=268, right=268),
-        ),
-        Tile(
-            coords=TBLR(top=244, bottom=756, left=488, right=1000),
-            overlap=TBLR(top=268, bottom=268, left=268, right=0),
-        ),
-        # Row 2
-        Tile(
-            coords=TBLR(top=488, bottom=1000, left=0, right=512),
-            overlap=TBLR(top=268, bottom=0, left=0, right=268),
-        ),
-        Tile(
-            coords=TBLR(top=488, bottom=1000, left=244, right=756),
-            overlap=TBLR(top=268, bottom=0, left=268, right=268),
-        ),
-        Tile(
-            coords=TBLR(top=488, bottom=1000, left=488, right=1000),
-            overlap=TBLR(top=268, bottom=0, left=268, right=0),
-        ),
-    ]
-
-    assert tiles == expected_tiles
-
-
-def test_calc_tiles_min_overlap_difficult_size_div8():
-    """Test calc_tiles_min_overlap() behavior when the image is a difficult size to spilt evenly and keep div8."""
-    # Parameters are a difficult size for other tile gen routines to calculate
-    tiles = calc_tiles_min_overlap(
-        image_height=1000,
-        image_width=1000,
-        tile_height=512,
-        tile_width=512,
-        min_overlap=64,
-        round_to_8=True,
-    )
-
-    expected_tiles = [
-        # Row 0
-        Tile(
-            coords=TBLR(top=0, bottom=512, left=0, right=512),
-            overlap=TBLR(top=0, bottom=272, left=0, right=272),
-        ),
-        Tile(
-            coords=TBLR(top=0, bottom=512, left=240, right=752),
-            overlap=TBLR(top=0, bottom=272, left=272, right=264),
-        ),
-        Tile(
-            coords=TBLR(top=0, bottom=512, left=488, right=1000),
-            overlap=TBLR(top=0, bottom=272, left=264, right=0),
-        ),
-        # Row 1
-        Tile(
-            coords=TBLR(top=240, bottom=752, left=0, right=512),
-            overlap=TBLR(top=272, bottom=264, left=0, right=272),
-        ),
-        Tile(
-            coords=TBLR(top=240, bottom=752, left=240, right=752),
-            overlap=TBLR(top=272, bottom=264, left=272, right=264),
-        ),
-        Tile(
-            coords=TBLR(top=240, bottom=752, left=488, right=1000),
-            overlap=TBLR(top=272, bottom=264, left=264, right=0),
-        ),
-        # Row 2
-        Tile(
-            coords=TBLR(top=488, bottom=1000, left=0, right=512),
-            overlap=TBLR(top=264, bottom=0, left=0, right=272),
-        ),
-        Tile(
-            coords=TBLR(top=488, bottom=1000, left=240, right=752),
-            overlap=TBLR(top=264, bottom=0, left=272, right=264),
-        ),
-        Tile(
-            coords=TBLR(top=488, bottom=1000, left=488, right=1000),
-            overlap=TBLR(top=264, bottom=0, left=264, right=0),
         ),
     ]
 
