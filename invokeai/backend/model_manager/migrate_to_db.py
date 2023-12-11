@@ -47,7 +47,8 @@ class MigrateModelYamlToDb:
 
     def get_db(self) -> ModelRecordServiceSQL:
         """Fetch the sqlite3 database for this installation."""
-        db = SqliteDatabase(self.config, self.logger)
+        db_path = None if self.config.use_memory_db else self.config.db_path
+        db = SqliteDatabase(db_path=db_path, logger=self.logger, verbose=self.config.log_sql)
         return ModelRecordServiceSQL(db)
 
     def get_yaml(self) -> DictConfig:

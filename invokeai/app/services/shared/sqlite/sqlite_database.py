@@ -3,58 +3,83 @@ import threading
 from logging import Logger
 from pathlib import Path
 
-from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
 
 
 class SqliteDatabase:
-    database: Path | str  # Must declare this here to satisfy type checker
+    """
+    Manages a connection to an SQLite database.
 
-    def __init__(self, config: InvokeAIAppConfig, logger: Logger) -> None:
-        self.initialize(config, logger)
+    This is a light wrapper around the `sqlite3` module, providing a few conveniences:
+    - The database file is written to disk if it does not exist.
+    - Foreign key constraints are enabled by default.
+    - The connection is configured to use the `sqlite3.Row` row factory.
+    - A `conn` attribute is provided to access the connection.
+    - A `lock` attribute is provided to lock the database connection.
+    - A `clean` method to run the VACUUM command and report on the freed space.
+    - A `reinitialize` method to close the connection and re-run the init.
+    - A `close` method to close the connection.
 
-    def initialize(self, config: InvokeAIAppConfig, logger: Logger) -> None:
-        self._logger = logger
-        self._config = config
-        self.is_memory = False
-        if self._config.use_memory_db:
-            self.database = sqlite_memory
-            self.is_memory = True
+    :param db_path: Path to the database file. If None, an in-memory database is used.
+    :param logger: Logger to use for logging.
+    :param verbose: Whether to log SQL statements. Provides `logger.debug` as the SQLite trace callback.
+    """
+
+    def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
+        self.initialize(db_path=db_path, logger=logger, verbose=verbose)
+
+    def initialize(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
+        """Initializes the database. This is used internally by the class constructor."""
+        self.logger = logger
+        self.db_path = db_path
+        self.verbose = verbose
+
+        if not self.db_path:
             logger.info("Initializing in-memory database")
         else:
-            self.database = self._config.db_path
-            self.database.parent.mkdir(parents=True, exist_ok=True)
-            self._logger.info(f"Initializing database at {self.database}")
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Initializing database at {self.db_path}")
 
-        self.conn = sqlite3.connect(database=self.database, check_same_thread=False)
+        self.conn = sqlite3.connect(database=self.db_path or sqlite_memory, check_same_thread=False)
         self.lock = threading.RLock()
         self.conn.row_factory = sqlite3.Row
 
-        if self._config.log_sql:
-            self.conn.set_trace_callback(self._logger.debug)
+        if self.verbose:
+            self.conn.set_trace_callback(self.logger.debug)
 
         self.conn.execute("PRAGMA foreign_keys = ON;")
 
     def reinitialize(self) -> None:
-        """Reinitializes the database. Needed after migration."""
+        """
+        Re-initializes the database by closing the connection and re-running the init.
+        Warning: This will wipe the database if it is an in-memory database.
+        """
         self.close()
-        self.initialize(self._config, self._logger)
+        self.initialize(db_path=self.db_path, logger=self.logger, verbose=self.verbose)
 
     def close(self) -> None:
+        """
+        Closes the connection to the database.
+        Warning: This will wipe the database if it is an in-memory database.
+        """
         self.conn.close()
 
     def clean(self) -> None:
+        """
+        Cleans the database by running the VACUUM command, reporting on the freed space.
+        """
+        # No need to clean in-memory database
+        if not self.db_path:
+            return
         with self.lock:
             try:
-                if self.database == sqlite_memory:
-                    return
-                initial_db_size = Path(self.database).stat().st_size
+                initial_db_size = Path(self.db_path).stat().st_size
                 self.conn.execute("VACUUM;")
                 self.conn.commit()
-                final_db_size = Path(self.database).stat().st_size
+                final_db_size = Path(self.db_path).stat().st_size
                 freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
                 if freed_space_in_mb > 0:
-                    self._logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
+                    self.logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
             except Exception as e:
-                self._logger.error(f"Error cleaning database: {e}")
+                self.logger.error(f"Error cleaning database: {e}")
                 raise

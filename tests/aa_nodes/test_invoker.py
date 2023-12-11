@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 import pytest
 
@@ -58,9 +57,10 @@ def graph_with_subgraph():
 def mock_services() -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
     logger = InvokeAILogger.get_logger()
-    db = SqliteDatabase(configuration, logger)
+    db_path = None if configuration.use_memory_db else configuration.db_path
+    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=configuration.log_sql)
     migrator = SQLiteMigrator(
-        db_path=db.database if isinstance(db.database, Path) else None,
+        db_path=db.db_path,
         conn=db.conn,
         lock=db.lock,
         logger=logger,

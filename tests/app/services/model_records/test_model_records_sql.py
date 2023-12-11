@@ -3,7 +3,6 @@ Test the refactored model config classes.
 """
 
 from hashlib import sha256
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -34,9 +33,10 @@ from invokeai.backend.util.logging import InvokeAILogger
 def store(datadir: Any) -> ModelRecordServiceBase:
     config = InvokeAIAppConfig(root=datadir)
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config, logger)
+    db_path = None if config.use_memory_db else config.db_path
+    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
     migrator = SQLiteMigrator(
-        db_path=db.database if isinstance(db.database, Path) else None,
+        db_path=db.db_path,
         conn=db.conn,
         lock=db.lock,
         logger=logger,

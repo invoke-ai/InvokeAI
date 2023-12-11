@@ -2,7 +2,6 @@
 
 from functools import partial
 from logging import Logger
-from pathlib import Path
 
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
@@ -75,10 +74,11 @@ class ApiDependencies:
         output_folder = config.output_path
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
-        db = SqliteDatabase(config, logger)
+        db_path = None if config.use_memory_db else config.db_path
+        db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
 
         migrator = SQLiteMigrator(
-            db_path=db.database if isinstance(db.database, Path) else None,
+            db_path=db.db_path,
             conn=db.conn,
             lock=db.lock,
             logger=logger,
@@ -89,7 +89,10 @@ class ApiDependencies:
         migrator.register_migration(migration_2)
         did_migrate = migrator.run_migrations()
 
-        if not db.is_memory and did_migrate:
+        # We need to reinitialize the database if we migrated, but only if we are using a file database.
+        # This closes the SqliteDatabase's connection and re-runs its `__init__` logic.
+        # If we do this with a memory database, we wipe the db.
+        if not db.db_path and did_migrate:
             db.reinitialize()
 
         configuration = config

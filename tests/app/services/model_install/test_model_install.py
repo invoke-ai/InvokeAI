@@ -42,11 +42,12 @@ def app_config(datadir: Path) -> InvokeAIAppConfig:
 @pytest.fixture
 def store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     logger = InvokeAILogger.get_logger(config=app_config)
-    database = SqliteDatabase(app_config, logger)
+    db_path = None if app_config.use_memory_db else app_config.db_path
+    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=app_config.log_sql)
     migrator = SQLiteMigrator(
-        db_path=database.database if isinstance(database.database, Path) else None,
-        conn=database.conn,
-        lock=database.lock,
+        db_path=db.db_path,
+        conn=db.conn,
+        lock=db.lock,
         logger=logger,
         log_sql=app_config.log_sql,
     )
@@ -54,8 +55,8 @@ def store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     migrator.register_migration(migration_2)
     migrator.run_migrations()
     # this test uses a file database, so we need to reinitialize it after migrations
-    database.reinitialize()
-    store: ModelRecordServiceBase = ModelRecordServiceSQL(database)
+    db.reinitialize()
+    store: ModelRecordServiceBase = ModelRecordServiceSQL(db)
     return store
 
 
