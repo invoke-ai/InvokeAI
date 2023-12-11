@@ -190,12 +190,12 @@ class SQLiteMigrator:
                 self._run_migrations(temp_db_cursor)
                 # Close the connections, copy the original database as a backup, and move the temp database to the
                 # original database's path.
+                temp_db_conn.close()
+                self._conn.close()
                 backup_db_path = self._finalize_migration(
                     temp_db_path=temp_db_path,
                     original_db_path=self._db_path,
                 )
-                temp_db_conn.close()
-                self._conn.close()
                 self._logger.info(f"Migration successful. Original DB backed up to {backup_db_path}")
             else:
                 # We are using a memory database. No special backup or special handling needed.
