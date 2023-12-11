@@ -6,8 +6,6 @@ from invokeai.app.services.shared.sqlite.sqlite_migrator import Migration
 def _migrate(cursor: sqlite3.Cursor) -> None:
     """Migration callback for database version 2."""
 
-    print("migration 2!!!")
-
     _add_images_has_workflow(cursor)
     _add_session_queue_workflow(cursor)
     _drop_old_workflow_tables(cursor)

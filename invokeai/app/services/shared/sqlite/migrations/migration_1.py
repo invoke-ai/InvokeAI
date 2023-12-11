@@ -6,8 +6,6 @@ from invokeai.app.services.shared.sqlite.sqlite_migrator import Migration
 def _migrate(cursor: sqlite3.Cursor) -> None:
     """Migration callback for database version 1."""
 
-    print("migration 1!!!")
-
     _create_board_images(cursor)
     _create_boards(cursor)
     _create_images(cursor)
