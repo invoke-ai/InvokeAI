@@ -219,18 +219,19 @@ def overridden_redoc() -> HTMLResponse:
 
 web_root_path = Path(list(web_dir.__path__)[0])
 
+# Only serve the UI if we it has a build
+if (web_root_path / "dist").exists():
+    # Cannot add headers to StaticFiles, so we must serve index.html with a custom route
+    # Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
+    @app.get("/", include_in_schema=False, name="ui_root")
+    def get_index() -> FileResponse:
+        return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
 
-# Cannot add headers to StaticFiles, so we must serve index.html with a custom route
-# Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
-@app.get("/", include_in_schema=False, name="ui_root")
-def get_index() -> FileResponse:
-    return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
+    # # Must mount *after* the other routes else it borks em
+    app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
+    app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 
-
-# # Must mount *after* the other routes else it borks em
 app.mount("/static", StaticFiles(directory=Path(web_root_path, "static/")), name="static")  # docs favicon is in here
-app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
-app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 
 
 def invoke_api() -> None:
