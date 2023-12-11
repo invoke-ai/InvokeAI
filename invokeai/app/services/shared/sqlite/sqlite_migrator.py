@@ -277,7 +277,7 @@ class SQLiteMigrator:
         """Gets the current version of the database, or 0 if the migrations table does not exist."""
         try:
             cursor.execute("SELECT MAX(version) FROM migrations;")
-            version = cursor.fetchone()[0]
+            version: int = cursor.fetchone()[0]
             if version is None:
                 return 0
             return version

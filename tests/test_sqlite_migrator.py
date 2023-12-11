@@ -79,17 +79,17 @@ def create_migrate(i: int) -> MigrateCallback:
     return migrate
 
 
-def test_migration_to_version_gt_from_version(no_op_migrate_callback: MigrateCallback):
+def test_migration_to_version_gt_from_version(no_op_migrate_callback: MigrateCallback) -> None:
     with pytest.raises(ValidationError, match="greater_than_equal"):
         Migration(from_version=1, to_version=0, migrate=no_op_migrate_callback)
 
 
-def test_migration_hash(no_op_migrate_callback: MigrateCallback):
+def test_migration_hash(no_op_migrate_callback: MigrateCallback) -> None:
     migration = Migration(from_version=0, to_version=1, migrate=no_op_migrate_callback)
     assert hash(migration) == hash((0, 1))
 
 
-def test_migration_registers_pre_and_post_callbacks(no_op_migrate_callback: MigrateCallback):
+def test_migration_registers_pre_and_post_callbacks(no_op_migrate_callback: MigrateCallback) -> None:
     def pre_callback(cursor: sqlite3.Cursor) -> None:
         pass
 
@@ -103,13 +103,15 @@ def test_migration_registers_pre_and_post_callbacks(no_op_migrate_callback: Migr
     assert post_callback in migration.post_migrate
 
 
-def test_migration_set_add_migration(migrator: SQLiteMigrator, migration_no_op: Migration):
+def test_migration_set_add_migration(migrator: SQLiteMigrator, migration_no_op: Migration) -> None:
     migration = migration_no_op
     migrator._migration_set.register(migration)
     assert migration in migrator._migration_set._migrations
 
 
-def test_migration_set_may_not_register_dupes(migrator: SQLiteMigrator, no_op_migrate_callback: MigrateCallback):
+def test_migration_set_may_not_register_dupes(
+    migrator: SQLiteMigrator, no_op_migrate_callback: MigrateCallback
+) -> None:
     migrate_1_to_2 = Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback)
     migrate_0_to_2 = Migration(from_version=0, to_version=2, migrate=no_op_migrate_callback)
     migrate_1_to_3 = Migration(from_version=1, to_version=3, migrate=no_op_migrate_callback)
@@ -120,14 +122,14 @@ def test_migration_set_may_not_register_dupes(migrator: SQLiteMigrator, no_op_mi
         migrator._migration_set.register(migrate_1_to_3)
 
 
-def test_migration_set_gets_migration(migration_no_op: Migration):
+def test_migration_set_gets_migration(migration_no_op: Migration) -> None:
     migration_set = MigrationSet()
     migration_set.register(migration_no_op)
     assert migration_set.get(0) == migration_no_op
     assert migration_set.get(1) is None
 
 
-def test_migration_set_validates_migration_chain(no_op_migrate_callback: MigrateCallback):
+def test_migration_set_validates_migration_chain(no_op_migrate_callback: MigrateCallback) -> None:
     migration_set = MigrationSet()
     migration_set.register(Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback))
     with pytest.raises(MigrationError, match="Migration chain is fragmented"):
@@ -143,7 +145,7 @@ def test_migration_set_validates_migration_chain(no_op_migrate_callback: Migrate
         migration_set.validate_migration_chain()
 
 
-def test_migration_set_counts_migrations(no_op_migrate_callback: MigrateCallback):
+def test_migration_set_counts_migrations(no_op_migrate_callback: MigrateCallback) -> None:
     migration_set = MigrationSet()
     assert migration_set.count == 0
     migration_set.register(Migration(from_version=0, to_version=1, migrate=no_op_migrate_callback))
@@ -152,7 +154,7 @@ def test_migration_set_counts_migrations(no_op_migrate_callback: MigrateCallback
     assert migration_set.count == 2
 
 
-def test_migration_set_gets_latest_version(no_op_migrate_callback: MigrateCallback):
+def test_migration_set_gets_latest_version(no_op_migrate_callback: MigrateCallback) -> None:
     migration_set = MigrationSet()
     assert migration_set.latest_version == 0
     migration_set.register(Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback))
@@ -161,19 +163,19 @@ def test_migration_set_gets_latest_version(no_op_migrate_callback: MigrateCallba
     assert migration_set.latest_version == 2
 
 
-def test_migrator_registers_migration(migrator: SQLiteMigrator, migration_no_op: Migration):
+def test_migrator_registers_migration(migrator: SQLiteMigrator, migration_no_op: Migration) -> None:
     migration = migration_no_op
     migrator.register_migration(migration)
     assert migration in migrator._migration_set._migrations
 
 
-def test_migrator_creates_migrations_table(migrator: SQLiteMigrator):
+def test_migrator_creates_migrations_table(migrator: SQLiteMigrator) -> None:
     migrator._create_migrations_table(migrator._cursor)
     migrator._cursor.execute("SELECT * FROM sqlite_master WHERE type='table' AND name='migrations';")
     assert migrator._cursor.fetchone() is not None
 
 
-def test_migrator_migration_sets_version(migrator: SQLiteMigrator, migration_no_op: Migration):
+def test_migrator_migration_sets_version(migrator: SQLiteMigrator, migration_no_op: Migration) -> None:
     migrator._create_migrations_table(migrator._cursor)
     migrator.register_migration(migration_no_op)
     migrator.run_migrations()
@@ -181,7 +183,7 @@ def test_migrator_migration_sets_version(migrator: SQLiteMigrator, migration_no_
     assert migrator._cursor.fetchone()[0] == 1
 
 
-def test_migrator_gets_current_version(migrator: SQLiteMigrator, migration_no_op: Migration):
+def test_migrator_gets_current_version(migrator: SQLiteMigrator, migration_no_op: Migration) -> None:
     assert migrator._get_current_version(migrator._cursor) == 0
     migrator._create_migrations_table(migrator._cursor)
     assert migrator._get_current_version(migrator._cursor) == 0
@@ -190,7 +192,7 @@ def test_migrator_gets_current_version(migrator: SQLiteMigrator, migration_no_op
     assert migrator._get_current_version(migrator._cursor) == 1
 
 
-def test_migrator_runs_single_migration(migrator: SQLiteMigrator, migration_create_test_table: Migration):
+def test_migrator_runs_single_migration(migrator: SQLiteMigrator, migration_create_test_table: Migration) -> None:
     migrator._create_migrations_table(migrator._cursor)
     migrator._run_migration(migration_create_test_table, migrator._cursor)
     assert migrator._get_current_version(migrator._cursor) == 1
@@ -198,9 +200,7 @@ def test_migrator_runs_single_migration(migrator: SQLiteMigrator, migration_crea
     assert migrator._cursor.fetchone() is not None
 
 
-def test_migrator_runs_all_migrations_in_memory(
-    migrator: SQLiteMigrator,
-):
+def test_migrator_runs_all_migrations_in_memory(migrator: SQLiteMigrator) -> None:
     migrations = [Migration(from_version=i, to_version=i + 1, migrate=create_migrate(i)) for i in range(0, 3)]
     for migration in migrations:
         migrator.register_migration(migration)
@@ -208,7 +208,7 @@ def test_migrator_runs_all_migrations_in_memory(
     assert migrator._get_current_version(migrator._cursor) == 3
 
 
-def test_migrator_runs_all_migrations_file(logger: Logger, lock: threading.RLock):
+def test_migrator_runs_all_migrations_file(logger: Logger, lock: threading.RLock) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
         # The Migrator closes the database when it finishes; we cannot use a context manager.
@@ -223,7 +223,7 @@ def test_migrator_runs_all_migrations_file(logger: Logger, lock: threading.RLock
             assert SQLiteMigrator._get_current_version(original_db_cursor) == 3
 
 
-def test_migrator_creates_temp_db():
+def test_migrator_creates_temp_db() -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
         with closing(sqlite3.connect(original_db_path)):
@@ -234,7 +234,7 @@ def test_migrator_creates_temp_db():
         assert temp_db_path == SQLiteMigrator._get_temp_db_path(original_db_path)
 
 
-def test_migrator_finalizes():
+def test_migrator_finalizes() -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
         temp_db_path = SQLiteMigrator._get_temp_db_path(original_db_path)
@@ -265,7 +265,7 @@ def test_migrator_finalizes():
 
 def test_migrator_makes_no_changes_on_failed_migration(
     migrator: SQLiteMigrator, migration_no_op: Migration, failing_migrate_callback: MigrateCallback
-):
+) -> None:
     migrator.register_migration(migration_no_op)
     migrator.run_migrations()
     assert migrator._get_current_version(migrator._cursor) == 1
@@ -275,7 +275,7 @@ def test_migrator_makes_no_changes_on_failed_migration(
     assert migrator._get_current_version(migrator._cursor) == 1
 
 
-def test_idempotent_migrations(migrator: SQLiteMigrator, migration_create_test_table: Migration):
+def test_idempotent_migrations(migrator: SQLiteMigrator, migration_create_test_table: Migration) -> None:
     migrator.register_migration(migration_create_test_table)
     migrator.run_migrations()
     # not throwing is sufficient
