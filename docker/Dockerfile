@@ -100,6 +100,8 @@ ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv/invokeai
 ENV INVOKEAI_ROOT=/invokeai
 ENV PATH="$VIRTUAL_ENV/bin:$INVOKEAI_SRC:$PATH"
+ENV CONTAINER_UID=${CONTAINER_UID:-1000}
+ENV CONTAINER_GID=${CONTAINER_GID:-1000}
 
 # --link requires buldkit w/ dockerfile syntax 1.4
 COPY --link --from=builder ${INVOKEAI_SRC} ${INVOKEAI_SRC}
@@ -117,7 +119,7 @@ WORKDIR ${INVOKEAI_SRC}
 RUN cd /usr/lib/$(uname -p)-linux-gnu/pkgconfig/ && ln -sf opencv4.pc opencv.pc
 RUN python3 -c "from patchmatch import patch_match"
 
-RUN mkdir -p ${INVOKEAI_ROOT} && chown -R 1000:1000 ${INVOKEAI_ROOT}
+RUN mkdir -p ${INVOKEAI_ROOT} && chown -R ${CONTAINER_UID}:${CONTAINER_GID} ${INVOKEAI_ROOT}
 
 COPY docker/docker-entrypoint.sh ./
 ENTRYPOINT ["/opt/invokeai/docker-entrypoint.sh"]
