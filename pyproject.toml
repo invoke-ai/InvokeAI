@@ -80,8 +80,8 @@ dependencies = [
   "semver~=3.0.1",
   "send2trash",
   "test-tube~=0.7.5",
-  "torch==2.1.0",
-  "torchvision==0.16.0",
+  "torch==2.1.1",
+  "torchvision==0.16.1",
   "torchmetrics~=0.11.0",
   "torchsde~=0.2.5",
   "transformers~=4.36.0",
@@ -107,7 +107,7 @@ dependencies = [
   "pytest-datadir",
 ]
 "xformers" = [
-  "xformers==0.0.22post7; sys_platform!='darwin'",
+  "xformers==0.0.23; sys_platform!='darwin'",
   "triton; sys_platform=='linux'",
 ]
 "onnx" = ["onnxruntime"]
