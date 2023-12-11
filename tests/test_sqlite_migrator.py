@@ -126,16 +126,19 @@ def test_migration_set_gets_migration(migration_no_op: Migration):
     assert migration_set.get(1) is None
 
 
-def test_migration_set_validates_migration_path(no_op_migrate_callback: MigrateCallback):
+def test_migration_set_validates_migration_chain(no_op_migrate_callback: MigrateCallback):
     migration_set = MigrationSet()
-    migration_set.validate_migration_chain()
+    migration_set.register(Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback))
+    with pytest.raises(MigrationError, match="Migration chain is fragmented"):
+        # no migration from 0 to 1
+        migration_set.validate_migration_chain()
     migration_set.register(Migration(from_version=0, to_version=1, migrate=no_op_migrate_callback))
     migration_set.validate_migration_chain()
-    migration_set.register(Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback))
     migration_set.register(Migration(from_version=2, to_version=3, migrate=no_op_migrate_callback))
     migration_set.validate_migration_chain()
     migration_set.register(Migration(from_version=4, to_version=5, migrate=no_op_migrate_callback))
     with pytest.raises(MigrationError, match="Migration chain is fragmented"):
+        # no migration from 3 to 4
         migration_set.validate_migration_chain()
 
 
