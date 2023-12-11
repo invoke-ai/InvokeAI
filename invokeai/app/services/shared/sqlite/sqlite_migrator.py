@@ -190,6 +190,7 @@ class SQLiteMigrator:
             if self._db_path:
                 # We are using a file database. Create a copy of the database to run the migrations on.
                 temp_db_path = self._create_temp_db(self._db_path)
+                self._logger.info(f"Copied database to {temp_db_path} for migration")
                 temp_db_conn = sqlite3.connect(temp_db_path)
                 # We have to re-set this because we just created a new connection.
                 if self._log_sql:
@@ -198,11 +199,12 @@ class SQLiteMigrator:
                 self._run_migrations(temp_db_cursor)
                 # Close the connections, copy the original database as a backup, and move the temp database to the
                 # original database's path.
-                self._finalize_migration(
+                backup_db_path = self._finalize_migration(
                     temp_db_conn=temp_db_conn,
                     temp_db_path=temp_db_path,
                     original_db_path=self._db_path,
                 )
+                self._logger.info(f"Migration successful. Original DB backed up to {backup_db_path}")
             else:
                 # We are using a memory database. No special backup or special handling needed.
                 self._run_migrations(self._cursor)
@@ -296,14 +298,13 @@ class SQLiteMigrator:
         """Copies the current database to a new file for migration."""
         temp_db_path = get_temp_db_path(current_db_path)
         shutil.copy2(current_db_path, temp_db_path)
-        self._logger.info(f"Copied database to {temp_db_path} for migration")
         return temp_db_path
 
-    def _finalize_migration(self, temp_db_conn: sqlite3.Connection, temp_db_path: Path, original_db_path: Path) -> None:
+    def _finalize_migration(self, temp_db_conn: sqlite3.Connection, temp_db_path: Path, original_db_path: Path) -> Path:
         """Closes connections, renames the original database as a backup and renames the migrated database to the original name."""
         self._conn.close()
         temp_db_conn.close()
         backup_db_path = get_backup_db_path(original_db_path)
         original_db_path.rename(backup_db_path)
         temp_db_path.rename(original_db_path)
-        self._logger.info(f"Migration successful. Original DB backed up to {backup_db_path}")
+        return backup_db_path
