@@ -9,12 +9,14 @@ import pytest
 from pydantic import ValidationError
 
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
-from invokeai.app.services.shared.sqlite.sqlite_migrator import (
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     MigrateCallback,
     Migration,
     MigrationError,
     MigrationSet,
     MigrationVersionError,
+)
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import (
     SQLiteMigrator,
 )
 

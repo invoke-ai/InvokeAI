@@ -4,6 +4,7 @@ Test the refactored model config classes.
 
 from hashlib import sha256
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -14,10 +15,10 @@ from invokeai.app.services.model_records import (
     ModelRecordServiceSQL,
     UnknownModelException,
 )
-from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
 from invokeai.backend.model_manager.config import (
     BaseModelType,
     MainCheckpointConfig,
@@ -30,7 +31,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 
 @pytest.fixture
-def store(datadir) -> ModelRecordServiceBase:
+def store(datadir: Any) -> ModelRecordServiceBase:
     config = InvokeAIAppConfig(root=datadir)
     logger = InvokeAILogger.get_logger(config=config)
     db = SqliteDatabase(config, logger)

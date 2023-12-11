@@ -19,6 +19,9 @@ from invokeai.app.services.model_install import (
 )
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL, UnknownModelException
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
 from invokeai.backend.model_manager.config import BaseModelType, ModelType
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -38,7 +41,20 @@ def app_config(datadir: Path) -> InvokeAIAppConfig:
 
 @pytest.fixture
 def store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
-    database = SqliteDatabase(app_config, InvokeAILogger.get_logger(config=app_config))
+    logger = InvokeAILogger.get_logger(config=app_config)
+    database = SqliteDatabase(app_config, logger)
+    migrator = SQLiteMigrator(
+        db_path=database.database if isinstance(database.database, Path) else None,
+        conn=database.conn,
+        lock=database.lock,
+        logger=logger,
+        log_sql=app_config.log_sql,
+    )
+    migrator.register_migration(migration_1)
+    migrator.register_migration(migration_2)
+    migrator.run_migrations()
+    # this test uses a file database, so we need to reinitialize it after migrations
+    database.reinitialize()
     store: ModelRecordServiceBase = ModelRecordServiceSQL(database)
     return store
 

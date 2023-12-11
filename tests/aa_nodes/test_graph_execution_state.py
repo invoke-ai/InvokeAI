@@ -29,10 +29,10 @@ from invokeai.app.services.shared.graph import (
     IterateInvocation,
     LibraryGraph,
 )
-from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .test_invoker import create_edge
