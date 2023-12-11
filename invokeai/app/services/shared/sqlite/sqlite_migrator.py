@@ -158,7 +158,7 @@ class SQLiteMigrator:
         self._conn = conn
         self._log_sql = log_sql
         self._cursor = self._conn.cursor()
-        self._migrations = MigrationSet()
+        self._migration_set = MigrationSet()
 
         # The presence of an temp database file indicates a catastrophic failure of a previous migration.
         if self._db_path and get_temp_db_path(self._db_path).is_file():
@@ -167,7 +167,7 @@ class SQLiteMigrator:
 
     def register_migration(self, migration: Migration) -> None:
         """Registers a migration."""
-        self._migrations.register(migration)
+        self._migration_set.register(migration)
         self._logger.debug(f"Registered migration {migration.from_version} -> {migration.to_version}")
 
     def run_migrations(self) -> bool:
@@ -177,11 +177,11 @@ class SQLiteMigrator:
             self._migration_set.validate_migration_chain()
             self._create_migrations_table(cursor=self._cursor)
 
-            if self._migrations.count == 0:
+            if self._migration_set.count == 0:
                 self._logger.debug("No migrations registered")
                 return False
 
-            if self._get_current_version(self._cursor) == self._migrations.latest_version:
+            if self._get_current_version(self._cursor) == self._migration_set.latest_version:
                 self._logger.debug("Database is up to date, no migrations to run")
                 return False
 
@@ -212,10 +212,10 @@ class SQLiteMigrator:
 
     def _run_migrations(self, temp_db_cursor: sqlite3.Cursor) -> None:
         """Runs all migrations in a loop."""
-        next_migration = self._migrations.get(from_version=self._get_current_version(temp_db_cursor))
+        next_migration = self._migration_set.get(from_version=self._get_current_version(temp_db_cursor))
         while next_migration is not None:
             self._run_migration(next_migration, temp_db_cursor)
-            next_migration = self._migrations.get(self._get_current_version(temp_db_cursor))
+            next_migration = self._migration_set.get(self._get_current_version(temp_db_cursor))
 
     def _run_migration(self, migration: Migration, temp_db_cursor: sqlite3.Cursor) -> None:
         """Runs a single migration."""
