@@ -1,6 +1,6 @@
 import sqlite3
 
-from invokeai.app.services.shared.sqlite.sqlite_migrator import Migration
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
 def _migrate(cursor: sqlite3.Cursor) -> None:

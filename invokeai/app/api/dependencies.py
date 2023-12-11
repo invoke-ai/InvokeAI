@@ -4,10 +4,10 @@ from functools import partial
 from logging import Logger
 from pathlib import Path
 
-from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
-from invokeai.app.services.shared.sqlite.migrations.migration_2_post import migrate_embedded_workflows
-from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2_post import migrate_embedded_workflows
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
