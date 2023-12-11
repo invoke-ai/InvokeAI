@@ -40,8 +40,8 @@ class Migration(BaseModel):
 
     @model_validator(mode="after")
     def validate_to_version(self) -> "Migration":
-        if self.to_version <= self.from_version:
-            raise ValueError("to_version must be greater than from_version")
+        if self.to_version != self.from_version + 1:
+            raise ValueError("to_version must be one greater than from_version")
         return self
 
     def __hash__(self) -> int:

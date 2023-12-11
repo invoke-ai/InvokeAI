@@ -81,9 +81,11 @@ def create_migrate(i: int) -> MigrateCallback:
     return migrate
 
 
-def test_migration_to_version_gt_from_version(no_op_migrate_callback: MigrateCallback) -> None:
-    with pytest.raises(ValidationError, match="greater_than_equal"):
-        Migration(from_version=1, to_version=0, migrate=no_op_migrate_callback)
+def test_migration_to_version_is_one_gt_from_version(no_op_migrate_callback: MigrateCallback) -> None:
+    with pytest.raises(ValidationError, match="to_version must be one greater than from_version"):
+        Migration(from_version=0, to_version=2, migrate=no_op_migrate_callback)
+    # not raising is sufficient
+    Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback)
 
 
 def test_migration_hash(no_op_migrate_callback: MigrateCallback) -> None:
