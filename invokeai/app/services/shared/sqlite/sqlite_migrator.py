@@ -91,6 +91,8 @@ class MigrationSet:
         if self.latest_version == 0:
             return
         next_migration = self.get(from_version=0)
+        if next_migration is None:
+            raise MigrationError("Migration chain is fragmented")
         touched_count = 1
         while next_migration is not None:
             next_migration = self.get(next_migration.to_version)
