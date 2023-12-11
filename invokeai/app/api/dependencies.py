@@ -22,6 +22,7 @@ from ..services.invoker import Invoker
 from ..services.item_storage.item_storage_sqlite import SqliteItemStorage
 from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
+from ..services.model_install import ModelInstallService
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
@@ -86,6 +87,9 @@ class ApiDependencies:
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
+        model_install_service = ModelInstallService(
+            app_config=config, record_store=model_record_service, event_bus=events
+        )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         processor = DefaultInvocationProcessor()
@@ -112,6 +116,7 @@ class ApiDependencies:
             logger=logger,
             model_manager=model_manager,
             model_records=model_record_service,
+            model_install=model_install_service,
             names=names,
             performance_statistics=performance_statistics,
             processor=processor,

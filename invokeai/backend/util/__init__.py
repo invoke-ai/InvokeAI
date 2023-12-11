@@ -11,4 +11,7 @@ from .devices import (  # noqa: F401
     normalize_device,
     torch_dtype,
 )
+from .logging import InvokeAILogger
 from .util import Chdir, ask_user, download_with_resume, instantiate_from_config, url_attachment_name  # noqa: F401
+
+__all__ = ["Chdir", "InvokeAILogger", "choose_precision", "choose_torch_device"]
