@@ -116,14 +116,16 @@ def test_migration_set_add_migration(migrator: SQLiteMigrator, migration_no_op: 
 def test_migration_set_may_not_register_dupes(
     migrator: SQLiteMigrator, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    migrate_1_to_2 = Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback)
-    migrate_0_to_2 = Migration(from_version=0, to_version=2, migrate=no_op_migrate_callback)
-    migrate_1_to_3 = Migration(from_version=1, to_version=3, migrate=no_op_migrate_callback)
-    migrator._migration_set.register(migrate_1_to_2)
-    with pytest.raises(MigrationVersionError, match=r"Migration to 2 already registered"):
-        migrator._migration_set.register(migrate_0_to_2)
-    with pytest.raises(MigrationVersionError, match=r"Migration from 1 already registered"):
-        migrator._migration_set.register(migrate_1_to_3)
+    migrate_0_to_1_a = Migration(from_version=0, to_version=1, migrate=no_op_migrate_callback)
+    migrate_0_to_1_b = Migration(from_version=0, to_version=1, migrate=no_op_migrate_callback)
+    migrator._migration_set.register(migrate_0_to_1_a)
+    with pytest.raises(MigrationVersionError, match=r"Migration with from_version or to_version already registered"):
+        migrator._migration_set.register(migrate_0_to_1_b)
+    migrate_1_to_2_a = Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback)
+    migrate_1_to_2_b = Migration(from_version=1, to_version=2, migrate=no_op_migrate_callback)
+    migrator._migration_set.register(migrate_1_to_2_a)
+    with pytest.raises(MigrationVersionError, match=r"Migration with from_version or to_version already registered"):
+        migrator._migration_set.register(migrate_1_to_2_b)
 
 
 def test_migration_set_gets_migration(migration_no_op: Migration) -> None:

@@ -65,10 +65,10 @@ class MigrationSet:
 
     def register(self, migration: Migration) -> None:
         """Registers a migration."""
-        if any(m.from_version == migration.from_version for m in self._migrations):
-            raise MigrationVersionError(f"Migration from {migration.from_version} already registered")
-        if any(m.to_version == migration.to_version for m in self._migrations):
-            raise MigrationVersionError(f"Migration to {migration.to_version} already registered")
+        migration_from_already_registered = any(m.from_version == migration.from_version for m in self._migrations)
+        migration_to_already_registered = any(m.to_version == migration.to_version for m in self._migrations)
+        if migration_from_already_registered or migration_to_already_registered:
+            raise MigrationVersionError("Migration with from_version or to_version already registered")
         self._migrations.add(migration)
 
     def get(self, from_version: int) -> Optional[Migration]:
