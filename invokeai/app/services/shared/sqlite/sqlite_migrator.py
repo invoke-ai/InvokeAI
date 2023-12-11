@@ -81,27 +81,23 @@ class MigrationSet:
         # register() ensures that there is only one migration with a given from_version, so this is safe.
         return next((m for m in self._migrations if m.from_version == from_version), None)
 
-    def validate_migration_path(self) -> None:
+    def validate_migration_chain(self) -> None:
         """
-        Validates that the migrations form a single path of migrations from version 0 to the latest version.
+        Validates that the migrations form a single chain of migrations from version 0 to the latest version.
         Raises a MigrationError if there is a problem.
         """
         if self.count == 0:
             return
         if self.latest_version == 0:
             return
-        current_version = 0
-        touched_count = 0
-        while current_version < self.latest_version:
-            migration = self.get(current_version)
-            if migration is None:
-                raise MigrationError(f"Missing migration from {current_version}")
-            current_version = migration.to_version
-            touched_count += 1
-        if current_version != self.latest_version:
-            raise MigrationError(f"Missing migration to {self.latest_version}")
+        next_migration = self.get(from_version=0)
+        touched_count = 1
+        while next_migration is not None:
+            next_migration = self.get(next_migration.to_version)
+            if next_migration is not None:
+                touched_count += 1
         if touched_count != self.count:
-            raise MigrationError("Migration path is not contiguous")
+            raise MigrationError("Migration chain is fragmented")
 
     @property
     def count(self) -> int:
@@ -178,7 +174,7 @@ class SQLiteMigrator:
         """Migrates the database to the latest version."""
         with self._lock:
             # This throws if there is a problem.
-            self._migrations.validate_migration_path()
+            self._migration_set.validate_migration_chain()
             self._create_migrations_table(cursor=self._cursor)
 
             if self._migrations.count == 0:
