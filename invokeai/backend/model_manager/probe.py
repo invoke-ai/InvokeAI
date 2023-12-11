@@ -115,11 +115,13 @@ class ModelProbe(object):
         fields: Optional[Dict[str, Any]] = None,
     ) -> AnyModelConfig:
         """
-        Probe the model at model_path and return sufficient information about it
-        to place it somewhere in the models directory hierarchy. If the model is
-        already loaded into memory, you may provide it as model in order to avoid
-        opening it a second time. The prediction_type_helper callable is a function that receives
-        the path to the model and returns the SchedulerPredictionType.
+        Probe the model at model_path and return its configuration record.
+
+        :param model_path: Path to the model file (checkpoint) or directory (diffusers).
+        :param fields: An optional dictionary that can be used to override probed
+        fields. Typically used for fields that don't probe well, such as prediction_type.
+
+        Returns: The appropriate model configuration derived from ModelConfigBase.
         """
         if fields is None:
             fields = {}
