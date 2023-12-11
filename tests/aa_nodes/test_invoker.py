@@ -1,8 +1,10 @@
 import logging
+from pathlib import Path
 
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
 
 # This import must happen before other invoke imports or test in other files(!!) break
@@ -24,6 +26,8 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation, LibraryGraph
+from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
@@ -52,8 +56,19 @@ def graph_with_subgraph():
 # the test invocations.
 @pytest.fixture
 def mock_services() -> InvocationServices:
-    db = SqliteDatabase(InvokeAIAppConfig(use_memory_db=True), InvokeAILogger.get_logger())
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
+    logger = InvokeAILogger.get_logger()
+    db = SqliteDatabase(configuration, logger)
+    migrator = SQLiteMigrator(
+        db_path=db.database if isinstance(db.database, Path) else None,
+        conn=db.conn,
+        lock=db.lock,
+        logger=logger,
+        log_sql=configuration.log_sql,
+    )
+    migrator.register_migration(migration_1)
+    migrator.register_migration(migration_2)
+    migrator.run_migrations()
 
     # NOTE: none of these are actually called by the test invocations
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")

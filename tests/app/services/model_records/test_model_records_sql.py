@@ -3,6 +3,7 @@ Test the refactored model config classes.
 """
 
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
@@ -13,7 +14,10 @@ from invokeai.app.services.model_records import (
     ModelRecordServiceSQL,
     UnknownModelException,
 )
+from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
 from invokeai.backend.model_manager.config import (
     BaseModelType,
     MainCheckpointConfig,
@@ -30,6 +34,18 @@ def store(datadir) -> ModelRecordServiceBase:
     config = InvokeAIAppConfig(root=datadir)
     logger = InvokeAILogger.get_logger(config=config)
     db = SqliteDatabase(config, logger)
+    migrator = SQLiteMigrator(
+        db_path=db.database if isinstance(db.database, Path) else None,
+        conn=db.conn,
+        lock=db.lock,
+        logger=logger,
+        log_sql=config.log_sql,
+    )
+    migrator.register_migration(migration_1)
+    migrator.register_migration(migration_2)
+    migrator.run_migrations()
+    # this test uses a file database, so we need to reinitialize it after migrations
+    db.reinitialize()
     return ModelRecordServiceSQL(db)
 
 

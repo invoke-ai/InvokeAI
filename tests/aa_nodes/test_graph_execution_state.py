@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -28,7 +29,10 @@ from invokeai.app.services.shared.graph import (
     IterateInvocation,
     LibraryGraph,
 )
+from invokeai.app.services.shared.sqlite.migrations.migration_1 import migration_1
+from invokeai.app.services.shared.sqlite.migrations.migration_2 import migration_2
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_migrator import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .test_invoker import create_edge
@@ -49,7 +53,18 @@ def simple_graph():
 @pytest.fixture
 def mock_services() -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    db = SqliteDatabase(configuration, InvokeAILogger.get_logger())
+    logger = InvokeAILogger.get_logger()
+    db = SqliteDatabase(configuration, logger)
+    migrator = SQLiteMigrator(
+        db_path=db.database if isinstance(db.database, Path) else None,
+        conn=db.conn,
+        lock=db.lock,
+        logger=logger,
+        log_sql=configuration.log_sql,
+    )
+    migrator.register_migration(migration_1)
+    migrator.register_migration(migration_2)
+    migrator.run_migrations()
     # NOTE: none of these are actually called by the test invocations
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
     return InvocationServices(
