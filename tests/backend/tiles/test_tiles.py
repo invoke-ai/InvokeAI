@@ -283,7 +283,9 @@ def test_calc_tiles_min_overlap_input_validation(
 
 def test_calc_tiles_even_split_single_tile():
     """Test calc_tiles_even_split() behavior when a single tile covers the image."""
-    tiles = calc_tiles_even_split(image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap_fraction=0.25
+    )
 
     expected_tiles = [
         Tile(
@@ -298,7 +300,9 @@ def test_calc_tiles_even_split_single_tile():
 def test_calc_tiles_even_split_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image is evenly covered by multiple tiles."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap_fraction=0.25
+    )
 
     expected_tiles = [
         # Row 0
@@ -334,7 +338,9 @@ def test_calc_tiles_even_split_evenly_divisible():
 def test_calc_tiles_even_split_not_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap_fraction=0.25
+    )
 
     expected_tiles = [
         # Row 0
@@ -371,7 +377,9 @@ def test_calc_tiles_even_split_not_evenly_divisible():
 def test_calc_tiles_even_split_difficult_size():
     """Test calc_tiles_even_split() behavior when the image is a difficult size to spilt evenly and keep div8."""
     # Parameters are a difficult size for other tile gen routines to calculate
-    tiles = calc_tiles_even_split(image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap=0.25)
+    tiles = calc_tiles_even_split(
+        image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap_fraction=0.25
+    )
 
     expected_tiles = [
         # Row 0
@@ -411,15 +419,15 @@ def test_calc_tiles_even_split_input_validation(
     image_width: int,
     num_tiles_x: int,
     num_tiles_y: int,
-    overlap: float,
+    overlap_fraction: float,
     raises: bool,
 ):
     """Test that calc_tiles_even_split() raises an exception if the inputs are invalid."""
     if raises:
         with pytest.raises(ValueError):
-            calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
+            calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap_fraction)
     else:
-        calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
+        calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap_fraction)
 
 
 #############################################
