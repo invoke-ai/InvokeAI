@@ -102,7 +102,7 @@ def calc_tiles_with_overlap(
 
 
 def calc_tiles_even_split(
-    image_height: int, image_width: int, num_tiles_x: int, num_tiles_y: int, overlap: float = 0
+    image_height: int, image_width: int, num_tiles_x: int, num_tiles_y: int, overlap_fraction: float = 0
 ) -> list[Tile]:
     """Calculate the tile coordinates for a given image shape with the number of tiles requested.
 
@@ -111,7 +111,7 @@ def calc_tiles_even_split(
         image_width (int): The image width in px.
         num_x_tiles (int): The number of tile to split the image into on the X-axis.
         num_y_tiles (int): The number of tile to split the image into on the Y-axis.
-        overlap (float, optional): The target overlap amount of the tiles size. Defaults to 0.
+        overlap_fraction (float, optional): The target overlap as fraction of the tiles size. Defaults to 0.
 
     Returns:
         list[Tile]: A list of tiles that cover the image shape. Ordered from left-to-right, top-to-bottom.
@@ -119,11 +119,15 @@ def calc_tiles_even_split(
 
     # Ensure tile size is divisible by 8
     if image_width % LATENT_SCALE_FACTOR != 0 or image_height % LATENT_SCALE_FACTOR != 0:
-        raise ValueError(f"image size (({image_width}, {image_height})) must be divisible by 8")
+        raise ValueError(f"image size (({image_width}, {image_height})) must be divisible by {LATENT_SCALE_FACTOR}")
 
     # Calculate the overlap size based on the percentage and adjust it to be divisible by 8 (rounding up)
-    overlap_x = LATENT_SCALE_FACTOR * math.ceil(int((image_width / num_tiles_x) * overlap) / LATENT_SCALE_FACTOR)
-    overlap_y = LATENT_SCALE_FACTOR * math.ceil(int((image_height / num_tiles_y) * overlap) / LATENT_SCALE_FACTOR)
+    overlap_x = LATENT_SCALE_FACTOR * math.ceil(
+        int((image_width / num_tiles_x) * overlap_fraction) / LATENT_SCALE_FACTOR
+    )
+    overlap_y = LATENT_SCALE_FACTOR * math.ceil(
+        int((image_height / num_tiles_y) * overlap_fraction) / LATENT_SCALE_FACTOR
+    )
 
     # Calculate the tile size based on the number of tiles and overlap, and ensure it's divisible by 8 (rounding down)
     tile_size_x = LATENT_SCALE_FACTOR * math.floor(
@@ -184,11 +188,11 @@ def calc_tiles_min_overlap(
     Returns:
         list[Tile]: A list of tiles that cover the image shape. Ordered from left-to-right, top-to-bottom.
     """
-    assert image_height >= tile_height
-    assert image_width >= tile_width
+
     assert min_overlap < tile_height
     assert min_overlap < tile_width
 
+    # The If Else catches the case when the tile size is larger than the images size and just clips the number of tiles to 1
     num_tiles_x = math.ceil((image_width - min_overlap) / (tile_width - min_overlap)) if tile_width < image_width else 1
     num_tiles_y = (
         math.ceil((image_height - min_overlap) / (tile_height - min_overlap)) if tile_height < image_height else 1
@@ -200,14 +204,10 @@ def calc_tiles_min_overlap(
     # Calculate tile coordinates. (Ignore overlap values for now.)
     for tile_idx_y in range(num_tiles_y):
         top = (tile_idx_y * (image_height - tile_height)) // (num_tiles_y - 1) if num_tiles_y > 1 else 0
-        if round_to_8:
-            top = LATENT_SCALE_FACTOR * (top // LATENT_SCALE_FACTOR)
         bottom = top + tile_height
 
         for tile_idx_x in range(num_tiles_x):
             left = (tile_idx_x * (image_width - tile_width)) // (num_tiles_x - 1) if num_tiles_x > 1 else 0
-            if round_to_8:
-                left = LATENT_SCALE_FACTOR * (left // LATENT_SCALE_FACTOR)
             right = left + tile_width
 
             tile = Tile(

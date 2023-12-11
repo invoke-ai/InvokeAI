@@ -371,8 +371,8 @@ def test_calc_tiles_min_overlap_difficult_size_div8():
         (128, 128, 128, 128, 127, False),  # OK
         (128, 128, 128, 128, 0, False),  # OK
         (128, 128, 64, 64, 0, False),  # OK
-        (128, 128, 129, 128, 0, True),  # tile_height exceeds image_height.
-        (128, 128, 128, 129, 0, True),  # tile_width exceeds image_width.
+        (128, 128, 129, 128, 0, False),  # tile_height exceeds image_height defaults to 1 tile.
+        (128, 128, 128, 129, 0, False),  # tile_width exceeds image_width defaults to 1 tile.
         (128, 128, 64, 128, 64, True),  # overlap equals tile_height.
         (128, 128, 128, 64, 64, True),  # overlap equals tile_width.
     ],

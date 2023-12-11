@@ -88,7 +88,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
         ge=1,
         description="Number of tiles to divide image into on the y axis",
     )
-    overlap: float = InputField(
+    overlap_fraction: float = InputField(
         default=0.25,
         ge=0,
         lt=1,
@@ -101,7 +101,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
             image_width=self.image_width,
             num_tiles_x=self.num_tiles_x,
             num_tiles_y=self.num_tiles_y,
-            overlap=self.overlap,
+            overlap_fraction=self.overlap_fraction,
         )
         return CalculateImageTilesOutput(tiles=tiles)
 
@@ -120,18 +120,9 @@ class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
     image_height: int = InputField(
         ge=1, default=1024, description="The image height, in pixels, to calculate tiles for."
     )
-    tile_width: int = InputField(ge=1, default=576, multiple_of=8, description="The tile width, in pixels.")
-    tile_height: int = InputField(ge=1, default=576, multiple_of=8, description="The tile height, in pixels.")
-    min_overlap: int = InputField(
-        default=128,
-        ge=0,
-        multiple_of=8,
-        description="Minimum overlap between adjacent tiles, in pixels(must be a multiple of 8).",
-    )
-    round_to_8: bool = InputField(
-        default=False,
-        description="Round outputs down to the nearest 8 (for pulling from a large noise field)",
-    )
+    tile_width: int = InputField(ge=1, default=576, description="The tile width, in pixels.")
+    tile_height: int = InputField(ge=1, default=576, description="The tile height, in pixels.")
+    min_overlap: int = InputField(default=128, ge=0, description="Minimum overlap between adjacent tiles, in pixels.")
 
     def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
         tiles = calc_tiles_min_overlap(
@@ -140,7 +131,6 @@ class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
             tile_height=self.tile_height,
             tile_width=self.tile_width,
             min_overlap=self.min_overlap,
-            round_to_8=self.round_to_8,
         )
         return CalculateImageTilesOutput(tiles=tiles)
 

@@ -74,6 +74,9 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
         return result
 
     # Assume RGB and convert to grey
+    # Could offer other options for the luminance conversion
+    # BT.709 [0.2126, 0.7152, 0.0722], BT.2020 [0.2627, 0.6780, 0.0593])
+    # it might not have a huge impact due to the blur that is applied over the seam
     iag1 = np.dot(ia1, [0.2989, 0.5870, 0.1140])  # BT.601 perceived brightness
     iag2 = np.dot(ia2, [0.2989, 0.5870, 0.1140])
 
@@ -92,6 +95,7 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
     min_x = gutter
 
     # Calc the energy in the difference
+    # Could offer different energy calculations e.g. Sobel or Scharr
     energy = np.abs(np.gradient(ia, axis=0)) + np.abs(np.gradient(ia, axis=1))
 
     # Find the starting position of the seam
@@ -107,6 +111,7 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
     lowest_energy_line[max_y - 1] = np.argmin(res[max_y - 1, min_x : max_x - 1])
 
     # Calc the path of the seam
+    # could offer options for larger search than just 1 pixel by adjusting lpos and rpos
     for ypos in range(max_y - 2, -1, -1):
         lowest_pos = lowest_energy_line[ypos + 1]
         lpos = lowest_pos - 1
