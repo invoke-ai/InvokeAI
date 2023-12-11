@@ -77,13 +77,7 @@ class ApiDependencies:
         db_path = None if config.use_memory_db else config.db_path
         db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
 
-        migrator = SQLiteMigrator(
-            db_path=db.db_path,
-            conn=db.conn,
-            lock=db.lock,
-            logger=logger,
-            log_sql=config.log_sql,
-        )
+        migrator = SQLiteMigrator(db=db)
         migration_2.register_post_callback(partial(migrate_embedded_workflows, logger=logger, image_files=image_files))
         migrator.register_migration(migration_1)
         migrator.register_migration(migration_2)

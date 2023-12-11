@@ -44,13 +44,7 @@ def store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     logger = InvokeAILogger.get_logger(config=app_config)
     db_path = None if app_config.use_memory_db else app_config.db_path
     db = SqliteDatabase(db_path=db_path, logger=logger, verbose=app_config.log_sql)
-    migrator = SQLiteMigrator(
-        db_path=db.db_path,
-        conn=db.conn,
-        lock=db.lock,
-        logger=logger,
-        log_sql=app_config.log_sql,
-    )
+    migrator = SQLiteMigrator(db=db)
     migrator.register_migration(migration_1)
     migrator.register_migration(migration_2)
     migrator.run_migrations()

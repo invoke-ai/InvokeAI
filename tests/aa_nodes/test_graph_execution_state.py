@@ -55,13 +55,7 @@ def mock_services() -> InvocationServices:
     logger = InvokeAILogger.get_logger()
     db_path = None if configuration.use_memory_db else configuration.db_path
     db = SqliteDatabase(db_path=db_path, logger=logger, verbose=configuration.log_sql)
-    migrator = SQLiteMigrator(
-        db_path=db.db_path,
-        conn=db.conn,
-        lock=db.lock,
-        logger=logger,
-        log_sql=configuration.log_sql,
-    )
+    migrator = SQLiteMigrator(db=db)
     migrator.register_migration(migration_1)
     migrator.register_migration(migration_2)
     migrator.run_migrations()

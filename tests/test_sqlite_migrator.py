@@ -1,5 +1,4 @@
 import sqlite3
-import threading
 from contextlib import closing
 from logging import Logger
 from pathlib import Path
@@ -8,7 +7,7 @@ from tempfile import TemporaryDirectory
 import pytest
 from pydantic import ValidationError
 
-from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     MigrateCallback,
     Migration,
@@ -27,14 +26,9 @@ def logger() -> Logger:
 
 
 @pytest.fixture
-def lock() -> threading.RLock:
-    return threading.RLock()
-
-
-@pytest.fixture
-def migrator(logger: Logger, lock: threading.RLock) -> SQLiteMigrator:
-    conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
-    return SQLiteMigrator(conn=conn, db_path=None, lock=lock, logger=logger)
+def migrator(logger: Logger) -> SQLiteMigrator:
+    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
+    return SQLiteMigrator(db=db)
 
 
 @pytest.fixture
@@ -176,50 +170,55 @@ def test_migrator_registers_migration(migrator: SQLiteMigrator, migration_no_op:
 
 
 def test_migrator_creates_migrations_table(migrator: SQLiteMigrator) -> None:
-    migrator._create_migrations_table(migrator._cursor)
-    migrator._cursor.execute("SELECT * FROM sqlite_master WHERE type='table' AND name='migrations';")
-    assert migrator._cursor.fetchone() is not None
+    cursor = migrator._db.conn.cursor()
+    migrator._create_migrations_table(cursor)
+    cursor.execute("SELECT * FROM sqlite_master WHERE type='table' AND name='migrations';")
+    assert cursor.fetchone() is not None
 
 
 def test_migrator_migration_sets_version(migrator: SQLiteMigrator, migration_no_op: Migration) -> None:
-    migrator._create_migrations_table(migrator._cursor)
+    cursor = migrator._db.conn.cursor()
+    migrator._create_migrations_table(cursor)
     migrator.register_migration(migration_no_op)
     migrator.run_migrations()
-    migrator._cursor.execute("SELECT MAX(version) FROM migrations;")
-    assert migrator._cursor.fetchone()[0] == 1
+    cursor.execute("SELECT MAX(version) FROM migrations;")
+    assert cursor.fetchone()[0] == 1
 
 
 def test_migrator_gets_current_version(migrator: SQLiteMigrator, migration_no_op: Migration) -> None:
-    assert migrator._get_current_version(migrator._cursor) == 0
-    migrator._create_migrations_table(migrator._cursor)
-    assert migrator._get_current_version(migrator._cursor) == 0
+    cursor = migrator._db.conn.cursor()
+    assert migrator._get_current_version(cursor) == 0
+    migrator._create_migrations_table(cursor)
+    assert migrator._get_current_version(cursor) == 0
     migrator.register_migration(migration_no_op)
     migrator.run_migrations()
-    assert migrator._get_current_version(migrator._cursor) == 1
+    assert migrator._get_current_version(cursor) == 1
 
 
 def test_migrator_runs_single_migration(migrator: SQLiteMigrator, migration_create_test_table: Migration) -> None:
-    migrator._create_migrations_table(migrator._cursor)
-    migrator._run_migration(migration_create_test_table, migrator._cursor)
-    assert migrator._get_current_version(migrator._cursor) == 1
-    migrator._cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
-    assert migrator._cursor.fetchone() is not None
+    cursor = migrator._db.conn.cursor()
+    migrator._create_migrations_table(cursor)
+    migrator._run_migration(migration_create_test_table, cursor)
+    assert migrator._get_current_version(cursor) == 1
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
+    assert cursor.fetchone() is not None
 
 
 def test_migrator_runs_all_migrations_in_memory(migrator: SQLiteMigrator) -> None:
+    cursor = migrator._db.conn.cursor()
     migrations = [Migration(from_version=i, to_version=i + 1, migrate=create_migrate(i)) for i in range(0, 3)]
     for migration in migrations:
         migrator.register_migration(migration)
     migrator.run_migrations()
-    assert migrator._get_current_version(migrator._cursor) == 3
+    assert migrator._get_current_version(cursor) == 3
 
 
-def test_migrator_runs_all_migrations_file(logger: Logger, lock: threading.RLock) -> None:
+def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
         # The Migrator closes the database when it finishes; we cannot use a context manager.
-        original_db_conn = sqlite3.connect(original_db_path)
-        migrator = SQLiteMigrator(conn=original_db_conn, db_path=original_db_path, lock=lock, logger=logger)
+        db = SqliteDatabase(db_path=original_db_path, logger=logger, verbose=False)
+        migrator = SQLiteMigrator(db=db)
         migrations = [Migration(from_version=i, to_version=i + 1, migrate=create_migrate(i)) for i in range(0, 3)]
         for migration in migrations:
             migrator.register_migration(migration)
@@ -272,18 +271,20 @@ def test_migrator_finalizes() -> None:
 def test_migrator_makes_no_changes_on_failed_migration(
     migrator: SQLiteMigrator, migration_no_op: Migration, failing_migrate_callback: MigrateCallback
 ) -> None:
+    cursor = migrator._db.conn.cursor()
     migrator.register_migration(migration_no_op)
     migrator.run_migrations()
-    assert migrator._get_current_version(migrator._cursor) == 1
+    assert migrator._get_current_version(cursor) == 1
     migrator.register_migration(Migration(from_version=1, to_version=2, migrate=failing_migrate_callback))
     with pytest.raises(MigrationError, match="Bad migration"):
         migrator.run_migrations()
-    assert migrator._get_current_version(migrator._cursor) == 1
+    assert migrator._get_current_version(cursor) == 1
 
 
 def test_idempotent_migrations(migrator: SQLiteMigrator, migration_create_test_table: Migration) -> None:
+    cursor = migrator._db.conn.cursor()
     migrator.register_migration(migration_create_test_table)
     migrator.run_migrations()
     # not throwing is sufficient
     migrator.run_migrations()
-    assert migrator._get_current_version(migrator._cursor) == 1
+    assert migrator._get_current_version(cursor) == 1
