@@ -10,25 +10,22 @@ class SqliteDatabase:
     """
     Manages a connection to an SQLite database.
 
+    :param db_path: Path to the database file. If None, an in-memory database is used.
+    :param logger: Logger to use for logging.
+    :param verbose: Whether to log SQL statements. Provides `logger.debug` as the SQLite trace callback.
+
     This is a light wrapper around the `sqlite3` module, providing a few conveniences:
     - The database file is written to disk if it does not exist.
     - Foreign key constraints are enabled by default.
     - The connection is configured to use the `sqlite3.Row` row factory.
-    - A `conn` attribute is provided to access the connection.
-    - A `lock` attribute is provided to lock the database connection.
-    - A `clean` method to run the VACUUM command and report on the freed space.
-    - A `reinitialize` method to close the connection and re-run the init.
-    - A `close` method to close the connection.
 
-    :param db_path: Path to the database file. If None, an in-memory database is used.
-    :param logger: Logger to use for logging.
-    :param verbose: Whether to log SQL statements. Provides `logger.debug` as the SQLite trace callback.
+    In addition to the constructor args, the instance provides the following attributes and methods:
+    - `conn`: A `sqlite3.Connection` object. Note that the connection must never be closed if the database is in-memory.
+    - `lock`: A shared re-entrant lock, used to approximate thread safety.
+    - `clean()`: Runs the SQL `VACUUM;` command and reports on the freed space.
     """
 
     def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
-        self.initialize(db_path=db_path, logger=logger, verbose=verbose)
-
-    def initialize(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
         """Initializes the database. This is used internally by the class constructor."""
         self.logger = logger
         self.db_path = db_path
@@ -48,21 +45,6 @@ class SqliteDatabase:
             self.conn.set_trace_callback(self.logger.debug)
 
         self.conn.execute("PRAGMA foreign_keys = ON;")
-
-    def reinitialize(self) -> None:
-        """
-        Re-initializes the database by closing the connection and re-running the init.
-        Warning: This will wipe the database if it is an in-memory database.
-        """
-        self.close()
-        self.initialize(db_path=self.db_path, logger=self.logger, verbose=self.verbose)
-
-    def close(self) -> None:
-        """
-        Closes the connection to the database.
-        Warning: This will wipe the database if it is an in-memory database.
-        """
-        self.conn.close()
 
     def clean(self) -> None:
         """

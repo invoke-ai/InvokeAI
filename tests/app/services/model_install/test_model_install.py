@@ -48,8 +48,6 @@ def store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     migrator.register_migration(migration_1)
     migrator.register_migration(migration_2)
     migrator.run_migrations()
-    # this test uses a file database, so we need to reinitialize it after migrations
-    db.reinitialize()
     store: ModelRecordServiceBase = ModelRecordServiceSQL(db)
     return store
 

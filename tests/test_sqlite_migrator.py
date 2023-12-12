@@ -198,7 +198,7 @@ def test_migrator_gets_current_version(migrator: SQLiteMigrator, migration_no_op
 def test_migrator_runs_single_migration(migrator: SQLiteMigrator, migration_create_test_table: Migration) -> None:
     cursor = migrator._db.conn.cursor()
     migrator._create_migrations_table(cursor)
-    migrator._run_migration(migration_create_test_table, cursor)
+    migrator._run_migration(migration_create_test_table)
     assert migrator._get_current_version(cursor) == 1
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
     assert cursor.fetchone() is not None
@@ -226,46 +226,6 @@ def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
         with closing(sqlite3.connect(original_db_path)) as original_db_conn:
             original_db_cursor = original_db_conn.cursor()
             assert SQLiteMigrator._get_current_version(original_db_cursor) == 3
-
-
-def test_migrator_creates_temp_db() -> None:
-    with TemporaryDirectory() as tempdir:
-        original_db_path = Path(tempdir) / "invokeai.db"
-        with closing(sqlite3.connect(original_db_path)):
-            # create the db file so _create_temp_db has something to copy
-            pass
-        temp_db_path = SQLiteMigrator._create_temp_db(original_db_path)
-        assert temp_db_path.is_file()
-        assert temp_db_path == SQLiteMigrator._get_temp_db_path(original_db_path)
-
-
-def test_migrator_finalizes() -> None:
-    with TemporaryDirectory() as tempdir:
-        original_db_path = Path(tempdir) / "invokeai.db"
-        temp_db_path = SQLiteMigrator._get_temp_db_path(original_db_path)
-        backup_db_path = SQLiteMigrator._get_backup_db_path(original_db_path)
-        with closing(sqlite3.connect(original_db_path)) as original_db_conn, closing(
-            sqlite3.connect(temp_db_path)
-        ) as temp_db_conn:
-            original_db_cursor = original_db_conn.cursor()
-            original_db_cursor.execute("CREATE TABLE original_db_test (id INTEGER PRIMARY KEY);")
-            original_db_conn.commit()
-            temp_db_cursor = temp_db_conn.cursor()
-            temp_db_cursor.execute("CREATE TABLE temp_db_test (id INTEGER PRIMARY KEY);")
-            temp_db_conn.commit()
-        SQLiteMigrator._finalize_migration(
-            original_db_path=original_db_path,
-            temp_db_path=temp_db_path,
-        )
-        with closing(sqlite3.connect(backup_db_path)) as backup_db_conn, closing(
-            sqlite3.connect(temp_db_path)
-        ) as temp_db_conn:
-            backup_db_cursor = backup_db_conn.cursor()
-            backup_db_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='original_db_test';")
-            assert backup_db_cursor.fetchone() is not None
-            temp_db_cursor = temp_db_conn.cursor()
-            temp_db_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='temp_db_test';")
-            assert temp_db_cursor.fetchone() is None
 
 
 def test_migrator_makes_no_changes_on_failed_migration(

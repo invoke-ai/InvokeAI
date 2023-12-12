@@ -39,8 +39,6 @@ def store(datadir: Any) -> ModelRecordServiceBase:
     migrator.register_migration(migration_1)
     migrator.register_migration(migration_2)
     migrator.run_migrations()
-    # this test uses a file database, so we need to reinitialize it after migrations
-    db.reinitialize()
     return ModelRecordServiceSQL(db)
 
 

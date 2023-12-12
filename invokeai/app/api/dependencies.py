@@ -81,13 +81,7 @@ class ApiDependencies:
         migration_2.register_post_callback(partial(migrate_embedded_workflows, logger=logger, image_files=image_files))
         migrator.register_migration(migration_1)
         migrator.register_migration(migration_2)
-        did_migrate = migrator.run_migrations()
-
-        # We need to reinitialize the database if we migrated, but only if we are using a file database.
-        # This closes the SqliteDatabase's connection and re-runs its `__init__` logic.
-        # If we do this with a memory database, we wipe the db.
-        if not db.db_path and did_migrate:
-            db.reinitialize()
+        migrator.run_migrations()
 
         configuration = config
         logger = logger
