@@ -41,7 +41,7 @@ class InvalidFieldError(TypeError):
 
 class Classification(str, Enum, metaclass=MetaEnum):
     """
-    The feature classification of an Invocation.
+    The classification of an Invocation.
     - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
     - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
     - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
@@ -808,7 +808,7 @@ def invocation(
     :param Optional[str] category: Adds a category to the invocation. Used to group the invocations in the UI. Defaults to None.
     :param Optional[str] version: Adds a version to the invocation. Must be a valid semver string. Defaults to None.
     :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
-    :param FeatureClassification classification: The classification of the invocation. Defaults to FeatureClassification.Stable. Use Beta or Prototype if the invocation is unstable.
+    :param Classification classification: The classification of the invocation. Defaults to FeatureClassification.Stable. Use Beta or Prototype if the invocation is unstable.
     """
 
     def wrapper(cls: Type[TBaseInvocation]) -> Type[TBaseInvocation]:
