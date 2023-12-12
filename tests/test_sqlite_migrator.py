@@ -308,6 +308,8 @@ def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
         with closing(sqlite3.connect(original_db_path)) as original_db_conn:
             original_db_cursor = original_db_conn.cursor()
             assert SQLiteMigrator._get_current_version(original_db_cursor) == 3
+        # Must manually close else we get an error on Windows
+        db.conn.close()
 
 
 def test_migrator_makes_no_changes_on_failed_migration(
