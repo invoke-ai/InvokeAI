@@ -4,8 +4,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_LIMIT } from 'features/gallery/store/types';
+import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
 import { clamp } from 'lodash-es';
-import { useCallback } from 'react';
+import { map } from 'nanostores';
+import { RefObject, useCallback } from 'react';
+import { ListRange, VirtuosoGridHandle } from 'react-virtuoso';
 import { boardsApi } from 'services/api/endpoints/boards';
 import {
   imagesApi,
@@ -13,6 +16,16 @@ import {
 } from 'services/api/endpoints/images';
 import { ListImagesArgs } from 'services/api/types';
 import { imagesAdapter } from 'services/api/util';
+
+export type UseNextPrevImageState = {
+  virtuosoRef: RefObject<VirtuosoGridHandle> | undefined;
+  virtuosoRangeRef: RefObject<ListRange> | undefined;
+};
+
+export const $useNextPrevImageState = map<UseNextPrevImageState>({
+  virtuosoRef: undefined,
+  virtuosoRangeRef: undefined,
+});
 
 export const nextPrevImageButtonsSelector = createMemoizedSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
@@ -78,6 +91,8 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
       isFetching: status === 'pending',
       nextImage,
       prevImage,
+      nextImageIndex,
+      prevImageIndex,
       queryArgs,
     };
   }
@@ -88,7 +103,9 @@ export const useNextPrevImage = () => {
 
   const {
     nextImage,
+    nextImageIndex,
     prevImage,
+    prevImageIndex,
     areMoreImagesAvailable,
     isFetching,
     queryArgs,
@@ -98,11 +115,43 @@ export const useNextPrevImage = () => {
 
   const handlePrevImage = useCallback(() => {
     prevImage && dispatch(imageSelected(prevImage));
-  }, [dispatch, prevImage]);
+    const range = $useNextPrevImageState.get().virtuosoRangeRef?.current;
+    const virtuoso = $useNextPrevImageState.get().virtuosoRef?.current;
+    if (!range || !virtuoso) {
+      return;
+    }
+
+    if (
+      prevImageIndex !== undefined &&
+      (prevImageIndex < range.startIndex || prevImageIndex > range.endIndex)
+    ) {
+      virtuoso.scrollToIndex({
+        index: prevImageIndex,
+        behavior: 'smooth',
+        align: getScrollToIndexAlign(prevImageIndex, range),
+      });
+    }
+  }, [dispatch, prevImage, prevImageIndex]);
 
   const handleNextImage = useCallback(() => {
     nextImage && dispatch(imageSelected(nextImage));
-  }, [dispatch, nextImage]);
+    const range = $useNextPrevImageState.get().virtuosoRangeRef?.current;
+    const virtuoso = $useNextPrevImageState.get().virtuosoRef?.current;
+    if (!range || !virtuoso) {
+      return;
+    }
+
+    if (
+      nextImageIndex !== undefined &&
+      (nextImageIndex < range.startIndex || nextImageIndex > range.endIndex)
+    ) {
+      virtuoso.scrollToIndex({
+        index: nextImageIndex,
+        behavior: 'smooth',
+        align: getScrollToIndexAlign(nextImageIndex, range),
+      });
+    }
+  }, [dispatch, nextImage, nextImageIndex]);
 
   const [listImages] = useLazyListImagesQuery();
 

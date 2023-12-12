@@ -1,7 +1,10 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { EntityId } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
+import { $useNextPrevImageState } from 'features/gallery/hooks/useNextPrevImage';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import {
@@ -11,7 +14,12 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExclamationCircle, FaImage } from 'react-icons/fa';
-import { VirtuosoGrid } from 'react-virtuoso';
+import {
+  ItemContent,
+  ListRange,
+  VirtuosoGrid,
+  VirtuosoGridHandle,
+} from 'react-virtuoso';
 import {
   useLazyListImagesQuery,
   useListImagesQuery,
@@ -20,7 +28,6 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-import { EntityId } from '@reduxjs/toolkit';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -48,6 +55,10 @@ const GalleryImageGrid = () => {
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
 
+  const virtuosoRangeRef = useRef<ListRange | null>(null);
+
+  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
+
   const { currentData, isFetching, isSuccess, isError } =
     useListImagesQuery(queryArgs);
 
@@ -72,12 +83,26 @@ const GalleryImageGrid = () => {
     });
   }, [areMoreAvailable, listImages, queryArgs, currentData?.ids.length]);
 
-  const itemContentFunc = useCallback(
-    (index: number, imageName: EntityId) => (
-      <GalleryImage key={imageName} imageName={imageName as string} />
-    ),
-    []
-  );
+  const virtuosoContext = useMemo<VirtuosoGalleryContext>(() => {
+    return {
+      virtuosoRef,
+      rootRef,
+      virtuosoRangeRef,
+    };
+  }, []);
+
+  const itemContentFunc: ItemContent<EntityId, VirtuosoGalleryContext> =
+    useCallback(
+      (index, imageName, virtuosoContext) => (
+        <GalleryImage
+          key={imageName}
+          index={index}
+          imageName={imageName as string}
+          virtuosoContext={virtuosoContext}
+        />
+      ),
+      []
+    );
 
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
@@ -92,6 +117,15 @@ const GalleryImageGrid = () => {
     }
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
+
+  const onRangeChanged = useCallback((range: ListRange) => {
+    virtuosoRangeRef.current = range;
+  }, []);
+
+  useEffect(() => {
+    $useNextPrevImageState.setKey('virtuosoRef', virtuosoRef);
+    $useNextPrevImageState.setKey('virtuosoRangeRef', virtuosoRangeRef);
+  }, []);
 
   if (!currentData) {
     return (
@@ -140,6 +174,10 @@ const GalleryImageGrid = () => {
             }}
             scrollerRef={setScroller}
             itemContent={itemContentFunc}
+            ref={virtuosoRef}
+            rangeChanged={onRangeChanged}
+            context={virtuosoContext}
+            overscan={10}
           />
         </Box>
         <IAIButton
