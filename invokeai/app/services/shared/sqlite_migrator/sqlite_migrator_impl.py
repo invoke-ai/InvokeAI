@@ -10,11 +10,20 @@ class SQLiteMigrator:
     """
     Manages migrations for a SQLite database.
 
-    :param db: The instanceof :class:`SqliteDatabase` to migrate.
+    :param db: The instance of :class:`SqliteDatabase` to migrate.
 
     Migrations should be registered with :meth:`register_migration`.
 
     Each migration is run in a transaction. If a migration fails, the transaction is rolled back.
+
+    Example Usage:
+    ```py
+    db = SqliteDatabase(db_path="my_db.db", logger=logger)
+    migrator = SQLiteMigrator(db=db)
+    migrator.register_migration(migration_1)
+    migrator.register_migration(migration_2)
+    migrator.run_migrations()
+    ```
     """
 
     backup_path: Optional[Path] = None

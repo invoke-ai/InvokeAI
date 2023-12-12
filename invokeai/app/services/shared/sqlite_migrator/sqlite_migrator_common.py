@@ -22,7 +22,12 @@ class MigrationVersionError(ValueError):
 
 
 class MigrationDependency:
-    """Represents a dependency for a migration."""
+    """
+    Represents a dependency for a migration.
+
+    :param name: The name of the dependency
+    :param dependency_type: The type of the dependency (e.g. str, SomeClass, etc.)
+    """
 
     def __init__(
         self,
@@ -55,26 +60,48 @@ class Migration(BaseModel):
     Migration callbacks will be provided an open cursor to the database. They should not commit their
     transaction; this is handled by the migrator.
 
-    If a migration needs an additional dependency, it must be provided with :meth:`provide_dependency`
-    before the migration is run.
-
     Example Usage:
     ```py
-    # Define the migrate callback
+    # Define the migrate callback. The dependency may be accessed by name in the kwargs.
     def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
-        some_dependency = kwargs["some_dependency"]
+        # Execute SQL using the cursor, taking care to *not commit* a transaction
+        cursor.execute('ALTER TABLE bananas ADD COLUMN with_sushi BOOLEAN DEFAULT FALSE;')
         ...
 
-    # Instantiate the migration, declaring dependencies
+    # Instantiate the migration
     migration = Migration(
         from_version=0,
         to_version=1,
         migrate_callback=migrate_callback,
-        dependencies={"some_dependency": MigrationDependency(name="some_dependency", dependency_type=SomeType)},
+    )
+    ```
+
+    If a migration needs an additional dependency, it must be provided with :meth:`provide_dependency`
+    before the migration is run. The migrator provides dependencies to the migrate callback,
+    raising an error if a dependency is missing or was provided the wrong type.
+
+    Example Usage:
+    ```py
+    # Create a migration dependency. This migration needs access the image files service, so we set the type to the ABC of that service.
+    image_files_dependency = MigrationDependency(name="image_files", dependency_type=ImageFileStorageBase)
+
+    # Define the migrate callback. The dependency may be accessed by name in the kwargs. The migrator will ensure that the dependency is of the required type.
+    def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
+        image_files = kwargs[image_files_dependency.name]
+        # Do something with image_files
+        ...
+
+    # Instantiate the migration, including the dependency.
+    migration = Migration(
+        from_version=0,
+        to_version=1,
+        migrate_callback=migrate_callback,
+        dependencies={image_files_dependency.name: image_files_dependency},
     )
 
-    # Register the dependency before running the migration
-    migration.provide_dependency(name="some_dependency", value=some_value)
+    # Provide the dependency before registering the migration.
+    # (DiskImageFileStorage is an implementation of ImageFileStorageBase)
+    migration.provide_dependency(name="image_files", value=DiskImageFileStorage())
     ```
     """
 
