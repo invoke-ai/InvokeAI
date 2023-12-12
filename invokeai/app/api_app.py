@@ -272,6 +272,8 @@ def invoke_api() -> None:
         port=port,
         loop="asyncio",
         log_level=app_config.log_level,
+        ssl_certfile=app_config.ssl_certfile,
+        ssl_keyfile=app_config.ssl_keyfile,
     )
     server = uvicorn.Server(config)
 

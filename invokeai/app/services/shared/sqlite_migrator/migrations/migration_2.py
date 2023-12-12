@@ -22,6 +22,7 @@ def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
     _drop_old_workflow_tables(cursor)
     _add_workflow_library(cursor)
     _drop_model_manager_metadata(cursor)
+    _recreate_model_config(cursor)
     _migrate_embedded_workflows(cursor, logger, image_files)
 
 
@@ -99,6 +100,41 @@ def _add_workflow_library(cursor: sqlite3.Cursor) -> None:
 def _drop_model_manager_metadata(cursor: sqlite3.Cursor) -> None:
     """Drops the `model_manager_metadata` table."""
     cursor.execute("DROP TABLE IF EXISTS model_manager_metadata;")
+
+
+def _recreate_model_config(cursor: sqlite3.Cursor) -> None:
+    """
+    Drops the `model_config` table, recreating it.
+
+    In 3.4.0, this table used explicit columns but was changed to use json_extract 3.5.0.
+
+    Because this table is not used in production, we are able to simply drop it and recreate it.
+    """
+
+    cursor.execute("DROP TABLE IF EXISTS model_config;")
+
+    cursor.execute(
+        """--sql
+        CREATE TABLE IF NOT EXISTS model_config (
+            id TEXT NOT NULL PRIMARY KEY,
+            -- The next 3 fields are enums in python, unrestricted string here
+            base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
+            type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
+            name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
+            path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
+            format TEXT GENERATED ALWAYS as (json_extract(config, '$.format')) VIRTUAL NOT NULL,
+            original_hash TEXT, -- could be null
+            -- Serialized JSON representation of the whole config object,
+            -- which will contain additional fields from subclasses
+            config TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+            -- Updated via trigger
+            updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+            -- unique constraint on combo of name, base and type
+            UNIQUE(name, base, type)
+        );
+        """
+    )
 
 
 def _migrate_embedded_workflows(

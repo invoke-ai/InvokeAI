@@ -154,14 +154,16 @@ groups in `invokeia.yaml`:
 
 ### Web Server
 
-| Setting  | Default Value  |  Description |
-|----------|----------------|--------------|
-| `host`     | `localhost`      | Name or IP address of the network interface that the web server will listen on  |
-| `port`     | `9090`           | Network port number that the web server will listen on  |
-| `allow_origins`  | `[]`       | A list of host names or IP addresses that are allowed to connect to the InvokeAI API in the format `['host1','host2',...]` |
-| `allow_credentials` | `true`   | Require credentials for a foreign host to access the InvokeAI API (don't change this) |
-| `allow_methods` | `*`         | List of HTTP methods ("GET", "POST") that the web server is allowed to use when accessing the API  |
-| `allow_headers` | `*`         | List of HTTP headers that the web server will accept when accessing the API  |
+| Setting             | Default Value | Description                                                                                                                |
+|---------------------|---------------|----------------------------------------------------------------------------------------------------------------------------|
+| `host`              | `localhost`   | Name or IP address of the network interface that the web server will listen on                                             |
+| `port`              | `9090`        | Network port number that the web server will listen on                                                                     |
+| `allow_origins`     | `[]`          | A list of host names or IP addresses that are allowed to connect to the InvokeAI API in the format `['host1','host2',...]` |
+| `allow_credentials` | `true`        | Require credentials for a foreign host to access the InvokeAI API (don't change this)                                      |
+| `allow_methods`     | `*`           | List of HTTP methods ("GET", "POST") that the web server is allowed to use when accessing the API                          |
+| `allow_headers`     | `*`           | List of HTTP headers that the web server will accept when accessing the API                                                |
+| `ssl_certfile`      | null          | Path to an SSL certificate file, used to enable HTTPS.                                                                     |
+| `ssl_keyfile`       | null          | Path to an SSL keyfile, if the key is not included in the certificate file.                                                |
 
 The documentation for InvokeAI's API can be accessed by browsing to the following URL: [http://localhost:9090/docs].
 

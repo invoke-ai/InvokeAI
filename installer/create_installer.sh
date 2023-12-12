@@ -13,14 +13,6 @@ function is_bin_in_path {
     builtin type -P "$1" &>/dev/null
 }
 
-function does_tag_exist {
-    git rev-parse --quiet --verify "refs/tags/$1" >/dev/null
-}
-
-function git_show_ref {
-    git show-ref --dereference $1 --abbrev 7
-}
-
 function git_show {
     git show -s --format='%h %s' $1
 }
@@ -53,49 +45,10 @@ VERSION=$(
 )
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
-LATEST_TAG="v3-latest"
-
-echo "Building installer for version $VERSION..."
-echo
-
-if does_tag_exist $VERSION; then
-    echo -e "${BCYAN}${VERSION}${RESET} already exists:"
-    git_show_ref tags/$VERSION
-    echo
-fi
-if does_tag_exist $LATEST_TAG; then
-    echo -e "${BCYAN}${LATEST_TAG}${RESET} already exists:"
-    git_show_ref tags/$LATEST_TAG
-    echo
-fi
 
 echo -e "${BGREEN}HEAD${RESET}:"
 git_show
 echo
-
-echo -e -n "Create tags ${BCYAN}${VERSION}${RESET} and ${BCYAN}${LATEST_TAG}${RESET} @ ${BGREEN}HEAD${RESET}, ${RED}deleting existing tags on remote${RESET}? "
-read -e -p 'y/n [n]: ' input
-RESPONSE=${input:='n'}
-if [ "$RESPONSE" == 'y' ]; then
-    echo
-    echo -e "Deleting ${BCYAN}${VERSION}${RESET} tag on remote..."
-    git push origin :refs/tags/$VERSION
-
-    echo -e "Tagging ${BGREEN}HEAD${RESET} with ${BCYAN}${VERSION}${RESET} locally..."
-    if ! git tag -fa $VERSION; then
-        echo "Existing/invalid tag"
-        exit -1
-    fi
-
-    echo -e "Deleting ${BCYAN}${LATEST_TAG}${RESET} tag on remote..."
-    git push origin :refs/tags/$LATEST_TAG
-
-    echo -e "Tagging ${BGREEN}HEAD${RESET} with ${BCYAN}${LATEST_TAG}${RESET} locally..."
-    git tag -fa $LATEST_TAG
-
-    echo
-    echo -e "${BYELLOW}Remember to 'git push origin --tags'!${RESET}"
-fi
 
 # ---------------------- FRONTEND ----------------------
 

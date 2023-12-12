@@ -95,21 +95,13 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     """--sql
                     INSERT INTO model_config (
                        id,
-                       base,
-                       type,
-                       name,
-                       path,
                        original_hash,
                        config
                       )
-                    VALUES (?,?,?,?,?,?,?);
+                    VALUES (?,?,?);
                     """,
                     (
                         key,
-                        record.base,
-                        record.type,
-                        record.name,
-                        record.path,
                         record.original_hash,
                         json_serialized,
                     ),
@@ -173,14 +165,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._cursor.execute(
                     """--sql
                     UPDATE model_config
-                    SET base=?,
-                        type=?,
-                        name=?,
-                        path=?,
+                    SET
                         config=?
                     WHERE id=?;
                     """,
-                    (record.base, record.type, record.name, record.path, json_serialized, key),
+                    (json_serialized, key),
                 )
                 if self._cursor.rowcount == 0:
                     raise UnknownModelException("model not found")
@@ -278,7 +267,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             self._cursor.execute(
                 """--sql
                 SELECT config FROM model_config
-                WHERE model_path=?;
+                WHERE path=?;
                 """,
                 (str(path),),
             )
