@@ -1032,7 +1032,9 @@
         "workflowValidation": "Workflow Validation Error",
         "workflowVersion": "Version",
         "zoomInNodes": "Zoom In",
-        "zoomOutNodes": "Zoom Out"
+        "zoomOutNodes": "Zoom Out",
+        "betaDesc": "This invocation is in beta. Until it is stable, it may have breaking changes during app updates. We plan to support this invocation long-term.",
+        "prototypeDesc": "This invocation is a prototype. It may have breaking changes during app updates and may be removed at any time."
     },
     "parameters": {
         "aspectRatio": "Aspect Ratio",

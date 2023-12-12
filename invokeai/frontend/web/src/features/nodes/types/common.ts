@@ -19,6 +19,9 @@ export const zColorField = z.object({
 });
 export type ColorField = z.infer<typeof zColorField>;
 
+export const zClassification = z.enum(['stable', 'beta', 'prototype']);
+export type Classification = z.infer<typeof zClassification>;
+
 export const zSchedulerField = z.enum([
   'euler',
   'deis',
