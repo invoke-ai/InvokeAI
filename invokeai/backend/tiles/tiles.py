@@ -199,10 +199,8 @@ def calc_tiles_min_overlap(
     if image_height < tile_height:
         tile_height = image_height
 
-    num_tiles_x = math.ceil((image_width - min_overlap) / (tile_width - min_overlap)) if tile_width < image_width else 1
-    num_tiles_y = (
-        math.ceil((image_height - min_overlap) / (tile_height - min_overlap)) if tile_height < image_height else 1
-    )
+    num_tiles_x = math.ceil((image_width - min_overlap) / (tile_width - min_overlap))
+    num_tiles_y = math.ceil((image_height - min_overlap) / (tile_height - min_overlap))
 
     # tiles[y * num_tiles_x + x] is the tile for the y'th row, x'th column.
     tiles: list[Tile] = []
