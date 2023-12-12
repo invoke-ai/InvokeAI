@@ -1,7 +1,7 @@
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetImageWorkflowQuery } from 'services/api/endpoints/images';
+import { useDebouncedImageWorkflow } from 'services/api/hooks/useDebouncedImageWorkflow';
 import { ImageDTO } from 'services/api/types';
 import DataViewer from './DataViewer';
 
@@ -11,7 +11,7 @@ type Props = {
 
 const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
   const { t } = useTranslation();
-  const { currentData: workflow } = useGetImageWorkflowQuery(image.image_name);
+  const { workflow } = useDebouncedImageWorkflow(image);
 
   if (!workflow) {
     return <IAINoContentFallback label={t('nodes.noWorkflow')} />;
