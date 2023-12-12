@@ -85,7 +85,7 @@ def logout():
 
 
 @authn_router.get("/logout")
-def logout():
+def logout_prompt():
     # FIXME: How does CRSF-mitigation work in this app?
     return HTMLResponse(
         """

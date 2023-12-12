@@ -41,6 +41,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import invokeai.frontend.web as web_dir
 
     from ..backend.util.logging import InvokeAILogger
+    from . import authn
     from .api.dependencies import ApiDependencies
     from .api.routers import (
         app_info,
@@ -55,7 +56,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         workflows,
     )
     from .api.sockets import SocketIO
-    from . import authn
     from .invocations.baseinvocation import (
         BaseInvocation,
         InputFieldJSONSchemaExtra,
@@ -132,6 +132,7 @@ app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
 
 app.include_router(authn.authn_router)
+
 
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?
