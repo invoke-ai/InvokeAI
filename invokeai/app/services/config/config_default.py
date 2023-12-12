@@ -176,7 +176,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
 
 from omegaconf import DictConfig, OmegaConf
-from pydantic import Field, TypeAdapter
+from pydantic import Field, SecretStr, TypeAdapter
 from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
@@ -224,6 +224,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     # SSL options correspond to https://www.uvicorn.org/settings/#https
     ssl_certfile        : Optional[Path] = Field(default=None, description="SSL certificate file (for HTTPS)", json_schema_extra=Categories.WebServer)
     ssl_keyfile         : Optional[Path] = Field(default=None, description="SSL key file", json_schema_extra=Categories.WebServer)
+    username            : str = Field(default="InvokeAI", description="Username for password-protecting the web interface.", json_schema_extra=Categories.WebServer)
+    password            : Optional[SecretStr] = Field(default=None, description="Password required for web access.", json_schema_extra=Categories.WebServer)
 
     # FEATURES
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", json_schema_extra=Categories.Features)

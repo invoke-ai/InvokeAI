@@ -32,6 +32,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
     from pydantic.json_schema import models_json_schema
+    from starlette.middleware.authentication import AuthenticationMiddleware
     from torch.backends.mps import is_available as is_mps_available
 
     # for PyCharm:
@@ -54,6 +55,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         workflows,
     )
     from .api.sockets import SocketIO
+    from . import authn
     from .invocations.baseinvocation import (
         BaseInvocation,
         InputFieldJSONSchemaExtra,
@@ -76,6 +78,12 @@ mimetypes.add_type("text/css", ".css")
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
 app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
+
+app.add_middleware(
+    AuthenticationMiddleware,
+    backend=authn.BasicAuthBackend(app_config=app_config),
+    on_error=authn.auth_required,
+)
 
 # Add event handler
 event_handler_id: int = id(app)
@@ -123,6 +131,7 @@ app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
 
+app.include_router(authn.authn_router)
 
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?
