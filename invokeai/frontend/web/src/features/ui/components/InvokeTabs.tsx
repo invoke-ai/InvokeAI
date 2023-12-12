@@ -1,4 +1,5 @@
 import {
+  Flex,
   Icon,
   Spacer,
   Tab,
@@ -16,6 +17,7 @@ import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsMenu';
+import StatusIndicator from 'features/system/components/StatusIndicator';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -100,9 +102,9 @@ const enabledTabsSelector = createMemoizedSelector(
   }
 );
 
-const SIDE_PANEL_MIN_SIZE_PX = 448;
-const MAIN_PANEL_MIN_SIZE_PX = 448;
-const GALLERY_PANEL_MIN_SIZE_PX = 360;
+export const SIDE_PANEL_MIN_SIZE_PX = 448;
+export const MAIN_PANEL_MIN_SIZE_PX = 448;
+export const GALLERY_PANEL_MIN_SIZE_PX = 360;
 
 export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
@@ -232,7 +234,12 @@ const InvokeTabs = () => {
         <InvokeAILogoComponent />
         {tabs}
         <Spacer />
-        <SettingsMenu />
+        <Flex sx={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+          {isSidePanelCollapsed && (
+            <StatusIndicator isSidePanelCollapsed={isSidePanelCollapsed} />
+          )}
+          <SettingsMenu />
+        </Flex>
       </TabList>
       <PanelGroup
         id="app"

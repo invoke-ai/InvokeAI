@@ -35,13 +35,58 @@ const LIGHT_COLOR_MAP = {
   error: 'red.500',
 };
 
-const StatusIndicator = () => {
-  const { isConnected, statusTranslationKey } = useAppSelector(
-    statusIndicatorSelector
+const StatusIcon = ({
+  statusColor,
+}: {
+  statusColor: 'ok' | 'error' | 'working';
+}) => {
+  return (
+    <Icon
+      as={FaCircle}
+      sx={{
+        boxSize: '0.5rem',
+        color: LIGHT_COLOR_MAP[statusColor],
+        _dark: { color: DARK_COLOR_MAP[statusColor] },
+      }}
+    />
   );
+};
+
+const StatusText = ({
+  statusColor,
+}: {
+  statusColor: 'ok' | 'error' | 'working';
+}) => {
   const { t } = useTranslation();
+  const { statusTranslationKey } = useAppSelector(statusIndicatorSelector);
+
+  return (
+    <Text
+      sx={{
+        fontSize: 'sm',
+        fontWeight: '600',
+        pb: '1px',
+        userSelect: 'none',
+        color: LIGHT_COLOR_MAP[statusColor],
+        _dark: {
+          color: DARK_COLOR_MAP[statusColor],
+        },
+      }}
+    >
+      {t(statusTranslationKey as ResourceKey)}
+    </Text>
+  );
+};
+
+type StatusIndicatorProps = {
+  isSidePanelCollapsed?: boolean;
+};
+
+const StatusIndicator = (props: StatusIndicatorProps) => {
   const ref = useRef(null);
+  const { isSidePanelCollapsed = false } = props;
   const { data: queueStatus } = useGetQueueStatusQuery();
+  const { isConnected } = useAppSelector(statusIndicatorSelector);
 
   const statusColor = useMemo(() => {
     if (!isConnected) {
@@ -57,16 +102,9 @@ const StatusIndicator = () => {
 
   const isHovered = useHoverDirty(ref);
 
-  return (
+  return !isSidePanelCollapsed ? (
     <Flex ref={ref} h="full" px={2} alignItems="center" gap={2}>
-      <Icon
-        as={FaCircle}
-        sx={{
-          boxSize: '0.5rem',
-          color: LIGHT_COLOR_MAP[statusColor],
-          _dark: { color: DARK_COLOR_MAP[statusColor] },
-        }}
-      />
+      <StatusIcon statusColor={statusColor} />
       <AnimatePresence>
         {isHovered && (
           <motion.div
@@ -83,22 +121,13 @@ const StatusIndicator = () => {
               transition: { delay: 0.8 },
             }}
           >
-            <Text
-              sx={{
-                fontSize: 'sm',
-                fontWeight: '600',
-                pb: '1px',
-                userSelect: 'none',
-                color: LIGHT_COLOR_MAP[statusColor],
-                _dark: { color: DARK_COLOR_MAP[statusColor] },
-              }}
-            >
-              {t(statusTranslationKey as ResourceKey)}
-            </Text>
+            <StatusText statusColor={statusColor} />
           </motion.div>
         )}
       </AnimatePresence>
     </Flex>
+  ) : (
+    <StatusIcon statusColor={statusColor} />
   );
 };
 
