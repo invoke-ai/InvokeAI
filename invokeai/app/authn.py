@@ -47,7 +47,7 @@ class BasicAuthBackend(AuthenticationBackend):
                 return
 
             decoded = base64.b64decode(credentials).decode("ascii")
-        except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
+        except (ValueError, UnicodeDecodeError, binascii.Error):
             raise AuthenticationError("Invalid basic auth credentials")
 
         username, _, password = decoded.partition(":")
@@ -61,24 +61,24 @@ class BasicAuthBackend(AuthenticationBackend):
 
 def auth_required(conn, exc: Exception):
     if isinstance(exc, AuthenticationRequired):
-        return PlainTextResponse(
-            "Authentication Required",
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            headers={"WWW-Authenticate": f"Basic realm='{BASIC_AUTH_REALM}'"},
-        )
+        message = "Authentication Required"
     else:
-        return PlainTextResponse(str(exc), status_code=status.HTTP_403_FORBIDDEN)
+        message = str(exc)
+    return PlainTextResponse(
+        message,
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        headers={"WWW-Authenticate": f"Basic realm='{BASIC_AUTH_REALM}'"},
+    )
 
 
 authn_router = APIRouter()
 
 
-# FIXME: We want to be able to hit "logout" even when not properly logged in to reset the browser's cached auth info.
-#     How do we exclude these from the auth-required middleware so we can 401 before it blocks with 403?
 @authn_router.post("/logout")
 def logout():
+    """Always sends UNAUTHORIZED, to encourage the browser to discard the current credentials."""
     return PlainTextResponse(
-        "Authentication Required",
+        "Hopefully this reset your browser's authentication credentials!",
         status_code=status.HTTP_401_UNAUTHORIZED,
         headers={"WWW-Authenticate": f"Basic realm='{BASIC_AUTH_REALM}'"},
     )
