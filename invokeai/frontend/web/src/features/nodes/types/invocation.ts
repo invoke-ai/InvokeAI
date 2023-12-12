@@ -1,6 +1,6 @@
 import { Edge, Node } from 'reactflow';
 import { z } from 'zod';
-import { zProgressImage } from './common';
+import { zClassification, zProgressImage } from './common';
 import {
   zFieldInputInstance,
   zFieldInputTemplate,
@@ -21,6 +21,7 @@ export const zInvocationTemplate = z.object({
   version: zSemVer,
   useCache: z.boolean(),
   nodePack: z.string().min(1).nullish(),
+  classification: zClassification,
 });
 export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
 // #endregion

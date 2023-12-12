@@ -96,10 +96,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             CREATE TABLE IF NOT EXISTS model_config (
                 id TEXT NOT NULL PRIMARY KEY,
                 -- The next 3 fields are enums in python, unrestricted string here
-                base TEXT NOT NULL,
-                type TEXT NOT NULL,
-                name TEXT NOT NULL,
-                path TEXT NOT NULL,
+                base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
+                type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
+                name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
+                path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
+                format TEXT GENERATED ALWAYS as (json_extract(config, '$.format')) VIRTUAL NOT NULL,
                 original_hash TEXT, -- could be null
                 -- Serialized JSON representation of the whole config object,
                 -- which will contain additional fields from subclasses
@@ -175,21 +176,13 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     """--sql
                     INSERT INTO model_config (
                        id,
-                       base,
-                       type,
-                       name,
-                       path,
                        original_hash,
                        config
                       )
-                    VALUES (?,?,?,?,?,?,?);
+                    VALUES (?,?,?);
                     """,
                     (
                         key,
-                        record.base,
-                        record.type,
-                        record.name,
-                        record.path,
                         record.original_hash,
                         json_serialized,
                     ),
@@ -269,14 +262,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._cursor.execute(
                     """--sql
                     UPDATE model_config
-                    SET base=?,
-                        type=?,
-                        name=?,
-                        path=?,
+                    SET
                         config=?
                     WHERE id=?;
                     """,
-                    (record.base, record.type, record.name, record.path, json_serialized, key),
+                    (json_serialized, key),
                 )
                 if self._cursor.rowcount == 0:
                     raise UnknownModelException("model not found")
@@ -374,7 +364,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             self._cursor.execute(
                 """--sql
                 SELECT config FROM model_config
-                WHERE model_path=?;
+                WHERE path=?;
                 """,
                 (str(path),),
             )

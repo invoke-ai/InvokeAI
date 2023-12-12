@@ -109,7 +109,8 @@
         "somethingWentWrong": "出了点问题",
         "copyError": "$t(gallery.copy) 错误",
         "input": "输入",
-        "notInstalled": "非 $t(common.installed)"
+        "notInstalled": "非 $t(common.installed)",
+        "delete": "删除"
     },
     "gallery": {
         "generations": "生成的图像",

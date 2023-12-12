@@ -39,6 +39,19 @@ class InvalidFieldError(TypeError):
     pass
 
 
+class Classification(str, Enum, metaclass=MetaEnum):
+    """
+    The classification of an Invocation.
+    - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
+    - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
+    - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
+    """
+
+    Stable = "stable"
+    Beta = "beta"
+    Prototype = "prototype"
+
+
 class Input(str, Enum, metaclass=MetaEnum):
     """
     The type of input a field accepts.
@@ -439,6 +452,7 @@ class UIConfigBase(BaseModel):
         description='The node\'s version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".',
     )
     node_pack: Optional[str] = Field(default=None, description="Whether or not this is a custom node")
+    classification: Classification = Field(default=Classification.Stable, description="The node's classification")
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -607,6 +621,7 @@ class BaseInvocation(ABC, BaseModel):
                 schema["category"] = uiconfig.category
             if uiconfig.node_pack is not None:
                 schema["node_pack"] = uiconfig.node_pack
+            schema["classification"] = uiconfig.classification
             schema["version"] = uiconfig.version
         if "required" not in schema or not isinstance(schema["required"], list):
             schema["required"] = []
@@ -782,6 +797,7 @@ def invocation(
     category: Optional[str] = None,
     version: Optional[str] = None,
     use_cache: Optional[bool] = True,
+    classification: Classification = Classification.Stable,
 ) -> Callable[[Type[TBaseInvocation]], Type[TBaseInvocation]]:
     """
     Registers an invocation.
@@ -792,6 +808,7 @@ def invocation(
     :param Optional[str] category: Adds a category to the invocation. Used to group the invocations in the UI. Defaults to None.
     :param Optional[str] version: Adds a version to the invocation. Must be a valid semver string. Defaults to None.
     :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
+    :param Classification classification: The classification of the invocation. Defaults to FeatureClassification.Stable. Use Beta or Prototype if the invocation is unstable.
     """
 
     def wrapper(cls: Type[TBaseInvocation]) -> Type[TBaseInvocation]:
@@ -812,6 +829,7 @@ def invocation(
         cls.UIConfig.title = title
         cls.UIConfig.tags = tags
         cls.UIConfig.category = category
+        cls.UIConfig.classification = classification
 
         # Grab the node pack's name from the module name, if it's a custom node
         is_custom_node = cls.__module__.rsplit(".", 1)[0] == "invokeai.app.invocations"

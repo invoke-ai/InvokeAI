@@ -5,6 +5,7 @@ import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import InvocationNodeCollapsedHandles from './InvocationNodeCollapsedHandles';
 import InvocationNodeInfoIcon from './InvocationNodeInfoIcon';
 import InvocationNodeStatusIndicator from './InvocationNodeStatusIndicator';
+import InvocationNodeClassificationIcon from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeClassificationIcon';
 
 type Props = {
   nodeId: string;
@@ -31,6 +32,7 @@ const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
       }}
     >
       <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
+      <InvocationNodeClassificationIcon nodeId={nodeId} />
       <NodeTitle nodeId={nodeId} />
       <Flex alignItems="center">
         <InvocationNodeStatusIndicator nodeId={nodeId} />
