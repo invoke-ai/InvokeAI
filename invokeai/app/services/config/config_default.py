@@ -221,6 +221,9 @@ class InvokeAIAppConfig(InvokeAISettings):
     allow_credentials   : bool = Field(default=True, description="Allow CORS credentials", json_schema_extra=Categories.WebServer)
     allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS", json_schema_extra=Categories.WebServer)
     allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS", json_schema_extra=Categories.WebServer)
+    # SSL options correspond to https://www.uvicorn.org/settings/#https
+    ssl_certfile        : Optional[Path] = Field(default=None, description="SSL certificate file (for HTTPS)", json_schema_extra=Categories.WebServer)
+    ssl_keyfile         : Optional[Path] = Field(default=None, description="SSL key file", json_schema_extra=Categories.WebServer)
 
     # FEATURES
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", json_schema_extra=Categories.Features)
