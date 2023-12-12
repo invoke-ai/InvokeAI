@@ -56,7 +56,7 @@ class MigrateModelYamlToDb:
         """Fetch the models.yaml DictConfig for this installation."""
         yaml_path = self.config.model_conf_path
         omegaconf = OmegaConf.load(yaml_path)
-        assert isinstance(omegaconf,DictConfig)
+        assert isinstance(omegaconf, DictConfig)
         return omegaconf
 
     def migrate(self) -> None:
