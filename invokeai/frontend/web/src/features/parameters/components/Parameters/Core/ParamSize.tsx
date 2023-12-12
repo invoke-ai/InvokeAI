@@ -1,10 +1,9 @@
 import { Flex, FormControl, FormLabel, Spacer } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
 import {
   setAspectRatio,
   setShouldLockAspectRatio,
@@ -14,14 +13,14 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaLock } from 'react-icons/fa';
 import { MdOutlineSwapVert } from 'react-icons/md';
-import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import ParamAspectRatio, { mappedAspectRatios } from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
 
-const sizeOptsSelector = createSelector(
-  [generationSelector, activeTabNameSelector],
-  (generation, activeTabName) => {
+const sizeOptsSelector = createMemoizedSelector(
+  [stateSelector, activeTabNameSelector],
+  ({ generation }, activeTabName) => {
     const { shouldFitToWidthHeight, shouldLockAspectRatio, width, height } =
       generation;
 
@@ -32,8 +31,7 @@ const sizeOptsSelector = createSelector(
       width,
       height,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 export default function ParamSize() {

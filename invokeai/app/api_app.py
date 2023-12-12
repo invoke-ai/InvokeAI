@@ -1,14 +1,17 @@
-from typing import Any
-
-from fastapi.responses import HTMLResponse
-
-from .services.config import InvokeAIAppConfig
-
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
+import sys
+
+from invokeai.version.invokeai_version import __version__
+
+from .services.config import InvokeAIAppConfig
+
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
+if app_config.version:
+    print(f"InvokeAI version {__version__}")
+    sys.exit(0)
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import asyncio
@@ -16,6 +19,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import socket
     from inspect import signature
     from pathlib import Path
+    from typing import Any
 
     import uvicorn
     from fastapi import FastAPI
@@ -23,7 +27,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
     from fastapi.openapi.utils import get_openapi
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, HTMLResponse
     from fastapi.staticfiles import StaticFiles
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
@@ -34,7 +38,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     # noinspection PyUnresolvedReferences
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
     import invokeai.frontend.web as web_dir
-    from invokeai.version.invokeai_version import __version__
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
@@ -51,7 +54,12 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         workflows,
     )
     from .api.sockets import SocketIO
-    from .invocations.baseinvocation import BaseInvocation, UIConfigBase, _InputField, _OutputField
+    from .invocations.baseinvocation import (
+        BaseInvocation,
+        InputFieldJSONSchemaExtra,
+        OutputFieldJSONSchemaExtra,
+        UIConfigBase,
+    )
 
     if is_mps_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
@@ -147,7 +155,11 @@ def custom_openapi() -> dict[str, Any]:
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = models_json_schema(
-        [(UIConfigBase, "serialization"), (_InputField, "serialization"), (_OutputField, "serialization")],
+        [
+            (UIConfigBase, "serialization"),
+            (InputFieldJSONSchemaExtra, "serialization"),
+            (OutputFieldJSONSchemaExtra, "serialization"),
+        ],
         ref_template="#/components/schemas/{model}",
     )
     for schema_key, ui_config_schema in ui_config_schemas[1]["$defs"].items():
@@ -155,7 +167,7 @@ def custom_openapi() -> dict[str, Any]:
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
-        invoker_name = invoker.__name__
+        invoker_name = invoker.__name__  # type: ignore [attr-defined] # this is a valid attribute
         output_type = signature(obj=invoker.invoke).return_annotation
         output_type_title = output_type_titles[output_type.__name__]
         invoker_schema = openapi_schema["components"]["schemas"][f"{invoker_name}"]
@@ -207,18 +219,19 @@ def overridden_redoc() -> HTMLResponse:
 
 web_root_path = Path(list(web_dir.__path__)[0])
 
+# Only serve the UI if we it has a build
+if (web_root_path / "dist").exists():
+    # Cannot add headers to StaticFiles, so we must serve index.html with a custom route
+    # Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
+    @app.get("/", include_in_schema=False, name="ui_root")
+    def get_index() -> FileResponse:
+        return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
 
-# Cannot add headers to StaticFiles, so we must serve index.html with a custom route
-# Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
-@app.get("/", include_in_schema=False, name="ui_root")
-def get_index() -> FileResponse:
-    return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
+    # # Must mount *after* the other routes else it borks em
+    app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
+    app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 
-
-# # Must mount *after* the other routes else it borks em
 app.mount("/static", StaticFiles(directory=Path(web_root_path, "static/")), name="static")  # docs favicon is in here
-app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
-app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 
 
 def invoke_api() -> None:
@@ -259,6 +272,8 @@ def invoke_api() -> None:
         port=port,
         loop="asyncio",
         log_level=app_config.log_level,
+        ssl_certfile=app_config.ssl_certfile,
+        ssl_keyfile=app_config.ssl_keyfile,
     )
     server = uvicorn.Server(config)
 
@@ -273,7 +288,4 @@ def invoke_api() -> None:
 
 
 if __name__ == "__main__":
-    if app_config.version:
-        print(f"InvokeAI version {__version__}")
-    else:
-        invoke_api()
+    invoke_api()

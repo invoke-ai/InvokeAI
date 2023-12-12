@@ -2,7 +2,7 @@ import { Box, ChakraProps, Flex, IconButton, Spinner } from '@chakra-ui/react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
-import { useNextPrevImage } from '../hooks/useNextPrevImage';
+import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 
 const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',

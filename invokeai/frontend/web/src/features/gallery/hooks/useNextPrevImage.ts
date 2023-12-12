@@ -1,8 +1,10 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { clamp, isEqual } from 'lodash-es';
+import { IMAGE_LIMIT } from 'features/gallery/store/types';
+import { clamp } from 'lodash-es';
 import { map } from 'nanostores';
 import { RefObject, useCallback } from 'react';
 import { ListRange, VirtuosoGridHandle } from 'react-virtuoso';
@@ -13,8 +15,6 @@ import {
 } from 'services/api/endpoints/images';
 import { ListImagesArgs } from 'services/api/types';
 import { imagesAdapter } from 'services/api/util';
-import { selectListImagesBaseQueryArgs } from '../store/gallerySelectors';
-import { IMAGE_LIMIT } from '../store/types';
 
 export type UseNextPrevImageState = {
   virtuosoRef: RefObject<VirtuosoGridHandle> | undefined;
@@ -26,7 +26,7 @@ export const $useNextPrevImageState = map<UseNextPrevImageState>({
   virtuosoRangeRef: undefined,
 });
 
-export const nextPrevImageButtonsSelector = createSelector(
+export const nextPrevImageButtonsSelector = createMemoizedSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
   (state, baseQueryArgs) => {
     const { data, status } =
@@ -94,11 +94,6 @@ export const nextPrevImageButtonsSelector = createSelector(
       prevImageIndex,
       queryArgs,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

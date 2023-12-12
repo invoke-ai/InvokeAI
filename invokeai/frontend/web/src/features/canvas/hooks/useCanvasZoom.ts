@@ -1,32 +1,27 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setStageCoordinates,
   setStageScale,
 } from 'features/canvas/store/canvasSlice';
-import Konva from 'konva';
-import { KonvaEventObject } from 'konva/lib/Node';
-import { clamp, isEqual } from 'lodash-es';
-
-import { MutableRefObject, useCallback } from 'react';
 import {
   CANVAS_SCALE_BY,
   MAX_CANVAS_SCALE,
   MIN_CANVAS_SCALE,
-} from '../util/constants';
+} from 'features/canvas/util/constants';
+import Konva from 'konva';
+import { KonvaEventObject } from 'konva/lib/Node';
+import { clamp } from 'lodash-es';
+import { MutableRefObject, useCallback } from 'react';
 
-const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    const { isMoveStageKeyHeld, stageScale } = canvas;
-    return {
-      isMoveStageKeyHeld,
-      stageScale,
-    };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
-);
+const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+  const { isMoveStageKeyHeld, stageScale } = canvas;
+  return {
+    isMoveStageKeyHeld,
+    stageScale,
+  };
+});
 
 const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();

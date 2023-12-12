@@ -1,20 +1,18 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { mouseOverFieldChanged } from 'features/nodes/store/nodesSlice';
 import { useCallback, useMemo } from 'react';
-import { mouseOverFieldChanged } from '../store/nodesSlice';
 
 export const useIsMouseOverField = (nodeId: string, fieldName: string) => {
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
-      createSelector(
+      createMemoizedSelector(
         stateSelector,
         ({ nodes }) =>
           nodes.mouseOverField?.nodeId === nodeId &&
-          nodes.mouseOverField?.fieldName === fieldName,
-        defaultSelectorOptions
+          nodes.mouseOverField?.fieldName === fieldName
       ),
     [fieldName, nodeId]
   );

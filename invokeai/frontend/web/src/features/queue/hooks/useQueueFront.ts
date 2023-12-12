@@ -5,7 +5,7 @@ import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 export const useQueueFront = () => {
   const dispatch = useAppDispatch();

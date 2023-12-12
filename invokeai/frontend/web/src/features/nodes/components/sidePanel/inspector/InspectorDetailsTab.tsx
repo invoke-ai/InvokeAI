@@ -6,47 +6,39 @@ import {
   HStack,
   Text,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIIconButton from 'common/components/IAIIconButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
+import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import {
-  InvocationNodeData,
+  InvocationNode,
   InvocationTemplate,
   isInvocationNode,
-} from 'features/nodes/types/types';
-import { memo } from 'react';
+} from 'features/nodes/types/invocation';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSync } from 'react-icons/fa';
-import { Node } from 'reactflow';
-import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
-import ScrollableContent from '../ScrollableContent';
 import EditableNodeTitle from './details/EditableNodeTitle';
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const lastSelectedNodeId =
-      nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+  const lastSelectedNodeId =
+    nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-    const lastSelectedNode = nodes.nodes.find(
-      (node) => node.id === lastSelectedNodeId
-    );
+  const lastSelectedNode = nodes.nodes.find(
+    (node) => node.id === lastSelectedNodeId
+  );
 
-    const lastSelectedNodeTemplate = lastSelectedNode
-      ? nodes.nodeTemplates[lastSelectedNode.data.type]
-      : undefined;
+  const lastSelectedNodeTemplate = lastSelectedNode
+    ? nodes.nodeTemplates[lastSelectedNode.data.type]
+    : undefined;
 
-    return {
-      node: lastSelectedNode,
-      template: lastSelectedNodeTemplate,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    node: lastSelectedNode,
+    template: lastSelectedNodeTemplate,
+  };
+});
 
 const InspectorDetailsTab = () => {
   const { node, template } = useAppSelector(selector);
@@ -63,12 +55,17 @@ const InspectorDetailsTab = () => {
 
 export default memo(InspectorDetailsTab);
 
-const Content = (props: {
-  node: Node<InvocationNodeData>;
+type ContentProps = {
+  node: InvocationNode;
   template: InvocationTemplate;
-}) => {
+};
+
+const Content = memo(({ node, template }: ContentProps) => {
   const { t } = useTranslation();
-  const { needsUpdate, updateNode } = useNodeVersion(props.node.id);
+  const needsUpdate = useMemo(
+    () => getNeedsUpdate(node, template),
+    [node, template]
+  );
   return (
     <Box
       sx={{
@@ -87,12 +84,12 @@ const Content = (props: {
             w: 'full',
           }}
         >
-          <EditableNodeTitle nodeId={props.node.data.id} />
+          <EditableNodeTitle nodeId={node.data.id} />
           <HStack>
             <FormControl>
               <FormLabel>{t('nodes.nodeType')}</FormLabel>
               <Text fontSize="sm" fontWeight={600}>
-                {props.template.title}
+                {template.title}
               </Text>
             </FormControl>
             <Flex
@@ -104,22 +101,16 @@ const Content = (props: {
               <FormControl isInvalid={needsUpdate}>
                 <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
                 <Text fontSize="sm" fontWeight={600}>
-                  {props.node.data.version}
+                  {node.data.version}
                 </Text>
               </FormControl>
-              {needsUpdate && (
-                <IAIIconButton
-                  aria-label={t('nodes.updateNode')}
-                  tooltip={t('nodes.updateNode')}
-                  icon={<FaSync />}
-                  onClick={updateNode}
-                />
-              )}
             </Flex>
           </HStack>
-          <NotesTextarea nodeId={props.node.data.id} />
+          <NotesTextarea nodeId={node.data.id} />
         </Flex>
       </ScrollableContent>
     </Box>
   );
-};
+});
+
+Content.displayName = 'Content';

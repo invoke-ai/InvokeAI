@@ -1,18 +1,15 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { redo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaRedo } from 'react-icons/fa';
 
-import { redo } from 'features/canvas/store/canvasSlice';
-
-import { stateSelector } from 'app/store/store';
-import { isEqual } from 'lodash-es';
-import { useTranslation } from 'react-i18next';
-import { useCallback } from 'react';
-
-const canvasRedoSelector = createSelector(
+const canvasRedoSelector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
   ({ canvas }, activeTabName) => {
     const { futureLayerStates } = canvas;
@@ -21,11 +18,6 @@ const canvasRedoSelector = createSelector(
       canRedo: futureLayerStates.length > 0,
       activeTabName,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

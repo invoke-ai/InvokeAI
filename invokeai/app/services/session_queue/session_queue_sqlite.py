@@ -28,7 +28,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     prepare_values_to_insert,
 )
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class SqliteSessionQueue(SessionQueueBase):
@@ -42,7 +42,8 @@ class SqliteSessionQueue(SessionQueueBase):
         self._set_in_progress_to_canceled()
         prune_result = self.prune(DEFAULT_QUEUE_ID)
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_session_event)
-        self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
+        if prune_result.deleted > 0:
+            self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
@@ -198,6 +199,15 @@ class SqliteSessionQueue(SessionQueueBase):
                 """
             )
 
+            self.__cursor.execute("PRAGMA table_info(session_queue)")
+            columns = [column[1] for column in self.__cursor.fetchall()]
+            if "workflow" not in columns:
+                self.__cursor.execute(
+                    """--sql
+                    ALTER TABLE session_queue ADD COLUMN workflow TEXT;
+                    """
+                )
+
             self.__conn.commit()
         except Exception:
             self.__conn.rollback()
@@ -280,8 +290,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             self.__cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )

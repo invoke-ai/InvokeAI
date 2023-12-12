@@ -1,24 +1,18 @@
 import { Flex } from '@chakra-ui/react';
-import { memo } from 'react';
-import ParamSymmetryHorizontal from './ParamSymmetryHorizontal';
-import ParamSymmetryVertical from './ParamSymmetryVertical';
-
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import ParamSymmetryHorizontal from './ParamSymmetryHorizontal';
 import ParamSymmetryToggle from './ParamSymmetryToggle';
+import ParamSymmetryVertical from './ParamSymmetryVertical';
 
-const selector = createSelector(
-  stateSelector,
-  (state) => ({
-    activeLabel: state.generation.shouldUseSymmetry ? 'Enabled' : undefined,
-  }),
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, (state) => ({
+  activeLabel: state.generation.shouldUseSymmetry ? 'Enabled' : undefined,
+}));
 
 const ParamSymmetryCollapse = () => {
   const { t } = useTranslation();

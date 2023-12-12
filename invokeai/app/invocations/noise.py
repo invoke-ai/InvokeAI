@@ -6,7 +6,7 @@ from pydantic import field_validator
 
 from invokeai.app.invocations.latent import LatentsField
 from invokeai.app.shared.fields import FieldDescriptions
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.app.util.misc import SEED_MAX
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from .baseinvocation import (
@@ -83,16 +83,16 @@ def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
     title="Noise",
     tags=["latents", "noise"],
     category="latents",
-    version="1.0.0",
+    version="1.0.1",
 )
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 
     seed: int = InputField(
+        default=0,
         ge=0,
         le=SEED_MAX,
         description=FieldDescriptions.seed,
-        default_factory=get_random_seed,
     )
     width: int = InputField(
         default=512,

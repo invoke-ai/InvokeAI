@@ -1,10 +1,10 @@
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { memo } from 'react';
 import { Image } from 'react-konva';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import useImage from 'use-image';
-import { CanvasImage } from '../store/canvasTypes';
+import { CanvasImage } from 'features/canvas/store/canvasTypes';
 import IAICanvasImageErrorFallback from './IAICanvasImageErrorFallback';
 
 type IAICanvasImageProps = {

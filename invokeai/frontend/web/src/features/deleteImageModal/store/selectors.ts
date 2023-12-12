@@ -1,11 +1,11 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { isInvocationNode } from 'features/nodes/types/types';
-import { some } from 'lodash-es';
-import { ImageUsage } from './types';
 import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { isImageFieldInputInstance } from 'features/nodes/types/field';
+import { isInvocationNode } from 'features/nodes/types/invocation';
+import { some } from 'lodash-es';
+import { ImageUsage } from './types';
 
 export const getImageUsage = (state: RootState, image_name: string) => {
   const { generation, canvas, nodes, controlAdapters } = state;
@@ -19,7 +19,8 @@ export const getImageUsage = (state: RootState, image_name: string) => {
     return some(
       node.data.inputs,
       (input) =>
-        input.type === 'ImageField' && input.value?.image_name === image_name
+        isImageFieldInputInstance(input) &&
+        input.value?.image_name === image_name
     );
   });
 
@@ -39,7 +40,7 @@ export const getImageUsage = (state: RootState, image_name: string) => {
   return imageUsage;
 };
 
-export const selectImageUsage = createSelector(
+export const selectImageUsage = createMemoizedSelector(
   [(state: RootState) => state],
   (state) => {
     const { imagesToDelete } = state.deleteImageModal;
@@ -53,6 +54,5 @@ export const selectImageUsage = createSelector(
     );
 
     return imagesUsage;
-  },
-  defaultSelectorOptions
+  }
 );

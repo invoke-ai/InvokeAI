@@ -31,7 +31,6 @@ from .baseinvocation import (
     UIComponent,
     UIType,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -326,9 +325,9 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     title="ONNX Latents to Image",
     tags=["latents", "image", "vae", "onnx"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
 )
-class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
@@ -378,7 +377,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

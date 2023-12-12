@@ -1,21 +1,16 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
+import { combinatorialToggled } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { combinatorialToggled } from '../store/dynamicPromptsSlice';
 
-const selector = createSelector(
-  stateSelector,
-  (state) => {
-    const { combinatorial } = state.dynamicPrompts;
+const selector = createMemoizedSelector(stateSelector, (state) => {
+  const { combinatorial } = state.dynamicPrompts;
 
-    return { combinatorial };
-  },
-  defaultSelectorOptions
-);
+  return { combinatorial };
+});
 
 const ParamDynamicPromptsCombinatorial = () => {
   const { combinatorial } = useAppSelector(selector);

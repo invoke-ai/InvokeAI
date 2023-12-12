@@ -1,25 +1,28 @@
-import { useState, PropsWithChildren, memo, useCallback } from 'react';
-import { useSelector } from 'react-redux';
-import { createSelector } from '@reduxjs/toolkit';
 import { Flex, Image, Text } from '@chakra-ui/react';
-import { motion } from 'framer-motion';
-import { NodeProps } from 'reactflow';
-import NodeWrapper from '../common/NodeWrapper';
-import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { stateSelector } from 'app/store/store';
+import { motion } from 'framer-motion';
+import { PropsWithChildren, memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
+import { NodeProps } from 'reactflow';
 
-const selector = createSelector(stateSelector, ({ system, gallery }) => {
-  const imageDTO = gallery.selection[gallery.selection.length - 1];
+const selector = createMemoizedSelector(
+  stateSelector,
+  ({ system, gallery }) => {
+    const imageDTO = gallery.selection[gallery.selection.length - 1];
 
-  return {
-    imageDTO,
-    progressImage: system.denoiseProgress?.progress_image,
-  };
-});
+    return {
+      imageDTO,
+      progressImage: system.denoiseProgress?.progress_image,
+    };
+  }
+);
 
 const CurrentImageNode = (props: NodeProps) => {
   const { progressImage, imageDTO } = useSelector(selector);

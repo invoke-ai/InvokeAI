@@ -49,7 +49,7 @@ class Edge(BaseModel):
 
 def get_output_field(node: BaseInvocation, field: str) -> Any:
     node_type = type(node)
-    node_outputs = get_type_hints(node_type.get_output_type())
+    node_outputs = get_type_hints(node_type.get_output_annotation())
     node_output_field = node_outputs.get(field) or None
     return node_output_field
 
@@ -188,7 +188,7 @@ class GraphInvocationOutput(BaseInvocationOutput):
 
 
 # TODO: Fill this out and move to invocations
-@invocation("graph")
+@invocation("graph", version="1.0.0")
 class GraphInvocation(BaseInvocation):
     """Execute a graph"""
 
@@ -205,29 +205,31 @@ class IterateInvocationOutput(BaseInvocationOutput):
     """Used to connect iteration outputs. Will be expanded to a specific output."""
 
     item: Any = OutputField(
-        description="The item being iterated over", title="Collection Item", ui_type=UIType.CollectionItem
+        description="The item being iterated over", title="Collection Item", ui_type=UIType._CollectionItem
     )
+    index: int = OutputField(description="The index of the item", title="Index")
+    total: int = OutputField(description="The total number of items", title="Total")
 
 
 # TODO: Fill this out and move to invocations
-@invocation("iterate", version="1.0.0")
+@invocation("iterate", version="1.1.0")
 class IterateInvocation(BaseInvocation):
     """Iterates over a list of items"""
 
     collection: list[Any] = InputField(
-        description="The list of items to iterate over", default_factory=list, ui_type=UIType.Collection
+        description="The list of items to iterate over", default=[], ui_type=UIType._Collection
     )
     index: int = InputField(description="The index, will be provided on executed iterators", default=0, ui_hidden=True)
 
     def invoke(self, context: InvocationContext) -> IterateInvocationOutput:
         """Produces the outputs as values"""
-        return IterateInvocationOutput(item=self.collection[self.index])
+        return IterateInvocationOutput(item=self.collection[self.index], index=self.index, total=len(self.collection))
 
 
 @invocation_output("collect_output")
 class CollectInvocationOutput(BaseInvocationOutput):
     collection: list[Any] = OutputField(
-        description="The collection of input items", title="Collection", ui_type=UIType.Collection
+        description="The collection of input items", title="Collection", ui_type=UIType._Collection
     )
 
 
@@ -238,12 +240,12 @@ class CollectInvocation(BaseInvocation):
     item: Optional[Any] = InputField(
         default=None,
         description="The item to collect (all inputs must be of the same type)",
-        ui_type=UIType.CollectionItem,
+        ui_type=UIType._CollectionItem,
         title="Collection Item",
         input=Input.Connection,
     )
     collection: list[Any] = InputField(
-        description="The collection, will be provided on execution", default_factory=list, ui_hidden=True
+        description="The collection, will be provided on execution", default=[], ui_hidden=True
     )
 
     def invoke(self, context: InvocationContext) -> CollectInvocationOutput:
@@ -379,7 +381,7 @@ class Graph(BaseModel):
                 raise NodeNotFoundError(f"Edge destination node {edge.destination.node_id} does not exist in the graph")
 
             # output fields are not on the node object directly, they are on the output type
-            if edge.source.field not in source_node.get_output_type().model_fields:
+            if edge.source.field not in source_node.get_output_annotation().model_fields:
                 raise NodeFieldNotFoundError(
                     f"Edge source field {edge.source.field} does not exist in node {edge.source.node_id}"
                 )

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
-import { useClearQueue } from '../hooks/useClearQueue';
+import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import QueueButton from './common/QueueButton';
 import { ChakraProps, Text } from '@chakra-ui/react';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';

@@ -39,7 +39,6 @@ from .baseinvocation import (
     InvocationContext,
     OutputField,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -129,7 +128,7 @@ class ControlNetInvocation(BaseInvocation):
 
 
 # This invocation exists for other invocations to subclass it - do not register with @invocation!
-class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+class ImageProcessorInvocation(BaseInvocation, WithMetadata):
     """Base class for invocations that preprocess images for ControlNet"""
 
     image: ImageField = InputField(description="The image to process")
@@ -153,7 +152,7 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             node_id=self.id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         """Builds an ImageOutput and its ImageField"""
@@ -173,7 +172,7 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithWorkflow):
     title="Canny Processor",
     tags=["controlnet", "canny"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class CannyImageProcessorInvocation(ImageProcessorInvocation):
     """Canny edge detection for ControlNet"""
@@ -196,7 +195,7 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation):
     title="HED (softedge) Processor",
     tags=["controlnet", "hed", "softedge"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class HedImageProcessorInvocation(ImageProcessorInvocation):
     """Applies HED edge detection to image"""
@@ -225,7 +224,7 @@ class HedImageProcessorInvocation(ImageProcessorInvocation):
     title="Lineart Processor",
     tags=["controlnet", "lineart"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class LineartImageProcessorInvocation(ImageProcessorInvocation):
     """Applies line art processing to image"""
@@ -247,7 +246,7 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation):
     title="Lineart Anime Processor",
     tags=["controlnet", "lineart", "anime"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
     """Applies line art anime processing to image"""
@@ -270,7 +269,7 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
     title="Openpose Processor",
     tags=["controlnet", "openpose", "pose"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class OpenposeImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Openpose processing to image"""
@@ -295,7 +294,7 @@ class OpenposeImageProcessorInvocation(ImageProcessorInvocation):
     title="Midas Depth Processor",
     tags=["controlnet", "midas"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class MidasDepthImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Midas depth processing to image"""
@@ -322,7 +321,7 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation):
     title="Normal BAE Processor",
     tags=["controlnet"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class NormalbaeImageProcessorInvocation(ImageProcessorInvocation):
     """Applies NormalBae processing to image"""
@@ -339,7 +338,7 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation):
 
 
 @invocation(
-    "mlsd_image_processor", title="MLSD Processor", tags=["controlnet", "mlsd"], category="controlnet", version="1.1.0"
+    "mlsd_image_processor", title="MLSD Processor", tags=["controlnet", "mlsd"], category="controlnet", version="1.2.0"
 )
 class MlsdImageProcessorInvocation(ImageProcessorInvocation):
     """Applies MLSD processing to image"""
@@ -362,7 +361,7 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation):
 
 
 @invocation(
-    "pidi_image_processor", title="PIDI Processor", tags=["controlnet", "pidi"], category="controlnet", version="1.1.0"
+    "pidi_image_processor", title="PIDI Processor", tags=["controlnet", "pidi"], category="controlnet", version="1.2.0"
 )
 class PidiImageProcessorInvocation(ImageProcessorInvocation):
     """Applies PIDI processing to image"""
@@ -389,7 +388,7 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation):
     title="Content Shuffle Processor",
     tags=["controlnet", "contentshuffle"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation):
     """Applies content shuffle processing to image"""
@@ -419,7 +418,7 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation):
     title="Zoe (Depth) Processor",
     tags=["controlnet", "zoe", "depth"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Zoe depth processing to image"""
@@ -435,7 +434,7 @@ class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
     title="Mediapipe Face Processor",
     tags=["controlnet", "mediapipe", "face"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class MediapipeFaceProcessorInvocation(ImageProcessorInvocation):
     """Applies mediapipe face processing to image"""
@@ -458,7 +457,7 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation):
     title="Leres (Depth) Processor",
     tags=["controlnet", "leres", "depth"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class LeresImageProcessorInvocation(ImageProcessorInvocation):
     """Applies leres processing to image"""
@@ -487,7 +486,7 @@ class LeresImageProcessorInvocation(ImageProcessorInvocation):
     title="Tile Resample Processor",
     tags=["controlnet", "tile"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class TileResamplerProcessorInvocation(ImageProcessorInvocation):
     """Tile resampler processor"""
@@ -527,7 +526,7 @@ class TileResamplerProcessorInvocation(ImageProcessorInvocation):
     title="Segment Anything Processor",
     tags=["controlnet", "segmentanything"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class SegmentAnythingProcessorInvocation(ImageProcessorInvocation):
     """Applies segment anything processing to image"""
@@ -569,7 +568,7 @@ class SamDetectorReproducibleColors(SamDetector):
     title="Color Map Processor",
     tags=["controlnet"],
     category="controlnet",
-    version="1.1.0",
+    version="1.2.0",
 )
 class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a color map from the provided image"""

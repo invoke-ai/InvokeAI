@@ -1,35 +1,25 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { isEqual } from 'lodash-es';
-
-import { Group, Line, Rect } from 'react-konva';
 import {
   isCanvasBaseImage,
   isCanvasBaseLine,
   isCanvasEraseRect,
   isCanvasFillRect,
-} from '../store/canvasTypes';
-import IAICanvasImage from './IAICanvasImage';
+} from 'features/canvas/store/canvasTypes';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { memo } from 'react';
+import { Group, Line, Rect } from 'react-konva';
+import IAICanvasImage from './IAICanvasImage';
 
-const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    const {
-      layerState: { objects },
-    } = canvas;
-    return {
-      objects,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+  const {
+    layerState: { objects },
+  } = canvas;
+  return {
+    objects,
+  };
+});
 
 const IAICanvasObjectRenderer = () => {
   const { objects } = useAppSelector(selector);

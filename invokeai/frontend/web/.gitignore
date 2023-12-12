@@ -9,7 +9,8 @@ lerna-debug.log*
 
 node_modules
 # We want to distribute the repo
-# dist
+dist
+dist/**
 dist-ssr
 *.local
 

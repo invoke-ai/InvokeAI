@@ -12,7 +12,7 @@ import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
-import { imagesApi } from '../../../../../services/api/endpoints/images';
+import { imagesApi } from 'services/api/endpoints/images';
 
 export const addImageUploadedFulfilledListener = () => {
   startAppListening({

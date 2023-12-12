@@ -1,7 +1,7 @@
 {
     "accessibility": {
         "copyMetadataJson": "Copy metadata JSON",
-        "createIssue":"Create Issue",
+        "createIssue": "Create Issue",
         "exitViewer": "Exit Viewer",
         "flipHorizontally": "Flip Horizontally",
         "flipVertically": "Flip Vertically",
@@ -13,7 +13,7 @@
         "nextImage": "Next Image",
         "previousImage": "Previous Image",
         "reset": "Reset",
-        "resetUI":"$t(accessibility.reset) UI",
+        "resetUI": "$t(accessibility.reset) UI",
         "rotateClockwise": "Rotate Clockwise",
         "rotateCounterClockwise": "Rotate Counter-Clockwise",
         "showGalleryPanel": "Show Gallery Panel",
@@ -59,7 +59,7 @@
         "back": "Back",
         "batch": "Batch Manager",
         "cancel": "Cancel",
-        "copyError":"$t(gallery.copy) Error",
+        "copyError": "$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
         "checkpoint": "Checkpoint",
@@ -67,7 +67,9 @@
         "controlNet": "ControlNet",
         "controlAdapter": "Control Adapter",
         "data": "Data",
+        "delete": "Delete",
         "details": "Details",
+        "direction": "Direction",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
         "darkMode": "Dark Mode",
@@ -76,7 +78,7 @@
         "error": "Error",
         "file": "File",
         "folder": "Folder",
-        "format":"format",
+        "format": "format",
         "generate": "Generate",
         "githubLabel": "Github",
         "hotkeysLabel": "Hotkeys",
@@ -115,6 +117,7 @@
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
+        "orderBy": "Order By",
         "outpaint": "outpaint",
         "outputs": "Outputs",
         "postProcessDesc1": "Invoke AI offers a wide variety of post processing features. Image Upscaling and Face Restoration are already available in the WebUI. You can access them from the Advanced Options menu of the Text To Image and Image To Image tabs. You can also process images directly, using the image action buttons above the current image display or in the viewer.",
@@ -125,6 +128,8 @@
         "random": "Random",
         "reportBugLabel": "Report Bug",
         "safetensors": "Safetensors",
+        "save": "Save",
+        "saveAs": "Save As",
         "settingsLabel": "Settings",
         "simple": "Simple",
         "somethingWentWrong": "Something went wrong",
@@ -160,7 +165,14 @@
         "trainingDesc2": "InvokeAI already supports training custom embeddourings using Textual Inversion using the main script.",
         "txt2img": "Text To Image",
         "unifiedCanvas": "Unified Canvas",
-        "upload": "Upload"
+        "unknown": "Unknown",
+        "upload": "Upload",
+        "updated": "Updated",
+        "created": "Created",
+        "prevPage": "Previous Page",
+        "nextPage": "Next Page",
+        "unknownError": "Unknown Error",
+        "unsaved": "Unsaved"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -242,7 +254,6 @@
         "setControlImageDimensions": "Set Control Image Dimensions To W/H",
         "showAdvanced": "Show Advanced",
         "toggleControlNet": "Toggle this ControlNet",
-        "unstarImage": "Unstar Image",
         "w": "W",
         "weight": "Weight",
         "enableIPAdapter": "Enable IP Adapter",
@@ -355,9 +366,9 @@
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
-        "drop":"Drop",
-        "dropOrUpload":"$t(gallery.drop) or Upload",
-        "dropToUpload":"$t(gallery.drop) to Upload",
+        "drop": "Drop",
+        "dropOrUpload": "$t(gallery.drop) or Upload",
+        "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage": "Delete Image",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
@@ -377,12 +388,16 @@
         "showGenerations": "Show Generations",
         "showUploads": "Show Uploads",
         "singleColumnLayout": "Single Column Layout",
+        "starImage": "Star Image",
+        "unstarImage": "Unstar Image",
         "unableToLoad": "Unable to load Gallery",
         "uploads": "Uploads",
         "deleteSelection": "Delete Selection",
         "downloadSelection": "Download Selection",
         "preparingDownload": "Preparing Download",
-        "preparingDownloadFailed": "Problem Preparing Download"
+        "preparingDownloadFailed": "Problem Preparing Download",
+        "problemDeletingImages": "Problem Deleting Images",
+        "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
     "hotkeys": {
         "acceptStagingImage": {
@@ -598,6 +613,7 @@
     },
     "metadata": {
         "cfgScale": "CFG scale",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "createdBy": "Created By",
         "fit": "Image to image fit",
         "generationMode": "Generation Mode",
@@ -775,7 +791,7 @@
         "esrganModel": "ESRGAN Model",
         "loading": "loading",
         "noLoRAsAvailable": "No LoRAs available",
-        "noLoRAsLoaded":"No LoRAs Loaded",
+        "noLoRAsLoaded": "No LoRAs Loaded",
         "noMatchingLoRAs": "No matching LoRAs",
         "noMatchingModels": "No matching Models",
         "noModelsAvailable": "No models available",
@@ -787,7 +803,7 @@
     "nodes": {
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
-        "addLinearView":"Add to Linear View",
+        "addLinearView": "Add to Linear View",
         "animatedEdges": "Animated Edges",
         "animatedEdgesHelp": "Animate selected edges and edges connected to selected nodes",
         "boardField": "Board",
@@ -802,9 +818,12 @@
         "cannotConnectOutputToOutput": "Cannot connect output to output",
         "cannotConnectToSelf": "Cannot connect to self",
         "cannotDuplicateConnection": "Cannot create duplicate connections",
+        "nodePack": "Node pack",
         "clipField": "Clip",
         "clipFieldDescription": "Tokenizer and text_encoder submodels.",
         "collection": "Collection",
+        "collectionFieldType": "{{name}} Collection",
+        "collectionOrScalarFieldType": "{{name}} Collection|Scalar",
         "collectionDescription": "TODO",
         "collectionItem": "Collection Item",
         "collectionItemDescription": "TODO",
@@ -891,10 +910,15 @@
         "mainModelField": "Model",
         "mainModelFieldDescription": "TODO",
         "maybeIncompatible": "May be Incompatible With Installed",
-        "mismatchedVersion": "Has Mismatched Version",
+        "mismatchedVersion": "Invalid node: node {{node}} of type {{type}} has mismatched version (try updating?)",
         "missingCanvaInitImage": "Missing canvas init image",
         "missingCanvaInitMaskImages": "Missing canvas init and mask images",
-        "missingTemplate": "Missing Template",
+        "missingTemplate": "Invalid node: node {{node}} of type {{type}} missing template (not installed?)",
+        "sourceNodeDoesNotExist": "Invalid edge: source/output node {{node}} does not exist",
+        "targetNodeDoesNotExist": "Invalid edge: target/input node {{node}} does not exist",
+        "sourceNodeFieldDoesNotExist": "Invalid edge: source/output field {{node}}.{{field}} does not exist",
+        "targetNodeFieldDoesNotExist": "Invalid edge: target/input field {{node}}.{{field}} does not exist",
+        "deletedInvalidEdge": "Deleted invalid edge {{source}} -> {{target}}",
         "noConnectionData": "No connection data",
         "noConnectionInProgress": "No connection in progress",
         "node": "Node",
@@ -926,9 +950,9 @@
         "problemSettingTitle": "Problem Setting Title",
         "reloadNodeTemplates": "Reload Node Templates",
         "removeLinearView": "Remove from Linear View",
-        "resetWorkflow": "Reset Workflow",
-        "resetWorkflowDesc": "Are you sure you want to reset this workflow?",
-        "resetWorkflowDesc2": "Resetting the workflow will clear all nodes, edges and workflow details.",
+        "resetWorkflow": "Reset Workflow Editor",
+        "resetWorkflowDesc": "Are you sure you want to reset the Workflow Editor?",
+        "resetWorkflowDesc2": "Resetting the Workflow Editor will clear all nodes, edges and workflow details. Saved workflows will not be affected.",
         "scheduler": "Scheduler",
         "schedulerDescription": "TODO",
         "sDXLMainModelField": "SDXL Model",
@@ -954,25 +978,37 @@
         "stringDescription": "Strings are text.",
         "stringPolymorphic": "String Polymorphic",
         "stringPolymorphicDescription": "A collection of strings.",
-        "unableToLoadWorkflow": "Unable to Validate Workflow",
+        "unableToLoadWorkflow": "Unable to Load Workflow",
         "unableToParseEdge": "Unable to parse edge",
         "unableToParseNode": "Unable to parse node",
+        "unableToUpdateNode": "Unable to update node",
         "unableToValidateWorkflow": "Unable to Validate Workflow",
+        "unableToMigrateWorkflow": "Unable to Migrate Workflow",
+        "unknownErrorValidatingWorkflow": "Unknown error validating workflow",
+        "inputFieldTypeParseError": "Unable to parse type of input field {{node}}.{{field}} ({{message}})",
+        "outputFieldTypeParseError": "Unable to parse type of output field {{node}}.{{field}} ({{message}})",
+        "unableToExtractSchemaNameFromRef": "unable to extract schema name from ref",
+        "unsupportedArrayItemType": "unsupported array item type \"{{type}}\"",
+        "unsupportedAnyOfLength": "too many union members ({{count}})",
+        "unsupportedMismatchedUnion": "mismatched CollectionOrScalar type with base types {{firstType}} and {{secondType}}",
+        "unableToParseFieldType": "unable to parse field type",
+        "unableToExtractEnumOptions": "unable to extract enum options",
         "uNetField": "UNet",
         "uNetFieldDescription": "UNet submodel.",
         "unhandledInputProperty": "Unhandled input property",
         "unhandledOutputProperty": "Unhandled output property",
         "unknownField": "Unknown field",
-        "unknownFieldType": "$(nodes.unknownField) type",
+        "unknownFieldType": "$t(nodes.unknownField) type: {{type}}",
         "unknownNode": "Unknown Node",
-        "unknownNodeType":"$t(nodes.unknownNode) type",
+        "unknownNodeType": "Unknown node type",
         "unknownTemplate": "Unknown Template",
-        "unknownInput": "Unknown input",
+        "unknownInput": "Unknown input: {{name}}",
         "unkownInvocation": "Unknown Invocation type",
-        "unknownOutput": "Unknown output",
+        "unknownOutput": "Unknown output: {{name}}",
         "updateNode": "Update Node",
-        "updateAllNodes": "Update All Nodes",
         "updateApp": "Update App",
+        "updateAllNodes": "Update Nodes",
+        "allNodesUpdated": "All Nodes Updated",
         "unableToUpdateNodes_one": "Unable to update {{count}} node",
         "unableToUpdateNodes_other": "Unable to update {{count}} nodes",
         "vaeField": "Vae",
@@ -981,6 +1017,8 @@
         "vaeModelFieldDescription": "TODO",
         "validateConnections": "Validate Connections and Graph",
         "validateConnectionsHelp": "Prevent invalid connections from being made, and invalid graphs from being invoked",
+        "unableToGetWorkflowVersion": "Unable to get workflow schema version",
+        "unrecognizedWorkflowVersion": "Unrecognized workflow schema version {{version}}",
         "version": "Version",
         "versionUnknown": " Version Unknown",
         "workflow": "Workflow",
@@ -1010,6 +1048,8 @@
             "setType": "Set cancel type"
         },
         "cfgScale": "CFG Scale",
+        "cfgRescaleMultiplier": "CFG Rescale Multiplier",
+        "cfgRescale": "CFG Rescale",
         "clipSkip": "CLIP Skip",
         "clipSkipWithLayerCount": "CLIP Skip {{layerCount}}",
         "closeViewer": "Close Viewer",
@@ -1239,7 +1279,6 @@
         "modelAddedSimple": "Model Added",
         "modelAddFailed": "Model Add Failed",
         "nodesBrokenConnections": "Cannot load. Some connections are broken.",
-        "nodesCleared": "Nodes Cleared",
         "nodesCorruptedGraph": "Cannot load. Graph seems to be corrupted.",
         "nodesLoaded": "Nodes Loaded",
         "nodesLoadedFailed": "Failed To Load Nodes",
@@ -1288,7 +1327,10 @@
         "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "uploadFailedUnableToLoadDesc": "Unable to load file",
         "upscalingFailed": "Upscaling Failed",
-        "workflowLoaded": "Workflow Loaded"
+        "workflowLoaded": "Workflow Loaded",
+        "problemRetrievingWorkflow": "Problem Retrieving Workflow",
+        "workflowDeleted": "Workflow Deleted",
+        "problemDeletingWorkflow": "Problem Deleting Workflow"
     },
     "tooltip": {
         "feature": {
@@ -1336,15 +1378,11 @@
         },
         "compositingBlur": {
             "heading": "Blur",
-            "paragraphs": [
-                "The blur radius of the mask."
-            ]
+            "paragraphs": ["The blur radius of the mask."]
         },
         "compositingBlurMethod": {
             "heading": "Blur Method",
-            "paragraphs": [
-                "The method of blur applied to the masked area."
-            ]
+            "paragraphs": ["The method of blur applied to the masked area."]
         },
         "compositingCoherencePass": {
             "heading": "Coherence Pass",
@@ -1354,9 +1392,7 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": [
-                "The mode of the Coherence Pass."
-            ]
+            "paragraphs": ["The mode of the Coherence Pass."]
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
@@ -1374,9 +1410,7 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
-            "paragraphs": [
-                "Adjust the mask."
-            ]
+            "paragraphs": ["Adjust the mask."]
         },
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
@@ -1434,9 +1468,7 @@
         },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": [
-                "Method to infill the selected area."
-            ]
+            "paragraphs": ["Method to infill the selected area."]
         },
         "lora": {
             "heading": "LoRA Weight",
@@ -1456,6 +1488,12 @@
             "heading": "CFG Scale",
             "paragraphs": [
                 "Controls how much your prompt influences the generation process."
+            ]
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "CFG Rescale Multiplier",
+            "paragraphs": [
+                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr). Suggested value 0.7."
             ]
         },
         "paramDenoisingStrength": {
@@ -1576,7 +1614,7 @@
         "redo": "Redo",
         "resetView": "Reset View",
         "saveBoxRegionOnly": "Save Box Region Only",
-        "saveMask":"Save $t(unifiedCanvas.mask)",
+        "saveMask": "Save $t(unifiedCanvas.mask)",
         "saveToGallery": "Save To Gallery",
         "scaledBoundingBox": "Scaled Bounding Box",
         "showCanvasDebugInfo": "Show Additional Canvas Info",
@@ -1587,5 +1625,36 @@
         "showIntermediates": "Show Intermediates",
         "snapToGrid": "Snap to Grid",
         "undo": "Undo"
+    },
+    "workflows": {
+        "workflows": "Workflows",
+        "workflowLibrary": "Library",
+        "userWorkflows": "My Workflows",
+        "defaultWorkflows": "Default Workflows",
+        "openWorkflow": "Open Workflow",
+        "uploadWorkflow": "Upload Workflow",
+        "deleteWorkflow": "Delete Workflow",
+        "unnamedWorkflow": "Unnamed Workflow",
+        "downloadWorkflow": "Download Workflow",
+        "saveWorkflow": "Save Workflow",
+        "saveWorkflowAs": "Save Workflow As",
+        "savingWorkflow": "Saving Workflow...",
+        "problemSavingWorkflow": "Problem Saving Workflow",
+        "workflowSaved": "Workflow Saved",
+        "noRecentWorkflows": "No Recent Workflows",
+        "noUserWorkflows": "No User Workflows",
+        "noSystemWorkflows": "No System Workflows",
+        "problemLoading": "Problem Loading Workflows",
+        "loading": "Loading Workflows",
+        "noDescription": "No description",
+        "searchWorkflows": "Search Workflows",
+        "clearWorkflowSearchFilter": "Clear Workflow Search Filter",
+        "workflowName": "Workflow Name",
+        "workflowEditorReset": "Workflow Editor Reset",
+        "workflowEditorMenu": "Workflow Editor Menu",
+        "workflowIsOpen": "Workflow is Open"
+    },
+    "app": {
+        "storeNotInitialized": "Store is not initialized"
     }
 }

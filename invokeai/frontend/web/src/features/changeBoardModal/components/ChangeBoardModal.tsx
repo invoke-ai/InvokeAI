@@ -8,22 +8,24 @@ import {
   Flex,
   Text,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import {
+  changeBoardReset,
+  isModalOpenChanged,
+} from 'features/changeBoardModal/store/slice';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import {
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
 } from 'services/api/endpoints/images';
-import { changeBoardReset, isModalOpenChanged } from '../store/slice';
-import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector],
   ({ changeBoardModal }) => {
     const { isModalOpen, imagesToChange } = changeBoardModal;
@@ -32,8 +34,7 @@ const selector = createSelector(
       isModalOpen,
       imagesToChange,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ChangeBoardModal = () => {

@@ -1,12 +1,11 @@
 import type { TypedAddListener, TypedStartListening } from '@reduxjs/toolkit';
 import {
-  AnyAction,
+  UnknownAction,
   ListenerEffect,
   addListener,
   createListenerMiddleware,
 } from '@reduxjs/toolkit';
-
-import type { AppDispatch, RootState } from '../../store';
+import type { AppDispatch, RootState } from 'app/store/store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
 import { addAnyEnqueuedListener } from './listeners/anyEnqueued';
@@ -71,7 +70,7 @@ import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } f
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
-import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
+import { addWorkflowLoadRequestedListener } from './listeners/workflowLoadRequested';
 import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 
 export const listenerMiddleware = createListenerMiddleware();
@@ -87,7 +86,7 @@ export const addAppListener = addListener as TypedAddListener<
 >;
 
 export type AppListenerEffect = ListenerEffect<
-  AnyAction,
+  UnknownAction,
   RootState,
   AppDispatch
 >;
@@ -178,7 +177,7 @@ addBoardIdSelectedListener();
 addReceivedOpenAPISchemaListener();
 
 // Workflows
-addWorkflowLoadedListener();
+addWorkflowLoadRequestedListener();
 addUpdateAllNodesRequestedListener();
 
 // DND

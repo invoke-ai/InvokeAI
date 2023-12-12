@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import {
@@ -12,6 +13,7 @@ import {
 } from 'features/dnd/types';
 import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
+import { useScrollToVisible } from 'features/gallery/hooks/useScrollToVisible';
 import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
@@ -21,8 +23,6 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
-import { useScrollToVisible } from 'features/gallery/hooks/useScrollToVisible';
 
 interface HoverableImageProps {
   imageName: string;

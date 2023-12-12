@@ -1,43 +1,38 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { isInvocationNode } from 'features/nodes/types/types';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ImageOutput } from 'services/api/types';
 import { AnyResult } from 'services/events/types';
-import ScrollableContent from '../ScrollableContent';
 import ImageOutputPreview from './outputs/ImageOutputPreview';
-import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const lastSelectedNodeId =
-      nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+  const lastSelectedNodeId =
+    nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-    const lastSelectedNode = nodes.nodes.find(
-      (node) => node.id === lastSelectedNodeId
-    );
+  const lastSelectedNode = nodes.nodes.find(
+    (node) => node.id === lastSelectedNodeId
+  );
 
-    const lastSelectedNodeTemplate = lastSelectedNode
-      ? nodes.nodeTemplates[lastSelectedNode.data.type]
-      : undefined;
+  const lastSelectedNodeTemplate = lastSelectedNode
+    ? nodes.nodeTemplates[lastSelectedNode.data.type]
+    : undefined;
 
-    const nes =
-      nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
+  const nes =
+    nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
 
-    return {
-      node: lastSelectedNode,
-      template: lastSelectedNodeTemplate,
-      nes,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    node: lastSelectedNode,
+    template: lastSelectedNodeTemplate,
+    nes,
+  };
+});
 
 const InspectorOutputsTab = () => {
   const { node, template, nes } = useAppSelector(selector);

@@ -1,10 +1,10 @@
 import { Flex, FormControl, FormLabel } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIInput from 'common/components/IAIInput';
 import IAITextarea from 'common/components/IAITextarea';
+import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import {
   workflowAuthorChanged,
   workflowContactChanged,
@@ -13,29 +13,23 @@ import {
   workflowNotesChanged,
   workflowTagsChanged,
   workflowVersionChanged,
-} from 'features/nodes/store/nodesSlice';
+} from 'features/nodes/store/workflowSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
-import ScrollableContent from '../ScrollableContent';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const { author, name, description, tags, version, contact, notes } =
-      nodes.workflow;
+const selector = createMemoizedSelector(stateSelector, ({ workflow }) => {
+  const { author, name, description, tags, version, contact, notes } = workflow;
 
-    return {
-      name,
-      author,
-      description,
-      tags,
-      version,
-      contact,
-      notes,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    name,
+    author,
+    description,
+    tags,
+    version,
+    contact,
+    notes,
+  };
+});
 
 const WorkflowGeneralTab = () => {
   const { author, name, description, tags, version, contact, notes } =

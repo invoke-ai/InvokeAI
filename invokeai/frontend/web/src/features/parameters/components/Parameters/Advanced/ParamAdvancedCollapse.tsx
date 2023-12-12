@@ -1,29 +1,44 @@
 import { Divider, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
+import { ParamCpuNoiseToggle } from 'features/parameters/components/Parameters/Noise/ParamCpuNoise';
+import ParamSeamless from 'features/parameters/components/Parameters/Seamless/ParamSeamless';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ParamCpuNoiseToggle } from '../Noise/ParamCpuNoise';
-import ParamSeamless from '../Seamless/ParamSeamless';
+import ParamCFGRescaleMultiplier from './ParamCFGRescaleMultiplier';
 import ParamClipSkip from './ParamClipSkip';
 
-const selector = createSelector(
-  stateSelector,
-  (state: RootState) => {
-    const { clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
-      state.generation;
+const selector = createMemoizedSelector(stateSelector, (state: RootState) => {
+  const {
+    clipSkip,
+    model,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldUseCpuNoise,
+    cfgRescaleMultiplier,
+  } = state.generation;
 
-    return { clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise };
-  },
-  defaultSelectorOptions
-);
+  return {
+    clipSkip,
+    model,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldUseCpuNoise,
+    cfgRescaleMultiplier,
+  };
+});
 
 export default function ParamAdvancedCollapse() {
-  const { clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise } =
-    useAppSelector(selector);
+  const {
+    clipSkip,
+    model,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldUseCpuNoise,
+    cfgRescaleMultiplier,
+  } = useAppSelector(selector);
   const { t } = useTranslation();
   const activeLabel = useMemo(() => {
     const activeLabel: string[] = [];
@@ -46,8 +61,20 @@ export default function ParamAdvancedCollapse() {
       activeLabel.push(t('parameters.seamlessY'));
     }
 
+    if (cfgRescaleMultiplier) {
+      activeLabel.push(t('parameters.cfgRescale'));
+    }
+
     return activeLabel.join(', ');
-  }, [clipSkip, model, seamlessXAxis, seamlessYAxis, shouldUseCpuNoise, t]);
+  }, [
+    cfgRescaleMultiplier,
+    clipSkip,
+    model,
+    seamlessXAxis,
+    seamlessYAxis,
+    shouldUseCpuNoise,
+    t,
+  ]);
 
   return (
     <IAICollapse label={t('common.advanced')} activeLabel={activeLabel}>
@@ -61,6 +88,8 @@ export default function ParamAdvancedCollapse() {
           </>
         )}
         <ParamCpuNoiseToggle />
+        <Divider />
+        <ParamCFGRescaleMultiplier />
       </Flex>
     </IAICollapse>
   );

@@ -1,33 +1,28 @@
-import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-
 import { Box, Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import SyncModelsButton from 'features/modelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { modelSelected } from 'features/parameters/store/actions';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
-import SyncModelsButton from 'features/modelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach } from 'lodash-es';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import {
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
-const selector = createSelector(
-  stateSelector,
-  (state) => ({ model: state.generation.model }),
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, (state) => ({
+  model: state.generation.model,
+}));
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();

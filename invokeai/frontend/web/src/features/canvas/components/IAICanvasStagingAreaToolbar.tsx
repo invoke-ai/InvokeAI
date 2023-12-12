@@ -1,8 +1,11 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import {
   commitStagingAreaImage,
   discardStagedImages,
@@ -11,10 +14,6 @@ import {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
-
-import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -28,30 +27,25 @@ import {
   FaTimes,
 } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { stagingAreaImageSaved } from '../store/actions';
 
-const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    const {
-      layerState: {
-        stagingArea: { images, selectedImageIndex },
-      },
-      shouldShowStagingOutline,
-      shouldShowStagingImage,
-    } = canvas;
+const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+  const {
+    layerState: {
+      stagingArea: { images, selectedImageIndex },
+    },
+    shouldShowStagingOutline,
+    shouldShowStagingImage,
+  } = canvas;
 
-    return {
-      currentIndex: selectedImageIndex,
-      total: images.length,
-      currentStagingAreaImage:
-        images.length > 0 ? images[selectedImageIndex] : undefined,
-      shouldShowStagingImage,
-      shouldShowStagingOutline,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    currentIndex: selectedImageIndex,
+    total: images.length,
+    currentStagingAreaImage:
+      images.length > 0 ? images[selectedImageIndex] : undefined,
+    shouldShowStagingImage,
+    shouldShowStagingOutline,
+  };
+});
 
 const IAICanvasStagingAreaToolbar = () => {
   const dispatch = useAppDispatch();

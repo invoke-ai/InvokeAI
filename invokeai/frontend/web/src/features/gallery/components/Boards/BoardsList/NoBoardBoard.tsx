@@ -1,38 +1,33 @@
 import { Box, Flex, Image, Text, Tooltip } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import { RemoveFromBoardDropData } from 'features/dnd/types';
+import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import {
   autoAddBoardIdChanged,
   boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { useBoardName } from 'services/api/hooks/useBoardName';
-import AutoAddIcon from '../AutoAddIcon';
-import BoardContextMenu from '../BoardContextMenu';
+import { useTranslation } from 'react-i18next';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
 } from 'services/api/endpoints/boards';
-import { useTranslation } from 'react-i18next';
+import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
   isSelected: boolean;
 }
 
-const selector = createSelector(
-  stateSelector,
-  ({ gallery }) => {
-    const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-    return { autoAddBoardId, autoAssignBoardOnClick };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ gallery }) => {
+  const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
+  return { autoAddBoardId, autoAssignBoardOnClick };
+});
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();

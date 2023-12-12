@@ -6,6 +6,7 @@ import {
   MenuItem,
   MenuList,
   Spacer,
+  useDisclosure,
 } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo } from 'react';
@@ -19,14 +20,17 @@ import {
   FaKeyboard,
 } from 'react-icons/fa';
 import { menuListMotionProps } from 'theme/components/menu';
-import { useFeatureStatus } from '../hooks/useFeatureStatus';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 import InvokeAILogoComponent from './InvokeAILogoComponent';
 import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
+import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 
 const SiteHeader = () => {
   const { t } = useTranslation();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  useGlobalMenuCloseTrigger(onClose);
 
   const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
   const isDiscordLinkEnabled = useFeatureStatus('discordLink').isFeatureEnabled;
@@ -46,7 +50,7 @@ const SiteHeader = () => {
       <Spacer />
       <StatusIndicator />
 
-      <Menu>
+      <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
         <MenuButton
           as={IAIIconButton}
           variant="link"

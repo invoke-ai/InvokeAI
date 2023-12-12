@@ -1,7 +1,7 @@
 import IAIButton from 'common/components/IAIButton';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useClearInvocationCache } from '../hooks/useClearInvocationCache';
+import { useClearInvocationCache } from 'features/queue/hooks/useClearInvocationCache';
 
 const ClearInvocationCacheButton = () => {
   const { t } = useTranslation();

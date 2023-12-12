@@ -1,8 +1,8 @@
 import { Flex, Icon, Text } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { STATUS_TRANSLATION_KEYS } from 'features/system/store/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ResourceKey } from 'i18next';
 import { memo, useMemo, useRef } from 'react';
@@ -10,9 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { FaCircle } from 'react-icons/fa';
 import { useHoverDirty } from 'react-use';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { STATUS_TRANSLATION_KEYS } from '../store/types';
 
-const statusIndicatorSelector = createSelector(
+const statusIndicatorSelector = createMemoizedSelector(
   stateSelector,
   ({ system }) => {
     const { isConnected, status } = system;
@@ -21,8 +20,7 @@ const statusIndicatorSelector = createSelector(
       isConnected,
       statusTranslationKey: STATUS_TRANSLATION_KEYS[status],
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const DARK_COLOR_MAP = {

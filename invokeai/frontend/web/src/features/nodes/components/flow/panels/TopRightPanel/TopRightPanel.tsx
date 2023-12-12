@@ -1,18 +1,17 @@
-import { Flex } from '@chakra-ui/layout';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Flex } from '@chakra-ui/react';
+import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import { memo } from 'react';
-import FieldTypeLegend from './FieldTypeLegend';
-import WorkflowEditorSettings from './WorkflowEditorSettings';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';
 
 const TopRightPanel = () => {
-  const shouldShowFieldTypeLegend = useAppSelector(
-    (state) => state.nodes.shouldShowFieldTypeLegend
-  );
+  const isWorkflowLibraryEnabled =
+    useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
     <Flex sx={{ gap: 2, position: 'absolute', top: 2, insetInlineEnd: 2 }}>
-      <WorkflowEditorSettings />
-      {shouldShowFieldTypeLegend && <FieldTypeLegend />}
+      {isWorkflowLibraryEnabled && <WorkflowLibraryButton />}
+      <WorkflowLibraryMenu />
     </Flex>
   );
 };

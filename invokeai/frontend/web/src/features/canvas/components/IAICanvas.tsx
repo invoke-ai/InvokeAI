@@ -1,28 +1,25 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import useCanvasDragMove from 'features/canvas/hooks/useCanvasDragMove';
+import useCanvasHotkeys from 'features/canvas/hooks/useCanvasHotkeys';
+import useCanvasMouseDown from 'features/canvas/hooks/useCanvasMouseDown';
+import useCanvasMouseMove from 'features/canvas/hooks/useCanvasMouseMove';
+import useCanvasMouseOut from 'features/canvas/hooks/useCanvasMouseOut';
+import useCanvasMouseUp from 'features/canvas/hooks/useCanvasMouseUp';
+import useCanvasWheel from 'features/canvas/hooks/useCanvasZoom';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import { canvasResized } from 'features/canvas/store/canvasSlice';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+  setCanvasBaseLayer,
+  setCanvasStage,
+} from 'features/canvas/util/konvaInstanceProvider';
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
-import useCanvasDragMove from '../hooks/useCanvasDragMove';
-import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
-import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
-import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
-import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
-import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
-import useCanvasWheel from '../hooks/useCanvasZoom';
-import { canvasResized } from '../store/canvasSlice';
-import {
-  setCanvasBaseLayer,
-  setCanvasStage,
-} from '../util/konvaInstanceProvider';
 import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
@@ -35,9 +32,9 @@ import IAICanvasStatusText from './IAICanvasStatusText';
 import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
 import IAICanvasToolPreview from './IAICanvasToolPreview';
 
-const selector = createSelector(
-  [canvasSelector, isStagingSelector],
-  (canvas, isStaging) => {
+const selector = createMemoizedSelector(
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     const {
       isMaskEnabled,
       stageScale,
@@ -83,8 +80,7 @@ const selector = createSelector(
       shouldShowIntermediates,
       shouldAntialias,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ChakraStage = chakra(Stage, {

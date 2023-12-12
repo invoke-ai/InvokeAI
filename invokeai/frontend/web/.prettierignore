@@ -1,5 +1,6 @@
 dist/
 public/locales/*.json
+!public/locales/en.json
 .husky/
 node_modules/
 patches/
@@ -9,6 +10,6 @@ index.html
 .yalc/
 *.scss
 src/services/api/schema.d.ts
-docs/
 static/
 src/theme/css/overlayscrollbars.css
+pnpm-lock.yaml

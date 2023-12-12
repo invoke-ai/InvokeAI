@@ -1,53 +1,47 @@
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-
-import { createSelector } from '@reduxjs/toolkit';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect, {
   IAISelectDataType,
 } from 'common/components/IAIMantineSearchableSelect';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterProcessorNode } from 'features/controlAdapters/hooks/useControlAdapterProcessorNode';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { controlAdapterProcessortTypeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { ControlAdapterProcessorType } from 'features/controlAdapters/store/types';
 import { configSelector } from 'features/system/store/configSelectors';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CONTROLNET_PROCESSORS } from '../../store/constants';
-import { controlAdapterProcessortTypeChanged } from '../../store/controlAdaptersSlice';
-import { ControlAdapterProcessorType } from '../../store/types';
 
 type Props = {
   id: string;
 };
 
-const selector = createSelector(
-  configSelector,
-  (config) => {
-    const controlNetProcessors: IAISelectDataType[] = map(
-      CONTROLNET_PROCESSORS,
-      (p) => ({
-        value: p.type,
-        label: p.label,
-      })
-    )
-      .sort((a, b) =>
-        // sort 'none' to the top
-        a.value === 'none'
-          ? -1
-          : b.value === 'none'
+const selector = createMemoizedSelector(configSelector, (config) => {
+  const controlNetProcessors: IAISelectDataType[] = map(
+    CONTROLNET_PROCESSORS,
+    (p) => ({
+      value: p.type,
+      label: p.label,
+    })
+  )
+    .sort((a, b) =>
+      // sort 'none' to the top
+      a.value === 'none'
+        ? -1
+        : b.value === 'none'
           ? 1
           : a.label.localeCompare(b.label)
-      )
-      .filter(
-        (d) =>
-          !config.sd.disabledControlNetProcessors.includes(
-            d.value as ControlAdapterProcessorType
-          )
-      );
+    )
+    .filter(
+      (d) =>
+        !config.sd.disabledControlNetProcessors.includes(
+          d.value as ControlAdapterProcessorType
+        )
+    );
 
-    return controlNetProcessors;
-  },
-  defaultSelectorOptions
-);
+  return controlNetProcessors;
+});
 
 const ParamControlAdapterProcessorSelect = ({ id }: Props) => {
   const isEnabled = useControlAdapterIsEnabled(id);

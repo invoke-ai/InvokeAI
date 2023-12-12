@@ -1,5 +1,6 @@
-import { Store } from '@reduxjs/toolkit';
+import { createStore } from 'app/store/store';
 import { atom } from 'nanostores';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const $store = atom<Store<any> | undefined>();
+export const $store = atom<
+  Readonly<ReturnType<typeof createStore>> | undefined
+>();

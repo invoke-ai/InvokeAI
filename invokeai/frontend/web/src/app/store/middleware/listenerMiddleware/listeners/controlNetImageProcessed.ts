@@ -12,10 +12,10 @@ import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import { isImageOutput } from 'services/api/guards';
 import { BatchConfig, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
+import { isImageOutput } from 'features/nodes/types/common';
 
 export const addControlNetImageProcessedListener = () => {
   startAppListening({
@@ -109,20 +109,9 @@ export const addControlNetImageProcessedListener = () => {
           t('queue.graphFailedToQueue')
         );
 
-        // handle usage-related errors
         if (error instanceof Object) {
           if ('data' in error && 'status' in error) {
             if (error.status === 403) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const detail = (error.data as any)?.detail || 'Unknown Error';
-              dispatch(
-                addToast({
-                  title: t('queue.graphFailedToQueue'),
-                  status: 'error',
-                  description: detail,
-                  duration: 15000,
-                })
-              );
               dispatch(pendingControlImagesCleared());
               dispatch(controlAdapterImageChanged({ id, controlImage: null }));
               return;

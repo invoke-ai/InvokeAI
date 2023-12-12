@@ -1,4 +1,4 @@
-import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { InvokeTabName } from './tabMap';
 
 export type Coordinates = {
@@ -23,7 +23,7 @@ export interface UIState {
   shouldShowProgressInViewer: boolean;
   shouldShowEmbeddingPicker: boolean;
   shouldAutoChangeDimensions: boolean;
-  favoriteSchedulers: SchedulerParam[];
-  globalContextMenuCloseTrigger: number;
+  favoriteSchedulers: ParameterScheduler[];
+  globalMenuCloseTrigger: number;
   panels: Record<string, string>;
 }

@@ -48,12 +48,11 @@ from typing import List, Optional, Union
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
-    ModelConfigBase,
     ModelConfigFactory,
     ModelType,
 )
 
-from ..shared.sqlite import SqliteDatabase
+from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
     CONFIG_FILE_VERSION,
     DuplicateModelException,
@@ -97,10 +96,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             CREATE TABLE IF NOT EXISTS model_config (
                 id TEXT NOT NULL PRIMARY KEY,
                 -- The next 3 fields are enums in python, unrestricted string here
-                base TEXT NOT NULL,
-                type TEXT NOT NULL,
-                name TEXT NOT NULL,
-                path TEXT NOT NULL,
+                base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
+                type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
+                name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
+                path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
+                format TEXT GENERATED ALWAYS as (json_extract(config, '$.format')) VIRTUAL NOT NULL,
                 original_hash TEXT, -- could be null
                 -- Serialized JSON representation of the whole config object,
                 -- which will contain additional fields from subclasses
@@ -158,7 +158,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             ("version", CONFIG_FILE_VERSION),
         )
 
-    def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> AnyModelConfig:
+    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
         """
         Add a model to the database.
 
@@ -176,21 +176,13 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     """--sql
                     INSERT INTO model_config (
                        id,
-                       base,
-                       type,
-                       name,
-                       path,
                        original_hash,
                        config
                       )
-                    VALUES (?,?,?,?,?,?,?);
+                    VALUES (?,?,?);
                     """,
                     (
                         key,
-                        record.base,
-                        record.type,
-                        record.name,
-                        record.path,
                         record.original_hash,
                         json_serialized,
                     ),
@@ -255,7 +247,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 raise e
 
-    def update_model(self, key: str, config: ModelConfigBase) -> AnyModelConfig:
+    def update_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
@@ -270,14 +262,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._cursor.execute(
                     """--sql
                     UPDATE model_config
-                    SET base=?,
-                        type=?,
-                        name=?,
-                        path=?,
+                    SET
                         config=?
                     WHERE id=?;
                     """,
-                    (record.base, record.type, record.name, record.path, json_serialized, key),
+                    (json_serialized, key),
                 )
                 if self._cursor.rowcount == 0:
                     raise UnknownModelException("model not found")
@@ -368,21 +357,21 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
 
-    def search_by_path(self, path: Union[str, Path]) -> List[ModelConfigBase]:
+    def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
         """Return models with the indicated path."""
         results = []
         with self._db.lock:
             self._cursor.execute(
                 """--sql
                 SELECT config FROM model_config
-                WHERE model_path=?;
+                WHERE path=?;
                 """,
                 (str(path),),
             )
             results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
 
-    def search_by_hash(self, hash: str) -> List[ModelConfigBase]:
+    def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
         """Return models with the indicated original_hash."""
         results = []
         with self._db.lock:

@@ -9,19 +9,21 @@ import {
   Text,
   Tooltip,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import { AddToBoardDropData } from 'features/dnd/types';
+import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import {
   autoAddBoardIdChanged,
   boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaUser } from 'react-icons/fa';
 import {
   useGetBoardAssetsTotalQuery,
@@ -30,9 +32,6 @@ import {
 } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
-import AutoAddIcon from '../AutoAddIcon';
-import BoardContextMenu from '../BoardContextMenu';
-import { useTranslation } from 'react-i18next';
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -48,20 +47,15 @@ const GalleryBoard = ({
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ gallery }) => {
-          const isSelectedForAutoAdd =
-            board.board_id === gallery.autoAddBoardId;
-          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+      createMemoizedSelector(stateSelector, ({ gallery }) => {
+        const isSelectedForAutoAdd = board.board_id === gallery.autoAddBoardId;
+        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
 
-          return {
-            isSelectedForAutoAdd,
-            autoAssignBoardOnClick,
-          };
-        },
-        defaultSelectorOptions
-      ),
+        return {
+          isSelectedForAutoAdd,
+          autoAssignBoardOnClick,
+        };
+      }),
     [board.board_id]
   );
 

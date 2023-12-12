@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from .item_storage.item_storage_base import ItemStorageABC
     from .latents_storage.latents_storage_base import LatentsStorageBase
+    from .model_install import ModelInstallServiceBase
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .model_records import ModelRecordServiceBase
     from .names.names_base import NameServiceBase
@@ -28,7 +29,6 @@ if TYPE_CHECKING:
     from .session_queue.session_queue_base import SessionQueueBase
     from .shared.graph import GraphExecutionState, LibraryGraph
     from .urls.urls_base import UrlServiceBase
-    from .workflow_image_records.workflow_image_records_base import WorkflowImageRecordsStorageBase
     from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 
 
@@ -51,6 +51,7 @@ class InvocationServices:
     logger: "Logger"
     model_manager: "ModelManagerServiceBase"
     model_records: "ModelRecordServiceBase"
+    model_install: "ModelInstallServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
     queue: "InvocationQueueABC"
@@ -59,7 +60,6 @@ class InvocationServices:
     invocation_cache: "InvocationCacheBase"
     names: "NameServiceBase"
     urls: "UrlServiceBase"
-    workflow_image_records: "WorkflowImageRecordsStorageBase"
     workflow_records: "WorkflowRecordsStorageBase"
 
     def __init__(
@@ -79,6 +79,7 @@ class InvocationServices:
         logger: "Logger",
         model_manager: "ModelManagerServiceBase",
         model_records: "ModelRecordServiceBase",
+        model_install: "ModelInstallServiceBase",
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
         queue: "InvocationQueueABC",
@@ -87,7 +88,6 @@ class InvocationServices:
         invocation_cache: "InvocationCacheBase",
         names: "NameServiceBase",
         urls: "UrlServiceBase",
-        workflow_image_records: "WorkflowImageRecordsStorageBase",
         workflow_records: "WorkflowRecordsStorageBase",
     ):
         self.board_images = board_images
@@ -105,6 +105,7 @@ class InvocationServices:
         self.logger = logger
         self.model_manager = model_manager
         self.model_records = model_records
+        self.model_install = model_install
         self.processor = processor
         self.performance_statistics = performance_statistics
         self.queue = queue
@@ -113,5 +114,4 @@ class InvocationServices:
         self.invocation_cache = invocation_cache
         self.names = names
         self.urls = urls
-        self.workflow_image_records = workflow_image_records
         self.workflow_records = workflow_records

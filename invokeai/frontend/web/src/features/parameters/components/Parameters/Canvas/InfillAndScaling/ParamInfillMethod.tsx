@@ -1,26 +1,20 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setInfillMethod } from 'features/parameters/store/generationSlice';
-
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ generation }) => {
-    const { infillMethod } = generation;
+const selector = createMemoizedSelector([stateSelector], ({ generation }) => {
+  const { infillMethod } = generation;
 
-    return {
-      infillMethod,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    infillMethod,
+  };
+});
 
 const ParamInfillMethod = () => {
   const dispatch = useAppDispatch();

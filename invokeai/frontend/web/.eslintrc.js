@@ -11,6 +11,7 @@ module.exports = {
     'plugin:react-hooks/recommended',
     'plugin:react/jsx-runtime',
     'prettier',
+    'plugin:storybook/recommended',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -25,9 +26,12 @@ module.exports = {
     '@typescript-eslint',
     'eslint-plugin-react-hooks',
     'i18next',
+    'path',
+    'unused-imports',
   ],
   root: true,
   rules: {
+    'path/no-relative-imports': ['error', { maxDepth: 0 }],
     curly: 'error',
     'i18next/no-literal-string': 2,
     'react/jsx-no-bind': ['error', { allowBind: true }],
@@ -42,9 +46,16 @@ module.exports = {
     radix: 'error',
     'space-before-blocks': 'error',
     'import/prefer-default-export': 'off',
-    '@typescript-eslint/no-unused-vars': [
+    '@typescript-eslint/no-unused-vars': 'off',
+    'unused-imports/no-unused-imports': 'error',
+    'unused-imports/no-unused-vars': [
       'warn',
-      { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+      {
+        vars: 'all',
+        varsIgnorePattern: '^_',
+        args: 'after-used',
+        argsIgnorePattern: '^_',
+      },
     ],
     '@typescript-eslint/ban-ts-comment': 'warn',
     '@typescript-eslint/no-explicit-any': 'warn',

@@ -9,15 +9,20 @@ import {
   Tooltip,
   VisuallyHidden,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import { usePanel } from 'features/ui/hooks/usePanel';
+import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { InvokeTabName } from 'features/ui/store/tabMap';
+import {
+  activeTabIndexSelector,
+  activeTabNameSelector,
+} from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
-import { isEqual } from 'lodash-es';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -25,12 +30,6 @@ import { FaCube, FaFont, FaImage, FaStream } from 'react-icons/fa';
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
-import { usePanel } from '../hooks/usePanel';
-import { usePanelStorage } from '../hooks/usePanelStorage';
-import {
-  activeTabIndexSelector,
-  activeTabNameSelector,
-} from '../store/uiSelectors';
 import FloatingGalleryButton from './FloatingGalleryButton';
 import FloatingSidePanelButtons from './FloatingParametersPanelButtons';
 import ParametersPanel from './ParametersPanel';
@@ -90,15 +89,12 @@ const tabs: InvokeTabInfo[] = [
   },
 ];
 
-const enabledTabsSelector = createSelector(
+const enabledTabsSelector = createMemoizedSelector(
   [stateSelector],
   ({ config }) => {
     const { disabledTabs } = config;
     const enabledTabs = tabs.filter((tab) => !disabledTabs.includes(tab.id));
     return enabledTabs;
-  },
-  {
-    memoizeOptions: { resultEqualityCheck: isEqual },
   }
 );
 

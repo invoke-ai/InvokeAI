@@ -1,12 +1,11 @@
 import { components } from 'services/api/schema';
-import { O } from 'ts-toolbelt';
 import {
   BaseModelType,
   Graph,
   GraphExecutionState,
   ModelType,
   SubModelType,
-} from '../api/types';
+} from 'services/api/types';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -16,11 +15,6 @@ export type ProgressImage = {
   width: number;
   height: number;
 };
-
-export type AnyInvocationType = O.Required<
-  NonNullable<NonNullable<Graph['nodes']>[string]>,
-  'type'
->['type'];
 
 export type AnyInvocation = NonNullable<NonNullable<Graph['nodes']>[string]>;
 

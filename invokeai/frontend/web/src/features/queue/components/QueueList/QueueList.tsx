@@ -1,8 +1,7 @@
 import { Flex, Heading } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import {
   listCursorChanged,
@@ -41,14 +40,10 @@ const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   },
 };
 
-const selector = createSelector(
-  stateSelector,
-  ({ queue }) => {
-    const { listCursor, listPriority } = queue;
-    return { listCursor, listPriority };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ queue }) => {
+  const { listCursor, listPriority } = queue;
+  return { listCursor, listPriority };
+});
 
 const computeItemKey = (index: number, item: SessionQueueItemDTO): number =>
   item.item_id;

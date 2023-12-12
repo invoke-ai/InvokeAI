@@ -5,13 +5,12 @@ import {
   PopoverBody,
   PopoverContent,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-import { useBuildNodeData } from 'features/nodes/hooks/useBuildNodeData';
+import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   addNodePopoverClosed,
   addNodePopoverOpened,
@@ -24,7 +23,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
 import { useTranslation } from 'react-i18next';
 import 'reactflow/dist/style.css';
-import { AnyInvocationType } from 'services/events/types';
 import { AddNodePopoverSelectItem } from './AddNodePopoverSelectItem';
 
 type NodeTemplate = {
@@ -52,76 +50,72 @@ const selectFilter = (value: string, item: NodeTemplate) => {
 
 const AddNodePopover = () => {
   const dispatch = useAppDispatch();
-  const buildInvocation = useBuildNodeData();
+  const buildInvocation = useBuildNode();
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
   const fieldFilter = useAppSelector(
-    (state) => state.nodes.currentConnectionFieldType
+    (state) => state.nodes.connectionStartFieldType
   );
   const handleFilter = useAppSelector(
     (state) => state.nodes.connectionStartParams?.handleType
   );
 
-  const selector = createSelector(
-    [stateSelector],
-    ({ nodes }) => {
-      // If we have a connection in progress, we need to filter the node choices
-      const filteredNodeTemplates = fieldFilter
-        ? filter(nodes.nodeTemplates, (template) => {
-            const handles =
-              handleFilter == 'source' ? template.inputs : template.outputs;
+  const selector = createMemoizedSelector([stateSelector], ({ nodes }) => {
+    // If we have a connection in progress, we need to filter the node choices
+    const filteredNodeTemplates = fieldFilter
+      ? filter(nodes.nodeTemplates, (template) => {
+          const handles =
+            handleFilter == 'source' ? template.inputs : template.outputs;
 
-            return some(handles, (handle) => {
-              const sourceType =
-                handleFilter == 'source' ? fieldFilter : handle.type;
-              const targetType =
-                handleFilter == 'target' ? fieldFilter : handle.type;
+          return some(handles, (handle) => {
+            const sourceType =
+              handleFilter == 'source' ? fieldFilter : handle.type;
+            const targetType =
+              handleFilter == 'target' ? fieldFilter : handle.type;
 
-              return validateSourceAndTargetTypes(sourceType, targetType);
-            });
-          })
-        : map(nodes.nodeTemplates);
+            return validateSourceAndTargetTypes(sourceType, targetType);
+          });
+        })
+      : map(nodes.nodeTemplates);
 
-      const data: NodeTemplate[] = map(filteredNodeTemplates, (template) => {
-        return {
-          label: template.title,
-          value: template.type,
-          description: template.description,
-          tags: template.tags,
-        };
+    const data: NodeTemplate[] = map(filteredNodeTemplates, (template) => {
+      return {
+        label: template.title,
+        value: template.type,
+        description: template.description,
+        tags: template.tags,
+      };
+    });
+
+    //We only want these nodes if we're not filtered
+    if (fieldFilter === null) {
+      data.push({
+        label: t('nodes.currentImage'),
+        value: 'current_image',
+        description: t('nodes.currentImageDescription'),
+        tags: ['progress'],
       });
 
-      //We only want these nodes if we're not filtered
-      if (fieldFilter === null) {
-        data.push({
-          label: t('nodes.currentImage'),
-          value: 'current_image',
-          description: t('nodes.currentImageDescription'),
-          tags: ['progress'],
-        });
+      data.push({
+        label: t('nodes.notes'),
+        value: 'notes',
+        description: t('nodes.notesDescription'),
+        tags: ['notes'],
+      });
+    }
 
-        data.push({
-          label: t('nodes.notes'),
-          value: 'notes',
-          description: t('nodes.notesDescription'),
-          tags: ['notes'],
-        });
-      }
+    data.sort((a, b) => a.label.localeCompare(b.label));
 
-      data.sort((a, b) => a.label.localeCompare(b.label));
-
-      return { data, t };
-    },
-    defaultSelectorOptions
-  );
+    return { data };
+  });
 
   const { data } = useAppSelector(selector);
   const isOpen = useAppSelector((state) => state.nodes.isAddNodePopoverOpen);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addNode = useCallback(
-    (nodeType: AnyInvocationType) => {
+    (nodeType: string) => {
       const invocation = buildInvocation(nodeType);
       if (!invocation) {
         const errorMessage = t('nodes.unknownNode', {
@@ -145,7 +139,7 @@ const AddNodePopover = () => {
         return;
       }
 
-      addNode(v as AnyInvocationType);
+      addNode(v);
     },
     [addNode]
   );

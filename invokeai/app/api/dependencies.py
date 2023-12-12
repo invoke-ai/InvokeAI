@@ -2,7 +2,6 @@
 
 from logging import Logger
 
-from invokeai.app.services.workflow_image_records.workflow_image_records_sqlite import SqliteWorkflowImageRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -23,6 +22,7 @@ from ..services.invoker import Invoker
 from ..services.item_storage.item_storage_sqlite import SqliteItemStorage
 from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
+from ..services.model_install import ModelInstallService
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
@@ -30,7 +30,7 @@ from ..services.session_processor.session_processor_default import DefaultSessio
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from ..services.shared.default_graphs import create_system_graphs
 from ..services.shared.graph import GraphExecutionState, LibraryGraph
-from ..services.shared.sqlite import SqliteDatabase
+from ..services.shared.sqlite.sqlite_database import SqliteDatabase
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
@@ -87,6 +87,9 @@ class ApiDependencies:
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
+        model_install_service = ModelInstallService(
+            app_config=config, record_store=model_record_service, event_bus=events
+        )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         processor = DefaultInvocationProcessor()
@@ -94,7 +97,6 @@ class ApiDependencies:
         session_processor = DefaultSessionProcessor()
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
-        workflow_image_records = SqliteWorkflowImageRecordsStorage(db=db)
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
 
         services = InvocationServices(
@@ -114,6 +116,7 @@ class ApiDependencies:
             logger=logger,
             model_manager=model_manager,
             model_records=model_record_service,
+            model_install=model_install_service,
             names=names,
             performance_statistics=performance_statistics,
             processor=processor,
@@ -121,14 +124,12 @@ class ApiDependencies:
             session_processor=session_processor,
             session_queue=session_queue,
             urls=urls,
-            workflow_image_records=workflow_image_records,
             workflow_records=workflow_records,
         )
 
         create_system_graphs(services.graph_library)
 
         ApiDependencies.invoker = Invoker(services)
-
         db.clean()
 
     @staticmethod

@@ -1,10 +1,9 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { KIND_MAP } from 'features/nodes/types/constants';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
-import { KIND_MAP } from '../types/constants';
-import { isInvocationNode } from '../types/types';
 
 export const useFieldType = (
   nodeId: string,
@@ -13,17 +12,14 @@ export const useFieldType = (
 ) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          if (!isInvocationNode(node)) {
-            return;
-          }
-          return node?.data[KIND_MAP[kind]][fieldName]?.type;
-        },
-        defaultSelectorOptions
-      ),
+      createMemoizedSelector(stateSelector, ({ nodes }) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (!isInvocationNode(node)) {
+          return;
+        }
+        const field = node.data[KIND_MAP[kind]][fieldName];
+        return field?.type;
+      }),
     [fieldName, kind, nodeId]
   );
 

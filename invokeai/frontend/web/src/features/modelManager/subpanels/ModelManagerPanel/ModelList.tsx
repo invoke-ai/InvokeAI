@@ -240,7 +240,7 @@ const modelsFilter = <
     | LoRAModelConfigEntity
     | OnnxModelConfigEntity,
 >(
-  data: EntityState<T> | undefined,
+  data: EntityState<T, string> | undefined,
   model_type: ModelType,
   model_format: ModelFormat | undefined,
   nameFilter: string

@@ -8,31 +8,26 @@ import {
   VStack,
   useDisclosure,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
+import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaImages, FaServer } from 'react-icons/fa';
-import { galleryViewChanged } from '../store/gallerySlice';
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
-import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [stateSelector],
-  (state) => {
-    const { galleryView } = state.gallery;
+const selector = createMemoizedSelector([stateSelector], (state) => {
+  const { galleryView } = state.gallery;
 
-    return {
-      galleryView,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    galleryView,
+  };
+});
 
 const ImageGalleryContent = () => {
   const { t } = useTranslation();

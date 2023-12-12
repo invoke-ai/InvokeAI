@@ -4,7 +4,7 @@ import IAIButton from 'common/components/IAIButton';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
-import { isStagingSelector } from '../store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { memo, useCallback } from 'react';
 
 const ClearCanvasHistoryButtonModal = () => {

@@ -1,9 +1,7 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
   resetCanvasInteractionState,
@@ -12,17 +10,15 @@ import {
   setShouldSnapToGrid,
   setTool,
 } from 'features/canvas/store/canvasSlice';
+import { CanvasTool } from 'features/canvas/store/canvasTypes';
+import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash-es';
-
 import { useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { CanvasTool } from '../store/canvasTypes';
-import { getCanvasStage } from '../util/konvaInstanceProvider';
 
-const selector = createSelector(
-  [canvasSelector, activeTabNameSelector, isStagingSelector],
-  (canvas, activeTabName, isStaging) => {
+const selector = createMemoizedSelector(
+  [stateSelector, activeTabNameSelector, isStagingSelector],
+  ({ canvas }, activeTabName, isStaging) => {
     const {
       cursorPosition,
       shouldLockBoundingBox,
@@ -42,11 +38,6 @@ const selector = createSelector(
       isMaskEnabled,
       shouldSnapToGrid,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

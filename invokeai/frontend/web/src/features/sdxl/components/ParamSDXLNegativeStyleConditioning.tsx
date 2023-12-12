@@ -1,20 +1,19 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAITextarea from 'common/components/IAITextarea';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
+import { setNegativeStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { AnimatePresence } from 'framer-motion';
-import { isEqual } from 'lodash-es';
 import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { setNegativeStylePromptSDXL } from '../store/sdxlSlice';
 import SDXLConcatLink from './SDXLConcatLink';
 
-const promptInputSelector = createSelector(
+const promptInputSelector = createMemoizedSelector(
   [stateSelector],
   ({ sdxl }) => {
     const { negativeStylePrompt, shouldConcatSDXLStylePrompt } = sdxl;
@@ -23,11 +22,6 @@ const promptInputSelector = createSelector(
       prompt: negativeStylePrompt,
       shouldConcatSDXLStylePrompt,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

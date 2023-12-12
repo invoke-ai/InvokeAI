@@ -6,18 +6,17 @@ import {
   controlAdapterDuplicated,
   controlAdapterIsEnabledChanged,
   controlAdapterRemoved,
-} from '../store/controlAdaptersSlice';
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
-
 import { ChevronUpIcon } from '@chakra-ui/icons';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useTranslation } from 'react-i18next';
 import { useToggle } from 'react-use';
-import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
-import { useControlAdapterType } from '../hooks/useControlAdapterType';
+import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import ControlAdapterImagePreview from './ControlAdapterImagePreview';
 import ControlAdapterProcessorComponent from './ControlAdapterProcessorComponent';
 import ControlAdapterShouldAutoConfig from './ControlAdapterShouldAutoConfig';

@@ -16,8 +16,11 @@ import {
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
   socketSessionRetrievalError,
-} from '../actions';
-import { ClientToServerEvents, ServerToClientEvents } from '../types';
+} from 'services/events/actions';
+import {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from 'services/events/types';
 
 type SetEventListenersArg = {
   socket: Socket<ServerToClientEvents, ClientToServerEvents>;

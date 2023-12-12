@@ -1,19 +1,18 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
-import { FIELDS } from 'features/nodes/types/constants';
+import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { memo } from 'react';
 import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
 
-const selector = createSelector(stateSelector, ({ nodes }) => {
-  const { shouldAnimateEdges, currentConnectionFieldType, shouldColorEdges } =
+const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+  const { shouldAnimateEdges, connectionStartFieldType, shouldColorEdges } =
     nodes;
 
-  const stroke =
-    currentConnectionFieldType && shouldColorEdges
-      ? colorTokenToCssVar(FIELDS[currentConnectionFieldType].color)
-      : colorTokenToCssVar('base.500');
+  const stroke = shouldColorEdges
+    ? getFieldColor(connectionStartFieldType)
+    : colorTokenToCssVar('base.500');
 
   let className = 'react-flow__custom_connection-path';
 

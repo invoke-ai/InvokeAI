@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { InvokeTabName } from './tabMap';
 import { UIState } from './uiTypes';
 
@@ -16,7 +16,7 @@ export const initialUIState: UIState = {
   shouldShowEmbeddingPicker: false,
   shouldAutoChangeDimensions: false,
   favoriteSchedulers: [],
-  globalContextMenuCloseTrigger: 0,
+  globalMenuCloseTrigger: 0,
   panels: {},
 };
 
@@ -50,7 +50,7 @@ export const uiSlice = createSlice({
     },
     favoriteSchedulersChanged: (
       state,
-      action: PayloadAction<SchedulerParam[]>
+      action: PayloadAction<ParameterScheduler[]>
     ) => {
       state.favoriteSchedulers = action.payload;
     },
@@ -60,8 +60,8 @@ export const uiSlice = createSlice({
     setShouldAutoChangeDimensions: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoChangeDimensions = action.payload;
     },
-    contextMenusClosed: (state) => {
-      state.globalContextMenuCloseTrigger += 1;
+    bumpGlobalMenuCloseTrigger: (state) => {
+      state.globalMenuCloseTrigger += 1;
     },
     panelsChanged: (
       state,
@@ -88,7 +88,7 @@ export const {
   favoriteSchedulersChanged,
   toggleEmbeddingPicker,
   setShouldAutoChangeDimensions,
-  contextMenusClosed,
+  bumpGlobalMenuCloseTrigger,
   panelsChanged,
 } = uiSlice.actions;
 

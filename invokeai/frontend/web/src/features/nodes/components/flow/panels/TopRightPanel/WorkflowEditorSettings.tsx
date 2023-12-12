@@ -9,15 +9,13 @@ import {
   ModalContent,
   ModalHeader,
   ModalOverlay,
-  forwardRef,
   useDisclosure,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
+import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopCenterPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
   shouldAnimateEdgesChanged,
@@ -25,38 +23,36 @@ import {
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
 } from 'features/nodes/store/nodesSlice';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { FaCog } from 'react-icons/fa';
-import { SelectionMode } from 'reactflow';
-import ReloadNodeTemplatesButton from '../TopCenterPanel/ReloadSchemaButton';
+import { ChangeEvent, ReactNode, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SelectionMode } from 'reactflow';
 
 const formLabelProps: FormLabelProps = {
   fontWeight: 600,
 };
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const {
-      shouldAnimateEdges,
-      shouldValidateGraph,
-      shouldSnapToGrid,
-      shouldColorEdges,
-      selectionMode,
-    } = nodes;
-    return {
-      shouldAnimateEdges,
-      shouldValidateGraph,
-      shouldSnapToGrid,
-      shouldColorEdges,
-      selectionModeIsChecked: selectionMode === SelectionMode.Full,
-    };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+  const {
+    shouldAnimateEdges,
+    shouldValidateGraph,
+    shouldSnapToGrid,
+    shouldColorEdges,
+    selectionMode,
+  } = nodes;
+  return {
+    shouldAnimateEdges,
+    shouldValidateGraph,
+    shouldSnapToGrid,
+    shouldColorEdges,
+    selectionModeIsChecked: selectionMode === SelectionMode.Full,
+  };
+});
 
-const WorkflowEditorSettings = forwardRef((_, ref) => {
+type Props = {
+  children: (props: { onOpen: () => void }) => ReactNode;
+};
+
+const WorkflowEditorSettings = ({ children }: Props) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const {
@@ -106,13 +102,7 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
 
   return (
     <>
-      <IAIIconButton
-        ref={ref}
-        aria-label={t('nodes.workflowSettings')}
-        tooltip={t('nodes.workflowSettings')}
-        icon={<FaCog />}
-        onClick={onOpen}
-      />
+      {children({ onOpen })}
 
       <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
         <ModalOverlay />
@@ -151,6 +141,7 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
                 label={t('nodes.colorCodeEdges')}
                 helperText={t('nodes.colorCodeEdgesHelp')}
               />
+              <Divider />
               <IAISwitch
                 formLabelProps={formLabelProps}
                 isChecked={selectionModeIsChecked}
@@ -175,6 +166,6 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
       </Modal>
     </>
   );
-});
+};
 
 export default memo(WorkflowEditorSettings);

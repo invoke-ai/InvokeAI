@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { buildAdHocUpscaleGraph } from 'features/nodes/util/graphBuilders/buildAdHocUpscaleGraph';
+import { buildAdHocUpscaleGraph } from 'features/nodes/util/graph/buildAdHocUpscaleGraph';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -75,31 +75,20 @@ export const addUpscaleRequestedListener = () => {
           t('queue.graphFailedToQueue')
         );
 
-        // handle usage-related errors
-        if (error instanceof Object) {
-          if ('data' in error && 'status' in error) {
-            if (error.status === 403) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const detail = (error.data as any)?.detail || 'Unknown Error';
-              dispatch(
-                addToast({
-                  title: t('queue.graphFailedToQueue'),
-                  status: 'error',
-                  description: detail,
-                  duration: 15000,
-                })
-              );
-              return;
-            }
-          }
+        if (
+          error instanceof Object &&
+          'status' in error &&
+          error.status === 403
+        ) {
+          return;
+        } else {
+          dispatch(
+            addToast({
+              title: t('queue.graphFailedToQueue'),
+              status: 'error',
+            })
+          );
         }
-
-        dispatch(
-          addToast({
-            title: t('queue.graphFailedToQueue'),
-            status: 'error',
-          })
-        );
       }
     },
   });

@@ -1,18 +1,22 @@
 import { Box, Flex, Spinner } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
+import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
+import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
+import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
 import {
@@ -22,29 +26,25 @@ import {
   useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
-import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
-import { controlAdapterImageChanged } from '../store/controlAdaptersSlice';
-import { useControlAdapterControlImage } from '../hooks/useControlAdapterControlImage';
-import { useControlAdapterProcessedControlImage } from '../hooks/useControlAdapterProcessedControlImage';
-import { useControlAdapterProcessorType } from '../hooks/useControlAdapterProcessorType';
 
 type Props = {
   id: string;
   isSmall?: boolean;
 };
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   stateSelector,
-  ({ controlAdapters, gallery }) => {
+  ({ controlAdapters, gallery, system }) => {
     const { pendingControlImages } = controlAdapters;
     const { autoAddBoardId } = gallery;
+    const { isConnected } = system;
 
     return {
       pendingControlImages,
       autoAddBoardId,
+      isConnected,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
@@ -55,18 +55,19 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { pendingControlImages, autoAddBoardId } = useAppSelector(selector);
+  const { pendingControlImages, autoAddBoardId, isConnected } =
+    useAppSelector(selector);
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
-  const { currentData: controlImage } = useGetImageDTOQuery(
-    controlImageName ?? skipToken
-  );
+  const { currentData: controlImage, isError: isErrorControlImage } =
+    useGetImageDTOQuery(controlImageName ?? skipToken);
 
-  const { currentData: processedControlImage } = useGetImageDTOQuery(
-    processedControlImageName ?? skipToken
-  );
+  const {
+    currentData: processedControlImage,
+    isError: isErrorProcessedControlImage,
+  } = useGetImageDTOQuery(processedControlImageName ?? skipToken);
 
   const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
   const [addToBoard] = useAddImageToBoardMutation();
@@ -157,6 +158,17 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     !isMouseOverImage &&
     !pendingControlImages.includes(id) &&
     processorType !== 'none';
+
+  useEffect(() => {
+    if (isConnected && (isErrorControlImage || isErrorProcessedControlImage)) {
+      handleResetControlImage();
+    }
+  }, [
+    handleResetControlImage,
+    isConnected,
+    isErrorControlImage,
+    isErrorProcessedControlImage,
+  ]);
 
   return (
     <Flex
