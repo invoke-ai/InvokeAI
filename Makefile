@@ -48,5 +48,5 @@ installer-zip:
 
 # Tag the release
 tag-release:
-	cd installer && ./tag-release.sh
+	cd installer && ./tag_release.sh
 
