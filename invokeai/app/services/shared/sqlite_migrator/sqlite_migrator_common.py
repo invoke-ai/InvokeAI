@@ -7,7 +7,16 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 @runtime_checkable
 class MigrateCallback(Protocol):
-    """A callback that performs a migration."""
+    """
+    A callback that performs a migration.
+
+    Migrate callbacks are provided an open cursor to the database. They should not commit their
+    transaction; this is handled by the migrator.
+
+    If the callback needs to access additional dependencies, will be provided to the callback at runtime.
+
+    See :class:`Migration` for an example.
+    """
 
     def __call__(self, cursor: sqlite3.Cursor, **kwargs: Any) -> None:
         ...
@@ -26,7 +35,7 @@ class MigrationDependency:
     Represents a dependency for a migration.
 
     :param name: The name of the dependency
-    :param dependency_type: The type of the dependency (e.g. str, SomeClass, etc.)
+    :param dependency_type: The type of the dependency (e.g. `str`, `int`, `SomeClass`, etc.)
     """
 
     def __init__(
@@ -62,10 +71,10 @@ class Migration(BaseModel):
 
     Example Usage:
     ```py
-    # Define the migrate callback. The dependency may be accessed by name in the kwargs.
+    # Define the migrate callback. This migration adds a column to the sushi table.
     def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
         # Execute SQL using the cursor, taking care to *not commit* a transaction
-        cursor.execute('ALTER TABLE bananas ADD COLUMN with_sushi BOOLEAN DEFAULT FALSE;')
+        cursor.execute('ALTER TABLE sushi ADD COLUMN with_banana BOOLEAN DEFAULT TRUE;')
         ...
 
     # Instantiate the migration
@@ -114,6 +123,7 @@ class Migration(BaseModel):
 
     @model_validator(mode="after")
     def validate_to_version(self) -> "Migration":
+        """Validates that to_version is one greater than from_version."""
         if self.to_version != self.from_version + 1:
             raise ValueError("to_version must be one greater than from_version")
         return self
@@ -143,7 +153,12 @@ class Migration(BaseModel):
 
 
 class MigrationSet:
-    """A set of Migrations. Performs validation during migration registration and provides utility methods."""
+    """
+    A set of Migrations. Performs validation during migration registration and provides utility methods.
+
+    Migrations should be registered with `register()`. Once all are registered, `validate_migration_chain()`
+    should be called to ensure that the migrations form a single chain of migrations from version 0 to the latest version.
+    """
 
     def __init__(self) -> None:
         self._migrations: set[Migration] = set()
