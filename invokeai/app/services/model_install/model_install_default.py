@@ -85,7 +85,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def event_bus(self) -> Optional[EventServiceBase]:  # noqa D102
         return self._event_bus
 
-    def stop(self) -> None:
+    def stop(self, *args, **kwargs) -> None:
         """Stop the install thread; after this the object can be deleted and garbage collected."""
         self._install_queue.put(STOP_JOB)
 
