@@ -7,11 +7,12 @@ import QueueBackButton from 'features/queue/components/QueueBackButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
 import ResumeProcessorButton from 'features/queue/components/ResumeProcessorButton';
 import ProgressBar from 'features/system/components/ProgressBar';
+import StatusIndicator from 'features/system/components/StatusIndicator';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const QueueControls = () => {
   const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
@@ -44,7 +45,11 @@ const QueueControls = () => {
       <Flex h={3} w="full">
         <ProgressBar />
       </Flex>
-      <QueueCounts />
+      <Flex w="full" h={5} sx={{}}>
+        <StatusIndicator />
+        <Spacer />
+        <QueueCounts />
+      </Flex>
     </Flex>
   );
 };

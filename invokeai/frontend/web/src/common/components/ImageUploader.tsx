@@ -152,7 +152,10 @@ const ImageUploader = (props: ImageUploaderProps) => {
   }, []);
 
   return (
-    <Box {...getRootProps({ style: {} })} onKeyDown={handleKeyDown}>
+    <Box
+      {...getRootProps({ style: { width: '100%', height: '100%' } })}
+      onKeyDown={handleKeyDown}
+    >
       <input {...getInputProps()} />
       {children}
       <AnimatePresence>

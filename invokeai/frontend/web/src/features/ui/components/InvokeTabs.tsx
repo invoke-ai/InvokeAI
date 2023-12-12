@@ -14,6 +14,8 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
+import SettingsMenu from 'features/system/components/SettingsMenu';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -224,12 +226,13 @@ const InvokeTabs = () => {
       <TabList
         sx={{
           pt: 2,
-          gap: 4,
           flexDir: 'column',
         }}
       >
+        <InvokeAILogoComponent />
         {tabs}
         <Spacer />
+        <SettingsMenu />
       </TabList>
       <PanelGroup
         id="app"

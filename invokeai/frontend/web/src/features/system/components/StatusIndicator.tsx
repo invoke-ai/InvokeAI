@@ -58,7 +58,15 @@ const StatusIndicator = () => {
   const isHovered = useHoverDirty(ref);
 
   return (
-    <Flex ref={ref} h="full" px={2} alignItems="center" gap={5}>
+    <Flex ref={ref} h="full" px={2} alignItems="center" gap={2}>
+      <Icon
+        as={FaCircle}
+        sx={{
+          boxSize: '0.5rem',
+          color: LIGHT_COLOR_MAP[statusColor],
+          _dark: { color: DARK_COLOR_MAP[statusColor] },
+        }}
+      />
       <AnimatePresence>
         {isHovered && (
           <motion.div
@@ -90,14 +98,6 @@ const StatusIndicator = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <Icon
-        as={FaCircle}
-        sx={{
-          boxSize: '0.5rem',
-          color: LIGHT_COLOR_MAP[statusColor],
-          _dark: { color: DARK_COLOR_MAP[statusColor] },
-        }}
-      />
     </Flex>
   );
 };

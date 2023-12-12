@@ -1,7 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
-import { Flex, Image, Text } from '@chakra-ui/react';
+import { Flex, Image, Text, Tooltip } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
-import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useRef } from 'react';
 import { useHoverDirty } from 'react-use';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
@@ -16,53 +15,60 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
   const isHovered = useHoverDirty(ref);
 
   return (
-    <Flex alignItems="center" gap={5} ps={1} ref={ref}>
-      <Image
-        src={InvokeAILogoImage}
-        alt="invoke-ai-logo"
+    <Flex alignItems="center" flexDirection="column" gap={5} ps={1} ref={ref}>
+      <Tooltip
         sx={{
-          w: '32px',
-          h: '32px',
-          minW: '32px',
-          minH: '32px',
-          userSelect: 'none',
+          background: 'base.100',
+          _dark: {
+            background: 'base.800',
+          },
         }}
-      />
-      <Flex sx={{ gap: 3, alignItems: 'center' }}>
-        <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
-          invoke <strong>ai</strong>
-        </Text>
-        <AnimatePresence>
-          {showVersion && isHovered && appVersion && (
-            <motion.div
-              key="statusText"
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-                transition: { duration: 0.15 },
-              }}
-              exit={{
-                opacity: 0,
-                transition: { delay: 0.8 },
+        placement="right"
+        label={
+          <Flex sx={{ gap: 1, alignItems: 'center' }}>
+            <Text
+              sx={{
+                userSelect: 'none',
+                color: 'base.800',
+                _dark: { color: 'base.300' },
               }}
             >
+              invoke <strong>ai</strong>
+            </Text>
+            {showVersion && isHovered && appVersion && (
               <Text
                 sx={{
                   fontWeight: 600,
+                  color: 'base.600',
+                  fontSize: 12,
                   marginTop: 1,
-                  color: 'base.300',
-                  fontSize: 14,
+                  _dark: {
+                    color: 'base.400',
+                  },
                 }}
                 variant="subtext"
               >
                 {appVersion.version}
               </Text>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Flex>
+            )}
+          </Flex>
+        }
+      >
+        <Image
+          src={InvokeAILogoImage}
+          alt="invoke-ai-logo"
+          sx={{
+            w: '32px',
+            h: '32px',
+            minW: '32px',
+            minH: '32px',
+            userSelect: 'none',
+          }}
+        />
+      </Tooltip>
+      <Flex
+        sx={{ gap: 3, alignItems: 'center', flexDirection: 'column' }}
+      ></Flex>
     </Flex>
   );
 };
