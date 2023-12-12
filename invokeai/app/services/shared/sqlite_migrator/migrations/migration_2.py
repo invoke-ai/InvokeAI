@@ -140,7 +140,7 @@ migration_2 = Migration(
     from_version=1,
     to_version=2,
     migrate_callback=migrate_callback,
-    dependencies={"image_files": image_files_dependency, "logger": logger_dependency},
+    dependencies={image_files_dependency.name: image_files_dependency, logger_dependency.name: logger_dependency},
 )
 """
 Database version 2.

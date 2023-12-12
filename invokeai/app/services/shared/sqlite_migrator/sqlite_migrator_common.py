@@ -33,10 +33,13 @@ class MigrationDependency:
         self.dependency_type = dependency_type
         self.value = None
 
-    def set(self, value: Any) -> None:
-        """Sets the value of the dependency."""
+    def set_value(self, value: Any) -> None:
+        """
+        Sets the value of the dependency.
+        If the value is not of the correct type, a TypeError is raised.
+        """
         if not isinstance(value, self.dependency_type):
-            raise ValueError(f"Dependency {self.name} must be of type {self.dependency_type}")
+            raise TypeError(f"Dependency {self.name} must be of type {self.dependency_type}")
         self.value = value
 
 
@@ -96,13 +99,16 @@ class Migration(BaseModel):
         """Provides a dependency for this migration."""
         if name not in self.dependencies:
             raise ValueError(f"{name} of type {type(value)} is not a dependency of this migration")
-        self.dependencies[name].set(value)
+        self.dependencies[name].set_value(value)
 
     def run(self, cursor: sqlite3.Cursor) -> None:
-        """Runs the migration."""
+        """
+        Runs the migration.
+        If any dependencies are missing, a MigrationError is raised.
+        """
         missing_dependencies = [d.name for d in self.dependencies.values() if d.value is None]
         if missing_dependencies:
-            raise ValueError(f"Missing migration dependencies: {', '.join(missing_dependencies)}")
+            raise MigrationError(f"Missing migration dependencies: {', '.join(missing_dependencies)}")
         self.migrate_callback = partial(self.migrate_callback, **{d.name: d.value for d in self.dependencies.values()})
         self.migrate_callback(cursor=cursor)
 
