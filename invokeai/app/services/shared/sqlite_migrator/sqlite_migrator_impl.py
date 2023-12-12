@@ -55,10 +55,9 @@ class SQLiteMigrator:
 
     def _run_migration(self, migration: Migration) -> None:
         """Runs a single migration."""
-        # Using sqlite3.Connection as a context manager commits a the transaction on exit, or rolls it back if an
-        # exception is raised. We want to commit the transaction if the migration is successful, or roll it back if
-        # there is an error.
         try:
+            # Using sqlite3.Connection as a context manager commits a the transaction on exit, or rolls it back if an
+            # exception is raised.
             with self._db.lock, self._db.conn as conn:
                 cursor = conn.cursor()
                 if self._get_current_version(cursor) != migration.from_version:
