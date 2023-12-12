@@ -191,8 +191,7 @@ def calc_tiles_min_overlap(
     assert min_overlap < tile_height
     assert min_overlap < tile_width
 
-    # catches the cases when the tile size is larger than the images size and just clips the number of tiles to 1
-
+    # catches the cases when the tile size is larger than the images size and adjusts the tile size
     if image_width < tile_width:
         tile_width = image_width
 
