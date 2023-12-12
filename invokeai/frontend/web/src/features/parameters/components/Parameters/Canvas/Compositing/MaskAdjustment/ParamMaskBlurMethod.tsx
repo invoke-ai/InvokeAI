@@ -1,6 +1,5 @@
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
-
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';

@@ -1,26 +1,23 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import SyncModelsButton from 'features/modelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToSDXLRefinerModelParam } from 'features/parameters/util/modelIdToSDXLRefinerModelParam';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import SyncModelsButton from 'features/modelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
-import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  stateSelector,
-  (state) => ({ model: state.sdxl.refinerModel }),
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, (state) => ({
+  model: state.sdxl.refinerModel,
+}));
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();

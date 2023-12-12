@@ -1,9 +1,7 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
-export const languageSelector = createSelector(
+export const languageSelector = createMemoizedSelector(
   stateSelector,
-  ({ system }) => system.language,
-  defaultSelectorOptions
+  ({ system }) => system.language
 );

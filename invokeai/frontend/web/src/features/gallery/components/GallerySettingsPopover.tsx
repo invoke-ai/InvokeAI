@@ -1,10 +1,10 @@
 import { Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import {
@@ -16,25 +16,17 @@ import { ChangeEvent, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 
-const selector = createSelector(
-  [stateSelector],
-  (state) => {
-    const {
-      galleryImageMinimumWidth,
-      shouldAutoSwitch,
-      autoAssignBoardOnClick,
-    } = state.gallery;
+const selector = createMemoizedSelector([stateSelector], (state) => {
+  const { galleryImageMinimumWidth, shouldAutoSwitch, autoAssignBoardOnClick } =
+    state.gallery;
 
-    return {
-      galleryImageMinimumWidth,
-      shouldAutoSwitch,
-      autoAssignBoardOnClick,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    galleryImageMinimumWidth,
+    shouldAutoSwitch,
+    autoAssignBoardOnClick,
+  };
+});
 
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();

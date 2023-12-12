@@ -1,9 +1,8 @@
 import { Box, Flex, Spinner } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
@@ -33,7 +32,7 @@ type Props = {
   isSmall?: boolean;
 };
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   stateSelector,
   ({ controlAdapters, gallery, system }) => {
     const { pendingControlImages } = controlAdapters;
@@ -45,8 +44,7 @@ const selector = createSelector(
       autoAddBoardId,
       isConnected,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {

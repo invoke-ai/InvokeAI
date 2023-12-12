@@ -2,6 +2,8 @@
 
 from typing import Optional
 
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
+
 from .invocation_queue.invocation_queue_common import InvocationQueueItem
 from .invocation_services import InvocationServices
 from .shared.graph import Graph, GraphExecutionState
@@ -22,6 +24,7 @@ class Invoker:
         session_queue_item_id: int,
         session_queue_batch_id: str,
         graph_execution_state: GraphExecutionState,
+        workflow: Optional[WorkflowWithoutID] = None,
         invoke_all: bool = False,
     ) -> Optional[str]:
         """Determines the next node to invoke and enqueues it, preparing if needed.
@@ -43,6 +46,7 @@ class Invoker:
                 session_queue_batch_id=session_queue_batch_id,
                 graph_execution_state_id=graph_execution_state.id,
                 invocation_id=invocation.id,
+                workflow=workflow,
                 invoke_all=invoke_all,
             )
         )

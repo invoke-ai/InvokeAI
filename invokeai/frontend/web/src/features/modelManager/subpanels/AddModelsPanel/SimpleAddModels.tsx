@@ -1,7 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
-
 import { SelectItem } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import IAIButton from 'common/components/IAIButton';

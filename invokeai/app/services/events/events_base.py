@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+
 from typing import Any, Optional
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
@@ -17,6 +18,7 @@ from invokeai.backend.model_management.models.base import BaseModelType, ModelTy
 class EventServiceBase:
     queue_event: str = "queue_event"
     download_event: str = "download_event"
+    model_event: str = "model_event"
 
     """Basic event bus, to have an empty stand-in when not needed"""
 
@@ -35,6 +37,13 @@ class EventServiceBase:
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.download_event,
+            payload={"event": event_name, "data": payload},
+        )
+
+    def __emit_model_event(self, event_name: str, payload: dict) -> None:
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.model_event,
             payload={"event": event_name, "data": payload},
         )
 
@@ -369,12 +378,7 @@ class EventServiceBase:
             },
         )
 
-    def emit_download_error(
-        self,
-        source: str,
-        error_type: str,
-        error: str,
-    ) -> None:
+    def emit_download_error(self, source: str, error_type: str, error: str) -> None:
         """
         Emit a "download_error" event when an download job encounters an exception.
 
@@ -384,6 +388,76 @@ class EventServiceBase:
         """
         self.__emit_download_event(
             event_name="download_error",
+            payload={
+                "source": source,
+                "error_type": error_type,
+                "error": error,
+            },
+        )
+
+    def emit_model_install_started(self, source: str) -> None:
+        """
+        Emitted when an install job is started.
+
+        :param source: Source of the model; local path, repo_id or url
+        """
+        self.__emit_model_event(
+            event_name="model_install_started",
+            payload={"source": source},
+        )
+
+    def emit_model_install_completed(self, source: str, key: str) -> None:
+        """
+        Emitted when an install job is completed successfully.
+
+        :param source: Source of the model; local path, repo_id or url
+        :param key: Model config record key
+        """
+        self.__emit_model_event(
+            event_name="model_install_completed",
+            payload={
+                "source": source,
+                "key": key,
+            },
+        )
+
+    def emit_model_install_progress(
+        self,
+        source: str,
+        current_bytes: int,
+        total_bytes: int,
+    ) -> None:
+        """
+        Emitted while the install job is in progress.
+        (Downloaded models only)
+
+        :param source: Source of the model
+        :param current_bytes: Number of bytes downloaded so far
+        :param total_bytes: Total bytes to download
+        """
+        self.__emit_model_event(
+            event_name="model_install_progress",
+            payload={
+                "source": source,
+                "current_bytes": int,
+                "total_bytes": int,
+            },
+        )
+
+    def emit_model_install_error(
+        self,
+        source: str,
+        error_type: str,
+        error: str,
+    ) -> None:
+        """
+        Emitted when an install job encounters an exception.
+
+        :param source: Source of the model
+        :param exception: The exception that raised the error
+        """
+        self.__emit_model_event(
+            event_name="model_install_error",
             payload={
                 "source": source,
                 "error_type": error_type,

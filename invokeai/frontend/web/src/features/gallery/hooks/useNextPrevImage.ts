@@ -1,20 +1,20 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { clamp, isEqual } from 'lodash-es';
+import { IMAGE_LIMIT } from 'features/gallery/store/types';
+import { clamp } from 'lodash-es';
 import { useCallback } from 'react';
 import { boardsApi } from 'services/api/endpoints/boards';
 import {
   imagesApi,
   useLazyListImagesQuery,
 } from 'services/api/endpoints/images';
-import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import { ListImagesArgs } from 'services/api/types';
 import { imagesAdapter } from 'services/api/util';
 
-export const nextPrevImageButtonsSelector = createSelector(
+export const nextPrevImageButtonsSelector = createMemoizedSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
   (state, baseQueryArgs) => {
     const { data, status } =
@@ -80,11 +80,6 @@ export const nextPrevImageButtonsSelector = createSelector(
       prevImage,
       queryArgs,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

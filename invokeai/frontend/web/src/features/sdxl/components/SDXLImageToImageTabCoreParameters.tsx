@@ -1,7 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
@@ -10,23 +10,20 @@ import ParamSize from 'features/parameters/components/Parameters/Core/ParamSize'
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
 import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
-import ParamSDXLImg2ImgDenoisingStrength from './ParamSDXLImg2ImgDenoisingStrength';
 import { useTranslation } from 'react-i18next';
+import ParamSDXLImg2ImgDenoisingStrength from './ParamSDXLImg2ImgDenoisingStrength';
 
-const selector = createSelector(
-  [uiSelector, generationSelector],
-  (ui, generation) => {
+const selector = createMemoizedSelector(
+  [stateSelector],
+  ({ ui, generation }) => {
     const { shouldUseSliders } = ui;
     const { shouldRandomizeSeed } = generation;
 
     const activeLabel = !shouldRandomizeSeed ? 'Manual Seed' : undefined;
 
     return { shouldUseSliders, activeLabel };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const SDXLImageToImageTabCoreParameters = () => {

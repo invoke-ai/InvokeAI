@@ -19,7 +19,6 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPastePropagation } from 'common/util/stopPastePropagation';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
 import { clamp } from 'lodash-es';
-
 import {
   FocusEvent,
   KeyboardEvent,

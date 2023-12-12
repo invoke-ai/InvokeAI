@@ -4,7 +4,7 @@ import {
   useColorModeValue,
   useToken,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
@@ -15,7 +15,7 @@ import {
   NODE_WIDTH,
 } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { contextMenusClosed } from 'features/ui/store/uiSlice';
+import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import {
   MouseEvent,
   PropsWithChildren,
@@ -37,7 +37,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const selectIsInProgress = useMemo(
     () =>
-      createSelector(
+      createMemoizedSelector(
         stateSelector,
         ({ nodes }) =>
           nodes.nodeExecutionStates[nodeId]?.status ===
@@ -70,7 +70,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
         dispatch(nodeExclusivelySelected(nodeId));
       }
-      dispatch(contextMenusClosed());
+      dispatch(bumpGlobalMenuCloseTrigger());
     },
     [dispatch, nodeId]
   );

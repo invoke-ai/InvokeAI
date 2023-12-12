@@ -1,22 +1,17 @@
 import { Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
 import ParamInfillPatchmatchDownscaleSize from './ParamInfillPatchmatchDownscaleSize';
 import ParamInfillTilesize from './ParamInfillTilesize';
 
-const selector = createSelector(
-  [generationSelector],
-  (parameters) => {
-    const { infillMethod } = parameters;
+const selector = createMemoizedSelector([stateSelector], ({ generation }) => {
+  const { infillMethod } = generation;
 
-    return {
-      infillMethod,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    infillMethod,
+  };
+});
 
 export default function ParamInfillOptions() {
   const { infillMethod } = useAppSelector(selector);

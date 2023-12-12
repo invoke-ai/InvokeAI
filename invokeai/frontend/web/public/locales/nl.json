@@ -682,7 +682,6 @@
         "parameterSet": "Instellen parameters",
         "nodesSaved": "Knooppunten bewaard",
         "nodesLoaded": "Knooppunten geladen",
-        "nodesCleared": "Knooppunten weggehaald",
         "nodesLoadedFailed": "Laden knooppunten mislukt",
         "problemCopyingImage": "Kan Afbeelding Niet Kopiëren",
         "nodesNotValidJSON": "Ongeldige JSON",

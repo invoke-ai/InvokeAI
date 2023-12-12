@@ -1,9 +1,8 @@
 import { Flex, Text } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { loraAdded } from 'features/lora/store/loraSlice';
@@ -13,13 +12,9 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createSelector(
-  stateSelector,
-  ({ lora }) => ({
-    loras: lora.loras,
-  }),
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector(stateSelector, ({ lora }) => ({
+  loras: lora.loras,
+}));
 
 const ParamLoRASelect = () => {
   const dispatch = useAppDispatch();

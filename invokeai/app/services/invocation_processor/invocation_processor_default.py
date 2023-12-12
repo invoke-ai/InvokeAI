@@ -108,6 +108,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                                 queue_item_id=queue_item.session_queue_item_id,
                                 queue_id=queue_item.session_queue_id,
                                 queue_batch_id=queue_item.session_queue_batch_id,
+                                workflow=queue_item.workflow,
                             )
                         )
 
@@ -178,6 +179,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             session_queue_item_id=queue_item.session_queue_item_id,
                             session_queue_id=queue_item.session_queue_id,
                             graph_execution_state=graph_execution_state,
+                            workflow=queue_item.workflow,
                             invoke_all=True,
                         )
                     except Exception as e:

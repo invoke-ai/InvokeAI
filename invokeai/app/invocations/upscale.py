@@ -14,7 +14,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
 from invokeai.backend.util.devices import choose_torch_device
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, invocation
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -29,8 +29,8 @@ if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
 
-@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.2.0")
-class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.3.0")
+class ESRGANInvocation(BaseInvocation, WithMetadata):
     """Upscales an image using RealESRGAN."""
 
     image: ImageField = InputField(description="The input image")
@@ -118,7 +118,7 @@ class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

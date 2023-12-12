@@ -1,10 +1,11 @@
 import { Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
+import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 import {
   setShouldAntialias,
   setShouldAutoSave,
@@ -16,17 +17,14 @@ import {
   setShouldShowIntermediates,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import { isEqual } from 'lodash-es';
-
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
-import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 
-export const canvasControlsSelector = createSelector(
-  [canvasSelector],
-  (canvas) => {
+export const canvasControlsSelector = createMemoizedSelector(
+  [stateSelector],
+  ({ canvas }) => {
     const {
       shouldAutoSave,
       shouldCropToBoundingBoxOnSave,
@@ -50,11 +48,6 @@ export const canvasControlsSelector = createSelector(
       shouldRestrictStrokesToBox,
       shouldAntialias,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 

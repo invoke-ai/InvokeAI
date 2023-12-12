@@ -1,4 +1,4 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { FieldType } from 'features/nodes/types/field';
 import i18n from 'i18next';
@@ -17,7 +17,7 @@ export const makeConnectionErrorSelector = (
   handleType: HandleType,
   fieldType?: FieldType
 ) => {
-  return createSelector(stateSelector, (state): string | undefined => {
+  return createMemoizedSelector(stateSelector, (state): string | undefined => {
     if (!fieldType) {
       return i18n.t('nodes.noFieldType');
     }

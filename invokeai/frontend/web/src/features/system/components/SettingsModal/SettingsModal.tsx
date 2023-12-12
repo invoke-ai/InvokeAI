@@ -12,15 +12,18 @@ import {
   useColorMode,
   useDisclosure,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { VALID_LOG_LEVELS } from 'app/logging/logger';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { useClearStorage } from 'common/hooks/useClearStorage';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { languageSelector } from 'features/system/store/systemSelectors';
 import {
   consoleLogLevelChanged,
+  languageChanged,
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
@@ -35,7 +38,6 @@ import {
   setShouldShowProgressInViewer,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
-import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
   ReactElement,
@@ -48,52 +50,43 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { languageSelector } from 'features/system/store/systemSelectors';
-import { languageChanged } from 'features/system/store/systemSlice';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
 import StyledFlex from './StyledFlex';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ system, ui }) => {
-    const {
-      shouldConfirmOnDelete,
-      enableImageDebugging,
-      consoleLogLevel,
-      shouldLogToConsole,
-      shouldAntialiasProgressImage,
-      shouldUseNSFWChecker,
-      shouldUseWatermarker,
-      shouldEnableInformationalPopovers,
-    } = system;
+const selector = createMemoizedSelector([stateSelector], ({ system, ui }) => {
+  const {
+    shouldConfirmOnDelete,
+    enableImageDebugging,
+    consoleLogLevel,
+    shouldLogToConsole,
+    shouldAntialiasProgressImage,
+    shouldUseNSFWChecker,
+    shouldUseWatermarker,
+    shouldEnableInformationalPopovers,
+  } = system;
 
-    const {
-      shouldUseSliders,
-      shouldShowProgressInViewer,
-      shouldAutoChangeDimensions,
-    } = ui;
+  const {
+    shouldUseSliders,
+    shouldShowProgressInViewer,
+    shouldAutoChangeDimensions,
+  } = ui;
 
-    return {
-      shouldConfirmOnDelete,
-      enableImageDebugging,
-      shouldUseSliders,
-      shouldShowProgressInViewer,
-      consoleLogLevel,
-      shouldLogToConsole,
-      shouldAntialiasProgressImage,
-      shouldUseNSFWChecker,
-      shouldUseWatermarker,
-      shouldAutoChangeDimensions,
-      shouldEnableInformationalPopovers,
-    };
-  },
-  {
-    memoizeOptions: { resultEqualityCheck: isEqual },
-  }
-);
+  return {
+    shouldConfirmOnDelete,
+    enableImageDebugging,
+    shouldUseSliders,
+    shouldShowProgressInViewer,
+    consoleLogLevel,
+    shouldLogToConsole,
+    shouldAntialiasProgressImage,
+    shouldUseNSFWChecker,
+    shouldUseWatermarker,
+    shouldAutoChangeDimensions,
+    shouldEnableInformationalPopovers,
+  };
+});
 
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;

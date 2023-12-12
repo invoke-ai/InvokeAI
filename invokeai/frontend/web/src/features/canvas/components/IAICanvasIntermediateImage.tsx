@@ -2,31 +2,22 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ImageConfig } from 'konva/lib/shapes/Image';
-import { isEqual } from 'lodash-es';
 import { memo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ system, canvas }) => {
-    const { denoiseProgress } = system;
-    const { boundingBox } = canvas.layerState.stagingArea;
-    const { batchIds } = canvas;
+const selector = createSelector([stateSelector], ({ system, canvas }) => {
+  const { denoiseProgress } = system;
+  const { boundingBox } = canvas.layerState.stagingArea;
+  const { batchIds } = canvas;
 
-    return {
-      boundingBox,
-      progressImage:
-        denoiseProgress && batchIds.includes(denoiseProgress.batch_id)
-          ? denoiseProgress.progress_image
-          : undefined,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+  return {
+    boundingBox,
+    progressImage:
+      denoiseProgress && batchIds.includes(denoiseProgress.batch_id)
+        ? denoiseProgress.progress_image
+        : undefined,
+  };
+});
 
 type Props = Omit<ImageConfig, 'image'>;
 

@@ -1,38 +1,33 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { fieldSchedulerValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  SchedulerFieldInputTemplate,
   SchedulerFieldInputInstance,
+  SchedulerFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { FieldComponentProps } from './types';
-import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { SCHEDULER_LABEL_MAP } from 'features/parameters/types/constants';
+import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
+import { FieldComponentProps } from './types';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ ui }) => {
-    const { favoriteSchedulers: enabledSchedulers } = ui;
+const selector = createMemoizedSelector([stateSelector], ({ ui }) => {
+  const { favoriteSchedulers: enabledSchedulers } = ui;
 
-    const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
-      value: name,
-      label: label,
-      group: enabledSchedulers.includes(name as ParameterScheduler)
-        ? 'Favorites'
-        : undefined,
-    })).sort((a, b) => a.label.localeCompare(b.label));
+  const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
+    value: name,
+    label: label,
+    group: enabledSchedulers.includes(name as ParameterScheduler)
+      ? 'Favorites'
+      : undefined,
+  })).sort((a, b) => a.label.localeCompare(b.label));
 
-    return {
-      data,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    data,
+  };
+});
 
 const SchedulerFieldInputComponent = (
   props: FieldComponentProps<

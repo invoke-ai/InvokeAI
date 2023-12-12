@@ -1,8 +1,7 @@
 import { SelectItem } from '@mantine/core';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
@@ -10,18 +9,14 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
+const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
+  const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
 
-    return {
-      autoAddBoardId,
-      autoAssignBoardOnClick,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    autoAddBoardId,
+    autoAssignBoardOnClick,
+  };
+});
 
 const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();

@@ -1,8 +1,8 @@
-import { TagDescription } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import {
   BaseQueryFn,
   FetchArgs,
   FetchBaseQueryError,
+  TagDescription,
   createApi,
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
@@ -20,6 +20,7 @@ export const tagTypes = [
   'ImageNameList',
   'ImageList',
   'ImageMetadata',
+  'ImageWorkflow',
   'ImageMetadataFromFile',
   'IntermediatesCount',
   'SessionQueueItem',
@@ -40,6 +41,7 @@ export const tagTypes = [
   'LoRAModel',
   'SDXLRefinerModel',
   'Workflow',
+  'WorkflowsRecent',
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';

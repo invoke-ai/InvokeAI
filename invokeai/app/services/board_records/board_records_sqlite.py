@@ -3,7 +3,7 @@ import threading
 from typing import Union, cast
 
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.misc import uuid_string
 
 from .board_records_base import BoardRecordStorageBase
