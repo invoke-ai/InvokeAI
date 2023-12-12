@@ -6,12 +6,16 @@ from tqdm import tqdm
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration, MigrationDependency
 
+# This migration requires an ImageFileStorageBase service and logger
+image_files_dependency = MigrationDependency(name="image_files", dependency_type=ImageFileStorageBase)
+logger_dependency = MigrationDependency(name="logger", dependency_type=Logger)
+
 
 def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
     """Migration callback for database version 2."""
 
-    logger = kwargs["logger"]
-    image_files = kwargs["image_files"]
+    logger = kwargs[logger_dependency.name]
+    image_files = kwargs[image_files_dependency.name]
 
     _add_images_has_workflow(cursor)
     _add_session_queue_workflow(cursor)
@@ -130,10 +134,6 @@ def _migrate_embedded_workflows(
 
     logger.info(f"Adding {len(to_migrate)} embedded workflows to database")
     cursor.executemany("UPDATE images SET has_workflow = ? WHERE image_name = ?", to_migrate)
-
-
-image_files_dependency = MigrationDependency(name="image_files", dependency_type=ImageFileStorageBase)
-logger_dependency = MigrationDependency(name="logger", dependency_type=Logger)
 
 
 migration_2 = Migration(
