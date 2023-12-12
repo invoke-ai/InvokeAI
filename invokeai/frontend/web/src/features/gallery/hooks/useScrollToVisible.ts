@@ -1,5 +1,6 @@
+import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
+import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
 import { useEffect, useRef } from 'react';
-import { VirtuosoGalleryContext } from '../components/ImageGrid/types';
 
 export const useScrollToVisible = (
   isSelected: boolean,
@@ -21,12 +22,8 @@ export const useScrollToVisible = (
       return;
     }
 
-    const root = virtuosoContext.rootRef.current;
-    const virtuoso = virtuosoContext.virtuosoRef.current;
-    const item = imageContainerRef.current;
-    const range = virtuosoContext.virtuosoRangeRef.current;
-    const itemRect = item.getBoundingClientRect();
-    const rootRect = root.getBoundingClientRect();
+    const itemRect = imageContainerRef.current.getBoundingClientRect();
+    const rootRect = virtuosoContext.rootRef.current.getBoundingClientRect();
     const itemIsVisible =
       itemRect.top >= rootRect.top &&
       itemRect.bottom <= rootRect.bottom &&
@@ -34,13 +31,13 @@ export const useScrollToVisible = (
       itemRect.right <= rootRect.right;
 
     if (!itemIsVisible) {
-      virtuoso.scrollToIndex({
+      virtuosoContext.virtuosoRef.current.scrollToIndex({
         index,
         behavior: 'smooth',
-        align:
-          index > (range.endIndex - range.startIndex) / 2 + range.startIndex
-            ? 'end'
-            : 'start',
+        align: getScrollToIndexAlign(
+          index,
+          virtuosoContext.virtuosoRangeRef.current
+        ),
       });
     }
   }, [isSelected, index, selectionCount, virtuosoContext]);

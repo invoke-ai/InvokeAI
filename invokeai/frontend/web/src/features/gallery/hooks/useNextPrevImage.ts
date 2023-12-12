@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_LIMIT } from 'features/gallery/store/types';
+import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
 import { clamp } from 'lodash-es';
 import { map } from 'nanostores';
 import { RefObject, useCallback } from 'react';
@@ -127,7 +128,7 @@ export const useNextPrevImage = () => {
       virtuoso.scrollToIndex({
         index: prevImageIndex,
         behavior: 'smooth',
-        align: 'start',
+        align: getScrollToIndexAlign(prevImageIndex, range),
       });
     }
   }, [dispatch, prevImage, prevImageIndex]);
@@ -147,7 +148,7 @@ export const useNextPrevImage = () => {
       virtuoso.scrollToIndex({
         index: nextImageIndex,
         behavior: 'smooth',
-        align: 'end',
+        align: getScrollToIndexAlign(nextImageIndex, range),
       });
     }
   }, [dispatch, nextImage, nextImageIndex]);
