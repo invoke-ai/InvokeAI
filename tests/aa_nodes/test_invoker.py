@@ -3,8 +3,8 @@ import logging
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import CreateSqliteDatabaseFunction
 
 # This import must happen before other invoke imports or test in other files(!!) break
 from .test_nodes import (  # isort: split
@@ -25,9 +25,6 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation, LibraryGraph
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
 
 
 @pytest.fixture
@@ -54,15 +51,10 @@ def graph_with_subgraph():
 # Defining it in a separate module will cause the union to be incomplete, and pydantic will not validate
 # the test invocations.
 @pytest.fixture
-def mock_services() -> InvocationServices:
+def mock_services(create_sqlite_database: CreateSqliteDatabaseFunction) -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
     logger = InvokeAILogger.get_logger()
-    db_path = None if configuration.use_memory_db else configuration.db_path
-    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=configuration.log_sql)
-    migrator = SQLiteMigrator(db=db)
-    migrator.register_migration(migration_1)
-    migrator.register_migration(migration_2)
-    migrator.run_migrations()
+    db = create_sqlite_database(configuration, logger)
 
     # NOTE: none of these are actually called by the test invocations
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")

@@ -28,11 +28,8 @@ from invokeai.app.services.shared.graph import (
     IterateInvocation,
     LibraryGraph,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import CreateSqliteDatabaseFunction
 
 from .test_invoker import create_edge
 
@@ -50,15 +47,10 @@ def simple_graph():
 # Defining it in a separate module will cause the union to be incomplete, and pydantic will not validate
 # the test invocations.
 @pytest.fixture
-def mock_services() -> InvocationServices:
+def mock_services(create_sqlite_database: CreateSqliteDatabaseFunction) -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
     logger = InvokeAILogger.get_logger()
-    db_path = None if configuration.use_memory_db else configuration.db_path
-    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=configuration.log_sql)
-    migrator = SQLiteMigrator(db=db)
-    migrator.register_migration(migration_1)
-    migrator.register_migration(migration_2)
-    migrator.run_migrations()
+    db = create_sqlite_database(configuration, logger)
     # NOTE: none of these are actually called by the test invocations
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
     return InvocationServices(

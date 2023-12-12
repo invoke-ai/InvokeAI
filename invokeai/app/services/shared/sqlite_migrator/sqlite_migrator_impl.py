@@ -66,21 +66,12 @@ class SQLiteMigrator:
                     )
                 self._logger.debug(f"Running migration from {migration.from_version} to {migration.to_version}")
 
-                # Run pre-migration callbacks
-                if migration.pre_migrate:
-                    self._logger.debug(f"Running {len(migration.pre_migrate)} pre-migration callbacks")
-                    for callback in migration.pre_migrate:
-                        callback(cursor)
-
                 # Run the actual migration
-                migration.migrate(cursor)
+                migration.run(cursor)
+
+                # Update the version
                 cursor.execute("INSERT INTO migrations (version) VALUES (?);", (migration.to_version,))
 
-                # Run post-migration callbacks
-                if migration.post_migrate:
-                    self._logger.debug(f"Running {len(migration.post_migrate)} post-migration callbacks")
-                    for callback in migration.post_migrate:
-                        callback(cursor)
                 self._logger.debug(
                     f"Successfully migrated database from {migration.from_version} to {migration.to_version}"
                 )

@@ -3,7 +3,7 @@ import sqlite3
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
-def _migrate(cursor: sqlite3.Cursor) -> None:
+def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
     """Migration callback for database version 1."""
 
     _create_board_images(cursor)
@@ -353,7 +353,7 @@ def _create_workflows(cursor: sqlite3.Cursor) -> None:
 migration_1 = Migration(
     from_version=0,
     to_version=1,
-    migrate=_migrate,
+    migrate_callback=migrate_callback,
 )
 """
 Database version 1 (initial state).

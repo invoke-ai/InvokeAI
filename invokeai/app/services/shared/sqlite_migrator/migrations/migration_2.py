@@ -1,16 +1,24 @@
 import sqlite3
+from logging import Logger
 
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from tqdm import tqdm
+
+from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration, MigrationDependency
 
 
-def _migrate(cursor: sqlite3.Cursor) -> None:
+def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
     """Migration callback for database version 2."""
+
+    logger = kwargs["logger"]
+    image_files = kwargs["image_files"]
 
     _add_images_has_workflow(cursor)
     _add_session_queue_workflow(cursor)
     _drop_old_workflow_tables(cursor)
     _add_workflow_library(cursor)
     _drop_model_manager_metadata(cursor)
+    _migrate_embedded_workflows(cursor, logger, image_files)
 
 
 def _add_images_has_workflow(cursor: sqlite3.Cursor) -> None:
@@ -89,19 +97,64 @@ def _drop_model_manager_metadata(cursor: sqlite3.Cursor) -> None:
     cursor.execute("DROP TABLE IF EXISTS model_manager_metadata;")
 
 
+def _migrate_embedded_workflows(
+    cursor: sqlite3.Cursor,
+    logger: Logger,
+    image_files: ImageFileStorageBase,
+) -> None:
+    """
+    In the v3.5.0 release, InvokeAI changed how it handles embedded workflows. The `images` table in
+    the database now has a `has_workflow` column, indicating if an image has a workflow embedded.
+
+    This migrate callback checks each image for the presence of an embedded workflow, then updates its entry
+    in the database accordingly.
+    """
+    # Get the total number of images and chunk it into pages
+    cursor.execute("SELECT image_name FROM images")
+    image_names: list[str] = [image[0] for image in cursor.fetchall()]
+    total_image_names = len(image_names)
+
+    if not total_image_names:
+        return
+
+    logger.info(f"Migrating workflows for {total_image_names} images")
+
+    # Migrate the images
+    to_migrate: list[tuple[bool, str]] = []
+    pbar = tqdm(image_names)
+    for idx, image_name in enumerate(pbar):
+        pbar.set_description(f"Checking image {idx + 1}/{total_image_names} for workflow")
+        pil_image = image_files.get(image_name)
+        if "invokeai_workflow" in pil_image.info:
+            to_migrate.append((True, image_name))
+
+    logger.info(f"Adding {len(to_migrate)} embedded workflows to database")
+    cursor.executemany("UPDATE images SET has_workflow = ? WHERE image_name = ?", to_migrate)
+
+
+image_files_dependency = MigrationDependency(name="image_files", dependency_type=ImageFileStorageBase)
+logger_dependency = MigrationDependency(name="logger", dependency_type=Logger)
+
+
 migration_2 = Migration(
     from_version=1,
     to_version=2,
-    migrate=_migrate,
+    migrate_callback=migrate_callback,
+    dependencies={"image_files": image_files_dependency, "logger": logger_dependency},
 )
 """
 Database version 2.
 
 Introduced in v3.5.0 for the new workflow library.
 
+Dependencies:
+- image_files: ImageFileStorageBase
+- logger: Logger
+
 Migration:
 - Add `has_workflow` column to `images` table
 - Add `workflow` column to `session_queue` table
 - Drop `workflows` and `workflow_images` tables
 - Add `workflow_library` table
+- Populates the `has_workflow` column in the `images` table (requires `image_files` & `logger` dependencies)
 """

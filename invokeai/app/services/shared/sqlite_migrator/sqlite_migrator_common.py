@@ -1,9 +1,16 @@
 import sqlite3
-from typing import Callable, Optional, TypeAlias
+from functools import partial
+from typing import Any, Optional, Protocol, runtime_checkable
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-MigrateCallback: TypeAlias = Callable[[sqlite3.Cursor], None]
+
+@runtime_checkable
+class MigrateCallback(Protocol):
+    """A callback that performs a migration."""
+
+    def __call__(self, cursor: sqlite3.Cursor, **kwargs: Any) -> None:
+        ...
 
 
 class MigrationError(RuntimeError):
@@ -14,28 +21,65 @@ class MigrationVersionError(ValueError):
     """Raised when a migration version is invalid."""
 
 
+class MigrationDependency:
+    """Represents a dependency for a migration."""
+
+    def __init__(
+        self,
+        name: str,
+        dependency_type: Any,
+    ) -> None:
+        self.name = name
+        self.dependency_type = dependency_type
+        self.value = None
+
+    def set(self, value: Any) -> None:
+        """Sets the value of the dependency."""
+        if not isinstance(value, self.dependency_type):
+            raise ValueError(f"Dependency {self.name} must be of type {self.dependency_type}")
+        self.value = value
+
+
 class Migration(BaseModel):
     """
     Represents a migration for a SQLite database.
 
+    :param from_version: The database version on which this migration may be run
+    :param to_version: The database version that results from this migration
+    :param migrate: The callback to run to perform the migration
+    :param dependencies: A dict of dependencies that must be provided to the migration
+
     Migration callbacks will be provided an open cursor to the database. They should not commit their
     transaction; this is handled by the migrator.
 
-    Pre- and post-migration callback may be registered with :meth:`register_pre_callback` or
-    :meth:`register_post_callback`.
+    If a migration needs an additional dependency, it must be provided with :meth:`provide_dependency`
+    before the migration is run.
 
-    If a migration has additional dependencies, it is recommended to use functools.partial to provide
-    the dependencies and register the partial as the migration callback.
+    Example Usage:
+    ```py
+    # Define the migrate callback
+    def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
+        some_dependency = kwargs["some_dependency"]
+        ...
+
+    # Instantiate the migration, declaring dependencies
+    migration = Migration(
+        from_version=0,
+        to_version=1,
+        migrate_callback=migrate_callback,
+        dependencies={"some_dependency": MigrationDependency(name="some_dependency", dependency_type=SomeType)},
+    )
+
+    # Register the dependency before running the migration
+    migration.provide_dependency(name="some_dependency", value=some_value)
+    ```
     """
 
     from_version: int = Field(ge=0, strict=True, description="The database version on which this migration may be run")
     to_version: int = Field(ge=1, strict=True, description="The database version that results from this migration")
-    migrate: MigrateCallback = Field(description="The callback to run to perform the migration")
-    pre_migrate: list[MigrateCallback] = Field(
-        default=[], description="A list of callbacks to run before the migration"
-    )
-    post_migrate: list[MigrateCallback] = Field(
-        default=[], description="A list of callbacks to run after the migration"
+    migrate_callback: MigrateCallback = Field(description="The callback to run to perform the migration")
+    dependencies: dict[str, MigrationDependency] = Field(
+        default={}, description="A dict of dependencies that must be provided to the migration"
     )
 
     @model_validator(mode="after")
@@ -48,13 +92,21 @@ class Migration(BaseModel):
         # Callables are not hashable, so we need to implement our own __hash__ function to use this class in a set.
         return hash((self.from_version, self.to_version))
 
-    def register_pre_callback(self, callback: MigrateCallback) -> None:
-        """Registers a pre-migration callback."""
-        self.pre_migrate.append(callback)
+    def provide_dependency(self, name: str, value: Any) -> None:
+        """Provides a dependency for this migration."""
+        if name not in self.dependencies:
+            raise ValueError(f"{name} of type {type(value)} is not a dependency of this migration")
+        self.dependencies[name].set(value)
 
-    def register_post_callback(self, callback: MigrateCallback) -> None:
-        """Registers a post-migration callback."""
-        self.post_migrate.append(callback)
+    def run(self, cursor: sqlite3.Cursor) -> None:
+        """Runs the migration."""
+        missing_dependencies = [d.name for d in self.dependencies.values() if d.value is None]
+        if missing_dependencies:
+            raise ValueError(f"Missing migration dependencies: {', '.join(missing_dependencies)}")
+        self.migrate_callback = partial(self.migrate_callback, **{d.name: d.value for d in self.dependencies.values()})
+        self.migrate_callback(cursor=cursor)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class MigrationSet:
@@ -78,7 +130,7 @@ class MigrationSet:
 
     def validate_migration_chain(self) -> None:
         """
-        Validates that the migrations form a single chain of migrations from version 0 to the latest version.
+        Validates that the migrations form a single chain of migrations from version 0 to the latest version,
         Raises a MigrationError if there is a problem.
         """
         if self.count == 0:

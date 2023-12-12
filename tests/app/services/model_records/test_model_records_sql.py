@@ -14,10 +14,6 @@ from invokeai.app.services.model_records import (
     ModelRecordServiceSQL,
     UnknownModelException,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
 from invokeai.backend.model_manager.config import (
     BaseModelType,
     MainCheckpointConfig,
@@ -27,18 +23,14 @@ from invokeai.backend.model_manager.config import (
     VaeDiffusersConfig,
 )
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import CreateSqliteDatabaseFunction
 
 
 @pytest.fixture
-def store(datadir: Any) -> ModelRecordServiceBase:
+def store(datadir: Any, create_sqlite_database: CreateSqliteDatabaseFunction) -> ModelRecordServiceBase:
     config = InvokeAIAppConfig(root=datadir)
     logger = InvokeAILogger.get_logger(config=config)
-    db_path = None if config.use_memory_db else config.db_path
-    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
-    migrator = SQLiteMigrator(db=db)
-    migrator.register_migration(migration_1)
-    migrator.register_migration(migration_2)
-    migrator.run_migrations()
+    db = create_sqlite_database(config, logger)
     return ModelRecordServiceSQL(db)
 
 
