@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Classification,
     Input,
     InputField,
     InvocationContext,
@@ -70,6 +71,7 @@ class CalculateImageTilesInvocation(BaseInvocation):
     tags=["tiles"],
     category="tiles",
     version="1.0.0",
+    classification=Classification.Beta,
 )
 class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
@@ -112,6 +114,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
     tags=["tiles"],
     category="tiles",
     version="1.0.0",
+    classification=Classification.Beta,
 )
 class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
@@ -156,7 +159,14 @@ class TileToPropertiesOutput(BaseInvocationOutput):
     overlap_right: int = OutputField(description="Overlap between this tile and its right neighbor.")
 
 
-@invocation("tile_to_properties", title="Tile to Properties", tags=["tiles"], category="tiles", version="1.0.0")
+@invocation(
+    "tile_to_properties",
+    title="Tile to Properties",
+    tags=["tiles"],
+    category="tiles",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
 class TileToPropertiesInvocation(BaseInvocation):
     """Split a Tile into its individual properties."""
 
@@ -182,7 +192,14 @@ class PairTileImageOutput(BaseInvocationOutput):
     tile_with_image: TileWithImage = OutputField(description="A tile description with its corresponding image.")
 
 
-@invocation("pair_tile_image", title="Pair Tile with Image", tags=["tiles"], category="tiles", version="1.0.0")
+@invocation(
+    "pair_tile_image",
+    title="Pair Tile with Image",
+    tags=["tiles"],
+    category="tiles",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
 class PairTileImageInvocation(BaseInvocation):
     """Pair an image with its tile properties."""
 
@@ -204,7 +221,14 @@ class PairTileImageInvocation(BaseInvocation):
 BLEND_MODES = Literal["Linear", "Seam"]
 
 
-@invocation("merge_tiles_to_image", title="Merge Tiles to Image", tags=["tiles"], category="tiles", version="1.1.0")
+@invocation(
+    "merge_tiles_to_image",
+    title="Merge Tiles to Image",
+    tags=["tiles"],
+    category="tiles",
+    version="1.1.0",
+    classification=Classification.Beta,
+)
 class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
     """Merge multiple tile images into a single image."""
 
