@@ -173,7 +173,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, TypeAdapter
@@ -334,7 +334,7 @@ class InvokeAIAppConfig(InvokeAISettings):
                 )
 
     @classmethod
-    def get_config(cls, **kwargs) -> InvokeAIAppConfig:
+    def get_config(cls, **kwargs: Dict[str, Any]) -> InvokeAIAppConfig:
         """Return a singleton InvokeAIAppConfig configuration object."""
         if (
             cls.singleton_config is None
@@ -383,17 +383,17 @@ class InvokeAIAppConfig(InvokeAISettings):
         return db_dir / DB_FILE
 
     @property
-    def model_conf_path(self) -> Optional[Path]:
+    def model_conf_path(self) -> Path:
         """Path to models configuration file."""
         return self._resolve(self.conf_path)
 
     @property
-    def legacy_conf_path(self) -> Optional[Path]:
+    def legacy_conf_path(self) -> Path:
         """Path to directory of legacy configuration files (e.g. v1-inference.yaml)."""
         return self._resolve(self.legacy_conf_dir)
 
     @property
-    def models_path(self) -> Optional[Path]:
+    def models_path(self) -> Path:
         """Path to the models directory."""
         return self._resolve(self.models_dir)
 

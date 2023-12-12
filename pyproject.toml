@@ -221,6 +221,8 @@ exclude = [
 # global mypy config
 [tool.mypy]
 ignore_missing_imports = true # ignores missing types in third-party libraries
+strict = true
+exclude = ["tests/*"]
 
 # overrides for specific modules
 [[tool.mypy.overrides]]
