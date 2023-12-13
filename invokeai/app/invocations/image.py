@@ -42,7 +42,6 @@ class ShowImageInvocation(BaseInvocation):
     tags=["image"],
     category="image",
     version="1.2.0",
-    classification=Classification.Beta,
 )
 class BlankImageInvocation(BaseInvocation, WithMetadata):
     """Creates a blank image and forwards it to the pipeline"""
@@ -429,6 +428,7 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata):
     tags=["image", "unsharp_mask"],
     category="image",
     version="1.2.0",
+    classification=Classification.Beta,
 )
 class UnsharpMaskInvocation(BaseInvocation, WithMetadata):
     """Applies an unsharp mask filter to an image"""
