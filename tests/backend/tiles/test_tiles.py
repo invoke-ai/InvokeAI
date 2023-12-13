@@ -241,6 +241,28 @@ def test_calc_tiles_min_overlap_not_evenly_divisible():
     assert tiles == expected_tiles
 
 
+def test_calc_tiles_min_overlap_tile_bigger_than_image():
+    """Test calc_tiles_min_overlap() behavior when the tile is nigger than the image"""
+    # Parameters mimic roughly the same output as the original tile generations of the same test name
+    tiles = calc_tiles_min_overlap(
+        image_height=1024,
+        image_width=1024,
+        tile_height=1408,
+        tile_width=1408,
+        min_overlap=128,
+    )
+
+    expected_tiles = [
+        # single tile
+        Tile(
+            coords=TBLR(top=0, bottom=1024, left=0, right=1024),
+            overlap=TBLR(top=0, bottom=0, left=0, right=0),
+        ),
+    ]
+
+    assert tiles == expected_tiles
+
+
 @pytest.mark.parametrize(
     [
         "image_height",
