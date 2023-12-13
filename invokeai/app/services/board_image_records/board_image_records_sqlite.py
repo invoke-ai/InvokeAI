@@ -20,63 +20,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         self._conn = db.conn
         self._cursor = self._conn.cursor()
 
-        try:
-            self._lock.acquire()
-            self._create_tables()
-            self._conn.commit()
-        finally:
-            self._lock.release()
-
-    def _create_tables(self) -> None:
-        """Creates the `board_images` junction table."""
-
-        # Create the `board_images` junction table.
-        self._cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS board_images (
-                board_id TEXT NOT NULL,
-                image_name TEXT NOT NULL,
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Soft delete, currently unused
-                deleted_at DATETIME,
-                -- enforce one-to-many relationship between boards and images using PK
-                -- (we can extend this to many-to-many later)
-                PRIMARY KEY (image_name),
-                FOREIGN KEY (board_id) REFERENCES boards (board_id) ON DELETE CASCADE,
-                FOREIGN KEY (image_name) REFERENCES images (image_name) ON DELETE CASCADE
-            );
-            """
-        )
-
-        # Add index for board id
-        self._cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_board_images_board_id ON board_images (board_id);
-            """
-        )
-
-        # Add index for board id, sorted by created_at
-        self._cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_board_images_board_id_created_at ON board_images (board_id, created_at);
-            """
-        )
-
-        # Add trigger for `updated_at`.
-        self._cursor.execute(
-            """--sql
-            CREATE TRIGGER IF NOT EXISTS tg_board_images_updated_at
-            AFTER UPDATE
-            ON board_images FOR EACH ROW
-            BEGIN
-                UPDATE board_images SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE board_id = old.board_id AND image_name = old.image_name;
-            END;
-            """
-        )
-
     def add_image_to_board(
         self,
         board_id: str,
