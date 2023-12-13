@@ -47,7 +47,7 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "fastapi~=0.104.1",
+  "fastapi~=0.105.0",
   "fastapi-events~=0.9.1",
   "huggingface-hub~=0.16.4",
   "imohash",
