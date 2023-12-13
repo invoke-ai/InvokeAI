@@ -242,17 +242,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_model: ControlNetModel = None,
     ):
         super().__init__(
-            vae,
-            text_encoder,
-            tokenizer,
-            unet,
-            scheduler,
-            safety_checker,
-            feature_extractor,
-            requires_safety_checker,
-        )
-
-        self.register_modules(
             vae=vae,
             text_encoder=text_encoder,
             tokenizer=tokenizer,
@@ -260,9 +249,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
-            # FIXME: can't currently register control module
-            # control_model=control_model,
+            requires_safety_checker=requires_safety_checker,
         )
+
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
         self.control_model = control_model
         self.use_ip_adapter = False
