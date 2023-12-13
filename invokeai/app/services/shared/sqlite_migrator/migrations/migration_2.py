@@ -149,9 +149,13 @@ class Migration2Callback:
         pbar = tqdm(image_names)
         for idx, image_name in enumerate(pbar):
             pbar.set_description(f"Checking image {idx + 1}/{total_image_names} for workflow")
-            pil_image = self._image_files.get(image_name)
-            if "invokeai_workflow" in pil_image.info:
-                to_migrate.append((True, image_name))
+            try:
+                pil_image = self._image_files.get(image_name)
+                if "invokeai_workflow" in pil_image.info:
+                    to_migrate.append((True, image_name))
+            except:
+                self._logger.warning(f"Image '{image_name}' not found. Skipping.")
+            continue
 
         self._logger.info(f"Adding {len(to_migrate)} embedded workflows to database")
         cursor.executemany("UPDATE images SET has_workflow = ? WHERE image_name = ?", to_migrate)
