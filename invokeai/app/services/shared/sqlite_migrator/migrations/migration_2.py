@@ -3,6 +3,7 @@ from logging import Logger
 
 from tqdm import tqdm
 
+from invokeai.backend.model_manager.migrate_to_db import MigrateModelYamlToDb
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
@@ -19,6 +20,7 @@ class Migration2Callback:
         self._add_workflow_library(cursor)
         self._drop_model_manager_metadata(cursor)
         self._recreate_model_config(cursor)
+        self._migrate_model_config_records()
         self._migrate_embedded_workflows(cursor)
 
     def _add_images_has_workflow(self, cursor: sqlite3.Cursor) -> None:
@@ -125,6 +127,11 @@ class Migration2Callback:
             );
             """
         )
+
+    def _migrate_model_config_records(self) -> None:
+        """After updating the model config table, we repopulate it."""
+        model_record_migrator = MigrateModelYamlToDb()
+        model_record_migrator.migrate()
 
     def _migrate_embedded_workflows(self, cursor: sqlite3.Cursor) -> None:
         """
