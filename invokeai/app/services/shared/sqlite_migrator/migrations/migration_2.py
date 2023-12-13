@@ -1,8 +1,6 @@
 import sqlite3
 from logging import Logger
-
 from tqdm import tqdm
-
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
@@ -153,7 +151,7 @@ class Migration2Callback:
                 pil_image = self._image_files.get(image_name)
                 if "invokeai_workflow" in pil_image.info:
                     to_migrate.append((True, image_name))
-            except:
+            except KeyError:
                 self._logger.warning(f"Image '{image_name}' not found. Skipping.")
             continue
 
