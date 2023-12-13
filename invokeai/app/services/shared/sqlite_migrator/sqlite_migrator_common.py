@@ -1,6 +1,5 @@
 import sqlite3
-from functools import partial
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -18,7 +17,7 @@ class MigrateCallback(Protocol):
     See :class:`Migration` for an example.
     """
 
-    def __call__(self, cursor: sqlite3.Cursor, **kwargs: Any) -> None:
+    def __call__(self, cursor: sqlite3.Cursor) -> None:
         ...
 
 
@@ -30,96 +29,69 @@ class MigrationVersionError(ValueError):
     """Raised when a migration version is invalid."""
 
 
-class MigrationDependency:
-    """
-    Represents a dependency for a migration.
-
-    :param name: The name of the dependency
-    :param dependency_type: The type of the dependency (e.g. `str`, `int`, `SomeClass`, etc.)
-    """
-
-    def __init__(
-        self,
-        name: str,
-        dependency_type: Any,
-    ) -> None:
-        self.name = name
-        self.dependency_type = dependency_type
-        self.value = None
-
-    def set_value(self, value: Any) -> None:
-        """
-        Sets the value of the dependency.
-        If the value is not of the correct type, a TypeError is raised.
-        """
-        if not isinstance(value, self.dependency_type):
-            raise TypeError(f"Dependency {self.name} must be of type {self.dependency_type}")
-        self.value = value
-
-
 class Migration(BaseModel):
     """
     Represents a migration for a SQLite database.
 
     :param from_version: The database version on which this migration may be run
     :param to_version: The database version that results from this migration
-    :param migrate: The callback to run to perform the migration
-    :param dependencies: A dict of dependencies that must be provided to the migration
+    :param migrate_callback: The callback to run to perform the migration
 
     Migration callbacks will be provided an open cursor to the database. They should not commit their
     transaction; this is handled by the migrator.
 
-    Example Usage:
+    It is suggested to use a class to define the migration callback and a builder function to create
+    the :class:`Migration`. This allows the callback to be provided with additional dependencies and
+    keeps things tidy, as all migration logic is self-contained.
+
+    Example:
     ```py
-    # Define the migrate callback. This migration adds a column to the sushi table.
-    def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
-        # Execute SQL using the cursor, taking care to *not commit* a transaction
-        cursor.execute('ALTER TABLE sushi ADD COLUMN with_banana BOOLEAN DEFAULT TRUE;')
-        ...
+    # Define the migration callback class
+    class Migration1Callback:
+        # This migration needs a logger, so we define a class that accepts a logger in its constructor.
+        def __init__(self, image_files: ImageFileStorageBase) -> None:
+            self._image_files = ImageFileStorageBase
 
-    # Instantiate the migration
-    migration = Migration(
-        from_version=0,
-        to_version=1,
-        migrate_callback=migrate_callback,
-    )
-    ```
+        # This dunder method allows the instance of the class to be called like a function.
+        def __call__(self, cursor: sqlite3.Cursor) -> None:
+            self._add_with_banana_column(cursor)
+            self._do_something_with_images(cursor)
 
-    If a migration needs an additional dependency, it must be provided with :meth:`provide_dependency`
-    before the migration is run. The migrator provides dependencies to the migrate callback,
-    raising an error if a dependency is missing or was provided the wrong type.
+        def _add_with_banana_column(self, cursor: sqlite3.Cursor) -> None:
+            \"""Adds the with_banana column to the sushi table.\"""
+            # Execute SQL using the cursor, taking care to *not commit* a transaction
+            cursor.execute('ALTER TABLE sushi ADD COLUMN with_banana BOOLEAN DEFAULT TRUE;')
 
-    Example Usage:
-    ```py
-    # Create a migration dependency. This migration needs access the image files service, so we set the type to the ABC of that service.
-    image_files_dependency = MigrationDependency(name="image_files", dependency_type=ImageFileStorageBase)
+        def _do_something_with_images(self, cursor: sqlite3.Cursor) -> None:
+            \"""Does something with the image files service.\"""
+            self._image_files.get(...)
 
-    # Define the migrate callback. The dependency may be accessed by name in the kwargs. The migrator will ensure that the dependency is of the required type.
-    def migrate_callback(cursor: sqlite3.Cursor, **kwargs) -> None:
-        image_files = kwargs[image_files_dependency.name]
-        # Do something with image_files
-        ...
+    # Define the migration builder function. This function creates an instance of the migration callback
+    # class and returns a Migration.
+    def build_migration_1(image_files: ImageFileStorageBase) -> Migration:
+        \"""Builds the migration from database version 0 to 1.
+        Requires the image files service to...
+        \"""
 
-    # Instantiate the migration, including the dependency.
-    migration = Migration(
-        from_version=0,
-        to_version=1,
-        migrate_callback=migrate_callback,
-        dependencies={image_files_dependency.name: image_files_dependency},
-    )
+        migration_1 = Migration(
+            from_version=0,
+            to_version=1,
+            migrate_callback=Migration1Callback(image_files=image_files),
+        )
 
-    # Provide the dependency before registering the migration.
-    # (DiskImageFileStorage is an implementation of ImageFileStorageBase)
-    migration.provide_dependency(name="image_files", value=DiskImageFileStorage())
+        return migration_1
+
+    # Register the migration after all dependencies have been initialized
+    db = SqliteDatabase(db_path, logger)
+    migrator = SqliteMigrator(db)
+    migrator.register_migration(build_migration_1(image_files))
+    migrator.run_migrations()
     ```
     """
 
     from_version: int = Field(ge=0, strict=True, description="The database version on which this migration may be run")
     to_version: int = Field(ge=1, strict=True, description="The database version that results from this migration")
-    migrate_callback: MigrateCallback = Field(description="The callback to run to perform the migration")
-    dependencies: dict[str, MigrationDependency] = Field(
-        default={}, description="A dict of dependencies that must be provided to the migration"
-    )
+    callback: MigrateCallback = Field(description="The callback to run to perform the migration")
 
     @model_validator(mode="after")
     def validate_to_version(self) -> "Migration":
@@ -131,23 +103,6 @@ class Migration(BaseModel):
     def __hash__(self) -> int:
         # Callables are not hashable, so we need to implement our own __hash__ function to use this class in a set.
         return hash((self.from_version, self.to_version))
-
-    def provide_dependency(self, name: str, value: Any) -> None:
-        """Provides a dependency for this migration."""
-        if name not in self.dependencies:
-            raise ValueError(f"{name} of type {type(value)} is not a dependency of this migration")
-        self.dependencies[name].set_value(value)
-
-    def run(self, cursor: sqlite3.Cursor) -> None:
-        """
-        Runs the migration.
-        If any dependencies are missing, a MigrationError is raised.
-        """
-        missing_dependencies = [d.name for d in self.dependencies.values() if d.value is None]
-        if missing_dependencies:
-            raise MigrationError(f"Missing migration dependencies: {', '.join(missing_dependencies)}")
-        self.migrate_callback = partial(self.migrate_callback, **{d.name: d.value for d in self.dependencies.values()})
-        self.migrate_callback(cursor=cursor)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

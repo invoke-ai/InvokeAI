@@ -20,8 +20,8 @@ class SQLiteMigrator:
     ```py
     db = SqliteDatabase(db_path="my_db.db", logger=logger)
     migrator = SQLiteMigrator(db=db)
-    migrator.register_migration(migration_1)
-    migrator.register_migration(migration_2)
+    migrator.register_migration(build_migration_1())
+    migrator.register_migration(build_migration_2())
     migrator.run_migrations()
     ```
     """
@@ -76,7 +76,7 @@ class SQLiteMigrator:
                 self._logger.debug(f"Running migration from {migration.from_version} to {migration.to_version}")
 
                 # Run the actual migration
-                migration.run(cursor)
+                migration.callback(cursor)
 
                 # Update the version
                 cursor.execute("INSERT INTO migrations (version) VALUES (?);", (migration.to_version,))

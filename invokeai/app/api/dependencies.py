@@ -2,9 +2,7 @@
 
 from logging import Logger
 
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import migration_1
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import migration_2
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SQLiteMigrator
+from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -33,7 +31,6 @@ from ..services.session_processor.session_processor_default import DefaultSessio
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from ..services.shared.default_graphs import create_system_graphs
 from ..services.shared.graph import GraphExecutionState, LibraryGraph
-from ..services.shared.sqlite.sqlite_database import SqliteDatabase
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
@@ -72,17 +69,7 @@ class ApiDependencies:
         output_folder = config.output_path
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
-        db_path = None if config.use_memory_db else config.db_path
-        db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
-
-        # This migration requires an ImageFileStorageBase service and logger
-        migration_2.provide_dependency("image_files", image_files)
-        migration_2.provide_dependency("logger", logger)
-
-        migrator = SQLiteMigrator(db=db)
-        migrator.register_migration(migration_1)
-        migrator.register_migration(migration_2)
-        migrator.run_migrations()
+        db = init_db(config=config, logger=logger, image_files=image_files)
 
         configuration = config
         logger = logger

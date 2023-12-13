@@ -29,7 +29,7 @@ from invokeai.app.services.shared.graph import (
     LibraryGraph,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import CreateSqliteDatabaseFunction
+from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 from .test_invoker import create_edge
 
@@ -47,10 +47,10 @@ def simple_graph():
 # Defining it in a separate module will cause the union to be incomplete, and pydantic will not validate
 # the test invocations.
 @pytest.fixture
-def mock_services(create_sqlite_database: CreateSqliteDatabaseFunction) -> InvocationServices:
+def mock_services() -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
     logger = InvokeAILogger.get_logger()
-    db = create_sqlite_database(configuration, logger)
+    db = create_mock_sqlite_database(configuration, logger)
     # NOTE: none of these are actually called by the test invocations
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
     return InvocationServices(
