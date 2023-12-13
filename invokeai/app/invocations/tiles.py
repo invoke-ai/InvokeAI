@@ -38,7 +38,14 @@ class CalculateImageTilesOutput(BaseInvocationOutput):
     tiles: list[Tile] = OutputField(description="The tiles coordinates that cover a particular image shape.")
 
 
-@invocation("calculate_image_tiles", title="Calculate Image Tiles", tags=["tiles"], category="tiles", version="1.0.0")
+@invocation(
+    "calculate_image_tiles",
+    title="Calculate Image Tiles",
+    tags=["tiles"],
+    category="tiles",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
 class CalculateImageTilesInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
 
