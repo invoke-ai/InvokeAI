@@ -6,7 +6,7 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration, MigrationError, MigrationSet
 
 
-class SQLiteMigrator:
+class SqliteMigrator:
     """
     Manages migrations for a SQLite database.
 
@@ -19,7 +19,7 @@ class SQLiteMigrator:
     Example Usage:
     ```py
     db = SqliteDatabase(db_path="my_db.db", logger=logger)
-    migrator = SQLiteMigrator(db=db)
+    migrator = SqliteMigrator(db=db)
     migrator.register_migration(build_migration_1())
     migrator.register_migration(build_migration_2())
     migrator.run_migrations()
