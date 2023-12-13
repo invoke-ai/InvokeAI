@@ -110,7 +110,17 @@
         "copyError": "$t(gallery.copy) 错误",
         "input": "输入",
         "notInstalled": "非 $t(common.installed)",
-        "delete": "删除"
+        "delete": "删除",
+        "updated": "已上传",
+        "save": "保存",
+        "created": "已创建",
+        "prevPage": "上一页",
+        "unknownError": "未知错误",
+        "direction": "指向",
+        "orderBy": "排序方式：",
+        "nextPage": "下一页",
+        "saveAs": "保存为",
+        "unsaved": "未保存"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -146,7 +156,11 @@
         "image": "图像",
         "drop": "弃用",
         "dropOrUpload": "$t(gallery.drop) 或上传",
-        "dropToUpload": "$t(gallery.drop) 以上传"
+        "dropToUpload": "$t(gallery.drop) 以上传",
+        "problemDeletingImagesDesc": "有一张或多张图像无法被删除",
+        "problemDeletingImages": "删除图像时出现问题",
+        "unstarImage": "取消收藏图像",
+        "starImage": "收藏图像"
     },
     "hotkeys": {
         "keyboardShortcuts": "键盘快捷键",
@@ -724,7 +738,7 @@
         "nodesUnrecognizedTypes": "无法加载。节点图有无法识别的节点类型",
         "nodesNotValidJSON": "无效的 JSON",
         "nodesNotValidGraph": "无效的 InvokeAi 节点图",
-        "nodesLoadedFailed": "节点图加载失败",
+        "nodesLoadedFailed": "节点加载失败",
         "modelAddedSimple": "已添加模型",
         "modelAdded": "已添加模型: {{modelName}}",
         "imageSavingFailed": "图像保存失败",
@@ -760,7 +774,10 @@
         "problemImportingMask": "导入遮罩时出现问题",
         "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{count}} 个不兼容的子模型",
         "setAsCanvasInitialImage": "设为画布初始图像",
-        "invalidUpload": "无效的上传"
+        "invalidUpload": "无效的上传",
+        "problemDeletingWorkflow": "删除工作流时出现问题",
+        "workflowDeleted": "已删除工作流",
+        "problemRetrievingWorkflow": "检索工作流时发生问题"
     },
     "unifiedCanvas": {
         "layer": "图层",
@@ -875,11 +892,11 @@
     },
     "nodes": {
         "zoomInNodes": "放大",
-        "resetWorkflowDesc": "是否确定要清空节点图?",
-        "resetWorkflow": "清空节点图",
-        "loadWorkflow": "读取节点图",
+        "resetWorkflowDesc": "是否确定要重置工作流编辑器?",
+        "resetWorkflow": "重置工作流编辑器",
+        "loadWorkflow": "加载工作流",
         "zoomOutNodes": "缩小",
-        "resetWorkflowDesc2": "重置节点图将清除所有节点、边际和节点图详情.",
+        "resetWorkflowDesc2": "重置工作流编辑器将清除所有节点、边际和节点图详情。不影响已保存的工作流。",
         "reloadNodeTemplates": "重载节点模板",
         "hideGraphNodes": "隐藏节点图信息",
         "fitViewportNodes": "自适应视图",
@@ -888,7 +905,7 @@
         "showLegendNodes": "显示字段类型图例",
         "hideLegendNodes": "隐藏字段类型图例",
         "showGraphNodes": "显示节点图信息",
-        "downloadWorkflow": "下载节点图 JSON",
+        "downloadWorkflow": "下载工作流 JSON",
         "workflowDescription": "简述",
         "versionUnknown": " 未知版本",
         "noNodeSelected": "无选中的节点",
@@ -1103,7 +1120,9 @@
         "collectionOrScalarFieldType": "{{name}} 合集 | 标量",
         "nodeVersion": "节点版本",
         "deletedInvalidEdge": "已删除无效的边缘 {{source}} -> {{target}}",
-        "unknownInput": "未知输入：{{name}}"
+        "unknownInput": "未知输入：{{name}}",
+        "prototypeDesc": "此调用是一个原型 (prototype)。它可能会在本项目更新期间发生破坏性更改，并且随时可能被删除。",
+        "betaDesc": "此调用尚处于测试阶段。在稳定之前，它可能会在项目更新期间发生破坏性更改。本项目计划长期支持这种调用。"
     },
     "controlnet": {
         "resize": "直接缩放",
@@ -1607,5 +1626,36 @@
         "hrf": "高分辨率修复",
         "hrfStrength": "高分辨率修复强度",
         "strengthTooltip": "值越低细节越少，但可以减少部分潜在的伪影。"
+    },
+    "workflows": {
+        "saveWorkflowAs": "保存工作流为",
+        "workflowEditorMenu": "工作流编辑器菜单",
+        "noSystemWorkflows": "无系统工作流",
+        "workflowName": "工作流名称",
+        "noUserWorkflows": "无用户工作流",
+        "defaultWorkflows": "默认工作流",
+        "saveWorkflow": "保存工作流",
+        "openWorkflow": "打开工作流",
+        "clearWorkflowSearchFilter": "清除工作流检索过滤器",
+        "workflowEditorReset": "工作流编辑器重置",
+        "workflowLibrary": "工作流库",
+        "downloadWorkflow": "下载工作流",
+        "noRecentWorkflows": "无最近工作流",
+        "workflowSaved": "已保存工作流",
+        "workflowIsOpen": "工作流已打开",
+        "unnamedWorkflow": "未命名的工作流",
+        "savingWorkflow": "保存工作流中...",
+        "problemLoading": "加载工作流时出现问题",
+        "loading": "加载工作流中",
+        "searchWorkflows": "检索工作流",
+        "problemSavingWorkflow": "保存工作流时出现问题",
+        "deleteWorkflow": "删除工作流",
+        "workflows": "工作流",
+        "noDescription": "无描述",
+        "uploadWorkflow": "上传工作流",
+        "userWorkflows": "我的工作流"
+    },
+    "app": {
+        "storeNotInitialized": "商店尚未初始化"
     }
 }
