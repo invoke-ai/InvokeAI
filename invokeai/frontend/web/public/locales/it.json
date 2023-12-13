@@ -104,7 +104,16 @@
         "copyError": "$t(gallery.copy) Errore",
         "input": "Ingresso",
         "notInstalled": "Non $t(common.installed)",
-        "unknownError": "Errore sconosciuto"
+        "unknownError": "Errore sconosciuto",
+        "updated": "Aggiornato",
+        "save": "Salva",
+        "created": "Creato",
+        "prevPage": "Pagina precedente",
+        "delete": "Elimina",
+        "orderBy": "Ordinato per",
+        "nextPage": "Pagina successiva",
+        "saveAs": "Salva come",
+        "unsaved": "Non salvato"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -763,7 +772,10 @@
         "setIPAdapterImage": "Imposta come immagine per l'Adattatore IP",
         "problemSavingMaskDesc": "Impossibile salvare la maschera",
         "setAsCanvasInitialImage": "Imposta come immagine iniziale della tela",
-        "invalidUpload": "Caricamento non valido"
+        "invalidUpload": "Caricamento non valido",
+        "problemDeletingWorkflow": "Problema durante l'eliminazione del flusso di lavoro",
+        "workflowDeleted": "Flusso di lavoro eliminato",
+        "problemRetrievingWorkflow": "Problema nel recupero del flusso di lavoro"
     },
     "tooltip": {
         "feature": {
@@ -886,11 +898,11 @@
         "zoomInNodes": "Ingrandire",
         "fitViewportNodes": "Adatta vista",
         "showGraphNodes": "Mostra sovrapposizione grafico",
-        "resetWorkflowDesc2": "Reimpostare il flusso di lavoro cancellerà tutti i nodi, i bordi e i dettagli del flusso di lavoro.",
+        "resetWorkflowDesc2": "Il ripristino dell'editor del flusso di lavoro cancellerà tutti i nodi, le connessioni e i dettagli del flusso di lavoro. I flussi di lavoro salvati non saranno interessati.",
         "reloadNodeTemplates": "Ricarica i modelli di nodo",
         "loadWorkflow": "Importa flusso di lavoro JSON",
-        "resetWorkflow": "Reimposta flusso di lavoro",
-        "resetWorkflowDesc": "Sei sicuro di voler reimpostare questo flusso di lavoro?",
+        "resetWorkflow": "Reimposta l'editor del flusso di lavoro",
+        "resetWorkflowDesc": "Sei sicuro di voler reimpostare l'editor del flusso di lavoro?",
         "downloadWorkflow": "Esporta flusso di lavoro JSON",
         "scheduler": "Campionatore",
         "addNode": "Aggiungi nodo",
@@ -1080,25 +1092,27 @@
         "collectionOrScalarFieldType": "{{name}} Raccolta|Scalare",
         "nodeVersion": "Versione Nodo",
         "inputFieldTypeParseError": "Impossibile analizzare il tipo di campo di input {{node}}.{{field}} ({{message}})",
-        "unsupportedArrayItemType": "tipo di elemento dell'array non supportato \"{{type}}\"",
+        "unsupportedArrayItemType": "Tipo di elemento dell'array non supportato \"{{type}}\"",
         "targetNodeFieldDoesNotExist": "Connessione non valida: il campo di destinazione/input {{node}}.{{field}} non esiste",
         "unsupportedMismatchedUnion": "tipo CollectionOrScalar non corrispondente con tipi di base {{firstType}} e {{secondType}}",
         "allNodesUpdated": "Tutti i nodi sono aggiornati",
         "sourceNodeDoesNotExist": "Connessione non valida: il nodo di origine/output {{node}} non esiste",
-        "unableToExtractEnumOptions": "impossibile estrarre le opzioni enum",
-        "unableToParseFieldType": "impossibile analizzare il tipo di campo",
+        "unableToExtractEnumOptions": "Impossibile estrarre le opzioni enum",
+        "unableToParseFieldType": "Impossibile analizzare il tipo di campo",
         "unrecognizedWorkflowVersion": "Versione dello schema del flusso di lavoro non riconosciuta {{version}}",
         "outputFieldTypeParseError": "Impossibile analizzare il tipo di campo di output {{node}}.{{field}} ({{message}})",
         "sourceNodeFieldDoesNotExist": "Connessione non valida: il campo di origine/output {{node}}.{{field}} non esiste",
         "unableToGetWorkflowVersion": "Impossibile ottenere la versione dello schema del flusso di lavoro",
         "nodePack": "Pacchetto di nodi",
-        "unableToExtractSchemaNameFromRef": "impossibile estrarre il nome dello schema dal riferimento",
+        "unableToExtractSchemaNameFromRef": "Impossibile estrarre il nome dello schema dal riferimento",
         "unknownOutput": "Output sconosciuto: {{name}}",
         "unknownNodeType": "Tipo di nodo sconosciuto",
         "targetNodeDoesNotExist": "Connessione non valida: il nodo di destinazione/input {{node}} non esiste",
         "unknownFieldType": "$t(nodes.unknownField) tipo: {{type}}",
         "deletedInvalidEdge": "Eliminata connessione non valida {{source}} -> {{target}}",
-        "unknownInput": "Input sconosciuto: {{name}}"
+        "unknownInput": "Input sconosciuto: {{name}}",
+        "prototypeDesc": "Questa invocazione è un prototipo. Potrebbe subire modifiche sostanziali durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento.",
+        "betaDesc": "Questa invocazione è in versione beta. Fino a quando non sarà stabile, potrebbe subire modifiche importanti durante gli aggiornamenti dell'app. Abbiamo intenzione di supportare questa invocazione a lungo termine."
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1594,5 +1608,34 @@
         "hrf": "Correzione Alta Risoluzione",
         "hrfStrength": "Forza della Correzione Alta Risoluzione",
         "strengthTooltip": "Valori più bassi comportano meno dettagli, il che può ridurre potenziali artefatti."
+    },
+    "workflows": {
+        "saveWorkflowAs": "Salva flusso di lavoro come",
+        "workflowEditorMenu": "Menu dell'editor del flusso di lavoro",
+        "noSystemWorkflows": "Nessun flusso di lavoro del sistema",
+        "workflowName": "Nome del flusso di lavoro",
+        "noUserWorkflows": "Nessun flusso di lavoro utente",
+        "defaultWorkflows": "Flussi di lavoro predefiniti",
+        "saveWorkflow": "Salva flusso di lavoro",
+        "openWorkflow": "Apri flusso di lavoro",
+        "clearWorkflowSearchFilter": "Cancella il filtro di ricerca del flusso di lavoro",
+        "workflowEditorReset": "Reimpostazione dell'editor del flusso di lavoro",
+        "workflowLibrary": "Libreria",
+        "noRecentWorkflows": "Nessun flusso di lavoro recente",
+        "workflowSaved": "Flusso di lavoro salvato",
+        "workflowIsOpen": "Il flusso di lavoro è aperto",
+        "unnamedWorkflow": "Flusso di lavoro senza nome",
+        "savingWorkflow": "Salvataggio del flusso di lavoro...",
+        "problemLoading": "Problema durante il caricamento dei flussi di lavoro",
+        "loading": "Caricamento dei flussi di lavoro",
+        "searchWorkflows": "Cerca flussi di lavoro",
+        "problemSavingWorkflow": "Problema durante il salvataggio del flusso di lavoro",
+        "deleteWorkflow": "Elimina flusso di lavoro",
+        "workflows": "Flussi di lavoro",
+        "noDescription": "Nessuna descrizione",
+        "userWorkflows": "I miei flussi di lavoro"
+    },
+    "app": {
+        "storeNotInitialized": "Il negozio non è inizializzato"
     }
 }
