@@ -41,7 +41,7 @@ dependencies = [
   "controlnet-aux>=0.0.6",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
-  "diffusers[torch]~=0.23.0",
+  "diffusers[torch]~=0.24.0",
   "dnspython~=2.4.0",
   "dynamicprompts",
   "easing-functions",
@@ -49,7 +49,7 @@ dependencies = [
   "facexlib",
   "fastapi~=0.105.0",
   "fastapi-events~=0.9.1",
-  "huggingface-hub~=0.16.4",
+  "huggingface-hub~=0.19.4",
   "imohash",
   "invisible-watermark~=0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                 # needed for plotting of Penner easing functions
