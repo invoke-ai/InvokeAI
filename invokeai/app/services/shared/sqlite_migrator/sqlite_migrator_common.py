@@ -97,7 +97,7 @@ class Migration(BaseModel):
     def validate_to_version(self) -> "Migration":
         """Validates that to_version is one greater than from_version."""
         if self.to_version != self.from_version + 1:
-            raise ValueError("to_version must be one greater than from_version")
+            raise MigrationVersionError("to_version must be one greater than from_version")
         return self
 
     def __hash__(self) -> int:
