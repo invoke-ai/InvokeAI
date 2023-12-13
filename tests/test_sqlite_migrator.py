@@ -237,7 +237,6 @@ def test_migrator_runs_all_migrations_in_memory(migrator: SQLiteMigrator) -> Non
 def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
-        # The Migrator closes the database when it finishes; we cannot use a context manager.
         db = SqliteDatabase(db_path=original_db_path, logger=logger, verbose=False)
         migrator = SQLiteMigrator(db=db)
         migrations = [Migration(from_version=i, to_version=i + 1, callback=create_migrate(i)) for i in range(0, 3)]
