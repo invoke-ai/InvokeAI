@@ -3,9 +3,9 @@ from logging import Logger
 
 from tqdm import tqdm
 
-from invokeai.backend.model_manager.migrate_to_db import MigrateModelYamlToDb
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from invokeai.backend.model_manager.migrate_to_db import MigrateModelYamlToDb
 
 
 class Migration2Callback:
