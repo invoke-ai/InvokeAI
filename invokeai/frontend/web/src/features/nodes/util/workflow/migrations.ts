@@ -64,7 +64,10 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
       const nodePack = invocationTemplate
         ? invocationTemplate.nodePack
         : t('common.unknown');
+
       (node.data as unknown as InvocationNodeData).nodePack = nodePack;
+      // Fallback to 1.0.0 if not specified - this matches the behavior of the backend
+      node.data.version ||= '1.0.0';
     }
   });
   // Bump version
