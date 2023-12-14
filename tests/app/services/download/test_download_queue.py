@@ -73,7 +73,7 @@ class DummyEventService(EventServiceBase):
         self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
 
 
-def test_basic_queue_download(datadir, session):
+def test_basic_queue_download(tmp_path, session):
     events = set()
 
     def event_handler(job: DownloadJob):
@@ -85,7 +85,7 @@ def test_basic_queue_download(datadir, session):
     queue.start()
     job = queue.download(
         source="http://www.civitai.com/models/12345",
-        dest=datadir,
+        dest=tmp_path,
         on_start=event_handler,
         on_progress=event_handler,
         on_complete=event_handler,
@@ -96,19 +96,19 @@ def test_basic_queue_download(datadir, session):
     queue.join()
 
     assert job.status == DownloadJobStatus("completed"), "expected job status to be completed"
-    assert Path(datadir, "mock12345.safetensors").exists(), f"expected {datadir}/mock12345.safetensors to exist"
+    assert Path(tmp_path, "mock12345.safetensors").exists(), f"expected {tmp_path}/mock12345.safetensors to exist"
 
     assert events == {DownloadJobStatus.RUNNING, DownloadJobStatus.COMPLETED}
     queue.stop()
 
-def test_errors(datadir, session):
+def test_errors(tmp_path, session):
     queue = DownloadQueueService(
         requests_session=session,
     )
     queue.start()
 
     for bad_url in ["http://www.civitai.com/models/broken", "http://www.civitai.com/models/missing"]:
-        queue.download(bad_url, dest=datadir)
+        queue.download(bad_url, dest=tmp_path)
 
     queue.join()
     jobs = queue.list_jobs()
@@ -121,14 +121,14 @@ def test_errors(datadir, session):
     assert jobs_dict["http://www.civitai.com/models/missing"].total_bytes == 0
     queue.stop()
 
-def test_event_bus(datadir, session):
+def test_event_bus(tmp_path, session):
     event_bus = DummyEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
     queue.start()
     queue.download(
         source="http://www.civitai.com/models/12345",
-        dest=datadir,
+        dest=tmp_path,
     )
     queue.join()
     events = event_bus.events
@@ -144,7 +144,7 @@ def test_event_bus(datadir, session):
 
     # test a failure
     event_bus.events = []  # reset our accumulator
-    queue.download(source="http://www.civitai.com/models/broken", dest=datadir)
+    queue.download(source="http://www.civitai.com/models/broken", dest=tmp_path)
     queue.join()
     events = event_bus.events
     print("\n".join([x.model_dump_json() for x in events]))
@@ -155,7 +155,7 @@ def test_event_bus(datadir, session):
     assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].payload["error"])
     queue.stop()
 
-def test_broken_callbacks(datadir, session, capsys):
+def test_broken_callbacks(tmp_path, session, capsys):
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -170,13 +170,13 @@ def test_broken_callbacks(datadir, session, capsys):
 
     job = queue.download(
         source="http://www.civitai.com/models/12345",
-        dest=datadir,
+        dest=tmp_path,
         on_progress=broken_callback,
     )
 
     queue.join()
     assert job.status == DownloadJobStatus.COMPLETED  # should complete even though the callback is borked
-    assert Path(datadir, "mock12345.safetensors").exists()
+    assert Path(tmp_path, "mock12345.safetensors").exists()
     assert callback_ran
     # LS: The pytest capsys fixture does not seem to be working. I can see the
     # correct stderr message in the pytest log, but it is not appearing in
@@ -186,7 +186,7 @@ def test_broken_callbacks(datadir, session, capsys):
     queue.stop()
 
 
-def test_cancel(datadir, session):
+def test_cancel(tmp_path, session):
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -197,7 +197,7 @@ def test_cancel(datadir, session):
 
     job = queue.download(
         source="http://www.civitai.com/models/12345",
-        dest=datadir,
+        dest=tmp_path,
         on_start=slow_callback,
     )
     queue.cancel_job(job)
