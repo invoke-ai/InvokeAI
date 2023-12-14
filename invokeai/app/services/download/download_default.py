@@ -8,7 +8,7 @@ import traceback
 from logging import Logger
 from pathlib import Path
 from queue import PriorityQueue
-from typing import Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 import requests
 from pydantic.networks import AnyHttpUrl, Url
@@ -39,6 +39,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     """Class for queued download of models."""
 
     _jobs: Dict[int, DownloadJob]
+    _max_parallel_dl: int = 5
     _worker_pool: Set[threading.Thread]
     _queue: PriorityQueue
     _lock: threading.Lock
@@ -67,12 +68,17 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
         self._requests = requests_session or requests.Session()
+        self._max_parallel_dl = max_parallel_dl
 
-        self._start_workers(max_parallel_dl)
+    def start(self, *args: Any, **kwargs: Any) -> None:
+        """Start the download worker threads."""
+        self._start_workers(self._max_parallel_dl)
 
-    def __del__(self) -> None:
-        if any(thread.is_alive for thread in self._worker_pool):
-            self._queue.put(STOP_JOB)
+    def stop(self, *args: Any, **kwargs: Any) -> None:
+        """Stop the download worker threads."""
+        for thread in self._worker_pool:
+            if thread.is_alive():
+                self._queue.put(STOP_JOB)
 
     def download(
         self,

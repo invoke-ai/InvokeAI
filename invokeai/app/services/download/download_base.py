@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 from pydantic import BaseModel, Field, PrivateAttr
 from pydantic.networks import AnyHttpUrl
@@ -122,6 +122,14 @@ class DownloadJob(BaseModel):
 
 class DownloadQueueServiceBase(ABC):
     """Multithreaded queue for downloading models via URL."""
+
+    @abstractmethod
+    def start(self, *args: Any, **kwargs: Any) -> None:
+        """Start the download worker threads."""
+
+    @abstractmethod
+    def stop(self, *args: Any, **kwargs: Any) -> None:
+        """Stop the download worker threads."""
 
     @abstractmethod
     def download(
