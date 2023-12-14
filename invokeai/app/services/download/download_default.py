@@ -8,7 +8,7 @@ import traceback
 from logging import Logger
 from pathlib import Path
 from queue import PriorityQueue
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set
 
 import requests
 from pydantic.networks import AnyHttpUrl, Url
