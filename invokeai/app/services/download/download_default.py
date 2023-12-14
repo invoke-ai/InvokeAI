@@ -82,8 +82,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def download(
         self,
-        source: Union[str, AnyHttpUrl],
-        dest: Union[str, Path],
+        source: AnyHttpUrl,
+        dest: Path,
         priority: int = 10,
         access_token: Optional[str] = None,
         on_start: Optional[DownloadEventHandler] = None,
@@ -97,10 +97,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
             self._next_job_id += 1
             job = DownloadJob(
                 id=id,
-                source=Url(source)
-                if isinstance(source, str)
-                else source,  # maybe a validator in DownloadJob would be better here
-                dest=Path(dest),
+                source=source,
+                dest=dest,
                 priority=priority,
                 access_token=access_token,
             )
@@ -114,7 +112,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             self._queue.put(job)
         return job
 
-    def join(self):
+    def join(self) -> None:
         """Wait for all jobs to complete."""
         self._queue.join()
 
@@ -126,14 +124,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
         """Prune completed and errored queue items from the job list."""
         with self._lock:
             to_delete = set()
-            try:
-                for job_id, job in self._jobs.items():
-                    if self._in_terminal_state(job):
-                        to_delete.add(job_id)
-                for job_id in to_delete:
-                    del self._jobs[job_id]
-            except KeyError as excp:
-                raise UnknownJobIDException("Unrecognized job") from excp
+            for job_id, job in self._jobs.items():
+                if self._in_terminal_state(job):
+                    to_delete.add(job_id)
+            for job_id in to_delete:
+                del self._jobs[job_id]
 
     def id_to_job(self, id: int) -> DownloadJob:
         """Translate a job ID into a DownloadJob object."""

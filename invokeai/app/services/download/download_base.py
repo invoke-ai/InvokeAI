@@ -134,8 +134,8 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def download(
         self,
-        source: Union[str, AnyHttpUrl],
-        dest: Union[str, Path],
+        source: AnyHttpUrl,
+        dest: Path,
         priority: int = 10,
         access_token: Optional[str] = None,
         on_start: Optional[DownloadEventHandler] = None,
@@ -147,7 +147,7 @@ class DownloadQueueServiceBase(ABC):
         Create a download job.
 
         :param source: Source of the download as a URL.
-        :param destdir: Path to download to. See below.
+        :param dest: Path to download to. See below.
         :param on_start, on_progress, on_complete, on_error: Callbacks for the indicated
          events.
         :returns: A DownloadJob object for monitoring the state of the download.
