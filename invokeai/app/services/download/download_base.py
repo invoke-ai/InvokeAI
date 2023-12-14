@@ -28,12 +28,7 @@ class UnknownJobIDException(Exception):
     """This exception is raised when an invalid job id is referened."""
 
 
-DownloadEventHandler = Callable[
-    [
-        "DownloadJob",
-    ],
-    None,
-]
+DownloadEventHandler = Callable[["DownloadJob"], None]
 
 
 @total_ordering
