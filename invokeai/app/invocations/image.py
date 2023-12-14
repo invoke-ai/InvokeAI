@@ -13,7 +13,7 @@ from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
-from .baseinvocation import BaseInvocation, Input, InputField, InvocationContext, WithMetadata, invocation
+from .baseinvocation import BaseInvocation, Classification, Input, InputField, InvocationContext, WithMetadata, invocation
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.0")
