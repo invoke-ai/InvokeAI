@@ -169,18 +169,18 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def list_jobs(self) -> List[DownloadJob]:
         """
-        List active DownloadJobBases.
+        List active download jobs.
 
-        :returns List[DownloadJobBase]: List of download jobs whose state is not "completed."
+        :returns List[DownloadJob]: List of download jobs whose state is not "completed."
         """
         pass
 
     @abstractmethod
     def id_to_job(self, id: int) -> DownloadJob:
         """
-        Return the DownloadJobBase corresponding to the integer ID.
+        Return the DownloadJob corresponding to the integer ID.
 
-        :param id: ID of the DownloadJobBase.
+        :param id: ID of the DownloadJob.
 
         Exceptions:
         * UnknownJobIDException
