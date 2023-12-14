@@ -65,7 +65,7 @@ class WorkflowWithoutID(BaseModel):
     nodes: list[dict[str, JsonValue]] = Field(description="The nodes of the workflow.")
     edges: list[dict[str, JsonValue]] = Field(description="The edges of the workflow.")
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
 
 WorkflowWithoutIDValidator = TypeAdapter(WorkflowWithoutID)
