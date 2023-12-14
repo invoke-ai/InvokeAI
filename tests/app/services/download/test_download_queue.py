@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import pytest
 import requests
 from pydantic import BaseModel
+from pydantic.networks import AnyHttpUrl
 from requests_testadapter import TestAdapter
 
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService
@@ -73,10 +74,10 @@ class DummyEventService(EventServiceBase):
         self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
 
 
-def test_basic_queue_download(tmp_path, session):
+def test_basic_queue_download(tmp_path, session) -> None:
     events = set()
 
-    def event_handler(job: DownloadJob):
+    def event_handler(job: DownloadJob) -> None:
         events.add(job.status)
 
     queue = DownloadQueueService(
@@ -84,7 +85,7 @@ def test_basic_queue_download(tmp_path, session):
     )
     queue.start()
     job = queue.download(
-        source="http://www.civitai.com/models/12345",
+        source=AnyHttpUrl("http://www.civitai.com/models/12345"),
         dest=tmp_path,
         on_start=event_handler,
         on_progress=event_handler,
@@ -101,14 +102,14 @@ def test_basic_queue_download(tmp_path, session):
     assert events == {DownloadJobStatus.RUNNING, DownloadJobStatus.COMPLETED}
     queue.stop()
 
-def test_errors(tmp_path, session):
+def test_errors(tmp_path, session) -> None:
     queue = DownloadQueueService(
         requests_session=session,
     )
     queue.start()
 
     for bad_url in ["http://www.civitai.com/models/broken", "http://www.civitai.com/models/missing"]:
-        queue.download(bad_url, dest=tmp_path)
+        queue.download(AnyHttpUrl(bad_url), dest=tmp_path)
 
     queue.join()
     jobs = queue.list_jobs()
@@ -121,13 +122,13 @@ def test_errors(tmp_path, session):
     assert jobs_dict["http://www.civitai.com/models/missing"].total_bytes == 0
     queue.stop()
 
-def test_event_bus(tmp_path, session):
+def test_event_bus(tmp_path, session) -> None:
     event_bus = DummyEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
     queue.start()
     queue.download(
-        source="http://www.civitai.com/models/12345",
+        source=AnyHttpUrl("http://www.civitai.com/models/12345"),
         dest=tmp_path,
     )
     queue.join()
@@ -144,7 +145,7 @@ def test_event_bus(tmp_path, session):
 
     # test a failure
     event_bus.events = []  # reset our accumulator
-    queue.download(source="http://www.civitai.com/models/broken", dest=tmp_path)
+    queue.download(source=AnyHttpUrl("http://www.civitai.com/models/broken"), dest=tmp_path)
     queue.join()
     events = event_bus.events
     print("\n".join([x.model_dump_json() for x in events]))
@@ -155,7 +156,7 @@ def test_event_bus(tmp_path, session):
     assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].payload["error"])
     queue.stop()
 
-def test_broken_callbacks(tmp_path, session, capsys):
+def test_broken_callbacks(tmp_path, session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -169,7 +170,7 @@ def test_broken_callbacks(tmp_path, session, capsys):
         print(1 / 0)  # deliberate error here
 
     job = queue.download(
-        source="http://www.civitai.com/models/12345",
+        source=AnyHttpUrl("http://www.civitai.com/models/12345"),
         dest=tmp_path,
         on_progress=broken_callback,
     )
@@ -186,7 +187,7 @@ def test_broken_callbacks(tmp_path, session, capsys):
     queue.stop()
 
 
-def test_cancel(tmp_path, session):
+def test_cancel(tmp_path, session) -> None:
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -196,7 +197,7 @@ def test_cancel(tmp_path, session):
         time.sleep(2)
 
     job = queue.download(
-        source="http://www.civitai.com/models/12345",
+        source=AnyHttpUrl("http://www.civitai.com/models/12345"),
         dest=tmp_path,
         on_start=slow_callback,
     )
@@ -205,5 +206,6 @@ def test_cancel(tmp_path, session):
 
     assert job.status == DownloadJobStatus.ERROR
     print(job.error_type)
+    assert(job.error_type)
     assert job.error_type.startswith("DownloadJobCancelledException")
     queue.stop()
