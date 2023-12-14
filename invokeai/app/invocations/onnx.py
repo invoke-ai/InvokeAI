@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Borisov Sergey (https://github.com/StAlKeR7779)
 
 import inspect
-import re
 
 # from contextlib import ExitStack
 from typing import List, Literal, Union
