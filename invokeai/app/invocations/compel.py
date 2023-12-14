@@ -211,7 +211,7 @@ class SDXLPromptInvocationBase:
         # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
-        for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", prompt):
+        for trigger in extract_ti_triggers_from_prompt(prompt):
             name = trigger[1:-1]
             try:
                 ti_list.append(
