@@ -1,23 +1,28 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """Migrate from the InvokeAI v2 models.yaml format to the v3 sqlite format."""
 
+import json
+import sqlite3
+
+from pathlib import Path
 from hashlib import sha1
 from logging import Logger
+from typing import Optional
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import TypeAdapter
 
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
-    ModelRecordServiceSQL,
     UnknownModelException,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
     ModelType,
+    ModelConfigFactory,
 )
 from invokeai.backend.model_manager.hash import FastModelHash
 from invokeai.backend.util.logging import InvokeAILogger
@@ -27,7 +32,7 @@ ModelsValidator = TypeAdapter(AnyModelConfig)
 
 class MigrateModelYamlToDb:
     """
-    Migrate the InvokeAI models.yaml format (VERSION 3.0.0) to SQL3 database format (VERSION 3.2.0)
+    Migrate the InvokeAI models.yaml format (VERSION 3.0.0) to SQL3 database format (VERSION 3.5.0).
 
     The class has one externally useful method, migrate(), which scans the
     currently models.yaml file and imports all its entries into invokeai.db.
@@ -41,17 +46,17 @@ class MigrateModelYamlToDb:
 
     config: InvokeAIAppConfig
     logger: Logger
+    cursor: sqlite3.Cursor
 
-    def __init__(self) -> None:
+    def __init__(self, cursor: Optional[sqlite3.Cursor] = None) -> None:
         self.config = InvokeAIAppConfig.get_config()
         self.config.parse_args()
         self.logger = InvokeAILogger.get_logger()
+        self.cursor = cursor or self.get_db().conn.cursor()
 
-    def get_db(self) -> ModelRecordServiceSQL:
-        """Fetch the sqlite3 database for this installation."""
+    def get_db(self) -> SqliteDatabase:
         db_path = None if self.config.use_memory_db else self.config.db_path
-        db = SqliteDatabase(db_path=db_path, logger=self.logger, verbose=self.config.log_sql)
-        return ModelRecordServiceSQL(db)
+        return SqliteDatabase(db_path=db_path, logger=self.logger, verbose=self.config.log_sql)
 
     def get_yaml(self) -> DictConfig:
         """Fetch the models.yaml DictConfig for this installation."""
@@ -62,8 +67,10 @@ class MigrateModelYamlToDb:
 
     def migrate(self) -> None:
         """Do the migration from models.yaml to invokeai.db."""
-        db = self.get_db()
-        yaml = self.get_yaml()
+        try:
+            yaml = self.get_yaml()
+        except OSError:
+            return
 
         for model_key, stanza in yaml.items():
             if model_key == "__metadata__":
@@ -86,20 +93,68 @@ class MigrateModelYamlToDb:
             new_config: AnyModelConfig = ModelsValidator.validate_python(stanza)  # type: ignore # see https://github.com/pydantic/pydantic/discussions/7094
 
             try:
-                if original_record := db.search_by_path(stanza.path):
-                    key = original_record[0].key
+                if original_record := self._search_by_path(stanza.path):
+                    key = original_record.key
                     self.logger.info(f"Updating model {model_name} with information from models.yaml using key {key}")
-                    db.update_model(key, new_config)
+                    self._update_model(key, new_config)
                 else:
                     self.logger.info(f"Adding model {model_name} with key {model_key}")
-                    db.add_model(new_key, new_config)
+                    self._add_model(new_key, new_config)
             except DuplicateModelException:
                 self.logger.warning(f"Model {model_name} is already in the database")
             except UnknownModelException:
                 self.logger.warning(f"Model at {stanza.path} could not be found in database")
 
+    def _search_by_path(self, path: Path) -> Optional[AnyModelConfig]:
+        self.cursor.execute(
+            """--sql
+            SELECT config FROM model_config
+            WHERE path=?;
+            """,
+            (str(path),),
+        )
+        results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self.cursor.fetchall()]
+        return results[0] if results else None
 
-def main():
+    def _update_model(self, key: str, config: AnyModelConfig) -> None:
+        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
+        json_serialized = record.model_dump_json()  # and turn it into a json string.
+        self.cursor.execute(
+            """--sql
+            UPDATE model_config
+            SET
+                config=?
+            WHERE id=?;
+            """,
+            (json_serialized, key),
+        )
+        if self.cursor.rowcount == 0:
+            raise UnknownModelException("model not found")
+
+    def _add_model(self, key: str, config: AnyModelConfig) -> None:
+        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
+        json_serialized = record.model_dump_json()  # and turn it into a json string.
+        try:
+            self.cursor.execute(
+                """--sql
+                INSERT INTO model_config (
+                   id,
+                   original_hash,
+                   config
+                  )
+                VALUES (?,?,?);
+                """,
+                (
+                    key,
+                    record.original_hash,
+                    json_serialized,
+                ),
+            )
+        except sqlite3.IntegrityError as e:
+            raise DuplicateModelException(f"{record.name}: model is already in database")
+
+
+def main() -> None:
     MigrateModelYamlToDb().migrate()
 
 
