@@ -149,8 +149,8 @@ class MigrateModelYamlToDb:
                     json_serialized,
                 ),
             )
-        except sqlite3.IntegrityError:
-            raise DuplicateModelException(f"{record.name}: model is already in database")
+        except sqlite3.IntegrityError as exc:
+            raise DuplicateModelException(f"{record.name}: model is already in database") from exc
 
 
 def main() -> None:
