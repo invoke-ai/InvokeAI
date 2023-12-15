@@ -61,9 +61,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 FROM node:18 AS web-builder
 WORKDIR /build
+RUN npm i -g pnpm
 COPY invokeai/frontend/web/ ./
 RUN --mount=type=cache,target=/usr/lib/node_modules \
-    npm install --include dev
+    pnpm i --include dev
 RUN --mount=type=cache,target=/usr/lib/node_modules \
     yarn vite build
 
