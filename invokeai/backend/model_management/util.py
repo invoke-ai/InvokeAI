@@ -9,7 +9,7 @@ def lora_token_vector_length(checkpoint: dict) -> int:
     :param checkpoint: The checkpoint
     """
 
-    def _get_shape_1(key, tensor, checkpoint):
+    def _get_shape_1(key: str, tensor, checkpoint) -> int:
         lora_token_vector_length = None
 
         if "." not in key:
@@ -56,6 +56,10 @@ def lora_token_vector_length(checkpoint: dict) -> int:
     lora_te2_length = None
     for key, tensor in checkpoint.items():
         if key.startswith("lora_unet_") and ("_attn2_to_k." in key or "_attn2_to_v." in key):
+            lora_token_vector_length = _get_shape_1(key, tensor, checkpoint)
+        elif key.startswith("lora_unet_") and (
+            "time_emb_proj.lora_down" in key
+        ):  # recognizes format at https://civitai.com/models/224641 work
             lora_token_vector_length = _get_shape_1(key, tensor, checkpoint)
         elif key.startswith("lora_te") and "_self_attn_" in key:
             tmp_length = _get_shape_1(key, tensor, checkpoint)
