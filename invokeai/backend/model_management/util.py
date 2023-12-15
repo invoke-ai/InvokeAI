@@ -59,7 +59,7 @@ def lora_token_vector_length(checkpoint: dict) -> int:
             lora_token_vector_length = _get_shape_1(key, tensor, checkpoint)
         elif key.startswith("lora_unet_") and (
             "time_emb_proj.lora_down" in key
-        ):  # recognizes format at https://civitai.com/models/224641 work
+        ):  # recognizes format at https://civitai.com/models/224641
             lora_token_vector_length = _get_shape_1(key, tensor, checkpoint)
         elif key.startswith("lora_te") and "_self_attn_" in key:
             tmp_length = _get_shape_1(key, tensor, checkpoint)

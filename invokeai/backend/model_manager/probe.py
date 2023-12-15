@@ -401,7 +401,7 @@ class LoRACheckpointProbe(CheckpointProbeBase):
         elif token_vector_length == 1024:
             return BaseModelType.StableDiffusion2
         elif token_vector_length == 1280:
-            return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641 work
+            return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641
         elif token_vector_length == 2048:
             return BaseModelType.StableDiffusionXL
         else:
