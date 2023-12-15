@@ -91,9 +91,11 @@ rm -rf InvokeAI-Installer
 
 # copy content
 mkdir InvokeAI-Installer
-for f in templates lib *.txt *.reg; do
+for f in templates *.txt *.reg; do
     cp -r ${f} InvokeAI-Installer/
 done
+mkdir InvokeAI-Installer/lib
+cp lib/*.py InvokeAI-Installer/lib
 
 # Move the wheel
 mv dist/*.whl InvokeAI-Installer/lib/
