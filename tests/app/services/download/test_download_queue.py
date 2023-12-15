@@ -8,6 +8,7 @@ import pytest
 import requests
 from pydantic import BaseModel
 from pydantic.networks import AnyHttpUrl
+from requests.sessions import Session
 from requests_testadapter import TestAdapter
 
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService
@@ -74,7 +75,7 @@ class DummyEventService(EventServiceBase):
         self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
 
 
-def test_basic_queue_download(tmp_path, session) -> None:
+def test_basic_queue_download(tmp_path: Path, session: Session) -> None:
     events = set()
 
     def event_handler(job: DownloadJob) -> None:
@@ -102,7 +103,7 @@ def test_basic_queue_download(tmp_path, session) -> None:
     assert events == {DownloadJobStatus.RUNNING, DownloadJobStatus.COMPLETED}
     queue.stop()
 
-def test_errors(tmp_path, session) -> None:
+def test_errors(tmp_path: Path, session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -122,7 +123,7 @@ def test_errors(tmp_path, session) -> None:
     assert jobs_dict["http://www.civitai.com/models/missing"].total_bytes == 0
     queue.stop()
 
-def test_event_bus(tmp_path, session) -> None:
+def test_event_bus(tmp_path: Path, session: Session) -> None:
     event_bus = DummyEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
@@ -156,7 +157,7 @@ def test_event_bus(tmp_path, session) -> None:
     assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].payload["error"])
     queue.stop()
 
-def test_broken_callbacks(tmp_path, session, capsys) -> None:
+def test_broken_callbacks(tmp_path: Path, session: requests.sessions.Session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -187,25 +188,35 @@ def test_broken_callbacks(tmp_path, session, capsys) -> None:
     queue.stop()
 
 
-def test_cancel(tmp_path, session) -> None:
+def test_cancel(tmp_path: Path, session: requests.sessions.Session) -> None:
+    event_bus = DummyEventService()
+
     queue = DownloadQueueService(
         requests_session=session,
+        event_bus=event_bus
     )
     queue.start()
 
+    cancelled = False
     def slow_callback(job: DownloadJob) -> None:
         time.sleep(2)
+
+    def cancelled_callback(job: DownloadJob) -> None:
+        nonlocal cancelled
+        cancelled = True
 
     job = queue.download(
         source=AnyHttpUrl("http://www.civitai.com/models/12345"),
         dest=tmp_path,
         on_start=slow_callback,
+        on_cancelled=cancelled_callback,
     )
     queue.cancel_job(job)
     queue.join()
 
-    assert job.status == DownloadJobStatus.ERROR
-    print(job.error_type)
-    assert(job.error_type)
-    assert job.error_type.startswith("DownloadJobCancelledException")
+    assert job.status == DownloadJobStatus.CANCELLED
+    assert cancelled
+    events = event_bus.events
+    assert events[-1].event_name == "download_cancelled"
+    assert events[-1].payload["source"] == "http://www.civitai.com/models/12345"
     queue.stop()

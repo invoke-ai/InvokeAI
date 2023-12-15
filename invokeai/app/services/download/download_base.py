@@ -17,6 +17,7 @@ class DownloadJobStatus(str, Enum):
     WAITING = "waiting"  # not enqueued, will not run
     RUNNING = "running"  # actively downloading
     COMPLETED = "completed"  # finished running
+    CANCELLED = "cancelled"  # user cancelled
     ERROR = "error"  # terminated with an error message
 
 
@@ -64,6 +65,7 @@ class DownloadJob(BaseModel):
     _on_start: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_progress: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_complete: Optional[DownloadEventHandler] = PrivateAttr(default=None)
+    _on_cancelled: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_error: Optional[DownloadEventHandler] = PrivateAttr(default=None)
 
     def __le__(self, other: "DownloadJob") -> bool:
@@ -101,11 +103,17 @@ class DownloadJob(BaseModel):
         """Return the on_error event handler."""
         return self._on_error
 
+    @property
+    def on_cancelled(self) -> Optional[DownloadEventHandler]:
+        """Return the on_cancelled event handler."""
+        return self._on_cancelled
+
     def set_callbacks(
         self,
         on_start: Optional[DownloadEventHandler] = None,
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
         on_error: Optional[DownloadEventHandler] = None,
     ) -> None:
         """Set the callbacks for download events."""
@@ -113,7 +121,7 @@ class DownloadJob(BaseModel):
         self._on_progress = on_progress
         self._on_complete = on_complete
         self._on_error = on_error
-
+        self._on_cancelled = on_cancelled
 
 class DownloadQueueServiceBase(ABC):
     """Multithreaded queue for downloading models via URL."""
@@ -136,6 +144,7 @@ class DownloadQueueServiceBase(ABC):
         on_start: Optional[DownloadEventHandler] = None,
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
         on_error: Optional[DownloadEventHandler] = None,
     ) -> DownloadJob:
         """

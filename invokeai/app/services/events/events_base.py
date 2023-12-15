@@ -378,6 +378,15 @@ class EventServiceBase:
             },
         )
 
+    def emit_download_cancelled(self, source: str) -> None:
+        """Emit a "download_cancelled" event in the event that the download was cancelled by user."""
+        self.__emit_download_event(
+            event_name="download_cancelled",
+            payload={
+                "source": source,
+            },
+        )
+
     def emit_download_error(self, source: str, error_type: str, error: str) -> None:
         """
         Emit a "download_error" event when an download job encounters an exception.

@@ -79,6 +79,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         for thread in self._worker_pool:
             if thread.is_alive():
                 self._queue.put(STOP_JOB)
+        self._worker_pool.clear()
 
     def download(
         self,
@@ -89,6 +90,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         on_start: Optional[DownloadEventHandler] = None,
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
         on_error: Optional[DownloadEventHandler] = None,
     ) -> DownloadJob:
         """Create a download job and return its ID."""
@@ -106,6 +108,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 on_start=on_start,
                 on_progress=on_progress,
                 on_complete=on_complete,
+                on_cancelled=on_cancelled,
                 on_error=on_error,
             )
             self._jobs[id] = job
@@ -120,7 +123,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         """List all the jobs."""
         return list(self._jobs.values())
 
-    def prune_jobs(self):
+    def prune_jobs(self) -> None:
         """Prune completed and errored queue items from the job list."""
         with self._lock:
             to_delete = set()
@@ -137,7 +140,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         except KeyError as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
 
-    def cancel_job(self, job: DownloadJob):
+    def cancel_job(self, job: DownloadJob) -> None:
         """
         Cancel the indicated job.
 
@@ -147,26 +150,29 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             job.cancel()
 
-    def cancel_all_jobs(self, preserve_partial: bool = False):
+    def cancel_all_jobs(self, preserve_partial: bool = False) -> None:
         """Cancel all jobs (those not in enqueued, running or paused state)."""
         for job in self._jobs.values():
             if not self._in_terminal_state(job):
                 self.cancel_job(job)
 
-    def _in_terminal_state(self, job: DownloadJob):
+    def _in_terminal_state(self, job: DownloadJob) -> None:
         return job.status in [
             DownloadJobStatus.COMPLETED,
+            DownloadJobStatus.CANCELLED,
             DownloadJobStatus.ERROR,
         ]
 
-    def _start_workers(self, max_workers: int):
+    def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
+        self.stop()  # stop any running threads and reset the worker pool set
         for i in range(0, max_workers):  # noqa B007
             worker = threading.Thread(target=self._download_next_item, daemon=True)
+            self._logger.debug(f"Download queue worker thread {worker.name} starting.")
             worker.start()
             self._worker_pool.add(worker)
 
-    def _download_next_item(self):
+    def _download_next_item(self) -> None:
         """Worker thread gets next job on priority queue."""
         done = False
         while not done:
@@ -181,16 +187,18 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 self._do_download(job)
                 self._signal_job_complete(job)
 
-            except (DownloadJobCancelledException, OSError, HTTPError) as excp:
+            except (OSError, HTTPError) as excp:
                 job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
                 self._signal_job_error(job)
-                if isinstance(excp, DownloadJobCancelledException):
-                    self._cleanup_cancelled_job(job)
+            except DownloadJobCancelledException:
+                self._signal_job_cancelled(job)
+                self._cleanup_cancelled_job(job)
 
             finally:
                 job.job_ended = get_iso_timestamp()
                 self._queue.task_done()
+        self._logger.debug(f"Download queue worker thread {threading.current_thread().name} exiting.")
 
     def _do_download(self, job: DownloadJob) -> None:
         """Do the actual download."""
@@ -222,12 +230,13 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         assert job.download_path
 
-        # potentially resume a partial previous download
+        # Don't clobber an existing file. See commit 82c2c85202f88c6d24ff84710f297cfc6ae174af
+        # for code that instead resumes an interrupted download.
         if job.download_path.exists():
-            job.bytes = job.download_path.stat().st_size
-            header["Range"] = f"bytes={job.bytes}-"
-            open_mode = "ab"
-            resp = self._requests.get(str(url), headers=header, stream=True)  # new range request
+            raise OSError("[Errno 17] File {job.download_path} exists")
+
+        # append ".downloading" to the path
+        in_progress_path = self._in_progress_path(job.download_path)
 
         # signal caller that the download is starting. At this point, key fields such as
         # download_path and total_bytes will be populated. We call it here because the might
@@ -252,7 +261,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         last_report_bytes = 0
 
         # DOWNLOAD LOOP
-        with open(job.download_path, open_mode) as file:
+        with open(in_progress_path, open_mode) as file:
             for data in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
                 if job.cancelled:
                     raise DownloadJobCancelledException("Job was cancelled at caller's request")
@@ -261,6 +270,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 if (job.bytes - last_report_bytes >= report_delta) or (job.bytes >= job.total_bytes):
                     last_report_bytes = job.bytes
                     self._signal_job_progress(job)
+
+        # if we get here we are done and can rename the file to the original dest
+        in_progress_path.rename(job.download_path)
 
     def _validate_filename(self, directory: str, filename: str) -> bool:
         pc_name_max = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 260  # hardcoded for windows
@@ -276,6 +288,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if len(os.path.join(directory, filename)) > pc_path_max:
             return False
         return True
+
+    def _in_progress_path(self, path: Path) -> Path:
+        return path.with_name(path.name + ".downloading")
 
     def _signal_job_started(self, job: DownloadJob) -> None:
         job.status = DownloadJobStatus.RUNNING
@@ -316,6 +331,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 str(job.source), download_path=job.download_path.as_posix(), total_bytes=job.total_bytes
             )
 
+    def _signal_job_cancelled(self, job: DownloadJob) -> None:
+        job.status = DownloadJobStatus.CANCELLED
+        if job.on_cancelled:
+            try:
+                job.on_cancelled(job)
+            except Exception as e:
+                self._logger.error(e)
+        if self._event_bus:
+            self._event_bus.emit_download_cancelled(str(job.source))
+
     def _signal_job_error(self, job: DownloadJob) -> None:
         job.status = DownloadJobStatus.ERROR
         if job.on_error:
@@ -328,10 +353,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
             assert job.error
             self._event_bus.emit_download_error(str(job.source), error_type=job.error_type, error=job.error)
 
-    def _cleanup_cancelled_job(self, job: DownloadJob):
+    def _cleanup_cancelled_job(self, job: DownloadJob) -> None:
         self._logger.warning(f"Cleaning up leftover files from cancelled download job {job.download_path}")
         try:
-            if partial_file := job.download_path:
+            if job.download_path:
+                partial_file = self._in_progress_path(job.download_path)
                 partial_file.unlink()
         except OSError as excp:
             self._logger.warning(excp)
@@ -346,11 +372,11 @@ class TqdmProgress(object):
     _bars: Dict[int, tqdm]  # the tqdm object
     _last: Dict[int, int]  # last bytes downloaded
 
-    def __init__(self):  # noqa D107
+    def __init__(self) -> None:  # noqa D107
         self._bars = {}
         self._last = {}
 
-    def update(self, job: DownloadJob):  # noqa D102
+    def update(self, job: DownloadJob) -> None:  # noqa D102
         job_id = job.id
         # new job
         if job_id not in self._bars:
