@@ -49,12 +49,12 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
     ModelConfigFactory,
+    ModelFormat,
     ModelType,
 )
 
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
-    CONFIG_FILE_VERSION,
     DuplicateModelException,
     ModelRecordServiceBase,
     UnknownModelException,
@@ -77,86 +77,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         super().__init__()
         self._db = db
         self._cursor = self._db.conn.cursor()
-
-        with self._db.lock:
-            # Enable foreign keys
-            self._db.conn.execute("PRAGMA foreign_keys = ON;")
-            self._create_tables()
-            self._db.conn.commit()
-        assert (
-            str(self.version) == CONFIG_FILE_VERSION
-        ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
-
-    def _create_tables(self) -> None:
-        """Create sqlite3 tables."""
-        #  model_config table breaks out the fields that are common to all config objects
-        # and puts class-specific ones in a serialized json object
-        self._cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS model_config (
-                id TEXT NOT NULL PRIMARY KEY,
-                -- The next 3 fields are enums in python, unrestricted string here
-                base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
-                type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
-                name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
-                path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
-                format TEXT GENERATED ALWAYS as (json_extract(config, '$.format')) VIRTUAL NOT NULL,
-                original_hash TEXT, -- could be null
-                -- Serialized JSON representation of the whole config object,
-                -- which will contain additional fields from subclasses
-                config TEXT NOT NULL,
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- unique constraint on combo of name, base and type
-                UNIQUE(name, base, type)
-            );
-            """
-        )
-
-        #  metadata table
-        self._cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS model_manager_metadata (
-                metadata_key TEXT NOT NULL PRIMARY KEY,
-                metadata_value TEXT NOT NULL
-            );
-            """
-        )
-
-        # Add trigger for `updated_at`.
-        self._cursor.execute(
-            """--sql
-            CREATE TRIGGER IF NOT EXISTS model_config_updated_at
-            AFTER UPDATE
-            ON model_config FOR EACH ROW
-            BEGIN
-                UPDATE model_config SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE id = old.id;
-            END;
-            """
-        )
-
-        # Add indexes for searchable fields
-        for stmt in [
-            "CREATE INDEX IF NOT EXISTS base_index ON model_config(base);",
-            "CREATE INDEX IF NOT EXISTS type_index ON model_config(type);",
-            "CREATE INDEX IF NOT EXISTS name_index ON model_config(name);",
-            "CREATE UNIQUE INDEX IF NOT EXISTS path_index ON model_config(path);",
-        ]:
-            self._cursor.execute(stmt)
-
-        # Add our version to the metadata table
-        self._cursor.execute(
-            """--sql
-            INSERT OR IGNORE into model_manager_metadata (
-               metadata_key,
-               metadata_value
-            )
-            VALUES (?,?);
-            """,
-            ("version", CONFIG_FILE_VERSION),
-        )
 
     def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
         """
@@ -206,22 +126,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 raise e
 
         return self.get_model(key)
-
-    @property
-    def version(self) -> str:
-        """Return the version of the database schema."""
-        with self._db.lock:
-            self._cursor.execute(
-                """--sql
-                SELECT metadata_value FROM model_manager_metadata
-                WHERE metadata_key=?;
-                """,
-                ("version",),
-            )
-            rows = self._cursor.fetchone()
-            if not rows:
-                raise KeyError("Models database does not have metadata key 'version'")
-            return rows[0]
 
     def del_model(self, key: str) -> None:
         """
@@ -322,6 +226,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
+        model_format: Optional[ModelFormat] = None,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
@@ -329,6 +234,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         :param model_name: Filter by name of model (optional)
         :param base_model: Filter by base model (optional)
         :param model_type: Filter by type of model (optional)
+        :param model_format: Filter by model format (e.g. "diffusers") (optional)
 
         If none of the optional filters are passed, will return all
         models in the database.
@@ -345,6 +251,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         if model_type:
             where_clause.append("type=?")
             bindings.append(model_type)
+        if model_format:
+            where_clause.append("format=?")
+            bindings.append(model_format)
         where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
         with self._db.lock:
             self._cursor.execute(

@@ -15,8 +15,11 @@ class TestModel(BaseModel):
 
 @pytest.fixture
 def db() -> SqliteItemStorage[TestModel]:
-    sqlite_db = SqliteDatabase(InvokeAIAppConfig(use_memory_db=True), InvokeAILogger.get_logger())
-    sqlite_item_storage = SqliteItemStorage[TestModel](db=sqlite_db, table_name="test", id_field="id")
+    config = InvokeAIAppConfig(use_memory_db=True)
+    logger = InvokeAILogger.get_logger()
+    db_path = None if config.use_memory_db else config.db_path
+    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
+    sqlite_item_storage = SqliteItemStorage[TestModel](db=db, table_name="test", id_field="id")
     return sqlite_item_storage
 
 
