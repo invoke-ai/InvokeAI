@@ -18,9 +18,9 @@ from invokeai.app.services.model_install import (
     ModelInstallServiceBase,
 )
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL, UnknownModelException
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import BaseModelType, ModelType
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
 @pytest.fixture
@@ -37,9 +37,12 @@ def app_config(datadir: Path) -> InvokeAIAppConfig:
 
 
 @pytest.fixture
-def store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
-    database = SqliteDatabase(app_config, InvokeAILogger.get_logger(config=app_config))
-    store: ModelRecordServiceBase = ModelRecordServiceSQL(database)
+def store(
+    app_config: InvokeAIAppConfig,
+) -> ModelRecordServiceBase:
+    logger = InvokeAILogger.get_logger(config=app_config)
+    db = create_mock_sqlite_database(app_config, logger)
+    store: ModelRecordServiceBase = ModelRecordServiceSQL(db)
     return store
 
 

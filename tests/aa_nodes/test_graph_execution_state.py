@@ -28,8 +28,8 @@ from invokeai.app.services.shared.graph import (
     IterateInvocation,
     LibraryGraph,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 from .test_invoker import create_edge
 
@@ -49,7 +49,8 @@ def simple_graph():
 @pytest.fixture
 def mock_services() -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    db = SqliteDatabase(configuration, InvokeAILogger.get_logger())
+    logger = InvokeAILogger.get_logger()
+    db = create_mock_sqlite_database(configuration, logger)
     # NOTE: none of these are actually called by the test invocations
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
     return InvocationServices(

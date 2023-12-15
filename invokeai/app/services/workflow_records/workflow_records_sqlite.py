@@ -26,7 +26,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self._lock = db.lock
         self._conn = db.conn
         self._cursor = self._conn.cursor()
-        self._create_tables()
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
@@ -227,90 +226,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     """,
                     (w.id, w.model_dump_json()),
                 )
-            self._conn.commit()
-        except Exception:
-            self._conn.rollback()
-            raise
-        finally:
-            self._lock.release()
-
-    def _create_tables(self) -> None:
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                CREATE TABLE IF NOT EXISTS workflow_library (
-                    workflow_id TEXT NOT NULL PRIMARY KEY,
-                    workflow TEXT NOT NULL,
-                    created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                    -- updated via trigger
-                    updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                    -- updated manually when retrieving workflow
-                    opened_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                    -- Generated columns, needed for indexing and searching
-                    category TEXT GENERATED ALWAYS as (json_extract(workflow, '$.meta.category')) VIRTUAL NOT NULL,
-                    name TEXT GENERATED ALWAYS as (json_extract(workflow, '$.name')) VIRTUAL NOT NULL,
-                    description TEXT GENERATED ALWAYS as (json_extract(workflow, '$.description')) VIRTUAL NOT NULL
-                );
-                """
-            )
-
-            self._cursor.execute(
-                """--sql
-                CREATE TRIGGER IF NOT EXISTS tg_workflow_library_updated_at
-                AFTER UPDATE
-                ON workflow_library FOR EACH ROW
-                BEGIN
-                    UPDATE workflow_library
-                    SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE workflow_id = old.workflow_id;
-                END;
-                """
-            )
-
-            self._cursor.execute(
-                """--sql
-                CREATE INDEX IF NOT EXISTS idx_workflow_library_created_at ON workflow_library(created_at);
-                """
-            )
-            self._cursor.execute(
-                """--sql
-                CREATE INDEX IF NOT EXISTS idx_workflow_library_updated_at ON workflow_library(updated_at);
-                """
-            )
-            self._cursor.execute(
-                """--sql
-                CREATE INDEX IF NOT EXISTS idx_workflow_library_opened_at ON workflow_library(opened_at);
-                """
-            )
-            self._cursor.execute(
-                """--sql
-                CREATE INDEX IF NOT EXISTS idx_workflow_library_category ON workflow_library(category);
-                """
-            )
-            self._cursor.execute(
-                """--sql
-                CREATE INDEX IF NOT EXISTS idx_workflow_library_name ON workflow_library(name);
-                """
-            )
-            self._cursor.execute(
-                """--sql
-                CREATE INDEX IF NOT EXISTS idx_workflow_library_description ON workflow_library(description);
-                """
-            )
-
-            # We do not need the original `workflows` table or `workflow_images` junction table.
-            self._cursor.execute(
-                """--sql
-                DROP TABLE IF EXISTS workflow_images;
-                """
-            )
-            self._cursor.execute(
-                """--sql
-                DROP TABLE IF EXISTS workflows;
-                """
-            )
-
             self._conn.commit()
         except Exception:
             self._conn.rollback()

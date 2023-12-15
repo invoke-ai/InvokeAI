@@ -100,7 +100,10 @@ export type paths = {
     get: operations["get_model_record"];
     /**
      * Del Model Record
-     * @description Delete Model
+     * @description Delete model record from database.
+     *
+     * The configuration record will be removed. The corresponding weights files will be
+     * deleted as well if they reside within the InvokeAI "models" directory.
      */
     delete: operations["del_model_record"];
     /**
@@ -115,6 +118,86 @@ export type paths = {
      * @description Add a model using the configuration information appropriate for its type.
      */
     post: operations["add_model_record"];
+  };
+  "/api/v1/model/record/import": {
+    /**
+     * List Model Install Jobs
+     * @description Return list of model install jobs.
+     *
+     * If the optional 'source' argument is provided, then the list will be filtered
+     * for partial string matches against the install source.
+     */
+    get: operations["list_model_install_jobs"];
+    /**
+     * Import Model
+     * @description Add a model using its local path, repo_id, or remote URL.
+     *
+     * Models will be downloaded, probed, configured and installed in a
+     * series of background threads. The return object has `status` attribute
+     * that can be used to monitor progress.
+     *
+     * The source object is a discriminated Union of LocalModelSource,
+     * HFModelSource and URLModelSource. Set the "type" field to the
+     * appropriate value:
+     *
+     * * To install a local path using LocalModelSource, pass a source of form:
+     *   `{
+     *     "type": "local",
+     *     "path": "/path/to/model",
+     *     "inplace": false
+     *   }`
+     *    The "inplace" flag, if true, will register the model in place in its
+     *    current filesystem location. Otherwise, the model will be copied
+     *    into the InvokeAI models directory.
+     *
+     * * To install a HuggingFace repo_id using HFModelSource, pass a source of form:
+     *   `{
+     *     "type": "hf",
+     *     "repo_id": "stabilityai/stable-diffusion-2.0",
+     *     "variant": "fp16",
+     *     "subfolder": "vae",
+     *     "access_token": "f5820a918aaf01"
+     *   }`
+     *  The `variant`, `subfolder` and `access_token` fields are optional.
+     *
+     * * To install a remote model using an arbitrary URL, pass:
+     *   `{
+     *     "type": "url",
+     *     "url": "http://www.civitai.com/models/123456",
+     *     "access_token": "f5820a918aaf01"
+     *   }`
+     * The `access_token` field is optonal
+     *
+     * The model's configuration record will be probed and filled in
+     * automatically.  To override the default guesses, pass "metadata"
+     * with a Dict containing the attributes you wish to override.
+     *
+     * Installation occurs in the background. Either use list_model_install_jobs()
+     * to poll for completion, or listen on the event bus for the following events:
+     *
+     *   "model_install_started"
+     *   "model_install_completed"
+     *   "model_install_error"
+     *
+     * On successful completion, the event's payload will contain the field "key"
+     * containing the installed ID of the model. On an error, the event's payload
+     * will contain the fields "error_type" and "error" describing the nature of the
+     * error and its traceback, respectively.
+     */
+    post: operations["import_model_record"];
+    /**
+     * Prune Model Install Jobs
+     * @description Prune all completed and errored jobs from the install job list.
+     */
+    patch: operations["prune_model_install_jobs"];
+  };
+  "/api/v1/model/record/sync": {
+    /**
+     * Sync Models To Config
+     * @description Traverse the models and autoimport directories. Model files without a corresponding
+     * record in the database are added. Orphan records without a models file are deleted.
+     */
+    patch: operations["sync_models_to_config"];
   };
   "/api/v1/images/upload": {
     /**
@@ -946,6 +1029,16 @@ export type components = {
        */
       prediction_type?: ("v_prediction" | "epsilon" | "sample") | null;
     };
+    /** Body_import_model_record */
+    Body_import_model_record: {
+      /** Source */
+      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
+      /**
+       * Config
+       * @description Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type
+       */
+      config?: Record<string, never> | null;
+    };
     /** Body_merge_models */
     Body_merge_models: {
       /** @description Model configuration */
@@ -1248,6 +1341,65 @@ export type components = {
       type: "infill_cv2";
     };
     /**
+     * Calculate Image Tiles Even Split
+     * @description Calculate the coordinates and overlaps of tiles that cover a target image shape.
+     */
+    CalculateImageTilesEvenSplitInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * Image Width
+       * @description The image width, in pixels, to calculate tiles for.
+       * @default 1024
+       */
+      image_width?: number;
+      /**
+       * Image Height
+       * @description The image height, in pixels, to calculate tiles for.
+       * @default 1024
+       */
+      image_height?: number;
+      /**
+       * Num Tiles X
+       * @description Number of tiles to divide image into on the x axis
+       * @default 2
+       */
+      num_tiles_x?: number;
+      /**
+       * Num Tiles Y
+       * @description Number of tiles to divide image into on the y axis
+       * @default 2
+       */
+      num_tiles_y?: number;
+      /**
+       * Overlap Fraction
+       * @description Overlap between adjacent tiles as a fraction of the tile's dimensions (0-1)
+       * @default 0.25
+       */
+      overlap_fraction?: number;
+      /**
+       * type
+       * @default calculate_image_tiles_even_split
+       * @constant
+       */
+      type: "calculate_image_tiles_even_split";
+    };
+    /**
      * Calculate Image Tiles
      * @description Calculate the coordinates and overlaps of tiles that cover a target image shape.
      */
@@ -1305,6 +1457,65 @@ export type components = {
        * @constant
        */
       type: "calculate_image_tiles";
+    };
+    /**
+     * Calculate Image Tiles Minimum Overlap
+     * @description Calculate the coordinates and overlaps of tiles that cover a target image shape.
+     */
+    CalculateImageTilesMinimumOverlapInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * Image Width
+       * @description The image width, in pixels, to calculate tiles for.
+       * @default 1024
+       */
+      image_width?: number;
+      /**
+       * Image Height
+       * @description The image height, in pixels, to calculate tiles for.
+       * @default 1024
+       */
+      image_height?: number;
+      /**
+       * Tile Width
+       * @description The tile width, in pixels.
+       * @default 576
+       */
+      tile_width?: number;
+      /**
+       * Tile Height
+       * @description The tile height, in pixels.
+       * @default 576
+       */
+      tile_height?: number;
+      /**
+       * Min Overlap
+       * @description Minimum overlap between adjacent tiles, in pixels.
+       * @default 128
+       */
+      min_overlap?: number;
+      /**
+       * type
+       * @default calculate_image_tiles_min_overlap
+       * @constant
+       */
+      type: "calculate_image_tiles_min_overlap";
     };
     /** CalculateImageTilesOutput */
     CalculateImageTilesOutput: {
@@ -3509,7 +3720,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["SchedulerInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["MaskCombineInvocation"];
+        [key: string]: components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"];
       };
       /**
        * Edges
@@ -3546,7 +3757,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["ModelLoaderOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["String2Output"] | components["schemas"]["ColorOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["ConditioningCollectionOutput"];
+        [key: string]: components["schemas"]["ImageOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["String2Output"];
       };
       /**
        * Errors
@@ -3609,6 +3820,26 @@ export type components = {
        * @constant
        */
       type: "graph_output";
+    };
+    /**
+     * HFModelSource
+     * @description A HuggingFace repo_id, with optional variant and sub-folder.
+     */
+    HFModelSource: {
+      /** Repo Id */
+      repo_id: string;
+      /** Variant */
+      variant?: string | null;
+      /** Subfolder */
+      subfolder?: string | null;
+      /** Access Token */
+      access_token?: string | null;
+      /**
+       * Type
+       * @default hf
+       * @constant
+       */
+      type?: "hf";
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -4993,6 +5224,12 @@ export type components = {
       type: "infill_tile";
     };
     /**
+     * InstallStatus
+     * @description State of an install job running in the background.
+     * @enum {string}
+     */
+    InstallStatus: "waiting" | "running" | "completed" | "error";
+    /**
      * Integer Collection Primitive
      * @description A collection of integer primitive values
      */
@@ -5732,6 +5969,25 @@ export type components = {
      */
     LoRAModelFormat: "lycoris" | "diffusers";
     /**
+     * LocalModelSource
+     * @description A local file or directory path.
+     */
+    LocalModelSource: {
+      /** Path */
+      path: string;
+      /**
+       * Inplace
+       * @default false
+       */
+      inplace?: boolean | null;
+      /**
+       * Type
+       * @default local
+       * @constant
+       */
+      type?: "local";
+    };
+    /**
      * LogLevel
      * @enum {integer}
      */
@@ -6268,8 +6524,16 @@ export type components = {
        */
       tiles_with_images?: components["schemas"]["TileWithImage"][];
       /**
+       * Blend Mode
+       * @description blending type Linear or Seam
+       * @default Seam
+       * @enum {string}
+       */
+      blend_mode?: "Linear" | "Seam";
+      /**
        * Blend Amount
        * @description The amount to blend adjacent tiles in pixels. Must be <= the amount of overlap between adjacent tiles.
+       * @default 32
        */
       blend_amount?: number;
       /**
@@ -6516,6 +6780,54 @@ export type components = {
       model_type: components["schemas"]["invokeai__backend__model_management__models__base__ModelType"];
       /** @description Info to load submodel */
       submodel?: components["schemas"]["SubModelType"] | null;
+    };
+    /**
+     * ModelInstallJob
+     * @description Object that tracks the current status of an install request.
+     */
+    ModelInstallJob: {
+      /**
+       * @description Current status of install process
+       * @default waiting
+       */
+      status?: components["schemas"]["InstallStatus"];
+      /**
+       * Config In
+       * @description Configuration information (e.g. 'description') to apply to model.
+       */
+      config_in?: Record<string, never>;
+      /**
+       * Config Out
+       * @description After successful installation, this will hold the configuration object.
+       */
+      config_out?: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"]) | (components["schemas"]["ONNXSD1Config"] | components["schemas"]["ONNXSD2Config"]) | (components["schemas"]["VaeDiffusersConfig"] | components["schemas"]["VaeCheckpointConfig"]) | (components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"]) | components["schemas"]["LoRAConfig"] | components["schemas"]["TextualInversionConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["T2IConfig"] | null;
+      /**
+       * Inplace
+       * @description Leave model in its current location; otherwise install under models directory
+       * @default false
+       */
+      inplace?: boolean;
+      /**
+       * Source
+       * @description Source (URL, repo_id, or local path) of model
+       */
+      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
+      /**
+       * Local Path
+       * Format: path
+       * @description Path to locally-downloaded model; may be the same as the source
+       */
+      local_path: string;
+      /**
+       * Error Type
+       * @description Class name of the exception that led to status==ERROR
+       */
+      error_type?: string | null;
+      /**
+       * Error
+       * @description Error traceback
+       */
+      error?: string | null;
     };
     /**
      * ModelLoaderOutput
@@ -9687,6 +9999,25 @@ export type components = {
        */
       type: "unet_output";
     };
+    /**
+     * URLModelSource
+     * @description A generic URL point to a checkpoint file.
+     */
+    URLModelSource: {
+      /**
+       * Url
+       * Format: uri
+       */
+      url: string;
+      /** Access Token */
+      access_token?: string | null;
+      /**
+       * Type
+       * @default generic_url
+       * @constant
+       */
+      type?: "generic_url";
+    };
     /** Upscaler */
     Upscaler: {
       /**
@@ -10201,6 +10532,15 @@ export type components = {
      */
     invokeai__backend__model_manager__config__SchedulerPredictionType: "epsilon" | "v_prediction" | "sample";
     /**
+     * Classification
+     * @description The feature classification of an Invocation.
+     * - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
+     * - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
+     * - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
+     * @enum {string}
+     */
+    Classification: "stable" | "beta" | "prototype";
+    /**
      * FieldKind
      * @description The kind of field.
      * - `Input`: An input field on a node.
@@ -10323,6 +10663,11 @@ export type components = {
        * @default null
        */
       node_pack: string | null;
+      /**
+       * @description The node's classification
+       * @default stable
+       */
+      classification: components["schemas"]["Classification"];
     };
     /**
      * UIType
@@ -10353,41 +10698,11 @@ export type components = {
      */
     UIType: "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_MainModel" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
     /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
-     * T2IAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    T2IAdapterModelFormat: "diffusers";
-    /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
-    /**
-     * IPAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    IPAdapterModelFormat: "invokeai";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
@@ -10395,11 +10710,41 @@ export type components = {
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
+     * IPAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    IPAdapterModelFormat: "invokeai";
+    /**
+     * CLIPVisionModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    CLIPVisionModelFormat: "diffusers";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * T2IAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    T2IAdapterModelFormat: "diffusers";
   };
   responses: never;
   parameters: never;
@@ -10802,6 +11147,8 @@ export type operations = {
         base_models?: components["schemas"]["invokeai__backend__model_manager__config__BaseModelType"][] | null;
         /** @description The type of model to get */
         model_type?: components["schemas"]["invokeai__backend__model_manager__config__ModelType"] | null;
+        /** @description Exact match on the name of the model */
+        model_name?: string | null;
       };
     };
     responses: {
@@ -10855,7 +11202,10 @@ export type operations = {
   };
   /**
    * Del Model Record
-   * @description Delete Model
+   * @description Delete model record from database.
+   *
+   * The configuration record will be removed. The corresponding weights files will be
+   * deleted as well if they reside within the InvokeAI "models" directory.
    */
   del_model_record: {
     parameters: {
@@ -10954,6 +11304,157 @@ export type operations = {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  /**
+   * List Model Install Jobs
+   * @description Return list of model install jobs.
+   *
+   * If the optional 'source' argument is provided, then the list will be filtered
+   * for partial string matches against the install source.
+   */
+  list_model_install_jobs: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ModelInstallJob"][];
+        };
+      };
+    };
+  };
+  /**
+   * Import Model
+   * @description Add a model using its local path, repo_id, or remote URL.
+   *
+   * Models will be downloaded, probed, configured and installed in a
+   * series of background threads. The return object has `status` attribute
+   * that can be used to monitor progress.
+   *
+   * The source object is a discriminated Union of LocalModelSource,
+   * HFModelSource and URLModelSource. Set the "type" field to the
+   * appropriate value:
+   *
+   * * To install a local path using LocalModelSource, pass a source of form:
+   *   `{
+   *     "type": "local",
+   *     "path": "/path/to/model",
+   *     "inplace": false
+   *   }`
+   *    The "inplace" flag, if true, will register the model in place in its
+   *    current filesystem location. Otherwise, the model will be copied
+   *    into the InvokeAI models directory.
+   *
+   * * To install a HuggingFace repo_id using HFModelSource, pass a source of form:
+   *   `{
+   *     "type": "hf",
+   *     "repo_id": "stabilityai/stable-diffusion-2.0",
+   *     "variant": "fp16",
+   *     "subfolder": "vae",
+   *     "access_token": "f5820a918aaf01"
+   *   }`
+   *  The `variant`, `subfolder` and `access_token` fields are optional.
+   *
+   * * To install a remote model using an arbitrary URL, pass:
+   *   `{
+   *     "type": "url",
+   *     "url": "http://www.civitai.com/models/123456",
+   *     "access_token": "f5820a918aaf01"
+   *   }`
+   * The `access_token` field is optonal
+   *
+   * The model's configuration record will be probed and filled in
+   * automatically.  To override the default guesses, pass "metadata"
+   * with a Dict containing the attributes you wish to override.
+   *
+   * Installation occurs in the background. Either use list_model_install_jobs()
+   * to poll for completion, or listen on the event bus for the following events:
+   *
+   *   "model_install_started"
+   *   "model_install_completed"
+   *   "model_install_error"
+   *
+   * On successful completion, the event's payload will contain the field "key"
+   * containing the installed ID of the model. On an error, the event's payload
+   * will contain the fields "error_type" and "error" describing the nature of the
+   * error and its traceback, respectively.
+   */
+  import_model_record: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_import_model_record"];
+      };
+    };
+    responses: {
+      /** @description The model imported successfully */
+      201: {
+        content: {
+          "application/json": components["schemas"]["ModelInstallJob"];
+        };
+      };
+      /** @description There is already a model corresponding to this path or repo_id */
+      409: {
+        content: never;
+      };
+      /** @description Unrecognized file/folder format */
+      415: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description The model appeared to import successfully, but could not be found in the model manager */
+      424: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Prune Model Install Jobs
+   * @description Prune all completed and errored jobs from the install job list.
+   */
+  prune_model_install_jobs: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description All completed and errored jobs have been pruned */
+      204: {
+        content: never;
+      };
+      /** @description Bad request */
+      400: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Sync Models To Config
+   * @description Traverse the models and autoimport directories. Model files without a corresponding
+   * record in the database are added. Orphan records without a models file are deleted.
+   */
+  sync_models_to_config: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Model config record database resynced with files on disk */
+      204: {
+        content: never;
+      };
+      /** @description Bad request */
+      400: {
+        content: never;
       };
     };
   };

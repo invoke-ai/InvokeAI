@@ -11,44 +11,48 @@ import {
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTrash } from 'react-icons/fa';
+import { FaCircleNodes } from 'react-icons/fa6';
 
-const ResetWorkflowEditorMenuItem = () => {
+const NewWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const isTouched = useAppSelector((state) => state.workflow.isTouched);
 
-  const handleConfirmClear = useCallback(() => {
+  const handleNewWorkflow = useCallback(() => {
     dispatch(nodeEditorReset());
 
     dispatch(
       addToast(
         makeToast({
-          title: t('workflows.workflowEditorReset'),
+          title: t('workflows.newWorkflowCreated'),
           status: 'success',
         })
       )
     );
 
     onClose();
-  }, [dispatch, t, onClose]);
+  }, [dispatch, onClose, t]);
+
+  const onClick = useCallback(() => {
+    if (!isTouched) {
+      handleNewWorkflow();
+      return;
+    }
+    onOpen();
+  }, [handleNewWorkflow, isTouched, onOpen]);
 
   return (
     <>
-      <MenuItem
-        as="button"
-        icon={<FaTrash />}
-        sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
-        onClick={onOpen}
-      >
-        {t('nodes.resetWorkflow')}
+      <MenuItem as="button" icon={<FaCircleNodes />} onClick={onClick}>
+        {t('nodes.newWorkflow')}
       </MenuItem>
 
       <AlertDialog
@@ -61,13 +65,13 @@ const ResetWorkflowEditorMenuItem = () => {
 
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('nodes.resetWorkflow')}
+            {t('nodes.newWorkflow')}
           </AlertDialogHeader>
 
           <AlertDialogBody py={4}>
             <Flex flexDir="column" gap={2}>
-              <Text>{t('nodes.resetWorkflowDesc')}</Text>
-              <Text variant="subtext">{t('nodes.resetWorkflowDesc2')}</Text>
+              <Text>{t('nodes.newWorkflowDesc')}</Text>
+              <Text variant="subtext">{t('nodes.newWorkflowDesc2')}</Text>
             </Flex>
           </AlertDialogBody>
 
@@ -75,7 +79,7 @@ const ResetWorkflowEditorMenuItem = () => {
             <Button ref={cancelRef} onClick={onClose}>
               {t('common.cancel')}
             </Button>
-            <Button colorScheme="error" ml={3} onClick={handleConfirmClear}>
+            <Button colorScheme="error" ml={3} onClick={handleNewWorkflow}>
               {t('common.accept')}
             </Button>
           </AlertDialogFooter>
@@ -85,4 +89,4 @@ const ResetWorkflowEditorMenuItem = () => {
   );
 };
 
-export default memo(ResetWorkflowEditorMenuItem);
+export default memo(NewWorkflowMenuItem);

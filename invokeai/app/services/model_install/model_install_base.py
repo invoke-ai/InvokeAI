@@ -5,7 +5,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from fastapi import Body
 from pydantic import BaseModel, Field, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
@@ -111,17 +110,7 @@ class URLModelSource(StringLikeSource):
         return str(self.url)
 
 
-# Body() is being applied here rather than Field() because otherwise FastAPI will
-# refuse to generate a schema. Relevant links:
-#
-# "Model Manager Refactor Phase 1 - SQL-based config storage
-#        https://github.com/invoke-ai/InvokeAI/pull/5039#discussion_r1389752119 (comment)
-# Param: xyz can only be a request body, using Body() when using discriminated unions
-#        https://github.com/tiangolo/fastapi/discussions/9761
-# Body parameter cannot be a pydantic union anymore sinve v0.95
-#       https://github.com/tiangolo/fastapi/discussions/9287
-
-ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Body(discriminator="type")]
+ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
 
 
 class ModelInstallJob(BaseModel):
