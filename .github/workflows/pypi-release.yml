@@ -18,21 +18,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node 20
+      - name: Setup Node 18
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: '8.12.1'
 
       - name: Install frontend dependencies
         run: pnpm install --prefer-frozen-lockfile
+        working-directory: invokeai/frontend/web
 
       - name: Build frontend
         run: pnpm run build
+        working-directory: invokeai/frontend/web
 
       - name: Install python dependencies
         run: pip install --upgrade build twine
