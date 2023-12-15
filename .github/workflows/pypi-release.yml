@@ -15,19 +15,37 @@ jobs:
       TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       TWINE_NON_INTERACTIVE: 1
     steps:
-      - name: checkout sources
-        uses: actions/checkout@v3
+      - name: Checkout sources
+        uses: actions/checkout@v4
 
-      - name: install deps
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+	
+      - name: Install pnpm dependencies
+        working-directory: invokeai/frontend/web
+        run: 'pnpm install --prefer-frozen-lockfile'
+
+      - name: Build frontend
+        working-directory: invokeai/frontend/web
+        run: 'pnpm build'
+
+      - name: Install python deps
         run: pip install --upgrade build twine
 
-      - name: build package
+      - name: Build wheel package
         run: python3 -m build
 
-      - name: check distribution
+      - name: Check distribution
         run: twine check dist/*
 
-      - name: check PyPI versions
+      - name: Check PyPI versions
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
         run: |
           pip install --upgrade requests
@@ -36,6 +54,6 @@ jobs:
           EXISTS=scripts.pypi_helper.local_on_pypi(); \
           print(f'PACKAGE_EXISTS={EXISTS}')" >> $GITHUB_ENV
 
-      - name: upload package
+      - name: Upload package
         if: env.PACKAGE_EXISTS == 'False' && env.TWINE_PASSWORD != ''
         run: twine upload dist/*
