@@ -27,7 +27,7 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: 8
-	
+
       - name: Install pnpm dependencies
         working-directory: invokeai/frontend/web
         run: 'pnpm install --prefer-frozen-lockfile'
