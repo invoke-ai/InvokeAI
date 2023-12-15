@@ -1,10 +1,15 @@
 import sqlite3
 from logging import Logger
 
+from pydantic import ValidationError
 from tqdm import tqdm
 
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from invokeai.app.services.workflow_records.workflow_records_common import (
+    UnsafeWorkflowWithVersionValidator,
+)
 
 
 class Migration2Callback:
@@ -134,7 +139,7 @@ class Migration2Callback:
         This migrate callback checks each image for the presence of an embedded workflow, then updates its entry
         in the database accordingly.
         """
-        # Get the total number of images and chunk it into pages
+        # Get all image names
         cursor.execute("SELECT image_name FROM images")
         image_names: list[str] = [image[0] for image in cursor.fetchall()]
         total_image_names = len(image_names)
@@ -149,8 +154,17 @@ class Migration2Callback:
         pbar = tqdm(image_names)
         for idx, image_name in enumerate(pbar):
             pbar.set_description(f"Checking image {idx + 1}/{total_image_names} for workflow")
-            pil_image = self._image_files.get(image_name)
+            try:
+                pil_image = self._image_files.get(image_name)
+            except ImageFileNotFoundException:
+                self._logger.warning(f"Image {image_name} not found, skipping")
+                continue
             if "invokeai_workflow" in pil_image.info:
+                try:
+                    UnsafeWorkflowWithVersionValidator.validate_json(pil_image.info.get("invokeai_workflow", ""))
+                except ValidationError:
+                    self._logger.warning(f"Image {image_name} has invalid embedded workflow, skipping")
+                    continue
                 to_migrate.append((True, image_name))
 
         self._logger.info(f"Adding {len(to_migrate)} embedded workflows to database")

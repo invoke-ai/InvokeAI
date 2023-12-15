@@ -9,7 +9,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import DownloadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/DownloadWorkflowMenuItem';
-import ResetWorkflowEditorMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/ResetWorkflowEditorMenuItem';
+import NewWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/NewWorkflowMenuItem';
 import SaveWorkflowAsMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/SaveWorkflowAsMenuItem';
 import SaveWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/SaveWorkflowMenuItem';
 import SettingsMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/SettingsMenuItem';
@@ -39,7 +39,7 @@ const WorkflowLibraryMenu = () => {
         {isWorkflowLibraryEnabled && <SaveWorkflowAsMenuItem />}
         <DownloadWorkflowMenuItem />
         <UploadWorkflowMenuItem />
-        <ResetWorkflowEditorMenuItem />
+        <NewWorkflowMenuItem />
         <MenuDivider />
         <SettingsMenuItem />
       </MenuList>
