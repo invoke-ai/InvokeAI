@@ -48,13 +48,14 @@ def store(
 
 @pytest.fixture
 def installer(app_config: InvokeAIAppConfig, store: ModelRecordServiceBase) -> ModelInstallServiceBase:
-    installer =  ModelInstallService(
+    installer = ModelInstallService(
         app_config=app_config,
         record_store=store,
         event_bus=DummyEventService(),
     )
     installer.start()
     return installer
+
 
 class DummyEvent(BaseModel):
     """Dummy Event to use with Dummy Event service."""

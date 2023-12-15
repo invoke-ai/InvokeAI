@@ -123,6 +123,7 @@ class DownloadJob(BaseModel):
         self._on_error = on_error
         self._on_cancelled = on_cancelled
 
+
 class DownloadQueueServiceBase(ABC):
     """Multithreaded queue for downloading models via URL."""
 

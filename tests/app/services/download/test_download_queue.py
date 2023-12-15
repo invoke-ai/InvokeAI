@@ -103,6 +103,7 @@ def test_basic_queue_download(tmp_path: Path, session: Session) -> None:
     assert events == {DownloadJobStatus.RUNNING, DownloadJobStatus.COMPLETED}
     queue.stop()
 
+
 def test_errors(tmp_path: Path, session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=session,
@@ -122,6 +123,7 @@ def test_errors(tmp_path: Path, session: Session) -> None:
     assert jobs_dict["http://www.civitai.com/models/missing"].status == DownloadJobStatus.COMPLETED
     assert jobs_dict["http://www.civitai.com/models/missing"].total_bytes == 0
     queue.stop()
+
 
 def test_event_bus(tmp_path: Path, session: Session) -> None:
     event_bus = DummyEventService()
@@ -157,6 +159,7 @@ def test_event_bus(tmp_path: Path, session: Session) -> None:
     assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].payload["error"])
     queue.stop()
 
+
 def test_broken_callbacks(tmp_path: Path, session: requests.sessions.Session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=session,
@@ -191,13 +194,11 @@ def test_broken_callbacks(tmp_path: Path, session: requests.sessions.Session, ca
 def test_cancel(tmp_path: Path, session: requests.sessions.Session) -> None:
     event_bus = DummyEventService()
 
-    queue = DownloadQueueService(
-        requests_session=session,
-        event_bus=event_bus
-    )
+    queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
     queue.start()
 
     cancelled = False
+
     def slow_callback(job: DownloadJob) -> None:
         time.sleep(2)
 
