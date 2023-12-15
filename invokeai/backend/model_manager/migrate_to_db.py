@@ -3,26 +3,25 @@
 
 import json
 import sqlite3
-
-from pathlib import Path
 from hashlib import sha1
 from logging import Logger
+from pathlib import Path
 from typing import Optional
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import TypeAdapter
 
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     UnknownModelException,
 )
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
-    ModelType,
     ModelConfigFactory,
+    ModelType,
 )
 from invokeai.backend.model_manager.hash import FastModelHash
 from invokeai.backend.util.logging import InvokeAILogger
@@ -150,7 +149,7 @@ class MigrateModelYamlToDb:
                     json_serialized,
                 ),
             )
-        except sqlite3.IntegrityError as e:
+        except sqlite3.IntegrityError:
             raise DuplicateModelException(f"{record.name}: model is already in database")
 
 
