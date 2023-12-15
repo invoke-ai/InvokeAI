@@ -293,6 +293,19 @@ manager, please follow these steps:
 
 ## Developer Install
 
+!!! warning
+
+    InvokeAI uses a SQLite database. By running on `main`, you accept responsibility for your database. This
+    means making regular backups (especially before pulling) and/or fixing it yourself in the event that a
+    PR introduces a schema change.
+    
+    If you don't need persistent backend storage, you can use an ephemeral in-memory database by setting
+    `use_memory_db: true` under `Path:` in your `invokeai.yaml` file.
+
+    If this is untenable, you should run the application via the official installer or a manual install of the
+    python package from pypi. These releases will not break your database.
+
+
 If you have an interest in how InvokeAI works, or you would like to
 add features or bugfixes, you are encouraged to install the source
 code for InvokeAI. For this to work, you will need to install the
@@ -388,3 +401,5 @@ environment variable INVOKEAI_ROOT to point to the installation directory.
 
 Note that if you run into problems with the Conda installation, the InvokeAI
 staff will **not** be able to help you out. Caveat Emptor!
+
+[dev-chat]: https://discord.com/channels/1020123559063990373/1049495067846524939

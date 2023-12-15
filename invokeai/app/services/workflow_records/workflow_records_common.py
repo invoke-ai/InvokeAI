@@ -65,10 +65,22 @@ class WorkflowWithoutID(BaseModel):
     nodes: list[dict[str, JsonValue]] = Field(description="The nodes of the workflow.")
     edges: list[dict[str, JsonValue]] = Field(description="The edges of the workflow.")
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
 
 WorkflowWithoutIDValidator = TypeAdapter(WorkflowWithoutID)
+
+
+class UnsafeWorkflowWithVersion(BaseModel):
+    """
+    This utility model only requires a workflow to have a valid version string.
+    It is used to validate a workflow version without having to validate the entire workflow.
+    """
+
+    meta: WorkflowMeta = Field(description="The meta of the workflow.")
+
+
+UnsafeWorkflowWithVersionValidator = TypeAdapter(UnsafeWorkflowWithVersion)
 
 
 class Workflow(WorkflowWithoutID):
