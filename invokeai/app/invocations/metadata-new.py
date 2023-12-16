@@ -1,4 +1,6 @@
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
+
+from pydantic import BaseModel, Field, model_validator
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -59,28 +61,18 @@ CORE_LABELS_FLOAT = Literal[
 ]
 
 
-# @invocation(
-#     "metadata_item_linked",
-#     title="Metadata Item Linked",
-#     tags=["metadata"],
-#     category="metadata",
-#     version="1.0.0",
-#     classification=Classification.Beta,
-# )
-# class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
-#     """Used to create an arbitrary metadata item then Add/Update it to the provided metadata"""
-
-#     label: str = InputField(description=FieldDescriptions.metadata_item_label)
-#     value: Any = InputField(description=FieldDescriptions.metadata_item_value, ui_type=UIType.Any)
-
-#     def invoke(self, context: InvocationContext) -> MetadataOutput:
-#         data = {}
-#         if self.metadata is not None:
-#             data.update(self.metadata.model_dump())
-
-#         data.update({self.label: self.value})
-#         data.update({"app_version": __version__})
-#         return MetadataOutput(metadata=MetadataField.model_validate(data))
+def validate_custom_label(
+    model: Union[
+        "MetadataItemLinkedInvocation",
+        "MetadataToStringInvocation",
+        "MetadataToIntegerInvocation",
+        "MetadataToFloatInvocation",
+    ],
+):
+    if model.label == CUSTOM_LABEL:
+        if model.custom_label is None or model.custom_label.strip() == "":
+            raise ValueError("You must enter a Custom Label")
+    return model
 
 
 @invocation(
@@ -100,22 +92,17 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
         input=Input.Direct,
     )
     custom_label: Optional[str] = InputField(
+        default=None,
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
     value: Any = InputField(description=FieldDescriptions.metadata_item_value, ui_type=UIType.Any)
 
-    def invoke(self, context: InvocationContext) -> MetadataOutput:
-        data = {}
-        if self.metadata is not None:
-            data.update(self.metadata.model_dump())
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
-        if self.label == CUSTOM_LABEL:
-            if self.custom_label is None:
-                raise ValueError("You must enter a Custom Label")
-            data.update({self.custom_label: self.value})
-        else:
-            data.update({self.label: self.value})
+    def invoke(self, context: InvocationContext) -> MetadataOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        data.update({self.custom_label if self.label == CUSTOM_LABEL else self.label: self.value})
         data.update({"app_version": __version__})
 
         return MetadataOutput(metadata=MetadataField.model_validate(data))
@@ -160,22 +147,17 @@ class MetadataToStringInvocation(BaseInvocation, WithMetadata):
         input=Input.Direct,
     )
     custom_label: Optional[str] = InputField(
+        default=None,
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
     default_value: str = InputField(description=FieldDescriptions.metadata_item_value)
 
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        data = {}
-        if self.metadata is not None:
-            data.update(self.metadata.model_dump())
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
-        if self.label == CUSTOM_LABEL:
-            if self.custom_label is None:
-                raise ValueError("You must enter a Custom Label")
-            output = data.get(self.custom_label, self.default_value)
-        else:
-            output = data.get(self.label, self.default_value)
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
 
         return StringOutput(value=str(output))
 
@@ -197,21 +179,17 @@ class MetadataToIntegerInvocation(BaseInvocation, WithMetadata):
         input=Input.Direct,
     )
     custom_label: Optional[str] = InputField(
+        default=None,
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
     default_value: int = InputField(description=FieldDescriptions.metadata_item_value)
 
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        data = {}
-        if self.metadata is not None:
-            data.update(self.metadata.model_dump())
-        if self.label == CUSTOM_LABEL:
-            if self.custom_label is None:
-                raise ValueError("You must enter a Custom Label")
-            output = data.get(self.custom_label, self.default_value)
-        else:
-            output = data.get(self.label, self.default_value)
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
 
         return IntegerOutput(value=int(output))
 
@@ -233,21 +211,16 @@ class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
         input=Input.Direct,
     )
     custom_label: Optional[str] = InputField(
+        default=None,
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
     default_value: int = InputField(description=FieldDescriptions.metadata_item_value)
 
-    def invoke(self, context: InvocationContext) -> FloatOutput:
-        data = {}
-        if self.metadata is not None:
-            data.update(self.metadata.model_dump())
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
-        if self.label == CUSTOM_LABEL:
-            if self.custom_label is None:
-                raise ValueError("You must enter a Custom Label")
-            output = data.get(self.custom_label, self.default_value)
-        else:
-            output = data.get(self.label, self.default_value)
+    def invoke(self, context: InvocationContext) -> FloatOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
 
         return FloatOutput(value=float(output))
