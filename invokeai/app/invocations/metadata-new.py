@@ -1,6 +1,6 @@
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import model_validator
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
     WithMetadata,
     invocation,
 )
+from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, SchedulerOutput
 from invokeai.app.invocations.metadata import MetadataOutput
 from invokeai.app.invocations.primitives import FloatOutput, ImageField, IntegerOutput, StringOutput
 from invokeai.app.shared.fields import FieldDescriptions
@@ -60,6 +61,11 @@ CORE_LABELS_FLOAT = Literal[
     "cfg_rescale_multiplier",
 ]
 
+CORE_LABELS_SCHEDULER = Literal[
+    f"{CUSTOM_LABEL}",
+    "scheduler",
+]
+
 
 def validate_custom_label(
     model: Union[
@@ -67,6 +73,7 @@ def validate_custom_label(
         "MetadataToStringInvocation",
         "MetadataToIntegerInvocation",
         "MetadataToFloatInvocation",
+        "MetadataToSchedulerInvocation",
     ],
 ):
     if model.label == CUSTOM_LABEL:
@@ -119,7 +126,7 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
 class MetadataFromImageInvocation(BaseInvocation):
     """Used to create a core metadata item then Add/Update it to the provided metadata"""
 
-    image: ImageField = InputField(description="The image")
+    image: ImageField = InputField(description=FieldDescriptions.image)
 
     def invoke(self, context: InvocationContext) -> MetadataOutput:
         data = {}
@@ -151,7 +158,7 @@ class MetadataToStringInvocation(BaseInvocation, WithMetadata):
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
-    default_value: str = InputField(description=FieldDescriptions.metadata_item_value)
+    default_value: str = InputField(description="The default string to use if not found in the metadata")
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
@@ -183,7 +190,7 @@ class MetadataToIntegerInvocation(BaseInvocation, WithMetadata):
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
-    default_value: int = InputField(description=FieldDescriptions.metadata_item_value)
+    default_value: int = InputField(description="The default integer to use if not found in the metadata")
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
@@ -215,7 +222,7 @@ class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
-    default_value: int = InputField(description=FieldDescriptions.metadata_item_value)
+    default_value: int = InputField(description="The default float to use if not found in the metadata")
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
@@ -224,3 +231,39 @@ class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
         output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
 
         return FloatOutput(value=float(output))
+
+
+@invocation(
+    "metadata_to_scheduler",
+    title="Metadata To Scheduler",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToSchedulerInvocation(BaseInvocation, WithMetadata):
+    """Extracts a Scheduler value of a label from metadata"""
+
+    label: CORE_LABELS_SCHEDULER = InputField(
+        default="scheduler",
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: SAMPLER_NAME_VALUES = InputField(
+        default="euler",
+        description="The default scheduler to use if not found in the metadata",
+        ui_type=UIType.Scheduler,
+    )
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> SchedulerOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
+
+        return SchedulerOutput(scheduler=output)
