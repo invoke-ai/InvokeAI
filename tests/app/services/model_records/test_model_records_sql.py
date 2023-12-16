@@ -3,6 +3,7 @@ Test the refactored model config classes.
 """
 
 from hashlib import sha256
+from typing import Any
 
 import pytest
 
@@ -13,7 +14,6 @@ from invokeai.app.services.model_records import (
     ModelRecordServiceSQL,
     UnknownModelException,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     BaseModelType,
     MainCheckpointConfig,
@@ -23,13 +23,16 @@ from invokeai.backend.model_manager.config import (
     VaeDiffusersConfig,
 )
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
 @pytest.fixture
-def store(datadir) -> ModelRecordServiceBase:
+def store(
+    datadir: Any,
+) -> ModelRecordServiceBase:
     config = InvokeAIAppConfig(root=datadir)
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config, logger)
+    db = create_mock_sqlite_database(config, logger)
     return ModelRecordServiceSQL(db)
 
 

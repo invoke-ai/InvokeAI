@@ -42,6 +42,21 @@ Please provide steps on how to test changes, any hardware or
 software specifications as well as any other pertinent information. 
 -->
 
+## Merge Plan
+
+<!--
+A merge plan describes how this PR should be handled after it is approved.
+
+Example merge plans:
+- "This PR can be merged when approved"
+- "This must be squash-merged when approved"
+- "DO NOT MERGE - I will rebase and tidy commits before merging"
+- "#dev-chat on discord needs to be advised of this change when it is merged"
+
+A merge plan is particularly important for large PRs or PRs that touch the
+database in any way.
+-->
+
 ## Added/updated tests?
 
 - [ ] Yes

@@ -28,52 +28,6 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         self._conn = db.conn
         self._cursor = self._conn.cursor()
 
-        try:
-            self._lock.acquire()
-            self._create_tables()
-            self._conn.commit()
-        finally:
-            self._lock.release()
-
-    def _create_tables(self) -> None:
-        """Creates the `boards` table and `board_images` junction table."""
-
-        # Create the `boards` table.
-        self._cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS boards (
-                board_id TEXT NOT NULL PRIMARY KEY,
-                board_name TEXT NOT NULL,
-                cover_image_name TEXT,
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Soft delete, currently unused
-                deleted_at DATETIME,
-                FOREIGN KEY (cover_image_name) REFERENCES images (image_name) ON DELETE SET NULL
-            );
-            """
-        )
-
-        self._cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_boards_created_at ON boards (created_at);
-            """
-        )
-
-        # Add trigger for `updated_at`.
-        self._cursor.execute(
-            """--sql
-            CREATE TRIGGER IF NOT EXISTS tg_boards_updated_at
-            AFTER UPDATE
-            ON boards FOR EACH ROW
-            BEGIN
-                UPDATE boards SET updated_at = current_timestamp
-                    WHERE board_id = old.board_id;
-            END;
-            """
-        )
-
     def delete(self, board_id: str) -> None:
         try:
             self._lock.acquire()

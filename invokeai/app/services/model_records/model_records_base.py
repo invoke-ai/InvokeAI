@@ -7,10 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Union
 
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType
-
-# should match the InvokeAI version when this is first released.
-CONFIG_FILE_VERSION = "3.2.0"
+from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType
 
 
 class DuplicateModelException(Exception):
@@ -31,12 +28,6 @@ class ConfigFileVersionMismatchException(Exception):
 
 class ModelRecordServiceBase(ABC):
     """Abstract base class for storage and retrieval of model configs."""
-
-    @property
-    @abstractmethod
-    def version(self) -> str:
-        """Return the config file/database schema version."""
-        pass
 
     @abstractmethod
     def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
@@ -115,6 +106,7 @@ class ModelRecordServiceBase(ABC):
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
+        model_format: Optional[ModelFormat] = None,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
@@ -122,6 +114,7 @@ class ModelRecordServiceBase(ABC):
         :param model_name: Filter by name of model (optional)
         :param base_model: Filter by base model (optional)
         :param model_type: Filter by type of model (optional)
+        :param model_format: Filter by model format (e.g. "diffusers") (optional)
 
         If none of the optional filters are passed, will return all
         models in the database.
