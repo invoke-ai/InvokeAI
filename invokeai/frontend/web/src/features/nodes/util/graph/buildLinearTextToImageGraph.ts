@@ -146,6 +146,7 @@ export const buildLinearTextToImageGraph = (
         id: LATENTS_TO_IMAGE,
         fp32,
         is_intermediate,
+        use_cache: false,
       },
     },
     edges: [
