@@ -258,6 +258,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       is_intermediate,
       width: width,
       height: height,
+      use_cache: false,
     };
 
     graph.edges.push(
@@ -288,6 +289,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       id: CANVAS_OUTPUT,
       is_intermediate,
       fp32,
+      use_cache: false,
     };
 
     graph.edges.push({

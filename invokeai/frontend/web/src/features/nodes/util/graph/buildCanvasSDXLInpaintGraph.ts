@@ -196,6 +196,7 @@ export const buildCanvasSDXLInpaintGraph = (
         id: CANVAS_OUTPUT,
         is_intermediate,
         reference: canvasInitImage,
+        use_cache: false,
       },
     },
     edges: [
