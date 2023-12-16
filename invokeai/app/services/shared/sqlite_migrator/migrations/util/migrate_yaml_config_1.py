@@ -16,7 +16,6 @@ from invokeai.app.services.model_records import (
     DuplicateModelException,
     UnknownModelException,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -29,7 +28,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 ModelsValidator = TypeAdapter(AnyModelConfig)
 
 
-class MigrateModelYamlToDb:
+class MigrateModelYamlToDb1:
     """
     Migrate the InvokeAI models.yaml format (VERSION 3.0.0) to SQL3 database format (VERSION 3.5.0).
 
@@ -47,15 +46,11 @@ class MigrateModelYamlToDb:
     logger: Logger
     cursor: sqlite3.Cursor
 
-    def __init__(self, cursor: Optional[sqlite3.Cursor] = None) -> None:
+    def __init__(self, cursor: sqlite3.Cursor = None) -> None:
         self.config = InvokeAIAppConfig.get_config()
         self.config.parse_args()
         self.logger = InvokeAILogger.get_logger()
-        self.cursor = cursor or self.get_db().conn.cursor()
-
-    def get_db(self) -> SqliteDatabase:
-        db_path = None if self.config.use_memory_db else self.config.db_path
-        return SqliteDatabase(db_path=db_path, logger=self.logger, verbose=self.config.log_sql)
+        self.cursor = cursor
 
     def get_yaml(self) -> DictConfig:
         """Fetch the models.yaml DictConfig for this installation."""
@@ -151,11 +146,3 @@ class MigrateModelYamlToDb:
             )
         except sqlite3.IntegrityError as exc:
             raise DuplicateModelException(f"{record.name}: model is already in database") from exc
-
-
-def main() -> None:
-    MigrateModelYamlToDb().migrate()
-
-
-if __name__ == "__main__":
-    main()

@@ -10,7 +10,8 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 from invokeai.app.services.workflow_records.workflow_records_common import (
     UnsafeWorkflowWithVersionValidator,
 )
-from invokeai.backend.model_manager.migrate_to_db import MigrateModelYamlToDb
+
+from .util.migrate_yaml_config_1 import MigrateModelYamlToDb1
 
 
 class Migration2Callback:
@@ -135,7 +136,7 @@ class Migration2Callback:
 
     def _migrate_model_config_records(self, cursor: sqlite3.Cursor) -> None:
         """After updating the model config table, we repopulate it."""
-        model_record_migrator = MigrateModelYamlToDb(cursor)
+        model_record_migrator = MigrateModelYamlToDb1(cursor)
         model_record_migrator.migrate()
 
     def _migrate_embedded_workflows(self, cursor: sqlite3.Cursor) -> None:

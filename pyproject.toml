@@ -138,7 +138,6 @@ dependencies = [
 "invokeai-node-web" = "invokeai.app.api_app:invoke_api"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
-"invokeai-migrate-models-yaml-to-db" = "invokeai.backend.model_manager.migrate_to_db:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
