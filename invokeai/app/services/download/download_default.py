@@ -156,7 +156,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if not self._in_terminal_state(job):
                 self.cancel_job(job)
 
-    def _in_terminal_state(self, job: DownloadJob) -> None:
+    def _in_terminal_state(self, job: DownloadJob) -> bool:
         return job.status in [
             DownloadJobStatus.COMPLETED,
             DownloadJobStatus.CANCELLED,
