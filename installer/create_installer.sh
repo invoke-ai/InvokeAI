@@ -113,6 +113,6 @@ cp WinLongPathsEnabled.reg InvokeAI-Installer/
 zip -r InvokeAI-installer-$VERSION.zip InvokeAI-Installer
 
 # clean up
-rm -rf InvokeAI-Installer tmp dist
+rm -rf InvokeAI-Installer tmp dist ../invokeai/frontend/web/dist/
 
 exit 0
