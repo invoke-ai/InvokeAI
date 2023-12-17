@@ -727,9 +727,6 @@
         "showMinimapnodes": "Mostrar el minimapa",
         "reloadNodeTemplates": "Recargar las plantillas de nodos",
         "loadWorkflow": "Cargar el flujo de trabajo",
-        "resetWorkflow": "Reiniciar e flujo de trabajo",
-        "resetWorkflowDesc": "¿Está seguro de que deseas restablecer este flujo de trabajo?",
-        "resetWorkflowDesc2": "Al reiniciar el flujo de trabajo se borrarán todos los nodos, aristas y detalles del flujo de trabajo.",
         "downloadWorkflow": "Descargar el flujo de trabajo en un archivo JSON"
     }
 }

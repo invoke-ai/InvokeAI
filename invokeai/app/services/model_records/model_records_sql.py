@@ -49,6 +49,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
     ModelConfigFactory,
+    ModelFormat,
     ModelType,
 )
 
@@ -225,6 +226,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
+        model_format: Optional[ModelFormat] = None,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
@@ -232,6 +234,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         :param model_name: Filter by name of model (optional)
         :param base_model: Filter by base model (optional)
         :param model_type: Filter by type of model (optional)
+        :param model_format: Filter by model format (e.g. "diffusers") (optional)
 
         If none of the optional filters are passed, will return all
         models in the database.
@@ -248,6 +251,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         if model_type:
             where_clause.append("type=?")
             bindings.append(model_type)
+        if model_format:
+            where_clause.append("format=?")
+            bindings.append(model_format)
         where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
         with self._db.lock:
             self._cursor.execute(
