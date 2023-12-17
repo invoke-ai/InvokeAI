@@ -77,7 +77,7 @@ class CalculateImageTilesInvocation(BaseInvocation):
     title="Calculate Image Tiles Even Split",
     tags=["tiles"],
     category="tiles",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
@@ -97,11 +97,11 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
         ge=1,
         description="Number of tiles to divide image into on the y axis",
     )
-    overlap_fraction: float = InputField(
-        default=0.25,
+    overlap: int = InputField(
+        default=128,
         ge=0,
-        lt=1,
-        description="Overlap between adjacent tiles as a fraction of the tile's dimensions (0-1)",
+        multiple_of=8,
+        description="The overlap, in pixels, between adjacent tiles.",
     )
 
     def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
@@ -110,7 +110,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
             image_width=self.image_width,
             num_tiles_x=self.num_tiles_x,
             num_tiles_y=self.num_tiles_y,
-            overlap_fraction=self.overlap_fraction,
+            overlap=self.overlap,
         )
         return CalculateImageTilesOutput(tiles=tiles)
 
