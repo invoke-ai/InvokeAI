@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import platform
 from contextlib import nullcontext
 from typing import Union
 
