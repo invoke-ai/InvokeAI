@@ -191,6 +191,7 @@ export const buildCanvasInpaintGraph = (
         id: CANVAS_OUTPUT,
         is_intermediate,
         reference: canvasInitImage,
+        use_cache: false,
       },
     },
     edges: [

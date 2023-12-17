@@ -21,16 +21,16 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - name: Setup Node 20
+      - name: Setup Node 18
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: '8.12.1'
       - name: Install dependencies
         run: 'pnpm install --prefer-frozen-lockfile'
       - name: Typescript

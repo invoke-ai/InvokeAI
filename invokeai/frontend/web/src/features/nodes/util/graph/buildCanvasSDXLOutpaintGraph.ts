@@ -204,6 +204,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         type: 'color_correct',
         id: CANVAS_OUTPUT,
         is_intermediate,
+        use_cache: false,
       },
     },
     edges: [
