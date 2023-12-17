@@ -11,5 +11,12 @@ module.exports = {
         tabWidth: 4,
       },
     },
+    {
+      files: ['**/*.md'],
+      options: {
+        tabWidth: 2,
+        printWidth: 100,
+      },
+    },
   ],
 };
