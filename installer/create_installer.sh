@@ -19,11 +19,6 @@ function git_show {
 
 cd "$(dirname "$0")"
 
-echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
-echo "The current working directory is $(pwd)"
-read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
-echo
-
 # Some machines only have `python3` in PATH, others have `python` - make an alias.
 # We can use a function to approximate an alias within a non-interactive shell.
 if ! is_bin_in_path python && is_bin_in_path python3; then

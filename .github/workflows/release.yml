@@ -1,0 +1,43 @@
+name: PyPI Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  buildrelease:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8.12.1'
+
+      - name: Install frontend dependencies
+        run: pnpm install --prefer-frozen-lockfile
+        working-directory: invokeai/frontend/web
+
+      - name: Install python dependencies
+        run: pip install --upgrade build twine
+
+      - uses: samuelcolvin/check-python-version@v1
+        id: check-python-version
+        with:
+          skip_env_check: true
+          version_file_path: invokeai/version/invokeai_version.py
+
+      - name: Run create_installer.sh
+        run: ./create_installer.sh
+        working-directory: installer
+
+      - name: Upload build as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: installer/InvokeAI-installer-${{fromJSON(steps.check-python-version.outputs.VERSION)}}.zip
