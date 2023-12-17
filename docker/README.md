@@ -23,7 +23,7 @@ This is done via Docker Desktop preferences
 1. Make a copy of `env.sample` and name it `.env` (`cp env.sample .env` (Mac/Linux) or `copy example.env .env` (Windows)). Make changes as necessary. Set `INVOKEAI_ROOT` to an absolute path to:
     a. the desired location of the InvokeAI runtime directory, or
     b. an existing, v3.0.0 compatible runtime directory.
-1. `docker compose up`
+1. Execute `run.sh`
 
 The image will be built automatically if needed.
 
@@ -39,7 +39,7 @@ The Docker daemon on the system must be already set up to use the GPU. In case o
 
 ## Customize
 
-Check the `.env.sample` file. It contains some environment variables for running in Docker. Copy it, name it `.env`, and fill it in with your own values. Next time you run `docker compose up`, your custom values will be used.
+Check the `.env.sample` file. It contains some environment variables for running in Docker. Copy it, name it `.env`, and fill it in with your own values. Next time you run `run.sh`, your custom values will be used.
 
 You can also set these values in `docker-compose.yml` directly, but `.env` will help avoid conflicts when code is updated.
 
