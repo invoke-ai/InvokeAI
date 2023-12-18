@@ -29,6 +29,10 @@ class UnknownJobIDException(Exception):
     """This exception is raised when an invalid job id is referened."""
 
 
+class ServiceInactiveException(Exception):
+    """This exception is raised when user attempts to initiate a download before the service is started."""
+
+
 DownloadEventHandler = Callable[["DownloadJob"], None]
 
 

@@ -7,7 +7,7 @@ import threading
 import traceback
 from logging import Logger
 from pathlib import Path
-from queue import PriorityQueue
+from queue import Empty, PriorityQueue
 from typing import Any, Dict, List, Optional, Set
 
 import requests
@@ -25,6 +25,7 @@ from .download_base import (
     DownloadJobCancelledException,
     DownloadJobStatus,
     DownloadQueueServiceBase,
+    ServiceInactiveException,
     UnknownJobIDException,
 )
 
@@ -41,11 +42,13 @@ class DownloadQueueService(DownloadQueueServiceBase):
     _jobs: Dict[int, DownloadJob]
     _max_parallel_dl: int = 5
     _worker_pool: Set[threading.Thread]
-    _queue: PriorityQueue
+    _queue: PriorityQueue[DownloadJob]
+    _stop_event: threading.Event
     _lock: threading.Lock
     _logger: Logger
     _events: Optional[EventServiceBase] = None
     _next_job_id: int = 0
+    _accept_download_requests: bool = False
     _requests: requests.sessions.Session
 
     def __init__(
@@ -63,22 +66,34 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._jobs = {}
         self._next_job_id = 0
         self._queue = PriorityQueue()
+        self._stop_event = threading.Event()
         self._worker_pool = set()
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
         self._requests = requests_session or requests.Session()
+        self._accept_download_requests = False
         self._max_parallel_dl = max_parallel_dl
 
     def start(self, *args: Any, **kwargs: Any) -> None:
         """Start the download worker threads."""
+        self._stop_event.clear()
         self._start_workers(self._max_parallel_dl)
+        self._accept_download_requests = True
 
     def stop(self, *args: Any, **kwargs: Any) -> None:
         """Stop the download worker threads."""
-        for thread in self._worker_pool:
-            if thread.is_alive():
-                self._queue.put(STOP_JOB)
+        queued_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.WAITING]
+        active_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.RUNNING]
+        self._accept_download_requests = False  # reject attempts to add new jobs to queue
+        if queued_jobs:
+            self._logger.warning(f"Cancelling {len(queued_jobs)} queued downloads")
+            with self._queue.mutex:
+                self._queue.queue.clear()
+        if active_jobs:
+            self._logger.info(f"Waiting for {len(active_jobs)} active download jobs to complete")
+            self.join()
+        self._stop_event.set()
         self._worker_pool.clear()
 
     def download(
@@ -94,6 +109,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
         on_error: Optional[DownloadEventHandler] = None,
     ) -> DownloadJob:
         """Create a download job and return its ID."""
+        if not self._accept_download_requests:
+            raise ServiceInactiveException(
+                "The download service is not currently accepting requests. Please call start() to initialize the service."
+            )
         with self._lock:
             id = self._next_job_id
             self._next_job_id += 1
@@ -166,6 +185,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
         self.stop()  # stop any running threads and reset the worker pool set
+        self._stop_event.clear()
         for i in range(0, max_workers):  # noqa B007
             worker = threading.Thread(target=self._download_next_item, daemon=True)
             self._logger.debug(f"Download queue worker thread {worker.name} starting.")
@@ -176,13 +196,15 @@ class DownloadQueueService(DownloadQueueServiceBase):
         """Worker thread gets next job on priority queue."""
         done = False
         while not done:
-            job = self._queue.get()
+            if self._stop_event.is_set():
+                done = True
+                continue
+            try:
+                job = self._queue.get(timeout=1)
+            except Empty:
+                continue
 
             try:
-                if job == STOP_JOB:  # marker that queue is done
-                    done = True
-                    continue
-
                 job.job_started = get_iso_timestamp()
                 self._do_download(job)
                 self._signal_job_complete(job)
@@ -233,7 +255,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         # Don't clobber an existing file. See commit 82c2c85202f88c6d24ff84710f297cfc6ae174af
         # for code that instead resumes an interrupted download.
         if job.download_path.exists():
-            raise OSError("[Errno 17] File {job.download_path} exists")
+            raise OSError(f"[Errno 17] File {job.download_path} exists")
 
         # append ".downloading" to the path
         in_progress_path = self._in_progress_path(job.download_path)
