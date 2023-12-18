@@ -389,7 +389,7 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
         elif "clip_g" in checkpoint:
             token_dim = checkpoint["clip_g"].shape[-1]
         else:
-            token_dim = list(checkpoint.values())[0].shape[0]
+            token_dim = list(checkpoint.values())[0].shape[-1]
         if token_dim == 768:
             return BaseModelType.StableDiffusion1
         elif token_dim == 1024:
