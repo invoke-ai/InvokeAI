@@ -32,10 +32,6 @@ from .download_base import (
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
 
-# marker that the queue is done and that thread should exit
-STOP_JOB = DownloadJob(id=-99, priority=-99, source=Url("http://dummy.com/"), dest=Path("/"))
-
-
 class DownloadQueueService(DownloadQueueServiceBase):
     """Class for queued download of models."""
 
