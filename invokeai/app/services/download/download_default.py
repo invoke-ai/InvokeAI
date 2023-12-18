@@ -11,7 +11,7 @@ from queue import Empty, PriorityQueue
 from typing import Any, Dict, List, Optional, Set
 
 import requests
-from pydantic.networks import AnyHttpUrl, Url
+from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 from tqdm import tqdm
 
