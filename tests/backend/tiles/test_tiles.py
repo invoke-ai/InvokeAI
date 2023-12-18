@@ -305,9 +305,7 @@ def test_calc_tiles_min_overlap_input_validation(
 
 def test_calc_tiles_even_split_single_tile():
     """Test calc_tiles_even_split() behavior when a single tile covers the image."""
-    tiles = calc_tiles_even_split(
-        image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap_fraction=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=512, image_width=1024, num_tiles_x=1, num_tiles_y=1, overlap=64)
 
     expected_tiles = [
         Tile(
@@ -322,36 +320,34 @@ def test_calc_tiles_even_split_single_tile():
 def test_calc_tiles_even_split_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image is evenly covered by multiple tiles."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(
-        image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap_fraction=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=576, image_width=1600, num_tiles_x=3, num_tiles_y=2, overlap=64)
 
     expected_tiles = [
         # Row 0
         Tile(
-            coords=TBLR(top=0, bottom=320, left=0, right=624),
-            overlap=TBLR(top=0, bottom=72, left=0, right=136),
+            coords=TBLR(top=0, bottom=320, left=0, right=576),
+            overlap=TBLR(top=0, bottom=64, left=0, right=64),
         ),
         Tile(
-            coords=TBLR(top=0, bottom=320, left=488, right=1112),
-            overlap=TBLR(top=0, bottom=72, left=136, right=136),
+            coords=TBLR(top=0, bottom=320, left=512, right=1088),
+            overlap=TBLR(top=0, bottom=64, left=64, right=64),
         ),
         Tile(
-            coords=TBLR(top=0, bottom=320, left=976, right=1600),
-            overlap=TBLR(top=0, bottom=72, left=136, right=0),
+            coords=TBLR(top=0, bottom=320, left=1024, right=1600),
+            overlap=TBLR(top=0, bottom=64, left=64, right=0),
         ),
         # Row 1
         Tile(
-            coords=TBLR(top=248, bottom=576, left=0, right=624),
-            overlap=TBLR(top=72, bottom=0, left=0, right=136),
+            coords=TBLR(top=256, bottom=576, left=0, right=576),
+            overlap=TBLR(top=64, bottom=0, left=0, right=64),
         ),
         Tile(
-            coords=TBLR(top=248, bottom=576, left=488, right=1112),
-            overlap=TBLR(top=72, bottom=0, left=136, right=136),
+            coords=TBLR(top=256, bottom=576, left=512, right=1088),
+            overlap=TBLR(top=64, bottom=0, left=64, right=64),
         ),
         Tile(
-            coords=TBLR(top=248, bottom=576, left=976, right=1600),
-            overlap=TBLR(top=72, bottom=0, left=136, right=0),
+            coords=TBLR(top=256, bottom=576, left=1024, right=1600),
+            overlap=TBLR(top=64, bottom=0, left=64, right=0),
         ),
     ]
     assert tiles == expected_tiles
@@ -360,36 +356,34 @@ def test_calc_tiles_even_split_evenly_divisible():
 def test_calc_tiles_even_split_not_evenly_divisible():
     """Test calc_tiles_even_split() behavior when the image requires 'uneven' overlaps to achieve proper coverage."""
     # Parameters mimic roughly the same output as the original tile generations of the same test name
-    tiles = calc_tiles_even_split(
-        image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap_fraction=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=400, image_width=1200, num_tiles_x=3, num_tiles_y=2, overlap=64)
 
     expected_tiles = [
         # Row 0
         Tile(
-            coords=TBLR(top=0, bottom=224, left=0, right=464),
-            overlap=TBLR(top=0, bottom=56, left=0, right=104),
+            coords=TBLR(top=0, bottom=232, left=0, right=440),
+            overlap=TBLR(top=0, bottom=64, left=0, right=64),
         ),
         Tile(
-            coords=TBLR(top=0, bottom=224, left=360, right=824),
-            overlap=TBLR(top=0, bottom=56, left=104, right=104),
+            coords=TBLR(top=0, bottom=232, left=376, right=816),
+            overlap=TBLR(top=0, bottom=64, left=64, right=64),
         ),
         Tile(
-            coords=TBLR(top=0, bottom=224, left=720, right=1200),
-            overlap=TBLR(top=0, bottom=56, left=104, right=0),
+            coords=TBLR(top=0, bottom=232, left=752, right=1200),
+            overlap=TBLR(top=0, bottom=64, left=64, right=0),
         ),
         # Row 1
         Tile(
-            coords=TBLR(top=168, bottom=400, left=0, right=464),
-            overlap=TBLR(top=56, bottom=0, left=0, right=104),
+            coords=TBLR(top=168, bottom=400, left=0, right=440),
+            overlap=TBLR(top=64, bottom=0, left=0, right=64),
         ),
         Tile(
-            coords=TBLR(top=168, bottom=400, left=360, right=824),
-            overlap=TBLR(top=56, bottom=0, left=104, right=104),
+            coords=TBLR(top=168, bottom=400, left=376, right=816),
+            overlap=TBLR(top=64, bottom=0, left=64, right=64),
         ),
         Tile(
-            coords=TBLR(top=168, bottom=400, left=720, right=1200),
-            overlap=TBLR(top=56, bottom=0, left=104, right=0),
+            coords=TBLR(top=168, bottom=400, left=752, right=1200),
+            overlap=TBLR(top=64, bottom=0, left=64, right=0),
         ),
     ]
 
@@ -399,28 +393,26 @@ def test_calc_tiles_even_split_not_evenly_divisible():
 def test_calc_tiles_even_split_difficult_size():
     """Test calc_tiles_even_split() behavior when the image is a difficult size to spilt evenly and keep div8."""
     # Parameters are a difficult size for other tile gen routines to calculate
-    tiles = calc_tiles_even_split(
-        image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap_fraction=0.25
-    )
+    tiles = calc_tiles_even_split(image_height=1000, image_width=1000, num_tiles_x=2, num_tiles_y=2, overlap=64)
 
     expected_tiles = [
         # Row 0
         Tile(
-            coords=TBLR(top=0, bottom=560, left=0, right=560),
-            overlap=TBLR(top=0, bottom=128, left=0, right=128),
+            coords=TBLR(top=0, bottom=528, left=0, right=528),
+            overlap=TBLR(top=0, bottom=64, left=0, right=64),
         ),
         Tile(
-            coords=TBLR(top=0, bottom=560, left=432, right=1000),
-            overlap=TBLR(top=0, bottom=128, left=128, right=0),
+            coords=TBLR(top=0, bottom=528, left=464, right=1000),
+            overlap=TBLR(top=0, bottom=64, left=64, right=0),
         ),
         # Row 1
         Tile(
-            coords=TBLR(top=432, bottom=1000, left=0, right=560),
-            overlap=TBLR(top=128, bottom=0, left=0, right=128),
+            coords=TBLR(top=464, bottom=1000, left=0, right=528),
+            overlap=TBLR(top=64, bottom=0, left=0, right=64),
         ),
         Tile(
-            coords=TBLR(top=432, bottom=1000, left=432, right=1000),
-            overlap=TBLR(top=128, bottom=0, left=128, right=0),
+            coords=TBLR(top=464, bottom=1000, left=464, right=1000),
+            overlap=TBLR(top=64, bottom=0, left=64, right=0),
         ),
     ]
 
@@ -428,11 +420,13 @@ def test_calc_tiles_even_split_difficult_size():
 
 
 @pytest.mark.parametrize(
-    ["image_height", "image_width", "num_tiles_x", "num_tiles_y", "overlap_fraction", "raises"],
+    ["image_height", "image_width", "num_tiles_x", "num_tiles_y", "overlap", "raises"],
     [
-        (128, 128, 1, 1, 0.25, False),  # OK
+        (128, 128, 1, 1, 127, False),  # OK
         (128, 128, 1, 1, 0, False),  # OK
-        (128, 128, 2, 1, 0, False),  # OK
+        (128, 128, 2, 2, 0, False),  # OK
+        (128, 128, 2, 1, 120, True),  # overlap equals tile_height.
+        (128, 128, 1, 2, 120, True),  # overlap equals tile_width.
         (127, 127, 1, 1, 0, True),  # image size must be dividable by 8
     ],
 )
@@ -441,15 +435,15 @@ def test_calc_tiles_even_split_input_validation(
     image_width: int,
     num_tiles_x: int,
     num_tiles_y: int,
-    overlap_fraction: float,
+    overlap: int,
     raises: bool,
 ):
     """Test that calc_tiles_even_split() raises an exception if the inputs are invalid."""
     if raises:
-        with pytest.raises(ValueError):
-            calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap_fraction)
+        with pytest.raises((AssertionError, ValueError)):
+            calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
     else:
-        calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap_fraction)
+        calc_tiles_even_split(image_height, image_width, num_tiles_x, num_tiles_y, overlap)
 
 
 #############################################

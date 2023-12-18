@@ -898,11 +898,8 @@
         "zoomInNodes": "Ingrandire",
         "fitViewportNodes": "Adatta vista",
         "showGraphNodes": "Mostra sovrapposizione grafico",
-        "resetWorkflowDesc2": "Il ripristino dell'editor del flusso di lavoro cancellerà tutti i nodi, le connessioni e i dettagli del flusso di lavoro. I flussi di lavoro salvati non saranno interessati.",
         "reloadNodeTemplates": "Ricarica i modelli di nodo",
         "loadWorkflow": "Importa flusso di lavoro JSON",
-        "resetWorkflow": "Reimposta l'editor del flusso di lavoro",
-        "resetWorkflowDesc": "Sei sicuro di voler reimpostare l'editor del flusso di lavoro?",
         "downloadWorkflow": "Esporta flusso di lavoro JSON",
         "scheduler": "Campionatore",
         "addNode": "Aggiungi nodo",
@@ -1112,7 +1109,10 @@
         "deletedInvalidEdge": "Eliminata connessione non valida {{source}} -> {{target}}",
         "unknownInput": "Input sconosciuto: {{name}}",
         "prototypeDesc": "Questa invocazione è un prototipo. Potrebbe subire modifiche sostanziali durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento.",
-        "betaDesc": "Questa invocazione è in versione beta. Fino a quando non sarà stabile, potrebbe subire modifiche importanti durante gli aggiornamenti dell'app. Abbiamo intenzione di supportare questa invocazione a lungo termine."
+        "betaDesc": "Questa invocazione è in versione beta. Fino a quando non sarà stabile, potrebbe subire modifiche importanti durante gli aggiornamenti dell'app. Abbiamo intenzione di supportare questa invocazione a lungo termine.",
+        "newWorkflow": "Nuovo flusso di lavoro",
+        "newWorkflowDesc": "Creare un nuovo flusso di lavoro?",
+        "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate."
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1619,7 +1619,6 @@
         "saveWorkflow": "Salva flusso di lavoro",
         "openWorkflow": "Apri flusso di lavoro",
         "clearWorkflowSearchFilter": "Cancella il filtro di ricerca del flusso di lavoro",
-        "workflowEditorReset": "Reimpostazione dell'editor del flusso di lavoro",
         "workflowLibrary": "Libreria",
         "noRecentWorkflows": "Nessun flusso di lavoro recente",
         "workflowSaved": "Flusso di lavoro salvato",
@@ -1633,7 +1632,10 @@
         "deleteWorkflow": "Elimina flusso di lavoro",
         "workflows": "Flussi di lavoro",
         "noDescription": "Nessuna descrizione",
-        "userWorkflows": "I miei flussi di lavoro"
+        "userWorkflows": "I miei flussi di lavoro",
+        "newWorkflowCreated": "Nuovo flusso di lavoro creato",
+        "downloadWorkflow": "Salva su file",
+        "uploadWorkflow": "Carica da file"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"

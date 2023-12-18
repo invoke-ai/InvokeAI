@@ -143,6 +143,7 @@ export const buildLinearImageToImageGraph = (
         // },
         fp32,
         is_intermediate,
+        use_cache: false,
       },
     },
     edges: [
