@@ -26,7 +26,7 @@ from invokeai.backend.model_manager.config import (
 
 from ..dependencies import ApiDependencies
 
-model_records_router = APIRouter(prefix="/v1/model/record", tags=["model_manager_v2"])
+model_records_router = APIRouter(prefix="/v1/model/record", tags=["model_manager_v2_unstable"])
 
 
 class ModelsList(BaseModel):
