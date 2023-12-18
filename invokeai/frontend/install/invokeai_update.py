@@ -4,11 +4,11 @@ pip install <path_to_git_source>.
 """
 import os
 import platform
+from distutils.version import LooseVersion
 
 import pkg_resources
 import psutil
 import requests
-from distutils.version import LooseVersion
 from rich import box, print
 from rich.console import Console, group
 from rich.panel import Panel
@@ -48,18 +48,17 @@ def invokeai_is_running() -> bool:
 
 
 def get_pypi_versions():
-    url = f"https://pypi.org/pypi/invokeai/json"
-    try: 
+    url = "https://pypi.org/pypi/invokeai/json"
+    try:
         data = requests.get(url).json()
-    except:
+    except Exception:
         raise Exception("Unable to fetch version information from PyPi")
 
     versions = list(data["releases"].keys())
     versions.sort(key=LooseVersion, reverse=True)
-    latest_version = [v for v in versions if 'rc' not in v][0]
-    latest_release_candidate = [v for v in versions if 'rc' in v][0]
+    latest_version = [v for v in versions if "rc" not in v][0]
+    latest_release_candidate = [v for v in versions if "rc" in v][0]
     return latest_version, latest_release_candidate
-
 
 
 def welcome(latest_release: str, latest_prerelease: str):
@@ -102,11 +101,7 @@ def get_extras():
     return extras
 
 
-
-
-
 def main():
-
     if invokeai_is_running():
         print(":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
         input("Press any key to continue...")
@@ -116,7 +111,6 @@ def main():
 
     welcome(latest_release, latest_prerelease)
 
-
     release = latest_release
     choice = Prompt.ask("Choice:", choices=["1", "2", "3"], default="1")
 
@@ -125,14 +119,13 @@ def main():
     elif choice == "2":
         release = latest_prerelease
     elif choice == "3":
-            release = Prompt.ask("Enter an InvokeAI version name")
+        release = Prompt.ask("Enter an InvokeAI version name")
 
     extras = get_extras()
 
     print(f":crossed_fingers: Upgrading to [yellow]{release}[/yellow]")
     cmd = f'pip install "invokeai{extras}=={release}" --use-pep517 --upgrade'
 
-   
     print("")
     print("")
     if os.system(cmd) == 0:
