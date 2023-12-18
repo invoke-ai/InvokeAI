@@ -69,8 +69,6 @@ COPY invokeai/frontend/web/ ./
 RUN --mount=type=cache,target=/pnpm/store \
     pnpm install --frozen-lockfile
 RUN pnpm run build
-RUN --mount=type=cache,target=/usr/lib/node_modules \
-    yarn vite build
 
 #### Runtime stage ---------------------------------------
 
