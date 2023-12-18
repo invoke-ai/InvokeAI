@@ -2,23 +2,8 @@
 
 version: '3.8'
 
-services:
-  invokeai:
+x-invokeai: &invokeai
     image: "local/invokeai:latest"
-    # edit below to run on a container runtime other than nvidia-container-runtime.
-    # not yet tested with rocm/AMD GPUs
-    # Comment out the "deploy" section to run on CPU only
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    # For AMD support, comment out the deploy section above and uncomment the devices section below:
-    #devices:
-    #  - /dev/kfd:/dev/kfd
-    #  - /dev/dri:/dev/dri
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -50,3 +35,27 @@ services:
     #   - |
     #     invokeai-model-install --yes --default-only --config_file ${INVOKEAI_ROOT}/config_custom.yaml
     #     invokeai-nodes-web --host 0.0.0.0
+
+services:
+  invokeai-nvidia:
+    <<: *invokeai
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  invokeai-cpu:
+    <<: *invokeai
+    profiles:
+      - cpu
+
+  invokeai-rocm:
+    <<: *invokeai
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    profiles:
+      - rocm
