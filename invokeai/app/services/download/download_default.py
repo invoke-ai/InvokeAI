@@ -32,6 +32,7 @@ from .download_base import (
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
 
+
 class DownloadQueueService(DownloadQueueServiceBase):
     """Class for queued download of models."""
 
