@@ -5,6 +5,7 @@ from invokeai.app.services.image_files.image_files_base import ImageFileStorageB
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import build_migration_1
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2 import build_migration_2
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_3 import build_migration_3
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
 
 
@@ -27,6 +28,7 @@ def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileSto
     migrator = SqliteMigrator(db=db)
     migrator.register_migration(build_migration_1())
     migrator.register_migration(build_migration_2(image_files=image_files, logger=logger))
+    migrator.register_migration(build_migration_3())
     migrator.run_migrations()
 
     return db
