@@ -58,7 +58,7 @@ def get_pypi_versions():
     versions.sort(key=LooseVersion, reverse=True)
     latest_version = [v for v in versions if "rc" not in v][0]
     latest_release_candidate = [v for v in versions if "rc" in v][0]
-    return latest_version, latest_release_candidate
+    return latest_version, latest_release_candidate, versions
 
 
 def welcome(latest_release: str, latest_prerelease: str):
@@ -107,7 +107,7 @@ def main():
         input("Press any key to continue...")
         return
 
-    latest_release, latest_prerelease = get_pypi_versions()
+    latest_release, latest_prerelease, versions = get_pypi_versions()
 
     welcome(latest_release, latest_prerelease)
 
@@ -119,7 +119,12 @@ def main():
     elif choice == "2":
         release = latest_prerelease
     elif choice == "3":
-        release = Prompt.ask("Enter an InvokeAI version name")
+        while True:
+            release = Prompt.ask("Enter an InvokeAI version")
+            release.strip()
+            if release in versions:
+                break
+            print(f":exclamation: [bold red]'{release}' is not a recognized InvokeAI release.[/red bold]")
 
     extras = get_extras()
 
