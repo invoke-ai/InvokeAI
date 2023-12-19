@@ -86,8 +86,8 @@ def build_migration_4() -> Migration:
     Adds the tables needed to store model metadata and tags.
     """
     migration_4 = Migration(
-        from_version=2,  # until migration_3 is merged, pretend we are doing 2-3
-        to_version=3,
+        from_version=3,
+        to_version=4,
         callback=Migration4Callback(),
     )
 
