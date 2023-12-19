@@ -15,10 +15,12 @@ This may need reworking.
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Set, Optional
+from typing import Any, Dict, List, Literal, Optional, Set, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.networks import AnyHttpUrl
+from typing_extensions import Annotated
+
 
 class CommercialUsage(str, Enum):
     """Type of commercial usage allowed."""
@@ -29,13 +31,21 @@ class CommercialUsage(str, Enum):
     RentCivit = "RentCivit"
     Sell = "Sell"
 
+
 class LicenseRestrictions(BaseModel):
     """Broad categories of licensing restrictions."""
 
-    AllowNoCredit: bool = Field(description="if true, model can be redistributed without crediting author", default=False)
+    AllowNoCredit: bool = Field(
+        description="if true, model can be redistributed without crediting author", default=False
+    )
     AllowDerivatives: bool = Field(description="if true, derivatives of this model can be redistributed", default=False)
-    AllowDifferentLicense: bool = Field(description="if true, derivatives of this model be redistributed under a different license", default=False)
-    AllowCommercialUse: CommercialUsage = Field(description="Type of commercial use allowed or 'No' if no commercial use is allowed.", default_factory=set)
+    AllowDifferentLicense: bool = Field(
+        description="if true, derivatives of this model be redistributed under a different license", default=False
+    )
+    AllowCommercialUse: CommercialUsage = Field(
+        description="Type of commercial use allowed or 'No' if no commercial use is allowed.", default_factory=set
+    )
+
 
 class ModelMetadataBase(BaseModel):
     """Base class for model metadata information."""
@@ -44,32 +54,41 @@ class ModelMetadataBase(BaseModel):
     author: str = Field(description="model's author")
     tags: Set[str] = Field(description="tags provided by model source")
 
+
 class HuggingFaceMetadata(ModelMetadataBase):
     """Extended metadata fields provided by HuggingFace."""
 
+    type: Literal["huggingface"] = "huggingface"
     id: str = Field(description="huggingface model id")
     tag_dict: Dict[str, Any]
     last_modified: datetime = Field(description="date of last commit to repo")
     files: List[Path] = Field(description="sibling files that belong to this model", default_factory=list)
 
+
 class CivitaiMetadata(ModelMetadataBase):
     """Extended metadata fields provided by Civitai."""
 
+    type: Literal["civitai"] = "civitai"
     id: int = Field(description="Civitai model identifier")
     version_name: str = Field(description="Version identifier, such as 'V2-alpha'")
     version_id: int = Field(description="Civitai model version identifier")
     created: datetime = Field(description="date the model was posted to CivitAI")
     description: str = Field(description="text description of model; may contain HTML")
-    version_description: str = Field(description="text description of the model's reversion; usually change history; may contain HTML")
+    version_description: str = Field(
+        description="text description of the model's reversion; usually change history; may contain HTML"
+    )
     nsfw: bool = Field(description="whether the model tends to generate NSFW content", default=False)
     restrictions: LicenseRestrictions = Field(description="license terms", default=LicenseRestrictions)
     trained_words: Set[str] = Field(description="words to trigger the model", default_factory=set)
     download_url: AnyHttpUrl = Field(description="download URL for this model")
     base_model_trained_on: str = Field(description="base model on which this model was trained (currently not an enum)")
     thumbnail_url: Optional[AnyHttpUrl] = Field(description="a thumbnail image for this model", default=None)
-    weight_min: float = Field(description="minimum suggested value for a LoRA or other secondary model", default=-1.0)   # note: For future use; not currently easily
-    weight_max: float = Field(description="maximum suggested value for a LoRA or other secondary model", default=+2.0)   #       recoverable from metadata
-
+    weight_min: float = Field(
+        description="minimum suggested value for a LoRA or other secondary model", default=-1.0
+    )  # note: For future use; not currently easily
+    weight_max: float = Field(
+        description="maximum suggested value for a LoRA or other secondary model", default=+2.0
+    )  #       recoverable from metadata
 
     @property
     def credit_required(self) -> bool:
@@ -79,7 +98,7 @@ class CivitaiMetadata(ModelMetadataBase):
     @property
     def allow_commercial_use(self) -> bool:
         """Return True if commercial use is allowed."""
-        return self.restrictions.AllowCommercialUse == CommercialUsage('None')
+        return self.restrictions.AllowCommercialUse == CommercialUsage("None")
 
     @property
     def allow_derivatives(self) -> bool:
@@ -90,3 +109,7 @@ class CivitaiMetadata(ModelMetadataBase):
     def allow_different_license(self) -> bool:
         """Return true if derivatives of this model can use a different license."""
         return self.restrictions.AllowDifferentLicense
+
+
+AnyModelRepoMetadata = Annotated[Union[HuggingFaceMetadata, CivitaiMetadata], Field(discriminator="type")]
+AnyModelRepoMetadataValidator = TypeAdapter(AnyModelRepoMetadata)
