@@ -11,7 +11,7 @@ complex functionality.
 
 InvokeAI Nodes can be found in the `invokeai/app/invocations` directory. These can be used as examples to create your own nodes.
 
-New nodes should be added to a subfolder in `nodes` direction found at the root level of the InvokeAI installation location. Nodes added to this folder will be able to be used upon application startup. 
+New nodes should be added to a subfolder in the `nodes` directory found at the root level of the InvokeAI installation location. Nodes added to this folder will be imported upon application startup. 
 
 Example `nodes`  subfolder structure:
 ```py
