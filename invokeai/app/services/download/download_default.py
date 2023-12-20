@@ -74,24 +74,30 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def start(self, *args: Any, **kwargs: Any) -> None:
         """Start the download worker threads."""
-        self._stop_event.clear()
-        self._start_workers(self._max_parallel_dl)
-        self._accept_download_requests = True
+        with self._lock:
+            if self._worker_pool:
+                raise Exception("Attempt to start the download service twice")
+            self._stop_event.clear()
+            self._start_workers(self._max_parallel_dl)
+            self._accept_download_requests = True
 
     def stop(self, *args: Any, **kwargs: Any) -> None:
         """Stop the download worker threads."""
-        queued_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.WAITING]
-        active_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.RUNNING]
-        self._accept_download_requests = False  # reject attempts to add new jobs to queue
-        if queued_jobs:
-            self._logger.warning(f"Cancelling {len(queued_jobs)} queued downloads")
-            with self._queue.mutex:
-                self._queue.queue.clear()
-        if active_jobs:
-            self._logger.info(f"Waiting for {len(active_jobs)} active download jobs to complete")
-            self.join()
-        self._stop_event.set()
-        self._worker_pool.clear()
+        with self._lock:
+            if not self._worker_pool:
+                raise Exception("Attempt to stop the download service before it was started")
+            self._accept_download_requests = False  # reject attempts to add new jobs to queue
+            queued_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.WAITING]
+            active_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.RUNNING]
+            if queued_jobs:
+                self._logger.warning(f"Cancelling {len(queued_jobs)} queued downloads")
+                with self._queue.mutex:
+                    self._queue.queue.clear()
+            if active_jobs:
+                self._logger.info(f"Waiting for {len(active_jobs)} active download jobs to complete")
+                self.join()
+            self._stop_event.set()
+            self._worker_pool.clear()
 
     def download(
         self,
@@ -181,7 +187,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
-        self.stop()  # stop any running threads and reset the worker pool set
         self._stop_event.clear()
         for i in range(0, max_workers):  # noqa B007
             worker = threading.Thread(target=self._download_next_item, daemon=True)
