@@ -59,14 +59,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # #### Build the Web UI ------------------------------------
 
-FROM node:18 AS web-builder
+FROM node:18-slim AS web-builder
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
 WORKDIR /build
 COPY invokeai/frontend/web/ ./
-RUN --mount=type=cache,target=/usr/lib/node_modules \
-    npm install --include dev
-RUN --mount=type=cache,target=/usr/lib/node_modules \
-    yarn vite build
-
+RUN --mount=type=cache,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+RUN pnpm run build
 
 #### Runtime stage ---------------------------------------
 
