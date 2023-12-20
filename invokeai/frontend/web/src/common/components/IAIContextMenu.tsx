@@ -97,6 +97,7 @@ export function IAIContextMenu<T extends HTMLElement = HTMLElement>(
         <Portal {...props.portalProps}>
           <Menu
             isOpen={isDeferredOpen}
+            placement='top'
             gutter={0}
             {...props.menuProps}
             onClose={onCloseHandler}
