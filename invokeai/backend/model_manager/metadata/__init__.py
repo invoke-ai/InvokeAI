@@ -27,6 +27,7 @@ from .metadata_base import (
     HuggingFaceMetadata,
     LicenseRestrictions,
 )
+from .metadata_store import ModelMetadataStore
 
 __all__ = [
     "AnyModelRepoMetadata",
@@ -35,4 +36,5 @@ __all__ = [
     "LicenseRestrictions",
     "HuggingFaceMetadata",
     "CivitaiMetadata",
+    "ModelMetadataStore",
 ]
