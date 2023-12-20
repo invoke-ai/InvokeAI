@@ -1,15 +1,17 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 
-"""
-This module defines core text-to-image model metadata fields.
+"""This module defines core text-to-image model metadata fields.
 
 Metadata comprises any descriptive information that is not essential
 for getting the model to run. For example "author" is metadata, while
 "type", "base" and "format" are not. The latter fields are part of the
 model's config, as defined in invokeai.backend.model_manager.config.
 
-Note that the "name" and "description" are also present in `config`.
-This may need reworking.
+Note that the "name" and "description" are also present in `config`
+records. This is intentional. The config record fields are intended to
+be editable by the user as a form of customization. The metadata
+versions of these fields are intended to be kept in sync with the
+remote repo.
 """
 
 from datetime import datetime
@@ -78,7 +80,7 @@ class CivitaiMetadata(ModelMetadataBase):
         description="text description of the model's reversion; usually change history; may contain HTML"
     )
     nsfw: bool = Field(description="whether the model tends to generate NSFW content", default=False)
-    restrictions: LicenseRestrictions = Field(description="license terms", default=LicenseRestrictions)
+    restrictions: LicenseRestrictions = Field(description="license terms", default_factory=LicenseRestrictions)
     trained_words: Set[str] = Field(description="words to trigger the model", default_factory=set)
     download_url: AnyHttpUrl = Field(description="download URL for this model")
     base_model_trained_on: str = Field(description="base model on which this model was trained (currently not an enum)")
@@ -98,7 +100,7 @@ class CivitaiMetadata(ModelMetadataBase):
     @property
     def allow_commercial_use(self) -> bool:
         """Return True if commercial use is allowed."""
-        return self.restrictions.AllowCommercialUse == CommercialUsage("None")
+        return self.restrictions.AllowCommercialUse != CommercialUsage("None")
 
     @property
     def allow_derivatives(self) -> bool:

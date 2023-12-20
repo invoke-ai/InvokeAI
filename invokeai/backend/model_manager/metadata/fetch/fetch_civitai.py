@@ -77,10 +77,10 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
             return self.from_civitai_modelid(int(model_id))
         elif match := re.match(CIVITAI_VERSION_PAGE_RE, str(url)):
             version_id = match.group(1)
-            return self._from_civitai_versionid(int(version_id))
+            return self.from_civitai_versionid(int(version_id))
         elif match := re.match(CIVITAI_DOWNLOAD_RE, str(url)):
             version_id = match.group(1)
-            return self._from_civitai_versionid(int(version_id))
+            return self.from_civitai_versionid(int(version_id))
         raise UnknownModelException("The url '{url}' does not match any known Civitai URL patterns")
 
     def from_id(self, id: str) -> AnyModelRepoMetadata:
@@ -89,7 +89,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
 
         May raise an `UnknownModelException`.
         """
-        return self._from_civitai_versionid(int(id))
+        return self.from_civitai_versionid(int(id))
 
     def from_civitai_modelid(self, model_id: int) -> CivitaiMetadata:
         """
@@ -100,9 +100,9 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         model_url = CIVITAI_MODEL_ENDPOINT + str(model_id)
         model = self._requests.get(model_url).json()
         default_version = model["modelVersions"][0]["id"]
-        return self._from_civitai_versionid(default_version, model)
+        return self.from_civitai_versionid(default_version, model)
 
-    def _from_civitai_versionid(
+    def from_civitai_versionid(
         self, version_id: int, model_metadata: Optional[Dict[str, Any]] = None
     ) -> CivitaiMetadata:
         version_url = CIVITAI_VERSION_ENDPOINT + str(version_id)

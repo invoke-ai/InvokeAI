@@ -28,6 +28,8 @@ from invokeai.app.services.model_records import UnknownModelException
 from ..metadata_base import AnyModelRepoMetadata, AnyModelRepoMetadataValidator, HuggingFaceMetadata
 from .fetch_base import ModelMetadataFetchBase
 
+HF_MODEL_RE = r"https?://huggingface.co/([\w\-.]+/[\w\-.]+)"
+
 
 class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
     """Fetch model metadata from HuggingFace."""
@@ -68,7 +70,6 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
 
         In the case of an invalid or missing URL, raises a ModelNotFound exception.
         """
-        HF_MODEL_RE = r"https?://huggingface.co/([\w\-.]+/[\w\-.]+)"
         if match := re.match(HF_MODEL_RE, str(url)):
             repo_id = match.group(1)
             return self.from_id(repo_id)

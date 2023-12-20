@@ -4,7 +4,7 @@ SQL Storage for Model Metadata
 """
 
 import sqlite3
-from typing import Set
+from typing import Optional, Set
 
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -59,9 +59,12 @@ class ModelMetadataStore:
                 )
                 self._update_tags(model_key, metadata.tags)
                 self._db.conn.commit()
-            except sqlite3.Error as e:
+            except sqlite3.IntegrityError as excp:  # FOREIGN KEY error: the key was not in model_config table
                 self._db.conn.rollback()
-                raise e
+                raise UnknownModelException from excp
+            except sqlite3.Error as excp:
+                self._db.conn.rollback()
+                raise excp
 
     def get_metadata(self, model_key: str) -> AnyModelRepoMetadata:
         """Retrieve the ModelRepoMetadata corresponding to model key."""
@@ -111,19 +114,21 @@ class ModelMetadataStore:
         """Return the keys of models containing all of the listed tags."""
         with self._db.lock:
             try:
-                matches: Set[str] = set()
+                matches: Optional[Set[str]] = None
                 for tag in tags:
                     self._cursor.execute(
                         """--sql
                         SELECT a.id FROM model_tags AS a,
-                                           tags AS b
+                                               tags AS b
                         WHERE a.tag_id=b.tag_id
                           AND b.tag_text=?;
                         """,
                         (tag,),
                     )
                     model_keys = {x[0] for x in self._cursor.fetchall()}
-                    matches = matches.intersection(model_keys) if len(matches) > 0 else model_keys
+                    if matches is None:
+                        matches = model_keys
+                    matches = matches.intersection(model_keys)
             except sqlite3.Error as e:
                 raise e
         return matches
@@ -136,6 +141,24 @@ class ModelMetadataStore:
             WHERE author=?;
             """,
             (author,),
+        )
+        return {x[0] for x in self._cursor.fetchall()}
+
+    def search_by_name(self, name: str) -> Set[str]:
+        """
+        Return the keys of models with the indicated name.
+
+        Note that this is the name of the model given to it by
+        the remote source. The user may have changed the local
+        name. The local name will be located in the model config
+        record object.
+        """
+        self._cursor.execute(
+            """--sql
+            SELECT id FROM model_metadata
+            WHERE name=?;
+            """,
+            (name,),
         )
         return {x[0] for x in self._cursor.fetchall()}
 

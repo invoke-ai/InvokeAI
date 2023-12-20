@@ -19,6 +19,7 @@ if data.allow_commercial_use:
    print("Commercial use of this model is allowed")
 """
 
+from .fetch import CivitaiMetadataFetch, HuggingFaceMetadataFetch
 from .metadata_base import (
     AnyModelRepoMetadata,
     AnyModelRepoMetadataValidator,
@@ -37,4 +38,6 @@ __all__ = [
     "HuggingFaceMetadata",
     "CivitaiMetadata",
     "ModelMetadataStore",
+    "CivitaiMetadataFetch",
+    "HuggingFaceMetadataFetch",
 ]

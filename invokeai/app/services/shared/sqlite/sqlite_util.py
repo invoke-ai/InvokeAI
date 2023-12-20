@@ -29,7 +29,7 @@ def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileSto
     migrator = SqliteMigrator(db=db)
     migrator.register_migration(build_migration_1())
     migrator.register_migration(build_migration_2(image_files=image_files, logger=logger))
-    migrator.register_migration(build_migration_3())
+    migrator.register_migration(build_migration_3(app_config=config, logger=logger))
     migrator.register_migration(build_migration_4())
     migrator.run_migrations()
 
