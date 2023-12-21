@@ -39,6 +39,36 @@ from .models import BaseModelType, ModelBase, ModelType, SubModelType
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
+SFAST_AVAILABLE = False
+TRITON_AVAILABLE = False
+XFORMERS_AVAILABLE = False
+SFAST_CONFIG = None
+
+try:
+    import triton
+
+    TRITON_AVAILABLE = True
+except ImportError:
+    pass
+
+try:
+    import xformers
+    XFORMERS_AVAILABLE = True
+except ImportError:
+    pass
+
+try:
+    from sfast.compilers.diffusion_pipeline_compiler import compile_unet, compile_vae, CompilationConfig
+
+    SFAST_CONFIG = CompilationConfig.Default()
+    SFAST_CONFIG.enable_cuda_graph = True
+    SFAST_CONFIG.enable_xformers = XFORMERS_AVAILABLE
+    SFAST_CONFIG.enable_triton = TRITON_AVAILABLE
+    SFAST_AVAILABLE = True
+except ImportError:
+    pass
+
+
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
 DEFAULT_MAX_CACHE_SIZE = 6.0
@@ -239,6 +269,9 @@ class ModelCache(object):
             snapshot_before = self._capture_memory_snapshot()
             with skip_torch_weight_init():
                 model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
+            if SFAST_AVAILABLE and submodel:
+                model = self._compile_model(model, submodel)
+
             snapshot_after = self._capture_memory_snapshot()
             end_load_time = time.time()
 
@@ -321,6 +354,16 @@ class ModelCache(object):
                     f" {(cache_entry.size/GIG):.3f} GB.\n"
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
+
+    def _compile_model(self, model: Any, model_type: SubModelType) -> Any:
+        if model_type == SubModelType("unet"):
+            self.logger.info("SFast-compiling unet model")
+            return compile_unet(model, SFAST_CONFIG)
+        elif model_type == SubModelType("vae"):
+            self.logger.info("SFast-compiling vae model")
+            return compile_vae(model, SFAST_CONFIG)
+        else:
+            return model
 
     class ModelLocker(object):
         def __init__(self, cache, key, model, gpu_load, size_needed):
