@@ -39,13 +39,29 @@ from .models import BaseModelType, ModelBase, ModelType, SubModelType
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
-sfast_available = True
-if sfast_available:
-    from sfast.compilers.diffusion_pipeline_compiler import (compile,
-                                                             compile_unet,
-                                                             compile_vae,
-                                                             CompilationConfig
-                                                             )
+SFAST_AVAILABLE = False
+TRITON_AVAILABLE = False
+SFAST_CONFIG = None
+
+try:
+    import triton
+
+    TRITON_AVAILABLE = True
+except ImportError:
+    pass
+
+try:
+    from sfast.compilers.diffusion_pipeline_compiler import compile_unet, compile_vae, CompilationConfig
+
+    SFAST_CONFIG = CompilationConfig.Default()
+    SFAST_CONFIG.enable_xformers = True
+    SFAST_CONFIG.enable_cuda_graph = True
+    if TRITON_AVAILABLE:
+        SFAST_CONFIG.enable_triton = True
+    SFAST_AVAILABLE = True
+except ImportError:
+    pass
+
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
@@ -247,7 +263,7 @@ class ModelCache(object):
             snapshot_before = self._capture_memory_snapshot()
             with skip_torch_weight_init():
                 model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
-            if sfast_available and submodel:
+            if SFAST_AVAILABLE and submodel:
                 model = self._compile_model(model, submodel)
 
             snapshot_after = self._capture_memory_snapshot()
@@ -333,18 +349,15 @@ class ModelCache(object):
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
 
-    def _compile_model(self, model, model_type):
-        config = CompilationConfig.Default()
-        config.enable_xformers = True
-        config.enable_triton = True
-        config.enable_cuda_graph = True
+    def _compile_model(self, model: Any, model_type: SubModelType) -> Any:
         if model_type == SubModelType("unet"):
-            return compile_unet(model, config)
+            self.logger.info("SFast-compiling unet model")
+            return compile_unet(model, SFAST_CONFIG)
         elif model_type == SubModelType("vae"):
-            return compile_vae(model, config)
+            self.logger.info("SFast-compiling vae model")
+            return compile_vae(model, SFAST_CONFIG)
         else:
             return model
-        
 
     class ModelLocker(object):
         def __init__(self, cache, key, model, gpu_load, size_needed):

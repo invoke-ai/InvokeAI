@@ -113,6 +113,7 @@ dependencies = [
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
+"stable-fast" = ["stable-fast"]
 
 [project.scripts]
 
