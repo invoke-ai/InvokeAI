@@ -24,12 +24,14 @@ import sys
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Dict, Optional, Type, Union, types
 
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_management.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.model_management.model_load_optimizations import skip_torch_weight_init
 
@@ -44,22 +46,11 @@ TRITON_AVAILABLE = False
 XFORMERS_AVAILABLE = False
 SFAST_CONFIG = None
 
-try:
-    import triton
-
-    TRITON_AVAILABLE = True
-except ImportError:
-    pass
+TRITON_AVAILABLE = find_spec("triton") is not None
+XFORMERS_AVAILABLE = find_spec("xformers") is not None
 
 try:
-    import xformers
-
-    XFORMERS_AVAILABLE = True
-except ImportError:
-    pass
-
-try:
-    from sfast.compilers.diffusion_pipeline_compiler import compile_unet, compile_vae, CompilationConfig
+    from sfast.compilers.diffusion_pipeline_compiler import CompilationConfig, compile_unet, compile_vae
 
     SFAST_CONFIG = CompilationConfig.Default()
     SFAST_CONFIG.enable_cuda_graph = True
@@ -141,6 +132,7 @@ class _CacheRecord:
 class ModelCache(object):
     def __init__(
         self,
+        app_config: InvokeAIAppConfig,
         max_cache_size: float = DEFAULT_MAX_CACHE_SIZE,
         max_vram_cache_size: float = DEFAULT_MAX_VRAM_CACHE_SIZE,
         execution_device: torch.device = torch.device("cuda"),
@@ -153,6 +145,7 @@ class ModelCache(object):
         log_memory_usage: bool = False,
     ):
         """
+        :param app_config: InvokeAIAppConfig for application
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
         :param execution_device: Torch device to load active model into [torch.device('cuda')]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
@@ -166,6 +159,7 @@ class ModelCache(object):
             behaviour.
         """
         self.model_infos: Dict[str, ModelBase] = {}
+        self.app_config = app_config
         # allow lazy offloading only when vram cache enabled
         self.lazy_offloading = lazy_offloading and max_vram_cache_size > 0
         self.precision: torch.dtype = precision
@@ -270,7 +264,7 @@ class ModelCache(object):
             snapshot_before = self._capture_memory_snapshot()
             with skip_torch_weight_init():
                 model = model_info.get_model(child_type=submodel, torch_dtype=self.precision)
-            if SFAST_AVAILABLE and submodel:
+            if SFAST_AVAILABLE and self.app_config.stable_fast and submodel:
                 model = self._compile_model(model, submodel)
 
             snapshot_after = self._capture_memory_snapshot()

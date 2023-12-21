@@ -141,7 +141,6 @@ class IPAttnProcessor2_0(torch.nn.Module):
                 ip_hidden_states = ipa_embed
 
                 # Expected ip_hidden_state shape: (batch_size, num_ip_images, ip_seq_len, ip_image_embedding)
-
                 ip_key = ipa_weights.to_k_ip(ip_hidden_states)
                 ip_value = ipa_weights.to_v_ip(ip_hidden_states)
 

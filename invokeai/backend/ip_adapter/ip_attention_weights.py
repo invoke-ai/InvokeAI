@@ -12,6 +12,8 @@ class IPAttentionProcessorWeights(torch.nn.Module):
         super().__init__()
         self.to_k_ip = torch.nn.Linear(in_dim, out_dim, bias=False)
         self.to_v_ip = torch.nn.Linear(in_dim, out_dim, bias=False)
+        for param in self.parameters():
+            param.requires_grad = False
 
 
 class IPAttentionWeights(torch.nn.Module):
