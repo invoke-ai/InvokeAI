@@ -39,6 +39,14 @@ from .models import BaseModelType, ModelBase, ModelType, SubModelType
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
+sfast_available = True
+if sfast_available:
+    from sfast.compilers.diffusion_pipeline_compiler import (compile,
+                                                             compile_unet,
+                                                             compile_vae,
+                                                             CompilationConfig
+                                                             )
+
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
 DEFAULT_MAX_CACHE_SIZE = 6.0
@@ -276,6 +284,8 @@ class ModelCache(object):
             self._cache_stack.remove(key)
         self._cache_stack.append(key)
 
+        if sfast_available and submodel:
+            cache_entry.model = self._compile_model(cache_entry.model, submodel)
         return self.ModelLocker(self, key, cache_entry.model, gpu_load, cache_entry.size)
 
     def _move_model_to_device(self, key: str, target_device: torch.device):
@@ -321,6 +331,20 @@ class ModelCache(object):
                     f" {(cache_entry.size/GIG):.3f} GB.\n"
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
+
+    def _compile_model(self, model, model_type):
+        config = CompilationConfig.Default()
+        config.enable_xformers = True
+        config.enable_triton = True
+        config.enable_jit_freeze = True
+        config.enable_cuda_graph = True
+        if model_type == SubModelType("unet"):
+            return compile_unet(model, config)
+        elif model_type == SubModelType("vae"):
+            return compile_vae(model, config)
+        else:
+            return model
+        
 
     class ModelLocker(object):
         def __init__(self, cache, key, model, gpu_load, size_needed):
