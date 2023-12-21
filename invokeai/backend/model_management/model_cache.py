@@ -53,6 +53,7 @@ except ImportError:
 
 try:
     import xformers
+
     XFORMERS_AVAILABLE = True
 except ImportError:
     pass
