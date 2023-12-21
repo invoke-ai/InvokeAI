@@ -91,7 +91,7 @@ def validate_custom_label(
     classification=Classification.Beta,
 )
 class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
-    """Used to create a core metadata item then Add/Update it to the provided metadata"""
+    """Used to Create/Add/Update a value into a metadata label"""
 
     label: CORE_LABELS = InputField(
         default=CUSTOM_LABEL,
@@ -139,14 +139,14 @@ class MetadataFromImageInvocation(BaseInvocation):
 
 @invocation(
     "metadata_to_string",
-    title="Metadata Extract String",
+    title="Metadata To String",
     tags=["metadata"],
     category="metadata",
     version="1.0.0",
     classification=Classification.Beta,
 )
 class MetadataToStringInvocation(BaseInvocation, WithMetadata):
-    """Extracts a string value a label from metadata"""
+    """Extracts a string value of a label from metadata"""
 
     label: CORE_LABELS_STRING = InputField(
         default=CUSTOM_LABEL,
