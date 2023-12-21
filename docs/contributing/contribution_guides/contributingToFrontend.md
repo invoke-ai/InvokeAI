@@ -46,17 +46,18 @@ We encourage you to ping @psychedelicious and @blessedcoolant on [Discord](http
 ```bash
 node --version
 ```
-2. Install [yarn classic](https://classic.yarnpkg.com/lang/en/) and confirm it is installed by running this:
+
+2. Install [pnpm](https://pnpm.io/) and confirm it is installed by running this:
 ```bash
-npm install --global yarn
-yarn --version
+npm install --global pnpm
+pnpm --version
 ```
 
-From `invokeai/frontend/web/` run `yarn install` to get everything set up.
+From `invokeai/frontend/web/` run `pnpm install` to get everything set up.
 
 Start everything in dev mode:
 1. Ensure your virtual environment is running
-2. Start the dev server: `yarn dev`
+2. Start the dev server: `pnpm dev`
 3. Start the InvokeAI Nodes backend: `python scripts/invokeai-web.py # run from the repo root`
 4. Point your browser to the dev server address e.g. [http://localhost:5173/](http://localhost:5173/)
 
@@ -72,4 +73,4 @@ For a number of technical and logistical reasons, we need to commit UI build art
 
 If you submit a PR, there is a good chance we will ask you to include a separate commit with a build of the app.
 
-To build for production, run `yarn build`.
+To build for production, run `pnpm build`.
