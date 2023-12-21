@@ -74,7 +74,9 @@ class CivitaiMetadata(ModelMetadataBase):
     id: int = Field(description="Civitai model identifier")
     version_name: str = Field(description="Version identifier, such as 'V2-alpha'")
     version_id: int = Field(description="Civitai model version identifier")
-    created: datetime = Field(description="date the model was posted to CivitAI")
+    created: datetime = Field(description="date the model was created")
+    updated: datetime = Field(description="date the model was last modified")
+    published: datetime = Field(description="date the model was published to Civitai")
     description: str = Field(description="text description of model; may contain HTML")
     version_description: str = Field(
         description="text description of the model's reversion; usually change history; may contain HTML"

@@ -98,49 +98,56 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         May raise an `UnknownModelException`.
         """
         model_url = CIVITAI_MODEL_ENDPOINT + str(model_id)
-        model = self._requests.get(model_url).json()
-        default_version = model["modelVersions"][0]["id"]
-        return self.from_civitai_versionid(default_version, model)
+        model_json = self._requests.get(model_url).json()
+        return self._from_model_json(model_json)
 
-    def from_civitai_versionid(
-        self, version_id: int, model_metadata: Optional[Dict[str, Any]] = None
-    ) -> CivitaiMetadata:
+    def _from_model_json(self, model_json: Dict[str, Any], version_id: Optional[int] = None) -> CivitaiMetadata:
+        version_id = version_id or model_json["modelVersions"][0]["id"]
+
+        # loop till we find the section containing the version requested
+        version_sections = [x for x in model_json["modelVersions"] if x["id"] == version_id]
+        if not version_sections:
+            raise UnknownModelException(f"Version {version_id} not found in model metadata")
+
+        version_json = version_sections[0]
+        safe_thumbnails = [x["url"] for x in version_json["images"] if x["nsfw"] == "None"]
+        return CivitaiMetadata(
+            id=model_json["id"],
+            name=model_json["name"],
+            version_id=version_json["id"],
+            version_name=version_json["name"],
+            created=datetime.fromisoformat(re.sub(r"Z$", "+00:00", version_json["createdAt"])),
+            updated=datetime.fromisoformat(re.sub(r"Z$", "+00:00", version_json["updatedAt"])),
+            published=datetime.fromisoformat(re.sub(r"Z$", "+00:00", version_json["publishedAt"])),
+            base_model_trained_on=version_json["baseModel"],  # note - need a dictionary to turn into a BaseModelType
+            download_url=version_json["downloadUrl"],
+            thumbnail_url=safe_thumbnails[0] if safe_thumbnails else None,
+            author=model_json["creator"]["username"],
+            description=model_json["description"],
+            version_description=version_json["description"] or "",
+            tags=model_json["tags"],
+            trained_words=version_json["trainedWords"],
+            nsfw=model_json["nsfw"],
+            restrictions=LicenseRestrictions(
+                AllowNoCredit=model_json["allowNoCredit"],
+                AllowCommercialUse=CommercialUsage(model_json["allowCommercialUse"]),
+                AllowDerivatives=model_json["allowDerivatives"],
+                AllowDifferentLicense=model_json["allowDifferentLicense"],
+            ),
+        )
+
+    def from_civitai_versionid(self, version_id: int) -> CivitaiMetadata:
+        """
+        Return a CivitaiMetadata object given a model version id.
+
+        May raise an `UnknownModelException`.
+        """
         version_url = CIVITAI_VERSION_ENDPOINT + str(version_id)
         version = self._requests.get(version_url).json()
 
         model_url = CIVITAI_MODEL_ENDPOINT + str(version["modelId"])
-        model = model_metadata or self._requests.get(model_url).json()
-        safe_thumbnails = [x["url"] for x in version["images"] if x["nsfw"] == "None"]
-
-        # It would be more elegant to define a Pydantic BaseModel that matches the Civitai metadata JSON.
-        # However the contents of the JSON does not exactly match the documentation at
-        # https://github.com/civitai/civitai/wiki/REST-API-Reference, and it feels safer to cherry pick
-        # a subset of the fields.
-        #
-        # In addition, there are some fields that I want to pick up from the model JSON, such as `tags`,
-        # that are not present in the version JSON.
-        return CivitaiMetadata(
-            id=version["modelId"],
-            name=version["model"]["name"],
-            version_id=version["id"],
-            version_name=version["name"],
-            created=datetime.fromisoformat(re.sub(r"Z$", "+00:00", version["createdAt"])),
-            base_model_trained_on=version["baseModel"],  # note - need a dictionary to turn into a BaseModelType
-            download_url=version["downloadUrl"],
-            thumbnail_url=safe_thumbnails[0] if safe_thumbnails else None,
-            author=model["creator"]["username"],
-            description=model["description"],
-            version_description=version["description"] or "",
-            tags=model["tags"],
-            trained_words=version["trainedWords"],
-            nsfw=version["model"]["nsfw"],
-            restrictions=LicenseRestrictions(
-                AllowNoCredit=model["allowNoCredit"],
-                AllowCommercialUse=CommercialUsage(model["allowCommercialUse"]),
-                AllowDerivatives=model["allowDerivatives"],
-                AllowDifferentLicense=model["allowDifferentLicense"],
-            ),
-        )
+        model_json = self._requests.get(model_url).json()
+        return self._from_model_json(model_json, version_id)
 
     @classmethod
     def from_json(cls, json: str) -> CivitaiMetadata:

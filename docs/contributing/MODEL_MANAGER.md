@@ -1288,7 +1288,9 @@ This descends from `ModelMetadataBase` and adds the following fields:
 | `id`           | int                  | Civitai model id |
 | `version_name` | str                  | Name of this version of the model (distinct from model name) |
 | `version_id`   | int                  | Civitai model version id (distinct from model id) |
-| `created`      | datetime             | Date the model was uploaded to Civitai; no modification date provided |
+| `created`      | datetime             | Date this version of the model was created |
+| `updated`      | datetime             | Date this version of the model was last updated |
+| `published`    | datetime             | Date this version of the model was published to Civitai |
 | `description`  | str                  | Model description. Quite verbose and contains HTML tags |
 | `version_description` | str           | Model version description, usually describes changes to the model |
 | `nsfw`         | bool                 | Whether the model tends to generate NSFW content |

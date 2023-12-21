@@ -26,7 +26,7 @@ from invokeai.backend.model_manager.metadata import (
     ModelMetadataStore,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.app.services.model_metadata.metadata_examples import (
+from tests.backend.model_manager_2.model_metadata.metadata_examples import (
     RepoCivitaiModelMetadata1,
     RepoCivitaiVersionMetadata1,
     RepoHFMetadata1,
