@@ -13,6 +13,7 @@ If you'd prefer, you can also just download the whole node folder from the linke
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
+    + [Adapters-Linked](#adapters-linked-nodes)
     + [Average Images](#average-images)
     + [Clean Image Artifacts After Cut](#clean-image-artifacts-after-cut)
     + [Close Color Mask](#close-color-mask) 
@@ -32,8 +33,9 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Image Resize Plus](#image-resize-plus)
     + [Load Video Frame](#load-video-frame)
     + [Make 3D](#make-3d)
-    + [Mask Operations](#mask-operations)    
+    + [Mask Operations](#mask-operations)
     + [Match Histogram](#match-histogram)
+    + [Metadata-Linked](#metadata-linked-nodes)
     + [Negative Image](#negative-image)    
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
@@ -50,6 +52,19 @@ To use a community workflow, download the the `.json` node graph file and load i
 - [Disclaimer](#disclaimer)
 - [Help](#help)
 
+
+--------------------------------
+### Adapters Linked Nodes
+
+**Description:** A set of nodes for linked adapters (ControlNet, IP-Adaptor & T2I-Adapter). This allows multiple adapters to be chained together without using a `collect` node which means it can be used inside an `iterate` node without any collecting on every iteration issues.
+
+- `ControlNet-Linked` - Collects ControlNet info to pass to other nodes.
+- `IP-Adapter-Linked` - Collects IP-Adapter info to pass to other nodes.
+- `T2I-Adapter-Linked` - Collects T2I-Adapter info to pass to other nodes.
+
+Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these. 
+
+**Node Link:** https://github.com/skunkworxdark/adapters-linked-nodes
 
 --------------------------------
 ### Average Images
@@ -306,6 +321,20 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 **Output Examples** 
 
 <img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" width="300" />
+
+--------------------------------
+### Metadata Linked Nodes
+
+**Description:** A set of nodes for Metadata. Collect Metadata from within an `iterate` node & extract metadata from an image.
+
+- `Metadata Item Linked` - Allows collecting of metadata while within an iterate node with no need for a collect node or conversion to metadata node.
+- `Metadata From Image` - Provides Metadata from an image.
+- `Metadata To String` - Extracts a String value of a label from metadata.
+- `Metadata To Integer` - Extracts an Integer value of a label from metadata.
+- `Metadata To Float` - Extracts a Float value of a label from metadata.
+- `Metadata To Scheduler` - Extracts a Scheduler value of a label from metadata.
+
+**Node Link:** https://github.com/skunkworxdark/metadata-linked-nodes
 
 --------------------------------
 ### Negative Image
