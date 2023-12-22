@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from .names.names_base import NameServiceBase
     from .session_processor.session_processor_base import SessionProcessorBase
     from .session_queue.session_queue_base import SessionQueueBase
-    from .shared.graph import GraphExecutionState, LibraryGraph
+    from .shared.graph import GraphExecutionState
     from .urls.urls_base import UrlServiceBase
     from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 
@@ -43,7 +43,6 @@ class InvocationServices:
     configuration: "InvokeAIAppConfig"
     events: "EventServiceBase"
     graph_execution_manager: "ItemStorageABC[GraphExecutionState]"
-    graph_library: "ItemStorageABC[LibraryGraph]"
     images: "ImageServiceABC"
     image_records: "ImageRecordStorageBase"
     image_files: "ImageFileStorageBase"
@@ -71,7 +70,6 @@ class InvocationServices:
         configuration: "InvokeAIAppConfig",
         events: "EventServiceBase",
         graph_execution_manager: "ItemStorageABC[GraphExecutionState]",
-        graph_library: "ItemStorageABC[LibraryGraph]",
         images: "ImageServiceABC",
         image_files: "ImageFileStorageBase",
         image_records: "ImageRecordStorageBase",
@@ -97,7 +95,6 @@ class InvocationServices:
         self.configuration = configuration
         self.events = events
         self.graph_execution_manager = graph_execution_manager
-        self.graph_library = graph_library
         self.images = images
         self.image_files = image_files
         self.image_records = image_records
