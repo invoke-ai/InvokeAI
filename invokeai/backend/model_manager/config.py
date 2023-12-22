@@ -99,6 +99,16 @@ class SchedulerPredictionType(str, Enum):
     Sample = "sample"
 
 
+class DiffusersVariant(str, Enum):
+    """Various hugging face variants on the diffusers format."""
+
+    DEFAULT = "default"  # usually the fp32 version
+    FP16 = "fp16"
+    ONNX = "onnx"
+    OPENVINO = "openvino"
+    FLAX = "flax"
+
+
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
