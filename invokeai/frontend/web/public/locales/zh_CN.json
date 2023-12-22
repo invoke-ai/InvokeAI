@@ -1119,7 +1119,10 @@
         "deletedInvalidEdge": "已删除无效的边缘 {{source}} -> {{target}}",
         "unknownInput": "未知输入：{{name}}",
         "prototypeDesc": "此调用是一个原型 (prototype)。它可能会在本项目更新期间发生破坏性更改，并且随时可能被删除。",
-        "betaDesc": "此调用尚处于测试阶段。在稳定之前，它可能会在项目更新期间发生破坏性更改。本项目计划长期支持这种调用。"
+        "betaDesc": "此调用尚处于测试阶段。在稳定之前，它可能会在项目更新期间发生破坏性更改。本项目计划长期支持这种调用。",
+        "newWorkflow": "新建工作流",
+        "newWorkflowDesc": "是否创建一个新的工作流？",
+        "newWorkflowDesc2": "当前工作流有未保存的更改。"
     },
     "controlnet": {
         "resize": "直接缩放",
@@ -1635,7 +1638,7 @@
         "openWorkflow": "打开工作流",
         "clearWorkflowSearchFilter": "清除工作流检索过滤器",
         "workflowLibrary": "工作流库",
-        "downloadWorkflow": "下载工作流",
+        "downloadWorkflow": "保存到文件",
         "noRecentWorkflows": "无最近工作流",
         "workflowSaved": "已保存工作流",
         "workflowIsOpen": "工作流已打开",
@@ -1648,8 +1651,9 @@
         "deleteWorkflow": "删除工作流",
         "workflows": "工作流",
         "noDescription": "无描述",
-        "uploadWorkflow": "上传工作流",
-        "userWorkflows": "我的工作流"
+        "uploadWorkflow": "从文件中加载",
+        "userWorkflows": "我的工作流",
+        "newWorkflowCreated": "已创建新的工作流"
     },
     "app": {
         "storeNotInitialized": "商店尚未初始化"
