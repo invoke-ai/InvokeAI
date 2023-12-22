@@ -11,6 +11,7 @@ from ..services.board_images.board_images_default import BoardImagesService
 from ..services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from ..services.boards.boards_default import BoardService
 from ..services.config import InvokeAIAppConfig
+from ..services.download import DownloadQueueService
 from ..services.image_files.image_files_disk import DiskImageFileStorage
 from ..services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from ..services.images.images_default import ImageService
@@ -85,6 +86,7 @@ class ApiDependencies:
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
+        download_queue_service = DownloadQueueService(event_bus=events)
         model_install_service = ModelInstallService(
             app_config=config, record_store=model_record_service, event_bus=events
         )
@@ -113,6 +115,7 @@ class ApiDependencies:
             logger=logger,
             model_manager=model_manager,
             model_records=model_record_service,
+            download_queue=download_queue_service,
             model_install=model_install_service,
             names=names,
             performance_statistics=performance_statistics,

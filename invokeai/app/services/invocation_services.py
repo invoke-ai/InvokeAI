@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from .board_records.board_records_base import BoardRecordStorageBase
     from .boards.boards_base import BoardServiceABC
     from .config import InvokeAIAppConfig
+    from .download import DownloadQueueServiceBase
     from .events.events_base import EventServiceBase
     from .image_files.image_files_base import ImageFileStorageBase
     from .image_records.image_records_base import ImageRecordStorageBase
@@ -50,6 +51,7 @@ class InvocationServices:
     logger: "Logger"
     model_manager: "ModelManagerServiceBase"
     model_records: "ModelRecordServiceBase"
+    download_queue: "DownloadQueueServiceBase"
     model_install: "ModelInstallServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
@@ -77,6 +79,7 @@ class InvocationServices:
         logger: "Logger",
         model_manager: "ModelManagerServiceBase",
         model_records: "ModelRecordServiceBase",
+        download_queue: "DownloadQueueServiceBase",
         model_install: "ModelInstallServiceBase",
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
@@ -102,6 +105,7 @@ class InvocationServices:
         self.logger = logger
         self.model_manager = model_manager
         self.model_records = model_records
+        self.download_queue = download_queue
         self.model_install = model_install
         self.processor = processor
         self.performance_statistics = performance_statistics
