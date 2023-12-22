@@ -356,7 +356,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         else:
             root = self.find_root().expanduser().absolute()
         self.root = root  # insulate ourselves from relative paths that may change
-        return root
+        return root.resolve()
 
     @property
     def root_dir(self) -> Path:
