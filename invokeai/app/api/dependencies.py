@@ -30,8 +30,7 @@ from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from ..services.shared.default_graphs import create_system_graphs
-from ..services.shared.graph import GraphExecutionState, LibraryGraph
+from ..services.shared.graph import GraphExecutionState
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
@@ -81,7 +80,6 @@ class ApiDependencies:
         boards = BoardService()
         events = FastAPIEventService(event_handler_id)
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
-        graph_library = SqliteItemStorage[LibraryGraph](db=db, table_name="graphs")
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
@@ -109,7 +107,6 @@ class ApiDependencies:
             configuration=configuration,
             events=events,
             graph_execution_manager=graph_execution_manager,
-            graph_library=graph_library,
             image_files=image_files,
             image_records=image_records,
             images=images,
@@ -129,8 +126,6 @@ class ApiDependencies:
             urls=urls,
             workflow_records=workflow_records,
         )
-
-        create_system_graphs(services.graph_library)
 
         ApiDependencies.invoker = Invoker(services)
         db.clean()

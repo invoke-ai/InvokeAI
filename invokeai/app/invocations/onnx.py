@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Borisov Sergey (https://github.com/StAlKeR7779)
 
 import inspect
-import re
 
 # from contextlib import ExitStack
 from typing import List, Literal, Union
@@ -21,6 +20,7 @@ from invokeai.backend import BaseModelType, ModelType, SubModelType
 from ...backend.model_management import ONNXModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import choose_torch_device
+from ..util.ti_utils import extract_ti_triggers_from_prompt
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -78,7 +78,7 @@ class ONNXPromptInvocation(BaseInvocation):
             ]
 
             ti_list = []
-            for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
+            for trigger in extract_ti_triggers_from_prompt(self.prompt):
                 name = trigger[1:-1]
                 try:
                     ti_list.append(
