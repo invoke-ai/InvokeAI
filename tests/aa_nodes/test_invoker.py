@@ -24,7 +24,7 @@ from invokeai.app.services.invocation_stats.invocation_stats_default import Invo
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
-from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation, LibraryGraph
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation
 
 
 @pytest.fixture
@@ -66,7 +66,6 @@ def mock_services() -> InvocationServices:
         configuration=configuration,
         events=TestEventService(),
         graph_execution_manager=graph_execution_manager,
-        graph_library=SqliteItemStorage[LibraryGraph](db=db, table_name="graphs"),
         image_files=None,  # type: ignore
         image_records=None,  # type: ignore
         images=None,  # type: ignore
@@ -75,6 +74,7 @@ def mock_services() -> InvocationServices:
         logger=logging,  # type: ignore
         model_manager=None,  # type: ignore
         model_records=None,  # type: ignore
+        download_queue=None,  # type: ignore
         model_install=None,  # type: ignore
         names=None,  # type: ignore
         performance_statistics=InvocationStatsService(),

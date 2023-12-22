@@ -270,7 +270,7 @@ upgrade script.** See the next section for a Windows recipe.
 3. Select option [1] to upgrade to the latest release.
 
 4. Once the upgrade is finished you will be returned to the launcher
-menu. Select option [7] "Re-run the configure script to fix a broken
+menu. Select option [6] "Re-run the configure script to fix a broken
 install or to complete a major upgrade".
 
 This will run the configure script against the v2.3 directory and

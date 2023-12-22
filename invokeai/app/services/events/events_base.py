@@ -17,6 +17,7 @@ from invokeai.backend.model_management.models.base import BaseModelType, ModelTy
 
 class EventServiceBase:
     queue_event: str = "queue_event"
+    download_event: str = "download_event"
     model_event: str = "model_event"
 
     """Basic event bus, to have an empty stand-in when not needed"""
@@ -29,6 +30,13 @@ class EventServiceBase:
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.queue_event,
+            payload={"event": event_name, "data": payload},
+        )
+
+    def __emit_download_event(self, event_name: str, payload: dict) -> None:
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.download_event,
             payload={"event": event_name, "data": payload},
         )
 
@@ -321,6 +329,79 @@ class EventServiceBase:
         self.__emit_queue_event(
             event_name="queue_cleared",
             payload={"queue_id": queue_id},
+        )
+
+    def emit_download_started(self, source: str, download_path: str) -> None:
+        """
+        Emit when a download job is started.
+
+        :param url: The downloaded url
+        """
+        self.__emit_download_event(
+            event_name="download_started",
+            payload={"source": source, "download_path": download_path},
+        )
+
+    def emit_download_progress(self, source: str, download_path: str, current_bytes: int, total_bytes: int) -> None:
+        """
+        Emit "download_progress" events at regular intervals during a download job.
+
+        :param source: The downloaded source
+        :param download_path: The local downloaded file
+        :param current_bytes: Number of bytes downloaded so far
+        :param total_bytes: The size of the file being downloaded (if known)
+        """
+        self.__emit_download_event(
+            event_name="download_progress",
+            payload={
+                "source": source,
+                "download_path": download_path,
+                "current_bytes": current_bytes,
+                "total_bytes": total_bytes,
+            },
+        )
+
+    def emit_download_complete(self, source: str, download_path: str, total_bytes: int) -> None:
+        """
+        Emit a "download_complete" event at the end of a successful download.
+
+        :param source: Source URL
+        :param download_path: Path to the locally downloaded file
+        :param total_bytes: The size of the downloaded file
+        """
+        self.__emit_download_event(
+            event_name="download_complete",
+            payload={
+                "source": source,
+                "download_path": download_path,
+                "total_bytes": total_bytes,
+            },
+        )
+
+    def emit_download_cancelled(self, source: str) -> None:
+        """Emit a "download_cancelled" event in the event that the download was cancelled by user."""
+        self.__emit_download_event(
+            event_name="download_cancelled",
+            payload={
+                "source": source,
+            },
+        )
+
+    def emit_download_error(self, source: str, error_type: str, error: str) -> None:
+        """
+        Emit a "download_error" event when an download job encounters an exception.
+
+        :param source: Source URL
+        :param error_type: The name of the exception that raised the error
+        :param error: The traceback from this error
+        """
+        self.__emit_download_event(
+            event_name="download_error",
+            payload={
+                "source": source,
+                "error_type": error_type,
+                "error": error,
+            },
         )
 
     def emit_model_install_started(self, source: str) -> None:
