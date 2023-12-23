@@ -2,12 +2,16 @@
 
 set -e
 
-BCYAN="\e[1;36m"
-BYELLOW="\e[1;33m"
-BGREEN="\e[1;32m"
-BRED="\e[1;31m"
-RED="\e[31m"
-RESET="\e[0m"
+BCYAN="\033[1;36m"
+BYELLOW="\033[1;33m"
+BGREEN="\033[1;32m"
+BRED="\033[1;31m"
+RED="\033[31m"
+RESET="\033[0m"
+
+function is_bin_in_path {
+    builtin type -P "$1" &>/dev/null
+}
 
 function does_tag_exist {
     git rev-parse --quiet --verify "refs/tags/$1" >/dev/null
@@ -20,6 +24,14 @@ function git_show_ref {
 function git_show {
     git show -s --format='%h %s' $1
 }
+
+# Some machines only have `python3` in PATH, others have `python` - make an alias.
+# We can use a function to approximate an alias within a non-interactive shell.
+if ! is_bin_in_path python && is_bin_in_path python3; then
+    function python {
+        python3 "$@"
+    }
+fi
 
 VERSION=$(
     cd ..
@@ -45,27 +57,31 @@ echo -e "${BGREEN}HEAD${RESET}:"
 git_show
 echo
 
-echo -e -n "Create tags ${BCYAN}${VERSION}${RESET} and ${BCYAN}${LATEST_TAG}${RESET} @ ${BGREEN}HEAD${RESET}, ${RED}deleting existing tags on remote${RESET}? "
+echo -e "${BGREEN}git remote -v${RESET}:"
+git remote -v
+echo
+
+echo -e -n "Create tags ${BCYAN}${VERSION}${RESET} and ${BCYAN}${LATEST_TAG}${RESET} @ ${BGREEN}HEAD${RESET}, ${RED}deleting existing tags on origin remote${RESET}? "
 read -e -p 'y/n [n]: ' input
 RESPONSE=${input:='n'}
 if [ "$RESPONSE" == 'y' ]; then
     echo
-    echo -e "Deleting ${BCYAN}${VERSION}${RESET} tag on remote..."
-    git push --delete origin $VERSION
+    echo -e "Deleting ${BCYAN}${VERSION}${RESET} tag on origin remote..."
+    git push origin :refs/tags/$VERSION
 
-    echo -e "Tagging ${BGREEN}HEAD${RESET} with ${BCYAN}${VERSION}${RESET} locally..."
+    echo -e "Tagging ${BGREEN}HEAD${RESET} with ${BCYAN}${VERSION}${RESET} on locally..."
     if ! git tag -fa $VERSION; then
         echo "Existing/invalid tag"
         exit -1
     fi
 
-    echo -e "Deleting ${BCYAN}${LATEST_TAG}${RESET} tag on remote..."
-    git push --delete origin $LATEST_TAG
+    echo -e "Deleting ${BCYAN}${LATEST_TAG}${RESET} tag on origin remote..."
+    git push origin :refs/tags/$LATEST_TAG
 
     echo -e "Tagging ${BGREEN}HEAD${RESET} with ${BCYAN}${LATEST_TAG}${RESET} locally..."
     git tag -fa $LATEST_TAG
 
-    echo -e "Pushing updated tags to remote..."
+    echo -e "Pushing updated tags to origin remote..."
     git push origin --tags
 fi
 exit 0

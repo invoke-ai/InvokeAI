@@ -1,15 +1,8 @@
-name: Test invoke.py pip
+name: 'Check: pytest'
+
 on:
-  push:
-    branches:
-      - 'main'
-  pull_request:
-    types:
-      - 'ready_for_review'
-      - 'opened'
-      - 'synchronize'
-  merge_group:
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -17,11 +10,9 @@ concurrency:
 
 jobs:
   matrix:
-    if: github.event.pull_request.draft == false
     strategy:
       matrix:
         python-version:
-          # - '3.9'
           - '3.10'
         pytorch:
           - linux-cuda-11_7
@@ -52,27 +43,12 @@ jobs:
     env:
       PIP_USE_PEP517: '1'
     steps:
-      - name: Checkout sources
-        id: checkout-sources
-        uses: actions/checkout@v3
-
-      - name: Check for changed python files
-        id: changed-files
-        uses: tj-actions/changed-files@v41
-        with:
-          files_yaml: |
-            python:
-              - 'pyproject.toml'
-              - 'invokeai/**'
-              - '!invokeai/frontend/web/**'
-              - 'tests/**'
+      - uses: actions/checkout@v4
 
       - name: set test prompt to main branch validation
-        if: steps.changed-files.outputs.python_any_changed == 'true'
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: setup python
-        if: steps.changed-files.outputs.python_any_changed == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -80,7 +56,6 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: install invokeai
-        if: steps.changed-files.outputs.python_any_changed == 'true'
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
         run: >
@@ -88,7 +63,6 @@ jobs:
           --editable=".[test]"
 
       - name: run pytest
-        if: steps.changed-files.outputs.python_any_changed == 'true'
         id: run-pytest
         run: pytest
 

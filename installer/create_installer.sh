@@ -2,12 +2,12 @@
 
 set -e
 
-BCYAN="\e[1;36m"
-BYELLOW="\e[1;33m"
-BGREEN="\e[1;32m"
-BRED="\e[1;31m"
-RED="\e[31m"
-RESET="\e[0m"
+BCYAN="\033[1;36m"
+BYELLOW="\033[1;33m"
+BGREEN="\033[1;32m"
+BRED="\033[1;31m"
+RED="\033[31m"
+RESET="\033[0m"
 
 function is_bin_in_path {
     builtin type -P "$1" &>/dev/null
@@ -44,12 +44,46 @@ VERSION=$(
     cd ..
     python -c "from invokeai.version import __version__ as version; print(version)"
 )
-PATCH=""
-VERSION="v${VERSION}${PATCH}"
+VERSION="v${VERSION}"
 
 echo -e "${BGREEN}HEAD${RESET}:"
 git_show HEAD
 echo
+
+# ---------------------- FRONTEND ----------------------
+
+pushd ../invokeai/frontend/web >/dev/null
+echo
+echo "Installing frontend dependencies..."
+echo
+pnpm i --frozen-lockfile
+echo
+echo "Building frontend..."
+if [[ -v CI ]]; then
+    # In CI, we have already done the frontend checks and can just build
+    pnpm vite build
+else
+    # This runs all the frontend checks and builds
+    pnpm build
+fi
+echo
+popd
+
+# ---------------------- BACKEND ----------------------
+
+echo
+echo "Building wheel..."
+echo
+
+# install the 'build' package in the user site packages, if needed
+# could be improved by using a temporary venv, but it's tiny and harmless
+if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
+    pip install --user build
+fi
+
+rm -rf ../build
+
+python -m build --outdir dist/ ../.
 
 # ----------------------
 
@@ -78,10 +112,21 @@ chmod a+x InvokeAI-Installer/install.sh
 cp install.bat.in InvokeAI-Installer/install.bat
 cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
-# Zip everything up
-zip -r InvokeAI-installer-$VERSION.zip InvokeAI-Installer
+FILENAME=InvokeAI-installer-$VERSION.zip
 
-# clean up
-rm -rf InvokeAI-Installer tmp dist ../invokeai/frontend/web/dist/
+# Zip everything up
+zip -r $FILENAME InvokeAI-Installer
+
+if [[ ! -v CI ]]; then
+    # clean up, but only if we are not in a github action
+    rm -rf InvokeAI-Installer tmp dist ../invokeai/frontend/web/dist/
+fi
+
+if [[ -v CI ]]; then
+    # Set the output variable for github action
+    echo "INSTALLER_FILENAME=$FILENAME" >>$GITHUB_OUTPUT
+    echo "INSTALLER_PATH=installer/$FILENAME" >>$GITHUB_OUTPUT
+    echo "DIST_PATH=installer/dist/" >>$GITHUB_OUTPUT
+fi
 
 exit 0

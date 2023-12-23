@@ -1,0 +1,34 @@
+name: 'On change: run check-frontend'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  merge_group:
+
+jobs:
+  check-changed-frontend-files:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_any_changed: ${{ steps.changed-files.outputs.frontend_any_changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for changed frontend files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files_yaml: |
+            frontend:
+              - 'invokeai/frontend/web/**'
+
+  run-check-frontend:
+    needs: check-changed-frontend-files
+    if: ${{ needs.check-changed-frontend-files.outputs.frontend_any_changed == 'true' }}
+    uses: ./.github/workflows/check-frontend.yml
