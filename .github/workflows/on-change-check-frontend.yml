@@ -1,4 +1,4 @@
-name: Run frontend code quality checks when frontend changes
+name: 'On frontend changes: run check-frontend'
 
 on:
   push:

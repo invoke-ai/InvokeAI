@@ -1,4 +1,4 @@
-name: Run pytest when python changes
+name: 'On python changes: run pytest'
 
 on:
   push:

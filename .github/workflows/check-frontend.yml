@@ -1,4 +1,4 @@
-name: Run frontend code quality checks
+name: Frontend checks
 
 on:
   workflow_dispatch:

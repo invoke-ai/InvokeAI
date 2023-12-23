@@ -1,4 +1,4 @@
-name: Run pytest
+name: Pytest
 
 on:
   workflow_dispatch:
@@ -44,10 +44,6 @@ jobs:
       PIP_USE_PEP517: '1'
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check python changes
-        uses: ./.github/actions/check-python-changes
-        id: check-python-changes
 
       - name: set test prompt to main branch validation
         if: steps.check-python-changes.outputs.python_any_changed == 'true'

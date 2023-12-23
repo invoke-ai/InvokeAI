@@ -1,4 +1,4 @@
-name: Run python code quality checks
+name: Python checks
 
 on:
   workflow_dispatch:
