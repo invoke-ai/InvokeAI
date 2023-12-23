@@ -108,7 +108,7 @@ dependencies = [
   "requests_testadapter",
 ]
 "xformers" = [
-  "xformers==0.0.23post1; sys_platform!='darwin'",
+  "xformers==0.0.23.post1; sys_platform!='darwin'",
   "triton; sys_platform=='linux'",
 ]
 "onnx" = ["onnxruntime"]
