@@ -1,55 +1,26 @@
-name: Check Python
+name: Run python code quality checks
 
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
-    inputs:
-      force:
-        description: 'Force check even if no files were changed'
-        required: true
-        default: false
-        type: boolean
   workflow_call:
-    inputs:
-      force:
-        description: 'Force check even if no files were changed'
-        required: true
-        default: false
-        type: boolean
 
 jobs:
   check-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check python changes
-        uses: ./.github/actions/check-python-changes
-        id: check-python-changes
-
-      - name: Determine if checks should run
-        id: should-run
-        run: |
-          echo Files changed: ${{ steps.check-python-changes.outputs.python_any_changed == 'true' }}
-          echo Force: ${{ inputs.force == true || inputs.force == 'true' }}
-          echo "bool=${{ steps.check-python-changes.outputs.python_any_changed == 'true' || inputs.force == true || inputs.force == 'true' }}" >> $GITHUB_OUTPUT
 
       - name: Install python dependencies
         uses: ./.github/actions/install-python-deps
-        if: steps.should-run.outputs.bool == 'true'
 
       - name: Install ruff
-        if: steps.should-run.outputs.bool == 'true'
         run: pip install ruff
+        shell: bash
 
       - name: Ruff check
-        if: steps.should-run.outputs.bool == 'true'
         run: ruff check --output-format=github .
+        shell: bash
 
       - name: Ruff format
-        if: steps.should-run.outputs.bool == 'true'
         run: ruff format --check .
+        shell: bash

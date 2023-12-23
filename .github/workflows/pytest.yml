@@ -1,28 +1,8 @@
 name: Run pytest
+
 on:
-  push:
-    branches:
-      - 'main'
-  pull_request:
-    types:
-      - 'ready_for_review'
-      - 'opened'
-      - 'synchronize'
-  merge_group:
   workflow_dispatch:
-    inputs:
-      force:
-        description: 'Force check even if no files were changed'
-        required: true
-        default: false
-        type: boolean
   workflow_call:
-    inputs:
-      force:
-        description: 'Force check even if no files were changed'
-        required: true
-        default: false
-        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -30,11 +10,9 @@ concurrency:
 
 jobs:
   matrix:
-    if: github.event.pull_request.draft == false
     strategy:
       matrix:
         python-version:
-          # - '3.9'
           - '3.10'
         pytorch:
           - linux-cuda-11_7
@@ -66,27 +44,17 @@ jobs:
       PIP_USE_PEP517: '1'
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Check python changes
         uses: ./.github/actions/check-python-changes
         id: check-python-changes
 
-      - name: Determine if checks should run
-        id: should-run
-        run: |
-          echo Files changed: ${{ steps.check-python-changes.outputs.python_any_changed == 'true' }}
-          echo Force: ${{ inputs.force == true || inputs.force == 'true' }}
-          echo "bool=${{ steps.check-python-changes.outputs.python_any_changed == 'true' || inputs.force == true || inputs.force == 'true' }}" >> $GITHUB_OUTPUT
-        shell: bash # windows runner defaults to pwsh, which doesn't support the above syntax
-
       - name: set test prompt to main branch validation
-        if: steps.should-run.outputs.bool == 'true'
+        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: setup python
-        if: steps.should-run.outputs.bool == 'true'
+        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -94,7 +62,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: install invokeai
-        if: steps.should-run.outputs.bool == 'true'
+        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
         run: >
@@ -102,7 +70,7 @@ jobs:
           --editable=".[test]"
 
       - name: run pytest
-        if: steps.should-run.outputs.bool == 'true'
+        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         id: run-pytest
         run: pytest
 

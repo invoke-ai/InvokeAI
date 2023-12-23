@@ -14,24 +14,21 @@ on:
 
 jobs:
   check-frontend:
+    if: github.event.inputs.skip_code_checks != 'true'
     uses: ./.github/workflows/check-frontend.yml
-    with:
-      force: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+
   check-python:
+    if: github.event.inputs.skip_code_checks != 'true'
     uses: ./.github/workflows/check-python.yml
-    with:
-      force: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+
   pytest:
+    if: github.event.inputs.skip_code_checks != 'true'
     uses: ./.github/workflows/pytest.yml
-    with:
-      force: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+
   build:
     runs-on: ubuntu-22.04
-    needs: [check-frontend, check-python, pytest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install python dependencies
         uses: ./.github/actions/install-python-deps
@@ -61,7 +58,7 @@ jobs:
 
   publish-testpypi:
     runs-on: ubuntu-22.04
-    needs: [build]
+    needs: [check-frontend, check-python, pytest, build]
     if: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
     environment:
       name: testpypi
@@ -87,7 +84,7 @@ jobs:
 
   publish-pypi:
     runs-on: ubuntu-22.04
-    needs: [build]
+    needs: [check-frontend, check-python, pytest, build]
     if: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
     environment:
       name: pypi
