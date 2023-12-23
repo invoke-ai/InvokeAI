@@ -67,7 +67,7 @@ RESPONSE=${input:='n'}
 if [ "$RESPONSE" == 'y' ]; then
     echo
     echo -e "Deleting ${BCYAN}${VERSION}${RESET} tag on origin remote..."
-    git push --delete origin $VERSION
+    git push origin :refs/tags/$VERSION
 
     echo -e "Tagging ${BGREEN}HEAD${RESET} with ${BCYAN}${VERSION}${RESET} on locally..."
     if ! git tag -fa $VERSION; then
@@ -76,7 +76,7 @@ if [ "$RESPONSE" == 'y' ]; then
     fi
 
     echo -e "Deleting ${BCYAN}${LATEST_TAG}${RESET} tag on origin remote..."
-    git push --delete origin $LATEST_TAG
+    git push origin :refs/tags/$LATEST_TAG
 
     echo -e "Tagging ${BGREEN}HEAD${RESET} with ${BCYAN}${LATEST_TAG}${RESET} locally..."
     git tag -fa $LATEST_TAG
