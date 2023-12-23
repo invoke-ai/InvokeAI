@@ -46,11 +46,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: set test prompt to main branch validation
-        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: setup python
-        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -58,7 +56,6 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: install invokeai
-        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
         run: >
@@ -66,7 +63,6 @@ jobs:
           --editable=".[test]"
 
       - name: run pytest
-        if: steps.check-python-changes.outputs.python_any_changed == 'true'
         id: run-pytest
         run: pytest
 
