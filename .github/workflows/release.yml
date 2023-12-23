@@ -23,7 +23,7 @@ jobs:
 
   pytest:
     if: github.event.inputs.skip_code_checks != 'true'
-    uses: ./.github/workflows/pytest.yml
+    uses: ./.github/workflows/check-pytest.yml
 
   build:
     runs-on: ubuntu-22.04
