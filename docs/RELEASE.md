@@ -17,11 +17,7 @@ The `release.yml` workflow runs a number of jobs to handle code checks, tests, b
 
 It is triggered on **tag push**, when the tag matches `v*.*.*`. It doesn't matter if you've prepped a release branch like `release/v3.5.0` or are releasing from `main` - it works the same.
 
-!!! tip
-
-    Because commits are reference-counted, it is safe to create a release branch, tag it, let the workflow run, then delete the branch.
-
-    So long as the tag exists, that commit will exist.
+> Because commits are reference-counted, it is safe to create a release branch, tag it, let the workflow run, then delete the branch. So long as the tag exists, that commit will exist.
 
 ### Triggering the Workflow
 
@@ -45,9 +41,9 @@ This job checks that the git ref matches the app version. It matches the ref aga
 
 When the workflow is triggered by tag push, the ref is the tag. If the workflow is run manually, the ref is the target selected from the **Use workflow from** dropdown.
 
-!!! tip
+This job uses [samuelcolvin/check-python-version].
 
-    Any valid [version specifier] works, so long as the tag matches the version. The release workflow works exactly the same for `RC`, `post`, `dev`, etc.
+> Any valid [version specifier] works, so long as the tag matches the version. The release workflow works exactly the same for `RC`, `post`, `dev`, etc.
 
 #### Check and Test Jobs
 
@@ -57,13 +53,9 @@ This is our test suite.
 - **`check-python`**: runs `ruff` (format and lint)
 - **`check-frontend`**: runs `prettier` (format), `eslint` (lint), `madge` (circular refs) and `tsc` (static type check)
 
-!!! info Future Enhancement
+> **TODO** We should add `mypy` or `pyright` to the **`check-python`** job.
 
-    We should add `mypy` or `pyright` to the **`check-python`** job.
-
-!!! info Future Enhancement
-
-    We should add an end-to-end test job that generates an image.
+> **TODO** We should add an end-to-end test job that generates an image.
 
 #### `build` Job
 
@@ -78,9 +70,7 @@ At this point, the release workflow pauses (the remaining jobs all require appro
 
 A maintainer should go to the **Summary** tab of the workflow, download the installer and test it. Ensure the app loads and generates.
 
-!!! info
-
-    The exact same wheel file is bundled in the installer and in the `dist` artifact, which is uploaded to PyPI. You should end up with the same exact installation of the `invokeai` package from any of these methods.
+> The same wheel file is bundled in the installer and in the `dist` artifact, which is uploaded to PyPI. You should end up with the exactly the same installation of the `invokeai` package from any of these methods.
 
 #### PyPI Publish Jobs
 
@@ -94,9 +84,7 @@ Both jobs require a maintainer to approve them from the workflow's **Summary** t
 - Select the environment (either `testpypi` or `pypi`)
 - Click **Approve and deploy**
 
-!!! warning
-
-    **If the version already exists on PyPI, the publish jobs will fail.** PyPI only allows a particular version to be published once - you cannot change it. If version published on PyPI has a problem, you'll need to "fail forward" by bumping the app version and publishing a followup release.
+> **If the version already exists on PyPI, the publish jobs will fail.** PyPI only allows a given version to be published once - you cannot change it. If version published on PyPI has a problem, you'll need to "fail forward" by bumping the app version and publishing a followup release.
 
 #### `publish-testpypi` Job
 
@@ -126,14 +114,12 @@ Publishes the distribution on the production PyPI index, using the `pypi` GitHub
 
 1. [Draft a new release] on GitHub, choosing the tag that triggered the release.
 2. Write the release notes, describing important changes. The **Generate release notes** button automatically inserts the changelog and new contributors, and you can copy/paste the intro from previous releases.
-3. Upload the zip file created in [Build the installer] into the Assets section of the release notes. You can also upload the zip into the body of the release notes, since it can be hard for users to find the Assets section.
+3. Upload the zip file created in **`build`** job into the Assets section of the release notes. You can also upload the zip into the body of the release notes, since it can be hard for users to find the Assets section.
 4. Check the **Set as a pre-release** and **Create a discussion for this release** checkboxes at the bottom of the release page.
 5. Publish the pre-release.
 6. Announce the pre-release in Discord.
 
-!!! info Future Enhancement
-
-    Workflows can create a GitHub release from a template and upload release assets. One popular action to handle this is [ncipollo/release-action]. A future enhancement to the release process could set this up.
+> **TODO** Workflows can create a GitHub release from a template and upload release assets. One popular action to handle this is [ncipollo/release-action]. A future enhancement to the release process could set this up.
 
 ## Manually Running the Release Workflow
 
