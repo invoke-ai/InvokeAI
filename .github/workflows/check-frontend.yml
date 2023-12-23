@@ -1,0 +1,38 @@
+name: 'Check: frontend'
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+defaults:
+  run:
+    working-directory: invokeai/frontend/web
+
+jobs:
+  check-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up frontend
+        uses: ./.github/actions/install-frontend-deps
+
+      - name: Run tsc check
+        run: 'pnpm run lint:tsc'
+        shell: bash
+
+      - name: Run dpdm check
+        run: 'pnpm run lint:dpdm'
+        shell: bash
+
+      - name: Run eslint check
+        run: 'pnpm run lint:eslint'
+        shell: bash
+
+      - name: Run prettier check
+        run: 'pnpm run lint:prettier'
+        shell: bash
+
+      - name: Run knip check
+        run: 'pnpm run lint:knip'
+        shell: bash
