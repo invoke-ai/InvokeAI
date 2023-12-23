@@ -31,7 +31,7 @@ jobs:
     if: github.event.inputs.skip_code_checks != 'true'
     uses: ./.github/workflows/check-python.yml
 
-  pytest:
+  check-pytest:
     if: github.event.inputs.skip_code_checks != 'true'
     uses: ./.github/workflows/check-pytest.yml
 
@@ -68,8 +68,8 @@ jobs:
 
   publish-testpypi:
     runs-on: ubuntu-latest
-    needs: [check-version, check-frontend, check-python, pytest, build]
-    if: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+    needs: [check-version, check-frontend, check-python, check-pytest, build]
+    if: github.event_name == 'workflow_dispatch'
     environment:
       name: testpypi
       url: https://test.pypi.org/p/invokeai
@@ -87,8 +87,8 @@ jobs:
 
   publish-pypi:
     runs-on: ubuntu-latest
-    needs: [check-version, check-frontend, check-python, pytest, build]
-    if: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+    needs: [check-version, check-frontend, check-python, check-pytest, build]
+    if: github.event_name == 'workflow_dispatch'
     environment:
       name: pypi
       url: https://pypi.org/p/invokeai
