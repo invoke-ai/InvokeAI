@@ -47,7 +47,7 @@ services:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [compute, utility]
+              capabilities: [gpu]
 
   invokeai-cpu:
     <<: *invokeai
