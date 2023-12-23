@@ -11,7 +11,7 @@ on:
       - 'docker/docker-entrypoint.sh'
       - 'workflows/build-container.yml'
     tags:
-      - 'v*'
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
