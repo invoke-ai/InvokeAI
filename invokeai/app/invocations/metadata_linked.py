@@ -17,8 +17,7 @@ from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, SchedulerOutput
 from invokeai.app.invocations.metadata import MetadataOutput
 from invokeai.app.invocations.primitives import FloatOutput, ImageField, IntegerOutput, StringOutput
 from invokeai.app.shared.fields import FieldDescriptions
-
-from ...version import __version__
+from invokeai.version import __version__
 
 CUSTOM_LABEL: str = "* CUSTOM LABEL *"
 
