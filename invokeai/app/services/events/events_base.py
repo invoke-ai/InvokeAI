@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -404,14 +404,14 @@ class EventServiceBase:
             },
         )
 
-    def emit_model_install_started(self, source: str) -> None:
+    def emit_model_install_running(self, source: str) -> None:
         """
-        Emitted when an install job is started.
+        Emitted at intervals when an install job is running.
 
         :param source: Source of the model; local path, repo_id or url
         """
         self.__emit_model_event(
-            event_name="model_install_started",
+            event_name="model_install_running",
             payload={"source": source},
         )
 
@@ -430,26 +430,24 @@ class EventServiceBase:
             },
         )
 
-    def emit_model_install_progress(
+    def emit_model_install_downloading(
         self,
         source: str,
-        current_bytes: int,
-        total_bytes: int,
+        parts: List[Dict[str, Any]],
     ) -> None:
         """
         Emitted while the install job is in progress.
         (Downloaded models only)
 
         :param source: Source of the model
-        :param current_bytes: Number of bytes downloaded so far
-        :param total_bytes: Total bytes to download
+        :param parts: Progress of downloading URLs that comprise the model, if any.
+         This is a Dict with keys "url", "path", "bytes" and "total_bytes".
         """
         self.__emit_model_event(
-            event_name="model_install_progress",
+            event_name="model_install_downloading",
             payload={
                 "source": source,
-                "current_bytes": int,
-                "total_bytes": int,
+                "parts": parts,
             },
         )
 

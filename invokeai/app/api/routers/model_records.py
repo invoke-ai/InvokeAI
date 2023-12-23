@@ -243,7 +243,7 @@ async def import_model(
     Installation occurs in the background. Either use list_model_install_jobs()
     to poll for completion, or listen on the event bus for the following events:
 
-      "model_install_started"
+      "model_install_running"
       "model_install_completed"
       "model_install_error"
 

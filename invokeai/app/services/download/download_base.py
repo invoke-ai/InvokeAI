@@ -72,6 +72,10 @@ class DownloadJob(BaseModel):
     _on_cancelled: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_error: Optional[DownloadEventHandler] = PrivateAttr(default=None)
 
+    def __hash__(self) -> int:
+        """Return hash of the string representation of this object, for indexing."""
+        return hash(str(self))
+
     def __le__(self, other: "DownloadJob") -> bool:
         """Return True if this job's priority is less than another's."""
         return self.priority <= other.priority
@@ -153,7 +157,7 @@ class DownloadQueueServiceBase(ABC):
         on_error: Optional[DownloadEventHandler] = None,
     ) -> DownloadJob:
         """
-        Create a download job.
+        Create and enqueue download job.
 
         :param source: Source of the download as a URL.
         :param dest: Path to download to. See below.
@@ -172,6 +176,25 @@ class DownloadQueueServiceBase(ABC):
         3. If the path exists and is an existing file, then the downloader will try to resume the download from
            the end of the existing file.
 
+        """
+        pass
+
+    @abstractmethod
+    def submit_download_job(
+        self,
+        job: DownloadJob,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadEventHandler] = None,
+    ) -> None:
+        """
+        Enqueue a download job.
+
+        :param job: The DownloadJob
+        :param on_start, on_progress, on_complete, on_error: Callbacks for the indicated
+         events.
         """
         pass
 

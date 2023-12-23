@@ -3,16 +3,18 @@ import traceback
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Set, Union
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events import EventServiceBase
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig
+from invokeai.backend.model_manager.metadata import ModelMetadataStore
 
 
 class InstallStatus(str, Enum):
@@ -22,6 +24,14 @@ class InstallStatus(str, Enum):
     RUNNING = "running"  # being processed
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
+    CANCELLED = "cancelled"  # terminated with an error message
+
+
+class ModelInstallPart(BaseModel):
+    url: AnyHttpUrl
+    path: Path
+    bytes: int = 0
+    total_bytes: int = 0
 
 
 class UnknownInstallJobException(Exception):
@@ -109,6 +119,11 @@ class URLModelSource(StringLikeSource):
         """Return string version of the url when string rep needed."""
         return str(self.url)
 
+    @field_validator("url", mode="before")
+    @classmethod
+    def to_url(cls, raw: str) -> AnyHttpUrl:
+        return AnyHttpUrl(raw)
+
 
 ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
 
@@ -130,6 +145,9 @@ class ModelInstallJob(BaseModel):
     local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
     error_type: Optional[str] = Field(default=None, description="Class name of the exception that led to status==ERROR")
     error: Optional[str] = Field(default=None, description="Error traceback")  # noqa #501
+    download_parts: Set[DownloadJob] = Field(
+        default_factory=set, description="Download jobs contributing to this install"
+    )
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
@@ -146,6 +164,8 @@ class ModelInstallServiceBase(ABC):
         self,
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
+        download_queue: DownloadQueueServiceBase,
+        metadata_store: ModelMetadataStore,
         event_bus: Optional["EventServiceBase"] = None,
     ):
         """

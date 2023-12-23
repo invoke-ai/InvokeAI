@@ -40,4 +40,5 @@ __all__ = [
     "ModelMetadataStore",
     "CivitaiMetadataFetch",
     "HuggingFaceMetadataFetch",
+    "ModelMetadataStore",
 ]

@@ -99,6 +99,33 @@ class DownloadQueueService(DownloadQueueServiceBase):
             self._stop_event.set()
             self._worker_pool.clear()
 
+    def submit_download_job(
+        self,
+        job: DownloadJob,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadEventHandler] = None,
+    ) -> None:
+        """Enqueue a download job."""
+        if not self._accept_download_requests:
+            raise ServiceInactiveException(
+                "The download service is not currently accepting requests. Please call start() to initialize the service."
+            )
+        with self._lock:
+            job.id = self._next_job_id
+            self._next_job_id += 1
+            job.set_callbacks(
+                on_start=on_start,
+                on_progress=on_progress,
+                on_complete=on_complete,
+                on_cancelled=on_cancelled,
+                on_error=on_error,
+            )
+            self._jobs[job.id] = job
+            self._queue.put(job)
+
     def download(
         self,
         source: AnyHttpUrl,
@@ -111,30 +138,25 @@ class DownloadQueueService(DownloadQueueServiceBase):
         on_cancelled: Optional[DownloadEventHandler] = None,
         on_error: Optional[DownloadEventHandler] = None,
     ) -> DownloadJob:
-        """Create a download job and return its ID."""
+        """Create and enqueue a download job and return it."""
         if not self._accept_download_requests:
             raise ServiceInactiveException(
                 "The download service is not currently accepting requests. Please call start() to initialize the service."
             )
-        with self._lock:
-            id = self._next_job_id
-            self._next_job_id += 1
-            job = DownloadJob(
-                id=id,
-                source=source,
-                dest=dest,
-                priority=priority,
-                access_token=access_token,
-            )
-            job.set_callbacks(
-                on_start=on_start,
-                on_progress=on_progress,
-                on_complete=on_complete,
-                on_cancelled=on_cancelled,
-                on_error=on_error,
-            )
-            self._jobs[id] = job
-            self._queue.put(job)
+        job = DownloadJob(
+            source=source,
+            dest=dest,
+            priority=priority,
+            access_token=access_token,
+        )
+        self.submit_download_job(
+            job,
+            on_start=on_start,
+            on_progress=on_progress,
+            on_complete=on_complete,
+            on_cancelled=on_cancelled,
+            on_error=on_error,
+        )
         return job
 
     def join(self) -> None:
@@ -322,7 +344,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_start(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(f"An error occurred while processing the on_start callback: {e}")
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_started(str(job.source), job.download_path.as_posix())
@@ -332,7 +354,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_progress(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(f"An error occurred while processing the on_progress callback: {e}")
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_progress(
@@ -348,7 +370,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_complete(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(f"An error occurred while processing the on_complete callback: {e}")
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_complete(
@@ -361,7 +383,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_cancelled(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(f"An error occurred while processing the on_cancelled callback: {e}")
         if self._event_bus:
             self._event_bus.emit_download_cancelled(str(job.source))
 

@@ -3,6 +3,7 @@
 from logging import Logger
 
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -61,7 +62,7 @@ class ApiDependencies:
     invoker: Invoker
 
     @staticmethod
-    def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
+    def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger) -> None:
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
@@ -87,8 +88,13 @@ class ApiDependencies:
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
         download_queue_service = DownloadQueueService(event_bus=events)
+        metadata_store = ModelMetadataStore(db=db)
         model_install_service = ModelInstallService(
-            app_config=config, record_store=model_record_service, event_bus=events
+            app_config=config,
+            record_store=model_record_service,
+            download_queue=download_queue_service,
+            metadata_store=metadata_store,
+            event_bus=events,
         )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
@@ -131,6 +137,6 @@ class ApiDependencies:
         db.clean()
 
     @staticmethod
-    def shutdown():
+    def shutdown() -> None:
         if ApiDependencies.invoker:
             ApiDependencies.invoker.stop()
