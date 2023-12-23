@@ -1,4 +1,4 @@
-name: Pytest
+name: 'Check: pytest'
 
 on:
   workflow_dispatch:

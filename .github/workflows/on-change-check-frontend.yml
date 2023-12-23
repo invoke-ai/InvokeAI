@@ -1,4 +1,4 @@
-name: 'On frontend changes: run check-frontend'
+name: 'On change: run check-frontend'
 
 on:
   push:

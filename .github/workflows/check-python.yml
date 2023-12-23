@@ -1,4 +1,4 @@
-name: Python checks
+name: 'Check: python'
 
 on:
   workflow_dispatch:

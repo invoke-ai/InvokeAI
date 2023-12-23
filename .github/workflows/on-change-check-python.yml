@@ -1,4 +1,4 @@
-name: 'On python changes: run check-python'
+name: 'On change: run check-python'
 
 on:
   push:

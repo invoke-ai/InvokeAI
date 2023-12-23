@@ -1,4 +1,4 @@
-name: 'On python changes: run pytest'
+name: 'On change: run pytest'
 
 on:
   push:
@@ -34,4 +34,4 @@ jobs:
   run-pytest:
     needs: check-changed-python-files
     if: ${{ needs.check-changed-python-files.outputs.python_any_changed == 'true' }}
-    uses: ./.github/workflows/pytest.yml
+    uses: ./.github/workflows/check-pytest.yml

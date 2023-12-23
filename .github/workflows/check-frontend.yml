@@ -1,4 +1,4 @@
-name: Frontend checks
+name: 'Check: frontend'
 
 on:
   workflow_dispatch:
