@@ -1,0 +1,70 @@
+name: Check Frontend
+
+on:
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  push:
+    branches:
+      - 'main'
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force check even if no files were changed'
+        required: true
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      force:
+        description: 'Force check even if no files were changed'
+        required: true
+        default: false
+        type: boolean
+
+defaults:
+  run:
+    working-directory: invokeai/frontend/web
+
+jobs:
+  check-frontend:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check frontend changes
+        uses: ./.github/actions/check-frontend-changes
+        id: check-frontend-changes
+
+      - name: Determine if checks should run
+        id: should-run
+        run: |
+          echo Files changed: ${{ steps.check-frontend-changes.outputs.frontend_any_changed == 'true' }}
+          echo Force: ${{ inputs.force == true || inputs.force == 'true' }}
+          echo "bool=${{ steps.check-frontend-changes.outputs.frontend_any_changed == 'true' || inputs.force == true || inputs.force == 'true' }}" >> $GITHUB_OUTPUT
+
+      - name: Set up frontend
+        uses: ./.github/actions/install-frontend-deps
+        if: steps.should-run.outputs.bool == 'true'
+
+      - name: Run tsc check
+        if: steps.should-run.outputs.bool == 'true'
+        run: 'pnpm run lint:tsc'
+
+      - name: Run madge check
+        if: steps.should-run.outputs.bool == 'true'
+        run: 'pnpm run lint:madge'
+
+      - name: Run eslint check
+        if: steps.should-run.outputs.bool == 'true'
+        run: 'pnpm run lint:eslint'
+
+      - name: Run prettier check
+        if: steps.should.run
+        run: 'pnpm run lint:prettier'

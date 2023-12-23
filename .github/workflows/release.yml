@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      skip_code_checks:
+        description: 'Skip code checks'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  check-frontend:
+    uses: ./.github/workflows/check-frontend.yml
+    with:
+      force: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+  check-python:
+    uses: ./.github/workflows/check-python.yml
+    with:
+      force: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+  pytest:
+    uses: ./.github/workflows/pytest.yml
+    with:
+      force: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+  build:
+    runs-on: ubuntu-22.04
+    needs: [check-frontend, check-python, pytest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install python dependencies
+        uses: ./.github/actions/install-python-deps
+
+      - name: Install pypa/build
+        run: pip install --upgrade build
+
+      - name: Setup frontend
+        uses: ./.github/actions/install-frontend-deps
+
+      - name: Run create_installer.sh
+        id: create_installer
+        run: ./create_installer.sh --skip_frontend_checks
+        working-directory: installer
+
+      - name: Upload python distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: ${{ steps.create_installer.outputs.DIST_PATH }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.create_installer.outputs.INSTALLER_FILENAME }}
+          path: ${{ steps.create_installer.outputs.INSTALLER_PATH }}
+
+  publish-testpypi:
+    runs-on: ubuntu-22.04
+    needs: [build]
+    if: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/invokeai
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: samuelcolvin/check-python-version@v4
+        id: check-python-version
+        with:
+          version_file_path: invokeai/version/invokeai_version.py
+
+      - name: Download distribution from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish distribution to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    runs-on: ubuntu-22.04
+    needs: [build]
+    if: ${{ github.event.inputs.skip_code_checks != true && github.event.inputs.skip_code_checks != 'true' }}
+    environment:
+      name: pypi
+      url: https://pypi.org/p/invokeai
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: samuelcolvin/check-python-version@v4
+        id: check-python-version
+        with:
+          version_file_path: invokeai/version/invokeai_version.py
+
+      - name: Download distribution from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

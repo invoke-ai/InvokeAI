@@ -19,11 +19,6 @@ function git_show {
 
 cd "$(dirname "$0")"
 
-echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
-echo "The current working directory is $(pwd)"
-read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
-echo
-
 # Some machines only have `python3` in PATH, others have `python` - make an alias.
 # We can use a function to approximate an alias within a non-interactive shell.
 if ! is_bin_in_path python && is_bin_in_path python3; then
@@ -43,8 +38,7 @@ VERSION=$(
     cd ..
     python -c "from invokeai.version import __version__ as version; print(version)"
 )
-PATCH=""
-VERSION="v${VERSION}${PATCH}"
+VERSION="v${VERSION}"
 
 echo -e "${BGREEN}HEAD${RESET}:"
 git_show
@@ -59,8 +53,14 @@ echo
 pnpm i --frozen-lockfile
 echo
 echo "Building frontend..."
+if [[ -v CI ]]; then
+    # In CI, we have already done the frontend checks and can just build
+    pnpm vite build
+else
+    # This runs all the frontend checks and builds
+    pnpm build
+fi
 echo
-pnpm build
 popd
 
 # ---------------------- BACKEND ----------------------
@@ -77,7 +77,7 @@ fi
 
 rm -rf ../build
 
-python -m build --wheel --outdir dist/ ../.
+python -m build --outdir dist/ ../.
 
 # ----------------------
 
@@ -97,8 +97,8 @@ done
 mkdir InvokeAI-Installer/lib
 cp lib/*.py InvokeAI-Installer/lib
 
-# Move the wheel
-mv dist/*.whl InvokeAI-Installer/lib/
+# Copy the wheel
+cp dist/*.whl InvokeAI-Installer/lib/
 
 # Install scripts
 # Mac/Linux
@@ -109,10 +109,21 @@ chmod a+x InvokeAI-Installer/install.sh
 perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in >InvokeAI-Installer/install.bat
 cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
-# Zip everything up
-zip -r InvokeAI-installer-$VERSION.zip InvokeAI-Installer
+FILENAME=InvokeAI-installer-$VERSION.zip
 
-# clean up
-rm -rf InvokeAI-Installer tmp dist ../invokeai/frontend/web/dist/
+# Zip everything up
+zip -r $FILENAME InvokeAI-Installer
+
+if [[ ! -v CI ]]; then
+    # clean up, but only if we are not in a github action
+    rm -rf InvokeAI-Installer tmp dist ../invokeai/frontend/web/dist/
+fi
+
+if [[ -v CI ]]; then
+    # Set the output variable for github action
+    echo "INSTALLER_FILENAME=$FILENAME" >>$GITHUB_OUTPUT
+    echo "INSTALLER_PATH=installer/$FILENAME" >>$GITHUB_OUTPUT
+    echo "DIST_PATH=installer/dist/" >>$GITHUB_OUTPUT
+fi
 
 exit 0

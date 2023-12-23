@@ -1,0 +1,20 @@
+name: Check Frontend Changes
+description: Checks for changes to frontend files
+outputs:
+  files-changed:
+    description: 'Whether frontend files were changed'
+    value: ${{ steps.changed-files.outputs.frontend_any_changed }}
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for changed frontend files
+      id: changed-files
+      uses: tj-actions/changed-files@v40
+      with:
+        files_yaml: |
+          frontend:
+            - 'invokeai/frontend/web/**'
