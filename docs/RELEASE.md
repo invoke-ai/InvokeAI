@@ -23,6 +23,10 @@ It is triggered on **tag push**. It doesn't matter if you've prepped a release b
 
     It is safe to create a release branch, tag it and have the workflow do its thing, then delete the branch. So long as the tag is not deleted, that snapshot of the repo will forever exist at the tag.
 
+### Pushing the Tag
+
+Run `make tag-release` to tag the current commit and kick off the workflow.
+
 ### Tag Push Example
 
 Any tag push will trigger the workflow, but it will publish only if the git ref (the tag) matches the app version.
