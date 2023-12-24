@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
 
@@ -148,12 +148,23 @@ class ModelInstallJob(BaseModel):
     download_parts: Set[DownloadJob] = Field(
         default_factory=set, description="Download jobs contributing to this install"
     )
+    # internal flag
+    _cancelled: bool = PrivateAttr(default=False)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
         self.error_type = e.__class__.__name__
         self.error = "".join(traceback.format_exception(e))
         self.status = InstallStatus.ERROR
+
+    def cancel(self) -> None:
+        """Call to cancel the job."""
+        self._cancelled = True
+
+    @property
+    def cancelled(self) -> bool:
+        """Call to cancel the job."""
+        return self._cancelled
 
 
 class ModelInstallServiceBase(ABC):

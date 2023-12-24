@@ -34,6 +34,7 @@ class ServiceInactiveException(Exception):
 
 
 DownloadEventHandler = Callable[["DownloadJob"], None]
+DownloadExceptionHandler = Callable[["DownloadJob", Optional[Exception]], None]
 
 
 @total_ordering
@@ -70,7 +71,7 @@ class DownloadJob(BaseModel):
     _on_progress: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_complete: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_cancelled: Optional[DownloadEventHandler] = PrivateAttr(default=None)
-    _on_error: Optional[DownloadEventHandler] = PrivateAttr(default=None)
+    _on_error: Optional[DownloadExceptionHandler] = PrivateAttr(default=None)
 
     def __hash__(self) -> int:
         """Return hash of the string representation of this object, for indexing."""
@@ -107,7 +108,7 @@ class DownloadJob(BaseModel):
         return self._on_complete
 
     @property
-    def on_error(self) -> Optional[DownloadEventHandler]:
+    def on_error(self) -> Optional[DownloadExceptionHandler]:
         """Return the on_error event handler."""
         return self._on_error
 
@@ -122,7 +123,7 @@ class DownloadJob(BaseModel):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> None:
         """Set the callbacks for download events."""
         self._on_start = on_start
@@ -154,7 +155,7 @@ class DownloadQueueServiceBase(ABC):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> DownloadJob:
         """
         Create and enqueue download job.
@@ -187,7 +188,7 @@ class DownloadQueueServiceBase(ABC):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> None:
         """
         Enqueue a download job.
@@ -220,21 +221,21 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_all_jobs(self):
+    def cancel_all_jobs(self) -> None:
         """Cancel all active and enquedjobs."""
         pass
 
     @abstractmethod
-    def prune_jobs(self):
+    def prune_jobs(self) -> None:
         """Prune completed and errored queue items from the job list."""
         pass
 
     @abstractmethod
-    def cancel_job(self, job: DownloadJob):
+    def cancel_job(self, job: DownloadJob) -> None:
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
 
     @abstractmethod
-    def join(self):
+    def join(self) -> None:
         """Wait until all jobs are off the queue."""
         pass

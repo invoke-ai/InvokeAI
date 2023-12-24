@@ -21,6 +21,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 from .download_base import (
     DownloadEventHandler,
+    DownloadExceptionHandler,
     DownloadJob,
     DownloadJobCancelledException,
     DownloadJobStatus,
@@ -106,7 +107,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> None:
         """Enqueue a download job."""
         if not self._accept_download_requests:
@@ -136,7 +137,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> DownloadJob:
         """Create and enqueue a download job and return it."""
         if not self._accept_download_requests:
@@ -236,7 +237,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             except (OSError, HTTPError) as excp:
                 job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
-                self._signal_job_error(job)
+                self._signal_job_error(job, excp)
             except DownloadJobCancelledException:
                 self._signal_job_cancelled(job)
                 self._cleanup_cancelled_job(job)
@@ -387,11 +388,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if self._event_bus:
             self._event_bus.emit_download_cancelled(str(job.source))
 
-    def _signal_job_error(self, job: DownloadJob) -> None:
+    def _signal_job_error(self, job: DownloadJob, excp: Optional[Exception] = None) -> None:
         job.status = DownloadJobStatus.ERROR
         if job.on_error:
             try:
-                job.on_error(job)
+                job.on_error(job, excp)
             except Exception as e:
                 self._logger.error(e)
         if self._event_bus:

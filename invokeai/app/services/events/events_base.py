@@ -451,6 +451,17 @@ class EventServiceBase:
             },
         )
 
+    def emit_model_install_cancelled(self, source: str) -> None:
+        """
+        Emitted when an install job is cancelled
+
+        :param source: Source of the model; local path, repo_id or url
+        """
+        self.__emit_model_event(
+            event_name="model_install_cancelled",
+            payload={"source": source},
+        )
+
     def emit_model_install_error(
         self,
         source: str,

@@ -102,7 +102,10 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         return self._from_model_json(model_json)
 
     def _from_model_json(self, model_json: Dict[str, Any], version_id: Optional[int] = None) -> CivitaiMetadata:
-        version_id = version_id or model_json["modelVersions"][0]["id"]
+        try:
+            version_id = version_id or model_json["modelVersions"][0]["id"]
+        except TypeError as excp:
+            raise UnknownModelException from excp
 
         # loop till we find the section containing the version requested
         version_sections = [x for x in model_json["modelVersions"] if x["id"] == version_id]

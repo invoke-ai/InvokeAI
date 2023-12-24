@@ -16,7 +16,40 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
+import requests
+from huggingface_hub import hf_hub_url
+from pydantic.networks import AnyHttpUrl
+
 from ..config import DiffusersVariant
+
+
+def select_hf_urls(
+    repo_id: str,
+    files: List[Path],
+    variant: Optional[DiffusersVariant] = None,
+    subfolder: Optional[Path] = None,
+) -> List[AnyHttpUrl]:
+    """
+    Take a list of files in a HuggingFace repo root and return the URLs of files needed to load the model.
+
+    :param files: List of files relative to the repo root.
+    :param subfolder: Filter by the indicated subfolder.
+    :param variant: Filter by files belonging to a particular variant, such as fp16.
+
+    The file list can be obtained from the `files` field of HuggingFaceMetadata,
+    as defined in `invokeai.backend.model_manager.metadata.metadata_base`.
+    """
+    paths = select_hf_model_files(files, variant, subfolder)
+    prefix = f"{subfolder}/" if subfolder else ""
+    if Path(f"{prefix}model_index.json") in paths:
+        url = hf_hub_url(repo_id, filename="model_index.json", subfolder=subfolder)
+        resp = requests.get(url)
+        resp.raise_for_status()
+        submodels = resp.json()
+        paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]
+        paths.insert(0, Path(f"{prefix}model_index.json"))
+
+    return [hf_hub_url(repo_id, filename=x.as_posix()) for x in paths]
 
 
 def select_hf_model_files(

@@ -9,6 +9,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.model_install import (
     InstallStatus,
@@ -17,8 +18,9 @@ from invokeai.app.services.model_install import (
     ModelInstallService,
     ModelInstallServiceBase,
 )
-from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL, UnknownModelException
+from invokeai.app.services.model_records import ModelRecordServiceSQL, UnknownModelException
 from invokeai.backend.model_manager.config import BaseModelType, ModelType
+from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
@@ -37,21 +39,19 @@ def app_config(datadir: Path) -> InvokeAIAppConfig:
 
 
 @pytest.fixture
-def store(
-    app_config: InvokeAIAppConfig,
-) -> ModelRecordServiceBase:
-    logger = InvokeAILogger.get_logger(config=app_config)
+def installer(app_config: InvokeAIAppConfig) -> ModelInstallServiceBase:
+    logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(app_config, logger)
-    store: ModelRecordServiceBase = ModelRecordServiceSQL(db)
-    return store
-
-
-@pytest.fixture
-def installer(app_config: InvokeAIAppConfig, store: ModelRecordServiceBase) -> ModelInstallServiceBase:
+    events = DummyEventService()
+    store = ModelRecordServiceSQL(db)
+    metadata_store = ModelMetadataStore(db)
+    download_queue = DownloadQueueService()  # do not report download events to simplify test logic
     installer = ModelInstallService(
         app_config=app_config,
         record_store=store,
-        event_bus=DummyEventService(),
+        download_queue=download_queue,
+        metadata_store=metadata_store,
+        event_bus=events,
     )
     installer.start()
     return installer
@@ -152,7 +152,7 @@ def test_background_install(installer: ModelInstallServiceBase, test_file: Path,
     assert isinstance(bus, DummyEventService)
     assert len(bus.events) == 2
     event_names = [x.event_name for x in bus.events]
-    assert "model_install_started" in event_names
+    assert "model_install_running" in event_names
     assert "model_install_completed" in event_names
     assert Path(bus.events[0].payload["source"]) == source
     assert Path(bus.events[1].payload["source"]) == source

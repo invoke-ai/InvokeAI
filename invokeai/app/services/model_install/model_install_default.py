@@ -5,21 +5,22 @@ import threading
 from hashlib import sha256
 from logging import Logger
 from pathlib import Path
-from queue import Queue
+from queue import Empty, Queue
 from random import randbytes
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
+from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueServiceBase
 from invokeai.app.services.events import EventServiceBase
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
+    DiffusersVariant,
     InvalidModelConfigException,
     ModelType,
 )
@@ -28,6 +29,8 @@ from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     CivitaiMetadata,
     CivitaiMetadataFetch,
+    HuggingFaceMetadata,
+    HuggingFaceMetadataFetch,
     ModelMetadataStore,
 )
 from invokeai.backend.model_manager.probe import ModelProbe
@@ -35,6 +38,7 @@ from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
 
 from .model_install_base import (
+    HFModelSource,
     InstallStatus,
     LocalModelSource,
     ModelInstallJob,
@@ -43,11 +47,7 @@ from .model_install_base import (
     URLModelSource,
 )
 
-# marker that the queue is done and that thread should exit
-STOP_JOB = ModelInstallJob(
-    source=LocalModelSource(path="stop"),
-    local_path=Path("/dev/null"),
-)
+TMPDIR_PREFIX = "INVOKEAI_INSTALLER_TMP_"
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -58,11 +58,13 @@ class ModelInstallService(ModelInstallServiceBase):
     _event_bus: Optional[EventServiceBase] = None
     _install_queue: Queue[ModelInstallJob]
     _install_jobs: List[ModelInstallJob]
+    _running: bool
     _logger: Logger
     _lock: threading.Lock
+    _stop_event: threading.Event
     _cached_model_paths: Set[Path]
     _download_queue: DownloadQueueServiceBase
-    _download_completion_event: threading.Event
+    _download_exited_event: threading.Event
     _models_installed: Set[str]
     _metadata_store: ModelMetadataStore
     _metadata_cache: Dict[ModelSource, Optional[AnyModelRepoMetadata]]
@@ -92,11 +94,13 @@ class ModelInstallService(ModelInstallServiceBase):
         self._cached_model_paths = set()
         self._models_installed = set()
         self._lock = threading.Lock()
-        self._download_completion_event = threading.Event()
+        self._stop_event = threading.Event()
+        self._download_exited_event = threading.Event()
         self._download_queue = download_queue
         self._metadata_cache = {}
         self._download_cache = {}
         self._metadata_store = metadata_store
+        self._running = False
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -113,48 +117,69 @@ class ModelInstallService(ModelInstallServiceBase):
     def start(self, *args: Any, **kwarg: Any) -> None:
         """Start the installer thread."""
         with self._lock:
+            if self._running:
+                raise Exception("Attempt to start the installer service twice")
             self._start_installer_thread()
             self.sync_to_config()
 
     def stop(self, *args: Any, **kwarg: Any) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
         with self._lock:
-            self._install_queue.put(STOP_JOB)
+            if not self._running:
+                raise Exception("Attempt to stop the install service before it was started")
+            self._stop_event.set()
+            with self._install_queue.mutex:
+                self._install_queue.queue.clear()  # get rid of pending jobs
+            active_jobs = [x for x in self.list_jobs() if x.status == InstallStatus.RUNNING]
+            if active_jobs:
+                self._logger.warning("Waiting for active install job to complete")
+            self.wait_for_installs()
+            self._download_cache.clear()
+            self._metadata_cache.clear()
+            self._running = False
 
     def _start_installer_thread(self) -> None:
         threading.Thread(target=self._install_next_item, daemon=True).start()
+        self._running = True
 
     def _install_next_item(self) -> None:
         done = False
         while not done:
-            job = self._install_queue.get()
-            if job == STOP_JOB:
+            if self._stop_event.is_set():
                 done = True
+                continue
+            try:
+                job = self._install_queue.get(timeout=1)
+            except Empty:
                 continue
 
             assert job.local_path is not None
             try:
-                self._signal_job_running(job)
-                if job.inplace:
-                    key = self.register_path(job.local_path, job.config_in)
+                if job.cancelled:
+                    self._signal_job_cancelled(job)
                 else:
-                    key = self.install_path(job.local_path, job.config_in)
-                job.config_out = self.record_store.get_model(key)
+                    self._signal_job_running(job)
+                    if job.inplace:
+                        key = self.register_path(job.local_path, job.config_in)
+                    else:
+                        key = self.install_path(job.local_path, job.config_in)
+                    job.config_out = self.record_store.get_model(key)
 
-                # enter the metadata, if there is any
-                if metadata := self._metadata_cache.get(job.source):
-                    self._metadata_store.add_metadata(key, metadata)
-                    del self._metadata_cache[job.source]
-
-                self._signal_job_completed(job)
+                    # enter the metadata, if there is any
+                    if metadata := self._metadata_cache.get(job.source):
+                        self._metadata_store.add_metadata(key, metadata)
+                    self._signal_job_completed(job)
 
             except (OSError, DuplicateModelException, InvalidModelConfigException) as excp:
                 self._signal_job_errored(job, excp)
+
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
                 if not isinstance(job.source, LocalModelSource):
                     rmtree(job.local_path.parent)
+                self._metadata_cache.pop(job.source, None)
                 self._install_queue.task_done()
+
         self._logger.info("Install thread exiting")
 
     def _signal_job_running(self, job: ModelInstallJob) -> None:
@@ -192,6 +217,11 @@ class ModelInstallService(ModelInstallServiceBase):
             assert error_type is not None
             assert error is not None
             self._event_bus.emit_model_install_error(str(job.source), error_type, error)
+
+    def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
+        self._logger.info(f"{job.source}: model installation was cancelled")
+        if self._event_bus:
+            self._event_bus.emit_model_install_cancelled(str(job.source))
 
     def register_path(
         self,
@@ -246,23 +276,34 @@ class ModelInstallService(ModelInstallServiceBase):
 
         else:  # a remote model
             install_job = ModelInstallJob(
-                source=source, config_in=config, local_path=Path(mkdtemp(dir=self._app_config.models_path))
+                source=source,
+                config_in=config,
+                local_path=Path(mkdtemp(dir=self._app_config.models_path, prefix=TMPDIR_PREFIX)),
             )
-            urls = self._get_urls_and_metadata(source)
-            for url in urls:
+
+            metadata = self._get_metadata(source)  #  may return None
+            url_and_paths = self._get_download_urls(source, metadata)
+            self._metadata_cache[source] = metadata  #  save for installation time
+
+            for url, path in url_and_paths:
                 assert hasattr(source, "access_token")
+                dest = install_job.local_path / path.parent
+                dest.mkdir(parents=True, exist_ok=True)
                 download_job = DownloadJob(
                     source=url,
-                    dest=install_job.local_path,
+                    dest=dest,
                     access_token=source.access_token,
                 )
                 self._download_cache[download_job.source] = install_job  # matches a download job to an install job
                 install_job.download_parts.add(download_job)
+
                 self._download_queue.submit_download_job(
                     download_job,
                     on_start=self._download_started_callback,
                     on_progress=self._download_progress_callback,
                     on_complete=self._download_complete_callback,
+                    on_error=self._download_error_callback,
+                    on_cancelled=self._download_cancelled_callback,
                 )
         self._install_jobs.append(install_job)
         return install_job
@@ -275,8 +316,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def wait_for_installs(self) -> List[ModelInstallJob]:  # noqa D102
         while len(self._download_cache) > 0:
-            self._download_completion_event.wait()
-            self._download_completion_event.clear()
+            self._download_exited_event.wait()
+            self._download_exited_event.clear()
         self._install_queue.join()
         return self._install_jobs
 
@@ -466,17 +507,46 @@ class ModelInstallService(ModelInstallServiceBase):
         self.record_store.add_model(key, info)
         return key
 
-    def _get_urls_and_metadata(self, source: ModelSource) -> List[AnyHttpUrl]:
-        assert isinstance(source, URLModelSource)
-        url = str(source.url)
-        if re.match(r"https?://civitai.com/", url):
-            metadata = CivitaiMetadataFetch().from_url(source.url)
-            assert isinstance(metadata, CivitaiMetadata)
-            self._metadata_cache[source] = metadata
-            return [metadata.download_url]
+    def _get_metadata(self, source: ModelSource) -> Optional[AnyModelRepoMetadata]:
+        url_patterns = {
+            r"https?://civitai.com/": CivitaiMetadataFetch,
+            r"https?://huggingface.co/": HuggingFaceMetadataFetch,
+        }
+
+        if hasattr(source, "url"):
+            for pattern, fetcher in url_patterns.items():
+                if re.match(pattern, str(source.url)):
+                    return fetcher().from_url(source.url)
+            return None
+
+        elif isinstance(source, HFModelSource):
+            return HuggingFaceMetadataFetch().from_id(source.repo_id)
+
         else:
-            self._metadata_cache[source] = None
-            return [source.url]
+            raise NotImplementedError(f"Do not know to do with a model source of type {type(source)}")
+
+    # Huggingface is  complicated because multiple files need to be downloaded into
+    # their proper subfolders. Furthermore, depending on the variant and subfolder
+    # requested, there are different sets of files to install. `HuggingFaceMetadataFetch.list_download_urls()`
+    # provides the logic to do this.
+    def _get_download_urls(
+        self, source: ModelSource, metadata: Optional[AnyModelRepoMetadata] = None
+    ) -> List[Tuple[AnyHttpUrl, Path]]:
+        if isinstance(source, URLModelSource):
+            if isinstance(metadata, CivitaiMetadata):
+                return [(metadata.download_url, Path("."))]  # download the file in the metadata URL
+            else:
+                return [(source.url, Path("."))]  # download the requested URL into temporary directory
+
+        elif isinstance(source, HFModelSource):
+            assert isinstance(metadata, HuggingFaceMetadata)
+            return HuggingFaceMetadataFetch().list_download_urls(
+                metadata,
+                variant=DiffusersVariant(source.variant) if source.variant else None,
+                subfolder=Path(source.subfolder) if source.subfolder else None,
+            )
+        else:
+            raise Exception("Don't know how to get the URL for a source of type {type(source)}")
 
     def _download_started_callback(self, download_job: DownloadJob) -> None:
         install_job = self._download_cache[download_job.source]
@@ -485,14 +555,48 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(install_job.source, URLModelSource):
             assert download_job.download_path
             install_job.local_path = download_job.download_path
+        elif isinstance(install_job.source, HFModelSource):
+            assert download_job.download_path
+            # If our installer local path is the original tmp directory, then we need
+            # to alter it to point to the directory containing the diffusers model.
+            # This hacky method relies on recognizing the tmp directory by its prefix.
+            if install_job.local_path.name.startswith(TMPDIR_PREFIX):
+                partial_path = download_job.download_path.relative_to(install_job.local_path)
+                diffusers_folder_name = partial_path.parts[0]
+                install_job.local_path = install_job.local_path / diffusers_folder_name
 
     def _download_progress_callback(self, download_job: DownloadJob) -> None:
         install_job = self._download_cache[download_job.source]
         self._signal_job_progress(install_job)
 
-    # TO DO - create an error callback to avoid infinite waiting
     def _download_complete_callback(self, download_job: DownloadJob) -> None:
+        with self._lock:
+            install_job = self._download_cache[download_job.source]
+            self._download_cache.pop(download_job.source, None)
+            self._download_exited_event.set()  # this lets wait_for_installs() know that the active job count has changed
+            # are there any more active jobs left in this task?
+            if all(x.status == DownloadJobStatus.COMPLETED for x in install_job.download_parts):
+                self._install_queue.put(
+                    install_job
+                )  #  now enqueue job for actual installation into the models directory
+
+    def _download_error_callback(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
         install_job = self._download_cache[download_job.source]
-        del self._download_cache[download_job.source]
-        self._download_completion_event.set()
-        self._install_queue.put(install_job)  #  enqueue job for completion
+        assert excp is not None
+        self._download_cache.pop(download_job.source, None)
+        self._download_exited_event.set()  # this lets wait_for_installs() know that the active job count has changed
+
+        # if there are other jobs in the download queue, we cancel them
+        pending_jobs = [
+            x
+            for x in self._download_queue.list_jobs()
+            if x.status in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]
+        ]
+        sibling_jobs = [x for x in pending_jobs if self._download_cache[x.source] == install_job]
+        for s in sibling_jobs:
+            self._download_queue.cancel_job(s)
+        install_job.cancel()
+        self._signal_job_errored(install_job, excp)
+
+    def _download_cancelled_callback(self, download_job: DownloadJob) -> None:
+        pass  # have to cancel other jobs, if any, but this will lead to a loop if not careful
