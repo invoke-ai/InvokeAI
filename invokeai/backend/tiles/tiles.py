@@ -102,7 +102,7 @@ def calc_tiles_with_overlap(
 
 
 def calc_tiles_even_split(
-    image_height: int, image_width: int, num_tiles_x: int, num_tiles_y: int, overlap_fraction: float = 0
+    image_height: int, image_width: int, num_tiles_x: int, num_tiles_y: int, overlap: int = 0
 ) -> list[Tile]:
     """Calculate the tile coordinates for a given image shape with the number of tiles requested.
 
@@ -111,31 +111,35 @@ def calc_tiles_even_split(
         image_width (int): The image width in px.
         num_x_tiles (int): The number of tile to split the image into on the X-axis.
         num_y_tiles (int): The number of tile to split the image into on the Y-axis.
-        overlap_fraction (float, optional): The target overlap as fraction of the tiles size. Defaults to 0.
+        overlap (int, optional): The overlap between adjacent tiles in pixels. Defaults to 0.
 
     Returns:
         list[Tile]: A list of tiles that cover the image shape. Ordered from left-to-right, top-to-bottom.
     """
-
-    # Ensure tile size is divisible by 8
+    # Ensure the image is divisible by LATENT_SCALE_FACTOR
     if image_width % LATENT_SCALE_FACTOR != 0 or image_height % LATENT_SCALE_FACTOR != 0:
         raise ValueError(f"image size (({image_width}, {image_height})) must be divisible by {LATENT_SCALE_FACTOR}")
 
-    # Calculate the overlap size based on the percentage and adjust it to be divisible by 8 (rounding up)
-    overlap_x = LATENT_SCALE_FACTOR * math.ceil(
-        int((image_width / num_tiles_x) * overlap_fraction) / LATENT_SCALE_FACTOR
-    )
-    overlap_y = LATENT_SCALE_FACTOR * math.ceil(
-        int((image_height / num_tiles_y) * overlap_fraction) / LATENT_SCALE_FACTOR
-    )
-
     # Calculate the tile size based on the number of tiles and overlap, and ensure it's divisible by 8 (rounding down)
-    tile_size_x = LATENT_SCALE_FACTOR * math.floor(
-        ((image_width + overlap_x * (num_tiles_x - 1)) // num_tiles_x) / LATENT_SCALE_FACTOR
-    )
-    tile_size_y = LATENT_SCALE_FACTOR * math.floor(
-        ((image_height + overlap_y * (num_tiles_y - 1)) // num_tiles_y) / LATENT_SCALE_FACTOR
-    )
+    if num_tiles_x > 1:
+        # ensure the overlap is not more than the maximum overlap if we only have 1 tile then we dont care about overlap
+        assert overlap <= image_width - (LATENT_SCALE_FACTOR * (num_tiles_x - 1))
+        tile_size_x = LATENT_SCALE_FACTOR * math.floor(
+            ((image_width + overlap * (num_tiles_x - 1)) // num_tiles_x) / LATENT_SCALE_FACTOR
+        )
+        assert overlap < tile_size_x
+    else:
+        tile_size_x = image_width
+
+    if num_tiles_y > 1:
+        # ensure the overlap is not more than the maximum overlap if we only have 1 tile then we dont care about overlap
+        assert overlap <= image_height - (LATENT_SCALE_FACTOR * (num_tiles_y - 1))
+        tile_size_y = LATENT_SCALE_FACTOR * math.floor(
+            ((image_height + overlap * (num_tiles_y - 1)) // num_tiles_y) / LATENT_SCALE_FACTOR
+        )
+        assert overlap < tile_size_y
+    else:
+        tile_size_y = image_height
 
     # tiles[y * num_tiles_x + x] is the tile for the y'th row, x'th column.
     tiles: list[Tile] = []
@@ -143,7 +147,7 @@ def calc_tiles_even_split(
     # Calculate tile coordinates. (Ignore overlap values for now.)
     for tile_idx_y in range(num_tiles_y):
         # Calculate the top and bottom of the row
-        top = tile_idx_y * (tile_size_y - overlap_y)
+        top = tile_idx_y * (tile_size_y - overlap)
         bottom = min(top + tile_size_y, image_height)
         # For the last row adjust bottom to be the height of the image
         if tile_idx_y == num_tiles_y - 1:
@@ -151,7 +155,7 @@ def calc_tiles_even_split(
 
         for tile_idx_x in range(num_tiles_x):
             # Calculate the left & right coordinate of each tile
-            left = tile_idx_x * (tile_size_x - overlap_x)
+            left = tile_idx_x * (tile_size_x - overlap)
             right = min(left + tile_size_x, image_width)
             # For the last tile in the row adjust right to be the width of the image
             if tile_idx_x == num_tiles_x - 1:

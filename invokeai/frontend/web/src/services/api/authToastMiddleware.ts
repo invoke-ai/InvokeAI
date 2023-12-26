@@ -5,12 +5,10 @@ import { t } from 'i18next';
 import { z } from 'zod';
 
 const zRejectedForbiddenAction = z.object({
-  action: z.object({
-    payload: z.object({
-      status: z.literal(403),
-      data: z.object({
-        detail: z.string(),
-      }),
+  payload: z.object({
+    status: z.literal(403),
+    data: z.object({
+      detail: z.string(),
     }),
   }),
 });
@@ -22,8 +20,8 @@ export const authToastMiddleware: Middleware =
         const parsed = zRejectedForbiddenAction.parse(action);
         const { dispatch } = api;
         const customMessage =
-          parsed.action.payload.data.detail !== 'Forbidden'
-            ? parsed.action.payload.data.detail
+          parsed.payload.data.detail !== 'Forbidden'
+            ? parsed.payload.data.detail
             : undefined;
         dispatch(
           addToast({
@@ -32,7 +30,7 @@ export const authToastMiddleware: Middleware =
             description: customMessage,
           })
         );
-      } catch {
+      } catch (error) {
         // no-op
       }
     }

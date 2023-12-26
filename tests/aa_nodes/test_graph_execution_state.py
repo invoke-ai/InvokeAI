@@ -26,7 +26,6 @@ from invokeai.app.services.shared.graph import (
     Graph,
     GraphExecutionState,
     IterateInvocation,
-    LibraryGraph,
 )
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
@@ -61,7 +60,6 @@ def mock_services() -> InvocationServices:
         configuration=configuration,
         events=TestEventService(),
         graph_execution_manager=graph_execution_manager,
-        graph_library=SqliteItemStorage[LibraryGraph](db=db, table_name="graphs"),
         image_files=None,  # type: ignore
         image_records=None,  # type: ignore
         images=None,  # type: ignore
@@ -70,6 +68,7 @@ def mock_services() -> InvocationServices:
         logger=logging,  # type: ignore
         model_manager=None,  # type: ignore
         model_records=None,  # type: ignore
+        download_queue=None,  # type: ignore
         model_install=None,  # type: ignore
         names=None,  # type: ignore
         performance_statistics=InvocationStatsService(),

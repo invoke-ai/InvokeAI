@@ -11,6 +11,8 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     UnsafeWorkflowWithVersionValidator,
 )
 
+from .util.migrate_yaml_config_1 import MigrateModelYamlToDb1
+
 
 class Migration2Callback:
     def __init__(self, image_files: ImageFileStorageBase, logger: Logger):
@@ -24,6 +26,7 @@ class Migration2Callback:
         self._add_workflow_library(cursor)
         self._drop_model_manager_metadata(cursor)
         self._recreate_model_config(cursor)
+        self._migrate_model_config_records(cursor)
         self._migrate_embedded_workflows(cursor)
 
     def _add_images_has_workflow(self, cursor: sqlite3.Cursor) -> None:
@@ -131,6 +134,11 @@ class Migration2Callback:
             """
         )
 
+    def _migrate_model_config_records(self, cursor: sqlite3.Cursor) -> None:
+        """After updating the model config table, we repopulate it."""
+        model_record_migrator = MigrateModelYamlToDb1(cursor)
+        model_record_migrator.migrate()
+
     def _migrate_embedded_workflows(self, cursor: sqlite3.Cursor) -> None:
         """
         In the v3.5.0 release, InvokeAI changed how it handles embedded workflows. The `images` table in
@@ -158,6 +166,9 @@ class Migration2Callback:
                 pil_image = self._image_files.get(image_name)
             except ImageFileNotFoundException:
                 self._logger.warning(f"Image {image_name} not found, skipping")
+                continue
+            except Exception as e:
+                self._logger.warning(f"Error while checking image {image_name}, skipping: {e}")
                 continue
             if "invokeai_workflow" in pil_image.info:
                 try:

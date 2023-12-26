@@ -113,7 +113,8 @@
         "orderBy": "Ordinato per",
         "nextPage": "Pagina successiva",
         "saveAs": "Salva come",
-        "unsaved": "Non salvato"
+        "unsaved": "Non salvato",
+        "direction": "Direzione"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -1109,7 +1110,11 @@
         "deletedInvalidEdge": "Eliminata connessione non valida {{source}} -> {{target}}",
         "unknownInput": "Input sconosciuto: {{name}}",
         "prototypeDesc": "Questa invocazione è un prototipo. Potrebbe subire modifiche sostanziali durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento.",
-        "betaDesc": "Questa invocazione è in versione beta. Fino a quando non sarà stabile, potrebbe subire modifiche importanti durante gli aggiornamenti dell'app. Abbiamo intenzione di supportare questa invocazione a lungo termine."
+        "betaDesc": "Questa invocazione è in versione beta. Fino a quando non sarà stabile, potrebbe subire modifiche importanti durante gli aggiornamenti dell'app. Abbiamo intenzione di supportare questa invocazione a lungo termine.",
+        "newWorkflow": "Nuovo flusso di lavoro",
+        "newWorkflowDesc": "Creare un nuovo flusso di lavoro?",
+        "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate.",
+        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1629,7 +1634,10 @@
         "deleteWorkflow": "Elimina flusso di lavoro",
         "workflows": "Flussi di lavoro",
         "noDescription": "Nessuna descrizione",
-        "userWorkflows": "I miei flussi di lavoro"
+        "userWorkflows": "I miei flussi di lavoro",
+        "newWorkflowCreated": "Nuovo flusso di lavoro creato",
+        "downloadWorkflow": "Salva su file",
+        "uploadWorkflow": "Carica da file"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"

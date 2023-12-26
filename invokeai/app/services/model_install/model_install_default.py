@@ -71,7 +71,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_queue = Queue()
         self._cached_model_paths = set()
         self._models_installed = set()
-        self._start_installer_thread()
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -85,8 +84,13 @@ class ModelInstallService(ModelInstallServiceBase):
     def event_bus(self) -> Optional[EventServiceBase]:  # noqa D102
         return self._event_bus
 
-    def stop(self, *args, **kwargs) -> None:
-        """Stop the install thread; after this the object can be deleted and garbage collected."""
+    def start(self, *args: Any, **kwarg: Any) -> None:
+        """Start the installer thread."""
+        self._start_installer_thread()
+        self.sync_to_config()
+
+    def stop(self, *args: Any, **kwarg: Any) -> None:
+        """Stop the installer thread; after this the object can be deleted and garbage collected."""
         self._install_queue.put(STOP_JOB)
 
     def _start_installer_thread(self) -> None:
