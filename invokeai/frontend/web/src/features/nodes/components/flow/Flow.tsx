@@ -157,11 +157,13 @@ export const Flow = () => {
   }, []);
 
   const onMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
-    const pos = $flow.get()?.screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
-    cursorPosition.current = pos;
+    if (flowWrapper.current?.getBoundingClientRect()) {
+      const pos = $flow.get()?.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      cursorPosition.current = pos;
+    }
   }, []);
 
   // #region Updatable Edges
