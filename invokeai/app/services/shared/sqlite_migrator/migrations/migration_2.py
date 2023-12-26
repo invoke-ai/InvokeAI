@@ -167,6 +167,9 @@ class Migration2Callback:
             except ImageFileNotFoundException:
                 self._logger.warning(f"Image {image_name} not found, skipping")
                 continue
+            except Exception as e:
+                self._logger.warning(f"Error while checking image {image_name}, skipping: {e}")
+                continue
             if "invokeai_workflow" in pil_image.info:
                 try:
                     UnsafeWorkflowWithVersionValidator.validate_json(pil_image.info.get("invokeai_workflow", ""))
