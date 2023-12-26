@@ -38,11 +38,11 @@ export const useBuildNode = () => {
         ?.getBoundingClientRect();
 
       if (rect) {
-        _x = rect.width / 2 - NODE_WIDTH / 2;
-        _y = rect.height / 2 - NODE_WIDTH / 2;
+        _x = rect.width / 2 - NODE_WIDTH / 2 + rect.left;
+        _y = rect.height / 2 - NODE_WIDTH / 2 + rect.top;
       }
 
-      const position = flow.project({
+      const position = flow.screenToFlowPosition({
         x: _x,
         y: _y,
       });
