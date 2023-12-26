@@ -105,6 +105,7 @@ dependencies = [
   "pytest>6.0.0",
   "pytest-cov",
   "pytest-datadir",
+  "requests_testadapter",
 ]
 "xformers" = [
   "xformers==0.0.23; sys_platform!='darwin'",

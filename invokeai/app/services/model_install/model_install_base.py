@@ -11,7 +11,6 @@ from typing_extensions import Annotated
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig
 
@@ -157,12 +156,12 @@ class ModelInstallServiceBase(ABC):
         :param event_bus: InvokeAI event bus for reporting events to.
         """
 
-    def start(self, invoker: Invoker) -> None:
-        """Call at InvokeAI startup time."""
-        self.sync_to_config()
+    @abstractmethod
+    def start(self, *args: Any, **kwarg: Any) -> None:
+        """Start the installer service."""
 
     @abstractmethod
-    def stop(self) -> None:
+    def stop(self, *args: Any, **kwarg: Any) -> None:
         """Stop the model install service. After this the objection can be safely deleted."""
 
     @property
