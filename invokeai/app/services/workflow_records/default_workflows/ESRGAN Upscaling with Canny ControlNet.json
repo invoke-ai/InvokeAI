@@ -459,7 +459,7 @@
               "name": "ControlNetModelField"
             },
             "value": {
-              "model_name": "sd-controlnet-canny",
+              "model_name": "canny",
               "base_model": "sd-1"
             }
           },
