@@ -136,7 +136,7 @@
               "name": "ControlNetModelField"
             },
             "value": {
-              "model_name": "sd-controlnet-depth",
+              "model_name": "depth",
               "base_model": "sd-1"
             }
           },
@@ -444,7 +444,7 @@
               "name": "ControlNetModelField"
             },
             "value": {
-              "model_name": "sd-controlnet-canny",
+              "model_name": "canny",
               "base_model": "sd-1"
             }
           },
