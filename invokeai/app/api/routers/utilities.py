@@ -23,10 +23,11 @@ class DynamicPromptsResponse(BaseModel):
 )
 async def parse_dynamicprompts(
     prompt: str = Body(description="The prompt to parse with dynamicprompts"),
-    max_prompts: int = Body(default=1000, description="The max number of prompts to generate"),
+    max_prompts: int = Body(ge=1, le=10000, default=1000, description="The max number of prompts to generate"),
     combinatorial: bool = Body(default=True, description="Whether to use the combinatorial generator"),
 ) -> DynamicPromptsResponse:
     """Creates a batch process"""
+    max_prompts = min(max_prompts, 10000)
     generator: Union[RandomPromptGenerator, CombinatorialPromptGenerator]
     try:
         error: Optional[str] = None
