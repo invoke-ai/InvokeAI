@@ -39,7 +39,7 @@ class ModelMetadataFetchBase(ABC):
         """
         Given a URL to a model repository, return a ModelMetadata object.
 
-        This method will raise an `invokeai.app.services.model_records.UnknownModelException`
+        This method will raise a `UnknownMetadataException`
         in the event that the requested model metadata is not found at the provided location.
         """
         pass
@@ -49,7 +49,7 @@ class ModelMetadataFetchBase(ABC):
         """
         Given an ID for a model, return a ModelMetadata object.
 
-        This method will raise an `invokeai.app.services.model_records.UnknownModelException`
+        This method will raise a `UnknownMetadataException`
         in the event that the requested model's metadata is not found at the provided id.
         """
         pass

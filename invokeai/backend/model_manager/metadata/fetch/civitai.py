@@ -32,8 +32,6 @@ import requests
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
-from invokeai.app.services.model_records import UnknownModelException
-
 from ..metadata_base import (
     AnyModelRepoMetadata,
     AnyModelRepoMetadataValidator,
@@ -41,6 +39,7 @@ from ..metadata_base import (
     CommercialUsage,
     LicenseRestrictions,
     RemoteModelFile,
+    UnknownMetadataException,
 )
 from .fetch_base import ModelMetadataFetchBase
 
@@ -84,13 +83,13 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         elif match := re.match(CIVITAI_DOWNLOAD_RE, str(url)):
             version_id = match.group(1)
             return self.from_civitai_versionid(int(version_id))
-        raise UnknownModelException("The url '{url}' does not match any known Civitai URL patterns")
+        raise UnknownMetadataException("The url '{url}' does not match any known Civitai URL patterns")
 
     def from_id(self, id: str) -> AnyModelRepoMetadata:
         """
         Given a Civitai model version ID, return a ModelRepoMetadata object.
 
-        May raise an `UnknownModelException`.
+        May raise an `UnknownMetadataException`.
         """
         return self.from_civitai_versionid(int(id))
 
@@ -98,7 +97,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         """
         Return metadata from the default version of the indicated model.
 
-        May raise an `UnknownModelException`.
+        May raise an `UnknownMetadataException`.
         """
         model_url = CIVITAI_MODEL_ENDPOINT + str(model_id)
         model_json = self._requests.get(model_url).json()
@@ -108,12 +107,12 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         try:
             version_id = version_id or model_json["modelVersions"][0]["id"]
         except TypeError as excp:
-            raise UnknownModelException from excp
+            raise UnknownMetadataException from excp
 
         # loop till we find the section containing the version requested
         version_sections = [x for x in model_json["modelVersions"] if x["id"] == version_id]
         if not version_sections:
-            raise UnknownModelException(f"Version {version_id} not found in model metadata")
+            raise UnknownMetadataException(f"Version {version_id} not found in model metadata")
 
         version_json = version_sections[0]
         safe_thumbnails = [x["url"] for x in version_json["images"] if x["nsfw"] == "None"]
@@ -157,7 +156,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         """
         Return a CivitaiMetadata object given a model version id.
 
-        May raise an `UnknownModelException`.
+        May raise an `UnknownMetadataException`.
         """
         if model_id is None:
             version_url = CIVITAI_VERSION_ENDPOINT + str(version_id)

@@ -18,7 +18,6 @@ assert isinstance(data, CivitaiMetadata)
 if data.allow_commercial_use:
    print("Commercial use of this model is allowed")
 """
-
 from .fetch import CivitaiMetadataFetch, HuggingFaceMetadataFetch
 from .metadata_base import (
     AnyModelRepoMetadata,
@@ -29,20 +28,22 @@ from .metadata_base import (
     LicenseRestrictions,
     ModelMetadataWithFiles,
     RemoteModelFile,
+    UnknownMetadataException,
 )
 from .metadata_store import ModelMetadataStore
 
 __all__ = [
     "AnyModelRepoMetadata",
     "AnyModelRepoMetadataValidator",
-    "CommercialUsage",
-    "LicenseRestrictions",
-    "ModelMetadataWithFiles",
-    "HuggingFaceMetadata",
     "CivitaiMetadata",
-    "ModelMetadataStore",
     "CivitaiMetadataFetch",
+    "CommercialUsage",
+    "HuggingFaceMetadata",
     "HuggingFaceMetadataFetch",
+    "LicenseRestrictions",
     "ModelMetadataStore",
+    "ModelMetadataStore",
+    "ModelMetadataWithFiles",
     "RemoteModelFile",
+    "UnknownMetadataException",
 ]

@@ -4,13 +4,12 @@ SQL Storage for Model Metadata
 """
 
 import sqlite3
-from typing import Optional, Set
+from typing import List, Optional, Set, Tuple
 
-from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 from .fetch import ModelMetadataFetchBase
-from .metadata_base import AnyModelRepoMetadata
+from .metadata_base import AnyModelRepoMetadata, UnknownMetadataException
 
 
 class ModelMetadataStore:
@@ -61,7 +60,7 @@ class ModelMetadataStore:
                 self._db.conn.commit()
             except sqlite3.IntegrityError as excp:  # FOREIGN KEY error: the key was not in model_config table
                 self._db.conn.rollback()
-                raise UnknownModelException from excp
+                raise UnknownMetadataException from excp
             except sqlite3.Error as excp:
                 self._db.conn.rollback()
                 raise excp
@@ -78,8 +77,20 @@ class ModelMetadataStore:
             )
             rows = self._cursor.fetchone()
             if not rows:
-                raise UnknownModelException("model metadata not found")
-            return ModelMetadataFetchBase.from_json(rows[0])
+                raise UnknownMetadataException("model metadata not found")
+            return ModelMetadataFetchBase.from_json(rows[0])  # see mypy typechecking issue in from_json() method
+
+    def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:  # key, metadata
+        """Dump out all the metadata."""
+        with self._db.lock:
+            self._cursor.execute(
+                """--sql
+                SELECT id,metadata FROM model_metadata;
+                """,
+                (),
+            )
+            rows = self._cursor.fetchall()
+        return [(x[0], ModelMetadataFetchBase.from_json(x[1])) for x in rows]
 
     def update_metadata(self, model_key: str, metadata: AnyModelRepoMetadata) -> AnyModelRepoMetadata:
         """
@@ -101,7 +112,7 @@ class ModelMetadataStore:
                     (json_serialized, model_key),
                 )
                 if self._cursor.rowcount == 0:
-                    raise UnknownModelException("model not found")
+                    raise UnknownMetadataException("model metadata not found")
                 self._update_tags(model_key, metadata.tags)
                 self._db.conn.commit()
             except sqlite3.Error as e:
@@ -131,7 +142,7 @@ class ModelMetadataStore:
                     matches = matches.intersection(model_keys)
             except sqlite3.Error as e:
                 raise e
-        return matches
+        return matches if matches else set()
 
     def search_by_author(self, author: str) -> Set[str]:
         """Return the keys of models authored by the indicated author."""

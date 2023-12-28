@@ -4,7 +4,7 @@
 
 from hashlib import sha1
 from random import randbytes
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.config import (
     BaseModelType,
     ModelType,
 )
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 
 from ..dependencies import ApiDependencies
 
@@ -32,9 +33,18 @@ model_records_router = APIRouter(prefix="/v1/model/record", tags=["model_manager
 class ModelsList(BaseModel):
     """Return list of configs."""
 
-    models: list[AnyModelConfig]
+    models: List[AnyModelConfig]
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class ModelTagSet(BaseModel):
+    """Return tags for a set of models."""
+
+    key: str
+    name: str
+    author: str
+    tags: Set[str]
 
 
 @model_records_router.get(
@@ -84,6 +94,58 @@ async def get_model_record(
         return record_store.get_model(key)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@model_records_router.get(
+    "/meta/i/{key}",
+    operation_id="get_model_metadata",
+    responses={
+        200: {"description": "Success"},
+        400: {"description": "Bad request"},
+        404: {"description": "No metadata available"},
+    },
+)
+async def get_model_metadata(
+    key: str = Path(description="Key of the model repo metadata to fetch."),
+) -> Optional[AnyModelRepoMetadata]:
+    """Get a model metadata object."""
+    record_store = ApiDependencies.invoker.services.model_records
+    result: AnyModelRepoMetadata = record_store.get_metadata(key)
+    if not result:
+        raise HTTPException(status_code=404, detail="No metadata for a model with this key")
+    return result
+
+
+@model_records_router.get(
+    "/tags",
+    operation_id="list_model_tags",
+)
+async def list_model_tags(
+    key: Optional[str] = Query(default=None, description="Optional model key; otherwise returns tags for all models"),
+) -> List[ModelTagSet]:
+    """Get a list of models."""
+    record_store = ApiDependencies.invoker.services.model_records
+    if key:
+        if metadata := record_store.get_metadata(key):
+            return [ModelTagSet(key=key, name=metadata.name, author=metadata.author, tags=metadata.tags)]
+        else:
+            return []
+    else:
+        all_metadata = record_store.list_all_metadata()
+        return [ModelTagSet(key=x[0], name=x[1].name, author=x[1].author, tags=x[1].tags) for x in all_metadata]
+
+
+@model_records_router.get(
+    "/tags/search",
+    operation_id="search_by_metadata_tags",
+)
+async def search_by_metadata_tags(
+    tags: Set[str] = Query(default=None, description="Tags to search for"),
+) -> ModelsList:
+    """Get a list of models."""
+    record_store = ApiDependencies.invoker.services.model_records
+    results = record_store.search_by_metadata_tag(tags)
+    return ModelsList(models=results)
 
 
 @model_records_router.patch(

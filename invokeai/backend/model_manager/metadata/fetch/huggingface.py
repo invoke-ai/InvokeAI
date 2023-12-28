@@ -23,9 +23,13 @@ from huggingface_hub.utils._errors import RepositoryNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
-from invokeai.app.services.model_records import UnknownModelException
-
-from ..metadata_base import AnyModelRepoMetadata, AnyModelRepoMetadataValidator, HuggingFaceMetadata, RemoteModelFile
+from ..metadata_base import (
+    AnyModelRepoMetadata,
+    AnyModelRepoMetadataValidator,
+    HuggingFaceMetadata,
+    RemoteModelFile,
+    UnknownMetadataException,
+)
 from .fetch_base import ModelMetadataFetchBase
 
 HF_MODEL_RE = r"https?://huggingface.co/([\w\-.]+/[\w\-.]+)"
@@ -58,7 +62,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         try:
             model_info = HfApi().model_info(repo_id=id, files_metadata=True)
         except RepositoryNotFoundError as excp:
-            raise UnknownModelException(f"'{id}' not found. See trace for details.") from excp
+            raise UnknownMetadataException(f"'{id}' not found. See trace for details.") from excp
 
         _, name = id.split("/")
         return HuggingFaceMetadata(
@@ -88,4 +92,4 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             repo_id = match.group(1)
             return self.from_id(repo_id)
         else:
-            raise UnknownModelException(f"'{url}' does not look like a HuggingFace model page")
+            raise UnknownMetadataException(f"'{url}' does not look like a HuggingFace model page")

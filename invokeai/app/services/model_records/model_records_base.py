@@ -5,9 +5,10 @@ Abstract base class for storing and retrieving model configuration records.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Set, Union
 
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 
 
 class DuplicateModelException(Exception):
@@ -72,6 +73,31 @@ class ModelRecordServiceBase(ABC):
         :param key: Key of model config to be fetched.
 
         Exceptions: UnknownModelException
+        """
+        pass
+
+    @abstractmethod
+    def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
+        """
+        Retrieve metadata (if any) from when model was downloaded from a repo.
+
+        :param key: Model key
+        """
+        pass
+
+    @abstractmethod
+    def list_all_metadata(self) -> List[AnyModelRepoMetadata]:
+        """
+        List metadata for all models that have it.
+        """
+        pass
+
+    @abstractmethod
+    def search_by_metadata_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
+        """
+        Search model metadata for ones with all listed tags and return their corresponding configs.
+
+        :param tags: Set of tags to search for. All tags must be present.
         """
         pass
 

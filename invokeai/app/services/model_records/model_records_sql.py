@@ -43,7 +43,7 @@ Typical usage:
 import json
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Set, Union
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -52,6 +52,7 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
 
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
@@ -293,3 +294,33 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             )
             results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
+
+    def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
+        """
+        Retrieve metadata (if any) from when model was downloaded from a repo.
+
+        :param key: Model key
+        """
+        store = ModelMetadataStore(self._db)
+        try:
+            metadata = store.get_metadata(key)
+            return metadata
+        except UnknownMetadataException:
+            return None
+
+    def search_by_metadata_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
+        """
+        Search model metadata for ones with all listed tags and return their corresponding configs.
+
+        :param tags: Set of tags to search for. All tags must be present.
+        """
+        store = ModelMetadataStore(self._db)
+        keys = store.search_by_tag(tags)
+        return [self.get_model(x) for x in keys]
+
+    def list_all_metadata(self) -> List[AnyModelRepoMetadata]:
+        """
+        List metadata for all models that have it.
+        """
+        store = ModelMetadataStore(self._db)
+        return store.list_all_metadata()

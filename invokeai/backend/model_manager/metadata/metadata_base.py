@@ -30,6 +30,10 @@ from invokeai.backend.model_manager import ModelRepoVariant
 from ..util import select_hf_files
 
 
+class UnknownMetadataException(Exception):
+    """Raised when no metadata is available for a model."""
+
+
 class CommercialUsage(str, Enum):
     """Type of commercial usage allowed."""
 
