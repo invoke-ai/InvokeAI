@@ -113,7 +113,8 @@
         "orderBy": "Ordinato per",
         "nextPage": "Pagina successiva",
         "saveAs": "Salva come",
-        "unsaved": "Non salvato"
+        "unsaved": "Non salvato",
+        "direction": "Direzione"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -1112,7 +1113,8 @@
         "betaDesc": "Questa invocazione è in versione beta. Fino a quando non sarà stabile, potrebbe subire modifiche importanti durante gli aggiornamenti dell'app. Abbiamo intenzione di supportare questa invocazione a lungo termine.",
         "newWorkflow": "Nuovo flusso di lavoro",
         "newWorkflowDesc": "Creare un nuovo flusso di lavoro?",
-        "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate."
+        "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate.",
+        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",

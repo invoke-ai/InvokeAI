@@ -120,7 +120,8 @@
         "orderBy": "排序方式：",
         "nextPage": "下一页",
         "saveAs": "保存为",
-        "unsaved": "未保存"
+        "unsaved": "未保存",
+        "ai": "ai"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -1122,7 +1123,8 @@
         "betaDesc": "此调用尚处于测试阶段。在稳定之前，它可能会在项目更新期间发生破坏性更改。本项目计划长期支持这种调用。",
         "newWorkflow": "新建工作流",
         "newWorkflowDesc": "是否创建一个新的工作流？",
-        "newWorkflowDesc2": "当前工作流有未保存的更改。"
+        "newWorkflowDesc2": "当前工作流有未保存的更改。",
+        "unsupportedAnyOfLength": "联合（union）数据类型数目过多 ({{count}})"
     },
     "controlnet": {
         "resize": "直接缩放",

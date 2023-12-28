@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -e -o pipefail
 
 run() {
   local scriptdir=$(dirname "${BASH_SOURCE[0]}")
@@ -8,14 +8,18 @@ run() {
   local build_args=""
   local profile=""
 
-  [[ -f ".env" ]] &&
-    build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
-    profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
+  touch .env
+  build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
+  profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
+
+  [[ -z "$profile" ]] && profile="nvidia"
 
   local service_name="invokeai-$profile"
 
-  printf "%s\n" "docker compose build args:"
-  printf "%s\n" "$build_args"
+  if [[ ! -z "$build_args" ]]; then
+    printf "%s\n" "docker compose build args:"
+    printf "%s\n" "$build_args"
+  fi
 
   docker compose build $build_args
   unset build_args
