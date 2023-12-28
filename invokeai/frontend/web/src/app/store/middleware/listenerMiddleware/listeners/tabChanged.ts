@@ -36,12 +36,12 @@ export const addTabChangedListener = () => {
             return;
           }
 
-          // need to filter out all the invalid canvas models (currently sdxl & refiner)
+          // need to filter out all the invalid canvas models (currently refiner & any)
           const validCanvasModels = mainModelsAdapter
             .getSelectors()
             .selectAll(models)
             .filter((model) =>
-              ['sd-1', 'sd-2', 'sxdl'].includes(model.base_model)
+              ['sd-1', 'sd-2', 'sdxl'].includes(model.base_model)
             );
 
           const firstValidCanvasModel = validCanvasModels[0];
