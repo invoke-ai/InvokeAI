@@ -7,6 +7,7 @@ import {
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { isImageOutput } from 'features/nodes/types/common';
 import {
   LINEAR_UI_OUTPUT,
   nodeIDDenyList,
@@ -18,8 +19,8 @@ import {
   appSocketInvocationComplete,
   socketInvocationComplete,
 } from 'services/events/actions';
+
 import { startAppListening } from '../..';
-import { isImageOutput } from 'features/nodes/types/common';
 
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
 const nodeTypeDenylist = ['load_image', 'image'];

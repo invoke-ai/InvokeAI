@@ -1,9 +1,5 @@
-import {
-  Box,
-  ChakraProps,
-  useColorModeValue,
-  useToken,
-} from '@chakra-ui/react';
+import type { ChakraProps } from '@chakra-ui/react';
+import { Box, useToken } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -16,13 +12,8 @@ import {
 } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
-import {
-  MouseEvent,
-  PropsWithChildren,
-  memo,
-  useCallback,
-  useMemo,
-} from 'react';
+import type { MouseEvent, PropsWithChildren } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
@@ -48,20 +39,13 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const isInProgress = useAppSelector(selectIsInProgress);
 
-  const [nodeInProgressLight, nodeInProgressDark, shadowsXl, shadowsBase] =
-    useToken('shadows', [
-      'nodeInProgress.light',
-      'nodeInProgress.dark',
-      'shadows.xl',
-      'shadows.base',
-    ]);
+  const [nodeInProgress, shadowsXl, shadowsBase] = useToken('shadows', [
+    'nodeInProgress',
+    'shadows.xl',
+    'shadows.base',
+  ]);
 
   const dispatch = useAppDispatch();
-
-  const inProgressShadow = useColorModeValue(
-    nodeInProgressLight,
-    nodeInProgressDark
-  );
 
   const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
 
@@ -117,7 +101,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
           transitionProperty: 'common',
           transitionDuration: '0.1s',
           opacity: 0.7,
-          shadow: isInProgress ? inProgressShadow : undefined,
+          shadow: isInProgress ? nodeInProgress : undefined,
           zIndex: -1,
         }}
       />

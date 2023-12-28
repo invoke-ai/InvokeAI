@@ -3,7 +3,8 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { RefObject, useCallback } from 'react';
+import type { RefObject } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type useLoadWorkflowFromFileOptions = {

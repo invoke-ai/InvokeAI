@@ -3,9 +3,10 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
-import GenerationModeStatusText from 'features/parameters/components/Parameters/Canvas/GenerationModeStatusText';
+import GenerationModeStatusText from 'features/parameters/components/Canvas/GenerationModeStatusText';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
 
 const warningColor = 'var(--invokeai-colors-warning-500)';
@@ -96,10 +97,7 @@ const IAICanvasStatusText = () => {
         margin: 1,
         borderRadius: 'base',
         pointerEvents: 'none',
-        bg: 'base.200',
-        _dark: {
-          bg: 'base.800',
-        },
+        bg: 'base.800',
       }}
     >
       <GenerationModeStatusText />

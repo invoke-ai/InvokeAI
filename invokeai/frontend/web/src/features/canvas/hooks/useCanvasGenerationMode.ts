@@ -1,5 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { GenerationMode } from 'features/canvas/store/canvasTypes';
+import type { GenerationMode } from 'features/canvas/store/canvasTypes';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
 import { useEffect, useState } from 'react';

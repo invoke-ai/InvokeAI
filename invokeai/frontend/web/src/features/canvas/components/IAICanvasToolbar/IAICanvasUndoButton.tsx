@@ -1,7 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { undo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
@@ -45,7 +45,7 @@ export default function IAICanvasUndoButton() {
   );
 
   return (
-    <IAIIconButton
+    <InvIconButton
       aria-label={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       tooltip={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       icon={<FaUndo />}

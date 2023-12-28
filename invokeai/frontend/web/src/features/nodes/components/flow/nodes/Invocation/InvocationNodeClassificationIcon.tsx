@@ -1,9 +1,10 @@
-import { Icon, Tooltip } from '@chakra-ui/react';
+import { Icon } from '@chakra-ui/react';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { useNodeClassification } from 'features/nodes/hooks/useNodeClassification';
+import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaFlask } from 'react-icons/fa';
-import { useNodeClassification } from 'features/nodes/hooks/useNodeClassification';
-import { Classification } from 'features/nodes/types/common';
 import { FaHammer } from 'react-icons/fa6';
 
 interface Props {
@@ -18,7 +19,7 @@ const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
   }
 
   return (
-    <Tooltip
+    <InvTooltip
       label={<ClassificationTooltipContent classification={classification} />}
       placement="top"
       shouldWrapChildren
@@ -31,7 +32,7 @@ const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
           color: 'base.400',
         }}
       />
-    </Tooltip>
+    </InvTooltip>
   );
 };
 

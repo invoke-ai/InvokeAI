@@ -1,4 +1,4 @@
-import { ChangeBoardModalState } from './types';
+import type { ChangeBoardModalState } from './types';
 
 export const initialState: ChangeBoardModalState = {
   isModalOpen: false,

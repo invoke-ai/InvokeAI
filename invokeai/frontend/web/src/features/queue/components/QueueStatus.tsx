@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+
 import StatusStatGroup from './common/StatusStatGroup';
 import StatusStatItem from './common/StatusStatItem';
 

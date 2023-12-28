@@ -1,7 +1,8 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { controlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { ControlAdapterType } from 'features/controlAdapters/store/types';
 import { useCallback, useMemo } from 'react';
-import { ControlAdapterType } from 'features/controlAdapters/store/types';
+
 import { useControlAdapterModels } from './useControlAdapterModels';
 
 export const useAddControlAdapter = (type: ControlAdapterType) => {

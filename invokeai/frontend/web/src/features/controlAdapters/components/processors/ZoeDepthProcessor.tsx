@@ -1,4 +1,4 @@
-import { RequiredZoeDepthImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { RequiredZoeDepthImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo } from 'react';
 
 type Props = {

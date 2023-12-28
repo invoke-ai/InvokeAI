@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 const getUpscaledPixels = (imageDTO?: ImageDTO, maxUpscalePixels?: number) => {
   if (!imageDTO) {

@@ -1,14 +1,15 @@
 import { Flex, Grid, GridItem } from '@chakra-ui/react';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useAnyOrDirectInputFieldNames } from 'features/nodes/hooks/useAnyOrDirectInputFieldNames';
 import { useConnectionInputFieldNames } from 'features/nodes/hooks/useConnectionInputFieldNames';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
+import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 import { memo } from 'react';
-import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
-import InvocationNodeFooter from './InvocationNodeFooter';
-import InvocationNodeHeader from './InvocationNodeHeader';
+
 import InputField from './fields/InputField';
 import OutputField from './fields/OutputField';
-import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
+import InvocationNodeFooter from './InvocationNodeFooter';
+import InvocationNodeHeader from './InvocationNodeHeader';
 
 type Props = {
   nodeId: string;

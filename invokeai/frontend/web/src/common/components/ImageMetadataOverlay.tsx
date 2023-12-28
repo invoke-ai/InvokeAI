@@ -1,6 +1,6 @@
 import { Badge, Flex } from '@chakra-ui/react';
 import { memo } from 'react';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type ImageMetadataOverlayProps = {
   imageDTO: ImageDTO;

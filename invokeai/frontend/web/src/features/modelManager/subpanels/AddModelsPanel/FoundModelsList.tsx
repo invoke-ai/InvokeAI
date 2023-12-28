@@ -1,22 +1,25 @@
-import { Flex, Text } from '@chakra-ui/react';
-import { makeToast } from 'features/system/util/makeToast';
-import { RootState } from 'app/store/store';
+import { Flex } from '@chakra-ui/react';
+import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIInput from 'common/components/IAIInput';
-import IAIScrollArea from 'common/components/IAIScrollArea';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { difference, forEach, intersection, map, values } from 'lodash-es';
-import { ChangeEvent, MouseEvent, useCallback, useState } from 'react';
+import type { ChangeEvent, MouseEvent } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ALL_BASE_MODELS } from 'services/api/constants';
+import type { SearchFolderResponse } from 'services/api/endpoints/models';
 import {
-  SearchFolderResponse,
   useGetMainModelsQuery,
   useGetModelsInFolderQuery,
   useImportMainModelsMutation,
 } from 'services/api/endpoints/models';
-import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
-import { ALL_BASE_MODELS } from 'services/api/constants';
 
 export default function FoundModelsList() {
   const searchFolder = useAppSelector(
@@ -112,61 +115,51 @@ export default function FoundModelsList() {
             gap: 4,
             alignItems: 'center',
             borderRadius: 4,
-            bg: 'base.200',
-            _dark: {
-              bg: 'base.800',
-            },
+            bg: 'base.800',
           }}
           key={model}
         >
           <Flex w="100%" sx={{ flexDirection: 'column', minW: '25%' }}>
-            <Text sx={{ fontWeight: 600 }}>
+            <InvText sx={{ fontWeight: 'semibold' }}>
               {model.split('\\').slice(-1)[0]}
-            </Text>
-            <Text
+            </InvText>
+            <InvText
               sx={{
                 fontSize: 'sm',
-                color: 'base.600',
-                _dark: {
-                  color: 'base.400',
-                },
+                color: 'base.400',
               }}
             >
               {model}
-            </Text>
+            </InvText>
           </Flex>
           {showActions ? (
             <Flex gap={2}>
-              <IAIButton
+              <InvButton
                 id={model}
                 onClick={quickAddHandler}
                 isLoading={isLoading}
               >
                 {t('modelManager.quickAdd')}
-              </IAIButton>
-              <IAIButton
+              </InvButton>
+              <InvButton
                 onClick={handleClickSetAdvanced.bind(null, model)}
                 isLoading={isLoading}
               >
                 {t('modelManager.advanced')}
-              </IAIButton>
+              </InvButton>
             </Flex>
           ) : (
-            <Text
+            <InvText
               sx={{
-                fontWeight: 600,
+                fontWeight: 'semibold',
                 p: 2,
                 borderRadius: 4,
-                color: 'accent.50',
-                bg: 'accent.400',
-                _dark: {
-                  color: 'accent.100',
-                  bg: 'accent.600',
-                },
+                color: 'blue.100',
+                bg: 'blue.600',
               }}
             >
               {t('common.installed')}
-            </Text>
+            </InvText>
           )}
         </Flex>
       );
@@ -188,13 +181,10 @@ export default function FoundModelsList() {
             alignItems: 'center',
             height: 96,
             userSelect: 'none',
-            bg: 'base.200',
-            _dark: {
-              bg: 'base.900',
-            },
+            bg: 'base.900',
           }}
         >
-          <Text variant="subtext">{t('modelManager.noModels')}</Text>
+          <InvText variant="subtext">{t('modelManager.noModels')}</InvText>
         </Flex>
       );
     }
@@ -208,34 +198,29 @@ export default function FoundModelsList() {
           minW: '50%',
         }}
       >
-        <IAIInput
-          onChange={handleSearchFilter}
-          label={t('modelManager.search')}
-          labelPos="side"
-        />
+        <InvControl label={t('modelManager.search')}>
+          <InvInput onChange={handleSearchFilter} />
+        </InvControl>
         <Flex p={2} gap={2}>
-          <Text sx={{ fontWeight: 600 }}>
+          <InvText sx={{ fontWeight: 'semibold' }}>
             {t('modelManager.modelsFound')}: {foundModels.length}
-          </Text>
-          <Text
+          </InvText>
+          <InvText
             sx={{
-              fontWeight: 600,
-              color: 'accent.500',
-              _dark: {
-                color: 'accent.200',
-              },
+              fontWeight: 'semibold',
+              color: 'blue.200',
             }}
           >
             {t('common.notInstalled')}: {filteredModels.length}
-          </Text>
+          </InvText>
         </Flex>
 
-        <IAIScrollArea offsetScrollbars>
+        <ScrollableContent>
           <Flex gap={2} flexDirection="column">
             {renderModels({ models: filteredModels })}
             {renderModels({ models: alreadyInstalled, showActions: false })}
           </Flex>
-        </IAIScrollArea>
+        </ScrollableContent>
       </Flex>
     );
   };

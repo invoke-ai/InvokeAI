@@ -1,17 +1,16 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import {
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type {
   ParameterNegativeStylePromptSDXL,
   ParameterPositiveStylePromptSDXL,
-  ParameterSDXLRefinerModel,
   ParameterScheduler,
+  ParameterSDXLRefinerModel,
 } from 'features/parameters/types/parameterSchemas';
 
 type SDXLState = {
   positiveStylePrompt: ParameterPositiveStylePromptSDXL;
   negativeStylePrompt: ParameterNegativeStylePromptSDXL;
   shouldConcatSDXLStylePrompt: boolean;
-  shouldUseSDXLRefiner: boolean;
-  sdxlImg2ImgDenoisingStrength: number;
   refinerModel: ParameterSDXLRefinerModel | null;
   refinerSteps: number;
   refinerCFGScale: number;
@@ -25,8 +24,6 @@ export const initialSDXLState: SDXLState = {
   positiveStylePrompt: '',
   negativeStylePrompt: '',
   shouldConcatSDXLStylePrompt: true,
-  shouldUseSDXLRefiner: false,
-  sdxlImg2ImgDenoisingStrength: 0.7,
   refinerModel: null,
   refinerSteps: 20,
   refinerCFGScale: 7.5,
@@ -48,12 +45,6 @@ const sdxlSlice = createSlice({
     },
     setShouldConcatSDXLStylePrompt: (state, action: PayloadAction<boolean>) => {
       state.shouldConcatSDXLStylePrompt = action.payload;
-    },
-    setShouldUseSDXLRefiner: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSDXLRefiner = action.payload;
-    },
-    setSDXLImg2ImgDenoisingStrength: (state, action: PayloadAction<number>) => {
-      state.sdxlImg2ImgDenoisingStrength = action.payload;
     },
     refinerModelChanged: (
       state,
@@ -92,8 +83,6 @@ export const {
   setPositiveStylePromptSDXL,
   setNegativeStylePromptSDXL,
   setShouldConcatSDXLStylePrompt,
-  setShouldUseSDXLRefiner,
-  setSDXLImg2ImgDenoisingStrength,
   refinerModelChanged,
   setRefinerSteps,
   setRefinerCFGScale,

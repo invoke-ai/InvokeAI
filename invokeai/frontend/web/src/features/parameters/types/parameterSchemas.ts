@@ -3,9 +3,9 @@ import {
   zControlNetModelField,
   zIPAdapterModelField,
   zLoRAModelField,
-  zMainOrONNXModelField,
-  zSDXLRefinerModelField,
+  zMainModelField,
   zSchedulerField,
+  zSDXLRefinerModelField,
   zT2IAdapterModelField,
   zVAEModelField,
 } from 'features/nodes/types/common';
@@ -116,8 +116,16 @@ export const isParameterHeight = (val: unknown): val is ParameterHeight =>
   zParameterHeight.safeParse(val).success;
 // #endregion
 
+// #region Aspect Ratio
+export const zParameterAspectRatio = z.number().int().min(0).max(6);
+export type ParameterAspectRatio = z.infer<typeof zParameterAspectRatio>;
+export const isParameterAspectRatio = (
+  val: unknown
+): val is ParameterAspectRatio => zParameterAspectRatio.safeParse(val).success;
+// #endregion
+
 // #region Model
-export const zParameterModel = zMainOrONNXModelField;
+export const zParameterModel = zMainModelField;
 export type ParameterModel = z.infer<typeof zParameterModel>;
 export const isParameterModel = (val: unknown): val is ParameterModel =>
   zParameterModel.safeParse(val).success;

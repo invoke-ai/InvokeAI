@@ -1,7 +1,8 @@
+import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPause } from 'react-icons/fa';
-import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
+
 import QueueButton from './common/QueueButton';
 
 type Props = {

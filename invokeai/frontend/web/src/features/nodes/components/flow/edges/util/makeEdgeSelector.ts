@@ -2,6 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+
 import { getFieldColor } from './getEdgeColor';
 
 export const makeEdgeSelector = (

@@ -1,6 +1,8 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
-import { BaseEdge, EdgeProps, getBezierPath } from 'reactflow';
+import type { EdgeProps } from 'reactflow';
+import { BaseEdge, getBezierPath } from 'reactflow';
+
 import { makeEdgeSelector } from './util/makeEdgeSelector';
 
 const InvocationDefaultEdge = ({

@@ -1,4 +1,5 @@
-import { StatGroup, StatGroupProps } from '@chakra-ui/react';
+import type { StatGroupProps } from '@chakra-ui/react';
+import { StatGroup } from '@chakra-ui/react';
 import { memo } from 'react';
 
 const StatusStatGroup = ({ children, ...rest }: StatGroupProps) => (
@@ -7,7 +8,7 @@ const StatusStatGroup = ({ children, ...rest }: StatGroupProps) => (
     justifyContent="center"
     w="full"
     h="full"
-    layerStyle="second"
+    layerStyle="first"
     borderRadius="base"
     py={2}
     px={3}

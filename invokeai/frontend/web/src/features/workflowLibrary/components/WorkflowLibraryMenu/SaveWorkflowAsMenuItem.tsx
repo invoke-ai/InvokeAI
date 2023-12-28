@@ -1,21 +1,13 @@
-import {
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  FormControl,
-  FormLabel,
-  Input,
-  MenuItem,
-  useDisclosure,
-} from '@chakra-ui/react';
+import { useDisclosure } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
+import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { useSaveWorkflowAs } from 'features/workflowLibrary/hooks/useSaveWorkflowAs';
 import { getWorkflowCopyName } from 'features/workflowLibrary/util/getWorkflowCopyName';
-import { ChangeEvent, memo, useCallback, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaClone } from 'react-icons/fa';
 
@@ -30,6 +22,7 @@ const SaveWorkflowAsButton = () => {
   const onOpenCallback = useCallback(() => {
     setName(getWorkflowCopyName(currentName));
     onOpen();
+    inputRef.current?.focus();
   }, [currentName, onOpen]);
 
   const onSave = useCallback(async () => {
@@ -42,42 +35,25 @@ const SaveWorkflowAsButton = () => {
 
   return (
     <>
-      <MenuItem as="button" icon={<FaClone />} onClick={onOpenCallback}>
+      <InvMenuItem as="button" icon={<FaClone />} onClick={onOpenCallback}>
         {t('workflows.saveWorkflowAs')}
-      </MenuItem>
-      <AlertDialog
+      </InvMenuItem>
+
+      <InvConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}
-        leastDestructiveRef={inputRef}
-        isCentered
+        title={t('workflows.saveWorkflowAs')}
+        acceptCallback={onSave}
       >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              {t('workflows.saveWorkflowAs')}
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              <FormControl>
-                <FormLabel>{t('workflows.workflowName')}</FormLabel>
-                <Input
-                  ref={inputRef}
-                  value={name}
-                  onChange={onChange}
-                  placeholder={t('workflows.workflowName')}
-                />
-              </FormControl>
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <IAIButton onClick={onClose}>{t('common.cancel')}</IAIButton>
-              <IAIButton colorScheme="accent" onClick={onSave} ml={3}>
-                {t('common.saveAs')}
-              </IAIButton>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
+        <InvControl label={t('workflows.workflowName')}>
+          <InvInput
+            ref={inputRef}
+            value={name}
+            onChange={onChange}
+            placeholder={t('workflows.workflowName')}
+          />
+        </InvControl>
+      </InvConfirmationAlertDialog>
     </>
   );
 };

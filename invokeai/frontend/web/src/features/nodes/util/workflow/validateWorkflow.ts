@@ -1,14 +1,13 @@
 import { parseify } from 'common/util/serialize';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import { isWorkflowInvocationNode } from 'features/nodes/types/workflow';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
-import { JsonObject } from 'type-fest';
-import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
-import { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { JsonObject } from 'type-fest';
+
 import { parseAndMigrateWorkflow } from './migrations';
-import {
-  WorkflowV2,
-  isWorkflowInvocationNode,
-} from 'features/nodes/types/workflow';
 
 type WorkflowWarning = {
   message: string;

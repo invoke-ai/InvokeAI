@@ -10,7 +10,7 @@ import {
   setShouldSnapToGrid,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { CanvasTool } from 'features/canvas/store/canvasTypes';
+import type { CanvasTool } from 'features/canvas/store/canvasTypes';
 import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useRef } from 'react';

@@ -1,4 +1,4 @@
-import { Node } from 'reactflow';
+import type { Node } from 'reactflow';
 
 export const findUnoccupiedPosition = (nodes: Node[], x: number, y: number) => {
   let newX = x;

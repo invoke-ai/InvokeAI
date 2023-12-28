@@ -1,8 +1,6 @@
 import { logger } from 'app/logging/logger';
-import {
-  ParameterSDXLRefinerModel,
-  zParameterSDXLRefinerModel,
-} from 'features/parameters/types/parameterSchemas';
+import type { ParameterSDXLRefinerModel } from 'features/parameters/types/parameterSchemas';
+import { zParameterSDXLRefinerModel } from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToSDXLRefinerModelParam = (
   mainModelId: string

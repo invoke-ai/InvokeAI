@@ -1,5 +1,6 @@
-import { Edge, Node } from 'reactflow';
+import type { Edge, Node } from 'reactflow';
 import { z } from 'zod';
+
 import { zClassification, zProgressImage } from './common';
 import {
   zFieldInputInstance,

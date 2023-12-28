@@ -6,16 +6,16 @@ import {
   Flex,
   Icon,
   Image,
-  Text,
-  Tooltip,
 } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
+import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { AddToBoardDropData } from 'features/dnd/types';
+import type { AddToBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import {
@@ -31,7 +31,7 @@ import {
   useUpdateBoardMutation,
 } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { BoardDTO } from 'services/api/types';
+import type { BoardDTO } from 'services/api/types';
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -159,7 +159,7 @@ const GalleryBoard = ({
           setBoardToDelete={setBoardToDelete}
         >
           {(ref) => (
-            <Tooltip label={tooltip} openDelay={1000} hasArrow>
+            <InvTooltip label={tooltip} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -171,10 +171,7 @@ const GalleryBoard = ({
                   alignItems: 'center',
                   borderRadius: 'base',
                   cursor: 'pointer',
-                  bg: 'base.200',
-                  _dark: {
-                    bg: 'base.800',
-                  },
+                  bg: 'base.800',
                 }}
               >
                 {coverImage?.thumbnail_url ? (
@@ -206,25 +203,10 @@ const GalleryBoard = ({
                         mt: -6,
                         opacity: 0.7,
                         color: 'base.500',
-                        _dark: {
-                          color: 'base.500',
-                        },
                       }}
                     />
                   </Flex>
                 )}
-                {/* <Flex
-                  sx={{
-                    position: 'absolute',
-                    insetInlineEnd: 0,
-                    top: 0,
-                    p: 1,
-                  }}
-                >
-                  <Badge variant="solid" sx={BASE_BADGE_STYLES}>
-                    {totalImages}/{totalAssets}
-                  </Badge>
-                </Flex> */}
                 {isSelectedForAutoAdd && <AutoAddIcon />}
                 <SelectionOverlay
                   isSelected={isSelected}
@@ -241,12 +223,8 @@ const GalleryBoard = ({
                     w: 'full',
                     maxW: 'full',
                     borderBottomRadius: 'base',
-                    bg: isSelected ? 'accent.400' : 'base.500',
+                    bg: isSelected ? 'blue.500' : 'base.600',
                     color: isSelected ? 'base.50' : 'base.100',
-                    _dark: {
-                      bg: isSelected ? 'accent.500' : 'base.600',
-                      color: isSelected ? 'base.50' : 'base.100',
-                    },
                     lineHeight: 'short',
                     fontSize: 'xs',
                   }}
@@ -264,7 +242,7 @@ const GalleryBoard = ({
                     <EditablePreview
                       sx={{
                         p: 0,
-                        fontWeight: isSelected ? 700 : 500,
+                        fontWeight: isSelected ? 'bold' : 'normal',
                         textAlign: 'center',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -288,11 +266,11 @@ const GalleryBoard = ({
                 <IAIDroppable
                   data={droppableData}
                   dropLabel={
-                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                    <InvText fontSize="md">{t('unifiedCanvas.move')}</InvText>
                   }
                 />
               </Flex>
-            </Tooltip>
+            </InvTooltip>
           )}
         </BoardContextMenu>
       </Flex>

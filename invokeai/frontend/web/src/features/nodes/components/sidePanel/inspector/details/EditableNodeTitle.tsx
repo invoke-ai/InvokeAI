@@ -45,21 +45,14 @@ const EditableNodeTitle = ({ nodeId, title }: Props) => {
   }, [label, templateTitle, title, t]);
 
   return (
-    <Flex
-      sx={{
-        w: 'full',
-        h: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
+    <Flex w="full" alignItems="center" justifyContent="center">
       <Editable
         as={Flex}
         value={localTitle}
         onChange={handleChange}
         onSubmit={handleSubmit}
         w="full"
-        fontWeight={600}
+        fontWeight="semibold"
       >
         <EditablePreview noOfLines={1} />
         <EditableInput

@@ -1,6 +1,7 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
+import { SyncModelsButton } from 'features/modelManager/components/SyncModels/SyncModelsButton';
 import { useTranslation } from 'react-i18next';
-import SyncModelsButton from './SyncModelsButton';
 
 export default function SyncModels() {
   const { t } = useTranslation();
@@ -14,8 +15,7 @@ export default function SyncModels() {
         gap: 4,
         justifyContent: 'space-between',
         alignItems: 'center',
-        bg: 'base.200',
-        _dark: { bg: 'base.800' },
+        bg: 'base.800',
       }}
     >
       <Flex
@@ -24,10 +24,12 @@ export default function SyncModels() {
           gap: 2,
         }}
       >
-        <Text sx={{ fontWeight: 600 }}>{t('modelManager.syncModels')}</Text>
-        <Text fontSize="sm" sx={{ _dark: { color: 'base.400' } }}>
+        <InvText sx={{ fontWeight: 'semibold' }}>
+          {t('modelManager.syncModels')}
+        </InvText>
+        <InvText fontSize="sm" sx={{ color: 'base.400' }}>
           {t('modelManager.syncModelsDesc')}
-        </Text>
+        </InvText>
       </Flex>
       <SyncModelsButton />
     </Flex>

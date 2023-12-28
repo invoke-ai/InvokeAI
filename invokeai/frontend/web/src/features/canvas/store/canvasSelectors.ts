@@ -1,6 +1,9 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { RootState, stateSelector } from 'app/store/store';
-import { CanvasImage, isCanvasBaseImage } from './canvasTypes';
+import type { RootState } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
+
+import type { CanvasImage } from './canvasTypes';
+import { isCanvasBaseImage } from './canvasTypes';
 
 export const isStagingSelector = createMemoizedSelector(
   [stateSelector],

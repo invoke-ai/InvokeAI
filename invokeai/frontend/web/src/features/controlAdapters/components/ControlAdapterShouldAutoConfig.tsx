@@ -1,11 +1,12 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAISwitch from 'common/components/IAISwitch';
-import { controlAdapterAutoConfigToggled } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterShouldAutoConfig } from 'features/controlAdapters/hooks/useControlAdapterShouldAutoConfig';
+import { controlAdapterAutoConfigToggled } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isNil } from 'lodash-es';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   id: string;
@@ -26,13 +27,12 @@ const ControlAdapterShouldAutoConfig = ({ id }: Props) => {
   }
 
   return (
-    <IAISwitch
-      label={t('controlnet.autoConfigure')}
-      aria-label={t('controlnet.autoConfigure')}
-      isChecked={shouldAutoConfig}
-      onChange={handleShouldAutoConfigChanged}
-      isDisabled={!isEnabled}
-    />
+    <InvControl label={t('controlnet.autoConfigure')} isDisabled={!isEnabled}>
+      <InvSwitch
+        isChecked={shouldAutoConfig}
+        onChange={handleShouldAutoConfigChanged}
+      />
+    </InvControl>
   );
 };
 

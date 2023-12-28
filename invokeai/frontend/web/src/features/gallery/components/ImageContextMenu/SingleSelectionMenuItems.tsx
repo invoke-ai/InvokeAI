@@ -1,8 +1,9 @@
-import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
+import { Flex, Spinner } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
@@ -40,7 +41,7 @@ import {
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -151,20 +152,20 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   return (
     <>
-      <MenuItem
+      <InvMenuItem
         as="a"
         href={imageDTO.image_url}
         target="_blank"
         icon={<FaExternalLinkAlt />}
       >
         {t('common.openInNewTab')}
-      </MenuItem>
+      </InvMenuItem>
       {isClipboardAPIAvailable && (
-        <MenuItem icon={<FaCopy />} onClickCapture={handleCopyImage}>
+        <InvMenuItem icon={<FaCopy />} onClickCapture={handleCopyImage}>
           {t('parameters.copyImage')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem
+      <InvMenuItem
         as="a"
         download={true}
         href={imageDTO.image_url}
@@ -173,8 +174,8 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         w="100%"
       >
         {t('parameters.downloadImage')}
-      </MenuItem>
-      <MenuItem
+      </InvMenuItem>
+      <InvMenuItem
         icon={
           getAndLoadEmbeddedWorkflowResult.isLoading ? (
             <SpinnerIcon />
@@ -186,8 +187,8 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         isDisabled={!imageDTO.has_workflow}
       >
         {t('nodes.loadWorkflow')}
-      </MenuItem>
-      <MenuItem
+      </InvMenuItem>
+      <InvMenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <FaQuoteRight />}
         onClickCapture={handleRecallPrompt}
         isDisabled={
@@ -197,62 +198,62 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         }
       >
         {t('parameters.usePrompt')}
-      </MenuItem>
-      <MenuItem
+      </InvMenuItem>
+      <InvMenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <FaSeedling />}
         onClickCapture={handleRecallSeed}
         isDisabled={isLoadingMetadata || metadata?.seed === undefined}
       >
         {t('parameters.useSeed')}
-      </MenuItem>
-      <MenuItem
+      </InvMenuItem>
+      <InvMenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <FaAsterisk />}
         onClickCapture={handleUseAllParameters}
         isDisabled={isLoadingMetadata || !metadata}
       >
         {t('parameters.useAll')}
-      </MenuItem>
-      <MenuItem
+      </InvMenuItem>
+      <InvMenuItem
         icon={<FaShare />}
         onClickCapture={handleSendToImageToImage}
         id="send-to-img2img"
       >
         {t('parameters.sendToImg2Img')}
-      </MenuItem>
+      </InvMenuItem>
       {isCanvasEnabled && (
-        <MenuItem
+        <InvMenuItem
           icon={<FaShare />}
           onClickCapture={handleSendToCanvas}
           id="send-to-canvas"
         >
           {t('parameters.sendToUnifiedCanvas')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
+      <InvMenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}
-      </MenuItem>
+      </InvMenuItem>
       {imageDTO.starred ? (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.off.icon : <MdStar />}
           onClickCapture={handleUnstarImage}
         >
           {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
-        </MenuItem>
+        </InvMenuItem>
       ) : (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleStarImage}
         >
           {customStarUi ? customStarUi.on.text : t('gallery.starImage')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem
-        sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
+      <InvMenuItem
+        sx={{ color: 'error.300' }}
         icon={<FaTrash />}
         onClickCapture={handleDelete}
       >
         {t('gallery.deleteImage')}
-      </MenuItem>
+      </InvMenuItem>
     </>
   );
 };

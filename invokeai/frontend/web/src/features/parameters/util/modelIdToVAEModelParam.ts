@@ -1,8 +1,6 @@
 import { logger } from 'app/logging/logger';
-import {
-  ParameterVAEModel,
-  zParameterVAEModel,
-} from 'features/parameters/types/parameterSchemas';
+import type { ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
+import { zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToVAEModelParam = (
   vaeModelId: string

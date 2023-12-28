@@ -1,4 +1,5 @@
-import { Box, Text } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
 import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import {
@@ -14,22 +15,22 @@ import {
   isEnumFieldInputTemplate,
   isFloatFieldInputInstance,
   isFloatFieldInputTemplate,
-  isIPAdapterModelFieldInputInstance,
-  isIPAdapterModelFieldInputTemplate,
   isImageFieldInputInstance,
   isImageFieldInputTemplate,
   isIntegerFieldInputInstance,
   isIntegerFieldInputTemplate,
+  isIPAdapterModelFieldInputInstance,
+  isIPAdapterModelFieldInputTemplate,
   isLoRAModelFieldInputInstance,
   isLoRAModelFieldInputTemplate,
   isMainModelFieldInputInstance,
   isMainModelFieldInputTemplate,
+  isSchedulerFieldInputInstance,
+  isSchedulerFieldInputTemplate,
   isSDXLMainModelFieldInputInstance,
   isSDXLMainModelFieldInputTemplate,
   isSDXLRefinerModelFieldInputInstance,
   isSDXLRefinerModelFieldInputTemplate,
-  isSchedulerFieldInputInstance,
-  isSchedulerFieldInputTemplate,
   isStringFieldInputInstance,
   isStringFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
@@ -39,19 +40,20 @@ import {
 } from 'features/nodes/types/field';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
-import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
+import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
 import NumberFieldInputComponent from './inputs/NumberFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
-import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
+import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
@@ -290,16 +292,15 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   return (
     <Box p={1}>
-      <Text
+      <InvText
         sx={{
           fontSize: 'sm',
-          fontWeight: 600,
-          color: 'error.400',
-          _dark: { color: 'error.300' },
+          fontWeight: 'semibold',
+          color: 'error.300',
         }}
       >
         {t('nodes.unknownFieldType', { type: fieldInstance?.type.name })}
-      </Text>
+      </InvText>
     </Box>
   );
 };

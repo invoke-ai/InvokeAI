@@ -1,11 +1,12 @@
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import {
+import type {
   ImageNSFWBlurInvocation,
   ImageWatermarkInvocation,
   LatentsToImageInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { LATENTS_TO_IMAGE, NSFW_CHECKER, WATERMARKER } from './constants';
 
 export const addWatermarkerToGraph = (

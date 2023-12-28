@@ -1,21 +1,18 @@
-import {
-  Divider,
-  Flex,
-  FormLabelProps,
-  Heading,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  useDisclosure,
-} from '@chakra-ui/react';
+import { Divider, Flex, Heading, useDisclosure } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISwitch from 'common/components/IAISwitch';
-import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopCenterPanel/ReloadSchemaButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import {
+  InvModal,
+  InvModalBody,
+  InvModalCloseButton,
+  InvModalContent,
+  InvModalHeader,
+  InvModalOverlay,
+} from 'common/components/InvModal/wrapper';
+import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
   shouldAnimateEdgesChanged,
@@ -23,13 +20,10 @@ import {
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
 } from 'features/nodes/store/nodesSlice';
-import { ChangeEvent, ReactNode, memo, useCallback } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SelectionMode } from 'reactflow';
-
-const formLabelProps: FormLabelProps = {
-  fontWeight: 600,
-};
 
 const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
   const {
@@ -104,12 +98,12 @@ const WorkflowEditorSettings = ({ children }: Props) => {
     <>
       {children({ onOpen })}
 
-      <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>{t('nodes.workflowSettings')}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+      <InvModal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
+        <InvModalOverlay />
+        <InvModalContent>
+          <InvModalHeader>{t('nodes.workflowSettings')}</InvModalHeader>
+          <InvModalCloseButton />
+          <InvModalBody>
             <Flex
               sx={{
                 flexDirection: 'column',
@@ -118,52 +112,62 @@ const WorkflowEditorSettings = ({ children }: Props) => {
               }}
             >
               <Heading size="sm">{t('parameters.general')}</Heading>
-              <IAISwitch
-                formLabelProps={formLabelProps}
-                onChange={handleChangeShouldAnimate}
-                isChecked={shouldAnimateEdges}
+              <InvControl
                 label={t('nodes.animatedEdges')}
                 helperText={t('nodes.animatedEdgesHelp')}
-              />
+              >
+                <InvSwitch
+                  onChange={handleChangeShouldAnimate}
+                  isChecked={shouldAnimateEdges}
+                />
+              </InvControl>
               <Divider />
-              <IAISwitch
-                formLabelProps={formLabelProps}
-                isChecked={shouldSnapToGrid}
-                onChange={handleChangeShouldSnap}
+              <InvControl
                 label={t('nodes.snapToGrid')}
                 helperText={t('nodes.snapToGridHelp')}
-              />
+              >
+                <InvSwitch
+                  isChecked={shouldSnapToGrid}
+                  onChange={handleChangeShouldSnap}
+                />
+              </InvControl>
               <Divider />
-              <IAISwitch
-                formLabelProps={formLabelProps}
-                isChecked={shouldColorEdges}
-                onChange={handleChangeShouldColor}
+              <InvControl
                 label={t('nodes.colorCodeEdges')}
                 helperText={t('nodes.colorCodeEdgesHelp')}
-              />
+              >
+                <InvSwitch
+                  isChecked={shouldColorEdges}
+                  onChange={handleChangeShouldColor}
+                />
+              </InvControl>
               <Divider />
-              <IAISwitch
-                formLabelProps={formLabelProps}
-                isChecked={selectionModeIsChecked}
-                onChange={handleChangeSelectionMode}
+              <InvControl
                 label={t('nodes.fullyContainNodes')}
                 helperText={t('nodes.fullyContainNodesHelp')}
-              />
+              >
+                <InvSwitch
+                  isChecked={selectionModeIsChecked}
+                  onChange={handleChangeSelectionMode}
+                />
+              </InvControl>
               <Heading size="sm" pt={4}>
                 {t('common.advanced')}
               </Heading>
-              <IAISwitch
-                formLabelProps={formLabelProps}
-                isChecked={shouldValidateGraph}
-                onChange={handleChangeShouldValidate}
+              <InvControl
                 label={t('nodes.validateConnections')}
                 helperText={t('nodes.validateConnectionsHelp')}
-              />
+              >
+                <InvSwitch
+                  isChecked={shouldValidateGraph}
+                  onChange={handleChangeShouldValidate}
+                />
+              </InvControl>
               <ReloadNodeTemplatesButton />
             </Flex>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+          </InvModalBody>
+        </InvModalContent>
+      </InvModal>
     </>
   );
 };

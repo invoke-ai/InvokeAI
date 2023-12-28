@@ -1,9 +1,11 @@
-import { Checkbox, Flex, FormControl, FormLabel } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
+import { InvControl } from 'common/components/InvControl/InvControl';
 import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { useIsIntermediate } from 'features/nodes/hooks/useIsIntermediate';
 import { nodeIsIntermediateChanged } from 'features/nodes/store/nodesSlice';
-import { ChangeEvent, memo, useCallback } from 'react';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
@@ -28,17 +30,9 @@ const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
   }
 
   return (
-    <FormControl as={Flex} sx={{ alignItems: 'center', gap: 2, w: 'auto' }}>
-      <FormLabel sx={{ fontSize: 'xs', mb: '1px' }}>
-        {t('hotkeys.saveToGallery.title')}
-      </FormLabel>
-      <Checkbox
-        className="nopan"
-        size="sm"
-        onChange={handleChange}
-        isChecked={!isIntermediate}
-      />
-    </FormControl>
+    <InvControl label={t('hotkeys.saveToGallery.title')} className="nopan">
+      <InvCheckbox onChange={handleChange} isChecked={!isIntermediate} />
+    </InvControl>
   );
 };
 

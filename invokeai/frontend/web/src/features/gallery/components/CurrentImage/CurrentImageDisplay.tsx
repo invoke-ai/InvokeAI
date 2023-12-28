@@ -1,7 +1,8 @@
 import { Flex } from '@chakra-ui/react';
+import { memo } from 'react';
+
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
-import { memo } from 'react';
 
 const CurrentImageDisplay = () => {
   return (

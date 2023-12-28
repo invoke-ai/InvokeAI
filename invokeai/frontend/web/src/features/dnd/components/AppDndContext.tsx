@@ -9,15 +9,17 @@ import { logger } from 'app/logging/logger';
 import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
-import { AnimatePresence, motion } from 'framer-motion';
-import { PropsWithChildren, memo, useCallback, useState } from 'react';
 import { useScaledModifer } from 'features/dnd/hooks/useScaledCenteredModifer';
-import {
+import type {
   DragEndEvent,
   DragStartEvent,
   TypesafeDraggableData,
 } from 'features/dnd/types';
 import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { PropsWithChildren } from 'react';
+import { memo, useCallback, useState } from 'react';
+
 import { DndContextTypesafe } from './DndContextTypesafe';
 import DragPreview from './DragPreview';
 

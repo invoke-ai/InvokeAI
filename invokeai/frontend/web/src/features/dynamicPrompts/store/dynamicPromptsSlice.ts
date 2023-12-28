@@ -1,6 +1,11 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import { z } from 'zod';
 
-export type SeedBehaviour = 'PER_ITERATION' | 'PER_PROMPT';
+export const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
+export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
+export const isSeedBehaviour = (v: unknown): v is SeedBehaviour =>
+  zSeedBehaviour.safeParse(v).success;
 export interface DynamicPromptsState {
   maxPrompts: number;
   combinatorial: boolean;

@@ -3,12 +3,14 @@ import {
   WorkflowMigrationError,
   WorkflowVersionError,
 } from 'features/nodes/types/error';
-import { FieldType } from 'features/nodes/types/field';
-import { InvocationNodeData } from 'features/nodes/types/invocation';
+import type { FieldType } from 'features/nodes/types/field';
+import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { zSemVer } from 'features/nodes/types/semver';
 import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from 'features/nodes/types/v1/fieldTypeMap';
-import { WorkflowV1, zWorkflowV1 } from 'features/nodes/types/v1/workflowV1';
-import { WorkflowV2, zWorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV1 } from 'features/nodes/types/v1/workflowV1';
+import { zWorkflowV1 } from 'features/nodes/types/v1/workflowV1';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import { zWorkflowV2 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 import { z } from 'zod';

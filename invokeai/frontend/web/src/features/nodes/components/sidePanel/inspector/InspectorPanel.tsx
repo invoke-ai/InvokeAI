@@ -7,11 +7,12 @@ import {
   Tabs,
 } from '@chakra-ui/react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import InspectorDataTab from './InspectorDataTab';
+import InspectorDetailsTab from './InspectorDetailsTab';
 import InspectorOutputsTab from './InspectorOutputsTab';
 import InspectorTemplateTab from './InspectorTemplateTab';
-import { useTranslation } from 'react-i18next';
-import InspectorDetailsTab from './InspectorDetailsTab';
 
 const InspectorPanel = () => {
   const { t } = useTranslation();

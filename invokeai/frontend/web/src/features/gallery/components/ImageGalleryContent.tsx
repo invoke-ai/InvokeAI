@@ -1,21 +1,22 @@
 import {
   Box,
-  ButtonGroup,
   Flex,
   Tab,
   TabList,
   Tabs,
-  VStack,
   useDisclosure,
+  VStack,
 } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaImages, FaServer } from 'react-icons/fa';
+
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
@@ -91,14 +92,9 @@ const ImageGalleryContent = () => {
             sx={{ w: 'full' }}
           >
             <TabList>
-              <ButtonGroup
-                isAttached
-                sx={{
-                  w: 'full',
-                }}
-              >
+              <InvButtonGroup w="full">
                 <Tab
-                  as={IAIButton}
+                  as={InvButton}
                   size="sm"
                   isChecked={galleryView === 'images'}
                   onClick={handleClickImages}
@@ -111,7 +107,7 @@ const ImageGalleryContent = () => {
                   {t('parameters.images')}
                 </Tab>
                 <Tab
-                  as={IAIButton}
+                  as={InvButton}
                   size="sm"
                   isChecked={galleryView === 'assets'}
                   onClick={handleClickAssets}
@@ -123,7 +119,7 @@ const ImageGalleryContent = () => {
                 >
                   {t('gallery.assets')}
                 </Tab>
-              </ButtonGroup>
+              </InvButtonGroup>
             </TabList>
           </Tabs>
         </Flex>

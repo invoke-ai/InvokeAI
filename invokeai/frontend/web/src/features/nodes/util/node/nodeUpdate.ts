@@ -1,11 +1,12 @@
 import { satisfies } from 'compare-versions';
 import { NodeUpdateError } from 'features/nodes/types/error';
-import {
+import type {
   InvocationNode,
   InvocationTemplate,
 } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
-import { cloneDeep, keys, defaultsDeep, pick } from 'lodash-es';
+import { cloneDeep, defaultsDeep, keys, pick } from 'lodash-es';
+
 import { buildInvocationNode } from './buildInvocationNode';
 
 export const getNeedsUpdate = (

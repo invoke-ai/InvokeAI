@@ -2,9 +2,10 @@ import { createAction } from '@reduxjs/toolkit';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '..';
+import type { ImageCache } from 'services/api/types';
 import { getListImagesUrl, imagesAdapter } from 'services/api/util';
-import { ImageCache } from 'services/api/types';
+
+import { startAppListening } from '..';
 
 export const appStarted = createAction('app/appStarted');
 

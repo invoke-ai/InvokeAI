@@ -1,21 +1,17 @@
-import {
-  NumberDecrementStepper,
-  NumberIncrementStepper,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-} from '@chakra-ui/react';
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { numberStringRegex } from 'common/components/IAINumberInput';
+import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { fieldNumberValueChanged } from 'features/nodes/store/nodesSlice';
-import {
+import type {
   FloatFieldInputInstance,
   FloatFieldInputTemplate,
   IntegerFieldInputInstance,
   IntegerFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { FieldComponentProps } from './types';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { isNil } from 'lodash-es';
+import { memo, useCallback, useMemo } from 'react';
+
+import type { FieldComponentProps } from './types';
 
 const NumberFieldInputComponent = (
   props: FieldComponentProps<
@@ -25,54 +21,53 @@ const NumberFieldInputComponent = (
 ) => {
   const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
-  const [valueAsString, setValueAsString] = useState<string>(
-    String(field.value)
-  );
   const isIntegerField = useMemo(
     () => fieldTemplate.type.name === 'IntegerField',
     [fieldTemplate.type]
   );
 
   const handleValueChanged = useCallback(
-    (v: string) => {
-      setValueAsString(v);
-      // This allows negatives and decimals e.g. '-123', `.5`, `-0.2`, etc.
-      if (!v.match(numberStringRegex)) {
-        // Cast the value to number. Floor it if it should be an integer.
-        dispatch(
-          fieldNumberValueChanged({
-            nodeId,
-            fieldName: field.name,
-            value: isIntegerField ? Math.floor(Number(v)) : Number(v),
-          })
-        );
-      }
+    (v: number) => {
+      dispatch(
+        fieldNumberValueChanged({
+          nodeId,
+          fieldName: field.name,
+          value: isIntegerField ? Math.floor(Number(v)) : Number(v),
+        })
+      );
     },
     [dispatch, field.name, isIntegerField, nodeId]
   );
 
-  useEffect(() => {
-    if (
-      !valueAsString.match(numberStringRegex) &&
-      field.value !== Number(valueAsString)
-    ) {
-      setValueAsString(String(field.value));
+  const min = useMemo(() => {
+    if (!isNil(fieldTemplate.minimum)) {
+      return fieldTemplate.minimum;
     }
-  }, [field.value, valueAsString]);
+    if (!isNil(fieldTemplate.exclusiveMinimum)) {
+      return fieldTemplate.exclusiveMinimum + 0.01;
+    }
+    return;
+  }, [fieldTemplate.exclusiveMinimum, fieldTemplate.minimum]);
+
+  const max = useMemo(() => {
+    if (!isNil(fieldTemplate.maximum)) {
+      return fieldTemplate.maximum;
+    }
+    if (!isNil(fieldTemplate.exclusiveMaximum)) {
+      return fieldTemplate.exclusiveMaximum - 0.01;
+    }
+    return;
+  }, [fieldTemplate.exclusiveMaximum, fieldTemplate.maximum]);
 
   return (
-    <NumberInput
+    <InvNumberInput
       onChange={handleValueChanged}
-      value={valueAsString}
+      value={field.value}
+      min={min ?? NUMPY_RAND_MIN}
+      max={max ?? NUMPY_RAND_MAX}
       step={isIntegerField ? 1 : 0.1}
-      precision={isIntegerField ? 0 : 3}
-    >
-      <NumberInputField className="nodrag" />
-      <NumberInputStepper>
-        <NumberIncrementStepper />
-        <NumberDecrementStepper />
-      </NumberInputStepper>
-    </NumberInput>
+      className="nodrag"
+    />
   );
 };
 

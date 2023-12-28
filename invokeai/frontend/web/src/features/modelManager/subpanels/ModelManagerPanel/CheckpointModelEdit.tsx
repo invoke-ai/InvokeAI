@@ -1,23 +1,26 @@
-import { Badge, Divider, Flex, Text } from '@chakra-ui/react';
+import { Badge, Divider, Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineTextInput from 'common/components/IAIMantineInput';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/CheckpointConfigsSelect';
+import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { CheckpointModelConfigEntity } from 'services/api/endpoints/models';
 import {
-  CheckpointModelConfigEntity,
   useGetCheckpointConfigsQuery,
   useUpdateMainModelsMutation,
 } from 'services/api/endpoints/models';
-import { CheckpointModelConfig } from 'services/api/types';
-import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
-import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/CheckpointConfigsSelect';
-import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
+import type { CheckpointModelConfig } from 'services/api/types';
+
 import ModelConvert from './ModelConvert';
 
 type CheckpointModelEditProps = {
@@ -110,12 +113,12 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
-          <Text fontSize="lg" fontWeight="bold">
+          <InvText fontSize="lg" fontWeight="bold">
             {model.model_name}
-          </Text>
-          <Text fontSize="sm" color="base.400">
+          </InvText>
+          <InvText fontSize="sm" color="base.400">
             {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
-          </Text>
+          </InvText>
         </Flex>
         {![''].includes(model.base_model) ? (
           <ModelConvert model={model} />
@@ -124,8 +127,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
             sx={{
               p: 2,
               borderRadius: 4,
-              bg: 'error.200',
-              _dark: { bg: 'error.400' },
+              bg: 'error.400',
             }}
           >
             {t('modelManager.conversionNotSupported')}
@@ -145,14 +147,12 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
           )}
         >
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <IAIMantineTextInput
-              label={t('modelManager.name')}
-              {...checkpointEditForm.getInputProps('model_name')}
-            />
-            <IAIMantineTextInput
-              label={t('modelManager.description')}
-              {...checkpointEditForm.getInputProps('description')}
-            />
+            <InvControl label={t('modelManager.name')}>
+              <InvInput {...checkpointEditForm.getInputProps('model_name')} />
+            </InvControl>
+            <InvControl label={t('modelManager.description')}>
+              <InvInput {...checkpointEditForm.getInputProps('description')} />
+            </InvControl>
             <BaseModelSelect
               required
               {...checkpointEditForm.getInputProps('base_model')}
@@ -161,15 +161,12 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               required
               {...checkpointEditForm.getInputProps('variant')}
             />
-            <IAIMantineTextInput
-              required
-              label={t('modelManager.modelLocation')}
-              {...checkpointEditForm.getInputProps('path')}
-            />
-            <IAIMantineTextInput
-              label={t('modelManager.vaeLocation')}
-              {...checkpointEditForm.getInputProps('vae')}
-            />
+            <InvControl isRequired label={t('modelManager.modelLocation')}>
+              <InvInput {...checkpointEditForm.getInputProps('path')} />
+            </InvControl>
+            <InvControl label={t('modelManager.vaeLocation')}>
+              <InvInput {...checkpointEditForm.getInputProps('vae')} />
+            </InvControl>
 
             <Flex flexDirection="column" gap={2}>
               {!useCustomConfig ? (
@@ -178,22 +175,21 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
                   {...checkpointEditForm.getInputProps('config')}
                 />
               ) : (
-                <IAIMantineTextInput
-                  required
-                  label={t('modelManager.config')}
-                  {...checkpointEditForm.getInputProps('config')}
-                />
+                <InvControl isRequired label={t('modelManager.config')}>
+                  <InvInput {...checkpointEditForm.getInputProps('config')} />
+                </InvControl>
               )}
-              <IAISimpleCheckbox
-                isChecked={useCustomConfig}
-                onChange={handleChangeUseCustomConfig}
-                label="Use Custom Config"
-              />
+              <InvControl label="Use Custom Config">
+                <InvCheckbox
+                  isChecked={useCustomConfig}
+                  onChange={handleChangeUseCustomConfig}
+                />
+              </InvControl>
             </Flex>
 
-            <IAIButton type="submit" isLoading={isLoading}>
+            <InvButton type="submit" isLoading={isLoading}>
               {t('modelManager.updateModel')}
-            </IAIButton>
+            </InvButton>
           </Flex>
         </form>
       </Flex>

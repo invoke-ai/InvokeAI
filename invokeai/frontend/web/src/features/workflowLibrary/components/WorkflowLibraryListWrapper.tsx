@@ -1,5 +1,6 @@
 import { Flex } from '@chakra-ui/react';
-import { PropsWithChildren, memo } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo } from 'react';
 
 const WorkflowLibraryListWrapper = (props: PropsWithChildren) => {
   return (

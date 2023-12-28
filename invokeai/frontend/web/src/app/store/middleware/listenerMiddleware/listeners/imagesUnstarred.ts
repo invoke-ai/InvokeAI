@@ -1,7 +1,8 @@
-import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '..';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
-import { ImageDTO } from 'services/api/types';
+import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
+
+import { startAppListening } from '..';
 
 export const addImagesUnstarredListener = () => {
   startAppListening({

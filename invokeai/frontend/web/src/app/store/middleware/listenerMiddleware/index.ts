@@ -1,11 +1,12 @@
-import type { TypedAddListener, TypedStartListening } from '@reduxjs/toolkit';
-import {
-  UnknownAction,
+import type {
   ListenerEffect,
-  addListener,
-  createListenerMiddleware,
+  TypedAddListener,
+  TypedStartListening,
+  UnknownAction,
 } from '@reduxjs/toolkit';
+import { addListener, createListenerMiddleware } from '@reduxjs/toolkit';
 import type { AppDispatch, RootState } from 'app/store/store';
+
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
 import { addAnyEnqueuedListener } from './listeners/anyEnqueued';
@@ -42,13 +43,13 @@ import {
   addImageRemovedFromBoardFulfilledListener,
   addImageRemovedFromBoardRejectedListener,
 } from './listeners/imageRemovedFromBoard';
+import { addImagesStarredListener } from './listeners/imagesStarred';
+import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
 import {
   addImageUploadedFulfilledListener,
   addImageUploadedRejectedListener,
 } from './listeners/imageUploaded';
-import { addImagesStarredListener } from './listeners/imagesStarred';
-import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
@@ -69,9 +70,9 @@ import { addSocketSubscribedEventListener as addSocketSubscribedListener } from 
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addTabChangedListener } from './listeners/tabChanged';
+import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addWorkflowLoadRequestedListener } from './listeners/workflowLoadRequested';
-import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 
 export const listenerMiddleware = createListenerMiddleware();
 

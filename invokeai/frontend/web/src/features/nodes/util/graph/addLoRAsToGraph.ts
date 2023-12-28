@@ -1,10 +1,11 @@
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { forEach, size } from 'lodash-es';
-import {
+import type {
   CoreMetadataInvocation,
   LoraLoaderInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CANVAS_INPAINT_GRAPH,

@@ -1,16 +1,18 @@
+import 'reactflow/dist/style.css';
+
 import { Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MdDeviceHub } from 'react-icons/md';
-import 'reactflow/dist/style.css';
+
 import AddNodePopover from './flow/AddNodePopover/AddNodePopover';
 import { Flow } from './flow/Flow';
 import BottomLeftPanel from './flow/panels/BottomLeftPanel/BottomLeftPanel';
 import MinimapPanel from './flow/panels/MinimapPanel/MinimapPanel';
-import { useTranslation } from 'react-i18next';
-import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
 
 const NodeEditor = () => {
   const isReady = useAppSelector((state) => state.nodes.isReady);

@@ -5,18 +5,14 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  KeyboardEvent,
-  ReactNode,
-  memo,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
-import { FileRejection, useDropzone } from 'react-dropzone';
+import type { KeyboardEvent, ReactNode } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
+import type { FileRejection } from 'react-dropzone';
+import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/types';
+import type { PostUploadAction } from 'services/api/types';
+
 import ImageUploadOverlay from './ImageUploadOverlay';
 
 const selector = createMemoizedSelector(

@@ -4,19 +4,23 @@ import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
-import { setAspectRatio } from 'features/parameters/store/generationSlice';
-import { IRect, Vector2d } from 'konva/lib/types';
-import { clamp, cloneDeep } from 'lodash-es';
-import { RgbaColor } from 'react-colorful';
-import { ImageDTO } from 'services/api/types';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
 import calculateScale from 'features/canvas/util/calculateScale';
 import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
 import floorCoordinates from 'features/canvas/util/floorCoordinates';
 import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundingBoxDimensions';
 import roundDimensionsTo64 from 'features/canvas/util/roundDimensionsTo64';
-import {
-  BoundingBoxScale,
+import { ASPECT_RATIO_MAP } from 'features/parameters/components/ImageSize/constants';
+import { aspectRatioSelected } from 'features/parameters/store/generationSlice';
+import type { IRect, Vector2d } from 'konva/lib/types';
+import { clamp, cloneDeep } from 'lodash-es';
+import type { RgbaColor } from 'react-colorful';
+import { queueApi } from 'services/api/endpoints/queue';
+import type { ImageDTO } from 'services/api/types';
+import { appSocketQueueItemStatusChanged } from 'services/events/actions';
+
+import type {
+  BoundingBoxScaleMethod,
   CanvasBaseLine,
   CanvasImage,
   CanvasLayer,
@@ -25,12 +29,12 @@ import {
   CanvasState,
   CanvasTool,
   Dimensions,
+} from './canvasTypes';
+import {
   isCanvasAnyLine,
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
-import { appSocketQueueItemStatusChanged } from 'services/events/actions';
-import { queueApi } from 'services/api/endpoints/queue';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -714,7 +718,7 @@ export const canvasSlice = createSlice({
     },
     setBoundingBoxScaleMethod: (
       state,
-      action: PayloadAction<BoundingBoxScale>
+      action: PayloadAction<BoundingBoxScaleMethod>
     ) => {
       state.boundingBoxScaleMethod = action.payload;
 
@@ -800,15 +804,17 @@ export const canvasSlice = createSlice({
         );
       }
     });
-    builder.addCase(setAspectRatio, (state, action) => {
-      const ratio = action.payload;
-      if (ratio) {
+    builder.addCase(aspectRatioSelected, (state, action) => {
+      const aspectRatioID = action.payload;
+      if (aspectRatioID !== 'Free') {
         state.boundingBoxDimensions.height = roundToMultiple(
-          state.boundingBoxDimensions.width / ratio,
+          state.boundingBoxDimensions.width /
+            ASPECT_RATIO_MAP[aspectRatioID].ratio,
           64
         );
         state.scaledBoundingBoxDimensions.height = roundToMultiple(
-          state.scaledBoundingBoxDimensions.width / ratio,
+          state.scaledBoundingBoxDimensions.width /
+            ASPECT_RATIO_MAP[aspectRatioID].ratio,
           64
         );
       }

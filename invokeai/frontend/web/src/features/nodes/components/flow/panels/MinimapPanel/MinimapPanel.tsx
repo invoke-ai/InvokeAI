@@ -1,5 +1,5 @@
-import { Flex, chakra, useColorModeValue } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
+import { chakra, Flex } from '@chakra-ui/react';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import { MiniMap } from 'reactflow';
@@ -11,16 +11,6 @@ const MinimapPanel = () => {
     (state: RootState) => state.nodes.shouldShowMinimapPanel
   );
 
-  const nodeColor = useColorModeValue(
-    'var(--invokeai-colors-accent-300)',
-    'var(--invokeai-colors-accent-600)'
-  );
-
-  const maskColor = useColorModeValue(
-    'var(--invokeai-colors-blackAlpha-300)',
-    'var(--invokeai-colors-blackAlpha-600)'
-  );
-
   return (
     <Flex sx={{ gap: 2, position: 'absolute', bottom: 2, insetInlineEnd: 2 }}>
       {shouldShowMinimapPanel && (
@@ -30,17 +20,14 @@ const MinimapPanel = () => {
           nodeBorderRadius={15}
           sx={{
             m: '0 !important',
-            backgroundColor: 'base.200 !important',
             borderRadius: 'base',
-            _dark: {
-              backgroundColor: 'base.500 !important',
-            },
+            backgroundColor: 'base.500 !important',
             svg: {
               borderRadius: 'inherit',
             },
           }}
-          nodeColor={nodeColor}
-          maskColor={maskColor}
+          nodeColor="var(--invokeai-colors-blue-600)"
+          maskColor="var(--invokeai-colors-blackAlpha-600)"
         />
       )}
     </Flex>

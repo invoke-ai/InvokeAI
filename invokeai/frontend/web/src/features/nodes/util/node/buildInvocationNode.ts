@@ -1,15 +1,15 @@
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
-import {
+import type {
   FieldInputInstance,
   FieldOutputInstance,
 } from 'features/nodes/types/field';
-import {
+import type {
   InvocationNode,
   InvocationTemplate,
 } from 'features/nodes/types/invocation';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { reduce } from 'lodash-es';
-import { XYPosition } from 'reactflow';
+import type { XYPosition } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 
 export const buildInvocationNode = (

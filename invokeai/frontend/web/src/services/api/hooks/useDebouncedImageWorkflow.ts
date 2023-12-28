@@ -1,7 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGetImageWorkflowQuery } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
 export const useDebouncedImageWorkflow = (imageDTO?: ImageDTO | null) => {

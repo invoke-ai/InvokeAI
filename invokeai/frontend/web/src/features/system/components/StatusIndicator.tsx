@@ -1,10 +1,11 @@
-import { Flex, Icon, Text } from '@chakra-ui/react';
+import { Flex, Icon } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { InvText } from 'common/components/InvText/wrapper';
 import { STATUS_TRANSLATION_KEYS } from 'features/system/store/types';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ResourceKey } from 'i18next';
+import type { ResourceKey } from 'i18next';
 import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCircle } from 'react-icons/fa';
@@ -23,16 +24,10 @@ const statusIndicatorSelector = createMemoizedSelector(
   }
 );
 
-const DARK_COLOR_MAP = {
+const COLOR_MAP = {
   ok: 'green.400',
   working: 'yellow.400',
   error: 'red.400',
-};
-
-const LIGHT_COLOR_MAP = {
-  ok: 'green.600',
-  working: 'yellow.500',
-  error: 'red.500',
 };
 
 const StatusIndicator = () => {
@@ -75,18 +70,17 @@ const StatusIndicator = () => {
               transition: { delay: 0.8 },
             }}
           >
-            <Text
+            <InvText
               sx={{
                 fontSize: 'sm',
-                fontWeight: '600',
+                fontWeight: 'semibold',
                 pb: '1px',
                 userSelect: 'none',
-                color: LIGHT_COLOR_MAP[statusColor],
-                _dark: { color: DARK_COLOR_MAP[statusColor] },
+                color: COLOR_MAP[statusColor],
               }}
             >
               {t(statusTranslationKey as ResourceKey)}
-            </Text>
+            </InvText>
           </motion.div>
         )}
       </AnimatePresence>
@@ -94,8 +88,7 @@ const StatusIndicator = () => {
         as={FaCircle}
         sx={{
           boxSize: '0.5rem',
-          color: LIGHT_COLOR_MAP[statusColor],
-          _dark: { color: DARK_COLOR_MAP[statusColor] },
+          color: COLOR_MAP[statusColor],
         }}
       />
     </Flex>

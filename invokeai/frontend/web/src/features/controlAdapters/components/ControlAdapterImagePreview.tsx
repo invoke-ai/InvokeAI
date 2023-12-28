@@ -10,11 +10,14 @@ import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/us
 import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
 import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
 import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
+import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
+import {
+  heightChanged,
+  widthChanged,
+} from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +28,7 @@ import {
   useGetImageDTOQuery,
   useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/types';
+import type { PostUploadAction } from 'services/api/types';
 
 type Props = {
   id: string;
@@ -115,8 +118,8 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
         })
       );
     } else {
-      dispatch(setWidth(controlImage.width));
-      dispatch(setHeight(controlImage.height));
+      dispatch(widthChanged(controlImage.width));
+      dispatch(heightChanged(controlImage.height));
     }
   }, [controlImage, activeTabName, dispatch]);
 
@@ -243,16 +246,10 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
             justifyContent: 'center',
             opacity: 0.8,
             borderRadius: 'base',
-            bg: 'base.400',
-            _dark: {
-              bg: 'base.900',
-            },
+            bg: 'base.900',
           }}
         >
-          <Spinner
-            size="xl"
-            sx={{ color: 'base.100', _dark: { color: 'base.400' } }}
-          />
+          <Spinner size="xl" sx={{ color: 'base.400' }} />
         </Flex>
       )}
     </Flex>

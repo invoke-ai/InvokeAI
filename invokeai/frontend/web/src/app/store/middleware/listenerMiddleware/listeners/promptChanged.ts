@@ -11,6 +11,7 @@ import {
 import { setPositivePrompt } from 'features/parameters/store/generationSlice';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { appSocketConnected } from 'services/events/actions';
+
 import { startAppListening } from '..';
 
 const matcher = isAnyOf(

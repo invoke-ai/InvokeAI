@@ -1,4 +1,4 @@
-import Konva from 'konva';
+import type Konva from 'konva';
 
 let canvasBaseLayer: Konva.Layer | null = null;
 let canvasStage: Konva.Stage | null = null;

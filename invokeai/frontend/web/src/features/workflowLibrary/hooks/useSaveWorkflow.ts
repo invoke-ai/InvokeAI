@@ -1,18 +1,19 @@
-import { ToastId, useToast } from '@chakra-ui/react';
+import type { ToastId } from '@chakra-ui/react';
+import { useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
 import {
   workflowIDChanged,
   workflowSaved,
 } from 'features/nodes/store/workflowSlice';
-import { WorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useCreateWorkflowMutation,
   useUpdateWorkflowMutation,
 } from 'services/api/endpoints/workflows';
-import { O } from 'ts-toolbelt';
+import type { O } from 'ts-toolbelt';
 
 type UseSaveLibraryWorkflowReturn = {
   saveWorkflow: () => Promise<void>;

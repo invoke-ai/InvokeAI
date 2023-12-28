@@ -1,6 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { RootState } from 'app/store/store';
-import { ListImagesArgs } from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { ListImagesArgs } from 'services/api/types';
+
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,

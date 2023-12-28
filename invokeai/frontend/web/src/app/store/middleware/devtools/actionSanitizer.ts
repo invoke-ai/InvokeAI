@@ -1,8 +1,8 @@
-import { UnknownAction } from '@reduxjs/toolkit';
+import type { UnknownAction } from '@reduxjs/toolkit';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import { Graph } from 'services/api/types';
+import type { Graph } from 'services/api/types';
 
 export const actionSanitizer = <A extends UnknownAction>(action: A): A => {
   if (isAnyGraphBuilt(action)) {

@@ -3,6 +3,7 @@ import {
   appSocketInvocationError,
   socketInvocationError,
 } from 'services/events/actions';
+
 import { startAppListening } from '../..';
 
 export const addInvocationErrorEventListener = () => {

@@ -1,9 +1,11 @@
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { RequiredContentShuffleImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { RequiredContentShuffleImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
+
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.content_shuffle_image_processor
@@ -88,66 +90,67 @@ const ContentShuffleProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <IAISlider
+      <InvControl
         label={t('controlnet.detectResolution')}
-        value={detect_resolution}
-        onChange={handleDetectResolutionChanged}
-        handleReset={handleDetectResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
+      >
+        <InvSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          onReset={handleDetectResolutionReset}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl
         label={t('controlnet.imageResolution')}
-        value={image_resolution}
-        onChange={handleImageResolutionChanged}
-        handleReset={handleImageResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
-        label={t('controlnet.w')}
-        value={w}
-        onChange={handleWChanged}
-        handleReset={handleWReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
-        isDisabled={!isEnabled}
-      />
-      <IAISlider
-        label={t('controlnet.h')}
-        value={h}
-        onChange={handleHChanged}
-        handleReset={handleHReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
-        isDisabled={!isEnabled}
-      />
-      <IAISlider
-        label={t('controlnet.f')}
-        value={f}
-        onChange={handleFChanged}
-        handleReset={handleFReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
-        isDisabled={!isEnabled}
-      />
+      >
+        <InvSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          onReset={handleImageResolutionReset}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.w')} isDisabled={!isEnabled}>
+        <InvSlider
+          value={w}
+          onChange={handleWChanged}
+          onReset={handleWReset}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.h')} isDisabled={!isEnabled}>
+        <InvSlider
+          value={h}
+          onChange={handleHChanged}
+          onReset={handleHReset}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.f')} isDisabled={!isEnabled}>
+        <InvSlider
+          value={f}
+          onChange={handleFChanged}
+          onReset={handleFReset}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
     </ProcessorWrapper>
   );
 };

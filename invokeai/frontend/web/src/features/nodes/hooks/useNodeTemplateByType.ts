@@ -1,7 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
 export const useNodeTemplateByType = (type: string) => {

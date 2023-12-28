@@ -1,8 +1,8 @@
 import { Flex } from '@chakra-ui/react';
-import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
-import { memo } from 'react';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';
+import { memo } from 'react';
 
 const TopRightPanel = () => {
   const isWorkflowLibraryEnabled =

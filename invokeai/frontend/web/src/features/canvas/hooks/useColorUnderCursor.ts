@@ -1,5 +1,4 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import Konva from 'konva';
 import {
   commitColorPickerColor,
   setColorPickerColor,
@@ -8,6 +7,7 @@ import {
   getCanvasBaseLayer,
   getCanvasStage,
 } from 'features/canvas/util/konvaInstanceProvider';
+import Konva from 'konva';
 
 const useColorPicker = () => {
   const dispatch = useAppDispatch();

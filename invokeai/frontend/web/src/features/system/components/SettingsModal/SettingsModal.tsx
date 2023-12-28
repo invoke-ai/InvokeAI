@@ -1,29 +1,24 @@
-import {
-  Flex,
-  Heading,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Text,
-  useColorMode,
-  useDisclosure,
-} from '@chakra-ui/react';
-import { VALID_LOG_LEVELS } from 'app/logging/logger';
+import { Flex, useDisclosure } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { useClearStorage } from 'common/hooks/useClearStorage';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { languageSelector } from 'features/system/store/systemSelectors';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvHeading } from 'common/components/InvHeading/wrapper';
 import {
-  consoleLogLevelChanged,
-  languageChanged,
+  InvModal,
+  InvModalBody,
+  InvModalCloseButton,
+  InvModalContent,
+  InvModalFooter,
+  InvModalHeader,
+  InvModalOverlay,
+} from 'common/components/InvModal/wrapper';
+import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import { InvText } from 'common/components/InvText/wrapper';
+import { useClearStorage } from 'common/hooks/useClearStorage';
+import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
+import {
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
@@ -32,61 +27,49 @@ import {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
-import { LANGUAGES } from 'features/system/store/types';
 import {
   setShouldAutoChangeDimensions,
   setShouldShowProgressInViewer,
-  setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
-import {
-  ChangeEvent,
-  ReactElement,
-  cloneElement,
-  memo,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import type { ChangeEvent, ReactElement } from 'react';
+import { cloneElement, memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
-import SettingSwitch from './SettingSwitch';
+
 import SettingsClearIntermediates from './SettingsClearIntermediates';
-import SettingsSchedulers from './SettingsSchedulers';
+import { SettingsLanguageSelect } from './SettingsLanguageSelect';
+import { SettingsLogLevelSelect } from './SettingsLogLevelSelect';
 import StyledFlex from './StyledFlex';
 
-const selector = createMemoizedSelector([stateSelector], ({ system, ui }) => {
-  const {
-    shouldConfirmOnDelete,
-    enableImageDebugging,
-    consoleLogLevel,
-    shouldLogToConsole,
-    shouldAntialiasProgressImage,
-    shouldUseNSFWChecker,
-    shouldUseWatermarker,
-    shouldEnableInformationalPopovers,
-  } = system;
+const selector = createMemoizedSelector(
+  [stateSelector],
+  ({ system, ui, generation }) => {
+    const {
+      shouldConfirmOnDelete,
+      enableImageDebugging,
+      shouldLogToConsole,
+      shouldAntialiasProgressImage,
+      shouldUseNSFWChecker,
+      shouldUseWatermarker,
+      shouldEnableInformationalPopovers,
+    } = system;
+    const { shouldUseCpuNoise } = generation;
+    const { shouldShowProgressInViewer, shouldAutoChangeDimensions } = ui;
 
-  const {
-    shouldUseSliders,
-    shouldShowProgressInViewer,
-    shouldAutoChangeDimensions,
-  } = ui;
-
-  return {
-    shouldConfirmOnDelete,
-    enableImageDebugging,
-    shouldUseSliders,
-    shouldShowProgressInViewer,
-    consoleLogLevel,
-    shouldLogToConsole,
-    shouldAntialiasProgressImage,
-    shouldUseNSFWChecker,
-    shouldUseWatermarker,
-    shouldAutoChangeDimensions,
-    shouldEnableInformationalPopovers,
-  };
-});
+    return {
+      shouldUseCpuNoise,
+      shouldConfirmOnDelete,
+      enableImageDebugging,
+      shouldShowProgressInViewer,
+      shouldLogToConsole,
+      shouldAntialiasProgressImage,
+      shouldUseNSFWChecker,
+      shouldUseWatermarker,
+      shouldAutoChangeDimensions,
+      shouldEnableInformationalPopovers,
+    };
+  }
+);
 
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
@@ -144,11 +127,10 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   } = useDisclosure();
 
   const {
+    shouldUseCpuNoise,
     shouldConfirmOnDelete,
     enableImageDebugging,
-    shouldUseSliders,
     shouldShowProgressInViewer,
-    consoleLogLevel,
     shouldLogToConsole,
     shouldAntialiasProgressImage,
     shouldUseNSFWChecker,
@@ -172,32 +154,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     }
   }, [countdown]);
 
-  const handleLogLevelChanged = useCallback(
-    (v: string) => {
-      dispatch(consoleLogLevelChanged(v as LogLevelName));
-    },
-    [dispatch]
-  );
-
-  const handleLanguageChanged = useCallback(
-    (l: string) => {
-      dispatch(languageChanged(l as keyof typeof LANGUAGES));
-    },
-    [dispatch]
-  );
-
   const handleLogToConsoleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldLogToConsoleChanged(e.target.checked));
     },
     [dispatch]
   );
-
-  const { colorMode, toggleColorMode } = useColorMode();
-
-  const isLocalizationEnabled =
-    useFeatureStatus('localization').isFeatureEnabled;
-  const language = useAppSelector(languageSelector);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -214,12 +176,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleChangeShouldUseWatermarker = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldUseWatermarkerChanged(e.target.checked));
-    },
-    [dispatch]
-  );
-  const handleChangeShouldUseSliders = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(setShouldUseSliders(e.target.checked));
     },
     [dispatch]
   );
@@ -253,6 +209,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     },
     [dispatch]
   );
+  const handleChangeShouldUseCpuNoise = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldUseCpuNoiseChanged(e.target.checked));
+    },
+    [dispatch]
+  );
 
   return (
     <>
@@ -260,165 +222,159 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         onClick: onSettingsModalOpen,
       })}
 
-      <Modal
+      <InvModal
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
         size="2xl"
         isCentered
       >
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+        <InvModalOverlay />
+        <InvModalContent>
+          <InvModalHeader bg="none">{t('common.settingsLabel')}</InvModalHeader>
+          <InvModalCloseButton />
+          <InvModalBody>
             <Flex sx={{ gap: 4, flexDirection: 'column' }}>
               <StyledFlex>
-                <Heading size="sm">{t('settings.general')}</Heading>
-                <SettingSwitch
-                  label={t('settings.confirmOnDelete')}
-                  isChecked={shouldConfirmOnDelete}
-                  onChange={handleChangeShouldConfirmOnDelete}
-                />
+                <InvHeading size="sm">{t('settings.general')}</InvHeading>
+                <InvControl label={t('settings.confirmOnDelete')}>
+                  <InvSwitch
+                    isChecked={shouldConfirmOnDelete}
+                    onChange={handleChangeShouldConfirmOnDelete}
+                  />
+                </InvControl>
               </StyledFlex>
 
               <StyledFlex>
-                <Heading size="sm">{t('settings.generation')}</Heading>
-                <SettingsSchedulers />
-                <SettingSwitch
+                <InvHeading size="sm">{t('settings.generation')}</InvHeading>
+                <InvControl
                   label={t('settings.enableNSFWChecker')}
                   isDisabled={!isNSFWCheckerAvailable}
-                  isChecked={shouldUseNSFWChecker}
-                  onChange={handleChangeShouldUseNSFWChecker}
-                />
-                <SettingSwitch
+                >
+                  <InvSwitch
+                    isChecked={shouldUseNSFWChecker}
+                    onChange={handleChangeShouldUseNSFWChecker}
+                  />
+                </InvControl>
+                <InvControl
                   label={t('settings.enableInvisibleWatermark')}
                   isDisabled={!isWatermarkerAvailable}
-                  isChecked={shouldUseWatermarker}
-                  onChange={handleChangeShouldUseWatermarker}
-                />
+                >
+                  <InvSwitch
+                    isChecked={shouldUseWatermarker}
+                    onChange={handleChangeShouldUseWatermarker}
+                  />
+                </InvControl>
               </StyledFlex>
 
               <StyledFlex>
-                <Heading size="sm">{t('settings.ui')}</Heading>
-                <SettingSwitch
-                  label={t('common.darkMode')}
-                  isChecked={colorMode === 'dark'}
-                  onChange={toggleColorMode}
-                />
-                <SettingSwitch
-                  label={t('settings.useSlidersForAll')}
-                  isChecked={shouldUseSliders}
-                  onChange={handleChangeShouldUseSliders}
-                />
-                <SettingSwitch
-                  label={t('settings.showProgressInViewer')}
-                  isChecked={shouldShowProgressInViewer}
-                  onChange={handleChangeShouldShowProgressInViewer}
-                />
-                <SettingSwitch
-                  label={t('settings.antialiasProgressImages')}
-                  isChecked={shouldAntialiasProgressImage}
-                  onChange={handleChangeShouldAntialiasProgressImage}
-                />
-                <SettingSwitch
-                  label={t('settings.autoChangeDimensions')}
-                  isChecked={shouldAutoChangeDimensions}
-                  onChange={handleChangeShouldAutoChangeDimensions}
-                />
-                {shouldShowLocalizationToggle && (
-                  <IAIMantineSelect
-                    disabled={!isLocalizationEnabled}
-                    label={t('common.languagePickerLabel')}
-                    value={language}
-                    data={Object.entries(LANGUAGES).map(([value, label]) => ({
-                      value,
-                      label,
-                    }))}
-                    onChange={handleLanguageChanged}
+                <InvHeading size="sm">{t('settings.ui')}</InvHeading>
+                <InvControl label={t('settings.showProgressInViewer')}>
+                  <InvSwitch
+                    isChecked={shouldShowProgressInViewer}
+                    onChange={handleChangeShouldShowProgressInViewer}
                   />
-                )}
-                <SettingSwitch
-                  label={t('settings.enableInformationalPopovers')}
-                  isChecked={shouldEnableInformationalPopovers}
-                  onChange={handleChangeShouldEnableInformationalPopovers}
-                />
+                </InvControl>
+                <InvControl label={t('settings.antialiasProgressImages')}>
+                  <InvSwitch
+                    isChecked={shouldAntialiasProgressImage}
+                    onChange={handleChangeShouldAntialiasProgressImage}
+                  />
+                </InvControl>
+                <InvControl label={t('settings.autoChangeDimensions')}>
+                  <InvSwitch
+                    isChecked={shouldAutoChangeDimensions}
+                    onChange={handleChangeShouldAutoChangeDimensions}
+                  />
+                </InvControl>
+                <InvControl
+                  label={t('parameters.useCpuNoise')}
+                  feature="noiseUseCPU"
+                >
+                  <InvSwitch
+                    isChecked={shouldUseCpuNoise}
+                    onChange={handleChangeShouldUseCpuNoise}
+                  />
+                </InvControl>
+                {shouldShowLocalizationToggle && <SettingsLanguageSelect />}
+                <InvControl label={t('settings.enableInformationalPopovers')}>
+                  <InvSwitch
+                    isChecked={shouldEnableInformationalPopovers}
+                    onChange={handleChangeShouldEnableInformationalPopovers}
+                  />
+                </InvControl>
               </StyledFlex>
 
               {shouldShowDeveloperSettings && (
                 <StyledFlex>
-                  <Heading size="sm">{t('settings.developer')}</Heading>
-                  <SettingSwitch
-                    label={t('settings.shouldLogToConsole')}
-                    isChecked={shouldLogToConsole}
-                    onChange={handleLogToConsoleChanged}
-                  />
-                  <IAIMantineSelect
-                    disabled={!shouldLogToConsole}
-                    label={t('settings.consoleLogLevel')}
-                    onChange={handleLogLevelChanged}
-                    value={consoleLogLevel}
-                    data={VALID_LOG_LEVELS.concat()}
-                  />
-                  <SettingSwitch
-                    label={t('settings.enableImageDebugging')}
-                    isChecked={enableImageDebugging}
-                    onChange={handleChangeEnableImageDebugging}
-                  />
+                  <InvHeading size="sm">{t('settings.developer')}</InvHeading>
+                  <InvControl label={t('settings.shouldLogToConsole')}>
+                    <InvSwitch
+                      isChecked={shouldLogToConsole}
+                      onChange={handleLogToConsoleChanged}
+                    />
+                  </InvControl>
+                  <SettingsLogLevelSelect />
+                  <InvControl label={t('settings.enableImageDebugging')}>
+                    <InvSwitch
+                      isChecked={enableImageDebugging}
+                      onChange={handleChangeEnableImageDebugging}
+                    />
+                  </InvControl>
                 </StyledFlex>
               )}
 
               {shouldShowClearIntermediates && <SettingsClearIntermediates />}
 
               <StyledFlex>
-                <Heading size="sm">{t('settings.resetWebUI')}</Heading>
-                <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
+                <InvHeading size="sm">{t('settings.resetWebUI')}</InvHeading>
+                <InvButton colorScheme="error" onClick={handleClickResetWebUI}>
                   {t('settings.resetWebUI')}
-                </IAIButton>
+                </InvButton>
                 {shouldShowResetWebUiText && (
                   <>
-                    <Text variant="subtext">
+                    <InvText variant="subtext">
                       {t('settings.resetWebUIDesc1')}
-                    </Text>
-                    <Text variant="subtext">
+                    </InvText>
+                    <InvText variant="subtext">
                       {t('settings.resetWebUIDesc2')}
-                    </Text>
+                    </InvText>
                   </>
                 )}
               </StyledFlex>
             </Flex>
-          </ModalBody>
+          </InvModalBody>
 
-          <ModalFooter>
-            <IAIButton onClick={onSettingsModalClose}>
+          <InvModalFooter>
+            <InvButton onClick={onSettingsModalClose}>
               {t('common.close')}
-            </IAIButton>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+            </InvButton>
+          </InvModalFooter>
+        </InvModalContent>
+      </InvModal>
 
-      <Modal
+      <InvModal
         closeOnOverlayClick={false}
         isOpen={isRefreshModalOpen}
         onClose={onRefreshModalClose}
         isCentered
         closeOnEsc={false}
       >
-        <ModalOverlay backdropFilter="blur(40px)" />
-        <ModalContent>
-          <ModalHeader />
-          <ModalBody>
+        <InvModalOverlay backdropFilter="blur(40px)" />
+        <InvModalContent>
+          <InvModalHeader />
+          <InvModalBody>
             <Flex justifyContent="center">
-              <Text fontSize="lg">
-                <Text>
+              <InvText fontSize="lg">
+                <InvText>
                   {t('settings.resetComplete')} {t('settings.reloadingIn')}{' '}
                   {countdown}...
-                </Text>
-              </Text>
+                </InvText>
+              </InvText>
             </Flex>
-          </ModalBody>
-          <ModalFooter />
-        </ModalContent>
-      </Modal>
+          </InvModalBody>
+          <InvModalFooter />
+        </InvModalContent>
+      </InvModal>
     </>
   );
 };

@@ -1,10 +1,10 @@
-import { IconButtonProps } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
-type DeleteImageButtonProps = Omit<IconButtonProps, 'aria-label'> & {
+type DeleteImageButtonProps = Omit<InvIconButtonProps, 'aria-label'> & {
   onClick: () => void;
 };
 
@@ -14,7 +14,7 @@ export const DeleteImageButton = (props: DeleteImageButtonProps) => {
   const isConnected = useAppSelector((state) => state.system.isConnected);
 
   return (
-    <IAIIconButton
+    <InvIconButton
       onClick={onClick}
       icon={<FaTrash />}
       tooltip={`${t('gallery.deleteImage')} (Del)`}

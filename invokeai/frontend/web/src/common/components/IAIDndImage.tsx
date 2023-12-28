@@ -1,37 +1,29 @@
-import {
-  ChakraProps,
-  Flex,
-  FlexProps,
-  Icon,
-  Image,
-  useColorMode,
-} from '@chakra-ui/react';
+import type { ChakraProps, FlexProps } from '@chakra-ui/react';
+import { Flex, Icon, Image } from '@chakra-ui/react';
 import {
   IAILoadingImageFallback,
   IAINoContentFallback,
 } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import type {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import {
+import type {
   MouseEvent,
   ReactElement,
   ReactNode,
   SyntheticEvent,
-  memo,
-  useCallback,
-  useState,
 } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { FaImage, FaUpload } from 'react-icons/fa';
-import { ImageDTO, PostUploadAction } from 'services/api/types';
-import { mode } from 'theme/util/mode';
+import type { ImageDTO, PostUploadAction } from 'services/api/types';
+
 import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
 import SelectionOverlay from './SelectionOverlay';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
 
 const defaultUploadElement = (
   <Icon
@@ -98,7 +90,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     dataTestId,
   } = props;
 
-  const { colorMode } = useColorMode();
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -128,10 +119,10 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     ? {}
     : {
         cursor: 'pointer',
-        bg: mode('base.200', 'base.700')(colorMode),
+        bg: 'base.700',
         _hover: {
-          bg: mode('base.300', 'base.650')(colorMode),
-          color: mode('base.500', 'base.300')(colorMode),
+          bg: 'base.650',
+          color: 'base.300',
         },
       };
 
@@ -208,7 +199,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   borderRadius: 'base',
                   transitionProperty: 'common',
                   transitionDuration: '0.1s',
-                  color: mode('base.500', 'base.500')(colorMode),
+                  color: 'base.500',
                   ...uploadButtonStyles,
                 }}
                 {...getUploadButtonProps()}

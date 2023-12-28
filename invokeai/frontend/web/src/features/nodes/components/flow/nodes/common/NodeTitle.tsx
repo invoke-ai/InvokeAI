@@ -11,7 +11,8 @@ import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { MouseEvent, memo, useCallback, useEffect, useState } from 'react';
+import type { MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -83,7 +84,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
           fontSize="sm"
           sx={{
             p: 0,
-            fontWeight: 700,
+            fontWeight: 'bold',
             _focusVisible: {
               p: 0,
               boxShadow: 'none',

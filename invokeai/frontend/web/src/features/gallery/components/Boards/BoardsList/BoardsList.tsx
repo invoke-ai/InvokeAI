@@ -2,11 +2,13 @@ import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import { BoardDTO } from 'services/api/types';
+import type { BoardDTO } from 'services/api/types';
+
 import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
@@ -52,14 +54,7 @@ const BoardsList = (props: Props) => {
           <OverlayScrollbarsComponent
             defer
             style={{ height: '100%', width: '100%' }}
-            options={{
-              scrollbars: {
-                visibility: 'auto',
-                autoHide: 'move',
-                autoHideDelay: 1300,
-                theme: 'os-theme-dark',
-              },
-            }}
+            options={overlayScrollbarsParams.options}
           >
             <Grid
               className="list-container"

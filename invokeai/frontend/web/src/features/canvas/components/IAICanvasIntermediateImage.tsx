@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ImageConfig } from 'konva/lib/shapes/Image';
+import type { ImageConfig } from 'konva/lib/shapes/Image';
 import { memo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 

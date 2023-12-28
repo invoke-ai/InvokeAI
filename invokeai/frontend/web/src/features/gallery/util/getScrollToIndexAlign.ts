@@ -1,4 +1,4 @@
-import { ListRange } from 'react-virtuoso';
+import type { ListRange } from 'react-virtuoso';
 
 /**
  * Gets the alignment for react-virtuoso's scrollToIndex function.

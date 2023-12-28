@@ -1,11 +1,13 @@
-import { Box, Flex, Image, Text, Tooltip } from '@chakra-ui/react';
+import { Box, Flex, Image } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import IAIDroppable from 'common/components/IAIDroppable';
+import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { RemoveFromBoardDropData } from 'features/dnd/types';
+import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import {
@@ -85,7 +87,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
       >
         <BoardContextMenu board_id="none">
           {(ref) => (
-            <Tooltip label={tooltip} openDelay={1000} hasArrow>
+            <InvTooltip label={tooltip} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -97,10 +99,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                   alignItems: 'center',
                   borderRadius: 'base',
                   cursor: 'pointer',
-                  bg: 'base.200',
-                  _dark: {
-                    bg: 'base.800',
-                  },
+                  bg: 'base.800',
                 }}
               >
                 <Flex
@@ -138,15 +137,11 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                     w: 'full',
                     maxW: 'full',
                     borderBottomRadius: 'base',
-                    bg: isSelected ? 'accent.400' : 'base.500',
+                    bg: isSelected ? 'blue.500' : 'base.600',
                     color: isSelected ? 'base.50' : 'base.100',
-                    _dark: {
-                      bg: isSelected ? 'accent.500' : 'base.600',
-                      color: isSelected ? 'base.50' : 'base.100',
-                    },
                     lineHeight: 'short',
                     fontSize: 'xs',
-                    fontWeight: isSelected ? 700 : 500,
+                    fontWeight: isSelected ? 'bold' : 'normal',
                   }}
                 >
                   {boardName}
@@ -158,11 +153,11 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 <IAIDroppable
                   data={droppableData}
                   dropLabel={
-                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                    <InvText fontSize="md">{t('unifiedCanvas.move')}</InvText>
                   }
                 />
               </Flex>
-            </Tooltip>
+            </InvTooltip>
           )}
         </BoardContextMenu>
       </Flex>

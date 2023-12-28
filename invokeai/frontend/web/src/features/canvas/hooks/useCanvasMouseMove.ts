@@ -8,9 +8,11 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { Vector2d } from 'konva/lib/types';
-import { MutableRefObject, useCallback } from 'react';
+import type Konva from 'konva';
+import type { Vector2d } from 'konva/lib/types';
+import type { MutableRefObject } from 'react';
+import { useCallback } from 'react';
+
 import useColorPicker from './useColorUnderCursor';
 
 const selector = createMemoizedSelector(

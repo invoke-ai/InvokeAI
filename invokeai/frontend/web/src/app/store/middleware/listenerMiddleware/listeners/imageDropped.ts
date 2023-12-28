@@ -6,16 +6,17 @@ import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
+import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { workflowExposedFieldAdded } from 'features/nodes/store/workflowSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
+
 import { startAppListening } from '../';
-import { workflowExposedFieldAdded } from 'features/nodes/store/workflowSlice';
 
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;

@@ -1,11 +1,6 @@
-import {
-  Flex,
-  Slider,
-  SliderFilledTrack,
-  SliderThumb,
-  SliderTrack,
-} from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { nodeOpacityChanged } from 'features/nodes/store/nodesSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +19,7 @@ export default function NodeOpacitySlider() {
 
   return (
     <Flex alignItems="center">
-      <Slider
+      <InvSlider
         aria-label={t('nodes.nodeOpacity')}
         value={nodeOpacity}
         min={0.5}
@@ -34,12 +29,7 @@ export default function NodeOpacitySlider() {
         orientation="vertical"
         defaultValue={30}
         h="calc(100% - 0.5rem)"
-      >
-        <SliderTrack>
-          <SliderFilledTrack />
-        </SliderTrack>
-        <SliderThumb />
-      </Slider>
+      />
     </Flex>
   );
 }
