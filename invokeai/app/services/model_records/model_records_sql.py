@@ -43,7 +43,7 @@ Typical usage:
 import json
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Set, Union, Dict, Any
+from typing import Any, Dict, List, Optional, Set, Union
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,

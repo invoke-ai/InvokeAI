@@ -12,10 +12,9 @@ from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Set, Union
 
+from huggingface_hub import HfFolder
 from pydantic.networks import AnyHttpUrl
 from requests import Session
-
-from huggingface_hub import HfFolder
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
@@ -43,7 +42,6 @@ from invokeai.backend.util import Chdir, InvokeAILogger
 from invokeai.backend.util.devices import choose_precision, choose_torch_device
 
 from .model_install_base import (
-    URLModelSource,
     CivitaiModelSource,
     HFModelSource,
     InstallStatus,
@@ -51,6 +49,7 @@ from .model_install_base import (
     ModelInstallJob,
     ModelInstallServiceBase,
     ModelSource,
+    URLModelSource,
 )
 
 TMPDIR_PREFIX = "tmpinstall_"
@@ -114,7 +113,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # There may not necessarily be a metadata store initialized
         # so we create one and initialize it with the same sql database
         # used by the record store service.
-        if metadata_store:  
+        if metadata_store:
             self._metadata_store = metadata_store
         else:
             assert isinstance(record_store, ModelRecordServiceSQL)
@@ -574,7 +573,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Add the user's access token to HuggingFace requests
         if isinstance(source, HFModelSource) and not source.access_token:
-            self._logger.info(f"Using saved HuggingFace access token.")
+            self._logger.info("Using saved HuggingFace access token.")
             source.access_token = HfFolder.get_token()
 
         self._logger.info(f"Queuing {source} for downloading")
@@ -694,7 +693,12 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
             parts = [
-                {"url": str(x.source), "local_path": str(x.download_path), "bytes": x.bytes, "total_bytes": x.total_bytes}
+                {
+                    "url": str(x.source),
+                    "local_path": str(x.download_path),
+                    "bytes": x.bytes,
+                    "total_bytes": x.total_bytes,
+                }
                 for x in job.download_parts
             ]
             assert job.bytes is not None
