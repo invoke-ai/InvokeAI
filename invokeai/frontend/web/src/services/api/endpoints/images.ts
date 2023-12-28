@@ -1,18 +1,19 @@
-import { EntityState, Update } from '@reduxjs/toolkit';
-import { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
+import type { EntityState, Update } from '@reduxjs/toolkit';
+import type { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
 import { logger } from 'app/logging/logger';
+import type { BoardId } from 'features/gallery/store/types';
 import {
   ASSETS_CATEGORIES,
-  BoardId,
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
-import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/metadata';
+import type { CoreMetadata } from 'features/nodes/types/metadata';
+import { zCoreMetadata } from 'features/nodes/types/metadata';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
-import { components, paths } from 'services/api/schema';
-import {
+import type { components, paths } from 'services/api/schema';
+import type {
   DeleteBoardResult,
   ImageCategory,
   ImageDTO,
@@ -27,7 +28,9 @@ import {
   imagesAdapter,
   imagesSelectors,
 } from 'services/api/util';
-import { ApiTagDescription, LIST_TAG, api } from '..';
+
+import type { ApiTagDescription } from '..';
+import { api, LIST_TAG } from '..';
 import { boardsApi } from './boards';
 
 export const imagesApi = api.injectEndpoints({

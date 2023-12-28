@@ -3,6 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import { useMemo } from 'react';
+
 import { useFieldType } from './useFieldType.ts';
 
 const selectIsConnectionInProgress = createMemoizedSelector(

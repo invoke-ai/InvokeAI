@@ -2,6 +2,7 @@ import { modelChanged } from 'features/parameters/store/generationSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { mainModelsAdapter, modelsApi } from 'services/api/endpoints/models';
+
 import { startAppListening } from '..';
 
 export const addTabChangedListener = () => {

@@ -1,18 +1,22 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
 import { useState } from 'react';
-import {
-  MainModelConfigEntity,
+import { useTranslation } from 'react-i18next';
+import { ALL_BASE_MODELS } from 'services/api/constants';
+import type {
   DiffusersModelConfigEntity,
   LoRAModelConfigEntity,
-  useGetMainModelsQuery,
-  useGetLoRAModelsQuery,
+  MainModelConfigEntity,
 } from 'services/api/endpoints/models';
+import {
+  useGetLoRAModelsQuery,
+  useGetMainModelsQuery,
+} from 'services/api/endpoints/models';
+
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import LoRAModelEdit from './ModelManagerPanel/LoRAModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
-import { ALL_BASE_MODELS } from 'services/api/constants';
-import { useTranslation } from 'react-i18next';
 
 export default function ModelManagerPanel() {
   const [selectedModelId, setSelectedModelId] = useState<string>();
@@ -76,7 +80,7 @@ const ModelEdit = (props: ModelEditProps) => {
         userSelect: 'none',
       }}
     >
-      <Text variant="subtext">{t('modelManager.noModelSelected')}</Text>
+      <InvText variant="subtext">{t('modelManager.noModelSelected')}</InvText>
     </Flex>
   );
 };

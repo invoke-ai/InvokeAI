@@ -3,13 +3,14 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageOutput } from 'services/api/types';
-import { AnyResult } from 'services/events/types';
+import type { ImageOutput } from 'services/api/types';
+import type { AnyResult } from 'services/events/types';
+
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
 const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {

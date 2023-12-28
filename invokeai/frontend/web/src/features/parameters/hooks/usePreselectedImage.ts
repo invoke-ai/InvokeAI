@@ -1,16 +1,17 @@
-import { t } from 'i18next';
-import { useCallback, useEffect } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { setActiveTab } from 'features/ui/store/uiSlice';
+import { t } from 'i18next';
+import { useCallback, useEffect } from 'react';
 import {
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
 } from 'services/api/endpoints/images';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import { initialImageSelected } from 'features/parameters/store/actions';
+
 import { useRecallParameters } from './useRecallParameters';
-import { skipToken } from '@reduxjs/toolkit/query';
 
 export const usePreselectedImage = (selectedImage?: {
   imageName: string;

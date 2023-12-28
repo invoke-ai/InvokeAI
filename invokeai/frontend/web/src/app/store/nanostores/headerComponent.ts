@@ -1,4 +1,4 @@
 import { atom } from 'nanostores';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 export const $headerComponent = atom<ReactNode | undefined>(undefined);

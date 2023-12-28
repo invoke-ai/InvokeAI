@@ -1,99 +1,67 @@
-import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { fieldControlNetModelValueChanged } from 'features/nodes/store/nodesSlice';
-import {
-  ControlNetModelFieldInputTemplate,
+import type {
   ControlNetModelFieldInputInstance,
+  ControlNetModelFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { FieldComponentProps } from './types';
-import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
-import { forEach } from 'lodash-es';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
+import type { ControlNetModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
-const ControlNetModelFieldInputComponent = (
-  props: FieldComponentProps<
-    ControlNetModelFieldInputInstance,
-    ControlNetModelFieldInputTemplate
-  >
-) => {
+import type { FieldComponentProps } from './types';
+
+type Props = FieldComponentProps<
+  ControlNetModelFieldInputInstance,
+  ControlNetModelFieldInputTemplate
+>;
+
+const ControlNetModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
-  const controlNetModel = field.value;
   const dispatch = useAppDispatch();
+  const { data, isLoading } = useGetControlNetModelsQuery();
 
-  const { data: controlNetModels } = useGetControlNetModelsQuery();
-
-  // grab the full model entity from the RTK Query cache
-  const selectedModel = useMemo(
-    () =>
-      controlNetModels?.entities[
-        `${controlNetModel?.base_model}/controlnet/${controlNetModel?.model_name}`
-      ] ?? null,
-    [
-      controlNetModel?.base_model,
-      controlNetModel?.model_name,
-      controlNetModels?.entities,
-    ]
-  );
-
-  const data = useMemo(() => {
-    if (!controlNetModels) {
-      return [];
-    }
-
-    const data: SelectItem[] = [];
-
-    forEach(controlNetModels.entities, (model, id) => {
-      if (!model) {
+  const _onChange = useCallback(
+    (value: ControlNetModelConfigEntity | null) => {
+      if (!value) {
         return;
       }
-
-      data.push({
-        value: id,
-        label: model.model_name,
-        group: MODEL_TYPE_MAP[model.base_model],
-      });
-    });
-
-    return data;
-  }, [controlNetModels]);
-
-  const handleValueChanged = useCallback(
-    (v: string | null) => {
-      if (!v) {
-        return;
-      }
-
-      const newControlNetModel = modelIdToControlNetModelParam(v);
-
-      if (!newControlNetModel) {
-        return;
-      }
-
       dispatch(
         fieldControlNetModelValueChanged({
           nodeId,
           fieldName: field.name,
-          value: newControlNetModel,
+          value,
         })
       );
     },
     [dispatch, field.name, nodeId]
   );
 
+  const { options, value, onChange, placeholder, noOptionsMessage } =
+    useGroupedModelInvSelect({
+      modelEntities: data,
+      onChange: _onChange,
+      selectedModel: field.value
+        ? { ...field.value, model_type: 'controlnet' }
+        : undefined,
+      isLoading,
+    });
+
   return (
-    <IAIMantineSelect
-      className="nowheel nodrag"
-      tooltip={selectedModel?.description}
-      value={selectedModel?.id ?? null}
-      placeholder="Pick one"
-      error={!selectedModel}
-      data={data}
-      onChange={handleValueChanged}
-      sx={{ width: '100%' }}
-    />
+    <InvTooltip label={value?.description}>
+      <InvControl className="nowheel nodrag" isInvalid={!value}>
+        <InvSelect
+          value={value}
+          placeholder={placeholder}
+          options={options}
+          onChange={onChange}
+          noOptionsMessage={noOptionsMessage}
+        />
+      </InvControl>
+    </InvTooltip>
   );
 };
 

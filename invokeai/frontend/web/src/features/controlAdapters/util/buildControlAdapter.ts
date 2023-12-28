@@ -1,5 +1,5 @@
-import { cloneDeep, merge } from 'lodash-es';
-import {
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type {
   ControlAdapterConfig,
   ControlAdapterType,
   ControlNetConfig,
@@ -7,7 +7,7 @@ import {
   RequiredCannyImageProcessorInvocation,
   T2IAdapterConfig,
 } from 'features/controlAdapters/store/types';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { cloneDeep, merge } from 'lodash-es';
 
 export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   type: 'controlnet',

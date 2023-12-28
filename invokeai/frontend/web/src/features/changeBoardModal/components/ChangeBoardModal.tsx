@@ -1,23 +1,20 @@
-import {
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  Flex,
-  Text,
-} from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type {
+  InvSelectOnChange,
+  InvSelectOption,
+} from 'common/components/InvSelect/types';
+import { InvText } from 'common/components/InvText/wrapper';
 import {
   changeBoardReset,
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import {
@@ -46,19 +43,19 @@ const ChangeBoardModal = () => {
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();
 
-  const data = useMemo(() => {
-    const data: { label: string; value: string }[] = [
-      { label: t('boards.uncategorized'), value: 'none' },
-    ];
-    (boards ?? []).forEach((board) =>
-      data.push({
+  const options = useMemo<InvSelectOption[]>(() => {
+    return [{ label: t('boards.uncategorized'), value: 'none' }].concat(
+      (boards ?? []).map((board) => ({
         label: board.board_name,
         value: board.board_id,
-      })
+      }))
     );
-
-    return data;
   }, [boards, t]);
+
+  const value = useMemo(
+    () => options.find((o) => o.value === selectedBoard),
+    [options, selectedBoard]
+  );
 
   const handleClose = useCallback(() => {
     dispatch(changeBoardReset());
@@ -88,56 +85,41 @@ const ChangeBoardModal = () => {
     selectedBoard,
   ]);
 
-  const handleSetSelectedBoard = useCallback(
-    (v: string | null) => setSelectedBoard(v),
-    []
-  );
-
-  const cancelRef = useRef<HTMLButtonElement>(null);
+  const onChange = useCallback<InvSelectOnChange>((v) => {
+    if (!v) {
+      return;
+    }
+    setSelectedBoard(v.value);
+  }, []);
 
   return (
-    <AlertDialog
+    <InvConfirmationAlertDialog
       isOpen={isModalOpen}
       onClose={handleClose}
-      leastDestructiveRef={cancelRef}
-      isCentered
+      title={t('boards.changeBoard')}
+      acceptCallback={handleChangeBoard}
+      acceptButtonText={t('boards.move')}
+      cancelButtonText={t('boards.cancel')}
     >
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('boards.changeBoard')}
-          </AlertDialogHeader>
-
-          <AlertDialogBody>
-            <Flex sx={{ flexDir: 'column', gap: 4 }}>
-              <Text>
-                {t('boards.movingImagesToBoard', {
-                  count: imagesToChange.length,
-                })}
-                :
-              </Text>
-              <IAIMantineSearchableSelect
-                placeholder={
-                  isFetching ? t('boards.loading') : t('boards.selectBoard')
-                }
-                disabled={isFetching}
-                onChange={handleSetSelectedBoard}
-                value={selectedBoard}
-                data={data}
-              />
-            </Flex>
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <IAIButton ref={cancelRef} onClick={handleClose}>
-              {t('boards.cancel')}
-            </IAIButton>
-            <IAIButton colorScheme="accent" onClick={handleChangeBoard} ml={3}>
-              {t('boards.move')}
-            </IAIButton>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+      <Flex sx={{ flexDir: 'column', gap: 4 }}>
+        <InvText>
+          {t('boards.movingImagesToBoard', {
+            count: imagesToChange.length,
+          })}
+          :
+        </InvText>
+        <InvControl isDisabled={isFetching}>
+          <InvSelect
+            placeholder={
+              isFetching ? t('boards.loading') : t('boards.selectBoard')
+            }
+            onChange={onChange}
+            value={value}
+            options={options}
+          />
+        </InvControl>
+      </Flex>
+    </InvConfirmationAlertDialog>
   );
 };
 

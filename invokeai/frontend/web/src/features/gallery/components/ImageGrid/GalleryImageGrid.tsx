@@ -1,53 +1,39 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { EntityId } from '@reduxjs/toolkit';
+import type { EntityId } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import type { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
 import { $useNextPrevImageState } from 'features/gallery/hooks/useNextPrevImage';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { IMAGE_LIMIT } from 'features/gallery/store/types';
-import {
-  UseOverlayScrollbarsParams,
-  useOverlayScrollbars,
-} from 'overlayscrollbars-react';
+import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExclamationCircle, FaImage } from 'react-icons/fa';
-import {
+import type {
   ItemContent,
   ListRange,
-  VirtuosoGrid,
   VirtuosoGridHandle,
 } from 'react-virtuoso';
+import { VirtuosoGrid } from 'react-virtuoso';
 import {
   useLazyListImagesQuery,
   useListImagesQuery,
 } from 'services/api/endpoints/images';
 import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
+
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-
-const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
-  defer: true,
-  options: {
-    scrollbars: {
-      visibility: 'auto',
-      autoHide: 'scroll',
-      autoHideDelay: 1300,
-      theme: 'os-theme-dark',
-    },
-    overflow: { x: 'hidden' },
-  },
-};
 
 const GalleryImageGrid = () => {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars(
-    overlayScrollbarsConfig
+    overlayScrollbarsParams
   );
   const selectedBoardId = useAppSelector(
     (state) => state.gallery.selectedBoardId
@@ -180,7 +166,7 @@ const GalleryImageGrid = () => {
             overscan={10}
           />
         </Box>
-        <IAIButton
+        <InvButton
           onClick={handleLoadMoreImages}
           isDisabled={!areMoreAvailable}
           isLoading={isFetching}
@@ -188,7 +174,7 @@ const GalleryImageGrid = () => {
           flexShrink={0}
         >
           {`Load More (${currentData.ids.length} of ${currentViewTotal})`}
-        </IAIButton>
+        </InvButton>
       </>
     );
   }

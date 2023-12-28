@@ -2,12 +2,9 @@ import { Badge, Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { memo, useMemo } from 'react';
-import {
-  BaseEdge,
-  EdgeLabelRenderer,
-  EdgeProps,
-  getBezierPath,
-} from 'reactflow';
+import type { EdgeProps } from 'reactflow';
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
+
 import { makeEdgeSelector } from './util/makeEdgeSelector';
 
 const InvocationCollapsedEdge = ({

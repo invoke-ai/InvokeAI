@@ -1,18 +1,21 @@
 import { Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineTextInput from 'common/components/IAIMantineInput';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
-import { useTranslation } from 'react-i18next';
-import { useAddMainModelsMutation } from 'services/api/endpoints/models';
-import { DiffusersModelConfig } from 'services/api/types';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
+import type { FocusEventHandler } from 'react';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useAddMainModelsMutation } from 'services/api/endpoints/models';
+import type { DiffusersModelConfig } from 'services/api/types';
+
 import { getModelName } from './util';
-import { FocusEventHandler, useCallback } from 'react';
 
 type AdvancedAddDiffusersProps = {
   model_path?: string;
@@ -99,37 +102,38 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
       style={{ width: '100%' }}
     >
       <Flex flexDirection="column" gap={2}>
-        <IAIMantineTextInput
-          required
-          label={t('modelManager.model')}
-          {...advancedAddDiffusersForm.getInputProps('model_name')}
-        />
-        <BaseModelSelect
-          label={t('modelManager.baseModel')}
-          {...advancedAddDiffusersForm.getInputProps('base_model')}
-        />
-        <IAIMantineTextInput
-          required
-          label={t('modelManager.modelLocation')}
-          placeholder={t('modelManager.modelLocationValidationMsg')}
-          {...advancedAddDiffusersForm.getInputProps('path')}
-          onBlur={handleBlurModelLocation}
-        />
-        <IAIMantineTextInput
-          label={t('modelManager.description')}
-          {...advancedAddDiffusersForm.getInputProps('description')}
-        />
-        <IAIMantineTextInput
-          label={t('modelManager.vaeLocation')}
-          {...advancedAddDiffusersForm.getInputProps('vae')}
-        />
-        <ModelVariantSelect
-          label={t('modelManager.variant')}
-          {...advancedAddDiffusersForm.getInputProps('variant')}
-        />
-        <IAIButton mt={2} type="submit">
+        <InvControl isRequired label={t('modelManager.model')}>
+          <InvInput {...advancedAddDiffusersForm.getInputProps('model_name')} />
+        </InvControl>
+        <InvControl label={t('modelManager.baseModel')}>
+          <BaseModelSelect
+            {...advancedAddDiffusersForm.getInputProps('base_model')}
+          />
+        </InvControl>
+        <InvControl isRequired label={t('modelManager.modelLocation')}>
+          <InvInput
+            placeholder={t('modelManager.modelLocationValidationMsg')}
+            {...advancedAddDiffusersForm.getInputProps('path')}
+            onBlur={handleBlurModelLocation}
+          />
+        </InvControl>
+        <InvControl label={t('modelManager.description')}>
+          <InvInput
+            {...advancedAddDiffusersForm.getInputProps('description')}
+          />
+        </InvControl>
+        <InvControl label={t('modelManager.vaeLocation')}>
+          <InvInput {...advancedAddDiffusersForm.getInputProps('vae')} />
+        </InvControl>
+        <InvControl label={t('modelManager.variant')}>
+          <ModelVariantSelect
+            {...advancedAddDiffusersForm.getInputProps('variant')}
+          />
+        </InvControl>
+
+        <InvButton mt={2} type="submit">
           {t('modelManager.addModel')}
-        </IAIButton>
+        </InvButton>
       </Flex>
     </form>
   );

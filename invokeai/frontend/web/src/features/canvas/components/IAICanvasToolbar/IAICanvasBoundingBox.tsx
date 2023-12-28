@@ -13,10 +13,10 @@ import {
   setIsTransformingBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import Konva from 'konva';
-import { GroupConfig } from 'konva/lib/Group';
-import { KonvaEventObject } from 'konva/lib/Node';
-import { Vector2d } from 'konva/lib/types';
+import type Konva from 'konva';
+import type { GroupConfig } from 'konva/lib/Group';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import type { Vector2d } from 'konva/lib/types';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
@@ -145,7 +145,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const y = Math.round(rect.y());
 
     if (aspectRatio) {
-      const newHeight = roundToMultiple(width / aspectRatio, 64);
+      const newHeight = roundToMultiple(width / aspectRatio.value, 64);
       dispatch(
         setBoundingBoxDimensions({
           width: width,

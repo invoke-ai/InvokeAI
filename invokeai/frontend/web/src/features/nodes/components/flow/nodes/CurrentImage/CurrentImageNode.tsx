@@ -1,16 +1,18 @@
-import { Flex, Image, Text } from '@chakra-ui/react';
+import { Flex, Image } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { InvText } from 'common/components/InvText/wrapper';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { motion } from 'framer-motion';
-import { PropsWithChildren, memo, useCallback, useState } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
-import { NodeProps } from 'reactflow';
+import type { NodeProps } from 'reactflow';
 
 const selector = createMemoizedSelector(
   stateSelector,
@@ -95,16 +97,15 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
             h: 8,
           }}
         >
-          <Text
+          <InvText
             sx={{
               fontSize: 'sm',
-              fontWeight: 600,
-              color: 'base.700',
-              _dark: { color: 'base.200' },
+              fontWeight: 'semibold',
+              color: 'base.200',
             }}
           >
             {t('nodes.currentImage')}
-          </Text>
+          </InvText>
         </Flex>
         <Flex
           layerStyle="nodeBody"

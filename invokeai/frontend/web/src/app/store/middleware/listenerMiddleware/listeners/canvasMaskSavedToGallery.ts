@@ -2,9 +2,10 @@ import { logger } from 'app/logging/logger';
 import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { addToast } from 'features/system/store/systemSlice';
-import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '..';
 import { t } from 'i18next';
+import { imagesApi } from 'services/api/endpoints/images';
+
+import { startAppListening } from '..';
 
 export const addCanvasMaskSavedToGalleryListener = () => {
   startAppListening({

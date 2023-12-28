@@ -1,22 +1,19 @@
-import {
-  ButtonGroup,
-  Flex,
-  Menu,
-  MenuButton,
-  MenuList,
-} from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
+import { InvMenu, InvMenuButton } from 'common/components/InvMenu/wrapper';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
-import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
+import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
@@ -41,7 +38,6 @@ import {
 import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
-import { menuListMotionProps } from 'theme/components/menu';
 
 const currentImageButtonsSelector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
@@ -229,23 +225,23 @@ const CurrentImageButtons = () => {
           gap: 2,
         }}
       >
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
-          <Menu isLazy>
-            <MenuButton
-              as={IAIIconButton}
+        <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
+          <InvMenu isLazy>
+            <InvMenuButton
+              as={InvIconButton}
               aria-label={t('parameters.imageActions')}
               tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
               icon={<FaEllipsis />}
             />
-            <MenuList motionProps={menuListMotionProps}>
+            <InvMenuList>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
-            </MenuList>
-          </Menu>
-        </ButtonGroup>
+            </InvMenuList>
+          </InvMenu>
+        </InvButtonGroup>
 
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
-          <IAIIconButton
+        <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
+          <InvIconButton
             icon={<FaCircleNodes />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
@@ -253,7 +249,7 @@ const CurrentImageButtons = () => {
             onClick={handleLoadWorkflow}
             isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
@@ -261,7 +257,7 @@ const CurrentImageButtons = () => {
             isDisabled={!metadata?.positive_prompt}
             onClick={handleUsePrompt}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
@@ -269,7 +265,7 @@ const CurrentImageButtons = () => {
             isDisabled={metadata?.seed === null || metadata?.seed === undefined}
             onClick={handleUseSeed}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
             icon={<FaRulerVertical />}
             tooltip={`${t('parameters.useSize')} (D)`}
@@ -282,7 +278,7 @@ const CurrentImageButtons = () => {
             }
             onClick={handleUseSize}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
             icon={<FaAsterisk />}
             tooltip={`${t('parameters.useAll')} (A)`}
@@ -290,37 +286,37 @@ const CurrentImageButtons = () => {
             isDisabled={!metadata}
             onClick={handleClickUseAllParameters}
           />
-        </ButtonGroup>
+        </InvButtonGroup>
 
         {isUpscalingEnabled && (
-          <ButtonGroup isAttached={true} isDisabled={isQueueMutationInProgress}>
+          <InvButtonGroup isDisabled={isQueueMutationInProgress}>
             {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
-          </ButtonGroup>
+          </InvButtonGroup>
         )}
 
-        <ButtonGroup isAttached={true}>
-          <IAIIconButton
+        <InvButtonGroup>
+          <InvIconButton
             icon={<FaCode />}
             tooltip={`${t('parameters.info')} (I)`}
             aria-label={`${t('parameters.info')} (I)`}
             isChecked={shouldShowImageDetails}
             onClick={handleClickShowImageDetails}
           />
-        </ButtonGroup>
+        </InvButtonGroup>
 
-        <ButtonGroup isAttached={true}>
-          <IAIIconButton
+        <InvButtonGroup>
+          <InvIconButton
             aria-label={t('settings.displayInProgress')}
             tooltip={t('settings.displayInProgress')}
             icon={<FaHourglassHalf />}
             isChecked={shouldShowProgressInViewer}
             onClick={handleClickProgressImagesToggle}
           />
-        </ButtonGroup>
+        </InvButtonGroup>
 
-        <ButtonGroup isAttached={true}>
+        <InvButtonGroup>
           <DeleteImageButton onClick={handleDelete} />
-        </ButtonGroup>
+        </InvButtonGroup>
       </Flex>
     </>
   );

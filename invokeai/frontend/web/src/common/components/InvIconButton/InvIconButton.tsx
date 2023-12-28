@@ -1,0 +1,27 @@
+import { forwardRef, IconButton } from '@chakra-ui/react';
+import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+
+export const InvIconButton = forwardRef<InvIconButtonProps, typeof IconButton>(
+  ({ isChecked, tooltip, ...rest }: InvIconButtonProps, ref) => {
+    if (tooltip) {
+      return (
+        <InvTooltip label={tooltip}>
+          <IconButton
+            ref={ref}
+            colorScheme={isChecked ? 'blue' : 'base'}
+            {...rest}
+          />
+        </InvTooltip>
+      );
+    }
+
+    return (
+      <IconButton
+        ref={ref}
+        colorScheme={isChecked ? 'blue' : 'base'}
+        {...rest}
+      />
+    );
+  }
+);

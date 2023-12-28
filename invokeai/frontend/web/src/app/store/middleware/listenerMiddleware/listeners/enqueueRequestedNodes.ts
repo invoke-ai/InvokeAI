@@ -2,7 +2,8 @@ import { enqueueRequested } from 'app/store/actions';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflow } from 'features/nodes/util/workflow/buildWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
-import { BatchConfig } from 'services/api/types';
+import type { BatchConfig } from 'services/api/types';
+
 import { startAppListening } from '..';
 
 export const addEnqueueRequestedNodes = () => {

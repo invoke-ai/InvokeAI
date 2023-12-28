@@ -1,4 +1,5 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
 import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
@@ -43,21 +44,21 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
 
   return (
     <Flex sx={{ flexDir: 'column' }}>
-      <Text sx={{ fontWeight: 600 }}>{fieldTitle}</Text>
+      <InvText sx={{ fontWeight: 'semibold' }}>{fieldTitle}</InvText>
       {fieldTemplate && (
-        <Text sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
+        <InvText sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
           {fieldTemplate.description}
-        </Text>
+        </InvText>
       )}
       {fieldTypeName && (
-        <Text>
+        <InvText>
           {t('parameters.type')}: {fieldTypeName}
-        </Text>
+        </InvText>
       )}
       {isInputTemplate && (
-        <Text>
+        <InvText>
           {t('common.input')}: {startCase(fieldTemplate.input)}
-        </Text>
+        </InvText>
       )}
     </Flex>
   );

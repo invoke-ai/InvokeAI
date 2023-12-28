@@ -1,20 +1,20 @@
 // type-safe dnd from https://github.com/clauderic/dnd-kit/issues/935
-import {
+import type {
   Active,
   Collision,
   DndContextProps,
   Over,
   Translate,
-  UseDraggableArguments,
-  UseDroppableArguments,
   useDraggable as useOriginalDraggable,
+  UseDraggableArguments,
   useDroppable as useOriginalDroppable,
+  UseDroppableArguments,
 } from '@dnd-kit/core';
-import {
-  FieldInputTemplate,
+import type {
   FieldInputInstance,
+  FieldInputTemplate,
 } from 'features/nodes/types/field';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
   id: string;

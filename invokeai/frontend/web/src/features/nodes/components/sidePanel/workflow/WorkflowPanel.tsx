@@ -7,10 +7,11 @@ import {
   Tabs,
 } from '@chakra-ui/react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import WorkflowGeneralTab from './WorkflowGeneralTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
 import WorkflowLinearTab from './WorkflowLinearTab';
-import { useTranslation } from 'react-i18next';
 
 const WorkflowPanel = () => {
   const { t } = useTranslation();

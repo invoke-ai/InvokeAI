@@ -1,4 +1,4 @@
-import { UIState } from './uiTypes';
+import type { UIState } from './uiTypes';
 
 /**
  * UI slice persist denylist

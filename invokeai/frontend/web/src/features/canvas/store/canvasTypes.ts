@@ -1,24 +1,21 @@
-import { IRect, Vector2d } from 'konva/lib/types';
-import { RgbaColor } from 'react-colorful';
+import type { IRect, Vector2d } from 'konva/lib/types';
+import type { RgbaColor } from 'react-colorful';
+import { z } from 'zod';
 
-export const LAYER_NAMES_DICT = [
+export type CanvasLayer = 'base' | 'mask';
+
+export const LAYER_NAMES_DICT: { label: string; value: CanvasLayer }[] = [
   { label: 'Base', value: 'base' },
   { label: 'Mask', value: 'mask' },
 ];
 
 export const LAYER_NAMES = ['base', 'mask'] as const;
 
-export type CanvasLayer = (typeof LAYER_NAMES)[number];
-
-export const BOUNDING_BOX_SCALES_DICT = [
-  { label: 'None', value: 'none' },
-  { label: 'Auto', value: 'auto' },
-  { label: 'Manual', value: 'manual' },
-];
-
-export const BOUNDING_BOX_SCALES = ['none', 'auto', 'manual'] as const;
-
-export type BoundingBoxScale = (typeof BOUNDING_BOX_SCALES)[number];
+export const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
+export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
+export const isBoundingBoxScaleMethod = (
+  v: unknown
+): v is BoundingBoxScaleMethod => zBoundingBoxScaleMethod.safeParse(v).success;
 
 export type CanvasDrawingTool = 'brush' | 'eraser';
 
@@ -122,7 +119,7 @@ export interface CanvasState {
   boundingBoxCoordinates: Vector2d;
   boundingBoxDimensions: Dimensions;
   boundingBoxPreviewFill: RgbaColor;
-  boundingBoxScaleMethod: BoundingBoxScale;
+  boundingBoxScaleMethod: BoundingBoxScaleMethod;
   brushColor: RgbaColor;
   brushSize: number;
   colorPickerColor: RgbaColor;

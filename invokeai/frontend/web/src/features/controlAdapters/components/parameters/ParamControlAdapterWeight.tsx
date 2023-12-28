@@ -1,6 +1,6 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterWeight } from 'features/controlAdapters/hooks/useControlAdapterWeight';
 import { controlAdapterWeightChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -30,19 +30,20 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
   }
 
   return (
-    <IAIInformationalPopover feature="controlNetWeight">
-      <IAISlider
-        isDisabled={!isEnabled}
-        label={t('controlnet.weight')}
+    <InvControl
+      label={t('controlnet.weight')}
+      isDisabled={!isEnabled}
+      feature="controlNetWeight"
+    >
+      <InvSlider
         value={weight}
         onChange={handleWeightChanged}
         min={0}
         max={2}
         step={0.01}
-        withSliderMarks
-        sliderMarks={[0, 1, 2]}
+        marks={[0, 1, 2]}
       />
-    </IAIInformationalPopover>
+    </InvControl>
   );
 };
 

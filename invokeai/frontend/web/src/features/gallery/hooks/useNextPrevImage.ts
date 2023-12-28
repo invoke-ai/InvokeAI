@@ -7,14 +7,15 @@ import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
 import { clamp } from 'lodash-es';
 import { map } from 'nanostores';
-import { RefObject, useCallback } from 'react';
-import { ListRange, VirtuosoGridHandle } from 'react-virtuoso';
+import type { RefObject } from 'react';
+import { useCallback } from 'react';
+import type { ListRange, VirtuosoGridHandle } from 'react-virtuoso';
 import { boardsApi } from 'services/api/endpoints/boards';
 import {
   imagesApi,
   useLazyListImagesQuery,
 } from 'services/api/endpoints/images';
-import { ListImagesArgs } from 'services/api/types';
+import type { ListImagesArgs } from 'services/api/types';
 import { imagesAdapter } from 'services/api/util';
 
 export type UseNextPrevImageState = {

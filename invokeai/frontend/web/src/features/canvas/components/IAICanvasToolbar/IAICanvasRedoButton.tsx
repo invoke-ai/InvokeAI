@@ -1,7 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { redo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
@@ -44,7 +44,7 @@ export default function IAICanvasRedoButton() {
   );
 
   return (
-    <IAIIconButton
+    <InvIconButton
       aria-label={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       tooltip={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       icon={<FaRedo />}

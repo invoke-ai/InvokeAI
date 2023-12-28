@@ -1,10 +1,11 @@
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   CreateDenoiseMaskInvocation,
   ImageDTO,
   NonNullableGraph,
   SeamlessModeInvocation,
 } from 'services/api/types';
+
 import {
   CANVAS_OUTPUT,
   INPAINT_IMAGE_RESIZE_UP,
@@ -44,6 +45,10 @@ export const addSDXLRefinerToGraph = (
     refinerStart,
   } = state.sdxl;
 
+  if (!refinerModel) {
+    return;
+  }
+
   const { seamlessXAxis, seamlessYAxis, vaePrecision } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
 
@@ -52,10 +57,6 @@ export const addSDXLRefinerToGraph = (
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
-
-  if (!refinerModel) {
-    return;
-  }
 
   upsertMetadata(graph, {
     refiner_model: refinerModel,

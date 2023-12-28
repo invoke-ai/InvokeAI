@@ -1,8 +1,10 @@
-import { Box, ChakraProps, Flex, IconButton, Spinner } from '@chakra-ui/react';
+import type { ChakraProps } from '@chakra-ui/react';
+import { Box, Flex, Spinner } from '@chakra-ui/react';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
-import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 
 const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',
@@ -39,7 +41,7 @@ const NextPrevImageButtons = () => {
         }}
       >
         {!isOnFirstImage && (
-          <IconButton
+          <InvIconButton
             aria-label={t('accessibility.previousImage')}
             icon={<FaAngleLeft size={64} />}
             variant="unstyled"
@@ -58,7 +60,7 @@ const NextPrevImageButtons = () => {
         }}
       >
         {!isOnLastImage && (
-          <IconButton
+          <InvIconButton
             aria-label={t('accessibility.nextImage')}
             icon={<FaAngleRight size={64} />}
             variant="unstyled"
@@ -68,7 +70,7 @@ const NextPrevImageButtons = () => {
           />
         )}
         {isOnLastImage && areMoreImagesAvailable && !isFetching && (
-          <IconButton
+          <InvIconButton
             aria-label={t('accessibility.loadMore')}
             icon={<FaAngleDoubleRight size={64} />}
             variant="unstyled"

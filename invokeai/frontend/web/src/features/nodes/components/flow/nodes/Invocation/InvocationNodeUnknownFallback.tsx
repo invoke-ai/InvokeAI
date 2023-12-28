@@ -1,10 +1,11 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
+import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useNodePack } from 'features/nodes/hooks/useNodePack';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
-import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 
 type Props = {
   nodeId: string;
@@ -33,22 +34,21 @@ const InvocationNodeUnknownFallback = ({
           borderBottomRadius: isOpen ? 0 : 'base',
           alignItems: 'center',
           h: 8,
-          fontWeight: 600,
+          fontWeight: 'semibold',
           fontSize: 'sm',
         }}
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <Text
+        <InvText
           sx={{
             w: 'full',
             textAlign: 'center',
             pe: 8,
-            color: 'error.500',
-            _dark: { color: 'error.300' },
+            color: 'error.300',
           }}
         >
           {label ? `${label} (${type})` : type}
-        </Text>
+        </InvText>
       </Flex>
       {isOpen && (
         <Flex
@@ -65,19 +65,19 @@ const InvocationNodeUnknownFallback = ({
           }}
         >
           <Flex gap={2} flexDir="column">
-            <Text as="span">
+            <InvText as="span">
               {t('nodes.unknownNodeType')}:{' '}
-              <Text as="span" fontWeight={600}>
+              <InvText as="span" fontWeight="semibold">
                 {type}
-              </Text>
-            </Text>
+              </InvText>
+            </InvText>
             {nodePack && (
-              <Text as="span">
+              <InvText as="span">
                 {t('nodes.nodePack')}:{' '}
-                <Text as="span" fontWeight={600}>
+                <InvText as="span" fontWeight="semibold">
                   {nodePack}
-                </Text>
-              </Text>
+                </InvText>
+              </InvText>
             )}
           </Flex>
         </Flex>

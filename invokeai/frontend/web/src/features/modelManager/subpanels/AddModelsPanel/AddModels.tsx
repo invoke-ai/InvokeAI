@@ -1,9 +1,11 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
-import IAIButton from 'common/components/IAIButton';
+import { Flex } from '@chakra-ui/react';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import AdvancedAddModels from './AdvancedAddModels';
 import SimpleAddModels from './SimpleAddModels';
-import { useTranslation } from 'react-i18next';
 
 export default function AddModels() {
   const { t } = useTranslation();
@@ -23,28 +25,27 @@ export default function AddModels() {
       maxHeight={window.innerHeight - 250}
       gap={4}
     >
-      <ButtonGroup isAttached>
-        <IAIButton
+      <InvButtonGroup>
+        <InvButton
           size="sm"
           isChecked={addModelMode == 'simple'}
           onClick={handleAddModelSimple}
         >
           {t('common.simple')}
-        </IAIButton>
-        <IAIButton
+        </InvButton>
+        <InvButton
           size="sm"
           isChecked={addModelMode == 'advanced'}
           onClick={handleAddModelAdvanced}
         >
           {t('common.advanced')}
-        </IAIButton>
-      </ButtonGroup>
+        </InvButton>
+      </InvButtonGroup>
       <Flex
         sx={{
           p: 4,
           borderRadius: 4,
-          background: 'base.200',
-          _dark: { background: 'base.800' },
+          background: 'base.800',
         }}
       >
         {addModelMode === 'simple' && <SimpleAddModels />}

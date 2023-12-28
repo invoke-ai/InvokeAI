@@ -1,10 +1,13 @@
-import IAISlider from 'common/components/IAISlider';
-import IAISwitch from 'common/components/IAISwitch';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { RequiredOpenposeImageProcessorInvocation } from 'features/controlAdapters/store/types';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { RequiredOpenposeImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.openpose_image_processor
@@ -57,36 +60,40 @@ const OpenposeProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <IAISlider
+      <InvControl
         label={t('controlnet.detectResolution')}
-        value={detect_resolution}
-        onChange={handleDetectResolutionChanged}
-        handleReset={handleDetectResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
+      >
+        <InvSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          onReset={handleDetectResolutionReset}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl
         label={t('controlnet.imageResolution')}
-        value={image_resolution}
-        onChange={handleImageResolutionChanged}
-        handleReset={handleImageResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISwitch
-        label={t('controlnet.handAndFace')}
-        isChecked={hand_and_face}
-        onChange={handleHandAndFaceChanged}
-        isDisabled={!isEnabled}
-      />
+      >
+        <InvSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          onReset={handleImageResolutionReset}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.handAndFace')} isDisabled={!isEnabled}>
+        <InvSwitch
+          isChecked={hand_and_face}
+          onChange={handleHandAndFaceChanged}
+        />
+      </InvControl>
     </ProcessorWrapper>
   );
 };

@@ -1,16 +1,20 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,
 } from 'features/nodes/types/constants';
-import { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import type {
+  AnyNode,
+  InvocationTemplate,
+} from 'features/nodes/types/invocation';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
 import { useCallback } from 'react';
-import { Node, useReactFlow } from 'reactflow';
+import type { Node } from 'reactflow';
+import { useReactFlow } from 'reactflow';
 
 const templatesSelector = createMemoizedSelector(
   [(state: RootState) => state.nodes],

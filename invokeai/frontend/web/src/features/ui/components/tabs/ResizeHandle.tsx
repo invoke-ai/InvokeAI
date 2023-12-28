@@ -1,4 +1,5 @@
-import { Box, Flex, FlexProps, useColorModeValue } from '@chakra-ui/react';
+import type { FlexProps } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { memo } from 'react';
 import { PanelResizeHandle } from 'react-resizable-panels';
 
@@ -15,8 +16,6 @@ const ResizeHandle = (props: ResizeHandleProps) => {
     isCollapsed = false,
     ...rest
   } = props;
-  const bg = useColorModeValue('base.100', 'base.850');
-  const hoverBg = useColorModeValue('base.300', 'base.700');
 
   if (direction === 'horizontal') {
     return (
@@ -38,10 +37,10 @@ const ResizeHandle = (props: ResizeHandleProps) => {
               : 'center',
             alignItems: 'center',
             div: {
-              bg,
+              bg: 'base.850',
             },
             _hover: {
-              div: { bg: hoverBg },
+              div: { bg: 'base.700' },
             },
           }}
           {...rest}
@@ -79,10 +78,10 @@ const ResizeHandle = (props: ResizeHandleProps) => {
             : 'center',
           justifyContent: 'center',
           div: {
-            bg,
+            bg: 'base.850',
           },
           _hover: {
-            div: { bg: hoverBg },
+            div: { bg: 'base.700' },
           },
         }}
         {...rest}

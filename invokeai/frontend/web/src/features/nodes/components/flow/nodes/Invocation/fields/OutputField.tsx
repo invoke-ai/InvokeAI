@@ -1,10 +1,15 @@
-import { Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvLabel } from 'common/components/InvControl/InvLabel';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldOutputInstance } from 'features/nodes/hooks/useFieldOutputInstance';
 import { useFieldOutputTemplate } from 'features/nodes/hooks/useFieldOutputTemplate';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { PropsWithChildren, memo } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import FieldHandle from './FieldHandle';
 import FieldTooltipContent from './FieldTooltipContent';
 
@@ -29,40 +34,34 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
   if (!fieldTemplate || !fieldInstance) {
     return (
       <OutputFieldWrapper shouldDim={shouldDim}>
-        <FormControl
-          sx={{
-            alignItems: 'stretch',
-            justifyContent: 'space-between',
-            gap: 2,
-            h: 'full',
-            w: 'full',
-          }}
+        <InvControl
+          alignItems="stretch"
+          justifyContent="space-between"
+          gap={2}
+          h="full"
+          w="full"
         >
-          <FormLabel
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              mb: 0,
-              px: 1,
-              gap: 2,
-              h: 'full',
-              fontWeight: 600,
-              color: 'error.400',
-              _dark: { color: 'error.300' },
-            }}
+          <InvLabel
+            display="flex"
+            alignItems="center"
+            h="full"
+            color="error.300"
+            mb={0}
+            px={1}
+            gap={2}
           >
             {t('nodes.unknownOutput', {
               name: fieldTemplate?.title ?? fieldName,
             })}
-          </FormLabel>
-        </FormControl>
+          </InvLabel>
+        </InvControl>
       </OutputFieldWrapper>
     );
   }
 
   return (
     <OutputFieldWrapper shouldDim={shouldDim}>
-      <Tooltip
+      <InvTooltip
         label={
           <FieldTooltipContent
             nodeId={nodeId}
@@ -73,14 +72,11 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
         openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
         placement="top"
         shouldWrapChildren
-        hasArrow
       >
-        <FormControl isDisabled={isConnected} pe={2}>
-          <FormLabel sx={{ mb: 0, fontWeight: 500 }}>
-            {fieldTemplate?.title}
-          </FormLabel>
-        </FormControl>
-      </Tooltip>
+        <InvControl isDisabled={isConnected} pe={2}>
+          <InvLabel mb={0}>{fieldTemplate?.title}</InvLabel>
+        </InvControl>
+      </InvTooltip>
       <FieldHandle
         fieldTemplate={fieldTemplate}
         handleType="source"

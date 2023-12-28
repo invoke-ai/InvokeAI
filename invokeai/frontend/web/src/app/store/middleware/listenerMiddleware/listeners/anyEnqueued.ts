@@ -1,4 +1,5 @@
 import { queueApi } from 'services/api/endpoints/queue';
+
 import { startAppListening } from '..';
 
 export const addAnyEnqueuedListener = () => {

@@ -1,11 +1,13 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterResizeMode } from 'features/controlAdapters/hooks/useControlAdapterResizeMode';
 import { controlAdapterResizeModeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { ResizeMode } from 'features/controlAdapters/store/types';
-import { useCallback } from 'react';
+import type { ResizeMode } from 'features/controlAdapters/store/types';
+import { isResizeMode } from 'features/controlAdapters/store/types';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -18,17 +20,34 @@ export default function ParamControlAdapterResizeMode({ id }: Props) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const RESIZE_MODE_DATA = [
-    { label: t('controlnet.resize'), value: 'just_resize' },
-    { label: t('controlnet.crop'), value: 'crop_resize' },
-    { label: t('controlnet.fill'), value: 'fill_resize' },
-  ];
+  const options: { label: string; value: ResizeMode }[] = useMemo(
+    () => [
+      { label: t('controlnet.resize'), value: 'just_resize' },
+      { label: t('controlnet.crop'), value: 'crop_resize' },
+      { label: t('controlnet.fill'), value: 'fill_resize' },
+      { label: t('controlnet.resizeSimple'), value: 'just_resize_simple' },
+    ],
+    [t]
+  );
 
-  const handleResizeModeChange = useCallback(
-    (resizeMode: ResizeMode) => {
-      dispatch(controlAdapterResizeModeChanged({ id, resizeMode }));
+  const handleResizeModeChange = useCallback<InvSelectOnChange>(
+    (v) => {
+      if (!isResizeMode(v?.value)) {
+        return;
+      }
+      dispatch(
+        controlAdapterResizeModeChanged({
+          id,
+          resizeMode: v.value,
+        })
+      );
     },
     [id, dispatch]
+  );
+
+  const value = useMemo(
+    () => options.find((o) => o.value === resizeMode),
+    [options, resizeMode]
   );
 
   if (!resizeMode) {
@@ -36,14 +55,16 @@ export default function ParamControlAdapterResizeMode({ id }: Props) {
   }
 
   return (
-    <IAIInformationalPopover feature="controlNetResizeMode">
-      <IAIMantineSelect
-        disabled={!isEnabled}
-        label={t('controlnet.resizeMode')}
-        data={RESIZE_MODE_DATA}
-        value={resizeMode}
+    <InvControl
+      label={t('controlnet.resizeMode')}
+      feature="controlNetResizeMode"
+    >
+      <InvSelect
+        value={value}
+        options={options}
+        isDisabled={!isEnabled}
         onChange={handleResizeModeChange}
       />
-    </IAIInformationalPopover>
+    </InvControl>
   );
 }

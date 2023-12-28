@@ -1,6 +1,6 @@
 import { ChevronUpIcon } from '@chakra-ui/icons';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { nodeIsOpenChanged } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useUpdateNodeInternals } from 'reactflow';
@@ -20,7 +20,7 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
   }, [dispatch, isOpen, nodeId, updateNodeInternals]);
 
   return (
-    <IAIIconButton
+    <InvIconButton
       className="nodrag"
       onClick={handleClick}
       aria-label="Minimize"
@@ -29,14 +29,8 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
         w: 8,
         h: 8,
         color: 'base.500',
-        _dark: {
-          color: 'base.500',
-        },
         _hover: {
-          color: 'base.700',
-          _dark: {
-            color: 'base.300',
-          },
+          color: 'base.300',
         },
       }}
       variant="link"

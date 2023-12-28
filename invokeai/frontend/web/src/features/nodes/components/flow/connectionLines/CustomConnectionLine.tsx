@@ -4,7 +4,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { memo } from 'react';
-import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
+import type { ConnectionLineComponentProps } from 'reactflow';
+import { getBezierPath } from 'reactflow';
 
 const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
   const { shouldAnimateEdges, connectionStartFieldType, shouldColorEdges } =

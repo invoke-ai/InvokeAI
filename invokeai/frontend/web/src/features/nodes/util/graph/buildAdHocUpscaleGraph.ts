@@ -1,17 +1,18 @@
-import { BoardId } from 'features/gallery/store/types';
-import { ESRGANModelName } from 'features/parameters/store/postprocessingSlice';
-import {
+import type { BoardId } from 'features/gallery/store/types';
+import type { ParamESRGANModelName } from 'features/parameters/store/postprocessingSlice';
+import type {
   ESRGANInvocation,
   Graph,
   LinearUIOutputInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { ESRGAN, LINEAR_UI_OUTPUT } from './constants';
 import { addCoreMetadataNode, upsertMetadata } from './metadata';
 
 type Arg = {
   image_name: string;
-  esrganModelName: ESRGANModelName;
+  esrganModelName: ParamESRGANModelName;
   autoAddBoardId: BoardId;
 };
 

@@ -1,11 +1,10 @@
-import {
+import type {
   BaseQueryFn,
   FetchArgs,
   FetchBaseQueryError,
   TagDescription,
-  createApi,
-  fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $projectId } from 'app/store/nanostores/projectId';

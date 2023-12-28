@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { NonNullableGraph } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -49,7 +50,7 @@ export const buildLinearSDXLTextToImageGraph = (
   const {
     positiveStylePrompt,
     negativeStylePrompt,
-    shouldUseSDXLRefiner,
+    refinerModel,
     refinerStart,
   } = state.sdxl;
 
@@ -119,7 +120,7 @@ export const buildLinearSDXLTextToImageGraph = (
         scheduler,
         steps,
         denoising_start: 0,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        denoising_end: refinerModel ? refinerStart : 1,
         is_intermediate,
       },
       [LATENTS_TO_IMAGE]: {
@@ -255,7 +256,7 @@ export const buildLinearSDXLTextToImageGraph = (
   }
 
   // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;

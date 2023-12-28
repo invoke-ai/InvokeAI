@@ -1,11 +1,19 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { ESRGANInvocation } from 'services/api/types';
+import { z } from 'zod';
 
-export type ESRGANModelName = NonNullable<ESRGANInvocation['model_name']>;
+export const zParamESRGANModelName = z.enum([
+  'RealESRGAN_x4plus.pth',
+  'RealESRGAN_x4plus_anime_6B.pth',
+  'ESRGAN_SRx4_DF2KOST_official-ff704c30.pth',
+  'RealESRGAN_x2plus.pth',
+]);
+export type ParamESRGANModelName = z.infer<typeof zParamESRGANModelName>;
+export const isParamESRGANModelName = (v: unknown): v is ParamESRGANModelName =>
+  zParamESRGANModelName.safeParse(v).success;
 
 export interface PostprocessingState {
-  esrganModelName: ESRGANModelName;
+  esrganModelName: ParamESRGANModelName;
 }
 
 export const initialPostprocessingState: PostprocessingState = {
@@ -16,7 +24,10 @@ export const postprocessingSlice = createSlice({
   name: 'postprocessing',
   initialState: initialPostprocessingState,
   reducers: {
-    esrganModelNameChanged: (state, action: PayloadAction<ESRGANModelName>) => {
+    esrganModelNameChanged: (
+      state,
+      action: PayloadAction<ParamESRGANModelName>
+    ) => {
       state.esrganModelName = action.payload;
     },
   },

@@ -1,4 +1,4 @@
-import { initialGalleryState } from './gallerySlice';
+import type { initialGalleryState } from './gallerySlice';
 
 /**
  * Gallery slice persist denylist

@@ -1,29 +1,25 @@
-import { Middleware } from '@reduxjs/toolkit';
+import 'i18n';
+
+import type { Middleware } from '@reduxjs/toolkit';
 import { $socketOptions } from 'app/hooks/useSocketIO';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
+import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
 import { createStore } from 'app/store/store';
-import { PartialAppConfig } from 'app/types/invokeai';
+import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
-import 'i18n';
-import React, {
-  PropsWithChildren,
-  ReactNode,
-  lazy,
-  memo,
-  useEffect,
-  useMemo,
-} from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
+import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { ManagerOptions, SocketOptions } from 'socket.io-client';
+import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));

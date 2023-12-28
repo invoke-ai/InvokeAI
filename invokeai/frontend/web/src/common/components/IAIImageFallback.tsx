@@ -1,15 +1,9 @@
-import {
-  As,
-  Flex,
-  FlexProps,
-  Icon,
-  Skeleton,
-  Spinner,
-  StyleProps,
-  Text,
-} from '@chakra-ui/react';
+import type { As, FlexProps, StyleProps } from '@chakra-ui/react';
+import { Flex, Icon, Skeleton, Spinner } from '@chakra-ui/react';
 import { FaImage } from 'react-icons/fa';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
+
+import { InvText } from './InvText/wrapper';
 
 type Props = { image: ImageDTO | undefined };
 
@@ -36,10 +30,7 @@ export const IAILoadingImageFallback = (props: Props) => {
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 'base',
-        bg: 'base.200',
-        _dark: {
-          bg: 'base.900',
-        },
+        bg: 'base.900',
       }}
     >
       <Spinner size="xl" />
@@ -68,16 +59,13 @@ export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
         gap: 2,
         userSelect: 'none',
         opacity: 0.7,
-        color: 'base.700',
-        _dark: {
-          color: 'base.500',
-        },
+        color: 'base.500',
         ...sx,
       }}
       {...rest}
     >
       {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
-      {props.label && <Text textAlign="center">{props.label}</Text>}
+      {props.label && <InvText textAlign="center">{props.label}</InvText>}
     </Flex>
   );
 };
@@ -103,16 +91,13 @@ export const IAINoContentFallbackWithSpinner = (
         gap: 2,
         userSelect: 'none',
         opacity: 0.7,
-        color: 'base.700',
-        _dark: {
-          color: 'base.500',
-        },
+        color: 'base.500',
         ...sx,
       }}
       {...rest}
     >
       <Spinner size="xl" />
-      {props.label && <Text textAlign="center">{props.label}</Text>}
+      {props.label && <InvText textAlign="center">{props.label}</InvText>}
     </Flex>
   );
 };

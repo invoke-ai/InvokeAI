@@ -1,13 +1,14 @@
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { omit } from 'lodash-es';
-import {
+import type {
   CollectInvocation,
   CoreMetadataInvocation,
   IPAdapterInvocation,
   IPAdapterMetadataField,
   NonNullableGraph,
 } from 'services/api/types';
+
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   IP_ADAPTER_COLLECT,

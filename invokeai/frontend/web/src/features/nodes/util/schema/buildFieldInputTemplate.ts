@@ -1,5 +1,5 @@
-import { isNumber, startCase } from 'lodash-es';
-import {
+import { FieldParseError } from 'features/nodes/types/error';
+import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
   ColorFieldInputTemplate,
@@ -8,27 +8,25 @@ import {
   FieldInputTemplate,
   FieldType,
   FloatFieldInputTemplate,
-  IPAdapterModelFieldInputTemplate,
   ImageFieldInputTemplate,
   IntegerFieldInputTemplate,
+  IPAdapterModelFieldInputTemplate,
   LoRAModelFieldInputTemplate,
   MainModelFieldInputTemplate,
+  SchedulerFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
   SDXLRefinerModelFieldInputTemplate,
-  SchedulerFieldInputTemplate,
   StatefulFieldType,
   StatelessFieldInputTemplate,
   StringFieldInputTemplate,
   T2IAdapterModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
-  isStatefulFieldType,
 } from 'features/nodes/types/field';
-import {
-  InvocationFieldSchema,
-  isSchemaObject,
-} from 'features/nodes/types/openapi';
+import { isStatefulFieldType } from 'features/nodes/types/field';
+import type { InvocationFieldSchema } from 'features/nodes/types/openapi';
+import { isSchemaObject } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
-import { FieldParseError } from 'features/nodes/types/error';
+import { isNumber, startCase } from 'lodash-es';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!

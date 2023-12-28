@@ -1,10 +1,11 @@
 import { logger } from 'app/logging/logger';
+import { isInitializedChanged } from 'features/system/store/systemSlice';
 import { size } from 'lodash-es';
 import { api } from 'services/api';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
+
 import { startAppListening } from '../..';
-import { isInitializedChanged } from 'features/system/store/systemSlice';
 
 export const addSocketConnectedEventListener = () => {
   startAppListening({

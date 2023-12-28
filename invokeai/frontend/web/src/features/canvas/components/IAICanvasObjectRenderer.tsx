@@ -10,6 +10,7 @@ import {
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { memo } from 'react';
 import { Group, Line, Rect } from 'react-konva';
+
 import IAICanvasImage from './IAICanvasImage';
 
 const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {

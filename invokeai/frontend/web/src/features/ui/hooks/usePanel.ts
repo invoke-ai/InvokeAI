@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { ImperativePanelHandle, Units } from 'react-resizable-panels';
+import type { ImperativePanelHandle, Units } from 'react-resizable-panels';
 
 export const usePanel = (minSize: number, units: Units) => {
   const ref = useRef<ImperativePanelHandle>(null);

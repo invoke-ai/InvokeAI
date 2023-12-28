@@ -3,18 +3,20 @@ import {
   EditableInput,
   EditablePreview,
   Flex,
-  Tooltip,
   forwardRef,
   useEditableControls,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
-import { MouseEvent, memo, useCallback, useEffect, useState } from 'react';
-import FieldTooltipContent from './FieldTooltipContent';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
+import type { MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import FieldTooltipContent from './FieldTooltipContent';
 
 interface Props {
   nodeId: string;
@@ -62,7 +64,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   }, [label, fieldTemplateTitle, t]);
 
   return (
-    <Tooltip
+    <InvTooltip
       label={
         withTooltip ? (
           <FieldTooltipContent
@@ -73,8 +75,6 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
         ) : undefined
       }
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-      placement="top"
-      hasArrow
     >
       <Flex
         ref={ref}
@@ -101,10 +101,10 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
           <EditablePreview
             sx={{
               p: 0,
-              fontWeight: isMissingInput ? 600 : 400,
+              fontWeight: isMissingInput ? 'bold' : 'normal',
               textAlign: 'left',
               _hover: {
-                fontWeight: '600 !important',
+                fontWeight: 'semibold !important',
               },
             }}
             noOfLines={1}
@@ -114,11 +114,8 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
             sx={{
               p: 0,
               w: 'full',
-              fontWeight: 600,
-              color: 'base.900',
-              _dark: {
-                color: 'base.100',
-              },
+              fontWeight: 'semibold',
+              color: 'base.100',
               _focusVisible: {
                 p: 0,
                 textAlign: 'left',
@@ -129,7 +126,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
           <EditableControls />
         </Editable>
       </Flex>
-    </Tooltip>
+    </InvTooltip>
   );
 });
 

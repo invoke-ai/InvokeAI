@@ -1,5 +1,6 @@
-import { Flex, Heading, Link, Text, useToast } from '@chakra-ui/react';
-import IAIButton from 'common/components/IAIButton';
+import { Flex, Heading, Link, useToast } from '@chakra-ui/react';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvText } from 'common/components/InvText/wrapper';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -67,30 +68,24 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
             alignItems: 'center',
           }}
         >
-          <Text
-            sx={{
-              fontWeight: 600,
-              color: 'error.500',
-              _dark: { color: 'error.400' },
-            }}
-          >
+          <InvText fontWeight="semibold" color="error.400">
             {error.name}: {error.message}
-          </Text>
+          </InvText>
         </Flex>
         <Flex sx={{ gap: 4 }}>
-          <IAIButton
+          <InvButton
             leftIcon={<FaArrowRotateLeft />}
             onClick={resetErrorBoundary}
           >
             {t('accessibility.resetUI')}
-          </IAIButton>
-          <IAIButton leftIcon={<FaCopy />} onClick={handleCopy}>
+          </InvButton>
+          <InvButton leftIcon={<FaCopy />} onClick={handleCopy}>
             {t('common.copyError')}
-          </IAIButton>
+          </InvButton>
           <Link href={url} isExternal>
-            <IAIButton leftIcon={<FaExternalLinkAlt />}>
+            <InvButton leftIcon={<FaExternalLinkAlt />}>
               {t('accessibility.createIssue')}
-            </IAIButton>
+            </InvButton>
           </Link>
         </Flex>
       </Flex>

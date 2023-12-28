@@ -1,4 +1,4 @@
-import { Node } from 'reactflow';
+import type { Node } from 'reactflow';
 
 /**
  * How long to wait before showing a tooltip when hovering a field handle.

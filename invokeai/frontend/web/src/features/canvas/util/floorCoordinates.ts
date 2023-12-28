@@ -1,4 +1,4 @@
-import { Vector2d } from 'konva/lib/types';
+import type { Vector2d } from 'konva/lib/types';
 
 const floorCoordinates = (coord: Vector2d): Vector2d => {
   return {

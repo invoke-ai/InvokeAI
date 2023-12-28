@@ -1,7 +1,9 @@
-import { FlexProps, Grid, forwardRef } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
+import type { FlexProps } from '@chakra-ui/react';
+import { forwardRef, Grid } from '@chakra-ui/react';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { PropsWithChildren, memo } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo } from 'react';
 
 type ListContainerProps = PropsWithChildren & FlexProps;
 const ListContainer = forwardRef((props: ListContainerProps, ref) => {

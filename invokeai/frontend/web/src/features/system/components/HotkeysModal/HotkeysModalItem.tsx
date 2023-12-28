@@ -1,4 +1,5 @@
-import { Box, Grid, Text } from '@chakra-ui/react';
+import { Box, Grid } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
 
 interface HotkeysModalProps {
   hotkey: string;
@@ -17,22 +18,22 @@ export default function HotkeysModalItem(props: HotkeysModalProps) {
       }}
     >
       <Grid>
-        <Text fontWeight={600}>{title}</Text>
+        <InvText fontWeight="semibold">{title}</InvText>
         {description && (
-          <Text
+          <InvText
             sx={{
               fontSize: 'sm',
             }}
             variant="subtext"
           >
             {description}
-          </Text>
+          </InvText>
         )}
       </Grid>
       <Box
         sx={{
           fontSize: 'sm',
-          fontWeight: 600,
+          fontWeight: 'semibold',
           px: 2,
           py: 1,
         }}

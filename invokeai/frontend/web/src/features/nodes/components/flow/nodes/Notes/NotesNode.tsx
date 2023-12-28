@@ -1,13 +1,14 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAITextarea from 'common/components/IAITextarea';
-import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
-import { NotesNodeData } from 'features/nodes/types/invocation';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { NodeProps } from 'reactflow';
-import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
+import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
+import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
+import type { NotesNodeData } from 'features/nodes/types/invocation';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+import type { NodeProps } from 'reactflow';
 
 const NotesNode = (props: NodeProps<NotesNodeData>) => {
   const { id: nodeId, data, selected } = props;
@@ -55,7 +56,7 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
               className="nopan"
               sx={{ flexDir: 'column', w: 'full', h: 'full' }}
             >
-              <IAITextarea
+              <InvTextarea
                 value={notes}
                 onChange={handleChange}
                 rows={8}

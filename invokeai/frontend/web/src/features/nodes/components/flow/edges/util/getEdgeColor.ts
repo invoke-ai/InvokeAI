@@ -1,6 +1,6 @@
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { FIELD_COLORS } from 'features/nodes/types/constants';
-import { FieldType } from 'features/nodes/types/field';
+import type { FieldType } from 'features/nodes/types/field';
 
 export const getFieldColor = (fieldType: FieldType | null): string => {
   if (!fieldType) {

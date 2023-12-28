@@ -11,7 +11,7 @@ import { initialSystemState } from 'features/system/store/systemSlice';
 import { initialHotkeysState } from 'features/ui/store/hotkeysSlice';
 import { initialUIState } from 'features/ui/store/uiSlice';
 import { defaultsDeep } from 'lodash-es';
-import { UnserializeFunction } from 'redux-remember';
+import type { UnserializeFunction } from 'redux-remember';
 
 const initialStates: {
   [key: string]: object; // TODO: type this properly

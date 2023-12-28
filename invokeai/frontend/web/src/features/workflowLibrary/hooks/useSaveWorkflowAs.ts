@@ -1,4 +1,5 @@
-import { ToastId, useToast } from '@chakra-ui/react';
+import type { ToastId } from '@chakra-ui/react';
+import { useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
 import {

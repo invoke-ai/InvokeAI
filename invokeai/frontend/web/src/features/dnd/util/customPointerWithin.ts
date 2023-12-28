@@ -1,4 +1,5 @@
-import { CollisionDetection, pointerWithin } from '@dnd-kit/core';
+import type { CollisionDetection } from '@dnd-kit/core';
+import { pointerWithin } from '@dnd-kit/core';
 
 /**
  * Filters out droppable elements that are overflowed, then applies the pointerWithin collision detection.

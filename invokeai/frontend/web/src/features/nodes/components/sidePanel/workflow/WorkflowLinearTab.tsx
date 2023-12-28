@@ -3,8 +3,8 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import LinearViewField from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

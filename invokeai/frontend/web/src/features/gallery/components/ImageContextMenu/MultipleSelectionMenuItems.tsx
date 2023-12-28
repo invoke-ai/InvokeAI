@@ -1,13 +1,16 @@
-import { MenuItem } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaDownload, FaFolder, FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
@@ -15,9 +18,6 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { addToast } from 'features/system/store/systemSlice';
-import { useTranslation } from 'react-i18next';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
@@ -89,36 +89,36 @@ const MultipleSelectionMenuItems = () => {
   return (
     <>
       {areAllStarred && (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleUnstarSelection}
         >
           {customStarUi ? customStarUi.off.text : `Unstar All`}
-        </MenuItem>
+        </InvMenuItem>
       )}
       {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStar />}
           onClickCapture={handleStarSelection}
         >
           {customStarUi ? customStarUi.on.text : `Star All`}
-        </MenuItem>
+        </InvMenuItem>
       )}
       {isBulkDownloadEnabled && (
-        <MenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
+        <InvMenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
           {t('gallery.downloadSelection')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
+      <InvMenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}
-      </MenuItem>
-      <MenuItem
-        sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
+      </InvMenuItem>
+      <InvMenuItem
+        sx={{ color: 'error.300' }}
         icon={<FaTrash />}
         onClickCapture={handleDeleteSelection}
       >
         {t('gallery.deleteSelection')}
-      </MenuItem>
+      </InvMenuItem>
     </>
   );
 };

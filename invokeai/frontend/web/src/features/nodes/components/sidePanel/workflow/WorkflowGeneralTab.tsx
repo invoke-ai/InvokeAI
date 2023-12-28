@@ -1,10 +1,12 @@
-import { Flex, FormControl, FormLabel } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIInput from 'common/components/IAIInput';
-import IAITextarea from 'common/components/IAITextarea';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
   workflowAuthorChanged,
   workflowContactChanged,
@@ -14,7 +16,8 @@ import {
   workflowTagsChanged,
   workflowVersionChanged,
 } from 'features/nodes/store/workflowSlice';
-import { ChangeEvent, memo, useCallback } from 'react';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(stateSelector, ({ workflow }) => {
@@ -92,53 +95,48 @@ const WorkflowGeneralTab = () => {
           h: 'full',
         }}
       >
-        <Flex sx={{ gap: 2, w: 'full' }}>
-          <IAIInput
-            label={t('nodes.workflowName')}
-            value={name}
-            onChange={handleChangeName}
-          />
-          <IAIInput
-            label={t('nodes.workflowVersion')}
-            value={version}
-            onChange={handleChangeVersion}
-          />
-        </Flex>
-        <Flex sx={{ gap: 2, w: 'full' }}>
-          <IAIInput
-            label={t('nodes.workflowAuthor')}
-            value={author}
-            onChange={handleChangeAuthor}
-          />
-          <IAIInput
-            label={t('nodes.workflowContact')}
-            value={contact}
-            onChange={handleChangeContact}
-          />
-        </Flex>
-        <IAIInput
-          label={t('nodes.workflowTags')}
-          value={tags}
-          onChange={handleChangeTags}
-        />
-        <FormControl as={Flex} sx={{ flexDir: 'column' }}>
-          <FormLabel>{t('nodes.workflowDescription')}</FormLabel>
-          <IAITextarea
+        <InvControlGroup orientation="vertical">
+          <Flex sx={{ gap: 2, w: 'full' }}>
+            <InvControl label={t('nodes.workflowName')}>
+              <InvInput value={name} onChange={handleChangeName} />
+            </InvControl>
+            <InvControl label={t('nodes.workflowVersion')}>
+              <InvInput value={version} onChange={handleChangeVersion} />
+            </InvControl>
+          </Flex>
+          <Flex sx={{ gap: 2, w: 'full' }}>
+            <InvControl label={t('nodes.workflowAuthor')}>
+              <InvInput value={author} onChange={handleChangeAuthor} />
+            </InvControl>
+            <InvControl label={t('nodes.workflowContact')}>
+              <InvInput value={contact} onChange={handleChangeContact} />
+            </InvControl>
+          </Flex>
+          <InvControl label={t('nodes.workflowTags')}>
+            <InvInput value={tags} onChange={handleChangeTags} />
+          </InvControl>
+        </InvControlGroup>
+        <InvControl
+          label={t('nodes.workflowDescription')}
+          orientation="vertical"
+        >
+          <InvTextarea
             onChange={handleChangeDescription}
             value={description}
             fontSize="sm"
-            sx={{ resize: 'none' }}
+            resize="none"
+            rows={3}
           />
-        </FormControl>
-        <FormControl as={Flex} sx={{ flexDir: 'column', h: 'full' }}>
-          <FormLabel>{t('nodes.workflowNotes')}</FormLabel>
-          <IAITextarea
+        </InvControl>
+        <InvControl label={t('nodes.workflowNotes')} orientation="vertical">
+          <InvTextarea
             onChange={handleChangeNotes}
             value={notes}
             fontSize="sm"
-            sx={{ h: 'full', resize: 'none' }}
+            resize="none"
+            rows={10}
           />
-        </FormControl>
+        </InvControl>
       </Flex>
     </ScrollableContent>
   );

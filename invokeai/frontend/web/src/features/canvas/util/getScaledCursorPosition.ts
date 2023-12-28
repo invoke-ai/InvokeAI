@@ -1,4 +1,4 @@
-import { Stage } from 'konva/lib/Stage';
+import type { Stage } from 'konva/lib/Stage';
 
 const getScaledCursorPosition = (stage: Stage) => {
   const pointerPosition = stage.getPointerPosition();

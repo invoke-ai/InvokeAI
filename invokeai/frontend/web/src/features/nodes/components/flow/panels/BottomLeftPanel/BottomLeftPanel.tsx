@@ -1,5 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { memo } from 'react';
+
 import NodeOpacitySlider from './NodeOpacitySlider';
 import ViewportControls from './ViewportControls';
 

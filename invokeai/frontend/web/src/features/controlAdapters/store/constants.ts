@@ -1,5 +1,6 @@
 import i18n from 'i18next';
-import {
+
+import type {
   ControlAdapterProcessorType,
   RequiredControlAdapterProcessorNode,
 } from './types';

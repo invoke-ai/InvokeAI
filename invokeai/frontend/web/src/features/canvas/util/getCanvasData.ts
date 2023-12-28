@@ -1,10 +1,11 @@
 import { logger } from 'app/logging/logger';
-import { Vector2d } from 'konva/lib/types';
-import {
+import type {
   CanvasLayerState,
   Dimensions,
-  isCanvasMaskLine,
 } from 'features/canvas/store/canvasTypes';
+import { isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
+import type { Vector2d } from 'konva/lib/types';
+
 import createMaskStage from './createMaskStage';
 import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';

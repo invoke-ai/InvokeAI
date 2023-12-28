@@ -6,7 +6,7 @@ import {
   setIsMovingStage,
   setStageCoordinates,
 } from 'features/canvas/store/canvasSlice';
-import { KonvaEventObject } from 'konva/lib/Node';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCallback } from 'react';
 
 const selector = createMemoizedSelector(

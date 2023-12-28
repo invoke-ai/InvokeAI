@@ -1,20 +1,21 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { FieldParseError } from 'features/nodes/types/error';
-import {
+import type {
   FieldInputTemplate,
   FieldOutputTemplate,
 } from 'features/nodes/types/field';
-import { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { InvocationSchemaObject } from 'features/nodes/types/openapi';
 import {
-  InvocationSchemaObject,
   isInvocationFieldSchema,
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
 } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
 import { reduce } from 'lodash-es';
-import { OpenAPIV3_1 } from 'openapi-types';
+import type { OpenAPIV3_1 } from 'openapi-types';
+
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
 import { parseFieldType } from './parseFieldType';

@@ -1,7 +1,7 @@
 import { Badge } from '@chakra-ui/react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SessionQueueItemStatus } from 'services/api/endpoints/queue';
+import type { SessionQueueItemStatus } from 'services/api/endpoints/queue';
 
 const STATUSES = {
   pending: { colorScheme: 'cyan', translationKey: 'queue.pending' },

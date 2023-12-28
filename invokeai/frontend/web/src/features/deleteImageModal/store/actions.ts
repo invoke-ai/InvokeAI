@@ -1,6 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
-import { ImageDTO } from 'services/api/types';
-import { ImageUsage } from './types';
+import type { ImageDTO } from 'services/api/types';
+
+import type { ImageUsage } from './types';
 
 export const imageDeletionConfirmed = createAction<{
   imageDTOs: ImageDTO[];

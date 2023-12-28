@@ -1,8 +1,11 @@
-import { Divider, Flex, Text } from '@chakra-ui/react';
+import { Divider, Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineTextInput from 'common/components/IAIMantineInput';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import {
   LORA_MODEL_FORMAT_MAP,
   MODEL_TYPE_MAP,
@@ -11,12 +14,9 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  LoRAModelConfigEntity,
-  useUpdateLoRAModelsMutation,
-} from 'services/api/endpoints/models';
-import { LoRAModelConfig } from 'services/api/types';
-import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import { useUpdateLoRAModelsMutation } from 'services/api/endpoints/models';
+import type { LoRAModelConfig } from 'services/api/types';
 
 type LoRAModelEditProps = {
   model: LoRAModelConfigEntity;
@@ -91,13 +91,13 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
   return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex flexDirection="column">
-        <Text fontSize="lg" fontWeight="bold">
+        <InvText fontSize="lg" fontWeight="bold">
           {model.model_name}
-        </Text>
-        <Text fontSize="sm" color="base.400">
+        </InvText>
+        <InvText fontSize="sm" color="base.400">
           {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')} ⋅{' '}
           {LORA_MODEL_FORMAT_MAP[model.model_format]} {t('common.format')}
-        </Text>
+        </InvText>
       </Flex>
       <Divider />
 
@@ -107,22 +107,19 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
         )}
       >
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <IAIMantineTextInput
-            label={t('modelManager.name')}
-            {...loraEditForm.getInputProps('model_name')}
-          />
-          <IAIMantineTextInput
-            label={t('modelManager.description')}
-            {...loraEditForm.getInputProps('description')}
-          />
+          <InvControl label={t('modelManager.name')}>
+            <InvInput {...loraEditForm.getInputProps('model_name')} />
+          </InvControl>
+          <InvControl label={t('modelManager.description')}>
+            <InvInput {...loraEditForm.getInputProps('description')} />
+          </InvControl>
           <BaseModelSelect {...loraEditForm.getInputProps('base_model')} />
-          <IAIMantineTextInput
-            label={t('modelManager.modelLocation')}
-            {...loraEditForm.getInputProps('path')}
-          />
-          <IAIButton type="submit" isLoading={isLoading}>
+          <InvControl label={t('modelManager.modelLocation')}>
+            <InvInput {...loraEditForm.getInputProps('path')} />
+          </InvControl>
+          <InvButton type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}
-          </IAIButton>
+          </InvButton>
         </Flex>
       </form>
     </Flex>

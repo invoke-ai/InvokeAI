@@ -1,6 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
-import { Flex, Image, Text } from '@chakra-ui/react';
+import { Flex, Image } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
+import { InvText } from 'common/components/InvText/wrapper';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useRef } from 'react';
 import { useHoverDirty } from 'react-use';
@@ -29,9 +30,9 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
         }}
       />
       <Flex sx={{ gap: 3, alignItems: 'center' }}>
-        <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
+        <InvText sx={{ fontSize: 'xl', userSelect: 'none' }}>
           invoke <strong>ai</strong>
-        </Text>
+        </InvText>
         <AnimatePresence>
           {showVersion && isHovered && appVersion && (
             <motion.div
@@ -48,9 +49,9 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
                 transition: { delay: 0.8 },
               }}
             >
-              <Text
+              <InvText
                 sx={{
-                  fontWeight: 600,
+                  fontWeight: 'semibold',
                   marginTop: 1,
                   color: 'base.300',
                   fontSize: 14,
@@ -58,7 +59,7 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
                 variant="subtext"
               >
                 {appVersion.version}
-              </Text>
+              </InvText>
             </motion.div>
           )}
         </AnimatePresence>

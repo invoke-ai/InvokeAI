@@ -1,10 +1,11 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
-import { useColorMode, useToken } from '@chakra-ui/react';
+import { useToken } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { range } from 'lodash-es';
-import { ReactNode, memo, useCallback, useLayoutEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { memo, useCallback, useLayoutEffect, useState } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
 
 const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
@@ -15,12 +16,8 @@ const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
 const IAICanvasGrid = () => {
   const { stageScale, stageCoordinates, stageDimensions } =
     useAppSelector(selector);
-  const { colorMode } = useColorMode();
   const [gridLines, setGridLines] = useState<ReactNode[]>([]);
-  const [darkGridLineColor, lightGridLineColor] = useToken('colors', [
-    'base.800',
-    'base.200',
-  ]);
+  const [gridLineColor] = useToken('colors', ['base.800']);
 
   const unscale = useCallback(
     (value: number) => {
@@ -78,7 +75,7 @@ const IAICanvasGrid = () => {
         x={fullRect.x1 + i * 64}
         y={fullRect.y1}
         points={[0, 0, 0, ySize]}
-        stroke={colorMode === 'dark' ? darkGridLineColor : lightGridLineColor}
+        stroke={gridLineColor}
         strokeWidth={1}
       />
     ));
@@ -88,21 +85,13 @@ const IAICanvasGrid = () => {
         x={fullRect.x1}
         y={fullRect.y1 + i * 64}
         points={[0, 0, xSize, 0]}
-        stroke={colorMode === 'dark' ? darkGridLineColor : lightGridLineColor}
+        stroke={gridLineColor}
         strokeWidth={1}
       />
     ));
 
     setGridLines(xLines.concat(yLines));
-  }, [
-    stageScale,
-    stageCoordinates,
-    stageDimensions,
-    unscale,
-    colorMode,
-    darkGridLineColor,
-    lightGridLineColor,
-  ]);
+  }, [stageScale, stageCoordinates, stageDimensions, unscale, gridLineColor]);
 
   return <Group>{gridLines}</Group>;
 };
