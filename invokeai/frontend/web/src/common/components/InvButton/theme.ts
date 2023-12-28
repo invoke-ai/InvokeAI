@@ -168,7 +168,7 @@ const getStyles = (
 
 export const buttonTheme = defineStyleConfig({
   baseStyle: {
-    fontWeight: 'bold',
+    fontWeight: 'semibold',
     svg: {
       transitionProperty: 'all',
       transitionDuration: 'faster',
