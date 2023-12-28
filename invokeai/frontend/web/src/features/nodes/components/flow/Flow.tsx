@@ -158,11 +158,10 @@ export const Flow = () => {
 
   const onMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
     if (flowWrapper.current?.getBoundingClientRect()) {
-      const pos = $flow.get()?.screenToFlowPosition({
+      cursorPosition.current = $flow.get()?.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
-      cursorPosition.current = pos;
     }
   }, []);
 
