@@ -43,7 +43,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
   return (
     <InvCard variant="lora">
       <InvCardHeader>
-        <InvText noOfLines={1}>{lora.model_name}</InvText>
+        <InvText noOfLines={1} wordBreak='break-all'>{lora.model_name}</InvText>
         <InvIconButton
           aria-label="Remove LoRA"
           variant="ghost"
