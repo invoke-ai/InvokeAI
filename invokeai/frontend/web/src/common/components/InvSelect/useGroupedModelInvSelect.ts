@@ -1,4 +1,5 @@
 import type { EntityState } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
 import { groupBy, map, reduce } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
@@ -28,6 +29,9 @@ export const useGroupedModelInvSelect = <T extends AnyModelConfigEntity>(
   arg: UseGroupedModelInvSelectArg<T>
 ): UseGroupedModelInvSelectReturn => {
   const { t } = useTranslation();
+  const base_model = useAppSelector(
+    (state) => state.generation.model?.base_model ?? 'sdxl'
+  );
   const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } =
     arg;
   const options = useMemo(() => {
@@ -51,8 +55,9 @@ export const useGroupedModelInvSelect = <T extends AnyModelConfigEntity>(
       },
       [] as GroupBase<InvSelectOption>[]
     );
+    _options.sort((a) => (a.label === base_model ? -1 : 1));
     return _options;
-  }, [getIsDisabled, modelEntities]);
+  }, [getIsDisabled, modelEntities, base_model]);
 
   const value = useMemo(
     () =>
