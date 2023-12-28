@@ -1,4 +1,4 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -215,24 +215,16 @@ const IAICanvasToolbar = () => {
   );
 
   return (
-    <Flex
-      sx={{
-        alignItems: 'center',
-        gap: 2,
-        flexWrap: 'wrap',
-      }}
-    >
-      <Box w={24}>
-        <InvTooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
-          <InvControl isDisabled={isStaging}>
-            <InvSelect
-              value={value}
-              options={LAYER_NAMES_DICT}
-              onChange={handleChangeLayer}
-            />
-          </InvControl>
-        </InvTooltip>
-      </Box>
+    <Flex alignItems="center" gap={2} flexWrap="wrap">
+      <InvTooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
+        <InvControl isDisabled={isStaging} w="5rem">
+          <InvSelect
+            value={value}
+            options={LAYER_NAMES_DICT}
+            onChange={handleChangeLayer}
+          />
+        </InvControl>
+      </InvTooltip>
 
       <IAICanvasMaskOptions />
       <IAICanvasToolChooserOptions />
