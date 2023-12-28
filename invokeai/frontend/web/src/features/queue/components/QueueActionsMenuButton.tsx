@@ -10,7 +10,8 @@ import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useTranslation } from 'react-i18next';
-import { FaPause, FaPlay, FaStream, FaTimes } from 'react-icons/fa';
+import { FaPause, FaPlay, FaTimes } from 'react-icons/fa';
+import { FaList } from 'react-icons/fa6';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export const QueueActionsMenuButton = () => {
@@ -52,7 +53,7 @@ export const QueueActionsMenuButton = () => {
         <InvMenuButton
           as={InvIconButton}
           aria-label="Queue Actions Menu"
-          icon={<FaStream />}
+          icon={<FaList />}
         />
         <InvMenuList>
           <InvMenuItem

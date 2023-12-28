@@ -25,8 +25,8 @@ import type { MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaCube, FaFont, FaImage, FaStream } from 'react-icons/fa';
-import { FaCircleNodes } from 'react-icons/fa6';
+import { FaCube, FaFont, FaImage } from 'react-icons/fa';
+import { FaCircleNodes, FaList } from 'react-icons/fa6';
 import { MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -81,7 +81,7 @@ const tabs: InvokeTabInfo[] = [
   {
     id: 'queue',
     translationKey: 'queue.queue',
-    icon: <FaStream />,
+    icon: <FaList />,
     content: <QueueTab />,
   },
 ];
