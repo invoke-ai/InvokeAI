@@ -15,10 +15,12 @@ from typing import Any, Dict, List, Optional, Set, Union
 from pydantic.networks import AnyHttpUrl
 from requests import Session
 
+from huggingface_hub import HfFolder
+
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
-from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
+from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -41,6 +43,7 @@ from invokeai.backend.util import Chdir, InvokeAILogger
 from invokeai.backend.util.devices import choose_precision, choose_torch_device
 
 from .model_install_base import (
+    URLModelSource,
     CivitaiModelSource,
     HFModelSource,
     InstallStatus,
@@ -81,7 +84,7 @@ class ModelInstallService(ModelInstallServiceBase):
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
-        metadata_store: ModelMetadataStore,
+        metadata_store: Optional[ModelMetadataStore] = None,
         event_bus: Optional[EventServiceBase] = None,
         session: Optional[Session] = None,
     ):
@@ -106,9 +109,16 @@ class ModelInstallService(ModelInstallServiceBase):
         self._download_queue = download_queue
         self._metadata_cache = {}
         self._download_cache = {}
-        self._metadata_store = metadata_store
         self._running = False
         self._session = session
+        # There may not necessarily be a metadata store initialized
+        # so we create one and initialize it with the same sql database
+        # used by the record store service.
+        if metadata_store:  
+            self._metadata_store = metadata_store
+        else:
+            assert isinstance(record_store, ModelRecordServiceSQL)
+            self._metadata_store = ModelMetadataStore(record_store.db)
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -488,7 +498,7 @@ class ModelInstallService(ModelInstallServiceBase):
             r"https?://huggingface.co/": HuggingFaceMetadataFetch,
         }
 
-        if hasattr(source, "url"):
+        if isinstance(source, URLModelSource):
             for pattern, fetcher in url_patterns.items():
                 if re.match(pattern, str(source.url)):
                     return fetcher(self._session).from_url(source.url)
@@ -561,6 +571,11 @@ class ModelInstallService(ModelInstallServiceBase):
         metadata = self._get_metadata(source)  #  may return None
         url_and_paths = self._get_download_urls(source, metadata)
         self._metadata_cache[source] = metadata  #  save for installation time
+
+        # Add the user's access token to HuggingFace requests
+        if isinstance(source, HFModelSource) and not source.access_token:
+            self._logger.info(f"Using saved HuggingFace access token.")
+            source.access_token = HfFolder.get_token()
 
         self._logger.info(f"Queuing {source} for downloading")
         for model_file in url_and_paths:
@@ -679,7 +694,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
             parts = [
-                {"url": str(x.source), "path": str(x.download_path), "bytes": x.bytes, "total_bytes": x.total_bytes}
+                {"url": str(x.source), "local_path": str(x.download_path), "bytes": x.bytes, "total_bytes": x.total_bytes}
                 for x in job.download_parts
             ]
             assert job.bytes is not None

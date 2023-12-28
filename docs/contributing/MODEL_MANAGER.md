@@ -21,7 +21,7 @@ model. These are the:
   transform them into Pydantic models, and cache them to the InvokeAI
   SQL database.
   
-* _DownloadQueueServiceBase_ (**CURRENTLY UNDER DEVELOPMENT - NOT IMPLEMENTED**)
+* _DownloadQueueServiceBase_
   A multithreaded downloader responsible
   for downloading models from a remote source to disk. The download
   queue has special methods for downloading repo_id folders from
@@ -35,13 +35,13 @@ model. These are the:
   
 ## Location of the Code
 
-All four of these services can be found in
+The four main services can be found in
 `invokeai/app/services` in the following directories:
 
 * `invokeai/app/services/model_records/`
 * `invokeai/app/services/model_install/`
+* `invokeai/app/services/downloads/`
 * `invokeai/app/services/model_loader/` (**under development**)
-* `invokeai/app/services/downloads/`(**under development**)
 
 Code related to the FastAPI web API can be found in
 `invokeai/app/api/routers/model_records.py`.
@@ -407,15 +407,18 @@ functionality:
   the download, installation and registration process.
   
 - Downloading a model from an arbitrary URL and installing it in
-  `models_dir` (_implementation pending_).
+  `models_dir`.
   
 - Special handling for Civitai model URLs which allow the user to
-  paste in a model page's URL or download link (_implementation pending_).
-
+  paste in a model page's URL or download link
   
 - Special handling for HuggingFace repo_ids to recursively download
   the contents of the repository, paying attention to alternative
-  variants such as fp16. (_implementation pending_)
+  variants such as fp16.
+  
+- Saving tags and other metadata about the model into the invokeai database
+  when fetching from a repo that provides that type of information,
+  (currently only Civitai and HuggingFace).
   
 ### Initializing the installer
 
@@ -431,16 +434,24 @@ following initialization pattern:
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.model_install import ModelInstallService
+from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.shared.sqlite import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
 
 config = InvokeAIAppConfig.get_config()
 config.parse_args()
+
 logger = InvokeAILogger.get_logger(config=config)
 db = SqliteDatabase(config, logger)
+record_store = ModelRecordServiceSQL(db)
+queue = DownloadQueueService()
+queue.start()
 
-store = ModelRecordServiceSQL(db)
-installer = ModelInstallService(config, store)
+installer = ModelInstallService(app_config=config, 
+                                record_store=record_store,
+						        download_queue=queue
+							    )
+installer.start()
 ```
 
 The full form of `ModelInstallService()` takes the following
@@ -448,9 +459,12 @@ required parameters:
 
 | **Argument**     | **Type**                     | **Description**              |
 |------------------|------------------------------|------------------------------|
-| `config`         | InvokeAIAppConfig       | InvokeAI app configuration object |
+| `app_config`         | InvokeAIAppConfig       | InvokeAI app configuration object |
 | `record_store`   | ModelRecordServiceBase  | Config record storage database |
-| `event_bus`      | EventServiceBase        | Optional event bus to send download/install progress events to |
+| `download_queue`   | DownloadQueueServiceBase  | Download queue object |
+| `metadata_store`   | Optional[ModelMetadataStore]  | Metadata storage object |
+|`session`           | Optional[requests.Session]    | Swap in a different Session object (usually for debugging) |
+
 
 Once initialized, the installer will provide the following methods:
 
@@ -479,14 +493,14 @@ source7 = URLModelSource(url='https://civitai.com/api/download/models/63006', ac
 for source in [source1, source2, source3, source4, source5, source6, source7]:
    install_job = installer.install_model(source)
    
-source2job = installer.wait_for_installs()
+source2job = installer.wait_for_installs(timeout=120)
 for source in sources:
     job = source2job[source]
-	if job.status == "completed":
+	if job.complete:
 		model_config = job.config_out
 		model_key = model_config.key
 		print(f"{source} installed as {model_key}")
-	elif job.status == "error":
+	elif job.errored:
 	    print(f"{source}: {job.error_type}.\nStack trace:\n{job.error}")
 	
 ```
@@ -520,43 +534,117 @@ The full list of arguments to `import_model()` is as follows:
 
 | **Argument**     | **Type**                     | **Default** | **Description**                           |
 |------------------|------------------------------|-------------|-------------------------------------------|
-| `source`         | Union[str, Path, AnyHttpUrl] |             | The source of the model, Path, URL or repo_id |
-| `inplace`        | bool                         | True        | Leave a local model in its current location |
-| `variant`        | str                          | None        | Desired variant, such as 'fp16' or 'onnx' (HuggingFace only) |
-| `subfolder`      | str                          | None        | Repository subfolder (HuggingFace only)   |
+| `source`         | ModelSource                 | None        | The source of the model, Path, URL or repo_id |
 | `config`         | Dict[str, Any]               | None        | Override all or a portion of model's probed attributes |
-| `access_token`   | str                          | None        | Provide authorization information needed to download |
 
-
-The `inplace` field controls how local model Paths are handled. If
-True (the default), then the model is simply registered in its current
-location by the installer's `ModelConfigRecordService`. Otherwise, a
-copy of the model put into the location specified by the `models_dir`
-application configuration parameter.
-
-The `variant` field is used for HuggingFace repo_ids only. If
-provided, the repo_id download handler will look for and download
-tensors files that follow the convention for the selected variant:
-
-- "fp16" will select files named "*model.fp16.{safetensors,bin}"
-- "onnx" will select files ending with the suffix ".onnx"
-- "openvino" will select files beginning with "openvino_model"
-
-In the special case of the "fp16" variant, the installer will select
-the 32-bit version of the files if the 16-bit version is unavailable.
-
-`subfolder` is used for HuggingFace repo_ids only. If provided, the
-model will be downloaded from the designated subfolder rather than the
-top-level repository folder. If a subfolder is attached to the repo_id
-using the format `repo_owner/repo_name:subfolder`, then the subfolder
-specified by the repo_id will override the subfolder argument.
+The next few sections describe the various types of ModelSource that
+can be passed to `import_model()`. 
 
 `config` can be used to override all or a portion of the configuration
 attributes returned by the model prober. See the section below for
 details.
 
-`access_token` is passed to the download queue and used to access
-repositories that require it.
+
+#### LocalModelSource
+
+This is used for a model that is located on a locally-accessible Posix
+filesystem, such as a local disk or networked fileshare.
+
+
+| **Argument**     | **Type**                     | **Default** | **Description**                           |
+|------------------|------------------------------|-------------|-------------------------------------------|
+| `path`           | str | Path                   | None        | Path to the model file or directory |
+| `inplace`        | bool                         | False       | If set, the model file(s) will be left in their location; otherwise they will be copied into the InvokeAI root's `models` directory |
+
+#### URLModelSource
+
+This is used for a single-file model that is accessible via a URL. The
+fields are:
+
+| **Argument**     | **Type**                     | **Default** | **Description**                           |
+|------------------|------------------------------|-------------|-------------------------------------------|
+| `url`            | AnyHttpUrl                   | None        | The URL for the model file. |
+| `access_token`   | str                          | None        | An access token needed to gain access to this file. |
+
+The `AnyHttpUrl` class can be imported from `pydantic.networks`.
+
+Ordinarily, no metadata is retrieved from these sources. However,
+there is special-case code in the installer that looks for HuggingFace
+and Civitai URLs and fetches the corresponding model metadata from
+the corresponding repo.
+
+#### CivitaiModelSource
+
+This is used for a model that is hosted by the Civitai web site.
+
+| **Argument**     | **Type**                     | **Default** | **Description**                           |
+|------------------|------------------------------|-------------|-------------------------------------------|
+| `version_id`     | int                          | None        | The ID of the particular version of the desired model. |
+| `access_token`   | str                          | None        | An access token needed to gain access to a subscriber's-only model. |
+
+Civitai has two model IDs, both of which are integers. The `model_id`
+corresponds to a collection of model versions that may different in
+arbitrary ways, such as derivation from different checkpoint training
+steps, SFW vs NSFW generation, pruned vs non-pruned, etc. The
+`version_id` points to a specific version. Please use the latter.
+
+Some Civitai models require an access token to download. These can be
+generated from the Civitai profile page of a logged-in
+account. Somewhat annoyingly, if you fail to provide the access token
+when downloading a model that needs it, Civitai generates a redirect
+to a login page rather than a 403 Forbidden error. The installer
+attempts to catch this event and issue an informative error
+message. Otherwise you will get an "unrecognized model suffix" error
+when the model prober tries to identify the type of the HTML login
+page.
+
+#### HFModelSource
+
+HuggingFace has the most complicated `ModelSource` structure:
+
+| **Argument**     | **Type**                     | **Default** | **Description**                           |
+|------------------|------------------------------|-------------|-------------------------------------------|
+| `repo_id`        | str                          | None        | The ID of the desired model. |
+| `variant`        | ModelRepoVariant             | ModelRepoVariant('fp16')      | The desired variant. |
+| `subfolder`      | Path                         | None        | Look for the model in a subfolder of the repo. |
+| `access_token`   | str                          | None        | An access token needed to gain access to a subscriber's-only model. |
+
+
+The `repo_id` is the repository ID, such as `stabilityai/sdxl-turbo`.
+
+The `variant` is one of the various diffusers formats that HuggingFace
+supports and is used to pick out from the hodgepodge of files that in
+a typical HuggingFace repository the particular components needed for
+a complete diffusers model. `ModelRepoVariant` is an enum that can be
+imported from `invokeai.backend.model_manager` and has the following
+values:
+
+| **Name**                   | **String Value**          |
+|----------------------------|---------------------------|
+| ModelRepoVariant.DEFAULT   | "default"                 |
+| ModelRepoVariant.FP16      | "fp16"                 |
+| ModelRepoVariant.FP32      | "fp32"                 |
+| ModelRepoVariant.ONNX      | "onnx"                 |
+| ModelRepoVariant.OPENVINO  | "openvino"             |
+| ModelRepoVariant.FLAX      | "flax"                 |
+
+You can also pass the string forms to `variant` directly. Note that
+InvokeAI may not be able to load and run all variants. At the current
+time, specifying `ModelRepoVariant.DEFAULT` will retrieve model files
+that are unqualified, e.g. `pytorch_model.safetensors` rather than
+`pytorch_model.fp16.safetensors`. These are usually the 32-bit
+safetensors forms of the model.
+
+If `subfolder` is specified, then the requested model resides in a
+subfolder of the main model repository. This is typically used to
+fetch and install VAEs.
+
+Some models require you to be registered with HuggingFace and logged
+in. To download these files, you must provide an
+`access_token`. Internally, if no access token is provided, then
+`HfFolder.get_token()` will be called to fill it in with the cached
+one.
+
 
 #### Monitoring the install job process
 
@@ -568,7 +656,7 @@ The `ModelInstallJob` class has the following structure:
 
 | **Attribute** | **Type**        |  **Description** |
 |----------------|-----------------|------------------|
-| `status`       | `InstallStatus`  | An enum of ["waiting", "running", "completed" and "error" |
+| `status`       | `InstallStatus`  | An enum of [`waiting`, `downloading`, `running`, `completed`, `error` and `cancelled`]|
 | `config_in`    | `dict`          | Overriding configuration values provided by the caller |
 | `config_out`   | `AnyModelConfig`| After successful completion, contains the configuration record written to the database | 
 | `inplace`      | `boolean`       | True if the caller asked to install the model in place using its local path | 
@@ -583,30 +671,70 @@ broadcast to the InvokeAI event bus. The events will appear on the bus
 as an event of type `EventServiceBase.model_event`, a timestamp and
 the following event names:
 
-- `model_install_started`
+##### `model_install_downloading`
 
-The payload will contain the keys `timestamp` and `source`. The latter
-indicates the requested model source for installation.
+For remote models only, `model_install_downloading` events will be issued at regular
+intervals as the download progresses. The event's payload contains the
+following keys:
 
-- `model_install_progress`
+| **Key** | **Type**        |  **Description** |
+|----------------|-----------|------------------|
+| `source`       | str       | String representation of the requested source |
+| `local_path`   | str       | String representation of the path to the downloading model (usually a temporary directory) |
+| `bytes`        | int       | How many bytes downloaded so far |
+| `total_bytes`  | int       | Total size of all the files that make up the model |
+| `parts`        | List[Dict]| Information on the progress of the individual files that make up the model |
 
-Emitted at regular intervals when downloading a remote model, the
-payload will contain the keys `timestamp`, `source`, `current_bytes`
-and `total_bytes`. These events are _not_ emitted when a local model
-already on the filesystem is imported.
 
-- `model_install_completed`
+The parts is a list of dictionaries that give information on each of
+the components pieces of the download. The dictionary's keys are
+`source`, `local_path`, `bytes` and `total_bytes`, and correspond to
+the like-named keys in the main event.
 
-Issued once at the end of a successful installation. The payload will
-contain the keys `timestamp`, `source` and `key`, where `key` is the
-ID under which the model has been registered.
+Note that downloading events will not be issued for local models, and
+that downloading events occur *before* the running event.
 
-- `model_install_error`
+##### `model_install_running`
 
-Emitted if the installation process fails for some reason. The payload
-will contain the keys `timestamp`, `source`, `error_type` and
-`error`. `error_type` is a short message indicating the nature of the
-error, and `error` is the long traceback to help debug the problem.
+`model_install_running` is issued when all the required downloads have completed (if applicable) and the
+model probing, copying and registration process has now started.
+
+The payload will contain the key `source`.
+
+##### `model_install_completed`
+
+`model_install_completed` is issued once at the end of a successful
+installation. The payload will contain the keys `source`,
+`total_bytes` and `key`, where `key` is the ID under which the model
+has been registered.
+
+##### `model_install_error`
+
+`model_install_error` is emitted if the installation process fails for
+some reason. The payload will contain the keys `source`, `error_type`
+and `error`. `error_type` is a short message indicating the nature of
+the error, and `error` is the long traceback to help debug the
+problem.
+
+##### `model_install_cancelled`
+
+`model_install_cancelled` is issued if the model installation is
+cancelled, or if one or more of its files' downloads are
+cancelled. The payload will contain `source`.
+
+##### Following the model status
+
+You may poll the `ModelInstallJob` object returned by `import_model()`
+to ascertain the state of the install. The job status can be read from
+the job's `status` attribute, an `InstallStatus` enum which has the
+enumerated values `WAITING`, `DOWNLOADING`, `RUNNING`, `COMPLETED`,
+`ERROR` and `CANCELLED`.
+
+For convenience, install jobs also provided the following boolean
+properties: `waiting`, `downloading`, `running`, `complete`, `errored`
+and `cancelled`, as well as `in_terminal_state`. The last will return
+True if the job is in the complete, errored or cancelled states.
+
 
 #### Model confguration and probing
 
@@ -626,17 +754,9 @@ overriding values for any of the model's configuration
 attributes. Here is an example of setting the
 `SchedulerPredictionType` and `name` for an sd-2 model:
 
-This is typically used to set
-the model's name and description, but can also be used to overcome
-cases in which automatic probing is unable to (correctly) determine
-the model's attribute. The most common situation is the
-`prediction_type` field for sd-2 (and rare sd-1) models. Here is an
-example of how it works:
-
 ```
 install_job = installer.import_model(
-               source='stabilityai/stable-diffusion-2-1',
-			   variant='fp16',
+               source=HFModelSource(repo_id='stabilityai/stable-diffusion-2-1',variant='fp32'),
 			   config=dict(
 			         prediction_type=SchedulerPredictionType('v_prediction')
 					 name='stable diffusion 2 base model',
@@ -648,29 +768,33 @@ install_job = installer.import_model(
 
 This section describes additional methods provided by the installer class.
 
-#### jobs = installer.wait_for_installs()
+#### jobs = installer.wait_for_installs([timeout])
 
 Block until all pending installs are completed or errored and then
-returns a list of completed jobs.
+returns a list of completed jobs. The optional `timeout` argument will
+return from the call if jobs aren't completed in the specified
+time. An argument of 0 (the default) will block indefinitely.
 
-#### jobs = installer.list_jobs([source])
+#### jobs = installer.list_jobs()
 
-Return a list of all active and complete `ModelInstallJobs`. An
-optional `source` argument allows you to filter the returned list by a
-model source string pattern using a partial string match.
+Return a list of all active and complete `ModelInstallJobs`.
 
 #### jobs = installer.get_job(source)
 
 Return a list of `ModelInstallJob` corresponding to the indicated
 model source.
 
+#### jobs = installer.cancel_job(job)
+
+Cancel the indicated job.
+
 #### installer.prune_jobs
 
-Remove non-pending jobs (completed or errored) from the job list
-returned by `list_jobs()` and `get_job()`.
+Remove jobs that are in a terminal state (i.e. complete, errored or
+cancelled) from the job list returned by `list_jobs()` and
+`get_job()`.
 
-#### installer.app_config, installer.record_store,
-installer.event_bus
+#### installer.app_config, installer.record_store, installer.event_bus
 
 Properties that provide access to the installer's `InvokeAIAppConfig`,
 `ModelRecordServiceBase` and `EventServiceBase` objects.
@@ -731,120 +855,6 @@ the API starts up. Its effect is to call `sync_to_config()` to
 synchronize the model record store database with what's currently on
 disk.
 
-# The remainder of this documentation is provisional, pending implementation of the Download and Load services
-
-## Let's get loaded, the lowdown on ModelLoadService
-
-The `ModelLoadService` is responsible for loading a named model into
-memory so that it can be used for inference. Despite the fact that it
-does a lot under the covers, it is very straightforward to use.
-
-An application-wide model loader is created at API initialization time
-and stored in
-`ApiDependencies.invoker.services.model_loader`. However, you can
-create alternative instances if you wish.
-
-### Creating a ModelLoadService object
-
-The class is defined in
-`invokeai.app.services.model_loader_service`. It is initialized with
-an InvokeAIAppConfig object, from which it gets configuration
-information such as the user's desired GPU and precision, and with a
-previously-created `ModelRecordServiceBase` object, from which it
-loads the requested model's configuration information.
-
-Here is a typical initialization pattern:
-
-```
-from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_record_service import ModelRecordServiceBase
-from invokeai.app.services.model_loader_service import ModelLoadService
-
-config = InvokeAIAppConfig.get_config()
-store = ModelRecordServiceBase.open(config)
-loader = ModelLoadService(config, store)
-```
-
-Note that we are relying on the contents of the application
-configuration to choose the implementation of
-`ModelRecordServiceBase`.
-
-### get_model(key, [submodel_type], [context]) -> ModelInfo:
-
-*** TO DO: change to get_model(key, context=None, **kwargs)
-
-The `get_model()` method, like its similarly-named cousin in
-`ModelRecordService`, receives the unique key that identifies the
-model.  It loads the model into memory, gets the model ready for use,
-and returns a `ModelInfo` object. 
-
-The optional second argument, `subtype` is a `SubModelType` string
-enum, such as "vae". It is mandatory when used with a main model, and
-is used to select which part of the main model to load.
-
-The optional third argument, `context` can be provided by
-an invocation to trigger model load event reporting. See below for
-details.
-
-The returned `ModelInfo` object shares some fields in common with
-`ModelConfigBase`, but is otherwise a completely different beast:
-
-| **Field Name** | **Type**        |  **Description** |
-|----------------|-----------------|------------------|
-| `key`          | str                    | The model key derived from the ModelRecordService database |
-| `name`         | str                    | Name of this model |
-| `base_model`   | BaseModelType          | Base model for this model |
-| `type`         | ModelType or SubModelType   | Either the model type (non-main) or the submodel type (main models)|
-| `location`     | Path or str            | Location of the model on the filesystem |
-| `precision`    | torch.dtype            | The torch.precision to use for inference |
-| `context`      | ModelCache.ModelLocker | A context class used to lock the model in VRAM while in use |
-
-The types for `ModelInfo` and `SubModelType` can be imported from
-`invokeai.app.services.model_loader_service`.
-
-To use the model, you use the `ModelInfo` as a context manager using
-the following pattern:
-
-```
-model_info = loader.get_model('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
-with model_info as vae:
-	image = vae.decode(latents)[0]
-```
-
-The `vae` model will stay locked in the GPU during the period of time
-it is in the context manager's scope.
-
-`get_model()` may raise any of the following exceptions:
-
-- `UnknownModelException`  -- key not in database
-- `ModelNotFoundException` -- key in database but model not found at path
-- `InvalidModelException`  -- the model is guilty of a variety of sins
-  
-** TO DO: ** Resolve discrepancy between ModelInfo.location and
-ModelConfig.path.
-
-### Emitting model loading events
-
-When the `context` argument is passed to `get_model()`, it will
-retrieve the invocation event bus from the passed `InvocationContext`
-object to emit events on the invocation bus. The two events are
-"model_load_started" and "model_load_completed". Both carry the
-following payload:
-
-```
-payload=dict(
-	queue_id=queue_id,
-	queue_item_id=queue_item_id,
-	queue_batch_id=queue_batch_id,
-	graph_execution_state_id=graph_execution_state_id,
-	model_key=model_key,
-	submodel=submodel,
-	hash=model_info.hash,
-	location=str(model_info.location),
-	precision=str(model_info.precision),
-)
-```
-
 ***
 
 ## Get on line: The Download Queue
@@ -884,7 +894,6 @@ following fields:
 | `job_started`    | float            |              | Timestamp for when the job started running |
 | `job_ended`      | float            |              | Timestamp for when the job completed or errored out |
 | `job_sequence`   | int              |              | A counter that is incremented each time a model is dequeued |
-| `preserve_partial_downloads`| bool  | False        | Resume partial downloads when relaunched.   |
 | `error`          | Exception        |              | A copy of the Exception that caused an error during download |
 
 When you create a job, you can assign it a `priority`. If multiple
@@ -1433,4 +1442,118 @@ set of keys to the corresponding model config objects.
 
 Find all model metadata records that have the given author and return
 a set of keys to the corresponding model config objects.
+
+# The remainder of this documentation is provisional, pending implementation of the Load service
+
+## Let's get loaded, the lowdown on ModelLoadService
+
+The `ModelLoadService` is responsible for loading a named model into
+memory so that it can be used for inference. Despite the fact that it
+does a lot under the covers, it is very straightforward to use.
+
+An application-wide model loader is created at API initialization time
+and stored in
+`ApiDependencies.invoker.services.model_loader`. However, you can
+create alternative instances if you wish.
+
+### Creating a ModelLoadService object
+
+The class is defined in
+`invokeai.app.services.model_loader_service`. It is initialized with
+an InvokeAIAppConfig object, from which it gets configuration
+information such as the user's desired GPU and precision, and with a
+previously-created `ModelRecordServiceBase` object, from which it
+loads the requested model's configuration information.
+
+Here is a typical initialization pattern:
+
+```
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_record_service import ModelRecordServiceBase
+from invokeai.app.services.model_loader_service import ModelLoadService
+
+config = InvokeAIAppConfig.get_config()
+store = ModelRecordServiceBase.open(config)
+loader = ModelLoadService(config, store)
+```
+
+Note that we are relying on the contents of the application
+configuration to choose the implementation of
+`ModelRecordServiceBase`.
+
+### get_model(key, [submodel_type], [context]) -> ModelInfo:
+
+*** TO DO: change to get_model(key, context=None, **kwargs)
+
+The `get_model()` method, like its similarly-named cousin in
+`ModelRecordService`, receives the unique key that identifies the
+model.  It loads the model into memory, gets the model ready for use,
+and returns a `ModelInfo` object. 
+
+The optional second argument, `subtype` is a `SubModelType` string
+enum, such as "vae". It is mandatory when used with a main model, and
+is used to select which part of the main model to load.
+
+The optional third argument, `context` can be provided by
+an invocation to trigger model load event reporting. See below for
+details.
+
+The returned `ModelInfo` object shares some fields in common with
+`ModelConfigBase`, but is otherwise a completely different beast:
+
+| **Field Name** | **Type**        |  **Description** |
+|----------------|-----------------|------------------|
+| `key`          | str                    | The model key derived from the ModelRecordService database |
+| `name`         | str                    | Name of this model |
+| `base_model`   | BaseModelType          | Base model for this model |
+| `type`         | ModelType or SubModelType   | Either the model type (non-main) or the submodel type (main models)|
+| `location`     | Path or str            | Location of the model on the filesystem |
+| `precision`    | torch.dtype            | The torch.precision to use for inference |
+| `context`      | ModelCache.ModelLocker | A context class used to lock the model in VRAM while in use |
+
+The types for `ModelInfo` and `SubModelType` can be imported from
+`invokeai.app.services.model_loader_service`.
+
+To use the model, you use the `ModelInfo` as a context manager using
+the following pattern:
+
+```
+model_info = loader.get_model('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+with model_info as vae:
+	image = vae.decode(latents)[0]
+```
+
+The `vae` model will stay locked in the GPU during the period of time
+it is in the context manager's scope.
+
+`get_model()` may raise any of the following exceptions:
+
+- `UnknownModelException`  -- key not in database
+- `ModelNotFoundException` -- key in database but model not found at path
+- `InvalidModelException`  -- the model is guilty of a variety of sins
+  
+** TO DO: ** Resolve discrepancy between ModelInfo.location and
+ModelConfig.path.
+
+### Emitting model loading events
+
+When the `context` argument is passed to `get_model()`, it will
+retrieve the invocation event bus from the passed `InvocationContext`
+object to emit events on the invocation bus. The two events are
+"model_load_started" and "model_load_completed". Both carry the
+following payload:
+
+```
+payload=dict(
+	queue_id=queue_id,
+	queue_item_id=queue_item_id,
+	queue_batch_id=queue_batch_id,
+	graph_execution_state_id=graph_execution_state_id,
+	model_key=model_key,
+	submodel=submodel,
+	hash=model_info.hash,
+	location=str(model_info.location),
+	precision=str(model_info.precision),
+)
+```
 

@@ -404,6 +404,35 @@ class EventServiceBase:
             },
         )
 
+    def emit_model_install_downloading(
+        self,
+        source: str,
+        local_path: str,
+        bytes: int,
+        total_bytes: int,
+        parts: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Emit at intervals while the install job is in progress (remote models only).
+
+        :param source: Source of the model
+        :param local_path: Where model is downloading to
+        :param parts: Progress of downloading URLs that comprise the model, if any.
+        :param bytes: Number of bytes downloaded so far.
+        :param total_bytes: Total size of download, including all files.
+        This emits a Dict with keys "source", "local_path", "bytes" and "total_bytes".
+        """
+        self.__emit_model_event(
+            event_name="model_install_downloading",
+            payload={
+                "source": source,
+                "local_path": local_path,
+                "bytes": bytes,
+                "total_bytes": total_bytes,
+                "parts": parts,
+            },
+        )
+
     def emit_model_install_running(self, source: str) -> None:
         """
         Emit once when an install job becomes active.
@@ -429,35 +458,6 @@ class EventServiceBase:
                 "source": source,
                 "total_bytes": total_bytes,
                 "key": key,
-            },
-        )
-
-    def emit_model_install_downloading(
-        self,
-        source: str,
-        local_path: str,
-        bytes: int,
-        total_bytes: int,
-        parts: List[Dict[str, Any]],
-    ) -> None:
-        """
-        Emit at intervals while the install job is in progress (remote models only).
-
-        :param source: Source of the model
-        :param local_path: Where model is downloading to
-        :param parts: Progress of downloading URLs that comprise the model, if any.
-        :param bytes: Number of bytes downloaded so far.
-        :param total_bytes: Total size of download, including all files.
-        This emits a Dict with keys "source", "parts", "bytes" and "total_bytes".
-        """
-        self.__emit_model_event(
-            event_name="model_install_downloading",
-            payload={
-                "source": source,
-                "local_path": local_path,
-                "bytes": bytes,
-                "total_bytes": total_bytes,
-                "parts": parts,
             },
         )
 

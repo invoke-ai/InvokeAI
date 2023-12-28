@@ -43,7 +43,7 @@ Typical usage:
 import json
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Set, Union, Dict, Any
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -79,7 +79,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         self._db = db
         self._cursor = self._db.conn.cursor()
 
-    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
+    @property
+    def db(self) -> SqliteDatabase:
+        """Return the underlying database."""
+        return self._db
+
+    def add_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
         """
         Add a model to the database.
 
