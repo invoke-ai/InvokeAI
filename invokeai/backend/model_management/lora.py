@@ -217,7 +217,7 @@ class ModelPatcher:
 
             for ti_name, ti in ti_list:
                 ti_embedding = _get_ti_embedding(text_encoder.get_input_embeddings(), ti)
-                
+
                 ti_tokens = []
                 for i in range(ti_embedding.shape[0]):
                     embedding = ti_embedding[i]
