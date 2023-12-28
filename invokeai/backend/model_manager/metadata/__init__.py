@@ -27,6 +27,8 @@ from .metadata_base import (
     CommercialUsage,
     HuggingFaceMetadata,
     LicenseRestrictions,
+    ModelMetadataWithFiles,
+    RemoteModelFile,
 )
 from .metadata_store import ModelMetadataStore
 
@@ -35,10 +37,12 @@ __all__ = [
     "AnyModelRepoMetadataValidator",
     "CommercialUsage",
     "LicenseRestrictions",
+    "ModelMetadataWithFiles",
     "HuggingFaceMetadata",
     "CivitaiMetadata",
     "ModelMetadataStore",
     "CivitaiMetadataFetch",
     "HuggingFaceMetadataFetch",
     "ModelMetadataStore",
+    "RemoteModelFile",
 ]

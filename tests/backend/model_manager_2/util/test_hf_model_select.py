@@ -3,8 +3,8 @@ from typing import List
 
 import pytest
 
-from invokeai.backend.model_manager.config import DiffusersVariant
-from invokeai.backend.model_manager.util.select_hf_files import select_hf_model_files
+from invokeai.backend.model_manager.config import ModelRepoVariant
+from invokeai.backend.model_manager.util.select_hf_files import filter_files
 
 
 # This is the full list of model paths returned by the HF API for sdxl-base
@@ -104,7 +104,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            DiffusersVariant.DEFAULT,
+            ModelRepoVariant.DEFAULT,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -129,7 +129,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            DiffusersVariant.OPENVINO,
+            ModelRepoVariant.OPENVINO,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -159,7 +159,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            DiffusersVariant.FP16,
+            ModelRepoVariant.FP16,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -184,7 +184,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            DiffusersVariant.ONNX,
+            ModelRepoVariant.ONNX,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -209,7 +209,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            DiffusersVariant.FLAX,
+            ModelRepoVariant.FLAX,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -233,7 +233,7 @@ def sdxl_base_files() -> List[Path]:
         ),
     ],
 )
-def test_select(sdxl_base_files: List[Path], variant: DiffusersVariant, expected_list: List[Path]) -> None:
+def test_select(sdxl_base_files: List[Path], variant: ModelRepoVariant, expected_list: List[Path]) -> None:
     print(f"testing variant {variant}")
-    filtered_files = select_hf_model_files(sdxl_base_files, variant)
+    filtered_files = filter_files(sdxl_base_files, variant)
     assert set(filtered_files) == {Path(x) for x in expected_list}

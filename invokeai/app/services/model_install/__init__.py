@@ -1,6 +1,7 @@
 """Initialization file for model install service package."""
 
 from .model_install_base import (
+    CivitaiModelSource,
     HFModelSource,
     InstallStatus,
     LocalModelSource,
@@ -22,4 +23,5 @@ __all__ = [
     "LocalModelSource",
     "HFModelSource",
     "URLModelSource",
+    "CivitaiModelSource",
 ]

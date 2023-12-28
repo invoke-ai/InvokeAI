@@ -16,45 +16,12 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-import requests
-from huggingface_hub import hf_hub_url
-from pydantic.networks import AnyHttpUrl
-
-from ..config import DiffusersVariant
+from ..config import ModelRepoVariant
 
 
-def select_hf_urls(
-    repo_id: str,
+def filter_files(
     files: List[Path],
-    variant: Optional[DiffusersVariant] = None,
-    subfolder: Optional[Path] = None,
-) -> List[AnyHttpUrl]:
-    """
-    Take a list of files in a HuggingFace repo root and return the URLs of files needed to load the model.
-
-    :param files: List of files relative to the repo root.
-    :param subfolder: Filter by the indicated subfolder.
-    :param variant: Filter by files belonging to a particular variant, such as fp16.
-
-    The file list can be obtained from the `files` field of HuggingFaceMetadata,
-    as defined in `invokeai.backend.model_manager.metadata.metadata_base`.
-    """
-    paths = select_hf_model_files(files, variant, subfolder)
-    prefix = f"{subfolder}/" if subfolder else ""
-    if Path(f"{prefix}model_index.json") in paths:
-        url = hf_hub_url(repo_id, filename="model_index.json", subfolder=subfolder)
-        resp = requests.get(url)
-        resp.raise_for_status()
-        submodels = resp.json()
-        paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]
-        paths.insert(0, Path(f"{prefix}model_index.json"))
-
-    return [hf_hub_url(repo_id, filename=x.as_posix()) for x in paths]
-
-
-def select_hf_model_files(
-    files: List[Path],
-    variant: Optional[DiffusersVariant] = None,
+    variant: Optional[ModelRepoVariant] = None,
     subfolder: Optional[Path] = None,
 ) -> List[Path]:
     """
@@ -67,15 +34,14 @@ def select_hf_model_files(
     The file list can be obtained from the `files` field of HuggingFaceMetadata,
     as defined in `invokeai.backend.model_manager.metadata.metadata_base`.
     """
-    if not variant:
-        variant = DiffusersVariant.DEFAULT
+    variant = variant or ModelRepoVariant.DEFAULT
     paths: List[Path] = []
 
     # Start by filtering on model file extensions, discarding images, docs, etc
     for file in files:
         if file.name.endswith((".json", ".txt")):
             paths.append(file)
-        elif file.name.endswith(("learned_embeds.bin", "ip_adapter.bin")):
+        elif file.name.endswith(("learned_embeds.bin", "ip_adapter.bin", "lora_weights.safetensors")):
             paths.append(file)
         elif re.search(r"model(\.[^.]+)?\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
             paths.append(file)
@@ -88,29 +54,30 @@ def select_hf_model_files(
     return sorted(_filter_by_variant(paths, variant))
 
 
-def _filter_by_variant(files: List[Path], variant: Optional[DiffusersVariant] = DiffusersVariant.DEFAULT) -> Set[Path]:
+def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path]:
     """Select the proper variant files from a list of HuggingFace repo_id paths."""
     result = set()
     basenames: Dict[Path, Path] = {}
     for path in files:
         if path.suffix == ".onnx":
-            if variant == DiffusersVariant.ONNX:
+            if variant == ModelRepoVariant.ONNX:
                 result.add(path)
 
         elif "openvino_model" in path.name:
-            if variant == DiffusersVariant.OPENVINO:
+            if variant == ModelRepoVariant.OPENVINO:
                 result.add(path)
 
         elif "flax_model" in path.name:
-            if variant == DiffusersVariant.FLAX:
+            if variant == ModelRepoVariant.FLAX:
                 result.add(path)
 
         elif path.suffix in [".json", ".txt"]:
             result.add(path)
 
         elif path.suffix in [".bin", ".safetensors", ".pt", ".ckpt"] and variant in [
-            DiffusersVariant.FP16,
-            DiffusersVariant.DEFAULT,
+            ModelRepoVariant.FP16,
+            ModelRepoVariant.FP32,
+            ModelRepoVariant.DEFAULT,
         ]:
             parent = path.parent
             suffixes = path.suffixes
@@ -123,11 +90,13 @@ def _filter_by_variant(files: List[Path], variant: Optional[DiffusersVariant] = 
                 basename = parent / path.stem
 
             if previous := basenames.get(basename):
-                if previous.suffix != ".safetensors" and suffix == ".safetensors":
+                if (
+                    previous.suffix != ".safetensors" and suffix == ".safetensors"
+                ):  # replace non-safetensors with safetensors when available
                     basenames[basename] = path
                 if variant_label == f".{variant}":
                     basenames[basename] = path
-                elif not variant_label and variant == DiffusersVariant.DEFAULT:
+                elif not variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.DEFAULT]:
                     basenames[basename] = path
             else:
                 basenames[basename] = path
@@ -138,9 +107,18 @@ def _filter_by_variant(files: List[Path], variant: Optional[DiffusersVariant] = 
     for v in basenames.values():
         result.add(v)
 
+    # If one of the architecture-related variants was specified and no files matched other than
+    # config and text files then we return an empty list
+    if (
+        variant
+        and variant in [ModelRepoVariant.ONNX, ModelRepoVariant.OPENVINO, ModelRepoVariant.FLAX]
+        and not any(variant.value in x.name for x in result)
+    ):
+        return set()
+
     # Prune folders that contain just a `config.json`. This happens when
     # the requested variant (e.g. "onnx") is missing
-    directories = {}
+    directories: Dict[Path, int] = {}
     for x in result:
         if not x.parent:
             continue

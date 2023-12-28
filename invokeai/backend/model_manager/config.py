@@ -99,11 +99,12 @@ class SchedulerPredictionType(str, Enum):
     Sample = "sample"
 
 
-class DiffusersVariant(str, Enum):
+class ModelRepoVariant(str, Enum):
     """Various hugging face variants on the diffusers format."""
 
-    DEFAULT = "default"  # usually the fp32 version
+    DEFAULT = "default"  # model files without "fp16" or other qualifier
     FP16 = "fp16"
+    FP32 = "fp32"
     ONNX = "onnx"
     OPENVINO = "openvino"
     FLAX = "flax"

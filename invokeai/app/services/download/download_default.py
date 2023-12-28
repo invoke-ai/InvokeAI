@@ -173,7 +173,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             to_delete = set()
             for job_id, job in self._jobs.items():
-                if self._in_terminal_state(job):
+                if job.in_terminal_state:
                     to_delete.add(job_id)
             for job_id in to_delete:
                 del self._jobs[job_id]
@@ -195,18 +195,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             job.cancel()
 
-    def cancel_all_jobs(self, preserve_partial: bool = False) -> None:
+    def cancel_all_jobs(self) -> None:
         """Cancel all jobs (those not in enqueued, running or paused state)."""
         for job in self._jobs.values():
-            if not self._in_terminal_state(job):
+            if not job.in_terminal_state:
                 self.cancel_job(job)
 
     def _in_terminal_state(self, job: DownloadJob) -> bool:
-        return job.status in [
-            DownloadJobStatus.COMPLETED,
-            DownloadJobStatus.CANCELLED,
-            DownloadJobStatus.ERROR,
-        ]
+        return job.in_terminal_state
 
     def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
@@ -319,6 +315,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     self._signal_job_progress(job)
 
         # if we get here we are done and can rename the file to the original dest
+        self._logger.debug(f"{job.source}: saved to {job.download_path} (bytes={job.bytes})")
         in_progress_path.rename(job.download_path)
 
     def _validate_filename(self, directory: str, filename: str) -> bool:
@@ -345,7 +342,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_start(job)
             except Exception as e:
-                self._logger.error(f"An error occurred while processing the on_start callback: {e}")
+                self._logger.error(
+                    f"An error occurred while processing the on_start callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_started(str(job.source), job.download_path.as_posix())
@@ -355,7 +354,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_progress(job)
             except Exception as e:
-                self._logger.error(f"An error occurred while processing the on_progress callback: {e}")
+                self._logger.error(
+                    f"An error occurred while processing the on_progress callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_progress(
@@ -371,7 +372,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_complete(job)
             except Exception as e:
-                self._logger.error(f"An error occurred while processing the on_complete callback: {e}")
+                self._logger.error(
+                    f"An error occurred while processing the on_complete callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_complete(
@@ -379,12 +382,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
             )
 
     def _signal_job_cancelled(self, job: DownloadJob) -> None:
+        if job.status not in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]:
+            return
         job.status = DownloadJobStatus.CANCELLED
         if job.on_cancelled:
             try:
                 job.on_cancelled(job)
             except Exception as e:
-                self._logger.error(f"An error occurred while processing the on_cancelled callback: {e}")
+                self._logger.error(
+                    f"An error occurred while processing the on_cancelled callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             self._event_bus.emit_download_cancelled(str(job.source))
 
@@ -394,14 +401,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_error(job, excp)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(traceback.format_exception(e))
         if self._event_bus:
             assert job.error_type
             assert job.error
             self._event_bus.emit_download_error(str(job.source), error_type=job.error_type, error=job.error)
 
     def _cleanup_cancelled_job(self, job: DownloadJob) -> None:
-        self._logger.warning(f"Cleaning up leftover files from cancelled download job {job.download_path}")
+        self._logger.debug(f"Cleaning up leftover files from cancelled download job {job.download_path}")
         try:
             if job.download_path:
                 partial_file = self._in_progress_path(job.download_path)

@@ -93,6 +93,26 @@ class DownloadJob(BaseModel):
         return self._cancelled
 
     @property
+    def complete(self) -> bool:
+        """Return true if job completed without errors."""
+        return self.status == DownloadJobStatus.COMPLETED
+
+    @property
+    def running(self) -> bool:
+        """Return true if the job is running."""
+        return self.status == DownloadJobStatus.RUNNING
+
+    @property
+    def errored(self) -> bool:
+        """Return true if the job is errored."""
+        return self.status == DownloadJobStatus.ERROR
+
+    @property
+    def in_terminal_state(self) -> bool:
+        """Return true if job has finished, one way or another."""
+        return self.status not in [DownloadJobStatus.WAITING, DownloadJobStatus.RUNNING]
+
+    @property
     def on_start(self) -> Optional[DownloadEventHandler]:
         """Return the on_start event handler."""
         return self._on_start

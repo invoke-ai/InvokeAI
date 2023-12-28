@@ -25,6 +25,7 @@ print(metadata.trained_words)
 
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import requests
@@ -39,6 +40,7 @@ from ..metadata_base import (
     CivitaiMetadata,
     CommercialUsage,
     LicenseRestrictions,
+    RemoteModelFile,
 )
 from .fetch_base import ModelMetadataFetchBase
 
@@ -72,12 +74,13 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         indicated, the default model version is returned. Otherwise, the requested version
         is returned.
         """
-        if match := re.match(CIVITAI_MODEL_PAGE_RE, str(url)):
+        if match := re.match(CIVITAI_VERSION_PAGE_RE, str(url)):
+            model_id = match.group(1)
+            version_id = match.group(2)
+            return self.from_civitai_versionid(int(version_id), int(model_id))
+        elif match := re.match(CIVITAI_MODEL_PAGE_RE, str(url)):
             model_id = match.group(1)
             return self.from_civitai_modelid(int(model_id))
-        elif match := re.match(CIVITAI_VERSION_PAGE_RE, str(url)):
-            version_id = match.group(1)
-            return self.from_civitai_versionid(int(version_id))
         elif match := re.match(CIVITAI_DOWNLOAD_RE, str(url)):
             version_id = match.group(1)
             return self.from_civitai_versionid(int(version_id))
@@ -114,15 +117,25 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
 
         version_json = version_sections[0]
         safe_thumbnails = [x["url"] for x in version_json["images"] if x["nsfw"] == "None"]
+        model_files = [
+            RemoteModelFile(
+                url=x["downloadUrl"],
+                path=Path(x["name"]),
+                size=int(x["sizeKB"] * 1000),
+                sha256=x["hashes"]["SHA256"],
+            )
+            for x in version_json["files"]
+        ]
         return CivitaiMetadata(
             id=model_json["id"],
-            name=model_json["name"],
+            name=version_json["name"],
             version_id=version_json["id"],
             version_name=version_json["name"],
-            created=datetime.fromisoformat(re.sub(r"Z$", "+00:00", version_json["createdAt"])),
-            updated=datetime.fromisoformat(re.sub(r"Z$", "+00:00", version_json["updatedAt"])),
-            published=datetime.fromisoformat(re.sub(r"Z$", "+00:00", version_json["publishedAt"])),
+            created=datetime.fromisoformat(_fix_timezone(version_json["createdAt"])),
+            updated=datetime.fromisoformat(_fix_timezone(version_json["updatedAt"])),
+            published=datetime.fromisoformat(_fix_timezone(version_json["publishedAt"])),
             base_model_trained_on=version_json["baseModel"],  # note - need a dictionary to turn into a BaseModelType
+            files=model_files,
             download_url=version_json["downloadUrl"],
             thumbnail_url=safe_thumbnails[0] if safe_thumbnails else None,
             author=model_json["creator"]["username"],
@@ -139,16 +152,18 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
             ),
         )
 
-    def from_civitai_versionid(self, version_id: int) -> CivitaiMetadata:
+    def from_civitai_versionid(self, version_id: int, model_id: Optional[int] = None) -> CivitaiMetadata:
         """
         Return a CivitaiMetadata object given a model version id.
 
         May raise an `UnknownModelException`.
         """
-        version_url = CIVITAI_VERSION_ENDPOINT + str(version_id)
-        version = self._requests.get(version_url).json()
+        if model_id is None:
+            version_url = CIVITAI_VERSION_ENDPOINT + str(version_id)
+            version = self._requests.get(version_url).json()
+            model_id = version["modelId"]
 
-        model_url = CIVITAI_MODEL_ENDPOINT + str(version["modelId"])
+        model_url = CIVITAI_MODEL_ENDPOINT + str(model_id)
         model_json = self._requests.get(model_url).json()
         return self._from_model_json(model_json, version_id)
 
@@ -158,3 +173,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         metadata = AnyModelRepoMetadataValidator.validate_json(json)
         assert isinstance(metadata, CivitaiMetadata)
         return metadata
+
+
+def _fix_timezone(date: str) -> str:
+    return re.sub(r"Z$", "+00:00", date)
