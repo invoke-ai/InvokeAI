@@ -276,7 +276,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             self.disable_attention_slicing()
             return
         elif config.attention_type == "torch-sdp":
-            raise Exception("torch-sdp attention slicing not yet implemented")
+            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
+                # diffusers enables sdp automatically
+                return
+            else:
+                raise Exception("torch-sdp attention slicing not available")
 
         # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
@@ -284,7 +288,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 self.enable_xformers_memory_efficient_attention()
                 return
             elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enable sdp automatically
+                # diffusers enables sdp automatically
                 return
 
         if self.unet.device.type == "cpu" or self.unet.device.type == "mps":
