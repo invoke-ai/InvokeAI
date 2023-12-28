@@ -227,11 +227,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
-        unfinished_jobs = [
-            x
-            for x in self._install_jobs
-            if x.status not in [InstallStatus.COMPLETED, InstallStatus.ERROR, InstallStatus.CANCELLED]
-        ]
+        unfinished_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
         self._install_jobs = unfinished_jobs
 
     def sync_to_config(self) -> None:
@@ -297,7 +293,9 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._signal_job_cancelled(job)
                 elif job.errored:
                     self._signal_job_errored(job)
-                elif job.waiting:
+                elif (
+                    job.waiting or job.downloading
+                ):  # local jobs will be in waiting state, remote jobs will be downloading state
                     self._signal_job_running(job)
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)
@@ -310,7 +308,16 @@ class ModelInstallService(ModelInstallServiceBase):
                         self._metadata_store.add_metadata(key, metadata)
                     self._signal_job_completed(job)
 
-            except (OSError, DuplicateModelException, InvalidModelConfigException) as excp:
+            except InvalidModelConfigException as excp:
+                if "unrecognized suffix" in str(excp):
+                    job.set_error(
+                        InvalidModelConfigException(
+                            f"The file {job.local_path} is not recognized as a model. Check the URL and access token."
+                        )
+                    )
+                    self._signal_job_errored(job)
+
+            except (OSError, DuplicateModelException) as excp:
                 job.set_error(excp)
                 self._signal_job_errored(job)
 
@@ -559,6 +566,7 @@ class ModelInstallService(ModelInstallServiceBase):
         for model_file in url_and_paths:
             url = model_file.url
             path = model_file.path
+            self._logger.info(f"Downloading {url} => {path}")
             install_job.total_bytes += model_file.size
             assert hasattr(source, "access_token")
             dest = tmpdir / path.parent
@@ -587,6 +595,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _download_started_callback(self, download_job: DownloadJob) -> None:
         with self._lock:
             install_job = self._download_cache[download_job.source]
+            install_job.status = InstallStatus.DOWNLOADING
 
             assert download_job.download_path
             if install_job.local_path == install_job._install_tmpdir:

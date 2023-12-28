@@ -21,6 +21,7 @@ class InstallStatus(str, Enum):
     """State of an install job running in the background."""
 
     WAITING = "waiting"  # waiting to be dequeued
+    DOWNLOADING = "downloading"  # downloading of model files in process
     RUNNING = "running"  # being processed
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
@@ -132,7 +133,7 @@ class URLModelSource(StringLikeSource):
 
     url: AnyHttpUrl
     access_token: Optional[str] = None
-    type: Literal["generic_url"] = "generic_url"
+    type: Literal["url"] = "url"
 
     def __str__(self) -> str:
         """Return string version of the url when string rep needed."""
@@ -206,6 +207,11 @@ class ModelInstallJob(BaseModel):
     def waiting(self) -> bool:
         """Return true if job is waiting to run."""
         return self.status == InstallStatus.WAITING
+
+    @property
+    def downloading(self) -> bool:
+        """Return true if job is downloading."""
+        return self.status == InstallStatus.DOWNLOADING
 
     @property
     def running(self) -> bool:

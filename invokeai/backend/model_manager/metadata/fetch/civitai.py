@@ -125,6 +125,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
                 sha256=x["hashes"]["SHA256"],
             )
             for x in version_json["files"]
+            if x.get("primary", False)  # Civitai has one "primary" file plus others such as VAEs
         ]
         return CivitaiMetadata(
             id=model_json["id"],

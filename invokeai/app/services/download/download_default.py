@@ -254,6 +254,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         resp = self._requests.get(str(url), headers=header, stream=True)
         if not resp.ok:
             raise HTTPError(resp.reason)
+
         content_length = int(resp.headers.get("content-length", 0))
         job.total_bytes = content_length
 
