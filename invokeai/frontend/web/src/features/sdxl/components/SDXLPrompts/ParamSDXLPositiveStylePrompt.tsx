@@ -6,10 +6,10 @@ import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
 import { usePrompt } from 'features/embedding/usePrompt';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { setPositiveStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const ParamSDXLPositiveStylePrompt = () => {
+export const ParamSDXLPositiveStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector((state) => state.sdxl.positiveStylePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -55,4 +55,6 @@ export const ParamSDXLPositiveStylePrompt = () => {
       </Box>
     </EmbeddingPopover>
   );
-};
+});
+
+ParamSDXLPositiveStylePrompt.displayName = 'ParamSDXLPositiveStylePrompt';

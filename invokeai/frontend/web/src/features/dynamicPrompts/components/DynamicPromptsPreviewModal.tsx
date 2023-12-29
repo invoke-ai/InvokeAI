@@ -8,13 +8,14 @@ import {
   InvModalOverlay,
 } from 'common/components/InvModal/wrapper';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
 import ParamDynamicPromptsSeedBehaviour from './ParamDynamicPromptsSeedBehaviour';
 
-export const DynamicPromptsModal = () => {
+export const DynamicPromptsModal = memo(() => {
   const { t } = useTranslation();
   const { isOpen, onClose } = useDynamicPromptsModal();
 
@@ -41,4 +42,6 @@ export const DynamicPromptsModal = () => {
       </InvModalContent>
     </InvModal>
   );
-};
+});
+
+DynamicPromptsModal.displayName = 'DynamicPromptsModal';

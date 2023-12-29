@@ -4,10 +4,10 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setShouldRandomizeSeed } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const ParamSeedRandomize = () => {
+export const ParamSeedRandomize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -29,4 +29,6 @@ export const ParamSeedRandomize = () => {
       />
     </InvControl>
   );
-};
+});
+
+ParamSeedRandomize.displayName = 'ParamSeedRandomize';

@@ -23,6 +23,7 @@ import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSee
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
@@ -49,7 +50,7 @@ const scalingLabelProps: InvLabelProps = {
   w: '4.5rem',
 };
 
-export const ImageSettingsAccordion = () => {
+export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { badges, activeTabName } = useAppSelector(selector);
 
@@ -95,9 +96,11 @@ export const ImageSettingsAccordion = () => {
       </Flex>
     </InvSingleAccordion>
   );
-};
+});
 
-const WidthHeight = (props: { activeTabName: InvokeTabName }) => {
+ImageSettingsAccordion.displayName = 'ImageSettingsAccordion';
+
+const WidthHeight = memo((props: { activeTabName: InvokeTabName }) => {
   if (props.activeTabName === 'unifiedCanvas') {
     return (
       <>
@@ -113,4 +116,6 @@ const WidthHeight = (props: { activeTabName: InvokeTabName }) => {
       <ParamHeight />
     </>
   );
-};
+});
+
+WidthHeight.displayName = 'WidthHeight';

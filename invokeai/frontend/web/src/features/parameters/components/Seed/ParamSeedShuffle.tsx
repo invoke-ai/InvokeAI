@@ -4,11 +4,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import randomInt from 'common/util/randomInt';
 import { setSeed } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaShuffle } from 'react-icons/fa6';
 
-export const ParamSeedShuffle = () => {
+export const ParamSeedShuffle = memo(() => {
   const dispatch = useAppDispatch();
   const shouldRandomizeSeed = useAppSelector(
     (state: RootState) => state.generation.shouldRandomizeSeed
@@ -31,4 +31,6 @@ export const ParamSeedShuffle = () => {
       {t('parameters.shuffle')}
     </InvButton>
   );
-};
+});
+
+ParamSeedShuffle.displayName = 'ParamSeedShuffle';

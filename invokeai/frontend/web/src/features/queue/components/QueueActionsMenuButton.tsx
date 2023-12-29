@@ -9,12 +9,13 @@ import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrent
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPause, FaPlay, FaTimes } from 'react-icons/fa';
 import { FaList } from 'react-icons/fa6';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
-export const QueueActionsMenuButton = () => {
+export const QueueActionsMenuButton = memo(() => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
@@ -100,4 +101,6 @@ export const QueueActionsMenuButton = () => {
       )}
     </Box>
   );
-};
+});
+
+QueueActionsMenuButton.displayName = 'QueueActionsMenuButton';

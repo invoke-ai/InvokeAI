@@ -4,6 +4,7 @@ import {
   keyframes,
   MenuItem as ChakraMenuItem,
 } from '@chakra-ui/react';
+import {memo} from'react'
 
 import type { InvMenuItemProps } from './types';
 
@@ -16,29 +17,33 @@ const spin = keyframes`
   }
 `;
 
-export const InvMenuItem = forwardRef<InvMenuItemProps, typeof ChakraMenuItem>(
-  (props: InvMenuItemProps, ref) => {
-    const {
-      isDestructive = false,
-      isLoading = false,
-      isDisabled,
-      icon,
-      ...rest
-    } = props;
-    return (
-      <ChakraMenuItem
-        ref={ref}
-        icon={
-          isLoading ? (
-            <SpinnerIcon animation={`${spin} 1s linear infinite`} />
-          ) : (
-            icon
-          )
-        }
-        isDisabled={isLoading || isDisabled}
-        data-destructive={isDestructive}
-        {...rest}
-      />
-    );
-  }
+export const InvMenuItem = memo(
+  forwardRef<InvMenuItemProps, typeof ChakraMenuItem>(
+    (props: InvMenuItemProps, ref) => {
+      const {
+        isDestructive = false,
+        isLoading = false,
+        isDisabled,
+        icon,
+        ...rest
+      } = props;
+      return (
+        <ChakraMenuItem
+          ref={ref}
+          icon={
+            isLoading ? (
+              <SpinnerIcon animation={`${spin} 1s linear infinite`} />
+            ) : (
+              icon
+            )
+          }
+          isDisabled={isLoading || isDisabled}
+          data-destructive={isDestructive}
+          {...rest}
+        />
+      );
+    }
+  )
 );
+
+InvMenuItem.displayName = 'InvMenuItem';

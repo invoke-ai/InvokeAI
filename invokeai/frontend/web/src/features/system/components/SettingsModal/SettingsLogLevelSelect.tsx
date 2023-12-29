@@ -4,10 +4,10 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { consoleLogLevelChanged } from 'features/system/store/systemSlice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const SettingsLogLevelSelect = () => {
+export const SettingsLogLevelSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const consoleLogLevel = useAppSelector(
@@ -43,4 +43,6 @@ export const SettingsLogLevelSelect = () => {
       <InvSelect value={value} options={options} onChange={onChange} />
     </InvControl>
   );
-};
+});
+
+SettingsLogLevelSelect.displayName = 'SettingsLogLevelSelect';

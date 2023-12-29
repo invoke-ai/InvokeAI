@@ -8,7 +8,7 @@ import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput'
 import type { InvNumberInputFieldProps } from 'common/components/InvNumberInput/types';
 import { setIterations } from 'features/parameters/store/generationSlice';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { IoSparkles } from 'react-icons/io5';
 
 import { QueueButtonTooltip } from './QueueButtonTooltip';
@@ -40,7 +40,7 @@ const selector = createMemoizedSelector([stateSelector], (state) => {
   };
 });
 
-export const InvokeQueueBackButton = () => {
+export const InvokeQueueBackButton = memo(() => {
   const { queueBack, isLoading, isDisabled } = useQueueBack();
   const { iterations, step, fineStep } = useAppSelector(selector);
   const dispatch = useAppDispatch();
@@ -89,4 +89,6 @@ export const InvokeQueueBackButton = () => {
       </InvButton>
     </Flex>
   );
-};
+});
+
+InvokeQueueBackButton.displayName = 'InvokeQueueBackButton';

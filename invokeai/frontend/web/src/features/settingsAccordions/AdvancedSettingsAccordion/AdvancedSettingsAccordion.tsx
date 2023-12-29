@@ -8,6 +8,7 @@ import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSea
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelProps: InvLabelProps = {
@@ -18,7 +19,7 @@ const labelProps2: InvLabelProps = {
   flexGrow: 1,
 };
 
-export const AdvancedSettingsAccordion = () => {
+export const AdvancedSettingsAccordion = memo(() => {
   const { t } = useTranslation();
 
   return (
@@ -41,4 +42,6 @@ export const AdvancedSettingsAccordion = () => {
       </Flex>
     </InvSingleAccordion>
   );
-};
+});
+
+AdvancedSettingsAccordion.displayName = 'AdvancedSettingsAccordion';

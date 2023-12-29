@@ -3,10 +3,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { setSeed } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const ParamSeedNumberInput = () => {
+export const ParamSeedNumberInput = memo(() => {
   const seed = useAppSelector((state) => state.generation.seed);
   const shouldRandomizeSeed = useAppSelector(
     (state) => state.generation.shouldRandomizeSeed
@@ -34,4 +34,6 @@ export const ParamSeedNumberInput = () => {
       />
     </InvControl>
   );
-};
+});
+
+ParamSeedNumberInput.displayName = 'ParamSeedNumberInput';

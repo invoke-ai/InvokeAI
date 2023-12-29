@@ -22,7 +22,7 @@ const exit: AnimationProps['exit'] = {
   transition: { duration: 0.1 },
 };
 
-export const IAIDropOverlay = (props: Props) => {
+const IAIDropOverlay = (props: Props) => {
   const { isOver, label = 'Drop' } = props;
   const motionId = useRef(uuidv4());
   return (

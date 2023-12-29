@@ -5,7 +5,7 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { heightChanged } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
@@ -32,7 +32,7 @@ const selector = createMemoizedSelector(
   }
 );
 
-export const ParamHeight = () => {
+export const ParamHeight = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { initial, height, min, max, inputMax, step, fineStep } =
@@ -71,4 +71,6 @@ export const ParamHeight = () => {
       />
     </InvControl>
   );
-};
+});
+
+ParamHeight.displayName = 'ParamHeight';

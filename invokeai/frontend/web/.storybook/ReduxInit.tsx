@@ -1,4 +1,4 @@
-import { PropsWithChildren, useEffect } from 'react';
+import { PropsWithChildren, memo, useEffect } from 'react';
 import { modelChanged } from '../src/features/parameters/store/generationSlice';
 import { useAppDispatch } from '../src/app/store/storeHooks';
 import { useGlobalModifiersInit } from '../src/common/hooks/useGlobalModifiers';
@@ -6,7 +6,7 @@ import { useGlobalModifiersInit } from '../src/common/hooks/useGlobalModifiers';
  * Initializes some state for storybook. Must be in a different component
  * so that it is run inside the redux context.
  */
-export const ReduxInit = (props: PropsWithChildren) => {
+export const ReduxInit = memo((props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
   useGlobalModifiersInit();
   useEffect(() => {
@@ -20,4 +20,6 @@ export const ReduxInit = (props: PropsWithChildren) => {
   }, []);
 
   return props.children;
-};
+});
+
+ReduxInit.displayName = 'ReduxInit';

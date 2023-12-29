@@ -2,11 +2,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { setShouldConcatSDXLStylePrompt } from 'features/sdxl/store/sdxlSlice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaLink, FaUnlink } from 'react-icons/fa';
 
-export const SDXLConcatButton = () => {
+export const SDXLConcatButton = memo(() => {
   const shouldConcatSDXLStylePrompt = useAppSelector(
     (state) => state.sdxl.shouldConcatSDXLStylePrompt
   );
@@ -38,4 +38,6 @@ export const SDXLConcatButton = () => {
       />
     </InvTooltip>
   );
-};
+});
+
+SDXLConcatButton.displayName = 'SDXLConcatButton';

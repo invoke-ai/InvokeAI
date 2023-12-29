@@ -4,6 +4,7 @@ import ClearQueueButton from 'features/queue/components/ClearQueueButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
 
 import { InvokeQueueBackButton } from './InvokeQueueBackButton';
 import { QueueActionsMenuButton } from './QueueActionsMenuButton';
@@ -35,7 +36,7 @@ const QueueControls = () => {
   );
 };
 
-export default QueueControls;
+export default memo(QueueControls);
 
 // const QueueCounts = () => {
 //   const { t } = useTranslation();

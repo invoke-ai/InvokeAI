@@ -1,10 +1,11 @@
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsBracesAsterisk } from 'react-icons/bs';
 
-export const ShowDynamicPromptsPreviewButton = () => {
+export const ShowDynamicPromptsPreviewButton = memo(() => {
   const { t } = useTranslation();
   const { isOpen, onOpen } = useDynamicPromptsModal();
   return (
@@ -19,4 +20,6 @@ export const ShowDynamicPromptsPreviewButton = () => {
       />
     </InvTooltip>
   );
-};
+});
+
+ShowDynamicPromptsPreviewButton.displayName = 'ShowDynamicPromptsPreviewButton';

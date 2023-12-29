@@ -10,12 +10,12 @@ import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput'
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { $modifiers } from 'common/hooks/useGlobalModifiers';
 import { AnimatePresence } from 'framer-motion';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 
 import { InvSliderMark } from './InvSliderMark';
 import type { InvFormattedMark, InvSliderProps } from './types';
 
-export const InvSlider = (props: InvSliderProps) => {
+export const InvSlider = memo((props: InvSliderProps) => {
   const {
     value,
     min,
@@ -112,4 +112,6 @@ export const InvSlider = (props: InvSliderProps) => {
       )}
     </>
   );
-};
+});
+
+InvSlider.displayName = 'InvSlider';
