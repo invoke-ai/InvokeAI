@@ -1,5 +1,4 @@
 import { Badge, Divider, Flex } from '@chakra-ui/react';
-import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
@@ -13,6 +12,8 @@ import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useEffect, useState } from 'react';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { CheckpointModelConfigEntity } from 'services/api/endpoints/models';
 import {
@@ -44,8 +45,14 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const checkpointEditForm = useForm<CheckpointModelConfig>({
-    initialValues: {
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = useForm<CheckpointModelConfig>({
+    defaultValues: {
       model_name: model.model_name ? model.model_name : '',
       base_model: model.base_model,
       model_type: 'main',
@@ -56,10 +63,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
       config: model.config ? model.config : '',
       variant: model.variant,
     },
-    validate: {
-      path: (value) =>
-        value.trim().length === 0 ? 'Must provide a path' : null,
-    },
+    mode: 'onChange',
   });
 
   const handleChangeUseCustomConfig = useCallback(
@@ -67,8 +71,8 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
     []
   );
 
-  const editModelFormSubmitHandler = useCallback(
-    (values: CheckpointModelConfig) => {
+  const onSubmit = useCallback<SubmitHandler<CheckpointModelConfig>>(
+    (values) => {
       const responseBody = {
         base_model: model.base_model,
         model_name: model.model_name,
@@ -77,7 +81,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
       updateMainModel(responseBody)
         .unwrap()
         .then((payload) => {
-          checkpointEditForm.setValues(payload as CheckpointModelConfig);
+          reset(payload as CheckpointModelConfig, { keepDefaultValues: true });
           dispatch(
             addToast(
               makeToast({
@@ -88,7 +92,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
           );
         })
         .catch((_) => {
-          checkpointEditForm.reset();
+          reset();
           dispatch(
             addToast(
               makeToast({
@@ -99,14 +103,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
           );
         });
     },
-    [
-      checkpointEditForm,
-      dispatch,
-      model.base_model,
-      model.model_name,
-      t,
-      updateMainModel,
-    ]
+    [dispatch, model.base_model, model.model_name, reset, t, updateMainModel]
   );
 
   return (
@@ -135,42 +132,53 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
         maxHeight={window.innerHeight - 270}
         overflowY="scroll"
       >
-        <form
-          onSubmit={checkpointEditForm.onSubmit((values) =>
-            editModelFormSubmitHandler(values)
-          )}
-        >
+        <form onSubmit={handleSubmit(onSubmit)}>
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <InvControl label={t('modelManager.name')}>
-              <InvInput {...checkpointEditForm.getInputProps('model_name')} />
+            <InvControl
+              label={t('modelManager.name')}
+              isInvalid={Boolean(errors.model_name)}
+              error={errors.model_name?.message}
+            >
+              <InvInput
+                {...register('model_name', {
+                  validate: (value) =>
+                    value.trim().length > 3 || 'Must be at least 3 characters',
+                })}
+              />
             </InvControl>
             <InvControl label={t('modelManager.description')}>
-              <InvInput {...checkpointEditForm.getInputProps('description')} />
+              <InvInput {...register('description')} />
             </InvControl>
-            <BaseModelSelect
-              required
-              {...checkpointEditForm.getInputProps('base_model')}
+            <BaseModelSelect<CheckpointModelConfig>
+              control={control}
+              name="base_model"
             />
-            <ModelVariantSelect
-              required
-              {...checkpointEditForm.getInputProps('variant')}
+            <ModelVariantSelect<CheckpointModelConfig>
+              control={control}
+              name="variant"
             />
-            <InvControl isRequired label={t('modelManager.modelLocation')}>
-              <InvInput {...checkpointEditForm.getInputProps('path')} />
+            <InvControl
+              label={t('modelManager.modelLocation')}
+              isInvalid={Boolean(errors.path)}
+              error={errors.path?.message}
+            >
+              <InvInput
+                {...register('path', {
+                  validate: (value) =>
+                    value.trim().length > 0 || 'Must provide a path',
+                })}
+              />
             </InvControl>
             <InvControl label={t('modelManager.vaeLocation')}>
-              <InvInput {...checkpointEditForm.getInputProps('vae')} />
+              <InvInput {...register('vae')} />
             </InvControl>
 
             <Flex flexDirection="column" gap={2}>
               {!useCustomConfig ? (
-                <CheckpointConfigsSelect
-                  required
-                  {...checkpointEditForm.getInputProps('config')}
-                />
+                <CheckpointConfigsSelect control={control} name="config" />
               ) : (
                 <InvControl isRequired label={t('modelManager.config')}>
-                  <InvInput {...checkpointEditForm.getInputProps('config')} />
+                  <InvInput {...register('config')} />
                 </InvControl>
               )}
               <InvControl label="Use Custom Config">

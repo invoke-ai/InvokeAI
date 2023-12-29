@@ -1,5 +1,4 @@
 import { Divider, Flex } from '@chakra-ui/react';
-import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -13,6 +12,8 @@ import {
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 import { useUpdateLoRAModelsMutation } from 'services/api/endpoints/models';
@@ -30,8 +31,14 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const loraEditForm = useForm<LoRAModelConfig>({
-    initialValues: {
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = useForm<LoRAModelConfig>({
+    defaultValues: {
       model_name: model.model_name ? model.model_name : '',
       base_model: model.base_model,
       model_type: 'lora',
@@ -39,14 +46,11 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
       description: model.description ? model.description : '',
       model_format: model.model_format,
     },
-    validate: {
-      path: (value) =>
-        value.trim().length === 0 ? 'Must provide a path' : null,
-    },
+    mode: 'onChange',
   });
 
-  const editModelFormSubmitHandler = useCallback(
-    (values: LoRAModelConfig) => {
+  const onSubmit = useCallback<SubmitHandler<LoRAModelConfig>>(
+    (values) => {
       const responseBody = {
         base_model: model.base_model,
         model_name: model.model_name,
@@ -56,7 +60,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
       updateLoRAModel(responseBody)
         .unwrap()
         .then((payload) => {
-          loraEditForm.setValues(payload as LoRAModelConfig);
+          reset(payload as LoRAModelConfig, { keepDefaultValues: true });
           dispatch(
             addToast(
               makeToast({
@@ -67,7 +71,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
           );
         })
         .catch((_) => {
-          loraEditForm.reset();
+          reset();
           dispatch(
             addToast(
               makeToast({
@@ -78,14 +82,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
           );
         });
     },
-    [
-      dispatch,
-      loraEditForm,
-      model.base_model,
-      model.model_name,
-      t,
-      updateLoRAModel,
-    ]
+    [dispatch, model.base_model, model.model_name, reset, t, updateLoRAModel]
   );
 
   return (
@@ -101,21 +98,39 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
       </Flex>
       <Divider />
 
-      <form
-        onSubmit={loraEditForm.onSubmit((values) =>
-          editModelFormSubmitHandler(values)
-        )}
-      >
+      <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <InvControl label={t('modelManager.name')}>
-            <InvInput {...loraEditForm.getInputProps('model_name')} />
+          <InvControl
+            label={t('modelManager.name')}
+            isInvalid={Boolean(errors.model_name)}
+            error={errors.model_name?.message}
+          >
+            <InvInput
+              {...register('model_name', {
+                validate: (value) =>
+                  value.trim().length > 3 || 'Must be at least 3 characters',
+              })}
+            />
           </InvControl>
           <InvControl label={t('modelManager.description')}>
-            <InvInput {...loraEditForm.getInputProps('description')} />
+            <InvInput {...register('description')} />
           </InvControl>
-          <BaseModelSelect {...loraEditForm.getInputProps('base_model')} />
-          <InvControl label={t('modelManager.modelLocation')}>
-            <InvInput {...loraEditForm.getInputProps('path')} />
+          <BaseModelSelect<LoRAModelConfig>
+            control={control}
+            name="base_model"
+          />
+
+          <InvControl
+            label={t('modelManager.modelLocation')}
+            isInvalid={Boolean(errors.path)}
+            error={errors.path?.message}
+          >
+            <InvInput
+              {...register('path', {
+                validate: (value) =>
+                  value.trim().length > 0 || 'Must provide a path',
+              })}
+            />
           </InvControl>
           <InvButton type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}

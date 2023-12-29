@@ -1,14 +1,19 @@
-import { formAnatomy as parts } from '@chakra-ui/anatomy';
+import {
+  formAnatomy as formParts,
+  formErrorAnatomy as formErrorParts,
+} from '@chakra-ui/anatomy';
 import {
   createMultiStyleConfigHelpers,
   defineStyle,
   defineStyleConfig,
 } from '@chakra-ui/styled-system';
 
-const { definePartsStyle, defineMultiStyleConfig } =
-  createMultiStyleConfigHelpers(parts.keys);
+const {
+  definePartsStyle: defineFormPartsStyle,
+  defineMultiStyleConfig: defineFormMultiStyleConfig,
+} = createMultiStyleConfigHelpers(formParts.keys);
 
-const formBaseStyle = definePartsStyle((props) => {
+const formBaseStyle = defineFormPartsStyle((props) => {
   return {
     container: {
       display: 'flex',
@@ -19,7 +24,7 @@ const formBaseStyle = definePartsStyle((props) => {
   };
 });
 
-const withHelperText = definePartsStyle(() => ({
+const withHelperText = defineFormPartsStyle(() => ({
   container: {
     flexDirection: 'column',
     gap: 0,
@@ -41,7 +46,7 @@ const withHelperText = definePartsStyle(() => ({
   },
 }));
 
-export const formTheme = defineMultiStyleConfig({
+export const formTheme = defineFormMultiStyleConfig({
   baseStyle: formBaseStyle,
   variants: {
     withHelperText,
@@ -72,4 +77,15 @@ const formLabelBaseStyle = defineStyle(() => {
 
 export const formLabelTheme = defineStyleConfig({
   baseStyle: formLabelBaseStyle,
+});
+
+const { defineMultiStyleConfig: defineFormErrorMultiStyleConfig } =
+  createMultiStyleConfigHelpers(formErrorParts.keys);
+
+export const formErrorTheme = defineFormErrorMultiStyleConfig({
+  baseStyle: {
+    text: {
+      color: 'error.300',
+    },
+  },
 });

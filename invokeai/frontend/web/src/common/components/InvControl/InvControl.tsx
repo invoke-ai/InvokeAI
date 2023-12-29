@@ -1,6 +1,7 @@
 import {
   Flex,
   FormControl as ChakraFormControl,
+  FormErrorMessage as ChakraFormErrorMessage,
   FormHelperText as ChakraFormHelperText,
   forwardRef,
 } from '@chakra-ui/react';
@@ -22,36 +23,38 @@ export const InvControl = memo(
         isDisabled,
         labelProps,
         label,
+        error,
         ...formControlProps
       } = props;
 
       const ctx = useContext(InvControlGroupContext);
 
-      if (helperText) {
-        return (
-          <ChakraFormControl
-            ref={ref}
-            variant="withHelperText"
-            orientation={orientation ?? ctx.orientation}
-            isDisabled={isDisabled ?? ctx.isDisabled}
-            {...formControlProps}
-          >
-            <Flex>
-              {label && (
-                <InvLabel
-                  feature={feature}
-                  renderInfoPopoverInPortal={renderInfoPopoverInPortal}
-                  {...labelProps}
-                >
-                  {label}
-                </InvLabel>
-              )}
-              {children}
-            </Flex>
+      return (
+        <ChakraFormControl
+          ref={ref}
+          variant="withHelperText"
+          orientation={orientation ?? ctx.orientation}
+          isDisabled={isDisabled ?? ctx.isDisabled}
+          {...formControlProps}
+        >
+          <Flex>
+            {label && (
+              <InvLabel
+                feature={feature}
+                renderInfoPopoverInPortal={renderInfoPopoverInPortal}
+                {...labelProps}
+              >
+                {label}
+              </InvLabel>
+            )}
+            {children}
+          </Flex>
+          {helperText && (
             <ChakraFormHelperText>{helperText}</ChakraFormHelperText>
-          </ChakraFormControl>
-        );
-      }
+          )}
+          {error && <ChakraFormErrorMessage>{error}</ChakraFormErrorMessage>}
+        </ChakraFormControl>
+      );
 
       return (
         <ChakraFormControl

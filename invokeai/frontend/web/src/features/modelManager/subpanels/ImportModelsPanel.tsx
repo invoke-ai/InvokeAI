@@ -17,7 +17,7 @@ const ImportModelsPanel = () => {
   const handleClickScanTab = useCallback(() => setAddModelTab('scan'), []);
 
   return (
-    <Flex flexDirection="column" gap={4}>
+    <Flex flexDirection="column" gap={4} h="full">
       <InvButtonGroup>
         <InvButton
           onClick={handleClickAddTab}
