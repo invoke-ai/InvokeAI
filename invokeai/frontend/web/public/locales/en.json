@@ -70,7 +70,7 @@
         "compositing": {
             "title": "Compositing",
             "coherenceTab": "Coherence Pass",
-            "infillMaskTab": "Infill & Mask"
+            "infillTab": "Infill"
         }
     },
     "common": {
