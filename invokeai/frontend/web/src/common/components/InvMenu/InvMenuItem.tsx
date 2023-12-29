@@ -4,7 +4,7 @@ import {
   keyframes,
   MenuItem as ChakraMenuItem,
 } from '@chakra-ui/react';
-import {memo} from'react'
+import { memo } from 'react';
 
 import type { InvMenuItemProps } from './types';
 

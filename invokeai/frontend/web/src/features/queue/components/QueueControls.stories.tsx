@@ -12,5 +12,5 @@ export default meta;
 type Story = StoryObj<typeof QueueControls>;
 
 export const Default: Story = {
-  render: QueueControls,
+  render: () => <QueueControls />,
 };
