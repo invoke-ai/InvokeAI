@@ -12,7 +12,7 @@ import {
 } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 import { useUpdateLoRAModelsMutation } from 'services/api/endpoints/models';
@@ -22,7 +22,7 @@ type LoRAModelEditProps = {
   model: LoRAModelConfigEntity;
 };
 
-export default function LoRAModelEdit(props: LoRAModelEditProps) {
+const LoRAModelEdit = (props: LoRAModelEditProps) => {
   const { model } = props;
 
   const [updateLoRAModel, { isLoading }] = useUpdateLoRAModelsMutation();
@@ -124,4 +124,6 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
       </form>
     </Flex>
   );
-}
+};
+
+export default memo(LoRAModelEdit);

@@ -49,7 +49,7 @@ export const ParamHeight = memo(() => {
     dispatch(heightChanged(initial));
   }, [dispatch, initial]);
 
-  const marks = useMemo(()=>[min, initial, max], [min, initial, max])
+  const marks = useMemo(() => [min, initial, max], [min, initial, max]);
 
   return (
     <InvControl label={t('parameters.height')}>

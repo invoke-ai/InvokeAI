@@ -10,7 +10,7 @@ import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVari
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DiffusersModelConfigEntity } from 'services/api/endpoints/models';
 import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
@@ -20,7 +20,7 @@ type DiffusersModelEditProps = {
   model: DiffusersModelConfigEntity;
 };
 
-export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
+const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
   const { model } = props;
 
   const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
@@ -133,4 +133,6 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
       </form>
     </Flex>
   );
-}
+};
+
+export default memo(DiffusersModelEdit);

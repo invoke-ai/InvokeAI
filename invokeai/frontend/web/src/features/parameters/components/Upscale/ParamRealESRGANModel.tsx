@@ -11,7 +11,7 @@ import {
   esrganModelNameChanged,
   isParamESRGANModelName,
 } from 'features/parameters/store/postprocessingSlice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const options: GroupBase<InvSelectOption>[] = [
@@ -48,7 +48,7 @@ const options: GroupBase<InvSelectOption>[] = [
   },
 ];
 
-export default function ParamESRGANModel() {
+const ParamESRGANModel = () => {
   const { t } = useTranslation();
 
   const esrganModelName = useAppSelector(
@@ -80,4 +80,6 @@ export default function ParamESRGANModel() {
       <InvSelect value={value} onChange={onChange} options={options} />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamESRGANModel);

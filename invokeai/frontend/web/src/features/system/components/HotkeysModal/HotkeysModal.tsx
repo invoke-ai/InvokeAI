@@ -16,7 +16,7 @@ import {
   InvModalOverlay,
 } from 'common/components/InvModal/wrapper';
 import type { ReactElement } from 'react';
-import { cloneElement } from 'react';
+import { cloneElement, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import HotkeysModalItem from './HotkeysModalItem';
@@ -32,7 +32,7 @@ type HotkeyList = {
   hotkey: string;
 };
 
-export default function HotkeysModal({ children }: HotkeysModalProps) {
+const HotkeysModal = ({ children }: HotkeysModalProps) => {
   const {
     isOpen: isHotkeyModalOpen,
     onOpen: onHotkeysModalOpen,
@@ -401,4 +401,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       </InvModal>
     </>
   );
-}
+};
+
+export default memo(HotkeysModal);

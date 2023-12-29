@@ -4,9 +4,9 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setShouldUseSymmetry } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 
-export default function ParamSymmetryToggle() {
+const ParamSymmetryToggle = () => {
   const shouldUseSymmetry = useAppSelector(
     (state: RootState) => state.generation.shouldUseSymmetry
   );
@@ -24,4 +24,6 @@ export default function ParamSymmetryToggle() {
       <InvSwitch isChecked={shouldUseSymmetry} onChange={handleChange} />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamSymmetryToggle);

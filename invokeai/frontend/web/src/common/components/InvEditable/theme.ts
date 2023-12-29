@@ -13,7 +13,7 @@ const baseStylePreview = defineStyle({
   py: '1',
   transitionProperty: 'common',
   transitionDuration: 'normal',
-  color: 'base.100'
+  color: 'base.100',
 });
 
 const baseStyleInput = defineStyle(() => ({

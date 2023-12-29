@@ -5,7 +5,7 @@ import { InvText } from 'common/components/InvText/wrapper';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { addToast } from 'features/system/store/systemSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useClearIntermediatesMutation,
@@ -15,7 +15,7 @@ import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 import StyledFlex from './StyledFlex';
 
-export default function SettingsClearIntermediates() {
+const SettingsClearIntermediates = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -88,4 +88,6 @@ export default function SettingsClearIntermediates() {
       </InvText>
     </StyledFlex>
   );
-}
+};
+
+export default memo(SettingsClearIntermediates);

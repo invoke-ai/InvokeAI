@@ -16,7 +16,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { pickBy } from 'lodash-es';
 import type { ChangeEvent } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 import {
@@ -36,7 +36,7 @@ type MergeInterpolationMethods =
   | 'inv_sigmoid'
   | 'add_difference';
 
-export default function MergeModelsPanel() {
+const MergeModelsPanel = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -422,4 +422,6 @@ export default function MergeModelsPanel() {
       </InvButton>
     </Flex>
   );
-}
+};
+
+export default memo(MergeModelsPanel);

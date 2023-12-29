@@ -11,7 +11,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { difference, forEach, intersection, map, values } from 'lodash-es';
 import type { ChangeEvent, MouseEvent } from 'react';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 import type { SearchFolderResponse } from 'services/api/endpoints/models';
@@ -21,7 +21,7 @@ import {
   useImportMainModelsMutation,
 } from 'services/api/endpoints/models';
 
-export default function FoundModelsList() {
+const FoundModelsList = () => {
   const searchFolder = useAppSelector(
     (state: RootState) => state.modelmanager.searchFolder
   );
@@ -203,7 +203,7 @@ export default function FoundModelsList() {
   };
 
   return renderFoundModels();
-}
+};
 
 const foundModelsFilter = (
   data: SearchFolderResponse | undefined,
@@ -221,3 +221,5 @@ const foundModelsFilter = (
   });
   return filteredModels;
 };
+
+export default memo(FoundModelsList);

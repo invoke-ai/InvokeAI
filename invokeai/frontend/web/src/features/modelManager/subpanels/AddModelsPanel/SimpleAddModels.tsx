@@ -9,6 +9,7 @@ import type { InvSelectOption } from 'common/components/InvSelect/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import type { CSSProperties } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
@@ -24,7 +25,7 @@ type ExtendedImportModelConfig = {
   prediction_type?: 'v_prediction' | 'epsilon' | 'sample' | 'none' | undefined;
 };
 
-export default function SimpleAddModels() {
+const SimpleAddModels = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -97,8 +98,10 @@ export default function SimpleAddModels() {
       </Flex>
     </form>
   );
-}
+};
 
 const formStyles: CSSProperties = {
   width: '100%',
 };
+
+export default memo(SimpleAddModels);

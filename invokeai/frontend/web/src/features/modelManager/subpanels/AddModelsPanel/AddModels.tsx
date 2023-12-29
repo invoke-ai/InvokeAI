@@ -1,13 +1,13 @@
 import { Flex } from '@chakra-ui/react';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AdvancedAddModels from './AdvancedAddModels';
 import SimpleAddModels from './SimpleAddModels';
 
-export default function AddModels() {
+const AddModels = () => {
   const { t } = useTranslation();
   const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>(
     'simple'
@@ -47,4 +47,6 @@ export default function AddModels() {
       </Flex>
     </Flex>
   );
-}
+};
+
+export default memo(AddModels);

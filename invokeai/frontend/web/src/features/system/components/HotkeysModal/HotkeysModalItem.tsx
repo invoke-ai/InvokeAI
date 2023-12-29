@@ -1,5 +1,6 @@
 import { Box, Grid } from '@chakra-ui/react';
 import { InvText } from 'common/components/InvText/wrapper';
+import { memo } from 'react';
 
 interface HotkeysModalProps {
   hotkey: string;
@@ -7,7 +8,7 @@ interface HotkeysModalProps {
   description?: string;
 }
 
-export default function HotkeysModalItem(props: HotkeysModalProps) {
+const HotkeysModalItem = (props: HotkeysModalProps) => {
   const { title, hotkey, description } = props;
   return (
     <Grid
@@ -24,4 +25,6 @@ export default function HotkeysModalItem(props: HotkeysModalProps) {
       </Box>
     </Grid>
   );
-}
+};
+
+export default memo(HotkeysModalItem);

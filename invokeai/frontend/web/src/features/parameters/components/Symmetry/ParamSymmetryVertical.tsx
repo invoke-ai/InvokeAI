@@ -3,10 +3,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setVerticalSymmetrySteps } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function ParamSymmetryVertical() {
+const ParamSymmetryVertical = () => {
   const verticalSymmetrySteps = useAppSelector(
     (state: RootState) => state.generation.verticalSymmetrySteps
   );
@@ -41,4 +41,6 @@ export default function ParamSymmetryVertical() {
       />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamSymmetryVertical);

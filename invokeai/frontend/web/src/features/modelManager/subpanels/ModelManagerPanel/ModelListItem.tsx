@@ -9,7 +9,7 @@ import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   LoRAModelConfigEntity,
@@ -27,7 +27,7 @@ type ModelListItemProps = {
   setSelectedModelId: (v: string | undefined) => void;
 };
 
-export default function ModelListItem(props: ModelListItemProps) {
+const ModelListItem = (props: ModelListItemProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [deleteMainModel] = useDeleteMainModelsMutation();
@@ -129,4 +129,6 @@ export default function ModelListItem(props: ModelListItemProps) {
       </InvConfirmationAlertDialog>
     </Flex>
   );
-}
+};
+
+export default memo(ModelListItem);

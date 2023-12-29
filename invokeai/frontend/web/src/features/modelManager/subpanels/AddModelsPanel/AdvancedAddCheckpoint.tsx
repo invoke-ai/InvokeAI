@@ -12,7 +12,7 @@ import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVari
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import type { CSSProperties, FocusEventHandler } from 'react';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import type { CheckpointModelConfig } from 'services/api/types';
@@ -23,9 +23,7 @@ type AdvancedAddCheckpointProps = {
   model_path?: string;
 };
 
-export default function AdvancedAddCheckpoint(
-  props: AdvancedAddCheckpointProps
-) {
+const AdvancedAddCheckpoint = (props: AdvancedAddCheckpointProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { model_path } = props;
@@ -173,8 +171,10 @@ export default function AdvancedAddCheckpoint(
       </Flex>
     </form>
   );
-}
+};
 
 const formStyles: CSSProperties = {
   width: '100%',
 };
+
+export default memo(AdvancedAddCheckpoint);

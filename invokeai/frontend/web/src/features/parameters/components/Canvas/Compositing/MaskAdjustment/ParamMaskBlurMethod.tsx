@@ -8,7 +8,7 @@ import type {
 } from 'common/components/InvSelect/types';
 import { setMaskBlurMethod } from 'features/parameters/store/generationSlice';
 import { isParameterMaskBlurMethod } from 'features/parameters/types/parameterSchemas';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const options: InvSelectOption[] = [
@@ -16,7 +16,7 @@ const options: InvSelectOption[] = [
   { label: 'Gaussian Blur', value: 'gaussian' },
 ];
 
-export default function ParamMaskBlurMethod() {
+const ParamMaskBlurMethod = () => {
   const maskBlurMethod = useAppSelector(
     (state: RootState) => state.generation.maskBlurMethod
   );
@@ -46,4 +46,6 @@ export default function ParamMaskBlurMethod() {
       <InvSelect value={value} onChange={onChange} options={options} />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamMaskBlurMethod);
