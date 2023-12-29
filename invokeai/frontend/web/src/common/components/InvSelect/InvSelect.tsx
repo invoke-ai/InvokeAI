@@ -46,7 +46,7 @@ export const InvSelect = memo((props: InvSelectProps) => {
         display:
           _state.hasValue && _state.selectProps.isClearable ? 'none' : 'flex',
       }),
-      crossIcon: (provided, _state) => ({ ...provided, boxSize: 2 }),
+      crossIcon: (provided, _state) => ({ ...provided, boxSize: 2.5 }),
       inputContainer: (provided, _state) => ({
         ...provided,
         cursor: 'pointer',
