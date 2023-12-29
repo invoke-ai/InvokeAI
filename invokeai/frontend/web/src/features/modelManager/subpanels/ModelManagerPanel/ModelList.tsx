@@ -272,15 +272,7 @@ const modelsFilter = <
 
 const StyledModelContainer = memo((props: PropsWithChildren) => {
   return (
-    <Flex
-      flexDirection="column"
-      gap={4}
-      borderRadius={4}
-      p={4}
-      sx={{
-        bg: 'base.800',
-      }}
-    >
+    <Flex flexDirection="column" gap={4} borderRadius={4} p={4} bg="base.800">
       {props.children}
     </Flex>
   );
@@ -301,7 +293,7 @@ const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList, selected } = props;
   return (
     <StyledModelContainer>
-      <Flex sx={{ gap: 2, flexDir: 'column' }}>
+      <Flex gap={2} flexDir="column">
         <InvText variant="subtext" fontSize="sm">
           {title}
         </InvText>

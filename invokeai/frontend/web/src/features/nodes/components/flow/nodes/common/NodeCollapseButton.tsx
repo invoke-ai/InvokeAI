@@ -24,23 +24,15 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
       className="nodrag"
       onClick={handleClick}
       aria-label="Minimize"
-      sx={{
-        minW: 8,
-        w: 8,
-        h: 8,
-        color: 'base.500',
-        _hover: {
-          color: 'base.300',
-        },
-      }}
+      minW={8}
+      w={8}
+      h={8}
       variant="link"
       icon={
         <ChevronUpIcon
-          sx={{
-            transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)',
-            transitionProperty: 'common',
-            transitionDuration: 'normal',
-          }}
+          transform={isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
+          transitionProperty="common"
+          transitionDuration="normal"
         />
       }
     />

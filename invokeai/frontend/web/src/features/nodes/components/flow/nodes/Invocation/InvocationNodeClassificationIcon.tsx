@@ -26,11 +26,9 @@ const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
     >
       <Icon
         as={getIcon(classification)}
-        sx={{
-          display: 'block',
-          boxSize: 4,
-          color: 'base.400',
-        }}
+        display="block"
+        boxSize={4}
+        color="base.400"
       />
     </InvTooltip>
   );

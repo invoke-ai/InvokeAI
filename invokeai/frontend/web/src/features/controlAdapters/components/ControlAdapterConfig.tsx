@@ -65,18 +65,14 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
 
   return (
     <Flex
-      sx={{
-        flexDir: 'column',
-        gap: 3,
-        p: 2,
-        borderRadius: 'base',
-        position: 'relative',
-        bg: 'base.750',
-      }}
+      flexDir="column"
+      gap={3}
+      p={2}
+      borderRadius="base"
+      position="relative"
+      bg="base.750"
     >
-      <Flex
-        sx={{ gap: 2, alignItems: 'center', justifyContent: 'space-between' }}
-      >
+      <Flex gap={2} alignItems="center" justifyContent="space-between">
         <InvControl label={t(`controlnet.${controlAdapterType}`, { number })}>
           <InvSwitch
             aria-label={t('controlnet.toggleControlNet')}
@@ -85,14 +81,12 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           />
         </InvControl>
       </Flex>
-      <Flex sx={{ gap: 2, alignItems: 'center' }}>
+      <Flex gap={2} alignItems="center">
         <Box
-          sx={{
-            w: 'full',
-            minW: 0,
-            transitionProperty: 'common',
-            transitionDuration: '0.1s',
-          }}
+          minW={0}
+          w="full"
+          transitionProperty="common"
+          transitionDuration="0.1s"
         >
           <ParamControlAdapterModel id={id} />
         </Box>
@@ -128,57 +122,46 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           }
           onClick={toggleIsExpanded}
           variant="ghost"
-          sx={{
-            _hover: {
-              bg: 'none',
-            },
-          }}
           icon={
             <ChevronUpIcon
-              sx={{
-                boxSize: 4,
-                color: 'base.300',
-                transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
-                transitionProperty: 'common',
-                transitionDuration: 'normal',
-              }}
+              boxSize={4}
+              color="base.300"
+              transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
+              transitionProperty="common"
+              transitionDuration="normal"
             />
           }
         />
       </Flex>
 
-      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3 }}>
-        <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
+      <Flex w="full" flexDir="column" gap={3}>
+        <Flex gap={4} w="full" alignItems="center">
           <Flex
-            sx={{
-              flexDir: 'column',
-              gap: 3,
-              h: 28,
-              w: 'full',
-              paddingInlineStart: 1,
-              paddingInlineEnd: isExpanded ? 1 : 0,
-              pb: 2,
-              justifyContent: 'space-between',
-            }}
+            flexDir="column"
+            gap={3}
+            h={28}
+            w="full"
+            paddingInlineStart={1}
+            paddingInlineEnd={isExpanded ? 1 : 0}
+            pb={2}
+            justifyContent="space-between"
           >
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>
           {!isExpanded && (
             <Flex
-              sx={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                h: 28,
-                w: 28,
-                aspectRatio: '1/1',
-              }}
+              alignItems="center"
+              justifyContent="center"
+              h={28}
+              w={28}
+              aspectRatio="1/1"
             >
               <ControlAdapterImagePreview id={id} isSmall />
             </Flex>
           )}
         </Flex>
-        <Flex sx={{ gap: 2 }}>
+        <Flex gap={2}>
           <ParamControlAdapterControlMode id={id} />
           <ParamControlAdapterResizeMode id={id} />
         </Flex>

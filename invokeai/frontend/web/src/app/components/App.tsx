@@ -75,23 +75,9 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
     >
       <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
         <ImageUploader>
-          <Grid
-            sx={{
-              gap: 4,
-              p: 4,
-              gridAutoRows: 'min-content auto',
-              w: 'full',
-              h: 'full',
-            }}
-          >
+          <Grid gap={4} p={4} gridAutoRows="min-content auto" w="full" h="full">
             {headerComponent || <SiteHeader />}
-            <Flex
-              sx={{
-                gap: 4,
-                w: 'full',
-                h: 'full',
-              }}
-            >
+            <Flex gap={4} w="full" h="full">
               <InvokeTabs />
             </Flex>
           </Grid>

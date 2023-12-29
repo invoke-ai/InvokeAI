@@ -52,34 +52,28 @@ const InitialImageDisplay = () => {
   return (
     <Flex
       layerStyle="first"
-      sx={{
-        position: 'relative',
-        flexDirection: 'column',
-        height: 'full',
-        width: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 'base',
-        p: 2,
-        gap: 4,
-      }}
+      position="relative"
+      flexDirection="column"
+      height="full"
+      width="full"
+      alignItems="center"
+      justifyContent="center"
+      borderRadius="base"
+      p={2}
+      gap={4}
     >
       <Flex
-        sx={{
-          w: 'full',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 2,
-        }}
+        w="full"
+        flexWrap="wrap"
+        justifyContent="center"
+        alignItems="center"
+        gap={2}
       >
         <InvText
-          sx={{
-            ps: 2,
-            fontWeight: 'semibold',
-            userSelect: 'none',
-            color: 'base.200',
-          }}
+          ps={2}
+          fontWeight="semibold"
+          userSelect="none"
+          color="base.200"
         >
           {t('metadata.initImage')}
         </InvText>

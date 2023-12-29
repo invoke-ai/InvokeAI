@@ -20,7 +20,7 @@ const baseStyleInput = defineStyle(() => ({
   transitionProperty: 'common',
   transitionDuration: 'normal',
   width: 'full',
-  _focusVisible: { boxShadow: 'outline' },
+  _focusVisible: { boxShadow: 'none' },
   _placeholder: { opacity: 0.6 },
   '::selection': {
     color: 'blue.50',

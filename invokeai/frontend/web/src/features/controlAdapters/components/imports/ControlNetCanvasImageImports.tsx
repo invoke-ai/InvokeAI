@@ -29,11 +29,7 @@ const ControlNetCanvasImageImports = (
   }, [id, dispatch]);
 
   return (
-    <Flex
-      sx={{
-        gap: 2,
-      }}
-    >
+    <Flex gap={2}>
       <InvIconButton
         size="sm"
         icon={<FaImage />}

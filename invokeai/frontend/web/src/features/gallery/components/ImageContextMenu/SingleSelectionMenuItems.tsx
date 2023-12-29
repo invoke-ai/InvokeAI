@@ -248,7 +248,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         </InvMenuItem>
       )}
       <InvMenuItem
-        sx={{ color: 'error.300' }}
+        color="error.300"
         icon={<FaTrash />}
         onClickCapture={handleDelete}
       >

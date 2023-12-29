@@ -123,13 +123,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
         {![''].includes(model.base_model) ? (
           <ModelConvert model={model} />
         ) : (
-          <Badge
-            sx={{
-              p: 2,
-              borderRadius: 4,
-              bg: 'error.400',
-            }}
-          >
+          <Badge p={2} borderRadius={4} bg="error.400">
             {t('modelManager.conversionNotSupported')}
           </Badge>
         )}

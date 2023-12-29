@@ -25,20 +25,12 @@ const NextPrevImageButtons = () => {
   } = useNextPrevImage();
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        height: '100%',
-        width: '100%',
-      }}
-    >
+    <Box pos="relative" h="full" w="full">
       <Box
-        sx={{
-          pos: 'absolute',
-          top: '50%',
-          transform: 'translate(0, -50%)',
-          insetInlineStart: 0,
-        }}
+        pos="absolute"
+        top="50%"
+        transform="translate(0, -50%)"
+        insetInlineStart={0}
       >
         {!isOnFirstImage && (
           <InvIconButton
@@ -52,12 +44,10 @@ const NextPrevImageButtons = () => {
         )}
       </Box>
       <Box
-        sx={{
-          pos: 'absolute',
-          top: '50%',
-          transform: 'translate(0, -50%)',
-          insetInlineEnd: 0,
-        }}
+        pos="absolute"
+        top="50%"
+        transform="translate(0, -50%)"
+        insetInlineEnd={0}
       >
         {!isOnLastImage && (
           <InvIconButton
@@ -80,14 +70,7 @@ const NextPrevImageButtons = () => {
           />
         )}
         {isOnLastImage && areMoreImagesAvailable && isFetching && (
-          <Flex
-            sx={{
-              w: 16,
-              h: 16,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+          <Flex w={16} h={16} alignItems="center" justifyContent="center">
             <Spinner opacity={0.5} size="xl" />
           </Flex>
         )}

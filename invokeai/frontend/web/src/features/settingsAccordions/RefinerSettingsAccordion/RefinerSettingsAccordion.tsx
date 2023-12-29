@@ -58,8 +58,8 @@ RefinerSettingsAccordion.displayName = 'RefinerSettingsAccordion';
 const RefinerSettingsAccordionNoRefiner: React.FC = memo(() => {
   const { t } = useTranslation();
   return (
-    <Flex sx={{ justifyContent: 'center', p: 4 }}>
-      <InvText sx={{ fontSize: 'sm', color: 'base.500' }}>
+    <Flex justifyContent="center" p={4}>
+      <InvText fontSize="sm" color="base.500">
         {t('models.noRefinerModelsInstalled')}
       </InvText>
     </Flex>

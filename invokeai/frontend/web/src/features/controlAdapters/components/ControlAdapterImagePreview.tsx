@@ -177,13 +177,11 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     <Flex
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      sx={{
-        position: 'relative',
-        w: 'full',
-        h: isSmall ? 28 : 366, // magic no touch
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      position="relative"
+      w="full"
+      h={isSmall ? 28 : 366} // magic no touch
+      alignItems="center"
+      justifyContent="center"
     >
       <IAIDndImage
         draggableData={draggableData}
@@ -194,17 +192,15 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       />
 
       <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          insetInlineStart: 0,
-          w: 'full',
-          h: 'full',
-          opacity: shouldShowProcessedImage ? 1 : 0,
-          transitionProperty: 'common',
-          transitionDuration: 'normal',
-          pointerEvents: 'none',
-        }}
+        position="absolute"
+        top={0}
+        insetInlineStart={0}
+        w="full"
+        h="full"
+        opacity={shouldShowProcessedImage ? 1 : 0}
+        transitionProperty="common"
+        transitionDuration="normal"
+        pointerEvents="none"
       >
         <IAIDndImage
           draggableData={draggableData}
@@ -236,20 +232,18 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 
       {pendingControlImages.includes(id) && (
         <Flex
-          sx={{
-            position: 'absolute',
-            top: 0,
-            insetInlineStart: 0,
-            w: 'full',
-            h: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: 0.8,
-            borderRadius: 'base',
-            bg: 'base.900',
-          }}
+          position="absolute"
+          top={0}
+          insetInlineStart={0}
+          w="full"
+          h="full"
+          alignItems="center"
+          justifyContent="center"
+          opacity={0.8}
+          borderRadius="base"
+          bg="base.900"
         >
-          <Spinner size="xl" sx={{ color: 'base.400' }} />
+          <Spinner size="xl" color="base.400" />
         </Flex>
       )}
     </Flex>

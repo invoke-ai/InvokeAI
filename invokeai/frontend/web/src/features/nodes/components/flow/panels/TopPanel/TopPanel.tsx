@@ -13,15 +13,13 @@ const TopCenterPanel = () => {
 
   return (
     <Flex
-      sx={{
-        gap: 2,
-        top: 2,
-        left: 2,
-        right: 2,
-        position: 'absolute',
-        alignItems: 'center',
-        pointerEvents: 'none',
-      }}
+      gap={2}
+      top={2}
+      left={2}
+      right={2}
+      position="absolute"
+      alignItems="center"
+      pointerEvents="none"
     >
       <AddNodeButton />
       <UpdateNodesButton />

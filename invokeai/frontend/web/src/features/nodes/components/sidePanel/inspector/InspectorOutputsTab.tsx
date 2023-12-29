@@ -52,24 +52,16 @@ const InspectorOutputsTab = () => {
   }
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        w: 'full',
-        h: 'full',
-      }}
-    >
+    <Box position="relative" w="full" h="full">
       <ScrollableContent>
         <Flex
-          sx={{
-            position: 'relative',
-            flexDir: 'column',
-            alignItems: 'flex-start',
-            p: 1,
-            gap: 2,
-            h: 'full',
-            w: 'full',
-          }}
+          position="relative"
+          flexDir="column"
+          alignItems="flex-start"
+          p={1}
+          gap={2}
+          h="full"
+          w="full"
         >
           {template?.outputType === 'image_output' ? (
             nes.outputs.map((result, i) => (

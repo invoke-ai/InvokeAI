@@ -272,13 +272,7 @@ const IAICanvasToolChooserOptions = () => {
                   />
                 </InvControl>
               </Flex>
-              <Box
-                sx={{
-                  width: '100%',
-                  paddingTop: 2,
-                  paddingBottom: 2,
-                }}
-              >
+              <Box w="full" pt={2} pb={2}>
                 <IAIColorPicker
                   withNumberInput={true}
                   color={brushColor}

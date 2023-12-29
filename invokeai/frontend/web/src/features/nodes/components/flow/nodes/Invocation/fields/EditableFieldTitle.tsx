@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import {
   Editable,
   EditableInput,
@@ -78,57 +79,53 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
     >
       <Flex
         ref={ref}
-        sx={{
-          position: 'relative',
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          gap: 1,
-          h: 'full',
-        }}
+        position="relative"
+        overflow="hidden"
+        alignItems="center"
+        justifyContent="flex-start"
+        gap={1}
+        h="full"
       >
         <Editable
           value={localTitle}
           onChange={handleChange}
           onSubmit={handleSubmit}
           as={Flex}
-          sx={{
-            position: 'relative',
-            alignItems: 'center',
-            h: 'full',
-          }}
+          position="relative"
+          alignItems="center"
+          h="full"
         >
           <EditablePreview
-            sx={{
-              p: 0,
-              fontWeight: isMissingInput ? 'bold' : 'normal',
-              textAlign: 'left',
-              _hover: {
-                fontWeight: 'semibold !important',
-              },
-            }}
+            fontWeight={isMissingInput ? 'bold' : 'normal'}
+            sx={editablePreviewStyles}
             noOfLines={1}
           />
-          <EditableInput
-            className="nodrag"
-            sx={{
-              p: 0,
-              w: 'full',
-              fontWeight: 'semibold',
-              color: 'base.100',
-              _focusVisible: {
-                p: 0,
-                textAlign: 'left',
-                boxShadow: 'none',
-              },
-            }}
-          />
+          <EditableInput className="nodrag" sx={editableInputStyles} />
           <EditableControls />
         </Editable>
       </Flex>
     </InvTooltip>
   );
 });
+
+const editableInputStyles: SystemStyleObject = {
+  p: 0,
+  w: 'full',
+  fontWeight: 'semibold',
+  color: 'base.100',
+  _focusVisible: {
+    p: 0,
+    textAlign: 'left',
+    boxShadow: 'none',
+  },
+};
+const editablePreviewStyles: SystemStyleObject = {
+  p: 0,
+  textAlign: 'left',
+  _hover: {
+    fontWeight: 'semibold !important',
+  },
+};
 
 export default memo(EditableFieldTitle);
 

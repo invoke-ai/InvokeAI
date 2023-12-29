@@ -78,12 +78,10 @@ const ImageFieldInputComponent = (
   return (
     <Flex
       className="nodrag"
-      sx={{
-        w: 'full',
-        h: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      w="full"
+      h="full"
+      alignItems="center"
+      justifyContent="center"
     >
       <IAIDndImage
         imageDTO={imageDTO}

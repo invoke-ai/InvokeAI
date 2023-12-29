@@ -18,14 +18,12 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
     <Flex
       className={DRAG_HANDLE_CLASSNAME}
       layerStyle="nodeFooter"
-      sx={{
-        w: 'full',
-        borderBottomRadius: 'base',
-        px: 2,
-        py: 0,
-        h: 8,
-        justifyContent: 'space-between',
-      }}
+      w="full"
+      borderBottomRadius="base"
+      px={2}
+      py={0}
+      h={8}
+      justifyContent="space-between"
     >
       {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
       {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}

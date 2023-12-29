@@ -69,7 +69,7 @@ const LoRASelect = () => {
         noOptionsMessage={noOptionsMessage}
         onChange={onChange}
         data-testid="add-lora"
-        sx={{ w: 'full' }}
+        w="full"
       />
     </InvControl>
   );

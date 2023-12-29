@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import {
   Box,
   Editable,
@@ -32,6 +33,14 @@ import {
 } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
+
+const editableInputStyles: SystemStyleObject = {
+  p: 0,
+  _focusVisible: {
+    p: 0,
+    textAlign: 'center',
+  },
+};
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -140,18 +149,16 @@ const GalleryBoard = ({
   }, []);
   const { t } = useTranslation();
   return (
-    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+    <Box w="full" h="full" userSelect="none">
       <Flex
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
-        sx={{
-          position: 'relative',
-          justifyContent: 'center',
-          alignItems: 'center',
-          aspectRatio: '1/1',
-          w: 'full',
-          h: 'full',
-        }}
+        position="relative"
+        justifyContent="center"
+        alignItems="center"
+        aspectRatio="1/1"
+        w="full"
+        h="full"
       >
         <BoardContextMenu
           board={board}
@@ -163,47 +170,39 @@ const GalleryBoard = ({
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
-                sx={{
-                  w: 'full',
-                  h: 'full',
-                  position: 'relative',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderRadius: 'base',
-                  cursor: 'pointer',
-                  bg: 'base.800',
-                }}
+                w="full"
+                h="full"
+                position="relative"
+                justifyContent="center"
+                alignItems="center"
+                borderRadius="base"
+                cursor="pointer"
+                bg="base.800"
               >
                 {coverImage?.thumbnail_url ? (
                   <Image
                     src={coverImage?.thumbnail_url}
                     draggable={false}
-                    sx={{
-                      objectFit: 'cover',
-                      w: 'full',
-                      h: 'full',
-                      maxH: 'full',
-                      borderRadius: 'base',
-                      borderBottomRadius: 'lg',
-                    }}
+                    objectFit="cover"
+                    w="full"
+                    h="full"
+                    maxH="full"
+                    borderRadius="base"
+                    borderBottomRadius="lg"
                   />
                 ) : (
                   <Flex
-                    sx={{
-                      w: 'full',
-                      h: 'full',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
+                    w="full"
+                    h="full"
+                    justifyContent="center"
+                    alignItems="center"
                   >
                     <Icon
                       boxSize={12}
                       as={FaUser}
-                      sx={{
-                        mt: -6,
-                        opacity: 0.7,
-                        color: 'base.500',
-                      }}
+                      mt={-6}
+                      opacity={0.7}
+                      color="base.500"
                     />
                   </Flex>
                 )}
@@ -213,21 +212,19 @@ const GalleryBoard = ({
                   isHovered={isHovered}
                 />
                 <Flex
-                  sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    p: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    w: 'full',
-                    maxW: 'full',
-                    borderBottomRadius: 'base',
-                    bg: isSelected ? 'blue.500' : 'base.600',
-                    color: isSelected ? 'base.50' : 'base.100',
-                    lineHeight: 'short',
-                    fontSize: 'xs',
-                  }}
+                  position="absolute"
+                  bottom={0}
+                  left={0}
+                  p={1}
+                  justifyContent="center"
+                  alignItems="center"
+                  w="full"
+                  maxW="full"
+                  borderBottomRadius="base"
+                  bg={isSelected ? 'blue.500' : 'base.600'}
+                  color={isSelected ? 'base.50' : 'base.100'}
+                  lineHeight="short"
+                  fontSize="xs"
                 >
                   <Editable
                     value={localBoardName}
@@ -235,31 +232,17 @@ const GalleryBoard = ({
                     submitOnBlur={true}
                     onChange={handleChange}
                     onSubmit={handleSubmit}
-                    sx={{
-                      w: 'full',
-                    }}
+                    w="full"
                   >
                     <EditablePreview
-                      sx={{
-                        p: 0,
-                        fontWeight: isSelected ? 'bold' : 'normal',
-                        textAlign: 'center',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
+                      p={0}
+                      fontWeight={isSelected ? 'bold' : 'normal'}
+                      textAlign="center"
+                      overflow="hidden"
+                      textOverflow="ellipsis"
                       noOfLines={1}
                     />
-                    <EditableInput
-                      sx={{
-                        p: 0,
-                        _focusVisible: {
-                          p: 0,
-                          textAlign: 'center',
-                          // get rid of the edit border
-                          boxShadow: 'none',
-                        },
-                      }}
-                    />
+                    <EditableInput sx={editableInputStyles} />
                   </Editable>
                 </Flex>
 

@@ -233,7 +233,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
           <InvModalHeader bg="none">{t('common.settingsLabel')}</InvModalHeader>
           <InvModalCloseButton />
           <InvModalBody>
-            <Flex sx={{ gap: 4, flexDirection: 'column' }}>
+            <Flex gap={4} flexDir="column">
               <StyledFlex>
                 <InvHeading size="sm">{t('settings.general')}</InvHeading>
                 <InvControl label={t('settings.confirmOnDelete')}>

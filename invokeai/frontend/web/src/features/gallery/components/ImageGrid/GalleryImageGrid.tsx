@@ -9,10 +9,12 @@ import { $useNextPrevImageState } from 'features/gallery/hooks/useNextPrevImage'
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExclamationCircle, FaImage } from 'react-icons/fa';
 import type {
+  GridComponents,
   ItemContent,
   ListRange,
   VirtuosoGridHandle,
@@ -27,6 +29,13 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
+
+const components: GridComponents = {
+  Item: ImageGridItemContainer,
+  List: ImageGridListContainer,
+};
+
+const virtuosoStyles: CSSProperties = { height: '100%' };
 
 const GalleryImageGrid = () => {
   const { t } = useTranslation();
@@ -115,14 +124,7 @@ const GalleryImageGrid = () => {
 
   if (!currentData) {
     return (
-      <Flex
-        sx={{
-          w: 'full',
-          h: 'full',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <IAINoContentFallback label={t('gallery.loading')} icon={FaImage} />
       </Flex>
     );
@@ -130,14 +132,7 @@ const GalleryImageGrid = () => {
 
   if (isSuccess && currentData?.ids.length === 0) {
     return (
-      <Flex
-        sx={{
-          w: 'full',
-          h: 'full',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <IAINoContentFallback
           label={t('gallery.noImagesInGallery')}
           icon={FaImage}
@@ -151,13 +146,10 @@ const GalleryImageGrid = () => {
       <>
         <Box ref={rootRef} data-overlayscrollbars="" h="100%">
           <VirtuosoGrid
-            style={{ height: '100%' }}
+            style={virtuosoStyles}
             data={currentData.ids}
             endReached={handleLoadMoreImages}
-            components={{
-              Item: ImageGridItemContainer,
-              List: ImageGridListContainer,
-            }}
+            components={components}
             scrollerRef={setScroller}
             itemContent={itemContentFunc}
             ref={virtuosoRef}
@@ -181,7 +173,7 @@ const GalleryImageGrid = () => {
 
   if (isError) {
     return (
-      <Box sx={{ w: 'full', h: 'full' }}>
+      <Box w="full" h="full">
         <IAINoContentFallback
           label={t('gallery.unableToLoad')}
           icon={FaExclamationCircle}

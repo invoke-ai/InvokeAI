@@ -10,7 +10,6 @@ import type {
 } from 'common/components/InvSelect/types';
 import { InvText } from 'common/components/InvText/wrapper';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
-import { motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
@@ -79,20 +78,15 @@ export default function ScanAdvancedAddModels() {
 
   return (
     <Box
-      as={motion.div}
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1, transition: { duration: 0.2 } }}
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        minWidth: '40%',
-        maxHeight: window.innerHeight - 300,
-        overflow: 'scroll',
-        p: 4,
-        gap: 4,
-        borderRadius: 4,
-        bg: 'base.800',
-      }}
+      display="flex"
+      flexDirection="column"
+      minWidth="40%"
+      maxHeight="calc(100vh - 300px)"
+      overflow="scroll"
+      p={4}
+      gap={4}
+      borderRadius={4}
+      bg="base.800"
     >
       <Flex justifyContent="space-between" alignItems="center">
         <InvText size="xl" fontWeight="semibold">

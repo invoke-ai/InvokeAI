@@ -38,41 +38,35 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   return (
     <Flex
       layerStyle="body"
-      sx={{
-        w: '100vw',
-        h: '100vh',
-        alignItems: 'center',
-        justifyContent: 'center',
-        p: 4,
-      }}
+      w="100vw"
+      h="100vh"
+      alignItems="center"
+      justifyContent="center"
+      p={4}
     >
       <Flex
         layerStyle="first"
-        sx={{
-          flexDir: 'column',
-          borderRadius: 'base',
-          justifyContent: 'center',
-          gap: 8,
-          p: 16,
-        }}
+        flexDir="column"
+        borderRadius="base"
+        justifyContent="center"
+        gap={8}
+        p={16}
       >
         <Heading>{t('common.somethingWentWrong')}</Heading>
         <Flex
           layerStyle="second"
-          sx={{
-            px: 8,
-            py: 4,
-            borderRadius: 'base',
-            gap: 4,
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
+          px={8}
+          py={4}
+          gap={4}
+          borderRadius="base"
+          justifyContent="space-between"
+          alignItems="center"
         >
           <InvText fontWeight="semibold" color="error.400">
             {error.name}: {error.message}
           </InvText>
         </Flex>
-        <Flex sx={{ gap: 4 }}>
+        <Flex gap={4}>
           <InvButton
             leftIcon={<FaArrowRotateLeft />}
             onClick={resetErrorBoundary}

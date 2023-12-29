@@ -48,12 +48,7 @@ const ParamUpscalePopover = (props: Props) => {
       </InvPopoverTrigger>
       <InvPopoverContent>
         <InvPopoverBody>
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
+          <Flex flexDirection="column" gap={4}>
             <ParamESRGANModel />
             <InvButton
               tooltip={detail}

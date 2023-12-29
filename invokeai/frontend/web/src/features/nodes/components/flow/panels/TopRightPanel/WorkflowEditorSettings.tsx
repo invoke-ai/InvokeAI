@@ -104,13 +104,7 @@ const WorkflowEditorSettings = ({ children }: Props) => {
           <InvModalHeader>{t('nodes.workflowSettings')}</InvModalHeader>
           <InvModalCloseButton />
           <InvModalBody>
-            <Flex
-              sx={{
-                flexDirection: 'column',
-                gap: 4,
-                py: 4,
-              }}
-            >
+            <Flex flexDirection="column" gap={4} py={4}>
               <Heading size="sm">{t('parameters.general')}</Heading>
               <InvControl
                 label={t('nodes.animatedEdges')}

@@ -101,7 +101,7 @@ const ChangeBoardModal = () => {
       acceptButtonText={t('boards.move')}
       cancelButtonText={t('boards.cancel')}
     >
-      <Flex sx={{ flexDir: 'column', gap: 4 }}>
+      <Flex flexDir="column" gap={4}>
         <InvText>
           {t('boards.movingImagesToBoard', {
             count: imagesToChange.length,

@@ -9,7 +9,7 @@ const TopRightPanel = () => {
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
-    <Flex sx={{ gap: 2, position: 'absolute', top: 2, insetInlineEnd: 2 }}>
+    <Flex gap={2} position="absolute" top={2} insetInlineEnd={2}>
       {isWorkflowLibraryEnabled && <WorkflowLibraryButton />}
       <WorkflowLibraryMenu />
     </Flex>

@@ -43,10 +43,10 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
   }, [field, fieldTemplate, t]);
 
   return (
-    <Flex sx={{ flexDir: 'column' }}>
-      <InvText sx={{ fontWeight: 'semibold' }}>{fieldTitle}</InvText>
+    <Flex flexDir="column">
+      <InvText fontWeight="semibold">{fieldTitle}</InvText>
       {fieldTemplate && (
-        <InvText sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
+        <InvText opacity={0.7} fontStyle="oblique 5deg">
           {fieldTemplate.description}
         </InvText>
       )}

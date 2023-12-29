@@ -59,22 +59,13 @@ function SearchFolderForm() {
       )}
       style={{ width: '100%' }}
     >
-      <Flex
-        sx={{
-          w: '100%',
-          gap: 2,
-          borderRadius: 4,
-          alignItems: 'center',
-        }}
-      >
+      <Flex w="100%" gap={2} borderRadius={4} alignItems="center">
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
           <InvText
-            sx={{
-              fontSize: 'sm',
-              fontWeight: 'semibold',
-              color: 'base.300',
-              minW: 'max-content',
-            }}
+            fontSize="sm"
+            fontWeight="semibold"
+            color="base.300"
+            minW="max-content"
           >
             {t('common.folder')}
           </InvText>
@@ -86,15 +77,13 @@ function SearchFolderForm() {
             />
           ) : (
             <Flex
-              sx={{
-                w: '100%',
-                p: 2,
-                px: 4,
-                bg: 'base.700',
-                borderRadius: 4,
-                fontSize: 'sm',
-                fontWeight: 'bold',
-              }}
+              w="100%"
+              p={2}
+              px={4}
+              bg="base.700"
+              borderRadius={4}
+              fontSize="sm"
+              fontWeight="bold"
             >
               {searchFolder}
             </Flex>

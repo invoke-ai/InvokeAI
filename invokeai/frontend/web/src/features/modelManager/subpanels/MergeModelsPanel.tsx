@@ -259,13 +259,8 @@ export default function MergeModelsPanel() {
   ]);
 
   return (
-    <Flex flexDirection="column" rowGap={4}>
-      <Flex
-        sx={{
-          flexDirection: 'column',
-          rowGap: 1,
-        }}
-      >
+    <Flex flexDir="column" gap={4}>
+      <Flex flexDir="column" gap={1}>
         <InvText>{t('modelManager.modelMergeHeaderHelp1')}</InvText>
         <InvText fontSize="sm" variant="subtext">
           {t('modelManager.modelMergeHeaderHelp2')}
@@ -273,28 +268,28 @@ export default function MergeModelsPanel() {
       </Flex>
 
       <Flex columnGap={4}>
-        <InvControl label={t('modelManager.modelType')} sx={{ w: 'full' }}>
+        <InvControl label={t('modelManager.modelType')} w="full">
           <InvSelect
             options={baseModelTypeSelectOptions}
             value={valueBaseModel}
             onChange={onChangeBaseModel}
           />
         </InvControl>
-        <InvControl label={t('modelManager.modelOne')} sx={{ w: 'full' }}>
+        <InvControl label={t('modelManager.modelOne')} w="full">
           <InvSelect
             options={optionsModelOne}
             value={valueModelOne}
             onChange={onChangeModelOne}
           />
         </InvControl>
-        <InvControl label={t('modelManager.modelTwo')} sx={{ w: 'full' }}>
+        <InvControl label={t('modelManager.modelTwo')} w="full">
           <InvSelect
             options={optionsModelTwo}
             value={valueModelTwo}
             onChange={onChangeModelTwo}
           />
         </InvControl>
-        <InvControl label={t('modelManager.modelThree')} sx={{ w: 'full' }}>
+        <InvControl label={t('modelManager.modelThree')} w="full">
           <InvSelect
             options={optionsModelThree}
             value={valueModelThree}
@@ -312,13 +307,11 @@ export default function MergeModelsPanel() {
       </InvControl>
 
       <Flex
-        sx={{
-          flexDirection: 'column',
-          padding: 4,
-          borderRadius: 'base',
-          gap: 4,
-          bg: 'base.800',
-        }}
+        flexDirection="column"
+        padding={4}
+        borderRadius="base"
+        gap={4}
+        bg="base.800"
       >
         <InvControl
           label={t('modelManager.alpha')}
@@ -337,14 +330,7 @@ export default function MergeModelsPanel() {
         </InvControl>
       </Flex>
 
-      <Flex
-        sx={{
-          padding: 4,
-          borderRadius: 'base',
-          gap: 4,
-          bg: 'base.800',
-        }}
-      >
+      <Flex padding={4} gap={4} borderRadius="base" bg="base.800">
         <InvText fontSize="sm" variant="subtext">
           {t('modelManager.interpolationType')}
         </InvText>
@@ -382,13 +368,11 @@ export default function MergeModelsPanel() {
       </Flex>
 
       <Flex
-        sx={{
-          flexDirection: 'column',
-          padding: 4,
-          borderRadius: 'base',
-          gap: 4,
-          bg: 'base.900',
-        }}
+        flexDirection="column"
+        padding={4}
+        borderRadius="base"
+        gap={4}
+        bg="base.900"
       >
         <Flex columnGap={4}>
           <InvText fontSize="sm" variant="subtext">

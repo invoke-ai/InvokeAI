@@ -217,14 +217,7 @@ const CurrentImageButtons = () => {
 
   return (
     <>
-      <Flex
-        sx={{
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 2,
-        }}
-      >
+      <Flex flexWrap="wrap" justifyContent="center" alignItems="center" gap={2}>
         <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
           <InvMenu isLazy>
             <InvMenuButton

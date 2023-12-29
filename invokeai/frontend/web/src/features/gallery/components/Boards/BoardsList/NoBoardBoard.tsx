@@ -71,19 +71,17 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   );
   const { t } = useTranslation();
   return (
-    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+    <Box w="full" h="full" userSelect="none">
       <Flex
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
-        sx={{
-          position: 'relative',
-          justifyContent: 'center',
-          alignItems: 'center',
-          aspectRatio: '1/1',
-          borderRadius: 'base',
-          w: 'full',
-          h: 'full',
-        }}
+        position="relative"
+        justifyContent="center"
+        alignItems="center"
+        aspectRatio="1/1"
+        borderRadius="base"
+        w="full"
+        h="full"
       >
         <BoardContextMenu board_id="none">
           {(ref) => (
@@ -91,58 +89,50 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
-                sx={{
-                  w: 'full',
-                  h: 'full',
-                  position: 'relative',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderRadius: 'base',
-                  cursor: 'pointer',
-                  bg: 'base.800',
-                }}
+                w="full"
+                h="full"
+                position="relative"
+                justifyContent="center"
+                alignItems="center"
+                borderRadius="base"
+                cursor="pointer"
+                bg="base.800"
               >
                 <Flex
-                  sx={{
-                    w: 'full',
-                    h: 'full',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
+                  w="full"
+                  h="full"
+                  justifyContent="center"
+                  alignItems="center"
                 >
                   <Image
                     src={InvokeAILogoImage}
                     alt="invoke-ai-logo"
-                    sx={{
-                      opacity: 0.4,
-                      filter: 'grayscale(1)',
-                      mt: -6,
-                      w: 16,
-                      h: 16,
-                      minW: 16,
-                      minH: 16,
-                      userSelect: 'none',
-                    }}
+                    opacity={0.4}
+                    filter="grayscale(1)"
+                    mt={-6}
+                    w={16}
+                    h={16}
+                    minW={16}
+                    minH={16}
+                    userSelect="none"
                   />
                 </Flex>
                 {autoAddBoardId === 'none' && <AutoAddIcon />}
                 <Flex
-                  sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    p: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    w: 'full',
-                    maxW: 'full',
-                    borderBottomRadius: 'base',
-                    bg: isSelected ? 'blue.500' : 'base.600',
-                    color: isSelected ? 'base.50' : 'base.100',
-                    lineHeight: 'short',
-                    fontSize: 'xs',
-                    fontWeight: isSelected ? 'bold' : 'normal',
-                  }}
+                  position="absolute"
+                  bottom={0}
+                  left={0}
+                  p={1}
+                  justifyContent="center"
+                  alignItems="center"
+                  w="full"
+                  maxW="full"
+                  borderBottomRadius="base"
+                  bg={isSelected ? 'blue.500' : 'base.600'}
+                  color={isSelected ? 'base.50' : 'base.100'}
+                  lineHeight="short"
+                  fontSize="xs"
+                  fontWeight={isSelected ? 'bold' : 'normal'}
                 >
                   {boardName}
                 </Flex>

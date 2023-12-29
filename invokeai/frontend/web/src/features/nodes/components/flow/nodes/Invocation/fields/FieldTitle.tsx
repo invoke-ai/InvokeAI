@@ -19,17 +19,15 @@ const FieldTitle = forwardRef((props: Props, ref) => {
   return (
     <Flex
       ref={ref}
-      sx={{
-        position: 'relative',
-        overflow: 'hidden',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        gap: 1,
-        h: 'full',
-        w: 'full',
-      }}
+      position="relative"
+      overflow="hidden"
+      alignItems="center"
+      justifyContent="flex-start"
+      gap={1}
+      h="full"
+      w="full"
     >
-      <InvText sx={{ fontWeight: isMissingInput ? 'bold' : 'normal' }}>
+      <InvText fontWeight={isMissingInput ? 'bold' : 'normal'}>
         {label || fieldTemplateTitle}
       </InvText>
     </Flex>

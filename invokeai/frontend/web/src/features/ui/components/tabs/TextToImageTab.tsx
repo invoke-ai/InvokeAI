@@ -6,20 +6,13 @@ const TextToImageTab = () => {
   return (
     <Box
       layerStyle="first"
-      sx={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        p: 2,
-        borderRadius: 'base',
-      }}
+      position="relative"
+      w="full"
+      h="full"
+      p={2}
+      borderRadius="base"
     >
-      <Flex
-        sx={{
-          width: '100%',
-          height: '100%',
-        }}
-      >
+      <Flex w="full" h="full">
         <CurrentImageDisplay />
       </Flex>
     </Box>

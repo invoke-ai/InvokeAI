@@ -93,10 +93,7 @@ const BoardContextMenu = ({
 
   const renderMenuFunc = useCallback(
     () => (
-      <InvMenuList
-        sx={{ visibility: 'visible !important' }}
-        onContextMenu={skipEvent}
-      >
+      <InvMenuList visibility="visible !important" onContextMenu={skipEvent}>
         <InvMenuGroup title={boardName}>
           <InvMenuItem
             icon={<FaPlus />}

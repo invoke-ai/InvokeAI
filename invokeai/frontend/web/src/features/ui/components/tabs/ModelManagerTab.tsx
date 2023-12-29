@@ -52,18 +52,22 @@ const ModelManagerTab = () => {
       isLazy
       variant="line"
       layerStyle="first"
-      sx={{ w: 'full', h: 'full', p: 4, gap: 4, borderRadius: 'base' }}
+      w="full"
+      h="full"
+      p={4}
+      gap={4}
+      borderRadius="base"
     >
       <TabList>
         {tabs.map((tab) => (
-          <Tab sx={{ borderTopRadius: 'base' }} key={tab.id}>
+          <Tab borderTopRadius="base" key={tab.id}>
             {tab.label}
           </Tab>
         ))}
       </TabList>
-      <TabPanels sx={{ w: 'full', h: 'full' }}>
+      <TabPanels w="full" h="full">
         {tabs.map((tab) => (
-          <TabPanel sx={{ w: 'full', h: 'full' }} key={tab.id}>
+          <TabPanel w="full" h="full" key={tab.id}>
             {tab.content}
           </TabPanel>
         ))}

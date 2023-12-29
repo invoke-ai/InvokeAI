@@ -110,25 +110,18 @@ export default function FoundModelsList() {
     return models.map((model) => {
       return (
         <Flex
-          sx={{
-            p: 4,
-            gap: 4,
-            alignItems: 'center',
-            borderRadius: 4,
-            bg: 'base.800',
-          }}
           key={model}
+          p={4}
+          gap={4}
+          alignItems="center"
+          borderRadius={4}
+          bg="base.800"
         >
-          <Flex w="100%" sx={{ flexDirection: 'column', minW: '25%' }}>
-            <InvText sx={{ fontWeight: 'semibold' }}>
+          <Flex w="full" minW="25%" flexDir="column">
+            <InvText fontWeight="semibold">
               {model.split('\\').slice(-1)[0]}
             </InvText>
-            <InvText
-              sx={{
-                fontSize: 'sm',
-                color: 'base.400',
-              }}
-            >
+            <InvText fontSize="sm" color="base.400">
               {model}
             </InvText>
           </Flex>
@@ -150,13 +143,11 @@ export default function FoundModelsList() {
             </Flex>
           ) : (
             <InvText
-              sx={{
-                fontWeight: 'semibold',
-                p: 2,
-                borderRadius: 4,
-                color: 'blue.100',
-                bg: 'blue.600',
-              }}
+              fontWeight="semibold"
+              p={2}
+              borderRadius={4}
+              color="blue.100"
+              bg="blue.600"
             >
               {t('common.installed')}
             </InvText>
@@ -174,15 +165,13 @@ export default function FoundModelsList() {
     if (!foundModels || foundModels.length === 0) {
       return (
         <Flex
-          sx={{
-            w: 'full',
-            h: 'full',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: 96,
-            userSelect: 'none',
-            bg: 'base.900',
-          }}
+          w="full"
+          h="full"
+          justifyContent="center"
+          alignItems="center"
+          height={96}
+          userSelect="none"
+          bg="base.900"
         >
           <InvText variant="subtext">{t('modelManager.noModels')}</InvText>
         </Flex>
@@ -190,27 +179,15 @@ export default function FoundModelsList() {
     }
 
     return (
-      <Flex
-        sx={{
-          flexDirection: 'column',
-          gap: 2,
-          w: '100%',
-          minW: '50%',
-        }}
-      >
+      <Flex flexDirection="column" gap={2} w="100%" minW="50%">
         <InvControl label={t('modelManager.search')}>
           <InvInput onChange={handleSearchFilter} />
         </InvControl>
         <Flex p={2} gap={2}>
-          <InvText sx={{ fontWeight: 'semibold' }}>
+          <InvText fontWeight="semibold">
             {t('modelManager.modelsFound')}: {foundModels.length}
           </InvText>
-          <InvText
-            sx={{
-              fontWeight: 'semibold',
-              color: 'blue.200',
-            }}
-          >
+          <InvText fontWeight="semibold" color="blue.200">
             {t('common.notInstalled')}: {filteredModels.length}
           </InvText>
         </Flex>

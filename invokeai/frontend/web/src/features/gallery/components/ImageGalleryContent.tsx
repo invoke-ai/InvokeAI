@@ -50,22 +50,18 @@ const ImageGalleryContent = () => {
   return (
     <VStack
       layerStyle="first"
-      sx={{
-        flexDirection: 'column',
-        h: 'full',
-        w: 'full',
-        borderRadius: 'base',
-        p: 2,
-      }}
+      flexDirection="column"
+      h="full"
+      w="full"
+      borderRadius="base"
+      p={2}
     >
-      <Box sx={{ w: 'full' }}>
+      <Box w="full">
         <Flex
           ref={resizeObserverRef}
-          sx={{
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
-          }}
+          alignItems="center"
+          justifyContent="space-between"
+          gap={2}
         >
           <GalleryBoardName
             isOpen={isBoardListOpen}
@@ -78,18 +74,12 @@ const ImageGalleryContent = () => {
         </Box>
       </Box>
       <Flex ref={galleryGridRef} direction="column" gap={2} h="full" w="full">
-        <Flex
-          sx={{
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
-          }}
-        >
+        <Flex alignItems="center" justifyContent="space-between" gap={2}>
           <Tabs
             index={galleryView === 'images' ? 0 : 1}
             variant="unstyled"
             size="sm"
-            sx={{ w: 'full' }}
+            w="full"
           >
             <TabList>
               <InvButtonGroup w="full">
@@ -98,9 +88,7 @@ const ImageGalleryContent = () => {
                   size="sm"
                   isChecked={galleryView === 'images'}
                   onClick={handleClickImages}
-                  sx={{
-                    w: 'full',
-                  }}
+                  w="full"
                   leftIcon={<FaImages />}
                   data-testid="images-tab"
                 >
@@ -111,9 +99,7 @@ const ImageGalleryContent = () => {
                   size="sm"
                   isChecked={galleryView === 'assets'}
                   onClick={handleClickAssets}
-                  sx={{
-                    w: 'full',
-                  }}
+                  w="full"
                   leftIcon={<FaServer />}
                   data-testid="assets-tab"
                 >

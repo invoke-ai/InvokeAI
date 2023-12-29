@@ -29,15 +29,13 @@ const UnifiedCanvasTab = () => {
       layerStyle="first"
       ref={setDroppableRef}
       tabIndex={-1}
-      sx={{
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 4,
-        p: 2,
-        borderRadius: 'base',
-        w: 'full',
-        h: 'full',
-      }}
+      flexDirection="column"
+      alignItems="center"
+      gap={4}
+      p={2}
+      borderRadius="base"
+      w="full"
+      h="full"
     >
       <IAICanvasToolbar />
       <IAICanvas />

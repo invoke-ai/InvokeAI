@@ -14,8 +14,17 @@ import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import type { AnimationProps} from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import type {
+  CSSProperties} from 'react';
+import {
+  memo,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
@@ -128,13 +137,11 @@ const CurrentImagePreview = () => {
     <Flex
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}
-      sx={{
-        width: 'full',
-        height: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-      }}
+      width="full"
+      height="full"
+      alignItems="center"
+      justifyContent="center"
+      position="relative"
     >
       {hasDenoiseProgress && shouldShowProgressInViewer ? (
         <ProgressImage />
@@ -158,13 +165,11 @@ const CurrentImagePreview = () => {
       )}
       {shouldShowImageDetails && imageDTO && (
         <Box
-          sx={{
-            position: 'absolute',
-            top: '0',
-            width: 'full',
-            height: 'full',
-            borderRadius: 'base',
-          }}
+          position="absolute"
+          top="0"
+          width="full"
+          height="full"
+          borderRadius="base"
         >
           <ImageMetadataViewer image={imageDTO} />
         </Box>
@@ -173,24 +178,10 @@ const CurrentImagePreview = () => {
         {!shouldShowImageDetails && imageDTO && shouldShowNextPrevButtons && (
           <motion.div
             key="nextPrevButtons"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.1 },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 0.1 },
-            }}
-            style={{
-              position: 'absolute',
-              top: '0',
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none',
-            }}
+            initial={initial}
+            animate={animate}
+            exit={exit}
+            style={motionStyles}
           >
             <NextPrevImageButtons />
           </motion.div>
@@ -201,3 +192,22 @@ const CurrentImagePreview = () => {
 };
 
 export default memo(CurrentImagePreview);
+
+const initial: AnimationProps['initial'] = {
+  opacity: 0,
+};
+const animate: AnimationProps['animate'] = {
+  opacity: 1,
+  transition: { duration: 0.1 },
+};
+const exit: AnimationProps['exit'] = {
+  opacity: 0,
+  transition: { duration: 0.1 },
+};
+const motionStyles: CSSProperties = {
+  position: 'absolute',
+  top: '0',
+  width: '100%',
+  height: '100%',
+  pointerEvents: 'none',
+};

@@ -18,7 +18,7 @@ import { memo, useCallback, useMemo } from 'react';
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
   selected: boolean;
-  width?: NonNullable<ChakraProps['sx']>['w'];
+  width?: ChakraProps['w'];
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
@@ -65,45 +65,39 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       onMouseEnter={handleMouseOver}
       onMouseLeave={handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
-      sx={{
-        h: 'full',
-        position: 'relative',
-        borderRadius: 'base',
-        w: width ?? NODE_WIDTH,
-        transitionProperty: 'common',
-        transitionDuration: '0.1s',
-        cursor: 'grab',
-        opacity,
-      }}
+      h="full"
+      position="relative"
+      borderRadius="base"
+      w={width ? width : NODE_WIDTH}
+      transitionProperty="common"
+      transitionDuration="0.1s"
+      cursor="grab"
+      opacity={opacity}
     >
       <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          insetInlineEnd: 0,
-          bottom: 0,
-          insetInlineStart: 0,
-          borderRadius: 'base',
-          pointerEvents: 'none',
-          shadow: `${shadowsXl}, ${shadowsBase}, ${shadowsBase}`,
-          zIndex: -1,
-        }}
+        position="absolute"
+        top={0}
+        insetInlineEnd={0}
+        bottom={0}
+        insetInlineStart={0}
+        borderRadius="base"
+        pointerEvents="none"
+        shadow={`${shadowsXl}, ${shadowsBase}, ${shadowsBase}`}
+        zIndex={-1}
       />
       <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          insetInlineEnd: 0,
-          bottom: 0,
-          insetInlineStart: 0,
-          borderRadius: 'md',
-          pointerEvents: 'none',
-          transitionProperty: 'common',
-          transitionDuration: '0.1s',
-          opacity: 0.7,
-          shadow: isInProgress ? nodeInProgress : undefined,
-          zIndex: -1,
-        }}
+        position="absolute"
+        top={0}
+        insetInlineEnd={0}
+        bottom={0}
+        insetInlineStart={0}
+        borderRadius="md"
+        pointerEvents="none"
+        transitionProperty="common"
+        transitionDuration="0.1s"
+        opacity={0.7}
+        shadow={isInProgress ? nodeInProgress : undefined}
+        zIndex={-1}
       />
       {children}
       <NodeSelectionOverlay isSelected={selected} isHovered={isMouseOverNode} />

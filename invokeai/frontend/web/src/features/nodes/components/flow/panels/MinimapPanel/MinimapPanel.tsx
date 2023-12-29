@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import { chakra, Flex } from '@chakra-ui/react';
 import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -6,26 +7,28 @@ import { MiniMap } from 'reactflow';
 
 const ChakraMiniMap = chakra(MiniMap);
 
+const minimapStyles: SystemStyleObject = {
+  m: '0 !important',
+  borderRadius: 'base',
+  backgroundColor: 'base.500 !important',
+  svg: {
+    borderRadius: 'inherit',
+  },
+};
+
 const MinimapPanel = () => {
   const shouldShowMinimapPanel = useAppSelector(
     (state: RootState) => state.nodes.shouldShowMinimapPanel
   );
 
   return (
-    <Flex sx={{ gap: 2, position: 'absolute', bottom: 2, insetInlineEnd: 2 }}>
+    <Flex gap={2} position="absolute" bottom={2} insetInlineEnd={2}>
       {shouldShowMinimapPanel && (
         <ChakraMiniMap
           pannable
           zoomable
           nodeBorderRadius={15}
-          sx={{
-            m: '0 !important',
-            borderRadius: 'base',
-            backgroundColor: 'base.500 !important',
-            svg: {
-              borderRadius: 'inherit',
-            },
-          }}
+          sx={minimapStyles}
           nodeColor="var(--invokeai-colors-blue-600)"
           maskColor="var(--invokeai-colors-blackAlpha-600)"
         />

@@ -1,4 +1,8 @@
-import type { ChakraProps, FlexProps } from '@chakra-ui/react';
+import type {
+  ChakraProps,
+  FlexProps,
+  SystemStyleObject,
+} from '@chakra-ui/react';
 import { Flex, Icon, Image } from '@chakra-ui/react';
 import {
   IAILoadingImageFallback,
@@ -17,7 +21,7 @@ import type {
   ReactNode,
   SyntheticEvent,
 } from 'react';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FaImage, FaUpload } from 'react-icons/fa';
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
@@ -25,14 +29,7 @@ import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
 import SelectionOverlay from './SelectionOverlay';
 
-const defaultUploadElement = (
-  <Icon
-    as={FaUpload}
-    sx={{
-      boxSize: 16,
-    }}
-  />
-);
+const defaultUploadElement = <Icon as={FaUpload} boxSize={16} />;
 
 const defaultNoContentFallback = <IAINoContentFallback icon={FaImage} />;
 
@@ -115,16 +112,29 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     isDisabled: isUploadDisabled,
   });
 
-  const uploadButtonStyles = isUploadDisabled
-    ? {}
-    : {
+  const uploadButtonStyles = useMemo(() => {
+    const styles: SystemStyleObject = {
+      minH: minSize,
+      w: 'full',
+      h: 'full',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 'base',
+      transitionProperty: 'common',
+      transitionDuration: '0.1s',
+      color: 'base.500',
+    };
+    if (!isUploadDisabled) {
+      Object.assign(styles, {
         cursor: 'pointer',
         bg: 'base.700',
         _hover: {
           bg: 'base.650',
           color: 'base.300',
         },
-      };
+      });
+    }
+  }, [isUploadDisabled, minSize]);
 
   return (
     <ImageContextMenu imageDTO={imageDTO}>
@@ -133,27 +143,23 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           ref={ref}
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
-          sx={{
-            width: 'full',
-            height: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            minW: minSize ? minSize : undefined,
-            minH: minSize ? minSize : undefined,
-            userSelect: 'none',
-            cursor: isDragDisabled || !imageDTO ? 'default' : 'pointer',
-          }}
+          width="full"
+          height="full"
+          alignItems="center"
+          justifyContent="center"
+          position="relative"
+          minW={minSize ? minSize : undefined}
+          minH={minSize ? minSize : undefined}
+          userSelect="none"
+          cursor={isDragDisabled || !imageDTO ? 'default' : 'pointer'}
         >
           {imageDTO && (
             <Flex
-              sx={{
-                w: 'full',
-                h: 'full',
-                position: fitContainer ? 'absolute' : 'relative',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              w="full"
+              h="full"
+              position={fitContainer ? 'absolute' : 'relative'}
+              alignItems="center"
+              justifyContent="center"
             >
               <Image
                 src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
@@ -168,14 +174,12 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 }
                 onError={onError}
                 draggable={false}
-                sx={{
-                  w: imageDTO.width,
-                  objectFit: 'contain',
-                  maxW: 'full',
-                  maxH: 'full',
-                  borderRadius: 'base',
-                  ...imageSx,
-                }}
+                w={imageDTO.width}
+                objectFit="contain"
+                maxW="full"
+                maxH="full"
+                borderRadius="base"
+                sx={imageSx}
                 data-testid={dataTestId}
               />
               {withMetadataOverlay && (
@@ -189,21 +193,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           )}
           {!imageDTO && !isUploadDisabled && (
             <>
-              <Flex
-                sx={{
-                  minH: minSize,
-                  w: 'full',
-                  h: 'full',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: 'base',
-                  transitionProperty: 'common',
-                  transitionDuration: '0.1s',
-                  color: 'base.500',
-                  ...uploadButtonStyles,
-                }}
-                {...getUploadButtonProps()}
-              >
+              <Flex sx={uploadButtonStyles} {...getUploadButtonProps()}>
                 <input {...getUploadInputProps()} />
                 {uploadElement}
               </Flex>
