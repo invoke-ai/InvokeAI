@@ -1,26 +1,20 @@
 import { Flex } from '@chakra-ui/layout';
 import { Portal } from '@chakra-ui/portal';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import type { RefObject } from 'react';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdPhotoLibrary } from 'react-icons/md';
-import type { ImperativePanelHandle } from 'react-resizable-panels';
 
 type Props = {
   isGalleryCollapsed: boolean;
-  galleryPanelRef: RefObject<ImperativePanelHandle>;
+  expandGallery: () => void;
 };
 
 const FloatingGalleryButton = ({
   isGalleryCollapsed,
-  galleryPanelRef,
+  expandGallery,
 }: Props) => {
   const { t } = useTranslation();
-
-  const handleShowGallery = useCallback(() => {
-    galleryPanelRef.current?.expand();
-  }, [galleryPanelRef]);
 
   if (!isGalleryCollapsed) {
     return null;
@@ -38,7 +32,7 @@ const FloatingGalleryButton = ({
         <InvIconButton
           tooltip="Show Gallery (G)"
           aria-label={t('accessibility.showGalleryPanel')}
-          onClick={handleShowGallery}
+          onClick={expandGallery}
           icon={<MdPhotoLibrary />}
           p={0}
           px={3}

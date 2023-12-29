@@ -36,7 +36,6 @@ const ImageToImageTab = () => {
         direction="horizontal"
         style={panelGroupStyles}
         storage={panelStorage}
-        units="percentages"
       >
         <Panel
           id="imageTab.content.initImage"
