@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useModelInvSelect } from 'common/components/InvSelect/useModelInvSelect';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,9 @@ import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 const selector = createMemoizedSelector(stateSelector, (state) => ({
   model: state.sdxl.refinerModel,
 }));
+
+const optionsFilter = (model: MainModelConfigEntity) =>
+  model.base_model === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -37,11 +40,12 @@ const ParamSDXLRefinerModelSelect = () => {
     [dispatch]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
+    useModelInvSelect({
       modelEntities: data,
       onChange: _onChange,
       selectedModel: model,
       isLoading,
+      optionsFilter,
     });
   return (
     <InvControl
