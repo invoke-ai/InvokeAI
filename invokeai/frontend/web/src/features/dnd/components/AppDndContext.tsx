@@ -19,7 +19,7 @@ import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties, PropsWithChildren } from 'react';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 
 import { DndContextTypesafe } from './DndContextTypesafe';
 import DragPreview from './DragPreview';
@@ -78,6 +78,7 @@ const AppDndContext = (props: PropsWithChildren) => {
   const sensors = useSensors(mouseSensor, touchSensor);
 
   const scaledModifier = useScaledModifer();
+  const modifiers = useMemo(() => [scaledModifier], [scaledModifier]);
 
   return (
     <DndContextTypesafe
@@ -90,7 +91,7 @@ const AppDndContext = (props: PropsWithChildren) => {
       {props.children}
       <DragOverlay
         dropAnimation={null}
-        modifiers={[scaledModifier]}
+        modifiers={modifiers}
         style={dragOverlayStyles}
       >
         <AnimatePresence>

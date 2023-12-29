@@ -184,6 +184,9 @@ dependencies:
     version: 2.1.0(zod@3.22.4)
 
 devDependencies:
+  '@arthurgeron/eslint-plugin-react-usememo':
+    specifier: ^2.2.1
+    version: 2.2.1
   '@chakra-ui/cli':
     specifier: ^2.4.1
     version: 2.4.1
@@ -337,6 +340,13 @@ packages:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.3
       '@jridgewell/trace-mapping': 0.3.20
+    dev: true
+
+  /@arthurgeron/eslint-plugin-react-usememo@2.2.1:
+    resolution: {integrity: sha512-XMYGogzqQYR7PC4F4ve+loBTrvsE7AHnhiBjUTBMW5hbFecbg6ReTQwj36WsV4vRXNnDRD3vfwkO4fH8WHcOog==}
+    dependencies:
+      minimatch: 9.0.3
+      uuid: 9.0.1
     dev: true
 
   /@aw-web-design/x-default-browser@1.4.126:

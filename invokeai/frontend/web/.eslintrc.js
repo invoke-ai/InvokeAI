@@ -30,6 +30,8 @@ module.exports = {
     'unused-imports',
     'simple-import-sort',
     'eslint-plugin-import',
+    // These rules are too strict for normal usage, but are useful for optimizing rerenders
+    // '@arthurgeron/react-usememo',
   ],
   root: true,
   rules: {
@@ -60,6 +62,18 @@ module.exports = {
         argsIgnorePattern: '^_',
       },
     ],
+    // These rules are too strict for normal usage, but are useful for optimizing rerenders
+    // '@arthurgeron/react-usememo/require-usememo': [
+    //   'warn',
+    //   {
+    //     strict: false,
+    //     checkHookReturnObject: false,
+    //     fix: { addImports: true },
+    //     checkHookCalls: false,
+
+    //   },
+    // ],
+    // '@arthurgeron/react-usememo/require-memo': 'warn',
     '@typescript-eslint/ban-ts-comment': 'warn',
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-empty-interface': [

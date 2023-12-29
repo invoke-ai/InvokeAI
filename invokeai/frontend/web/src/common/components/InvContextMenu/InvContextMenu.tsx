@@ -12,7 +12,12 @@
  * - increment it in `onPaneClick` (and wherever else we want to close the menu)
  * - `useEffect()` to close the menu when `globalContextMenuCloseTrigger` changes
  */
-import type { MenuButtonProps, MenuProps, PortalProps } from '@chakra-ui/react';
+import type {
+  ChakraProps,
+  MenuButtonProps,
+  MenuProps,
+  PortalProps,
+} from '@chakra-ui/react';
 import { Portal, useEventListener } from '@chakra-ui/react';
 import { InvMenu, InvMenuButton } from 'common/components/InvMenu/wrapper';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
@@ -102,7 +107,7 @@ export const InvContextMenu = typedMemo(
                 cursor="default"
                 bg="transparent"
                 size="sm"
-                _hover={{ bg: 'transparent' }}
+                _hover={_hover}
                 {...props.menuButtonProps}
               />
               {props.renderMenu()}
@@ -113,6 +118,8 @@ export const InvContextMenu = typedMemo(
     );
   }
 );
+
+const _hover: ChakraProps['_hover'] = { bg: 'transparent' };
 
 Object.assign(InvContextMenu, {
   displayName: 'InvContextMenu',

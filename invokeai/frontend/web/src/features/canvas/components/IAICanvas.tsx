@@ -175,6 +175,8 @@ const IAICanvas = () => {
     [stageCursor]
   );
 
+  const scale= useMemo(()=>({x: stageScale, y: stageScale}),[stageScale])
+
   return (
     <Flex
       id="canvas-container"
@@ -193,7 +195,7 @@ const IAICanvas = () => {
           y={stageCoordinates.y}
           width={stageDimensions.width}
           height={stageDimensions.height}
-          scale={{ x: stageScale, y: stageScale }}
+          scale={scale}
           onTouchStart={handleMouseDown}
           onTouchMove={handleMouseMove}
           onTouchEnd={handleMouseUp}

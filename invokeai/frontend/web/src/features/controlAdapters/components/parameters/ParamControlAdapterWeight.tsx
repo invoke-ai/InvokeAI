@@ -42,10 +42,12 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
         min={0}
         max={2}
         step={0.01}
-        marks={[0, 1, 2]}
+        marks={marks}
       />
     </InvControl>
   );
 };
 
 export default memo(ParamControlAdapterWeight);
+
+const marks = [0, 1, 2];

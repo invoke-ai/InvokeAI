@@ -120,6 +120,7 @@
     "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {
+    "@arthurgeron/eslint-plugin-react-usememo": "^2.2.1",
     "@chakra-ui/cli": "^2.4.1",
     "@storybook/addon-docs": "^7.6.6",
     "@storybook/addon-essentials": "^7.6.6",

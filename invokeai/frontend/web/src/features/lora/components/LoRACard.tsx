@@ -62,7 +62,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           max={2}
           step={0.01}
           onReset={onReset}
-          marks={[-1, 0, 1, 2]}
+          marks={marks}
         />
         <InvNumberInput
           value={lora.weight}
@@ -79,3 +79,5 @@ export const LoRACard = memo((props: LoRACardProps) => {
 });
 
 LoRACard.displayName = 'LoRACard';
+
+const marks = [-1, 0, 1, 2];

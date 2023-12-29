@@ -1,11 +1,14 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
+import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setShouldFitToWidthHeight } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const labelProps: InvLabelProps = { flexGrow: 1 };
 
 export default function ImageToImageFit() {
   const dispatch = useAppDispatch();
@@ -26,7 +29,7 @@ export default function ImageToImageFit() {
   return (
     <InvControl
       label={t('parameters.imageFit')}
-      labelProps={{ flexGrow: 1 }}
+      labelProps={labelProps}
       w="full"
     >
       <InvSwitch

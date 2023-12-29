@@ -55,10 +55,7 @@ const EditableNodeTitle = ({ nodeId, title }: Props) => {
         fontWeight="semibold"
       >
         <EditablePreview noOfLines={1} />
-        <EditableInput
-          className="nodrag"
-          _focusVisible={{ boxShadow: 'none' }}
-        />
+        <EditableInput className="nodrag" />
       </Editable>
     </Flex>
   );

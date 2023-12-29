@@ -1,5 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
+import type { InvNumberInputFieldProps } from 'common/components/InvNumberInput/types';
 import { setIterations } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
@@ -23,14 +24,16 @@ const ParamIterations = () => {
       value={iterations}
       h="full"
       w="216px"
-      numberInputFieldProps={{
-        ps: '144px',
-        borderInlineStartRadius: 'base',
-        h: 'full',
-        textAlign: 'center',
-      }}
+      numberInputFieldProps={numberInputFieldProps}
     />
   );
 };
 
 export default memo(ParamIterations);
+
+const numberInputFieldProps: InvNumberInputFieldProps = {
+  ps: '144px',
+  borderInlineStartRadius: 'base',
+  h: 'full',
+  textAlign: 'center',
+};

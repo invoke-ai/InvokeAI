@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
@@ -220,13 +221,13 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
           onClick={handleSaveControlImage}
           icon={controlImage ? <FaSave size={16} /> : undefined}
           tooltip={t('controlnet.saveControlImage')}
-          styleOverrides={{ marginTop: 6 }}
+          styleOverrides={saveControlImageStyleOverrides}
         />
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
           icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
           tooltip={t('controlnet.setControlImageDimensions')}
-          styleOverrides={{ marginTop: 12 }}
+          styleOverrides={setControlImageDimensionsStyleOverrides}
         />
       </>
 
@@ -251,3 +252,6 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 };
 
 export default memo(ControlAdapterImagePreview);
+
+const saveControlImageStyleOverrides: SystemStyleObject = { mt: 6 };
+const setControlImageDimensionsStyleOverrides: SystemStyleObject = { mt: 12 };
