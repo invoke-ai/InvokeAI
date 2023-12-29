@@ -1,4 +1,5 @@
 import {
+  forwardRef,
   RangeSlider as ChakraRangeSlider,
   RangeSliderFilledTrack as ChakraRangeSliderFilledTrack,
   RangeSliderThumb as ChakraRangeSliderThumb,
@@ -16,7 +17,7 @@ import { InvRangeSliderMark } from './InvRangeSliderMark';
 import type { InvRangeSliderProps } from './types';
 
 export const InvRangeSlider = memo(
-  forwardRef<InvRangeSliderProps, ChakraRangeSlider>(
+  forwardRef<InvRangeSliderProps, typeof ChakraRangeSlider>(
     (props: InvRangeSliderProps, ref) => {
       const {
         value,

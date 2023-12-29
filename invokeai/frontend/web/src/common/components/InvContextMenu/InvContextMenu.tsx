@@ -16,7 +16,8 @@ import type { MenuButtonProps, MenuProps, PortalProps } from '@chakra-ui/react';
 import { Portal, useEventListener } from '@chakra-ui/react';
 import { InvMenu, InvMenuButton } from 'common/components/InvMenu/wrapper';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { typedMemo } from 'common/util/typedMemo';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface InvContextMenuProps<T extends HTMLElement = HTMLDivElement> {
   renderMenu: () => JSX.Element | null;
@@ -26,7 +27,7 @@ export interface InvContextMenuProps<T extends HTMLElement = HTMLDivElement> {
   menuButtonProps?: MenuButtonProps;
 }
 
-export const InvContextMenu = memo(
+export const InvContextMenu = typedMemo(
   <T extends HTMLElement = HTMLElement>(props: InvContextMenuProps<T>) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isRendered, setIsRendered] = useState(false);
@@ -113,4 +114,6 @@ export const InvContextMenu = memo(
   }
 );
 
-InvContextMenu.displayName = 'InvContextMenu';
+Object.assign(InvContextMenu, {
+  displayName: 'InvContextMenu',
+});
