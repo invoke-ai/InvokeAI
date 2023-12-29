@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+
 import { appConfig } from './config/vite.app.config';
 import { packageConfig } from './config/vite.package.config';
 

@@ -1,9 +1,10 @@
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   ImageNSFWBlurInvocation,
   LatentsToImageInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { LATENTS_TO_IMAGE, NSFW_CHECKER } from './constants';
 
 export const addNSFWCheckerToGraph = (

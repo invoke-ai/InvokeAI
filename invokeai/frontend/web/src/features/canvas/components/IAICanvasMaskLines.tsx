@@ -2,7 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
-import { GroupConfig } from 'konva/lib/Group';
+import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
 import { Group, Line } from 'react-konva';
 

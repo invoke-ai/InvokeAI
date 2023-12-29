@@ -1,13 +1,17 @@
 import { Flex, Grid } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
+import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { $headerComponent } from 'app/store/nanostores/headerComponent';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { PartialAppConfig } from 'app/types/invokeai';
+import type { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
+import { useClearStorage } from 'common/hooks/useClearStorage';
+import { useGlobalModifiersInit } from 'common/hooks/useGlobalModifiers';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
+import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import SiteHeader from 'features/system/components/SiteHeader';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
@@ -16,12 +20,10 @@ import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
-import GlobalHotkeys from './GlobalHotkeys';
 import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
-import { useSocketIO } from 'app/hooks/useSocketIO';
-import { useClearStorage } from 'common/hooks/useClearStorage';
 
 const DEFAULT_CONFIG = {};
 
@@ -41,6 +43,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
 
   // singleton!
   useSocketIO();
+  useGlobalModifiersInit();
 
   const handleReset = useCallback(() => {
     clearStorage();
@@ -72,23 +75,9 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
     >
       <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
         <ImageUploader>
-          <Grid
-            sx={{
-              gap: 4,
-              p: 4,
-              gridAutoRows: 'min-content auto',
-              w: 'full',
-              h: 'full',
-            }}
-          >
+          <Grid gap={4} p={4} gridAutoRows="min-content auto" w="full" h="full">
             {headerComponent || <SiteHeader />}
-            <Flex
-              sx={{
-                gap: 4,
-                w: 'full',
-                h: 'full',
-              }}
-            >
+            <Flex gap={4} w="full" h="full">
               <InvokeTabs />
             </Flex>
           </Grid>
@@ -96,8 +85,8 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       </Grid>
       <DeleteImageModal />
       <ChangeBoardModal />
+      <DynamicPromptsModal />
       <Toaster />
-      <GlobalHotkeys />
       <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );

@@ -1,14 +1,15 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import {
+import type {
   DenoiseLatentsInvocation,
-  ESRGANInvocation,
   Edge,
+  ESRGANInvocation,
   LatentsToImageInvocation,
   NoiseInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import {
   DENOISE_LATENTS,
   DENOISE_LATENTS_HRF,
@@ -113,15 +114,15 @@ export const addHrfToGraph = (
 ): void => {
   // Double check hrf is enabled.
   if (
-    !state.generation.hrfEnabled ||
-    state.config.disabledSDFeatures.includes('hrf') ||
-    state.generation.model?.model_type === 'onnx' // TODO: ONNX support
+    !state.hrf.hrfEnabled ||
+    state.config.disabledSDFeatures.includes('hrf')
   ) {
     return;
   }
   const log = logger('txt2img');
 
-  const { vae, hrfStrength, hrfEnabled, hrfMethod } = state.generation;
+  const { vae } = state.generation;
+  const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
   const isAutoVae = !vae;
   const width = state.generation.width;
   const height = state.generation.height;
@@ -309,7 +310,7 @@ export const addHrfToGraph = (
     cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
     scheduler: originalDenoiseLatentsNode?.scheduler,
     steps: originalDenoiseLatentsNode?.steps,
-    denoising_start: 1 - state.generation.hrfStrength,
+    denoising_start: 1 - hrfStrength,
     denoising_end: 1,
   };
   graph.edges.push(

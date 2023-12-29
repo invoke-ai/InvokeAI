@@ -6,7 +6,7 @@ import {
   COLOR_PICKER_SIZE,
   COLOR_PICKER_STROKE_RADIUS,
 } from 'features/canvas/util/constants';
-import { GroupConfig } from 'konva/lib/Group';
+import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
 import { Circle, Group } from 'react-konva';
 

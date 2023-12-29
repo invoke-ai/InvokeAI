@@ -1,6 +1,6 @@
-import { AnyListenerPredicate } from '@reduxjs/toolkit';
+import type { AnyListenerPredicate } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
 import {
   controlAdapterAutoConfigToggled,
@@ -10,8 +10,9 @@ import {
   controlAdapterProcessortTypeChanged,
   selectControlAdapterById,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { startAppListening } from '..';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+
+import { startAppListening } from '..';
 
 type AnyControlAdapterParamChangeAction =
   | ReturnType<typeof controlAdapterProcessorParamsChanged>

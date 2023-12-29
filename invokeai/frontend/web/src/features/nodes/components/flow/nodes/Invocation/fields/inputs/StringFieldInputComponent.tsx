@@ -1,13 +1,15 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIInput from 'common/components/IAIInput';
-import IAITextarea from 'common/components/IAITextarea';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
-import {
+import type {
   StringFieldInputInstance,
   StringFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { FieldComponentProps } from './types';
-import { ChangeEvent, memo, useCallback } from 'react';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+
+import type { FieldComponentProps } from './types';
 
 const StringFieldInputComponent = (
   props: FieldComponentProps<StringFieldInputInstance, StringFieldInputTemplate>
@@ -30,7 +32,7 @@ const StringFieldInputComponent = (
 
   if (fieldTemplate.ui_component === 'textarea') {
     return (
-      <IAITextarea
+      <InvTextarea
         className="nodrag"
         onChange={handleValueChanged}
         value={field.value}
@@ -40,7 +42,7 @@ const StringFieldInputComponent = (
     );
   }
 
-  return <IAIInput onChange={handleValueChanged} value={field.value} />;
+  return <InvInput onChange={handleValueChanged} value={field.value} />;
 };
 
 export default memo(StringFieldInputComponent);

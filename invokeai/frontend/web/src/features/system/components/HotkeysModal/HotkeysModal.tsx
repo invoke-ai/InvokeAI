@@ -1,22 +1,24 @@
+import { Divider, Flex, useDisclosure } from '@chakra-ui/react';
+import { InvAccordionButton } from 'common/components/InvAccordion/InvAccordionButton';
 import {
-  Accordion,
-  AccordionButton,
-  AccordionIcon,
-  AccordionItem,
-  AccordionPanel,
-  Divider,
-  Flex,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  useDisclosure,
-} from '@chakra-ui/react';
-import { ReactElement, cloneElement } from 'react';
+  InvAccordion,
+  InvAccordionIcon,
+  InvAccordionItem,
+  InvAccordionPanel,
+} from 'common/components/InvAccordion/wrapper';
+import {
+  InvModal,
+  InvModalBody,
+  InvModalCloseButton,
+  InvModalContent,
+  InvModalFooter,
+  InvModalHeader,
+  InvModalOverlay,
+} from 'common/components/InvModal/wrapper';
+import type { ReactElement } from 'react';
+import { cloneElement, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import HotkeysModalItem from './HotkeysModalItem';
 
 type HotkeysModalProps = {
@@ -30,7 +32,7 @@ type HotkeyList = {
   hotkey: string;
 };
 
-export default function HotkeysModal({ children }: HotkeysModalProps) {
+const HotkeysModal = ({ children }: HotkeysModalProps) => {
   const {
     isOpen: isHotkeyModalOpen,
     onOpen: onHotkeysModalOpen,
@@ -304,99 +306,101 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       {cloneElement(children, {
         onClick: onHotkeysModalOpen,
       })}
-      <Modal isOpen={isHotkeyModalOpen} onClose={onHotkeysModalClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>{t('hotkeys.keyboardShortcuts')}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <Accordion allowMultiple>
+      <InvModal isOpen={isHotkeyModalOpen} onClose={onHotkeysModalClose}>
+        <InvModalOverlay />
+        <InvModalContent>
+          <InvModalHeader>{t('hotkeys.keyboardShortcuts')}</InvModalHeader>
+          <InvModalCloseButton />
+          <InvModalBody>
+            <InvAccordion allowMultiple>
               <Flex flexDir="column" gap={2}>
-                <AccordionItem>
-                  <AccordionButton>
+                <InvAccordionItem>
+                  <InvAccordionButton>
                     <Flex
                       width="100%"
                       justifyContent="space-between"
                       alignItems="center"
                     >
                       <h2>{t('hotkeys.appHotkeys')}</h2>
-                      <AccordionIcon />
+                      <InvAccordionIcon />
                     </Flex>
-                  </AccordionButton>
-                  <AccordionPanel>
+                  </InvAccordionButton>
+                  <InvAccordionPanel>
                     {renderHotkeyModalItems(appHotkeys)}
-                  </AccordionPanel>
-                </AccordionItem>
+                  </InvAccordionPanel>
+                </InvAccordionItem>
 
-                <AccordionItem>
-                  <AccordionButton>
+                <InvAccordionItem>
+                  <InvAccordionButton>
                     <Flex
                       width="100%"
                       justifyContent="space-between"
                       alignItems="center"
                     >
                       <h2>{t('hotkeys.generalHotkeys')}</h2>
-                      <AccordionIcon />
+                      <InvAccordionIcon />
                     </Flex>
-                  </AccordionButton>
-                  <AccordionPanel>
+                  </InvAccordionButton>
+                  <InvAccordionPanel>
                     {renderHotkeyModalItems(generalHotkeys)}
-                  </AccordionPanel>
-                </AccordionItem>
+                  </InvAccordionPanel>
+                </InvAccordionItem>
 
-                <AccordionItem>
-                  <AccordionButton>
+                <InvAccordionItem>
+                  <InvAccordionButton>
                     <Flex
                       width="100%"
                       justifyContent="space-between"
                       alignItems="center"
                     >
                       <h2>{t('hotkeys.galleryHotkeys')}</h2>
-                      <AccordionIcon />
+                      <InvAccordionIcon />
                     </Flex>
-                  </AccordionButton>
-                  <AccordionPanel>
+                  </InvAccordionButton>
+                  <InvAccordionPanel>
                     {renderHotkeyModalItems(galleryHotkeys)}
-                  </AccordionPanel>
-                </AccordionItem>
+                  </InvAccordionPanel>
+                </InvAccordionItem>
 
-                <AccordionItem>
-                  <AccordionButton>
+                <InvAccordionItem>
+                  <InvAccordionButton>
                     <Flex
                       width="100%"
                       justifyContent="space-between"
                       alignItems="center"
                     >
                       <h2>{t('hotkeys.unifiedCanvasHotkeys')}</h2>
-                      <AccordionIcon />
+                      <InvAccordionIcon />
                     </Flex>
-                  </AccordionButton>
-                  <AccordionPanel>
+                  </InvAccordionButton>
+                  <InvAccordionPanel>
                     {renderHotkeyModalItems(unifiedCanvasHotkeys)}
-                  </AccordionPanel>
-                </AccordionItem>
+                  </InvAccordionPanel>
+                </InvAccordionItem>
 
-                <AccordionItem>
-                  <AccordionButton>
+                <InvAccordionItem>
+                  <InvAccordionButton>
                     <Flex
                       width="100%"
                       justifyContent="space-between"
                       alignItems="center"
                     >
                       <h2>{t('hotkeys.nodesHotkeys')}</h2>
-                      <AccordionIcon />
+                      <InvAccordionIcon />
                     </Flex>
-                  </AccordionButton>
-                  <AccordionPanel>
+                  </InvAccordionButton>
+                  <InvAccordionPanel>
                     {renderHotkeyModalItems(nodesHotkeys)}
-                  </AccordionPanel>
-                </AccordionItem>
+                  </InvAccordionPanel>
+                </InvAccordionItem>
               </Flex>
-            </Accordion>
-          </ModalBody>
-          <ModalFooter />
-        </ModalContent>
-      </Modal>
+            </InvAccordion>
+          </InvModalBody>
+          <InvModalFooter />
+        </InvModalContent>
+      </InvModal>
     </>
   );
-}
+};
+
+export default memo(HotkeysModal);

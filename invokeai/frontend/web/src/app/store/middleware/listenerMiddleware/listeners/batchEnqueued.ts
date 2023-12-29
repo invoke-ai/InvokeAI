@@ -5,7 +5,8 @@ import { zPydanticValidationError } from 'features/system/store/zodSchemas';
 import { t } from 'i18next';
 import { truncate, upperFirst } from 'lodash-es';
 import { queueApi } from 'services/api/endpoints/queue';
-import { TOAST_OPTIONS, theme } from 'theme/theme';
+import { theme, TOAST_OPTIONS } from 'theme/theme';
+
 import { startAppListening } from '..';
 
 const { toast } = createStandaloneToast({

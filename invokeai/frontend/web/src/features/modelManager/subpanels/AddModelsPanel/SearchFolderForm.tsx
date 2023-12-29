@@ -1,17 +1,19 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIInput from 'common/components/IAIInput';
-import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
-import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
 import {
   setAdvancedAddScanModel,
   setSearchFolder,
 } from 'features/modelManager/store/modelManagerSlice';
+import type { CSSProperties } from 'react';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
+import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 
 type SearchFolderForm = {
   folder: string;
@@ -56,46 +58,33 @@ function SearchFolderForm() {
       onSubmit={searchFolderForm.onSubmit((values) =>
         searchFolderFormSubmitHandler(values)
       )}
-      style={{ width: '100%' }}
+      style={formStyles}
     >
-      <Flex
-        sx={{
-          w: '100%',
-          gap: 2,
-          borderRadius: 4,
-          alignItems: 'center',
-        }}
-      >
+      <Flex w="100%" gap={2} borderRadius={4} alignItems="center">
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
-          <Text
-            sx={{
-              fontSize: 'sm',
-              fontWeight: 600,
-              color: 'base.700',
-              minW: 'max-content',
-              _dark: { color: 'base.300' },
-            }}
+          <InvText
+            fontSize="sm"
+            fontWeight="semibold"
+            color="base.300"
+            minW="max-content"
           >
             {t('common.folder')}
-          </Text>
+          </InvText>
           {!searchFolder ? (
-            <IAIInput
+            <InvInput
               w="100%"
               size="md"
               {...searchFolderForm.getInputProps('folder')}
             />
           ) : (
             <Flex
-              sx={{
-                w: '100%',
-                p: 2,
-                px: 4,
-                bg: 'base.300',
-                borderRadius: 4,
-                fontSize: 'sm',
-                fontWeight: 'bold',
-                _dark: { bg: 'base.700' },
-              }}
+              w="100%"
+              p={2}
+              px={4}
+              bg="base.700"
+              borderRadius={4}
+              fontSize="sm"
+              fontWeight="bold"
             >
               {searchFolder}
             </Flex>
@@ -104,7 +93,7 @@ function SearchFolderForm() {
 
         <Flex gap={2}>
           {!searchFolder ? (
-            <IAIIconButton
+            <InvIconButton
               aria-label={t('modelManager.findModels')}
               tooltip={t('modelManager.findModels')}
               icon={<FaSearch />}
@@ -113,7 +102,7 @@ function SearchFolderForm() {
               type="submit"
             />
           ) : (
-            <IAIIconButton
+            <InvIconButton
               aria-label={t('modelManager.scanAgain')}
               tooltip={t('modelManager.scanAgain')}
               icon={<FaSync />}
@@ -123,7 +112,7 @@ function SearchFolderForm() {
             />
           )}
 
-          <IAIIconButton
+          <InvIconButton
             aria-label={t('modelManager.clearCheckpointFolder')}
             tooltip={t('modelManager.clearCheckpointFolder')}
             icon={<FaTrash />}
@@ -139,3 +128,7 @@ function SearchFolderForm() {
 }
 
 export default memo(SearchFolderForm);
+
+const formStyles: CSSProperties = {
+  width: '100%',
+};

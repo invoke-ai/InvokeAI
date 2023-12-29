@@ -1,8 +1,11 @@
-import { UseToastOptions } from '@chakra-ui/react';
-import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { UseToastOptions } from '@chakra-ui/react';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
+import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { startCase } from 'lodash-es';
-import { LogLevelName } from 'roarr';
+import type { LogLevelName } from 'roarr';
 import {
   appSocketConnected,
   appSocketDisconnected,
@@ -17,9 +20,8 @@ import {
   appSocketQueueItemStatusChanged,
   appSocketSessionRetrievalError,
 } from 'services/events/actions';
-import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
-import { makeToast } from 'features/system/util/makeToast';
-import { LANGUAGES, SystemState } from './types';
+
+import type { Language, SystemState } from './types';
 
 export const initialSystemState: SystemState = {
   isInitialized: false,
@@ -66,7 +68,7 @@ export const systemSlice = createSlice({
     ) => {
       state.shouldAntialiasProgressImage = action.payload;
     },
-    languageChanged: (state, action: PayloadAction<keyof typeof LANGUAGES>) => {
+    languageChanged: (state, action: PayloadAction<Language>) => {
       state.language = action.payload;
     },
     shouldUseNSFWCheckerChanged(state, action: PayloadAction<boolean>) {

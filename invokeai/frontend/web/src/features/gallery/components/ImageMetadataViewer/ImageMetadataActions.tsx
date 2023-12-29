@@ -1,18 +1,19 @@
-import {
+import type {
   ControlNetMetadataItem,
   CoreMetadata,
-  LoRAMetadataItem,
   IPAdapterMetadataItem,
+  LoRAMetadataItem,
   T2IAdapterMetadataItem,
 } from 'features/nodes/types/metadata';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { memo, useMemo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   isParameterControlNetModel,
   isParameterLoRAModel,
   isParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {

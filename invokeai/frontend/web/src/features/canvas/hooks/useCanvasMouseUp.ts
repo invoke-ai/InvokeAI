@@ -10,8 +10,9 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { MutableRefObject, useCallback } from 'react';
+import type Konva from 'konva';
+import type { MutableRefObject } from 'react';
+import { useCallback } from 'react';
 
 const selector = createMemoizedSelector(
   [activeTabNameSelector, stateSelector, isStagingSelector],

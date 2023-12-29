@@ -1,5 +1,6 @@
-import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { NonNullableGraph } from 'services/api/types';
+
 import {
   CANVAS_COHERENCE_INPAINT_CREATE_MASK,
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
@@ -33,7 +34,7 @@ export const addVAEToGraph = (
 ): void => {
   const { vae, canvasCoherenceMode } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
-  const { shouldUseSDXLRefiner } = state.sdxl;
+  const { refinerModel } = state.sdxl;
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
@@ -159,7 +160,7 @@ export const addVAEToGraph = (
     }
   }
 
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     if (
       graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
       graph.id === SDXL_CANVAS_OUTPAINT_GRAPH

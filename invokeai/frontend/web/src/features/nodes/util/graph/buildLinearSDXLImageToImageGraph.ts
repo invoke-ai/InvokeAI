@@ -1,10 +1,11 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -55,14 +56,14 @@ export const buildLinearSDXLImageToImageGraph = (
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
+    img2imgStrength: strength,
   } = state.generation;
 
   const {
     positiveStylePrompt,
     negativeStylePrompt,
-    shouldUseSDXLRefiner,
+    refinerModel,
     refinerStart,
-    sdxlImg2ImgDenoisingStrength: strength,
   } = state.sdxl;
 
   /**
@@ -139,10 +140,10 @@ export const buildLinearSDXLImageToImageGraph = (
         cfg_scale,
         scheduler,
         steps,
-        denoising_start: shouldUseSDXLRefiner
+        denoising_start: refinerModel
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        denoising_end: refinerModel ? refinerStart : 1,
         is_intermediate,
       },
       [IMAGE_TO_LATENTS]: {
@@ -363,7 +364,7 @@ export const buildLinearSDXLImageToImageGraph = (
   }
 
   // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;

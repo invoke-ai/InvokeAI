@@ -9,14 +9,7 @@ const WorkflowJSONTab = () => {
   const { t } = useTranslation();
 
   return (
-    <Flex
-      sx={{
-        flexDir: 'column',
-        alignItems: 'flex-start',
-        gap: 2,
-        h: 'full',
-      }}
-    >
+    <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
       <DataViewer data={workflow} label={t('nodes.workflow')} />
     </Flex>
   );

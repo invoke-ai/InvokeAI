@@ -3,9 +3,9 @@ import {
   // useCancelByBatchIdsMutation,
   useClearQueueMutation,
   useEnqueueBatchMutation,
+  usePauseProcessorMutation,
   usePruneQueueMutation,
   useResumeProcessorMutation,
-  usePauseProcessorMutation,
 } from 'services/api/endpoints/queue';
 
 export const useIsQueueMutationInProgress = () => {

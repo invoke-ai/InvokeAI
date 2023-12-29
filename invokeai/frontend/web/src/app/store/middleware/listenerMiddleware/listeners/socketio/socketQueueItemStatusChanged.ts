@@ -4,6 +4,7 @@ import {
   appSocketQueueItemStatusChanged,
   socketQueueItemStatusChanged,
 } from 'services/events/actions';
+
 import { startAppListening } from '../..';
 
 export const addSocketQueueItemStatusChangedEventListener = () => {

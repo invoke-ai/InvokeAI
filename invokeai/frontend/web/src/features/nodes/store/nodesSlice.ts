@@ -1,7 +1,8 @@
-import { createSlice, isAnyOf, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
-import {
+import type {
   BoardFieldValue,
   BooleanFieldValue,
   ColorFieldValue,
@@ -20,6 +21,8 @@ import {
   StringFieldValue,
   T2IAdapterModelFieldValue,
   VAEModelFieldValue,
+} from 'features/nodes/types/field';
+import {
   zBoardFieldValue,
   zBooleanFieldValue,
   zColorFieldValue,
@@ -37,33 +40,37 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import {
+import type {
   AnyNode,
   InvocationTemplate,
+  NodeExecutionState,
+} from 'features/nodes/types/invocation';
+import {
   isInvocationNode,
   isNotesNode,
-  NodeExecutionState,
   zNodeStatus,
 } from 'features/nodes/types/invocation';
 import { cloneDeep, forEach } from 'lodash-es';
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
+import type {
   Connection,
   Edge,
   EdgeChange,
   EdgeRemoveChange,
-  getConnectedEdges,
-  getIncomers,
-  getOutgoers,
   Node,
   NodeChange,
   OnConnectStartParams,
-  SelectionMode,
-  updateEdge,
   Viewport,
   XYPosition,
+} from 'reactflow';
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  getConnectedEdges,
+  getIncomers,
+  getOutgoers,
+  SelectionMode,
+  updateEdge,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import {
@@ -74,8 +81,9 @@ import {
   appSocketQueueItemStatusChanged,
 } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
-import { z } from 'zod';
-import { NodesState } from './types';
+import type { z } from 'zod';
+
+import type { NodesState } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 

@@ -2,6 +2,7 @@ import { modelChanged } from 'features/parameters/store/generationSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { mainModelsAdapter, modelsApi } from 'services/api/endpoints/models';
+
 import { startAppListening } from '..';
 
 export const addTabChangedListener = () => {
@@ -35,12 +36,12 @@ export const addTabChangedListener = () => {
             return;
           }
 
-          // need to filter out all the invalid canvas models (currently sdxl & refiner)
+          // need to filter out all the invalid canvas models (currently refiner & any)
           const validCanvasModels = mainModelsAdapter
             .getSelectors()
             .selectAll(models)
             .filter((model) =>
-              ['sd-1', 'sd-2', 'sxdl'].includes(model.base_model)
+              ['sd-1', 'sd-2', 'sdxl'].includes(model.base_model)
             );
 
           const firstValidCanvasModel = validCanvasModels[0];

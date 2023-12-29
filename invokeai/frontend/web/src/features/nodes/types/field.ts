@@ -1,10 +1,11 @@
 import { z } from 'zod';
+
 import {
   zBoardField,
   zColorField,
   zControlNetModelField,
-  zIPAdapterModelField,
   zImageField,
+  zIPAdapterModelField,
   zLoRAModelField,
   zMainOrONNXModelField,
   zSchedulerField,
@@ -699,6 +700,10 @@ export const isControlNetModelFieldInputTemplate = (
   val: unknown
 ): val is ControlNetModelFieldInputTemplate =>
   zControlNetModelFieldInputTemplate.safeParse(val).success;
+export const isControlNetModelFieldValue = (
+  v: unknown
+): v is ControlNetModelFieldValue =>
+  zControlNetModelFieldValue.safeParse(v).success;
 // #endregion
 
 // #region IPAdapterModelField
@@ -747,6 +752,10 @@ export const isIPAdapterModelFieldInputTemplate = (
   val: unknown
 ): val is IPAdapterModelFieldInputTemplate =>
   zIPAdapterModelFieldInputTemplate.safeParse(val).success;
+export const isIPAdapterModelFieldValue = (
+  val: unknown
+): val is IPAdapterModelFieldValue =>
+  zIPAdapterModelFieldValue.safeParse(val).success;
 // #endregion
 
 // #region T2IAdapterField

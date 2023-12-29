@@ -7,7 +7,7 @@ import {
   controlAdapterRecalled,
   controlAdaptersReset,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
+import type {
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
@@ -17,8 +17,13 @@ import {
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
-import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
 import {
+  setHrfEnabled,
+  setHrfMethod,
+  setHrfStrength,
+} from 'features/hrf/store/hrfSlice';
+import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
+import type {
   ControlNetMetadataItem,
   CoreMetadata,
   IPAdapterMetadataItem,
@@ -30,28 +35,25 @@ import {
   modelSelected,
 } from 'features/parameters/store/actions';
 import {
+  heightChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
-  setHeight,
-  setHrfEnabled,
-  setHrfMethod,
-  setHrfStrength,
   setImg2imgStrength,
   setNegativePrompt,
   setPositivePrompt,
   setScheduler,
   setSeed,
   setSteps,
-  setWidth,
   vaeSelected,
+  widthChanged,
 } from 'features/parameters/store/generationSlice';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
   isParameterControlNetModel,
+  isParameterHeight,
   isParameterHRFEnabled,
   isParameterHRFMethod,
-  isParameterHeight,
   isParameterIPAdapterModel,
   isParameterLoRAModel,
   isParameterModel,
@@ -59,11 +61,11 @@ import {
   isParameterNegativeStylePromptSDXL,
   isParameterPositivePrompt,
   isParameterPositiveStylePromptSDXL,
+  isParameterScheduler,
   isParameterSDXLRefinerModel,
   isParameterSDXLRefinerNegativeAestheticScore,
   isParameterSDXLRefinerPositiveAestheticScore,
   isParameterSDXLRefinerStart,
-  isParameterScheduler,
   isParameterSeed,
   isParameterSteps,
   isParameterStrength,
@@ -94,7 +96,7 @@ import {
   useGetLoRAModelsQuery,
   useGetT2IAdapterModelsQuery,
 } from 'services/api/endpoints/models';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createMemoizedSelector(
@@ -370,7 +372,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(setWidth(width));
+      dispatch(widthChanged(width));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -385,7 +387,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(setHeight(height));
+      dispatch(heightChanged(height));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -404,8 +406,8 @@ export const useRecallParameters = () => {
         allParameterNotSetToast();
         return;
       }
-      dispatch(setHeight(height));
-      dispatch(setWidth(width));
+      dispatch(heightChanged(height));
+      dispatch(widthChanged(width));
       allParameterSetToast();
     },
     [dispatch, allParameterSetToast, allParameterNotSetToast]
@@ -883,11 +885,11 @@ export const useRecallParameters = () => {
       }
 
       if (isParameterWidth(width)) {
-        dispatch(setWidth(width));
+        dispatch(widthChanged(width));
       }
 
       if (isParameterHeight(height)) {
-        dispatch(setHeight(height));
+        dispatch(heightChanged(height));
       }
 
       if (isParameterStrength(strength)) {

@@ -1,12 +1,13 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import {
+  isAnyNodeOrEdgeMutation,
   nodeEditorReset,
   nodesDeleted,
-  isAnyNodeOrEdgeMutation,
 } from 'features/nodes/store/nodesSlice';
-import { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
-import { FieldIdentifier } from 'features/nodes/types/field';
+import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
 
 export const initialWorkflowState: WorkflowState = {

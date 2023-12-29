@@ -1,4 +1,4 @@
-import { DeleteImageState } from './types';
+import type { DeleteImageState } from './types';
 
 export const initialDeleteImageState: DeleteImageState = {
   imagesToDelete: [],

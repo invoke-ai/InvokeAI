@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import {
   Box,
   Editable,
@@ -6,16 +7,16 @@ import {
   Flex,
   Icon,
   Image,
-  Text,
-  Tooltip,
 } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
+import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { AddToBoardDropData } from 'features/dnd/types';
+import type { AddToBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import {
@@ -31,7 +32,15 @@ import {
   useUpdateBoardMutation,
 } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { BoardDTO } from 'services/api/types';
+import type { BoardDTO } from 'services/api/types';
+
+const editableInputStyles: SystemStyleObject = {
+  p: 0,
+  _focusVisible: {
+    p: 0,
+    textAlign: 'center',
+  },
+};
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -140,18 +149,16 @@ const GalleryBoard = ({
   }, []);
   const { t } = useTranslation();
   return (
-    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+    <Box w="full" h="full" userSelect="none">
       <Flex
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
-        sx={{
-          position: 'relative',
-          justifyContent: 'center',
-          alignItems: 'center',
-          aspectRatio: '1/1',
-          w: 'full',
-          h: 'full',
-        }}
+        position="relative"
+        justifyContent="center"
+        alignItems="center"
+        aspectRatio="1/1"
+        w="full"
+        h="full"
       >
         <BoardContextMenu
           board={board}
@@ -159,97 +166,65 @@ const GalleryBoard = ({
           setBoardToDelete={setBoardToDelete}
         >
           {(ref) => (
-            <Tooltip label={tooltip} openDelay={1000} hasArrow>
+            <InvTooltip label={tooltip} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
-                sx={{
-                  w: 'full',
-                  h: 'full',
-                  position: 'relative',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderRadius: 'base',
-                  cursor: 'pointer',
-                  bg: 'base.200',
-                  _dark: {
-                    bg: 'base.800',
-                  },
-                }}
+                w="full"
+                h="full"
+                position="relative"
+                justifyContent="center"
+                alignItems="center"
+                borderRadius="base"
+                cursor="pointer"
+                bg="base.800"
               >
                 {coverImage?.thumbnail_url ? (
                   <Image
                     src={coverImage?.thumbnail_url}
                     draggable={false}
-                    sx={{
-                      objectFit: 'cover',
-                      w: 'full',
-                      h: 'full',
-                      maxH: 'full',
-                      borderRadius: 'base',
-                      borderBottomRadius: 'lg',
-                    }}
+                    objectFit="cover"
+                    w="full"
+                    h="full"
+                    maxH="full"
+                    borderRadius="base"
+                    borderBottomRadius="lg"
                   />
                 ) : (
                   <Flex
-                    sx={{
-                      w: 'full',
-                      h: 'full',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
+                    w="full"
+                    h="full"
+                    justifyContent="center"
+                    alignItems="center"
                   >
                     <Icon
                       boxSize={12}
                       as={FaUser}
-                      sx={{
-                        mt: -6,
-                        opacity: 0.7,
-                        color: 'base.500',
-                        _dark: {
-                          color: 'base.500',
-                        },
-                      }}
+                      mt={-6}
+                      opacity={0.7}
+                      color="base.500"
                     />
                   </Flex>
                 )}
-                {/* <Flex
-                  sx={{
-                    position: 'absolute',
-                    insetInlineEnd: 0,
-                    top: 0,
-                    p: 1,
-                  }}
-                >
-                  <Badge variant="solid" sx={BASE_BADGE_STYLES}>
-                    {totalImages}/{totalAssets}
-                  </Badge>
-                </Flex> */}
                 {isSelectedForAutoAdd && <AutoAddIcon />}
                 <SelectionOverlay
                   isSelected={isSelected}
                   isHovered={isHovered}
                 />
                 <Flex
-                  sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    p: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    w: 'full',
-                    maxW: 'full',
-                    borderBottomRadius: 'base',
-                    bg: isSelected ? 'accent.400' : 'base.500',
-                    color: isSelected ? 'base.50' : 'base.100',
-                    _dark: {
-                      bg: isSelected ? 'accent.500' : 'base.600',
-                      color: isSelected ? 'base.50' : 'base.100',
-                    },
-                    lineHeight: 'short',
-                    fontSize: 'xs',
-                  }}
+                  position="absolute"
+                  bottom={0}
+                  left={0}
+                  p={1}
+                  justifyContent="center"
+                  alignItems="center"
+                  w="full"
+                  maxW="full"
+                  borderBottomRadius="base"
+                  bg={isSelected ? 'blue.500' : 'base.600'}
+                  color={isSelected ? 'base.50' : 'base.100'}
+                  lineHeight="short"
+                  fontSize="xs"
                 >
                   <Editable
                     value={localBoardName}
@@ -257,42 +232,28 @@ const GalleryBoard = ({
                     submitOnBlur={true}
                     onChange={handleChange}
                     onSubmit={handleSubmit}
-                    sx={{
-                      w: 'full',
-                    }}
+                    w="full"
                   >
                     <EditablePreview
-                      sx={{
-                        p: 0,
-                        fontWeight: isSelected ? 700 : 500,
-                        textAlign: 'center',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
+                      p={0}
+                      fontWeight={isSelected ? 'bold' : 'normal'}
+                      textAlign="center"
+                      overflow="hidden"
+                      textOverflow="ellipsis"
                       noOfLines={1}
                     />
-                    <EditableInput
-                      sx={{
-                        p: 0,
-                        _focusVisible: {
-                          p: 0,
-                          textAlign: 'center',
-                          // get rid of the edit border
-                          boxShadow: 'none',
-                        },
-                      }}
-                    />
+                    <EditableInput sx={editableInputStyles} />
                   </Editable>
                 </Flex>
 
                 <IAIDroppable
                   data={droppableData}
                   dropLabel={
-                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
+                    <InvText fontSize="md">{t('unifiedCanvas.move')}</InvText>
                   }
                 />
               </Flex>
-            </Tooltip>
+            </InvTooltip>
           )}
         </BoardContextMenu>
       </Flex>

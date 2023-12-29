@@ -1,4 +1,4 @@
-import { MenuItem } from '@chakra-ui/react';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,9 +10,9 @@ const DownloadWorkflowMenuItem = () => {
   return (
     <WorkflowEditorSettings>
       {({ onOpen }) => (
-        <MenuItem as="button" icon={<FaCog />} onClick={onOpen}>
+        <InvMenuItem as="button" icon={<FaCog />} onClick={onOpen}>
           {t('nodes.workflowSettings')}
-        </MenuItem>
+        </InvMenuItem>
       )}
     </WorkflowEditorSettings>
   );

@@ -1,28 +1,29 @@
-import { Divider, Flex, Text } from '@chakra-ui/react';
-import { useForm } from '@mantine/form';
+import { Divider, Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineTextInput from 'common/components/IAIMantineInput';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import {
   LORA_MODEL_FORMAT_MAP,
   MODEL_TYPE_MAP,
 } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import {
-  LoRAModelConfigEntity,
-  useUpdateLoRAModelsMutation,
-} from 'services/api/endpoints/models';
-import { LoRAModelConfig } from 'services/api/types';
-import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import { useUpdateLoRAModelsMutation } from 'services/api/endpoints/models';
+import type { LoRAModelConfig } from 'services/api/types';
 
 type LoRAModelEditProps = {
   model: LoRAModelConfigEntity;
 };
 
-export default function LoRAModelEdit(props: LoRAModelEditProps) {
+const LoRAModelEdit = (props: LoRAModelEditProps) => {
   const { model } = props;
 
   const [updateLoRAModel, { isLoading }] = useUpdateLoRAModelsMutation();
@@ -30,8 +31,14 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const loraEditForm = useForm<LoRAModelConfig>({
-    initialValues: {
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = useForm<LoRAModelConfig>({
+    defaultValues: {
       model_name: model.model_name ? model.model_name : '',
       base_model: model.base_model,
       model_type: 'lora',
@@ -39,14 +46,11 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
       description: model.description ? model.description : '',
       model_format: model.model_format,
     },
-    validate: {
-      path: (value) =>
-        value.trim().length === 0 ? 'Must provide a path' : null,
-    },
+    mode: 'onChange',
   });
 
-  const editModelFormSubmitHandler = useCallback(
-    (values: LoRAModelConfig) => {
+  const onSubmit = useCallback<SubmitHandler<LoRAModelConfig>>(
+    (values) => {
       const responseBody = {
         base_model: model.base_model,
         model_name: model.model_name,
@@ -56,7 +60,7 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
       updateLoRAModel(responseBody)
         .unwrap()
         .then((payload) => {
-          loraEditForm.setValues(payload as LoRAModelConfig);
+          reset(payload as LoRAModelConfig, { keepDefaultValues: true });
           dispatch(
             addToast(
               makeToast({
@@ -67,7 +71,7 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
           );
         })
         .catch((_) => {
-          loraEditForm.reset();
+          reset();
           dispatch(
             addToast(
               makeToast({
@@ -78,53 +82,63 @@ export default function LoRAModelEdit(props: LoRAModelEditProps) {
           );
         });
     },
-    [
-      dispatch,
-      loraEditForm,
-      model.base_model,
-      model.model_name,
-      t,
-      updateLoRAModel,
-    ]
+    [dispatch, model.base_model, model.model_name, reset, t, updateLoRAModel]
   );
 
   return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex flexDirection="column">
-        <Text fontSize="lg" fontWeight="bold">
+        <InvText fontSize="lg" fontWeight="bold">
           {model.model_name}
-        </Text>
-        <Text fontSize="sm" color="base.400">
+        </InvText>
+        <InvText fontSize="sm" color="base.400">
           {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')} ⋅{' '}
           {LORA_MODEL_FORMAT_MAP[model.model_format]} {t('common.format')}
-        </Text>
+        </InvText>
       </Flex>
       <Divider />
 
-      <form
-        onSubmit={loraEditForm.onSubmit((values) =>
-          editModelFormSubmitHandler(values)
-        )}
-      >
+      <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <IAIMantineTextInput
+          <InvControl
             label={t('modelManager.name')}
-            {...loraEditForm.getInputProps('model_name')}
+            isInvalid={Boolean(errors.model_name)}
+            error={errors.model_name?.message}
+          >
+            <InvInput
+              {...register('model_name', {
+                validate: (value) =>
+                  value.trim().length > 3 || 'Must be at least 3 characters',
+              })}
+            />
+          </InvControl>
+          <InvControl label={t('modelManager.description')}>
+            <InvInput {...register('description')} />
+          </InvControl>
+          <BaseModelSelect<LoRAModelConfig>
+            control={control}
+            name="base_model"
           />
-          <IAIMantineTextInput
-            label={t('modelManager.description')}
-            {...loraEditForm.getInputProps('description')}
-          />
-          <BaseModelSelect {...loraEditForm.getInputProps('base_model')} />
-          <IAIMantineTextInput
+
+          <InvControl
             label={t('modelManager.modelLocation')}
-            {...loraEditForm.getInputProps('path')}
-          />
-          <IAIButton type="submit" isLoading={isLoading}>
+            isInvalid={Boolean(errors.path)}
+            error={errors.path?.message}
+          >
+            <InvInput
+              {...register('path', {
+                validate: (value) =>
+                  value.trim().length > 0 || 'Must provide a path',
+              })}
+            />
+          </InvControl>
+          <InvButton type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}
-          </IAIButton>
+          </InvButton>
         </Flex>
       </form>
     </Flex>
   );
-}
+};
+
+export default memo(LoRAModelEdit);

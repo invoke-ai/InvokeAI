@@ -1,5 +1,5 @@
-import { components } from 'services/api/schema';
-import {
+import type { components } from 'services/api/schema';
+import type {
   BaseModelType,
   Graph,
   GraphExecutionState,

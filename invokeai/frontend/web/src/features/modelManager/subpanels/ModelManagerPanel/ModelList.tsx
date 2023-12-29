@@ -1,20 +1,26 @@
-import { ButtonGroup, Flex, Spinner, Text } from '@chakra-ui/react';
-import { EntityState } from '@reduxjs/toolkit';
-import IAIButton from 'common/components/IAIButton';
-import IAIInput from 'common/components/IAIInput';
+import { Flex, Spinner } from '@chakra-ui/react';
+import type { EntityState } from '@reduxjs/toolkit';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
 import { forEach } from 'lodash-es';
-import { ChangeEvent, PropsWithChildren, memo } from 'react';
-import { useCallback, useState } from 'react';
+import type { ChangeEvent, PropsWithChildren } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
-import {
+import type {
   LoRAModelConfigEntity,
   MainModelConfigEntity,
   OnnxModelConfigEntity,
+} from 'services/api/endpoints/models';
+import {
   useGetLoRAModelsQuery,
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
+
 import ModelListItem from './ModelListItem';
 
 type ModelListProps = {
@@ -98,56 +104,54 @@ const ModelList = (props: ModelListProps) => {
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
       <Flex flexDirection="column" gap={4} paddingInlineEnd={4}>
-        <ButtonGroup isAttached>
-          <IAIButton
+        <InvButtonGroup>
+          <InvButton
             onClick={setModelFormatFilter.bind(null, 'all')}
             isChecked={modelFormatFilter === 'all'}
             size="sm"
           >
             {t('modelManager.allModels')}
-          </IAIButton>
-          <IAIButton
+          </InvButton>
+          <InvButton
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'diffusers')}
             isChecked={modelFormatFilter === 'diffusers'}
           >
             {t('modelManager.diffusersModels')}
-          </IAIButton>
-          <IAIButton
+          </InvButton>
+          <InvButton
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'checkpoint')}
             isChecked={modelFormatFilter === 'checkpoint'}
           >
             {t('modelManager.checkpointModels')}
-          </IAIButton>
-          <IAIButton
+          </InvButton>
+          <InvButton
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'onnx')}
             isChecked={modelFormatFilter === 'onnx'}
           >
             {t('modelManager.onnxModels')}
-          </IAIButton>
-          <IAIButton
+          </InvButton>
+          <InvButton
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'olive')}
             isChecked={modelFormatFilter === 'olive'}
           >
             {t('modelManager.oliveModels')}
-          </IAIButton>
-          <IAIButton
+          </InvButton>
+          <InvButton
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'lora')}
             isChecked={modelFormatFilter === 'lora'}
           >
             {t('modelManager.loraModels')}
-          </IAIButton>
-        </ButtonGroup>
+          </InvButton>
+        </InvButtonGroup>
 
-        <IAIInput
-          onChange={handleSearchFilter}
-          label={t('modelManager.search')}
-          labelPos="side"
-        />
+        <InvControl label={t('modelManager.search')}>
+          <InvInput onChange={handleSearchFilter} />
+        </InvControl>
 
         <Flex
           flexDirection="column"
@@ -268,18 +272,7 @@ const modelsFilter = <
 
 const StyledModelContainer = memo((props: PropsWithChildren) => {
   return (
-    <Flex
-      flexDirection="column"
-      gap={4}
-      borderRadius={4}
-      p={4}
-      sx={{
-        bg: 'base.200',
-        _dark: {
-          bg: 'base.800',
-        },
-      }}
-    >
+    <Flex flexDirection="column" gap={4} borderRadius={4} p={4} bg="base.800">
       {props.children}
     </Flex>
   );
@@ -300,10 +293,10 @@ const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList, selected } = props;
   return (
     <StyledModelContainer>
-      <Flex sx={{ gap: 2, flexDir: 'column' }}>
-        <Text variant="subtext" fontSize="sm">
+      <Flex gap={2} flexDir="column">
+        <InvText variant="subtext" fontSize="sm">
           {title}
-        </Text>
+        </InvText>
         {modelList.map((model) => (
           <ModelListItem
             key={model.id}
@@ -331,9 +324,9 @@ const FetchingModelsLoader = memo(
           gap={8}
         >
           <Spinner />
-          <Text variant="subtext">
+          <InvText variant="subtext">
             {loadingMessage ? loadingMessage : 'Fetching...'}
-          </Text>
+          </InvText>
         </Flex>
       </StyledModelContainer>
     );

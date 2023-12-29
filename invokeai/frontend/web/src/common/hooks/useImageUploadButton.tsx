@@ -2,7 +2,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/types';
+import type { PostUploadAction } from 'services/api/types';
 
 type UseImageUploadButtonArgs = {
   postUploadAction?: PostUploadAction;

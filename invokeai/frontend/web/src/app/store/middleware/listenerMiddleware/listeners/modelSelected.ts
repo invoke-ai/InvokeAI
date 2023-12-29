@@ -7,17 +7,18 @@ import {
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
+  heightChanged,
   modelChanged,
-  setHeight,
-  setWidth,
   vaeSelected,
+  widthChanged,
 } from 'features/parameters/store/generationSlice';
+import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
+
 import { startAppListening } from '..';
-import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 
 export const addModelSelectedListener = () => {
   startAppListening({
@@ -89,12 +90,12 @@ export const addModelSelectedListener = () => {
         state.ui.shouldAutoChangeDimensions
       ) {
         if (['sdxl', 'sdxl-refiner'].includes(newModel.base_model)) {
-          dispatch(setWidth(1024));
-          dispatch(setHeight(1024));
+          dispatch(widthChanged(1024));
+          dispatch(heightChanged(1024));
           dispatch(setBoundingBoxDimensions({ width: 1024, height: 1024 }));
         } else {
-          dispatch(setWidth(512));
-          dispatch(setHeight(512));
+          dispatch(widthChanged(512));
+          dispatch(heightChanged(512));
           dispatch(setBoundingBoxDimensions({ width: 512, height: 512 }));
         }
       }

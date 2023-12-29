@@ -1,15 +1,15 @@
 import { Flex } from '@chakra-ui/react';
-import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
-import { memo } from 'react';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';
+import { memo } from 'react';
 
 const TopRightPanel = () => {
   const isWorkflowLibraryEnabled =
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
-    <Flex sx={{ gap: 2, position: 'absolute', top: 2, insetInlineEnd: 2 }}>
+    <Flex gap={2} position="absolute" top={2} insetInlineEnd={2}>
       {isWorkflowLibraryEnabled && <WorkflowLibraryButton />}
       <WorkflowLibraryMenu />
     </Flex>

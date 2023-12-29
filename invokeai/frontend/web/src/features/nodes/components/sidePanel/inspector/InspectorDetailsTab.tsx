@@ -1,25 +1,21 @@
-import {
-  Box,
-  Flex,
-  FormControl,
-  FormLabel,
-  HStack,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Flex, HStack } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvText } from 'common/components/InvText/wrapper';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
-import {
+import type {
   InvocationNode,
   InvocationTemplate,
-  isInvocationNode,
 } from 'features/nodes/types/invocation';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import EditableNodeTitle from './details/EditableNodeTitle';
 
 const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
@@ -67,44 +63,28 @@ const Content = memo(({ node, template }: ContentProps) => {
     [node, template]
   );
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        w: 'full',
-        h: 'full',
-      }}
-    >
+    <Box position="relative" w="full" h="full">
       <ScrollableContent>
         <Flex
-          sx={{
-            flexDir: 'column',
-            position: 'relative',
-            p: 1,
-            gap: 2,
-            w: 'full',
-          }}
+          flexDir="column"
+          position="relative"
+          w="full"
+          h="full"
+          p={1}
+          gap={2}
         >
           <EditableNodeTitle nodeId={node.data.id} />
           <HStack>
-            <FormControl>
-              <FormLabel>{t('nodes.nodeType')}</FormLabel>
-              <Text fontSize="sm" fontWeight={600}>
+            <InvControl label={t('nodes.nodeType')}>
+              <InvText fontSize="sm" fontWeight="semibold">
                 {template.title}
-              </Text>
-            </FormControl>
-            <Flex
-              flexDir="row"
-              alignItems="center"
-              justifyContent="space-between"
-              w="full"
-            >
-              <FormControl isInvalid={needsUpdate}>
-                <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
-                <Text fontSize="sm" fontWeight={600}>
-                  {node.data.version}
-                </Text>
-              </FormControl>
-            </Flex>
+              </InvText>
+            </InvControl>
+            <InvControl label={t('nodes.nodeVersion')} isInvalid={needsUpdate}>
+              <InvText fontSize="sm" fontWeight="semibold">
+                {node.data.version}
+              </InvText>
+            </InvControl>
           </HStack>
           <NotesTextarea nodeId={node.data.id} />
         </Flex>

@@ -13,13 +13,15 @@ import {
   setIsTransformingBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import Konva from 'konva';
-import { GroupConfig } from 'konva/lib/Group';
-import { KonvaEventObject } from 'konva/lib/Node';
-import { Vector2d } from 'konva/lib/types';
+import type Konva from 'konva';
+import type { GroupConfig } from 'konva/lib/Group';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import type { Vector2d } from 'konva/lib/types';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
+
+const borderDash = [4, 4];
 
 const boundingBoxPreviewSelector = createMemoizedSelector(
   [stateSelector],
@@ -145,7 +147,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const y = Math.round(rect.y());
 
     if (aspectRatio) {
-      const newHeight = roundToMultiple(width / aspectRatio, 64);
+      const newHeight = roundToMultiple(width / aspectRatio.value, 64);
       dispatch(
         setBoundingBoxDimensions({
           width: width,
@@ -289,11 +291,11 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         anchorFill="rgba(212,216,234,1)"
         anchorSize={15}
         anchorStroke="rgb(42,42,42)"
-        borderDash={[4, 4]}
+        borderDash={borderDash}
         borderEnabled={true}
         borderStroke="black"
         draggable={false}
-        enabledAnchors={tool === 'move' ? undefined : []}
+        enabledAnchors={tool === 'move' ? undefined : emptyArray}
         flipEnabled={false}
         ignoreStroke={true}
         keepRatio={false}
@@ -311,3 +313,5 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 };
 
 export default memo(IAICanvasBoundingBox);
+
+const emptyArray: string[] = [];

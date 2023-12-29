@@ -3,6 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const cursorPositionSelector = createMemoizedSelector(
@@ -22,7 +23,7 @@ const cursorPositionSelector = createMemoizedSelector(
   }
 );
 
-export default function IAICanvasStatusTextCursorPos() {
+const IAICanvasStatusTextCursorPos = () => {
   const { cursorCoordinatesString } = useAppSelector(cursorPositionSelector);
   const { t } = useTranslation();
 
@@ -31,4 +32,6 @@ export default function IAICanvasStatusTextCursorPos() {
       'unifiedCanvas.cursorPosition'
     )}: ${cursorCoordinatesString}`}</Box>
   );
-}
+};
+
+export default memo(IAICanvasStatusTextCursorPos);

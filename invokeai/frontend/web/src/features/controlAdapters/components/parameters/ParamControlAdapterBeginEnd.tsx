@@ -1,23 +1,13 @@
-import {
-  FormControl,
-  FormLabel,
-  HStack,
-  RangeSlider,
-  RangeSliderFilledTrack,
-  RangeSliderMark,
-  RangeSliderThumb,
-  RangeSliderTrack,
-  Tooltip,
-} from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvRangeSlider } from 'common/components/InvRangeSlider/InvRangeSlider';
 import { useControlAdapterBeginEndStepPct } from 'features/controlAdapters/hooks/useControlAdapterBeginEndStepPct';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import {
   controlAdapterBeginStepPctChanged,
   controlAdapterEndStepPctChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -26,28 +16,48 @@ type Props = {
 
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 
-const ParamControlAdapterBeginEnd = ({ id }: Props) => {
+export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const stepPcts = useControlAdapterBeginEndStepPct(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleStepPctChanged = useCallback(
-    (v: number[]) => {
+  const onChange = useCallback(
+    (v: [number, number]) => {
       dispatch(
         controlAdapterBeginStepPctChanged({
           id,
-          beginStepPct: v[0] as number,
+          beginStepPct: v[0],
         })
       );
       dispatch(
         controlAdapterEndStepPctChanged({
           id,
-          endStepPct: v[1] as number,
+          endStepPct: v[1],
         })
       );
     },
     [dispatch, id]
+  );
+
+  const onReset = useCallback(() => {
+    dispatch(
+      controlAdapterBeginStepPctChanged({
+        id,
+        beginStepPct: 0,
+      })
+    );
+    dispatch(
+      controlAdapterEndStepPctChanged({
+        id,
+        endStepPct: 1,
+      })
+    );
+  }, [dispatch, id]);
+
+  const value = useMemo<[number, number]>(
+    () => [stepPcts?.beginStepPct ?? 0, stepPcts?.endStepPct ?? 1],
+    [stepPcts]
   );
 
   if (!stepPcts) {
@@ -55,69 +65,28 @@ const ParamControlAdapterBeginEnd = ({ id }: Props) => {
   }
 
   return (
-    <IAIInformationalPopover feature="controlNetBeginEnd">
-      <FormControl isDisabled={!isEnabled}>
-        <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
-        <HStack w="100%" gap={2} alignItems="center">
-          <RangeSlider
-            aria-label={['Begin Step %', 'End Step %!']}
-            value={[stepPcts.beginStepPct, stepPcts.endStepPct]}
-            onChange={handleStepPctChanged}
-            min={0}
-            max={1}
-            step={0.01}
-            minStepsBetweenThumbs={5}
-            isDisabled={!isEnabled}
-          >
-            <RangeSliderTrack>
-              <RangeSliderFilledTrack />
-            </RangeSliderTrack>
-            <Tooltip
-              label={formatPct(stepPcts.beginStepPct)}
-              placement="top"
-              hasArrow
-            >
-              <RangeSliderThumb index={0} />
-            </Tooltip>
-            <Tooltip
-              label={formatPct(stepPcts.endStepPct)}
-              placement="top"
-              hasArrow
-            >
-              <RangeSliderThumb index={1} />
-            </Tooltip>
-            <RangeSliderMark
-              value={0}
-              sx={{
-                insetInlineStart: '0 !important',
-                insetInlineEnd: 'unset !important',
-              }}
-            >
-              0%
-            </RangeSliderMark>
-            <RangeSliderMark
-              value={0.5}
-              sx={{
-                insetInlineStart: '50% !important',
-                transform: 'translateX(-50%)',
-              }}
-            >
-              50%
-            </RangeSliderMark>
-            <RangeSliderMark
-              value={1}
-              sx={{
-                insetInlineStart: 'unset !important',
-                insetInlineEnd: '0 !important',
-              }}
-            >
-              100%
-            </RangeSliderMark>
-          </RangeSlider>
-        </HStack>
-      </FormControl>
-    </IAIInformationalPopover>
+    <InvControl
+      isDisabled={!isEnabled}
+      label={t('controlnet.beginEndStepPercent')}
+      feature="controlNetBeginEnd"
+      orientation="vertical"
+    >
+      <InvRangeSlider
+        aria-label={ariaLabel}
+        value={value}
+        onChange={onChange}
+        onReset={onReset}
+        min={0}
+        max={1}
+        step={0.01}
+        minStepsBetweenThumbs={5}
+        formatValue={formatPct}
+        marks
+      />
+    </InvControl>
   );
-};
+});
 
-export default memo(ParamControlAdapterBeginEnd);
+ParamControlAdapterBeginEnd.displayName = 'ParamControlAdapterBeginEnd';
+
+const ariaLabel = ['Begin Step %', 'End Step %'];

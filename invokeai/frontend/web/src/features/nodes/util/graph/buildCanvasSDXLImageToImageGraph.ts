@@ -1,10 +1,11 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   ImageDTO,
   ImageToLatentsInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -53,13 +54,10 @@ export const buildCanvasSDXLImageToImageGraph = (
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
+    img2imgStrength: strength,
   } = state.generation;
 
-  const {
-    shouldUseSDXLRefiner,
-    refinerStart,
-    sdxlImg2ImgDenoisingStrength: strength,
-  } = state.sdxl;
+  const { refinerModel, refinerStart } = state.sdxl;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
@@ -142,10 +140,10 @@ export const buildCanvasSDXLImageToImageGraph = (
         cfg_scale,
         scheduler,
         steps,
-        denoising_start: shouldUseSDXLRefiner
+        denoising_start: refinerModel
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        denoising_end: refinerModel ? refinerStart : 1,
       },
     },
     edges: [
@@ -357,7 +355,7 @@ export const buildCanvasSDXLImageToImageGraph = (
   }
 
   // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     addSDXLRefinerToGraph(
       state,
       graph,

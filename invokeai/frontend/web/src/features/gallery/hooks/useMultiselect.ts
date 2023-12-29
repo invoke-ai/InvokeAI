@@ -4,9 +4,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { MouseEvent, useCallback, useMemo } from 'react';
+import type { MouseEvent } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
 
 const selector = createMemoizedSelector(

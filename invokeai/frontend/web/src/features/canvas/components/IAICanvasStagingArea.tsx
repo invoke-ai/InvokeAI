@@ -1,10 +1,13 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { GroupConfig } from 'konva/lib/Group';
+import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
 import { Group, Rect } from 'react-konva';
+
 import IAICanvasImage from './IAICanvasImage';
+
+const dash = [4, 4];
 
 const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
   const {
@@ -68,7 +71,7 @@ const IAICanvasStagingArea = (props: Props) => {
             y={y}
             width={width}
             height={height}
-            dash={[4, 4]}
+            dash={dash}
             strokeWidth={1}
             stroke="black"
             strokeScaleEnabled={false}

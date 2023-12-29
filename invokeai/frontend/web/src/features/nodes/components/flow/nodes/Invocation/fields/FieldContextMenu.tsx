@@ -1,11 +1,11 @@
-import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  IAIContextMenu,
-  IAIContextMenuProps,
-} from 'common/components/IAIContextMenu';
+import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
+import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
+import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
 import { useFieldInputKind } from 'features/nodes/hooks/useFieldInputKind';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
@@ -13,16 +13,16 @@ import {
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
 } from 'features/nodes/store/workflowSlice';
-import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaMinus, FaPlus } from 'react-icons/fa';
-import { menuListMotionProps } from 'theme/components/menu';
 
 type Props = {
   nodeId: string;
   fieldName: string;
   kind: 'input' | 'output';
-  children: IAIContextMenuProps<HTMLDivElement>['children'];
+  children: InvContextMenuProps<HTMLDivElement>['children'];
 };
 
 const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
@@ -69,24 +69,24 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     const menuItems: ReactNode[] = [];
     if (mayExpose && !isExposed) {
       menuItems.push(
-        <MenuItem
+        <InvMenuItem
           key={`${nodeId}.${fieldName}.expose-field`}
           icon={<FaPlus />}
           onClick={handleExposeField}
         >
           {t('nodes.addLinearView')}
-        </MenuItem>
+        </InvMenuItem>
       );
     }
     if (mayExpose && isExposed) {
       menuItems.push(
-        <MenuItem
+        <InvMenuItem
           key={`${nodeId}.${fieldName}.unexpose-field`}
           icon={<FaMinus />}
           onClick={handleUnexposeField}
         >
           {t('nodes.removeLinearView')}
-        </MenuItem>
+        </InvMenuItem>
       );
     }
     return menuItems;
@@ -103,35 +103,19 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   const renderMenuFunc = useCallback(
     () =>
       !menuItems.length ? null : (
-        <MenuList
-          sx={{ visibility: 'visible !important' }}
-          motionProps={menuListMotionProps}
-          onContextMenu={skipEvent}
-        >
-          <MenuGroup
+        <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+          <InvMenuGroup
             title={label || fieldTemplateTitle || t('nodes.unknownField')}
           >
             {menuItems}
-          </MenuGroup>
-        </MenuList>
+          </InvMenuGroup>
+        </InvMenuList>
       ),
     [fieldTemplateTitle, label, menuItems, skipEvent, t]
   );
 
   return (
-    <IAIContextMenu<HTMLDivElement>
-      menuProps={{
-        size: 'sm',
-        isLazy: true,
-      }}
-      menuButtonProps={{
-        bg: 'transparent',
-        _hover: { bg: 'transparent' },
-      }}
-      renderMenu={renderMenuFunc}
-    >
-      {children}
-    </IAIContextMenu>
+    <InvContextMenu renderMenu={renderMenuFunc}>{children}</InvContextMenu>
   );
 };
 

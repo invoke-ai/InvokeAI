@@ -1,9 +1,11 @@
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { RequiredMlsdImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { RequiredMlsdImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
+
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor
@@ -71,58 +73,63 @@ const MlsdImageProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <IAISlider
+      <InvControl
         label={t('controlnet.detectResolution')}
-        value={detect_resolution}
-        onChange={handleDetectResolutionChanged}
-        handleReset={handleDetectResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
+      >
+        <InvSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          onReset={handleDetectResolutionReset}
+          min={0}
+          max={4096}
+          marks={marks0to4096}
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl
         label={t('controlnet.imageResolution')}
-        value={image_resolution}
-        onChange={handleImageResolutionChanged}
-        handleReset={handleImageResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
-        label={t('controlnet.w')}
-        value={thr_d}
-        onChange={handleThrDChanged}
-        handleReset={handleThrDReset}
-        withReset
-        min={0}
-        max={1}
-        step={0.01}
-        withInput
-        withSliderMarks
-        isDisabled={!isEnabled}
-      />
-      <IAISlider
-        label={t('controlnet.h')}
-        value={thr_v}
-        onChange={handleThrVChanged}
-        handleReset={handleThrVReset}
-        withReset
-        min={0}
-        max={1}
-        step={0.01}
-        withInput
-        withSliderMarks
-        isDisabled={!isEnabled}
-      />
+      >
+        <InvSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          onReset={handleImageResolutionReset}
+          min={0}
+          max={4096}
+          marks={marks0to4096}
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.w')} isDisabled={!isEnabled}>
+        <InvSlider
+          value={thr_d}
+          onChange={handleThrDChanged}
+          onReset={handleThrDReset}
+          min={0}
+          max={1}
+          step={0.01}
+          marks={marks0to1}
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.h')} isDisabled={!isEnabled}>
+        <InvSlider
+          value={thr_v}
+          onChange={handleThrVChanged}
+          onReset={handleThrVReset}
+          min={0}
+          max={1}
+          step={0.01}
+          marks={marks0to1}
+          withNumberInput
+        />
+      </InvControl>
     </ProcessorWrapper>
   );
 };
 
 export default memo(MlsdImageProcessor);
+
+const marks0to4096 = [0, 4096];
+const marks0to1 = [0, 1];

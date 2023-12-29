@@ -4,6 +4,7 @@ import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+
 import { startAppListening } from '..';
 
 export const addReceivedOpenAPISchemaListener = () => {

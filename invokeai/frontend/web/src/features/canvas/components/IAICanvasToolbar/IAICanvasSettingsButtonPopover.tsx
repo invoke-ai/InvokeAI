@@ -2,9 +2,13 @@ import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
+import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import {
+  InvPopoverBody,
+  InvPopoverContent,
+  InvPopoverTrigger,
+} from 'common/components/InvPopover/wrapper';
 import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 import {
   setShouldAntialias,
@@ -17,7 +21,9 @@ import {
   setShouldShowIntermediates,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { InvIconButton, InvPopover } from 'index';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
@@ -127,66 +133,76 @@ const IAICanvasSettingsButtonPopover = () => {
   );
 
   return (
-    <IAIPopover
-      isLazy={false}
-      triggerComponent={
-        <IAIIconButton
+    <InvPopover>
+      <InvPopoverTrigger>
+        <InvIconButton
           tooltip={t('unifiedCanvas.canvasSettings')}
           aria-label={t('unifiedCanvas.canvasSettings')}
           icon={<FaWrench />}
         />
-      }
-    >
-      <Flex direction="column" gap={2}>
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.showIntermediates')}
-          isChecked={shouldShowIntermediates}
-          onChange={handleChangeShouldShowIntermediates}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.showGrid')}
-          isChecked={shouldShowGrid}
-          onChange={handleChangeShouldShowGrid}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.snapToGrid')}
-          isChecked={shouldSnapToGrid}
-          onChange={handleChangeShouldSnapToGrid}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.darkenOutsideSelection')}
-          isChecked={shouldDarkenOutsideBoundingBox}
-          onChange={handleChangeShouldDarkenOutsideBoundingBox}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.autoSaveToGallery')}
-          isChecked={shouldAutoSave}
-          onChange={handleChangeShouldAutoSave}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.saveBoxRegionOnly')}
-          isChecked={shouldCropToBoundingBoxOnSave}
-          onChange={handleChangeShouldCropToBoundingBoxOnSave}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.limitStrokesToBox')}
-          isChecked={shouldRestrictStrokesToBox}
-          onChange={handleChangeShouldRestrictStrokesToBox}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.showCanvasDebugInfo')}
-          isChecked={shouldShowCanvasDebugInfo}
-          onChange={handleChangeShouldShowCanvasDebugInfo}
-        />
-
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.antialiasing')}
-          isChecked={shouldAntialias}
-          onChange={handleChangeShouldAntialias}
-        />
-        <ClearCanvasHistoryButtonModal />
-      </Flex>
-    </IAIPopover>
+      </InvPopoverTrigger>
+      <InvPopoverContent>
+        <InvPopoverBody>
+          <Flex direction="column" gap={2}>
+            <InvControl label={t('unifiedCanvas.showIntermediates')}>
+              <InvCheckbox
+                isChecked={shouldShowIntermediates}
+                onChange={handleChangeShouldShowIntermediates}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.showGrid')}>
+              <InvCheckbox
+                isChecked={shouldShowGrid}
+                onChange={handleChangeShouldShowGrid}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.snapToGrid')}>
+              <InvCheckbox
+                isChecked={shouldSnapToGrid}
+                onChange={handleChangeShouldSnapToGrid}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.darkenOutsideSelection')}>
+              <InvCheckbox
+                isChecked={shouldDarkenOutsideBoundingBox}
+                onChange={handleChangeShouldDarkenOutsideBoundingBox}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.autoSaveToGallery')}>
+              <InvCheckbox
+                isChecked={shouldAutoSave}
+                onChange={handleChangeShouldAutoSave}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.saveBoxRegionOnly')}>
+              <InvCheckbox
+                isChecked={shouldCropToBoundingBoxOnSave}
+                onChange={handleChangeShouldCropToBoundingBoxOnSave}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.limitStrokesToBox')}>
+              <InvCheckbox
+                isChecked={shouldRestrictStrokesToBox}
+                onChange={handleChangeShouldRestrictStrokesToBox}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.showCanvasDebugInfo')}>
+              <InvCheckbox
+                isChecked={shouldShowCanvasDebugInfo}
+                onChange={handleChangeShouldShowCanvasDebugInfo}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.antialiasing')}>
+              <InvCheckbox
+                isChecked={shouldAntialias}
+                onChange={handleChangeShouldAntialias}
+              />
+            </InvControl>
+            <ClearCanvasHistoryButtonModal />
+          </Flex>
+        </InvPopoverBody>
+      </InvPopoverContent>
+    </InvPopover>
   );
 };
 

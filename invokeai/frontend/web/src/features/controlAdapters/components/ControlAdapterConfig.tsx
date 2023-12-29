@@ -1,30 +1,38 @@
+import { ChevronUpIcon } from '@chakra-ui/icons';
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { FaCopy, FaTrash } from 'react-icons/fa';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import type { InvLabelProps } from 'common/components/InvControl/types';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import {
   controlAdapterDuplicated,
   controlAdapterIsEnabledChanged,
   controlAdapterRemoved,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
-import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
-import { ChevronUpIcon } from '@chakra-ui/icons';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAISwitch from 'common/components/IAISwitch';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FaCopy, FaTrash } from 'react-icons/fa';
 import { useToggle } from 'react-use';
-import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
-import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
+
 import ControlAdapterImagePreview from './ControlAdapterImagePreview';
 import ControlAdapterProcessorComponent from './ControlAdapterProcessorComponent';
 import ControlAdapterShouldAutoConfig from './ControlAdapterShouldAutoConfig';
 import ControlNetCanvasImageImports from './imports/ControlNetCanvasImageImports';
-import ParamControlAdapterBeginEnd from './parameters/ParamControlAdapterBeginEnd';
+import { ParamControlAdapterBeginEnd } from './parameters/ParamControlAdapterBeginEnd';
 import ParamControlAdapterControlMode from './parameters/ParamControlAdapterControlMode';
+import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
+import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
+
+const labelProps: InvLabelProps = {
+  flexGrow: 1,
+};
 
 const ControlAdapterConfig = (props: { id: string; number: number }) => {
   const { id, number } = props;
@@ -62,52 +70,45 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
 
   return (
     <Flex
-      sx={{
-        flexDir: 'column',
-        gap: 3,
-        p: 2,
-        borderRadius: 'base',
-        position: 'relative',
-        bg: 'base.250',
-        _dark: {
-          bg: 'base.750',
-        },
-      }}
+      flexDir="column"
+      gap={4}
+      p={4}
+      borderRadius="base"
+      position="relative"
+      bg="base.750"
     >
-      <Flex
-        sx={{ gap: 2, alignItems: 'center', justifyContent: 'space-between' }}
-      >
-        <IAISwitch
+      <Flex gap={2} alignItems="center" justifyContent="space-between">
+        <InvControl
           label={t(`controlnet.${controlAdapterType}`, { number })}
-          aria-label={t('controlnet.toggleControlNet')}
-          isChecked={isEnabled}
-          onChange={handleToggleIsEnabled}
-          formControlProps={{ w: 'full' }}
-          formLabelProps={{ fontWeight: 600 }}
-        />
+          labelProps={labelProps}
+        >
+          <InvSwitch
+            aria-label={t('controlnet.toggleControlNet')}
+            isChecked={isEnabled}
+            onChange={handleToggleIsEnabled}
+          />
+        </InvControl>
       </Flex>
-      <Flex sx={{ gap: 2, alignItems: 'center' }}>
+      <Flex gap={4} alignItems="center">
         <Box
-          sx={{
-            w: 'full',
-            minW: 0,
-            transitionProperty: 'common',
-            transitionDuration: '0.1s',
-          }}
+          minW={0}
+          w="full"
+          transitionProperty="common"
+          transitionDuration="0.1s"
         >
           <ParamControlAdapterModel id={id} />
         </Box>
         {activeTabName === 'unifiedCanvas' && (
           <ControlNetCanvasImageImports id={id} />
         )}
-        <IAIIconButton
+        <InvIconButton
           size="sm"
           tooltip={t('controlnet.duplicate')}
           aria-label={t('controlnet.duplicate')}
           onClick={handleDuplicate}
           icon={<FaCopy />}
         />
-        <IAIIconButton
+        <InvIconButton
           size="sm"
           tooltip={t('controlnet.delete')}
           aria-label={t('controlnet.delete')}
@@ -115,7 +116,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           onClick={handleDelete}
           icon={<FaTrash />}
         />
-        <IAIIconButton
+        <InvIconButton
           size="sm"
           tooltip={
             isExpanded
@@ -129,68 +130,45 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           }
           onClick={toggleIsExpanded}
           variant="ghost"
-          sx={{
-            _hover: {
-              bg: 'none',
-            },
-          }}
           icon={
             <ChevronUpIcon
-              sx={{
-                boxSize: 4,
-                color: 'base.700',
-                transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
-                transitionProperty: 'common',
-                transitionDuration: 'normal',
-                _dark: {
-                  color: 'base.300',
-                },
-              }}
+              boxSize={4}
+              color="base.300"
+              transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
+              transitionProperty="common"
+              transitionDuration="normal"
             />
           }
         />
       </Flex>
 
-      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3 }}>
-        <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
-          <Flex
-            sx={{
-              flexDir: 'column',
-              gap: 3,
-              h: 28,
-              w: 'full',
-              paddingInlineStart: 1,
-              paddingInlineEnd: isExpanded ? 1 : 0,
-              pb: 2,
-              justifyContent: 'space-between',
-            }}
-          >
+      <Flex w="full" flexDir="column" gap={4}>
+        <Flex gap={4} w="full" alignItems="center">
+          <Flex flexDir="column" gap={4} h={32} w="full">
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>
           {!isExpanded && (
             <Flex
-              sx={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                h: 28,
-                w: 28,
-                aspectRatio: '1/1',
-              }}
+              alignItems="center"
+              justifyContent="center"
+              h={32}
+              w={32}
+              aspectRatio="1/1"
             >
               <ControlAdapterImagePreview id={id} isSmall />
             </Flex>
           )}
         </Flex>
-        <Flex sx={{ gap: 2 }}>
-          <ParamControlAdapterControlMode id={id} />
-          <ParamControlAdapterResizeMode id={id} />
-        </Flex>
-        <ParamControlAdapterProcessorSelect id={id} />
       </Flex>
 
       {isExpanded && (
         <>
+          <Flex gap={2}>
+            <ParamControlAdapterControlMode id={id} />
+            <ParamControlAdapterResizeMode id={id} />
+          </Flex>
+          <ParamControlAdapterProcessorSelect id={id} />
           <ControlAdapterImagePreview id={id} />
           <ControlAdapterShouldAutoConfig id={id} />
           <ControlAdapterProcessorComponent id={id} />

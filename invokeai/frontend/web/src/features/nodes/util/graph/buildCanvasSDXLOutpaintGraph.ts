@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   ImageDTO,
   ImageToLatentsInvocation,
   InfillPatchMatchInvocation,
@@ -8,6 +8,7 @@ import {
   NoiseInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -75,13 +76,10 @@ export const buildCanvasSDXLOutpaintGraph = (
     infillMethod,
     seamlessXAxis,
     seamlessYAxis,
+    img2imgStrength: strength,
   } = state.generation;
 
-  const {
-    sdxlImg2ImgDenoisingStrength: strength,
-    shouldUseSDXLRefiner,
-    refinerStart,
-  } = state.sdxl;
+  const { refinerModel, refinerStart } = state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
@@ -166,10 +164,10 @@ export const buildCanvasSDXLOutpaintGraph = (
         steps: steps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: shouldUseSDXLRefiner
+        denoising_start: refinerModel
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        denoising_end: refinerModel ? refinerStart : 1,
       },
       [CANVAS_COHERENCE_NOISE]: {
         type: 'noise',
@@ -762,7 +760,7 @@ export const buildCanvasSDXLOutpaintGraph = (
   }
 
   // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     addSDXLRefinerToGraph(
       state,
       graph,

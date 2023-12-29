@@ -1,21 +1,12 @@
-import {
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  Button,
-  Flex,
-  MenuItem,
-  Text,
-  useDisclosure,
-} from '@chakra-ui/react';
+import { Flex, useDisclosure } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { InvText } from 'common/components/InvText/wrapper';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCircleNodes } from 'react-icons/fa6';
 
@@ -23,7 +14,6 @@ const NewWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const cancelRef = useRef<HTMLButtonElement | null>(null);
   const isTouched = useAppSelector((state) => state.workflow.isTouched);
 
   const handleNewWorkflow = useCallback(() => {
@@ -51,40 +41,21 @@ const NewWorkflowMenuItem = () => {
 
   return (
     <>
-      <MenuItem as="button" icon={<FaCircleNodes />} onClick={onClick}>
+      <InvMenuItem as="button" icon={<FaCircleNodes />} onClick={onClick}>
         {t('nodes.newWorkflow')}
-      </MenuItem>
+      </InvMenuItem>
 
-      <AlertDialog
+      <InvConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}
-        leastDestructiveRef={cancelRef}
-        isCentered
+        title={t('nodes.newWorkflow')}
+        acceptCallback={handleNewWorkflow}
       >
-        <AlertDialogOverlay />
-
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('nodes.newWorkflow')}
-          </AlertDialogHeader>
-
-          <AlertDialogBody py={4}>
-            <Flex flexDir="column" gap={2}>
-              <Text>{t('nodes.newWorkflowDesc')}</Text>
-              <Text variant="subtext">{t('nodes.newWorkflowDesc2')}</Text>
-            </Flex>
-          </AlertDialogBody>
-
-          <AlertDialogFooter>
-            <Button ref={cancelRef} onClick={onClose}>
-              {t('common.cancel')}
-            </Button>
-            <Button colorScheme="error" ml={3} onClick={handleNewWorkflow}>
-              {t('common.accept')}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <Flex flexDir="column" gap={2}>
+          <InvText>{t('nodes.newWorkflowDesc')}</InvText>
+          <InvText variant="subtext">{t('nodes.newWorkflowDesc2')}</InvText>
+        </Flex>
+      </InvConfirmationAlertDialog>
     </>
   );
 };

@@ -1,5 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { BoardId } from 'features/gallery/store/types';
+import type { BoardId } from 'features/gallery/store/types';
 import { useMemo } from 'react';
 import {
   useGetBoardAssetsTotalQuery,

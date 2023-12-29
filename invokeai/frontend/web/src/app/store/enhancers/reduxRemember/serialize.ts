@@ -8,7 +8,7 @@ import { postprocessingPersistDenylist } from 'features/parameters/store/postpro
 import { systemPersistDenylist } from 'features/system/store/systemPersistDenylist';
 import { uiPersistDenylist } from 'features/ui/store/uiPersistDenylist';
 import { omit } from 'lodash-es';
-import { SerializeFunction } from 'redux-remember';
+import type { SerializeFunction } from 'redux-remember';
 
 const serializationDenylist: {
   [key: string]: string[];

@@ -8,6 +8,7 @@ import {
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
+
 import { startAppListening } from '..';
 
 const matcher = isAnyOf(commitStagingAreaImage, discardStagedImages);

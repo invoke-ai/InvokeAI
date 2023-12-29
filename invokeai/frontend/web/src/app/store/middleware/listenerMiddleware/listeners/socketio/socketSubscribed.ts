@@ -3,6 +3,7 @@ import {
   appSocketSubscribedSession,
   socketSubscribedSession,
 } from 'services/events/actions';
+
 import { startAppListening } from '../..';
 
 export const addSocketSubscribedEventListener = () => {

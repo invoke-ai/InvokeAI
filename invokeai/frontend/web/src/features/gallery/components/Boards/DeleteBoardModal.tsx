@@ -1,22 +1,21 @@
-import {
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  Flex,
-  Skeleton,
-  Text,
-} from '@chakra-ui/react';
+import { Flex, Skeleton } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
+import {
+  InvAlertDialog,
+  InvAlertDialogBody,
+  InvAlertDialogContent,
+  InvAlertDialogFooter,
+  InvAlertDialogHeader,
+  InvAlertDialogOverlay,
+} from 'common/components/InvAlertDialog/wrapper';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvText } from 'common/components/InvText/wrapper';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
-import { ImageUsage } from 'features/deleteImageModal/store/types';
+import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +24,7 @@ import {
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
 } from 'services/api/endpoints/images';
-import { BoardDTO } from 'services/api/types';
+import type { BoardDTO } from 'services/api/types';
 
 type Props = {
   boardToDelete?: BoardDTO;
@@ -106,28 +105,23 @@ const DeleteBoardModal = (props: Props) => {
   }
 
   return (
-    <AlertDialog
+    <InvAlertDialog
       isOpen={Boolean(boardToDelete)}
       onClose={handleClose}
       leastDestructiveRef={cancelRef}
       isCentered
     >
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
+      <InvAlertDialogOverlay>
+        <InvAlertDialogContent>
+          <InvAlertDialogHeader fontSize="lg" fontWeight="bold">
             {t('controlnet.delete')} {boardToDelete.board_name}
-          </AlertDialogHeader>
+          </InvAlertDialogHeader>
 
-          <AlertDialogBody>
+          <InvAlertDialogBody>
             <Flex direction="column" gap={3}>
               {isFetchingBoardNames ? (
                 <Skeleton>
-                  <Flex
-                    sx={{
-                      w: 'full',
-                      h: 32,
-                    }}
-                  />
+                  <Flex w="full" h={32} />
                 </Skeleton>
               ) : (
                 <ImageUsageMessage
@@ -136,40 +130,38 @@ const DeleteBoardModal = (props: Props) => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
-              <Text>
+              <InvText>{t('boards.deletedBoardsCannotbeRestored')}</InvText>
+              <InvText>
                 {canRestoreDeletedImagesFromBin
                   ? t('gallery.deleteImageBin')
                   : t('gallery.deleteImagePermanent')}
-              </Text>
+              </InvText>
             </Flex>
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <Flex
-              sx={{ justifyContent: 'space-between', width: 'full', gap: 2 }}
-            >
-              <IAIButton ref={cancelRef} onClick={handleClose}>
+          </InvAlertDialogBody>
+          <InvAlertDialogFooter>
+            <Flex w="full" gap={2} justifyContent="space-between">
+              <InvButton ref={cancelRef} onClick={handleClose}>
                 {t('boards.cancel')}
-              </IAIButton>
-              <IAIButton
+              </InvButton>
+              <InvButton
                 colorScheme="warning"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardOnly}
               >
                 {t('boards.deleteBoardOnly')}
-              </IAIButton>
-              <IAIButton
+              </InvButton>
+              <InvButton
                 colorScheme="error"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardAndImages}
               >
                 {t('boards.deleteBoardAndImages')}
-              </IAIButton>
+              </InvButton>
             </Flex>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+          </InvAlertDialogFooter>
+        </InvAlertDialogContent>
+      </InvAlertDialogOverlay>
+    </InvAlertDialog>
   );
 };
 
