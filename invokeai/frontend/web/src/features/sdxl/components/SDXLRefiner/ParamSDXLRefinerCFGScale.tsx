@@ -1,3 +1,5 @@
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -5,26 +7,50 @@ import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selector = createMemoizedSelector([stateSelector], ({ config }) => {
+  const { min, inputMax, sliderMax, coarseStep, fineStep, initial } =
+    config.sd.guidance;
+
+  return {
+    marks: [min, Math.floor(sliderMax / 2), sliderMax],
+    min,
+    inputMax,
+    sliderMax,
+    coarseStep,
+    fineStep,
+    initial,
+  };
+});
+
 const ParamSDXLRefinerCFGScale = () => {
   const refinerCFGScale = useAppSelector((state) => state.sdxl.refinerCFGScale);
+  const { marks, min, inputMax, sliderMax, coarseStep, fineStep, initial } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleChange = useCallback(
+  const onChange = useCallback(
     (v: number) => dispatch(setRefinerCFGScale(v)),
     [dispatch]
   );
+
+  const onReset = useCallback(() => {
+    dispatch(setRefinerCFGScale(initial));
+  }, [dispatch, initial]);
 
   return (
     <InvControl label={t('sdxl.cfgScale')}>
       <InvSlider
         value={refinerCFGScale}
-        min={1}
-        max={200}
-        step={0.5}
-        fineStep={0.1}
-        onChange={handleChange}
+        min={min}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={onChange}
+        onReset={onReset}
         withNumberInput
+        numberInputMax={inputMax}
+        marks={marks}
       />
     </InvControl>
   );
