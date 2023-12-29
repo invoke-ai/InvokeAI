@@ -20,7 +20,8 @@ const filledTrack = defineStyle((_props) => {
   };
 });
 
-const thumb = defineStyle(() => {
+const thumb = defineStyle((props) => {
+  const { orientation } = props;
   return {
     w: 4,
     h: 4,
@@ -29,10 +30,16 @@ const thumb = defineStyle(() => {
     borderColor: 'base.200',
     borderWidth: 2,
     _hover: {
-      transform: `translateY(-50%) scale(1.15)`,
+      transform:
+        orientation === 'vertical'
+          ? 'translateX(-50%) scale(1.15)'
+          : 'translateY(-50%) scale(1.15)',
       transition: 'transform 0.1s',
       _active: {
-        transform: `translateY(-50%) scale(1.22)`,
+        transform:
+          orientation === 'vertical'
+            ? 'translateX(-50%) scale(1.22)'
+            : 'translateY(-50%) scale(1.22)',
         transition: 'transform 0.05s',
       },
     },
@@ -51,7 +58,7 @@ const baseStyle = definePartsStyle((props) => ({
   container: container(),
   track: track(),
   filledTrack: filledTrack(props),
-  thumb: thumb(),
+  thumb: thumb(props),
   mark: mark(),
 }));
 
