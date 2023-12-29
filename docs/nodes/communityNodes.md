@@ -36,7 +36,8 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Mask Operations](#mask-operations)
     + [Match Histogram](#match-histogram)
     + [Metadata-Linked](#metadata-linked-nodes)
-    + [Negative Image](#negative-image)    
+    + [Negative Image](#negative-image)
+    + [Nightmare Promptgen](#nightmare-promptgen)    
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
@@ -345,6 +346,13 @@ Node Link: https://github.com/VeyDlin/negative-image-node
 
 View:
 </br><img src="https://raw.githubusercontent.com/VeyDlin/negative-image-node/master/.readme/node.png" width="500" />
+
+--------------------------------
+### Nightmare Promptgen
+
+**Description:** Nightmare Prompt Generator - Uses a local text generation model to create unique imaginative (but usually nightmarish) prompts for InvokeAI. By default, it allows you to choose from some gpt-neo models I finetuned on over 2500 of my own InvokeAI prompts in Compel format, but you're able to add your own, as well. Offers support for replacing any troublesome words with a random choice from list you can also define.
+
+**Node Link:** [https://github.com/gogurtenjoyer/nightmare-promptgen](https://github.com/gogurtenjoyer/nightmare-promptgen)
 
 --------------------------------
 ### Oobabooga
