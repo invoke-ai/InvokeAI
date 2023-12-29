@@ -5,7 +5,7 @@ import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -15,8 +15,6 @@ import WorkflowPanel from './workflow/WorkflowPanel';
 const panelGroupStyles: CSSProperties = { height: '100%', width: '100%' };
 
 const NodeEditorPanelGroup = () => {
-  const [isTopPanelCollapsed, setIsTopPanelCollapsed] = useState(false);
-  const [isBottomPanelCollapsed, setIsBottomPanelCollapsed] = useState(false);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const panelStorage = usePanelStorage();
   const handleDoubleClickHandle = useCallback(() => {
@@ -37,31 +35,14 @@ const NodeEditorPanelGroup = () => {
         style={panelGroupStyles}
         storage={panelStorage}
       >
-        <Panel
-          id="workflow"
-          collapsible
-          onCollapse={setIsTopPanelCollapsed}
-          minSize={25}
-        >
+        <Panel id="workflow" collapsible minSize={25}>
           <WorkflowPanel />
         </Panel>
         <ResizeHandle
           direction="vertical"
           onDoubleClick={handleDoubleClickHandle}
-          collapsedDirection={
-            isTopPanelCollapsed
-              ? 'top'
-              : isBottomPanelCollapsed
-                ? 'bottom'
-                : undefined
-          }
         />
-        <Panel
-          id="inspector"
-          collapsible
-          onCollapse={setIsBottomPanelCollapsed}
-          minSize={25}
-        >
+        <Panel id="inspector" collapsible minSize={25}>
           <InspectorPanel />
         </Panel>
       </PanelGroup>

@@ -95,13 +95,10 @@ const enabledTabsSelector = createMemoizedSelector(
   }
 );
 
-const SIDE_PANEL_MIN_SIZE_PX = 448;
-const MAIN_PANEL_MIN_SIZE_PX = 448;
-const GALLERY_PANEL_MIN_SIZE_PX = 360;
-
 export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
+const GALLERY_MIN_SIZE_PCT = 20
 
 const InvokeTabs = () => {
   const activeTabIndex = useAppSelector(activeTabIndexSelector);
@@ -156,52 +153,17 @@ const InvokeTabs = () => {
   );
 
   const {
-    isCollapsed: isSidePanelCollapsed,
-    expand: expandSidePanel,
-    collapse: collapseSidePanel,
-    toggle: toggleSidePanel,
-  } = usePanel(SIDE_PANEL_MIN_SIZE_PX, 'pixels');
-
-  const {
     ref: galleryPanelRef,
     minSize: galleryPanelMinSize,
     isCollapsed: isGalleryPanelCollapsed,
-    setIsCollapsed: setIsGalleryPanelCollapsed,
+    onCollapse: onCollapseGalleryPanel,
+    onExpand: onExpandGalleryPanel,
     reset: resetGalleryPanel,
     expand: expandGalleryPanel,
-    collapse: collapseGalleryPanel,
     toggle: toggleGalleryPanel,
-  } = usePanel(GALLERY_PANEL_MIN_SIZE_PX, 'pixels');
+  } = usePanel(GALLERY_MIN_SIZE_PCT);
 
-  useHotkeys(
-    'f',
-    () => {
-      if (isGalleryPanelCollapsed || isSidePanelCollapsed) {
-        expandGalleryPanel();
-        expandSidePanel();
-      } else {
-        collapseSidePanel();
-        collapseGalleryPanel();
-      }
-    },
-    [dispatch, isGalleryPanelCollapsed, isSidePanelCollapsed]
-  );
-
-  useHotkeys(
-    ['t', 'o'],
-    () => {
-      toggleSidePanel();
-    },
-    [dispatch]
-  );
-
-  useHotkeys(
-    'g',
-    () => {
-      toggleGalleryPanel();
-    },
-    [dispatch]
-  );
+  useHotkeys('g', toggleGalleryPanel, []);
 
   const panelStorage = usePanelStorage();
 
@@ -219,73 +181,47 @@ const InvokeTabs = () => {
         {tabs}
         <Spacer />
       </InvTabList>
-      {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
-        <Flex h="full" w={434} flexShrink={0}>
-          {activeTabName === 'nodes' ? (
-            <NodeEditorPanelGroup />
-          ) : (
-            <ParametersPanel />
-          )}
-        </Flex>
-      )}
       <PanelGroup
         id="app"
         autoSaveId="app"
         direction="horizontal"
         style={panelStyles}
         storage={panelStorage}
-        units="pixels"
       >
-        {/* {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
-          <>
-            <Panel
-              order={0}
-              id="side"
-              ref={sidePanelRef}
-              defaultSize={sidePanelMinSize}
-              minSize={sidePanelMinSize}
-              onCollapse={setIsSidePanelCollapsed}
-              collapsible
-            >
-              {activeTabName === 'nodes' ? (
-                <NodeEditorPanelGroup />
-              ) : (
-                <ParametersPanel />
-              )}
-            </Panel>
-            <ResizeHandle
-              onDoubleClick={resetSidePanel}
-              collapsedDirection={isSidePanelCollapsed ? 'left' : undefined}
-            />
-            <FloatingSidePanelButtons
-              isSidePanelCollapsed={isSidePanelCollapsed}
-              sidePanelRef={sidePanelRef}
-            />
-          </>
-        )} */}
-        <Panel id="main" order={1} minSize={MAIN_PANEL_MIN_SIZE_PX}>
-          <InvTabPanels style={panelStyles}>{tabPanels}</InvTabPanels>
+        <Panel id="main" order={0} minSize={50}>
+          <Flex w="full" h="full" gap={4}>
+            {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
+              <Flex h="full" w={434} flexShrink={0}>
+                {activeTabName === 'nodes' ? (
+                  <NodeEditorPanelGroup />
+                ) : (
+                  <ParametersPanel />
+                )}
+              </Flex>
+            )}
+            <InvTabPanels w="full" h="full">
+              {tabPanels}
+            </InvTabPanels>
+          </Flex>
         </Panel>
         {!NO_GALLERY_TABS.includes(activeTabName) && (
           <>
-            <ResizeHandle
-              onDoubleClick={resetGalleryPanel}
-              collapsedDirection={isGalleryPanelCollapsed ? 'right' : undefined}
-            />
+            <ResizeHandle onDoubleClick={resetGalleryPanel} />
             <Panel
               id="gallery"
               ref={galleryPanelRef}
-              order={2}
+              order={1}
               defaultSize={galleryPanelMinSize}
               minSize={galleryPanelMinSize}
-              onCollapse={setIsGalleryPanelCollapsed}
+              onCollapse={onCollapseGalleryPanel}
+              onExpand={onExpandGalleryPanel}
               collapsible
             >
               <ImageGalleryContent />
             </Panel>
             <FloatingGalleryButton
               isGalleryCollapsed={isGalleryPanelCollapsed}
-              galleryPanelRef={galleryPanelRef}
+              expandGallery={expandGalleryPanel}
             />
           </>
         )}

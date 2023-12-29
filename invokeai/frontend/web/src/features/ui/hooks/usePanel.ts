@@ -1,16 +1,28 @@
 import { useCallback, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import type { ImperativePanelHandle, Units } from 'react-resizable-panels';
+import type {
+  ImperativePanelHandle,
+  PanelOnCollapse,
+  PanelOnExpand,
+} from 'react-resizable-panels';
 
-export const usePanel = (minSize: number, units: Units) => {
+export const usePanel = (minSize: number) => {
   const ref = useRef<ImperativePanelHandle>(null);
 
   const [isCollapsed, setIsCollapsed] = useState(() =>
-    Boolean(ref.current?.getCollapsed())
+    Boolean(ref.current?.isCollapsed())
   );
 
+  const onCollapse = useCallback<PanelOnCollapse>(() => {
+    setIsCollapsed(true);
+  }, []);
+
+  const onExpand = useCallback<PanelOnExpand>(() => {
+    setIsCollapsed(false);
+  }, []);
+
   const toggle = useCallback(() => {
-    if (ref.current?.getCollapsed()) {
+    if (ref.current?.isCollapsed()) {
       flushSync(() => {
         ref.current?.expand();
       });
@@ -35,15 +47,16 @@ export const usePanel = (minSize: number, units: Units) => {
 
   const reset = useCallback(() => {
     flushSync(() => {
-      ref.current?.resize(minSize, units);
+      ref.current?.resize(minSize);
     });
-  }, [minSize, units]);
+  }, [minSize]);
 
   return {
     ref,
     minSize,
     isCollapsed,
-    setIsCollapsed,
+    onCollapse,
+    onExpand,
     reset,
     toggle,
     expand,
