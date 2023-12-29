@@ -98,7 +98,7 @@ const enabledTabsSelector = createMemoizedSelector(
 export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
-const GALLERY_MIN_SIZE_PCT = 20
+const GALLERY_MIN_SIZE_PCT = 20;
 
 const InvokeTabs = () => {
   const activeTabIndex = useAppSelector(activeTabIndexSelector);

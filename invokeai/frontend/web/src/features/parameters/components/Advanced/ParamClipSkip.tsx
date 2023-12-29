@@ -4,10 +4,10 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function ParamClipSkip() {
+const ParamClipSkip = () => {
   const clipSkip = useAppSelector(
     (state: RootState) => state.generation.clipSkip
   );
@@ -60,4 +60,6 @@ export default function ParamClipSkip() {
       />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamClipSkip);

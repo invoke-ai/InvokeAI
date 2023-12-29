@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { redo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaRedo } from 'react-icons/fa';
@@ -21,7 +21,7 @@ const canvasRedoSelector = createMemoizedSelector(
   }
 );
 
-export default function IAICanvasRedoButton() {
+const IAICanvasRedoButton = () => {
   const dispatch = useAppDispatch();
   const { canRedo, activeTabName } = useAppSelector(canvasRedoSelector);
 
@@ -52,4 +52,6 @@ export default function IAICanvasRedoButton() {
       isDisabled={!canRedo}
     />
   );
-}
+};
+
+export default memo(IAICanvasRedoButton);

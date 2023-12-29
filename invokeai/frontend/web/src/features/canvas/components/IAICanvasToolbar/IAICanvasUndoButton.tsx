@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { undo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaUndo } from 'react-icons/fa';
@@ -21,7 +21,7 @@ const canvasUndoSelector = createMemoizedSelector(
   }
 );
 
-export default function IAICanvasUndoButton() {
+const IAICanvasUndoButton = () => {
   const dispatch = useAppDispatch();
 
   const { t } = useTranslation();
@@ -53,4 +53,6 @@ export default function IAICanvasUndoButton() {
       isDisabled={!canUndo}
     />
   );
-}
+};
+
+export default memo(IAICanvasUndoButton);

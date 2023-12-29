@@ -5,7 +5,7 @@ import type {
   InvSelectOnChange,
   InvSelectOption,
 } from 'common/components/InvSelect/types';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
@@ -17,7 +17,7 @@ export type ManualAddMode = z.infer<typeof zManualAddMode>;
 export const isManualAddMode = (v: unknown): v is ManualAddMode =>
   zManualAddMode.safeParse(v).success;
 
-export default function AdvancedAddModels() {
+const AdvancedAddModels = () => {
   const [advancedAddMode, setAdvancedAddMode] =
     useState<ManualAddMode>('diffusers');
 
@@ -54,4 +54,6 @@ export default function AdvancedAddModels() {
       </Flex>
     </Flex>
   );
-}
+};
+
+export default memo(AdvancedAddModels);

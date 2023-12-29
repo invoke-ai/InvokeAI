@@ -175,7 +175,7 @@ const IAICanvas = () => {
     [stageCursor]
   );
 
-  const scale= useMemo(()=>({x: stageScale, y: stageScale}),[stageScale])
+  const scale = useMemo(() => ({ x: stageScale, y: stageScale }), [stageScale]);
 
   return (
     <Flex

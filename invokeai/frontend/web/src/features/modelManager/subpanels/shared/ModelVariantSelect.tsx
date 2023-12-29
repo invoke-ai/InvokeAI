@@ -4,6 +4,7 @@ import type {
   InvSelectOption,
   InvSelectProps,
 } from 'common/components/InvSelect/types';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const options: InvSelectOption[] = [
@@ -14,11 +15,13 @@ const options: InvSelectOption[] = [
 
 type VariantSelectProps = Omit<InvSelectProps, 'options'>;
 
-export default function ModelVariantSelect(props: VariantSelectProps) {
+const ModelVariantSelect = (props: VariantSelectProps) => {
   const { t } = useTranslation();
   return (
     <InvControl label={t('modelManager.variant')}>
       <InvSelect options={options} {...props} />
     </InvControl>
   );
-}
+};
+
+export default memo(ModelVariantSelect);

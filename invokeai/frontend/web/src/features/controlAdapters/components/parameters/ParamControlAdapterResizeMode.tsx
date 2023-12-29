@@ -7,14 +7,14 @@ import { useControlAdapterResizeMode } from 'features/controlAdapters/hooks/useC
 import { controlAdapterResizeModeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ResizeMode } from 'features/controlAdapters/store/types';
 import { isResizeMode } from 'features/controlAdapters/store/types';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
   id: string;
 };
 
-export default function ParamControlAdapterResizeMode({ id }: Props) {
+const ParamControlAdapterResizeMode = ({ id }: Props) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const resizeMode = useControlAdapterResizeMode(id);
   const dispatch = useAppDispatch();
@@ -67,4 +67,6 @@ export default function ParamControlAdapterResizeMode({ id }: Props) {
       />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamControlAdapterResizeMode);

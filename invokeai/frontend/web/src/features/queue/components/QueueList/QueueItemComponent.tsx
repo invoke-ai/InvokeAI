@@ -63,7 +63,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
     [item.status]
   );
 
-  const icon = useMemo(() => (<FaTimes />), []);
+  const icon = useMemo(() => <FaTimes />, []);
   return (
     <Flex
       flexDir="column"

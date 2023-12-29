@@ -3,10 +3,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setMaskBlur } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function ParamMaskBlur() {
+const ParamMaskBlur = () => {
   const dispatch = useAppDispatch();
   const maskBlur = useAppSelector(
     (state: RootState) => state.generation.maskBlur
@@ -37,4 +37,6 @@ export default function ParamMaskBlur() {
       />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamMaskBlur);

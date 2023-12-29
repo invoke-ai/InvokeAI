@@ -1,9 +1,10 @@
 import { Flex } from '@chakra-ui/react';
 import { InvText } from 'common/components/InvText/wrapper';
 import { SyncModelsButton } from 'features/modelManager/components/SyncModels/SyncModelsButton';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function SyncModels() {
+const SyncModels = () => {
   const { t } = useTranslation();
 
   return (
@@ -25,4 +26,6 @@ export default function SyncModels() {
       <SyncModelsButton />
     </Flex>
   );
-}
+};
+
+export default memo(SyncModels);

@@ -16,7 +16,7 @@ import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import type { ChangeEvent } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConvertMainModelsMutation } from 'services/api/endpoints/models';
 import type { CheckpointModelConfig } from 'services/api/types';
@@ -27,7 +27,7 @@ interface ModelConvertProps {
 
 type SaveLocation = 'InvokeAIRoot' | 'Custom';
 
-export default function ModelConvert(props: ModelConvertProps) {
+const ModelConvert = (props: ModelConvertProps) => {
   const { model } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -186,4 +186,6 @@ export default function ModelConvert(props: ModelConvertProps) {
       </InvConfirmationAlertDialog>
     </>
   );
-}
+};
+
+export default memo(ModelConvert);

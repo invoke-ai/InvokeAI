@@ -314,4 +314,4 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
 export default memo(IAICanvasBoundingBox);
 
-const emptyArray: string[] = []
+const emptyArray: string[] = [];

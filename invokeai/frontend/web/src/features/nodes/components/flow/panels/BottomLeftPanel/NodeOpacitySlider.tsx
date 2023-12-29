@@ -2,10 +2,10 @@ import { Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { nodeOpacityChanged } from 'features/nodes/store/nodesSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function NodeOpacitySlider() {
+const NodeOpacitySlider = () => {
   const dispatch = useAppDispatch();
   const nodeOpacity = useAppSelector((state) => state.nodes.nodeOpacity);
   const { t } = useTranslation();
@@ -32,4 +32,6 @@ export default function NodeOpacitySlider() {
       />
     </Flex>
   );
-}
+};
+
+export default memo(NodeOpacitySlider);

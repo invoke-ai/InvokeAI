@@ -7,7 +7,7 @@ import { Group, Rect } from 'react-konva';
 
 import IAICanvasImage from './IAICanvasImage';
 
-const dash = [4, 4]
+const dash = [4, 4];
 
 const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
   const {

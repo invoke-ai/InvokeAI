@@ -10,7 +10,7 @@ import type {
 } from 'common/components/InvSelect/types';
 import { InvText } from 'common/components/InvText/wrapper';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 
@@ -19,7 +19,7 @@ import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 import type { ManualAddMode } from './AdvancedAddModels';
 import { isManualAddMode } from './AdvancedAddModels';
 
-export default function ScanAdvancedAddModels() {
+const ScanAdvancedAddModels = () => {
   const advancedAddScanModel = useAppSelector(
     (state: RootState) => state.modelmanager.advancedAddScanModel
   );
@@ -121,4 +121,6 @@ export default function ScanAdvancedAddModels() {
       )}
     </Box>
   );
-}
+};
+
+export default memo(ScanAdvancedAddModels);

@@ -5,6 +5,7 @@ import type {
   InvSelectProps,
 } from 'common/components/InvSelect/types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const options: InvSelectOption[] = [
@@ -16,11 +17,13 @@ const options: InvSelectOption[] = [
 
 type BaseModelSelectProps = Omit<InvSelectProps, 'options'>;
 
-export default function BaseModelSelect(props: BaseModelSelectProps) {
+const BaseModelSelect = (props: BaseModelSelectProps) => {
   const { t } = useTranslation();
   return (
     <InvControl label={t('modelManager.baseModel')}>
       <InvSelect options={options} {...props} />
     </InvControl>
   );
-}
+};
+
+export default memo(BaseModelSelect);

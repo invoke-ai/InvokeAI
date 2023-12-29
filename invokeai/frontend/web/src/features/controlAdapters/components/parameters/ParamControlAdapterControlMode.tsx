@@ -6,14 +6,14 @@ import { useControlAdapterControlMode } from 'features/controlAdapters/hooks/use
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { controlAdapterControlModeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlMode } from 'features/controlAdapters/store/types';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
   id: string;
 };
 
-export default function ParamControlAdapterControlMode({ id }: Props) {
+const ParamControlAdapterControlMode = ({ id }: Props) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const controlMode = useControlAdapterControlMode(id);
   const dispatch = useAppDispatch();
@@ -66,4 +66,6 @@ export default function ParamControlAdapterControlMode({ id }: Props) {
       />
     </InvControl>
   );
-}
+};
+
+export default memo(ParamControlAdapterControlMode);

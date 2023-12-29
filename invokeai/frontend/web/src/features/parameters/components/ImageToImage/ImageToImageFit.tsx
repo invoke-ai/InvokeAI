@@ -5,12 +5,12 @@ import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setShouldFitToWidthHeight } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelProps: InvLabelProps = { flexGrow: 1 };
 
-export default function ImageToImageFit() {
+const ImageToImageFit = () => {
   const dispatch = useAppDispatch();
 
   const shouldFitToWidthHeight = useAppSelector(
@@ -38,4 +38,6 @@ export default function ImageToImageFit() {
       />
     </InvControl>
   );
-}
+};
+
+export default memo(ImageToImageFit);

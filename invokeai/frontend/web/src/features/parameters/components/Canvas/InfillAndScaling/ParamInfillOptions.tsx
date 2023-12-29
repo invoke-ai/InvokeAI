@@ -1,9 +1,10 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { memo } from 'react';
 
 import ParamInfillPatchmatchDownscaleSize from './ParamInfillPatchmatchDownscaleSize';
 import ParamInfillTilesize from './ParamInfillTilesize';
 
-export default function ParamInfillOptions() {
+const ParamInfillOptions = () => {
   const infillMethod = useAppSelector((state) => state.generation.infillMethod);
   if (infillMethod === 'tile') {
     return <ParamInfillTilesize />;
@@ -14,4 +15,6 @@ export default function ParamInfillOptions() {
   }
 
   return null;
-}
+};
+
+export default memo(ParamInfillOptions);

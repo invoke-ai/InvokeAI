@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AddModels from './AddModelsPanel/AddModels';
@@ -9,7 +9,7 @@ import ScanModels from './AddModelsPanel/ScanModels';
 
 type AddModelTabs = 'add' | 'scan';
 
-export default function ImportModelsPanel() {
+const ImportModelsPanel = () => {
   const [addModelTab, setAddModelTab] = useState<AddModelTabs>('add');
   const { t } = useTranslation();
 
@@ -41,4 +41,6 @@ export default function ImportModelsPanel() {
       {addModelTab == 'scan' && <ScanModels />}
     </Flex>
   );
-}
+};
+
+export default memo(ImportModelsPanel);

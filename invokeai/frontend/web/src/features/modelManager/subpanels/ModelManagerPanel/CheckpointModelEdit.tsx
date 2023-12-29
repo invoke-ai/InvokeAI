@@ -12,7 +12,7 @@ import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVari
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CheckpointModelConfigEntity } from 'services/api/endpoints/models';
 import {
@@ -27,7 +27,7 @@ type CheckpointModelEditProps = {
   model: CheckpointModelConfigEntity;
 };
 
-export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
+const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
   const { model } = props;
 
   const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
@@ -189,4 +189,6 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
       </Flex>
     </Flex>
   );
-}
+};
+
+export default memo(CheckpointModelEdit);

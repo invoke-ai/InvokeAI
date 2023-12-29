@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { InvText } from 'common/components/InvText/wrapper';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 import type {
@@ -18,7 +18,7 @@ import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import LoRAModelEdit from './ModelManagerPanel/LoRAModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
 
-export default function ModelManagerPanel() {
+const ModelManagerPanel = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>();
   const { mainModel } = useGetMainModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
@@ -42,7 +42,7 @@ export default function ModelManagerPanel() {
       <ModelEdit model={model} />
     </Flex>
   );
-}
+};
 
 type ModelEditProps = {
   model: MainModelConfigEntity | LoRAModelConfigEntity | undefined;
@@ -82,3 +82,5 @@ const ModelEdit = (props: ModelEditProps) => {
     </Flex>
   );
 };
+
+export default memo(ModelManagerPanel);
