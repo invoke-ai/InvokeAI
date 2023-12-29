@@ -8,13 +8,17 @@ const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(parts.keys);
 
 const baseStylePreview = defineStyle({
+  fontSize: 'md',
   borderRadius: 'md',
   py: '1',
   transitionProperty: 'common',
   transitionDuration: 'normal',
+  color: 'base.100'
 });
 
 const baseStyleInput = defineStyle(() => ({
+  color: 'base.100',
+  fontSize: 'md',
   borderRadius: 'md',
   py: '1',
   transitionProperty: 'common',
@@ -23,8 +27,8 @@ const baseStyleInput = defineStyle(() => ({
   _focusVisible: { boxShadow: 'none' },
   _placeholder: { opacity: 0.6 },
   '::selection': {
-    color: 'blue.50',
-    bg: 'blue.400',
+    color: 'blue.900',
+    bg: 'blue.300',
   },
 }));
 

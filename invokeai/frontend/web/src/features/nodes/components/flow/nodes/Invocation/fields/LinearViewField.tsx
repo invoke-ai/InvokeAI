@@ -58,7 +58,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
           placement="top"
         >
           <Flex h="full" alignItems="center">
-            <Icon as={FaInfoCircle} />
+            <Icon fontSize="sm" color="base.300" as={FaInfoCircle} />
           </Flex>
         </InvTooltip>
         <InvIconButton

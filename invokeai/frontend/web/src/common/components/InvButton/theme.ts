@@ -54,7 +54,7 @@ const getColors = (
   const bgColorHover = c === 'invokeYellow' ? `${c}.300` : `${c}.300`;
 
   const notSolidFg = {
-    fg: c === 'base' ? 'base.100' : bgColor,
+    fg: c === 'base' ? 'base.300' : bgColor,
     fgHover: c === 'base' ? 'base.50' : bgColorHover,
     fgDisabled: 'base.600',
   };
