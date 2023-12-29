@@ -7,15 +7,10 @@ import SearchFolderForm from './SearchFolderForm';
 
 const ScanModels = () => {
   return (
-    <Flex flexDirection="column" w="100%" gap={4}>
+    <Flex flexDirection="column" w="100%" h="full" gap={4}>
       <SearchFolderForm />
       <Flex gap={4}>
-        <Flex
-          maxHeight="calc(100vh - 300px)"
-          overflow="scroll"
-          gap={4}
-          w="100%"
-        >
+        <Flex overflow="scroll" gap={4} w="100%" h="full">
           <FoundModelsList />
         </Flex>
         <ScanAdvancedAddModels />

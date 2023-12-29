@@ -4,7 +4,11 @@ import { badgeTheme } from 'common/components/InvBadge/theme';
 import { buttonTheme } from 'common/components/InvButton/theme';
 import { cardTheme } from 'common/components/InvCard/theme';
 import { checkboxTheme } from 'common/components/InvCheckbox/theme';
-import { formLabelTheme, formTheme } from 'common/components/InvControl/theme';
+import {
+  formErrorTheme,
+  formLabelTheme,
+  formTheme,
+} from 'common/components/InvControl/theme';
 import { editableTheme } from 'common/components/InvEditable/theme';
 import { headingTheme } from 'common/components/InvHeading/theme';
 import { inputTheme } from 'common/components/InvInput/theme';
@@ -112,6 +116,7 @@ export const theme: ThemeOverride = {
     Text: textTheme,
     Textarea: textareaTheme,
     Tooltip: tooltipTheme,
+    FormError: formErrorTheme,
   },
   space: space,
   sizes: space,

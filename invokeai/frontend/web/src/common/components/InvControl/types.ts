@@ -7,6 +7,7 @@ import type { Feature } from 'common/components/IAIInformationalPopover/constant
 export type InvControlProps = ChakraFormControlProps & {
   label?: string;
   helperText?: string;
+  error?: string;
   feature?: Feature;
   renderInfoPopoverInPortal?: boolean;
   labelProps?: Omit<
