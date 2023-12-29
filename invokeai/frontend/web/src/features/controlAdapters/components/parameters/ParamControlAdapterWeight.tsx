@@ -34,6 +34,7 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
       label={t('controlnet.weight')}
       isDisabled={!isEnabled}
       feature="controlNetWeight"
+      orientation="vertical"
     >
       <InvSlider
         value={weight}

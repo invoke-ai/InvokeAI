@@ -2,6 +2,7 @@ import { ChevronUpIcon } from '@chakra-ui/icons';
 import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
+import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
@@ -28,6 +29,10 @@ import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
+
+const labelProps: InvLabelProps = {
+  flexGrow: 1,
+};
 
 const ControlAdapterConfig = (props: { id: string; number: number }) => {
   const { id, number } = props;
@@ -66,14 +71,17 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
   return (
     <Flex
       flexDir="column"
-      gap={3}
-      p={2}
+      gap={4}
+      p={4}
       borderRadius="base"
       position="relative"
       bg="base.750"
     >
       <Flex gap={2} alignItems="center" justifyContent="space-between">
-        <InvControl label={t(`controlnet.${controlAdapterType}`, { number })}>
+        <InvControl
+          label={t(`controlnet.${controlAdapterType}`, { number })}
+          labelProps={labelProps}
+        >
           <InvSwitch
             aria-label={t('controlnet.toggleControlNet')}
             isChecked={isEnabled}
@@ -81,7 +89,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           />
         </InvControl>
       </Flex>
-      <Flex gap={2} alignItems="center">
+      <Flex gap={4} alignItems="center">
         <Box
           minW={0}
           w="full"
@@ -134,18 +142,9 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
         />
       </Flex>
 
-      <Flex w="full" flexDir="column" gap={3}>
+      <Flex w="full" flexDir="column" gap={4}>
         <Flex gap={4} w="full" alignItems="center">
-          <Flex
-            flexDir="column"
-            gap={3}
-            h={28}
-            w="full"
-            paddingInlineStart={1}
-            paddingInlineEnd={isExpanded ? 1 : 0}
-            pb={2}
-            justifyContent="space-between"
-          >
+          <Flex flexDir="column" gap={4} h={32} w="full">
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>
@@ -153,23 +152,23 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
             <Flex
               alignItems="center"
               justifyContent="center"
-              h={28}
-              w={28}
+              h={32}
+              w={32}
               aspectRatio="1/1"
             >
               <ControlAdapterImagePreview id={id} isSmall />
             </Flex>
           )}
         </Flex>
-        <Flex gap={2}>
-          <ParamControlAdapterControlMode id={id} />
-          <ParamControlAdapterResizeMode id={id} />
-        </Flex>
-        <ParamControlAdapterProcessorSelect id={id} />
       </Flex>
 
       {isExpanded && (
         <>
+          <Flex gap={2}>
+            <ParamControlAdapterControlMode id={id} />
+            <ParamControlAdapterResizeMode id={id} />
+          </Flex>
+          <ParamControlAdapterProcessorSelect id={id} />
           <ControlAdapterImagePreview id={id} />
           <ControlAdapterShouldAutoConfig id={id} />
           <ControlAdapterProcessorComponent id={id} />
