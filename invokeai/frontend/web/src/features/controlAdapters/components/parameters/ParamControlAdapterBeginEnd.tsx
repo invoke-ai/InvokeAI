@@ -64,6 +64,7 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
       isDisabled={!isEnabled}
       label={t('controlnet.beginEndStepPercent')}
       feature="controlNetBeginEnd"
+      orientation="vertical"
     >
       <InvRangeSlider
         aria-label={['Begin Step %', 'End Step %']}

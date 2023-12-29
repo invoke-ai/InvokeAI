@@ -14,8 +14,7 @@ const formBaseStyle = definePartsStyle((props) => {
       display: 'flex',
       flexDirection: props.orientation === 'vertical' ? 'column' : 'row',
       alignItems: props.orientation === 'vertical' ? 'flex-start' : 'center',
-      gap: 4,
-      // h: props.orientation === 'vertical' ? 'unset' : 8,
+      gap: props.orientation === 'vertical' ? 2 : 4,
     },
   };
 });
