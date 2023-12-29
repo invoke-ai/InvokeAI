@@ -1,3 +1,4 @@
+import type { ChakraProps } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
@@ -68,8 +69,12 @@ export const EmbeddingSelect = ({
         onChange={onChange}
         onMenuClose={onClose}
         data-testid="add-embedding"
-        w="full"
+        sx={selectStyles}
       />
     </InvControl>
   );
+};
+
+const selectStyles: ChakraProps['sx'] = {
+  w: 'full',
 };

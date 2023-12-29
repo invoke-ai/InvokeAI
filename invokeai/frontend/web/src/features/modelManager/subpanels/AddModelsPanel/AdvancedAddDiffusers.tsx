@@ -9,7 +9,7 @@ import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSel
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import type { FocusEventHandler } from 'react';
+import type { CSSProperties, FocusEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
@@ -99,7 +99,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
       onSubmit={advancedAddDiffusersForm.onSubmit((v) =>
         advancedAddDiffusersFormHandler(v)
       )}
-      style={{ width: '100%' }}
+      style={formStyles}
     >
       <Flex flexDirection="column" gap={2}>
         <InvControl isRequired label={t('modelManager.model')}>
@@ -138,3 +138,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
     </form>
   );
 }
+
+const formStyles: CSSProperties = {
+  width: '100%',
+};

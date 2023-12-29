@@ -11,7 +11,7 @@ import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/Chec
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import type { FocusEventHandler } from 'react';
+import type { CSSProperties, FocusEventHandler } from 'react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
@@ -112,7 +112,7 @@ export default function AdvancedAddCheckpoint(
       onSubmit={advancedAddCheckpointForm.onSubmit((v) =>
         advancedAddCheckpointFormHandler(v)
       )}
-      style={{ width: '100%' }}
+      style={formStyles}
     >
       <Flex flexDirection="column" gap={2}>
         <InvControl label={t('modelManager.model')} isRequired>
@@ -148,7 +148,6 @@ export default function AdvancedAddCheckpoint(
           {!useCustomConfig ? (
             <CheckpointConfigsSelect
               required
-              w="full"
               {...advancedAddCheckpointForm.getInputProps('config')}
             />
           ) : (
@@ -175,3 +174,7 @@ export default function AdvancedAddCheckpoint(
     </form>
   );
 }
+
+const formStyles: CSSProperties = {
+  width: '100%',
+};

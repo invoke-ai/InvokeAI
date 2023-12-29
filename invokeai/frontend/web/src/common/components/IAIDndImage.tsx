@@ -112,7 +112,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     isDisabled: isUploadDisabled,
   });
 
-  const uploadButtonStyles = useMemo(() => {
+  const uploadButtonStyles = useMemo<SystemStyleObject>(() => {
     const styles: SystemStyleObject = {
       minH: minSize,
       w: 'full',
@@ -134,6 +134,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         },
       });
     }
+    return styles;
   }, [isUploadDisabled, minSize]);
 
   return (

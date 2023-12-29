@@ -21,7 +21,7 @@ import {
   activeTabNameSelector,
 } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import type { MouseEvent, ReactElement, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -101,6 +101,7 @@ const GALLERY_PANEL_MIN_SIZE_PX = 360;
 
 export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 
 const InvokeTabs = () => {
   const activeTabIndex = useAppSelector(activeTabIndexSelector);
@@ -231,7 +232,7 @@ const InvokeTabs = () => {
         id="app"
         autoSaveId="app"
         direction="horizontal"
-        style={{ height: '100%', width: '100%' }}
+        style={panelStyles}
         storage={panelStorage}
         units="pixels"
       >
@@ -263,9 +264,7 @@ const InvokeTabs = () => {
           </>
         )} */}
         <Panel id="main" order={1} minSize={MAIN_PANEL_MIN_SIZE_PX}>
-          <InvTabPanels style={{ height: '100%', width: '100%' }}>
-            {tabPanels}
-          </InvTabPanels>
+          <InvTabPanels style={panelStyles}>{tabPanels}</InvTabPanels>
         </Panel>
         {!NO_GALLERY_TABS.includes(activeTabName) && (
           <>

@@ -14,17 +14,10 @@ import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import type { AnimationProps} from 'framer-motion';
+import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import type {
-  CSSProperties} from 'react';
-import {
-  memo,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import type { CSSProperties } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';

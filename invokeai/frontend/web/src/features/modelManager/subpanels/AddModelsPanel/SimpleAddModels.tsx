@@ -8,6 +8,7 @@ import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import type { InvSelectOption } from 'common/components/InvSelect/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
@@ -73,7 +74,7 @@ export default function SimpleAddModels() {
   return (
     <form
       onSubmit={addModelForm.onSubmit((v) => handleAddModelSubmit(v))}
-      style={{ width: '100%' }}
+      style={formStyles}
     >
       <Flex flexDirection="column" width="100%" gap={4}>
         <InvControl label={t('modelManager.modelLocation')}>
@@ -97,3 +98,7 @@ export default function SimpleAddModels() {
     </form>
   );
 }
+
+const formStyles: CSSProperties = {
+  width: '100%',
+};

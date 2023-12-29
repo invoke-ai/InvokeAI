@@ -1,4 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
+import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { memo, useRef } from 'react';
@@ -9,23 +10,27 @@ type Props = {
   label?: ReactNode;
 };
 
+const initial: AnimationProps['initial'] = {
+  opacity: 0,
+};
+const animate: AnimationProps['animate'] = {
+  opacity: 1,
+  transition: { duration: 0.1 },
+};
+const exit: AnimationProps['exit'] = {
+  opacity: 0,
+  transition: { duration: 0.1 },
+};
+
 export const IAIDropOverlay = (props: Props) => {
   const { isOver, label = 'Drop' } = props;
   const motionId = useRef(uuidv4());
   return (
     <motion.div
       key={motionId.current}
-      initial={{
-        opacity: 0,
-      }}
-      animate={{
-        opacity: 1,
-        transition: { duration: 0.1 },
-      }}
-      exit={{
-        opacity: 0,
-        transition: { duration: 0.1 },
-      }}
+      initial={initial}
+      animate={animate}
+      exit={exit}
     >
       <Flex position="absolute" top={0} insetInlineStart={0} w="full" h="full">
         <Flex

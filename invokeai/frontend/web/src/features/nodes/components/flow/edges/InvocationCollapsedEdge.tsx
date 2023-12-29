@@ -47,21 +47,20 @@ const InvocationCollapsedEdge = ({
 
   const { base500 } = useChakraThemeTokens();
 
+  const edgeStyles = useMemo(
+    () => ({
+      strokeWidth: isSelected ? 3 : 2,
+      stroke: base500,
+      opacity: isSelected ? 0.8 : 0.5,
+      animation: shouldAnimate ? 'dashdraw 0.5s linear infinite' : undefined,
+      strokeDasharray: shouldAnimate ? 5 : 'none',
+    }),
+    [base500, isSelected, shouldAnimate]
+  );
+
   return (
     <>
-      <BaseEdge
-        path={edgePath}
-        markerEnd={markerEnd}
-        style={{
-          strokeWidth: isSelected ? 3 : 2,
-          stroke: base500,
-          opacity: isSelected ? 0.8 : 0.5,
-          animation: shouldAnimate
-            ? 'dashdraw 0.5s linear infinite'
-            : undefined,
-          strokeDasharray: shouldAnimate ? 5 : 'none',
-        }}
-      />
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={edgeStyles} />
       {data?.count && data.count > 1 && (
         <EdgeLabelRenderer>
           <Flex

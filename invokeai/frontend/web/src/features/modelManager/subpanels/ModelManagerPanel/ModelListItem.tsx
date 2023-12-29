@@ -123,8 +123,8 @@ export default function ModelListItem(props: ModelListItemProps) {
         acceptButtonText={t('modelManager.delete')}
       >
         <Flex rowGap={4} flexDirection="column">
-          <p style={{ fontWeight: 'bold' }}>{t('modelManager.deleteMsg1')}</p>
-          <p>{t('modelManager.deleteMsg2')}</p>
+          <InvText fontWeight="bold">{t('modelManager.deleteMsg1')}</InvText>
+          <InvText>{t('modelManager.deleteMsg2')}</InvText>
         </Flex>
       </InvConfirmationAlertDialog>
     </Flex>

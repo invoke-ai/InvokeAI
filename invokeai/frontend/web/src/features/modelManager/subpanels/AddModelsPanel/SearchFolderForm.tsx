@@ -9,6 +9,7 @@ import {
   setAdvancedAddScanModel,
   setSearchFolder,
 } from 'features/modelManager/store/modelManagerSlice';
+import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
@@ -57,7 +58,7 @@ function SearchFolderForm() {
       onSubmit={searchFolderForm.onSubmit((values) =>
         searchFolderFormSubmitHandler(values)
       )}
-      style={{ width: '100%' }}
+      style={formStyles}
     >
       <Flex w="100%" gap={2} borderRadius={4} alignItems="center">
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
@@ -127,3 +128,7 @@ function SearchFolderForm() {
 }
 
 export default memo(SearchFolderForm);
+
+const formStyles: CSSProperties = {
+  width: '100%',
+};
