@@ -99,6 +99,7 @@ export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PCT = 20;
+const OPTIONS_PANEL_WIDTH = '434px';
 
 const InvokeTabs = () => {
   const activeTabIndex = useAppSelector(activeTabIndexSelector);
@@ -191,7 +192,7 @@ const InvokeTabs = () => {
         <Panel id="main" order={0} minSize={50}>
           <Flex w="full" h="full" gap={4}>
             {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
-              <Flex h="full" w={434} flexShrink={0}>
+              <Flex h="full" w={OPTIONS_PANEL_WIDTH} flexShrink={0}>
                 {activeTabName === 'nodes' ? (
                   <NodeEditorPanelGroup />
                 ) : (

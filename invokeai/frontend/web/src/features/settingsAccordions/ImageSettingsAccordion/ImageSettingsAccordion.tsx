@@ -43,11 +43,11 @@ const selector = createMemoizedSelector(
 );
 
 const labelProps: InvLabelProps = {
-  w: 12,
+  minW: 12,
 };
 
 const scalingLabelProps: InvLabelProps = {
-  w: '4.5rem',
+  minW: '4.5rem',
 };
 
 export const ImageSettingsAccordion = memo(() => {
