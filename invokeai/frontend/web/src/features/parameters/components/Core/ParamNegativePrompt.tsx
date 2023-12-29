@@ -6,10 +6,10 @@ import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
 import { usePrompt } from 'features/embedding/usePrompt';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { setNegativePrompt } from 'features/parameters/store/generationSlice';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const ParamNegativePrompt = () => {
+export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector((state) => state.generation.negativePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -55,4 +55,6 @@ export const ParamNegativePrompt = () => {
       </Box>
     </EmbeddingPopover>
   );
-};
+});
+
+ParamNegativePrompt.displayName = 'ParamNegativePrompt';

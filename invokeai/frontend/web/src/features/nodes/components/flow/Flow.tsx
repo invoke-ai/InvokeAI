@@ -24,7 +24,7 @@ import {
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import type { CSSProperties, MouseEvent } from 'react';
-import { useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type {
   OnConnect,
@@ -77,7 +77,7 @@ const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
 
 const snapGrid: [number, number] = [25, 25];
 
-export const Flow = () => {
+export const Flow = memo(() => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.nodes.nodes);
   const edges = useAppSelector((state) => state.nodes.edges);
@@ -287,4 +287,6 @@ export const Flow = () => {
       <Background />
     </ReactFlow>
   );
-};
+});
+
+Flow.displayName = 'Flow';

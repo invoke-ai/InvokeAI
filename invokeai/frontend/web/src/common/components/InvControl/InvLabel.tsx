@@ -4,7 +4,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import { InvControlGroupContext } from 'common/components/InvControl/InvControlGroup';
-import { useContext } from 'react';
+import { memo, useContext } from 'react';
 
 import type { InvLabelProps } from './types';
 
@@ -13,31 +13,35 @@ const selector = createSelector(
   ({ system }) => system.shouldEnableInformationalPopovers
 );
 
-export const InvLabel = forwardRef<InvLabelProps, typeof FormLabel>(
-  (
-    { feature, renderInfoPopoverInPortal, children, ...rest }: InvLabelProps,
-    ref
-  ) => {
-    const shouldEnableInformationalPopovers = useAppSelector(selector);
-    const ctx = useContext(InvControlGroupContext);
-    if (feature && shouldEnableInformationalPopovers) {
+export const InvLabel = memo(
+  forwardRef<InvLabelProps, typeof FormLabel>(
+    (
+      { feature, renderInfoPopoverInPortal, children, ...rest }: InvLabelProps,
+      ref
+    ) => {
+      const shouldEnableInformationalPopovers = useAppSelector(selector);
+      const ctx = useContext(InvControlGroupContext);
+      if (feature && shouldEnableInformationalPopovers) {
+        return (
+          <IAIInformationalPopover
+            feature={feature}
+            inPortal={renderInfoPopoverInPortal}
+          >
+            <Flex as="span">
+              <FormLabel ref={ref} {...ctx.labelProps} {...rest}>
+                {children}
+              </FormLabel>
+            </Flex>
+          </IAIInformationalPopover>
+        );
+      }
       return (
-        <IAIInformationalPopover
-          feature={feature}
-          inPortal={renderInfoPopoverInPortal}
-        >
-          <Flex as="span">
-            <FormLabel ref={ref} {...ctx.labelProps} {...rest}>
-              {children}
-            </FormLabel>
-          </Flex>
-        </IAIInformationalPopover>
+        <FormLabel ref={ref} {...ctx.labelProps} {...rest}>
+          {children}
+        </FormLabel>
       );
     }
-    return (
-      <FormLabel ref={ref} {...ctx.labelProps} {...rest}>
-        {children}
-      </FormLabel>
-    );
-  }
+  )
 );
+
+InvLabel.displayName = 'InvLabel';

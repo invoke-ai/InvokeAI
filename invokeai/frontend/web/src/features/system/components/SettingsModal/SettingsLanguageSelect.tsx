@@ -5,10 +5,10 @@ import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { languageChanged } from 'features/system/store/systemSlice';
 import { isLanguage } from 'features/system/store/types';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const SettingsLanguageSelect = () => {
+export const SettingsLanguageSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const language = useAppSelector((state) => state.system.language);
@@ -58,4 +58,6 @@ export const SettingsLanguageSelect = () => {
       <InvSelect value={value} options={options} onChange={onChange} />
     </InvControl>
   );
-};
+});
+
+SettingsLanguageSelect.displayName = 'SettingsLanguageSelect';

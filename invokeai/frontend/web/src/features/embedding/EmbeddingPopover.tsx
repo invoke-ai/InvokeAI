@@ -6,9 +6,10 @@ import {
 } from 'common/components/InvPopover/wrapper';
 import { EmbeddingSelect } from 'features/embedding/EmbeddingSelect';
 import type { EmbeddingPopoverProps } from 'features/embedding/types';
+import { memo } from 'react';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 
-export const EmbeddingPopover = (props: EmbeddingPopoverProps) => {
+export const EmbeddingPopover = memo((props: EmbeddingPopoverProps) => {
   const {
     onSelect,
     isOpen,
@@ -43,4 +44,6 @@ export const EmbeddingPopover = (props: EmbeddingPopoverProps) => {
       </InvPopoverContent>
     </InvPopover>
   );
-};
+});
+
+EmbeddingPopover.displayName = 'EmbeddingPopover';

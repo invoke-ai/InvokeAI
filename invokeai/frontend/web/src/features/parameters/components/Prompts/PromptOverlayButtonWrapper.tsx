@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/layout';
-import type { PropsWithChildren } from 'react';
+import { memo, type PropsWithChildren } from 'react';
 
-export const PromptOverlayButtonWrapper = (props: PropsWithChildren) => (
+export const PromptOverlayButtonWrapper = memo((props: PropsWithChildren) => (
   <Flex
     pos="absolute"
     insetBlockStart={0}
@@ -14,4 +14,6 @@ export const PromptOverlayButtonWrapper = (props: PropsWithChildren) => (
   >
     {props.children}
   </Flex>
-);
+));
+
+PromptOverlayButtonWrapper.displayName = 'PromptOverlayButtonWrapper';

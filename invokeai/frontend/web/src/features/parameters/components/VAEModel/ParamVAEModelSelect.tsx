@@ -6,7 +6,7 @@ import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
 import { vaeSelected } from 'features/parameters/store/generationSlice';
 import { pick } from 'lodash-es';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VaeModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
@@ -60,4 +60,4 @@ const ParamVAEModelSelect = () => {
   );
 };
 
-export default ParamVAEModelSelect;
+export default memo(ParamVAEModelSelect);

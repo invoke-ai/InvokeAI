@@ -1,11 +1,11 @@
 import { NumberInputField as ChakraNumberInputField } from '@chakra-ui/react';
 import { useGlobalModifiersSetters } from 'common/hooks/useGlobalModifiers';
 import type { KeyboardEventHandler } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 
 import type { InvNumberInputFieldProps } from './types';
 
-export const InvNumberInputField = (props: InvNumberInputFieldProps) => {
+export const InvNumberInputField = memo((props: InvNumberInputFieldProps) => {
   const { onKeyUp, onKeyDown, children, ...rest } = props;
   const { setShift } = useGlobalModifiersSetters();
 
@@ -29,4 +29,6 @@ export const InvNumberInputField = (props: InvNumberInputFieldProps) => {
       {children}
     </ChakraNumberInputField>
   );
-};
+});
+
+InvNumberInputField.displayName = 'InvNumberInputField';

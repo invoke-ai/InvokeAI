@@ -4,10 +4,11 @@ import {
   InvAccordionItem,
   InvAccordionPanel,
 } from 'common/components/InvAccordion/wrapper';
+import { memo } from 'react';
 
 import type { InvSingleAccordionProps } from './types';
 
-export const InvSingleAccordion = (props: InvSingleAccordionProps) => {
+export const InvSingleAccordion = memo((props: InvSingleAccordionProps) => {
   return (
     <InvAccordion
       allowToggle
@@ -21,4 +22,6 @@ export const InvSingleAccordion = (props: InvSingleAccordionProps) => {
       </InvAccordionItem>
     </InvAccordion>
   );
-};
+});
+
+InvSingleAccordion.displayName = 'InvSingleAccordion';

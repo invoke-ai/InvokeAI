@@ -1,11 +1,11 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { isLockedToggled } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaLock, FaLockOpen } from 'react-icons/fa6';
 
-export const LockAspectRatioButton = () => {
+export const LockAspectRatioButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isLocked = useAppSelector(
@@ -24,4 +24,6 @@ export const LockAspectRatioButton = () => {
       icon={isLocked ? <FaLock /> : <FaLockOpen />}
     />
   );
-};
+});
+
+LockAspectRatioButton.displayName = 'LockAspectRatioButton';

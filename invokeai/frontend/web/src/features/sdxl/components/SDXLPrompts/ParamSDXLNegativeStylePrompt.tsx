@@ -6,11 +6,11 @@ import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
 import { usePrompt } from 'features/embedding/usePrompt';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { setNegativeStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-export const ParamSDXLNegativeStylePrompt = () => {
+export const ParamSDXLNegativeStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector((state) => state.sdxl.negativeStylePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -65,4 +65,6 @@ export const ParamSDXLNegativeStylePrompt = () => {
       </Box>
     </EmbeddingPopover>
   );
-};
+});
+
+ParamSDXLNegativeStylePrompt.displayName = 'ParamSDXLNegativeStylePrompt';

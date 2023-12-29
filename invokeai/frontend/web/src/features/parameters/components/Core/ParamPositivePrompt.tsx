@@ -8,12 +8,12 @@ import { usePrompt } from 'features/embedding/usePrompt';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { setPositivePrompt } from 'features/parameters/store/generationSlice';
 import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-export const ParamPositivePrompt = () => {
+export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector((state) => state.generation.positivePrompt);
   const baseModel = useAppSelector((state) => state.generation.model)
@@ -79,4 +79,6 @@ export const ParamPositivePrompt = () => {
       </Box>
     </EmbeddingPopover>
   );
-};
+});
+
+ParamPositivePrompt.displayName = 'ParamPositivePrompt';

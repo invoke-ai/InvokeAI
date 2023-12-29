@@ -7,14 +7,14 @@ import type { InvSelectOption } from 'common/components/InvSelect/types';
 import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/ImageSize/constants';
 import { isAspectRatioID } from 'features/parameters/components/ImageSize/types';
 import { aspectRatioSelected } from 'features/parameters/store/generationSlice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LockAspectRatioButton } from './LockAspectRatioButton';
 import { SetOptimalSizeButton } from './SetOptimalSizeButton';
 import { SwapDimensionsButton } from './SwapDimensionsButton';
 
-export const AspectRatioSelect = () => {
+export const AspectRatioSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const aspectRatioID = useAppSelector(
@@ -49,6 +49,8 @@ export const AspectRatioSelect = () => {
       <SetOptimalSizeButton />
     </InvControl>
   );
-};
+});
+
+AspectRatioSelect.displayName = 'AspectRatioSelect';
 
 const selectStyles: SystemStyleObject = { minW: 48 };

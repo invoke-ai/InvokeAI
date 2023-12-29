@@ -21,6 +21,7 @@ import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { size, truncate } from 'lodash-es';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelProps: InvLabelProps = {
@@ -43,7 +44,7 @@ const badgesSelector = createMemoizedSelector(
   }
 );
 
-export const GenerationSettingsAccordion = () => {
+export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
 
@@ -86,4 +87,6 @@ export const GenerationSettingsAccordion = () => {
       </InvTabs>
     </InvSingleAccordion>
   );
-};
+});
+
+GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';

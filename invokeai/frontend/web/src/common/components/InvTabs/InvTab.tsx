@@ -2,9 +2,10 @@ import { Spacer } from '@chakra-ui/layout';
 import { forwardRef, Tab as ChakraTab } from '@chakra-ui/react';
 import { InvBadge } from 'common/components/InvBadge/wrapper';
 import type { InvTabProps } from 'common/components/InvTabs/types';
+import { memo } from 'react';
 
-export const InvTab = forwardRef<InvTabProps, typeof ChakraTab>(
-  (props: InvTabProps, ref) => {
+export const InvTab = memo(
+  forwardRef<InvTabProps, typeof ChakraTab>((props: InvTabProps, ref) => {
     const { children, badges, ...rest } = props;
     return (
       <ChakraTab ref={ref} {...rest}>
@@ -17,5 +18,7 @@ export const InvTab = forwardRef<InvTabProps, typeof ChakraTab>(
         ))}
       </ChakraTab>
     );
-  }
+  })
 );
+
+InvTab.displayName = 'InvTab';
