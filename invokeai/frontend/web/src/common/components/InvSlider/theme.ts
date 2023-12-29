@@ -23,12 +23,11 @@ const filledTrack = defineStyle((_props) => {
 const thumb = defineStyle((props) => {
   const { orientation } = props;
   return {
-    w: 4,
-    h: 4,
+    w: 5,
+    h: 5,
     bg: 'base.400',
-    borderRadius: 'base',
     borderColor: 'base.200',
-    borderWidth: 2,
+    borderWidth: 3,
     _hover: {
       transform:
         orientation === 'vertical'
