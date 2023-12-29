@@ -1,4 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
@@ -18,26 +20,43 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
-import { size } from 'lodash-es';
+import { size, truncate } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 
 const labelProps: InvLabelProps = {
   w: '4rem',
 };
 
+const badgesSelector = createMemoizedSelector(
+  stateSelector,
+  ({ lora, generation }) => {
+    const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
+    const accordionBadges: (string | number)[] = [];
+    if (generation.model) {
+      accordionBadges.push(
+        truncate(generation.model.model_name, { length: 24, omission: '...' })
+      );
+      accordionBadges.push(generation.model.base_model);
+    }
+
+    return { loraTabBadges, accordionBadges };
+  }
+);
+
 export const GenerationSettingsAccordion = () => {
   const { t } = useTranslation();
-  const loraCount = useAppSelector((state) => size(state.lora.loras));
+  const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
 
   return (
     <InvSingleAccordion
       label={t('accordions.generation.title')}
       defaultIsOpen={true}
+      badges={accordionBadges}
     >
       <InvTabs variant="collapse">
         <InvTabList>
           <InvTab>{t('accordions.generation.modelTab')}</InvTab>
-          <InvTab badges={loraCount ? [loraCount] : undefined}>
+          <InvTab badges={loraTabBadges}>
             {t('accordions.generation.conceptsTab')}
           </InvTab>
         </InvTabList>
