@@ -71,26 +71,18 @@ const StatusIndicator = () => {
             }}
           >
             <InvText
-              sx={{
-                fontSize: 'sm',
-                fontWeight: 'semibold',
-                pb: '1px',
-                userSelect: 'none',
-                color: COLOR_MAP[statusColor],
-              }}
+              fontSize="sm"
+              fontWeight="semibold"
+              pb="1px"
+              userSelect="none"
+              color={COLOR_MAP[statusColor]}
             >
               {t(statusTranslationKey as ResourceKey)}
             </InvText>
           </motion.div>
         )}
       </AnimatePresence>
-      <Icon
-        as={FaCircle}
-        sx={{
-          boxSize: '0.5rem',
-          color: COLOR_MAP[statusColor],
-        }}
-      />
+      <Icon as={FaCircle} boxSize="0.5rem" color={COLOR_MAP[statusColor]} />
     </Flex>
   );
 };

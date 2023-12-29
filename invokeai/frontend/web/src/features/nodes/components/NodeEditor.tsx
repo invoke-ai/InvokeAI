@@ -20,14 +20,12 @@ const NodeEditor = () => {
   return (
     <Flex
       layerStyle="first"
-      sx={{
-        position: 'relative',
-        width: 'full',
-        height: 'full',
-        borderRadius: 'base',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      position="relative"
+      width="full"
+      height="full"
+      borderRadius="base"
+      alignItems="center"
+      justifyContent="center"
     >
       <AnimatePresence>
         {isReady && (
@@ -71,15 +69,13 @@ const NodeEditor = () => {
           >
             <Flex
               layerStyle="first"
-              sx={{
-                position: 'relative',
-                width: 'full',
-                height: 'full',
-                borderRadius: 'base',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'none',
-              }}
+              position="relative"
+              width="full"
+              height="full"
+              borderRadius="base"
+              alignItems="center"
+              justifyContent="center"
+              pointerEvents="none"
             >
               <IAINoContentFallback
                 label={t('nodes.loadingNodes')}

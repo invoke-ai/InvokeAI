@@ -20,11 +20,7 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
 
   return (
     <>
-      <InvMenuItem
-        sx={{ color: 'error.300' }}
-        icon={<FaTrash />}
-        onClick={handleDelete}
-      >
+      <InvMenuItem color="error.300" icon={<FaTrash />} onClick={handleDelete}>
         {t('boards.deleteBoard')}
       </InvMenuItem>
     </>

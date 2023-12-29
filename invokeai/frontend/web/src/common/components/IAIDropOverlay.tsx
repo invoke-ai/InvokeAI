@@ -27,59 +27,45 @@ export const IAIDropOverlay = (props: Props) => {
         transition: { duration: 0.1 },
       }}
     >
-      <Flex
-        sx={{
-          position: 'absolute',
-          top: 0,
-          insetInlineStart: 0,
-          w: 'full',
-          h: 'full',
-        }}
-      >
+      <Flex position="absolute" top={0} insetInlineStart={0} w="full" h="full">
         <Flex
-          sx={{
-            position: 'absolute',
-            top: 0,
-            insetInlineStart: 0,
-            w: 'full',
-            h: 'full',
-            bg: 'base.900',
-            opacity: 0.7,
-            borderRadius: 'base',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transitionProperty: 'common',
-            transitionDuration: '0.1s',
-          }}
+          position="absolute"
+          top={0}
+          insetInlineStart={0}
+          w="full"
+          h="full"
+          bg="base.900"
+          opacity={0.7}
+          borderRadius="base"
+          alignItems="center"
+          justifyContent="center"
+          transitionProperty="common"
+          transitionDuration="0.1s"
         />
 
         <Flex
-          sx={{
-            position: 'absolute',
-            top: 0.5,
-            insetInlineStart: 0.5,
-            insetInlineEnd: 0.5,
-            bottom: 0.5,
-            opacity: 1,
-            borderWidth: 2,
-            borderColor: isOver ? 'base.50' : 'base.300',
-            borderRadius: 'lg',
-            borderStyle: 'dashed',
-            transitionProperty: 'common',
-            transitionDuration: '0.1s',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+          position="absolute"
+          top={0.5}
+          insetInlineStart={0.5}
+          insetInlineEnd={0.5}
+          bottom={0.5}
+          opacity={1}
+          borderWidth={2}
+          borderColor={isOver ? 'base.50' : 'base.300'}
+          borderRadius="lg"
+          borderStyle="dashed"
+          transitionProperty="common"
+          transitionDuration="0.1s"
+          alignItems="center"
+          justifyContent="center"
         >
           <Box
-            sx={{
-              fontSize: '2xl',
-              fontWeight: 'semibold',
-              transform: isOver ? 'scale(1.1)' : 'scale(1)',
-              color: isOver ? 'base.50' : 'base.300',
-              transitionProperty: 'common',
-              transitionDuration: '0.1s',
-            }}
+            fontSize="2xl"
+            fontWeight="semibold"
+            transform={isOver ? 'scale(1.1)' : 'scale(1)'}
+            color={isOver ? 'base.50' : 'base.300'}
+            transitionProperty="common"
+            transitionDuration="0.1s"
           >
             {label}
           </Box>

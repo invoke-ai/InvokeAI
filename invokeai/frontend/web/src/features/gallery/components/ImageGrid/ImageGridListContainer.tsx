@@ -16,9 +16,7 @@ const ListContainer = forwardRef((props: ListContainerProps, ref) => {
       {...props}
       className="list-container"
       ref={ref}
-      sx={{
-        gridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr));`,
-      }}
+      gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
       data-testid="image-list-container"
     >
       {props.children}

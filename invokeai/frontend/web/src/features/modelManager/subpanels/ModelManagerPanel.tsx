@@ -34,7 +34,7 @@ export default function ModelManagerPanel() {
   const model = mainModel ? mainModel : loraModel;
 
   return (
-    <Flex sx={{ gap: 8, w: 'full', h: 'full' }}>
+    <Flex gap={8} w="full" h="full">
       <ModelList
         selectedModelId={selectedModelId}
         setSelectedModelId={setSelectedModelId}
@@ -71,14 +71,12 @@ const ModelEdit = (props: ModelEditProps) => {
 
   return (
     <Flex
-      sx={{
-        w: 'full',
-        h: 'full',
-        justifyContent: 'center',
-        alignItems: 'center',
-        maxH: 96,
-        userSelect: 'none',
-      }}
+      w="full"
+      h="full"
+      justifyContent="center"
+      alignItems="center"
+      maxH={96}
+      userSelect="none"
     >
       <InvText variant="subtext">{t('modelManager.noModelSelected')}</InvText>
     </Flex>

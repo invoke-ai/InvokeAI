@@ -94,7 +94,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
       defaultIsOpen={true}
       badges={badges}
     >
-      <Flex sx={{ flexDir: 'column', gap: 2, p: 4 }}>
+      <Flex gap={2} p={4} flexDir="column">
         <InvButtonGroup
           size="sm"
           w="full"

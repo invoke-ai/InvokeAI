@@ -22,44 +22,16 @@ const ParametersPanel = () => {
   );
 
   return (
-    <Flex
-      sx={{
-        w: 'full',
-        h: 'full',
-        flexDir: 'column',
-        gap: 2,
-      }}
-    >
+    <Flex w="full" h="full" flexDir="column" gap={2}>
       <QueueControls />
-      <Flex
-        sx={{
-          w: 'full',
-          h: 'full',
-          position: 'relative',
-        }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
-        >
+      <Flex w="full" h="full" position="relative">
+        <Box position="absolute" top={0} left={0} right={0} bottom={0}>
           <OverlayScrollbarsComponent
             defer
             style={{ height: '100%', width: '100%' }}
             options={overlayScrollbarsParams.options}
           >
-            <Flex
-              sx={{
-                gap: 2,
-                flexDirection: 'column',
-                h: 'full',
-                w: 'full',
-              }}
-            >
+            <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
               <ImageSettingsAccordion />
               <GenerationSettingsAccordion />

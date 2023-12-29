@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
@@ -26,6 +27,11 @@ import {
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 
+const imageSx: SystemStyleObject = { w: 'full', h: 'full' };
+const imageIconStyleOverrides: SystemStyleObject = {
+  bottom: 2,
+  top: 'auto',
+};
 interface HoverableImageProps {
   imageName: string;
   index: number;
@@ -130,19 +136,14 @@ const GalleryImage = (props: HoverableImageProps) => {
   }
 
   return (
-    <Box
-      sx={{ w: 'full', h: 'full', touchAction: 'none' }}
-      data-testid={`image-${imageDTO.image_name}`}
-    >
+    <Box w="full" h="full" data-testid={`image-${imageDTO.image_name}`}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
-        sx={{
-          position: 'relative',
-          justifyContent: 'center',
-          alignItems: 'center',
-          aspectRatio: '1/1',
-        }}
+        position="relative"
+        justifyContent="center"
+        alignItems="center"
+        aspectRatio="1/1"
       >
         <IAIDndImage
           onClick={handleClick}
@@ -150,7 +151,7 @@ const GalleryImage = (props: HoverableImageProps) => {
           draggableData={draggableData}
           isSelected={isSelected}
           minSize={0}
-          imageSx={{ w: 'full', h: 'full' }}
+          imageSx={imageSx}
           isDropDisabled={true}
           isUploadDisabled={true}
           thumbnail={true}
@@ -170,10 +171,7 @@ const GalleryImage = (props: HoverableImageProps) => {
                 onClick={handleDelete}
                 icon={<FaTrash />}
                 tooltip={t('gallery.deleteImage')}
-                styleOverrides={{
-                  bottom: 2,
-                  top: 'auto',
-                }}
+                styleOverrides={imageIconStyleOverrides}
               />
             )}
           </>

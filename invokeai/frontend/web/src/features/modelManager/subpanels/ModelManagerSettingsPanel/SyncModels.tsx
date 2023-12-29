@@ -8,26 +8,17 @@ export default function SyncModels() {
 
   return (
     <Flex
-      sx={{
-        w: 'full',
-        p: 4,
-        borderRadius: 4,
-        gap: 4,
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        bg: 'base.800',
-      }}
+      w="full"
+      p={4}
+      borderRadius={4}
+      gap={4}
+      justifyContent="space-between"
+      alignItems="center"
+      bg="base.800"
     >
-      <Flex
-        sx={{
-          flexDirection: 'column',
-          gap: 2,
-        }}
-      >
-        <InvText sx={{ fontWeight: 'semibold' }}>
-          {t('modelManager.syncModels')}
-        </InvText>
-        <InvText fontSize="sm" sx={{ color: 'base.400' }}>
+      <Flex flexDirection="column" gap={2}>
+        <InvText fontWeight="semibold">{t('modelManager.syncModels')}</InvText>
+        <InvText fontSize="sm" variant="subtext">
           {t('modelManager.syncModelsDesc')}
         </InvText>
       </Flex>

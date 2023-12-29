@@ -37,16 +37,14 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   return (
     <Flex
       layerStyle="first"
-      sx={{
-        padding: 4,
-        gap: 1,
-        flexDirection: 'column',
-        width: 'full',
-        height: 'full',
-        borderRadius: 'base',
-        position: 'absolute',
-        overflow: 'hidden',
-      }}
+      padding={4}
+      gap={1}
+      flexDirection="column"
+      width="full"
+      height="full"
+      borderRadius="base"
+      position="absolute"
+      overflow="hidden"
     >
       <Flex gap={2}>
         <InvText fontWeight="semibold">{t('common.file')}:</InvText>
@@ -58,13 +56,11 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
 
       <Tabs
         variant="line"
-        sx={{
-          display: 'flex',
-          flexDir: 'column',
-          w: 'full',
-          h: 'full',
-        }}
         isLazy={true}
+        display="flex"
+        flexDir="column"
+        w="full"
+        h="full"
       >
         <TabList>
           <Tab>{t('metadata.recallParameters')}</Tab>

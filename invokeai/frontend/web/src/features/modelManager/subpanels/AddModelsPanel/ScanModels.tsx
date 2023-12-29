@@ -10,12 +10,10 @@ export default function ScanModels() {
       <SearchFolderForm />
       <Flex gap={4}>
         <Flex
-          sx={{
-            maxHeight: window.innerHeight - 300,
-            overflow: 'scroll',
-            gap: 4,
-            w: '100%',
-          }}
+          maxHeight="calc(100vh - 300px)"
+          overflow="scroll"
+          gap={4}
+          w="100%"
         >
           <FoundModelsList />
         </Flex>

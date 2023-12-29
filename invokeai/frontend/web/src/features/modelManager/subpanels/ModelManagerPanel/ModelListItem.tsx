@@ -84,23 +84,16 @@ export default function ModelListItem(props: ModelListItemProps) {
   ]);
 
   return (
-    <Flex sx={{ gap: 2, alignItems: 'center', w: 'full' }}>
+    <Flex gap={2} alignItems="center" w="full">
       <Flex
         as={InvButton}
         isChecked={isSelected}
-        sx={{
-          justifyContent: 'start',
-          p: 2,
-          borderRadius: 'base',
-          w: 'full',
-          alignItems: 'center',
-          color: isSelected ? 'base.50' : 'base.100',
-          bg: isSelected ? 'blue.600' : 'base.850',
-          _hover: {
-            color: isSelected ? 'base.50' : 'base.100',
-            bg: isSelected ? 'blue.550' : 'base.700',
-          },
-        }}
+        variant={isSelected ? 'solid' : 'ghost'}
+        justifyContent="start"
+        p={2}
+        borderRadius="base"
+        w="full"
+        alignItems="center"
         onClick={handleSelectModel}
       >
         <Flex gap={4} alignItems="center">

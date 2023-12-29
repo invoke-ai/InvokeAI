@@ -65,19 +65,15 @@ const InvocationCollapsedEdge = ({
       {data?.count && data.count > 1 && (
         <EdgeLabelRenderer>
           <Flex
-            sx={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            }}
+            position="absolute"
+            transform={`translate(-50%, -50%) translate(${labelX}px,${labelY}px)`}
             className="nodrag nopan"
           >
             <Badge
               variant="solid"
-              sx={{
-                bg: 'base.500',
-                opacity: isSelected ? 0.8 : 0.5,
-                boxShadow: 'base',
-              }}
+              bg="base.500"
+              opacity={isSelected ? 0.8 : 0.5}
+              boxShadow="base"
             >
               {data.count}
             </Badge>

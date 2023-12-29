@@ -210,18 +210,11 @@ const InvokeTabs = () => {
       defaultIndex={activeTabIndex}
       index={activeTabIndex}
       onChange={handleTabChange}
-      sx={{
-        flexGrow: 1,
-        gap: 4,
-      }}
+      flexGrow={1}
+      gap={4}
       isLazy
     >
-      <InvTabList
-        sx={{
-          gap: 4,
-          flexDir: 'column',
-        }}
-      >
+      <InvTabList gap={4} flexDir="column">
         {tabs}
         <Spacer />
       </InvTabList>

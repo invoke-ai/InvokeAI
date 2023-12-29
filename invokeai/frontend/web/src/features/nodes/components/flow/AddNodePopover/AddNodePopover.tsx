@@ -230,9 +230,6 @@ const AddNodePopover = () => {
             onChange={onChange}
             onMenuClose={onClose}
             onKeyDown={onKeyDown}
-            sx={{
-              width: 'full',
-            }}
           />
         </InvPopoverBody>
       </InvPopoverContent>

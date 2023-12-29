@@ -38,12 +38,7 @@ const SiteHeader = () => {
   const discordLink = 'https://discord.gg/ZmtBAhwWhy';
 
   return (
-    <Flex
-      sx={{
-        gap: 2,
-        alignItems: 'center',
-      }}
-    >
+    <Flex gap={2} alignItems="center">
       <InvokeAILogoComponent />
       <Spacer />
       <StatusIndicator />
@@ -54,7 +49,7 @@ const SiteHeader = () => {
           variant="link"
           aria-label={t('accessibility.menu')}
           icon={<FaBars />}
-          sx={{ boxSize: 8 }}
+          boxSize={8}
         />
         <InvMenuList>
           <InvMenuGroup title={t('common.communityLabel')}>

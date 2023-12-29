@@ -11,7 +11,7 @@ type OverlayDragImageProps = {
 
 const BOX_SIZE = 28;
 
-const STYLES: ChakraProps['sx'] = {
+const imageStyles: ChakraProps['sx'] = {
   w: BOX_SIZE,
   h: BOX_SIZE,
   maxW: BOX_SIZE,
@@ -24,6 +24,14 @@ const STYLES: ChakraProps['sx'] = {
   color: 'base.100',
 };
 
+const multiImageStyles: ChakraProps['sx'] = {
+  position: 'relative',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexDir: 'column',
+  ...imageStyles,
+};
+
 const DragPreview = (props: OverlayDragImageProps) => {
   const { t } = useTranslation();
   if (!props.dragData) {
@@ -34,17 +42,15 @@ const DragPreview = (props: OverlayDragImageProps) => {
     const { field, fieldTemplate } = props.dragData.payload;
     return (
       <Box
-        sx={{
-          position: 'relative',
-          p: 2,
-          px: 3,
-          opacity: 0.7,
-          bg: 'base.300',
-          borderRadius: 'base',
-          boxShadow: 'dark-lg',
-          whiteSpace: 'nowrap',
-          fontSize: 'sm',
-        }}
+        position="relative"
+        p={2}
+        px={3}
+        opacity={0.7}
+        bg="base.300"
+        borderRadius="base"
+        boxShadow="dark-lg"
+        whiteSpace="nowrap"
+        fontSize="sm"
       >
         <InvText>{field.label || fieldTemplate.title}</InvText>
       </Box>
@@ -55,19 +61,15 @@ const DragPreview = (props: OverlayDragImageProps) => {
     const { thumbnail_url, width, height } = props.dragData.payload.imageDTO;
     return (
       <Box
-        sx={{
-          position: 'relative',
-          width: 'full',
-          height: 'full',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        position="relative"
+        width="full"
+        height="full"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
       >
         <Image
-          sx={{
-            ...STYLES,
-          }}
+          sx={imageStyles}
           objectFit="contain"
           src={thumbnail_url}
           width={width}
@@ -79,15 +81,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
 
   if (props.dragData.payloadType === 'IMAGE_DTOS') {
     return (
-      <Flex
-        sx={{
-          position: 'relative',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDir: 'column',
-          ...STYLES,
-        }}
-      >
+      <Flex sx={multiImageStyles}>
         <Heading>{props.dragData.payload.imageDTOs.length}</Heading>
         <Heading size="sm">{t('parameters.images')}</Heading>
       </Flex>

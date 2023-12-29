@@ -20,15 +20,13 @@ const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
   return (
     <Flex
       layerStyle="nodeHeader"
-      sx={{
-        borderTopRadius: 'base',
-        borderBottomRadius: isOpen ? 0 : 'base',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        h: 8,
-        textAlign: 'center',
-        color: 'base.200',
-      }}
+      borderTopRadius="base"
+      borderBottomRadius={isOpen ? 0 : 'base'}
+      alignItems="center"
+      justifyContent="space-between"
+      h={8}
+      textAlign="center"
+      color="base.200"
     >
       <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
       <InvocationNodeClassificationIcon nodeId={nodeId} />

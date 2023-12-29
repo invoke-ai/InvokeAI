@@ -12,13 +12,11 @@ const QueueControls = () => {
   const isPrependEnabled = useFeatureStatus('prependQueue').isFeatureEnabled;
   return (
     <Flex
-      sx={{
-        w: 'full',
-        position: 'relative',
-        borderRadius: 'base',
-        gap: 2,
-        flexDir: 'column',
-      }}
+      w="full"
+      position="relative"
+      borderRadius="base"
+      gap={2}
+      flexDir="column"
     >
       <InvButtonGroup size="lg" isAttached={false}>
         {isPrependEnabled && <QueueFrontButton />}

@@ -41,13 +41,7 @@ export default function AddModels() {
           {t('common.advanced')}
         </InvButton>
       </InvButtonGroup>
-      <Flex
-        sx={{
-          p: 4,
-          borderRadius: 4,
-          background: 'base.800',
-        }}
-      >
+      <Flex p={4} borderRadius={4} bg="base.800">
         {addModelMode === 'simple' && <SimpleAddModels />}
         {addModelMode === 'advanced' && <AdvancedAddModels />}
       </Flex>

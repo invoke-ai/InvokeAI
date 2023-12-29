@@ -40,12 +40,10 @@ const FloatingGalleryButton = ({
           aria-label={t('accessibility.showGalleryPanel')}
           onClick={handleShowGallery}
           icon={<MdPhotoLibrary />}
-          sx={{
-            p: 0,
-            px: 3,
-            h: 48,
-            borderEndRadius: 0,
-          }}
+          p={0}
+          px={3}
+          h={48}
+          borderEndRadius={0}
         />
       </Flex>
     </Portal>

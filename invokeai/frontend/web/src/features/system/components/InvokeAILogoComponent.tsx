@@ -21,16 +21,14 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
       <Image
         src={InvokeAILogoImage}
         alt="invoke-ai-logo"
-        sx={{
-          w: '32px',
-          h: '32px',
-          minW: '32px',
-          minH: '32px',
-          userSelect: 'none',
-        }}
+        w="32px"
+        h="32px"
+        minW="32px"
+        minH="32px"
+        userSelect="none"
       />
-      <Flex sx={{ gap: 3, alignItems: 'center' }}>
-        <InvText sx={{ fontSize: 'xl', userSelect: 'none' }}>
+      <Flex gap={3} alignItems="center">
+        <InvText fontSize="xl" userSelect="none">
           invoke <strong>ai</strong>
         </InvText>
         <AnimatePresence>
@@ -50,13 +48,10 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
               }}
             >
               <InvText
-                sx={{
-                  fontWeight: 'semibold',
-                  marginTop: 1,
-                  color: 'base.300',
-                  fontSize: 14,
-                }}
-                variant="subtext"
+                fontWeight="semibold"
+                marginTop={1}
+                color="base.300"
+                fontSize={14}
               >
                 {appVersion.version}
               </InvText>

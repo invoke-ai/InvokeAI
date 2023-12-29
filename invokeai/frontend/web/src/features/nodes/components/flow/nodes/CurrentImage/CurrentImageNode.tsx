@@ -34,12 +34,10 @@ const CurrentImageNode = (props: NodeProps) => {
       <Wrapper nodeProps={props}>
         <Image
           src={progressImage.dataURL}
-          sx={{
-            w: 'full',
-            h: 'full',
-            objectFit: 'contain',
-            borderRadius: 'base',
-          }}
+          w="full"
+          h="full"
+          objectFit="contain"
+          borderRadius="base"
         />
       </Wrapper>
     );
@@ -83,38 +81,26 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={DRAG_HANDLE_CLASSNAME}
-        sx={{
-          position: 'relative',
-          flexDirection: 'column',
-        }}
+        position="relative"
+        flexDirection="column"
       >
         <Flex
           layerStyle="nodeHeader"
-          sx={{
-            borderTopRadius: 'base',
-            alignItems: 'center',
-            justifyContent: 'center',
-            h: 8,
-          }}
+          borderTopRadius="base"
+          alignItems="center"
+          justifyContent="center"
+          h={8}
         >
-          <InvText
-            sx={{
-              fontSize: 'sm',
-              fontWeight: 'semibold',
-              color: 'base.200',
-            }}
-          >
+          <InvText fontSize="sm" fontWeight="semibold" color="base.200">
             {t('nodes.currentImage')}
           </InvText>
         </Flex>
         <Flex
           layerStyle="nodeBody"
-          sx={{
-            w: 'full',
-            h: 'full',
-            borderBottomRadius: 'base',
-            p: 2,
-          }}
+          w="full"
+          h="full"
+          borderBottomRadius="base"
+          p={2}
         >
           {props.children}
           {isHovering && (

@@ -38,16 +38,14 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
         <>
           <Flex
             layerStyle="nodeBody"
-            sx={{
-              flexDirection: 'column',
-              w: 'full',
-              h: 'full',
-              py: 2,
-              gap: 1,
-              borderBottomRadius: withFooter ? 0 : 'base',
-            }}
+            flexDirection="column"
+            w="full"
+            h="full"
+            py={2}
+            gap={1}
+            borderBottomRadius={withFooter ? 0 : 'base'}
           >
-            <Flex sx={{ flexDir: 'column', px: 2, w: 'full', h: 'full' }}>
+            <Flex flexDir="column" px={2} w="full" h="full">
               <Grid gridTemplateColumns="1fr auto" gridAutoRows="1fr">
                 {inputConnectionFieldNames.map((fieldName, i) => (
                   <GridItem

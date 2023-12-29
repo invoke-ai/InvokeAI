@@ -83,56 +83,38 @@ const IAICanvasStatusText = () => {
 
   return (
     <Flex
-      sx={{
-        flexDirection: 'column',
-        position: 'absolute',
-        top: 0,
-        insetInlineStart: 0,
-        opacity: 0.65,
-        display: 'flex',
-        fontSize: 'sm',
-        padding: 1,
-        px: 2,
-        minWidth: 48,
-        margin: 1,
-        borderRadius: 'base',
-        pointerEvents: 'none',
-        bg: 'base.800',
-      }}
+      flexDirection="column"
+      position="absolute"
+      top={0}
+      insetInlineStart={0}
+      opacity={0.65}
+      display="flex"
+      fontSize="sm"
+      padding={1}
+      px={2}
+      minWidth={48}
+      margin={1}
+      borderRadius="base"
+      pointerEvents="none"
+      bg="base.800"
     >
       <GenerationModeStatusText />
-      <Box
-        style={{
-          color: activeLayerColor,
-        }}
-      >{`${t('unifiedCanvas.activeLayer')}: ${t(
+      <Box color={activeLayerColor}>{`${t('unifiedCanvas.activeLayer')}: ${t(
         `unifiedCanvas.${layer}`
       )}`}</Box>
       <Box>{`${t('unifiedCanvas.canvasScale')}: ${canvasScaleString}%`}</Box>
       {shouldPreserveMaskedArea && (
-        <Box
-          style={{
-            color: warningColor,
-          }}
-        >
+        <Box color={warningColor}>
           {t('unifiedCanvas.preserveMaskedArea')}: {t('common.on')}
         </Box>
       )}
       {shouldShowBoundingBox && (
-        <Box
-          style={{
-            color: boundingBoxColor,
-          }}
-        >{`${t(
+        <Box color={boundingBoxColor}>{`${t(
           'unifiedCanvas.boundingBox'
         )}: ${boundingBoxDimensionsString}`}</Box>
       )}
       {shouldShowScaledBoundingBox && (
-        <Box
-          style={{
-            color: boundingBoxColor,
-          }}
-        >{`${t(
+        <Box color={boundingBoxColor}>{`${t(
           'unifiedCanvas.scaledBoundingBox'
         )}: ${scaledBoundingBoxDimensionsString}`}</Box>
       )}

@@ -103,13 +103,7 @@ const PopoverContent = ({ data, feature }: PopoverContentProps) => {
     <InvPopoverContent w={96}>
       <InvPopoverCloseButton />
       <InvPopoverBody>
-        <Flex
-          sx={{
-            gap: 2,
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-          }}
-        >
+        <Flex gap={2} flexDirection="column" alignItems="flex-start">
           {heading && (
             <>
               <InvHeading size="sm">{heading}</InvHeading>
@@ -119,12 +113,10 @@ const PopoverContent = ({ data, feature }: PopoverContentProps) => {
           {data?.image && (
             <>
               <Image
-                sx={{
-                  objectFit: 'contain',
-                  maxW: '60%',
-                  maxH: '60%',
-                  backgroundColor: 'white',
-                }}
+                objectFit="contain"
+                maxW="60%"
+                maxH="60%"
+                backgroundColor="white"
                 src={data.image}
                 alt="Optional Image"
               />

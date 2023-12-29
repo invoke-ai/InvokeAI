@@ -292,13 +292,7 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   return (
     <Box p={1}>
-      <InvText
-        sx={{
-          fontSize: 'sm',
-          fontWeight: 'semibold',
-          color: 'error.300',
-        }}
-      >
+      <InvText fontSize="sm" fontWeight="semibold" color="error.300">
         {t('nodes.unknownFieldType', { type: fieldInstance?.type.name })}
       </InvText>
     </Box>

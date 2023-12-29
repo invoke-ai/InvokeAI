@@ -7,15 +7,13 @@ import CurrentImagePreview from './CurrentImagePreview';
 const CurrentImageDisplay = () => {
   return (
     <Flex
-      sx={{
-        position: 'relative',
-        flexDirection: 'column',
-        height: '100%',
-        width: '100%',
-        rowGap: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      position="relative"
+      flexDirection="column"
+      height="100%"
+      width="100%"
+      rowGap={4}
+      alignItems="center"
+      justifyContent="center"
     >
       <CurrentImageButtons />
       <CurrentImagePreview />

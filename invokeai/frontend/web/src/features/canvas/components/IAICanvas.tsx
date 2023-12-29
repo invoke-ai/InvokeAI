@@ -18,7 +18,7 @@ import {
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
 
 import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
@@ -163,35 +163,32 @@ const IAICanvas = () => {
     };
   }, [dispatch]);
 
+  const stageStyles = useMemo(
+    () => ({
+      outline: 'none',
+      overflow: 'hidden',
+      cursor: stageCursor ? stageCursor : undefined,
+      canvas: {
+        outline: 'none',
+      },
+    }),
+    [stageCursor]
+  );
+
   return (
     <Flex
       id="canvas-container"
       ref={containerRef}
-      sx={{
-        position: 'relative',
-        height: '100%',
-        width: '100%',
-        borderRadius: 'base',
-      }}
+      position="relative"
+      height="100%"
+      width="100%"
+      borderRadius="base"
     >
-      <Box
-        sx={{
-          position: 'absolute',
-          // top: 0,
-          // insetInlineStart: 0,
-        }}
-      >
+      <Box position="absolute">
         <ChakraStage
           tabIndex={-1}
           ref={canvasStageRefCallback}
-          sx={{
-            outline: 'none',
-            overflow: 'hidden',
-            cursor: stageCursor ? stageCursor : undefined,
-            canvas: {
-              outline: 'none',
-            },
-          }}
+          sx={stageStyles}
           x={stageCoordinates.x}
           y={stageCoordinates.y}
           width={stageDimensions.width}

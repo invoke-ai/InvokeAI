@@ -103,10 +103,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   const renderMenuFunc = useCallback(
     () =>
       !menuItems.length ? null : (
-        <InvMenuList
-          sx={{ visibility: 'visible !important' }}
-          onContextMenu={skipEvent}
-        >
+        <InvMenuList visibility="visible" onContextMenu={skipEvent}>
           <InvMenuGroup
             title={label || fieldTemplateTitle || t('nodes.unknownField')}
           >

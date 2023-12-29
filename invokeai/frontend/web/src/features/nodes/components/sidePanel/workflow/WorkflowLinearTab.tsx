@@ -19,24 +19,16 @@ const WorkflowLinearTab = () => {
   const { t } = useTranslation();
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        w: 'full',
-        h: 'full',
-      }}
-    >
+    <Box position="relative" w="full" h="full">
       <ScrollableContent>
         <Flex
-          sx={{
-            position: 'relative',
-            flexDir: 'column',
-            alignItems: 'flex-start',
-            p: 1,
-            gap: 2,
-            h: 'full',
-            w: 'full',
-          }}
+          position="relative"
+          flexDir="column"
+          alignItems="flex-start"
+          p={1}
+          gap={2}
+          h="full"
+          w="full"
         >
           {fields.length ? (
             fields.map(({ nodeId, fieldName }) => (

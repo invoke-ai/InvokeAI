@@ -68,7 +68,7 @@ export const EmbeddingSelect = ({
         onChange={onChange}
         onMenuClose={onClose}
         data-testid="add-embedding"
-        sx={{ w: 'full' }}
+        w="full"
       />
     </InvControl>
   );

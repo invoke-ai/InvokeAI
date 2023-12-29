@@ -20,7 +20,7 @@ const ImageToImageTab = () => {
   const panelStorage = usePanelStorage();
 
   return (
-    <Box sx={{ w: 'full', h: 'full' }}>
+    <Box w="full" h="full">
       <PanelGroup
         ref={panelGroupRef}
         autoSaveId="imageTab.content"

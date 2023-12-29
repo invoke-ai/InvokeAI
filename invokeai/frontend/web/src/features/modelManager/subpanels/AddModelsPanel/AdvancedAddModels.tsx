@@ -48,13 +48,7 @@ export default function AdvancedAddModels() {
         <InvSelect value={value} options={options} onChange={handleChange} />
       </InvControl>
 
-      <Flex
-        sx={{
-          p: 4,
-          borderRadius: 4,
-          bg: 'base.850',
-        }}
-      >
+      <Flex p={4} borderRadius={4} bg="base.850">
         {advancedAddMode === 'diffusers' && <AdvancedAddDiffusers />}
         {advancedAddMode === 'checkpoint' && <AdvancedAddCheckpoint />}
       </Flex>

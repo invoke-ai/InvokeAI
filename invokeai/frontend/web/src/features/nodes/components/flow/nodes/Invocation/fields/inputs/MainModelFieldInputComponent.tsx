@@ -48,7 +48,7 @@ const MainModelFieldInputComponent = (props: Props) => {
     });
 
   return (
-    <Flex sx={{ w: 'full', alignItems: 'center', gap: 2 }}>
+    <Flex w="full" alignItems="center" gap={2}>
       <InvControl
         className="nowheel nodrag"
         isDisabled={!options.length}

@@ -56,7 +56,6 @@ const IPAdapterModelFieldInputComponent = (
           placeholder="Pick one"
           options={options}
           onChange={onChange}
-          sx={{ width: '100%' }}
         />
       </InvControl>
     </InvTooltip>

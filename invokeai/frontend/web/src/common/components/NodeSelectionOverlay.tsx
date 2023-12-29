@@ -21,19 +21,17 @@ const SelectionOverlay = ({ isSelected, isHovered }: Props) => {
   return (
     <Box
       className="selection-box"
-      sx={{
-        position: 'absolute',
-        top: 0,
-        insetInlineEnd: 0,
-        bottom: 0,
-        insetInlineStart: 0,
-        borderRadius: 'base',
-        opacity: isSelected || isHovered ? 1 : 0.5,
-        transitionProperty: 'common',
-        transitionDuration: '0.1s',
-        pointerEvents: 'none',
-        shadow,
-      }}
+      position="absolute"
+      top={0}
+      insetInlineEnd={0}
+      bottom={0}
+      insetInlineStart={0}
+      borderRadius="base"
+      opacity={isSelected || isHovered ? 1 : 0.5}
+      transitionProperty="common"
+      transitionDuration="0.1s"
+      pointerEvents="none"
+      shadow={shadow}
     />
   );
 };

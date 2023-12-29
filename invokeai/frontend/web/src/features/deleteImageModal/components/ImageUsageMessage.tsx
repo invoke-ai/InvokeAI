@@ -29,7 +29,7 @@ const ImageUsageMessage = (props: Props) => {
   return (
     <>
       <InvText>{topMessage}</InvText>
-      <UnorderedList sx={{ paddingInlineStart: 6 }}>
+      <UnorderedList paddingInlineStart={6}>
         {imageUsage.isInitialImage && (
           <ListItem>{t('common.img2img')}</ListItem>
         )}

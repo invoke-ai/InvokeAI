@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/styled-system';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SingleValue } from 'chakra-react-select';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -41,7 +42,7 @@ export const AspectRatioSelect = () => {
         value={value}
         onChange={onChange}
         options={ASPECT_RATIO_OPTIONS}
-        sx={{ minW: 48 }}
+        sx={selectStyles}
       />
       <SwapDimensionsButton />
       <LockAspectRatioButton />
@@ -49,3 +50,5 @@ export const AspectRatioSelect = () => {
     </InvControl>
   );
 };
+
+const selectStyles: SystemStyleObject = { minW: 48 };

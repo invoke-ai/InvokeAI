@@ -29,40 +29,29 @@ const InvocationNodeUnknownFallback = ({
       <Flex
         className={DRAG_HANDLE_CLASSNAME}
         layerStyle="nodeHeader"
-        sx={{
-          borderTopRadius: 'base',
-          borderBottomRadius: isOpen ? 0 : 'base',
-          alignItems: 'center',
-          h: 8,
-          fontWeight: 'semibold',
-          fontSize: 'sm',
-        }}
+        borderTopRadius="base"
+        borderBottomRadius={isOpen ? 0 : 'base'}
+        alignItems="center"
+        h={8}
+        fontWeight="semibold"
+        fontSize="sm"
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <InvText
-          sx={{
-            w: 'full',
-            textAlign: 'center',
-            pe: 8,
-            color: 'error.300',
-          }}
-        >
+        <InvText w="full" textAlign="center" pe={8} color="error.300">
           {label ? `${label} (${type})` : type}
         </InvText>
       </Flex>
       {isOpen && (
         <Flex
           layerStyle="nodeBody"
-          sx={{
-            userSelect: 'auto',
-            flexDirection: 'column',
-            w: 'full',
-            h: 'full',
-            p: 4,
-            gap: 1,
-            borderBottomRadius: 'base',
-            fontSize: 'sm',
-          }}
+          userSelect="auto"
+          flexDirection="column"
+          w="full"
+          h="full"
+          p={4}
+          gap={1}
+          borderBottomRadius="base"
+          fontSize="sm"
         >
           <Flex gap={2} flexDir="column">
             <InvText as="span">

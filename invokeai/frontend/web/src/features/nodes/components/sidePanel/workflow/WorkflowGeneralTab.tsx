@@ -87,16 +87,9 @@ const WorkflowGeneralTab = () => {
 
   return (
     <ScrollableContent>
-      <Flex
-        sx={{
-          flexDir: 'column',
-          alignItems: 'flex-start',
-          gap: 2,
-          h: 'full',
-        }}
-      >
+      <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
         <InvControlGroup orientation="vertical">
-          <Flex sx={{ gap: 2, w: 'full' }}>
+          <Flex gap={2} w="full">
             <InvControl label={t('nodes.workflowName')}>
               <InvInput value={name} onChange={handleChangeName} />
             </InvControl>
@@ -104,7 +97,7 @@ const WorkflowGeneralTab = () => {
               <InvInput value={version} onChange={handleChangeVersion} />
             </InvControl>
           </Flex>
-          <Flex sx={{ gap: 2, w: 'full' }}>
+          <Flex gap={2} w="full">
             <InvControl label={t('nodes.workflowAuthor')}>
               <InvInput value={author} onChange={handleChangeAuthor} />
             </InvControl>

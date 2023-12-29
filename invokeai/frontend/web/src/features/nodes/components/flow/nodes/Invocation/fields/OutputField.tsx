@@ -97,16 +97,14 @@ type OutputFieldWrapperProps = PropsWithChildren<{
 const OutputFieldWrapper = memo(
   ({ shouldDim, children }: OutputFieldWrapperProps) => (
     <Flex
-      sx={{
-        position: 'relative',
-        minH: 8,
-        py: 0.5,
-        alignItems: 'center',
-        opacity: shouldDim ? 0.5 : 1,
-        transitionProperty: 'opacity',
-        transitionDuration: '0.1s',
-        justifyContent: 'flex-end',
-      }}
+      position="relative"
+      minH={8}
+      py={0.5}
+      alignItems="center"
+      opacity={shouldDim ? 0.5 : 1}
+      transitionProperty="opacity"
+      transitionDuration="0.1s"
+      justifyContent="flex-end"
     >
       {children}
     </Flex>

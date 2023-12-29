@@ -150,7 +150,7 @@ const IAICanvasMaskOptions = () => {
                 onChange={handleChangePreserveMaskedArea}
               />
             </InvControl>
-            <Box sx={{ paddingTop: 2, paddingBottom: 2 }}>
+            <Box pt={2} pb={2}>
               <IAIColorPicker
                 color={maskColor}
                 onChange={handleChangeMaskColor}

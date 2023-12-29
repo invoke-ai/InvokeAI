@@ -25,12 +25,10 @@ const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
     >
       <Icon
         as={FaInfoCircle}
-        sx={{
-          display: 'block',
-          boxSize: 4,
-          w: 8,
-          color: needsUpdate ? 'error.400' : 'base.400',
-        }}
+        display="block"
+        boxSize={4}
+        w={8}
+        color={needsUpdate ? 'error.400' : 'base.400'}
       />
     </InvTooltip>
   );
@@ -66,7 +64,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
 
     if (!data.version) {
       return (
-        <InvText as="span" sx={{ color: 'error.500' }}>
+        <InvText as="span" color="error.500">
           {t('nodes.versionUnknown')}
         </InvText>
       );
@@ -74,7 +72,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
 
     if (!nodeTemplate.version) {
       return (
-        <InvText as="span" sx={{ color: 'error.500' }}>
+        <InvText as="span" color="error.500">
           {t('nodes.version')} {data.version} ({t('nodes.unknownTemplate')})
         </InvText>
       );
@@ -82,7 +80,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
 
     if (compare(data.version, nodeTemplate.version, '<')) {
       return (
-        <InvText as="span" sx={{ color: 'error.500' }}>
+        <InvText as="span" color="error.500">
           {t('nodes.version')} {data.version} ({t('nodes.updateNode')})
         </InvText>
       );
@@ -90,7 +88,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
 
     if (compare(data.version, nodeTemplate.version, '>')) {
       return (
-        <InvText as="span" sx={{ color: 'error.500' }}>
+        <InvText as="span" color="error.500">
           {t('nodes.version')} {data.version} ({t('nodes.updateApp')})
         </InvText>
       );
@@ -104,16 +102,12 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
   }, [data, nodeTemplate, t]);
 
   if (!isInvocationNodeData(data)) {
-    return (
-      <InvText sx={{ fontWeight: 'semibold' }}>
-        {t('nodes.unknownNode')}
-      </InvText>
-    );
+    return <InvText fontWeight="semibold">{t('nodes.unknownNode')}</InvText>;
   }
 
   return (
-    <Flex sx={{ flexDir: 'column' }}>
-      <InvText as="span" sx={{ fontWeight: 'semibold' }}>
+    <Flex flexDir="column">
+      <InvText as="span" fontWeight="semibold">
         {title}
       </InvText>
       {nodeTemplate?.nodePack && (
@@ -121,7 +115,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
           {t('nodes.nodePack')}: {nodeTemplate.nodePack}
         </InvText>
       )}
-      <InvText sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
+      <InvText opacity={0.7} fontStyle="oblique 5deg">
         {nodeTemplate?.description}
       </InvText>
       {versionComponent}

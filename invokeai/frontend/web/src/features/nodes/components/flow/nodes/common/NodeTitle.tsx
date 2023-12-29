@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import {
   Box,
   Editable,
@@ -50,46 +51,28 @@ const NodeTitle = ({ nodeId, title }: Props) => {
 
   return (
     <Flex
-      sx={{
-        overflow: 'hidden',
-        w: 'full',
-        h: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'text',
-      }}
+      overflow="hidden"
+      w="full"
+      h="full"
+      alignItems="center"
+      justifyContent="center"
+      cursor="text"
     >
       <Editable
         as={Flex}
         value={localTitle}
         onChange={handleChange}
         onSubmit={handleSubmit}
-        sx={{
-          alignItems: 'center',
-          position: 'relative',
-          w: 'full',
-          h: 'full',
-        }}
+        alignItems="center"
+        position="relative"
+        w="full"
+        h="full"
       >
-        <EditablePreview
-          fontSize="sm"
-          sx={{
-            p: 0,
-            w: 'full',
-          }}
-          noOfLines={1}
-        />
+        <EditablePreview fontSize="sm" p={0} w="full" noOfLines={1} />
         <EditableInput
           className="nodrag"
           fontSize="sm"
-          sx={{
-            p: 0,
-            fontWeight: 'bold',
-            _focusVisible: {
-              p: 0,
-              boxShadow: 'none',
-            },
-          }}
+          sx={editableInputStyles}
         />
         <EditableControls />
       </Editable>
@@ -120,13 +103,19 @@ function EditableControls() {
     <Box
       className={DRAG_HANDLE_CLASSNAME}
       onDoubleClick={handleDoubleClick}
-      sx={{
-        position: 'absolute',
-        w: 'full',
-        h: 'full',
-        top: 0,
-        cursor: 'grab',
-      }}
+      position="absolute"
+      w="full"
+      h="full"
+      top={0}
+      cursor="grab"
     />
   );
 }
+
+const editableInputStyles: SystemStyleObject = {
+  p: 0,
+  fontWeight: 'bold',
+  _focusVisible: {
+    p: 0,
+  },
+};

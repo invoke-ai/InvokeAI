@@ -148,7 +148,7 @@ export default function AdvancedAddCheckpoint(
           {!useCustomConfig ? (
             <CheckpointConfigsSelect
               required
-              sx={{ w: 'full' }}
+              w="full"
               {...advancedAddCheckpointForm.getInputProps('config')}
             />
           ) : (

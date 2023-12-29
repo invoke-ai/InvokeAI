@@ -36,20 +36,14 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
 
     if (selectionCount > 1) {
       return (
-        <InvMenuList
-          sx={{ visibility: 'visible !important' }}
-          onContextMenu={skipEvent}
-        >
+        <InvMenuList visibility="visible" onContextMenu={skipEvent}>
           <MultipleSelectionMenuItems />
         </InvMenuList>
       );
     }
 
     return (
-      <InvMenuList
-        sx={{ visibility: 'visible !important' }}
-        onContextMenu={skipEvent}
-      >
+      <InvMenuList visibility="visible" onContextMenu={skipEvent}>
         <SingleSelectionMenuItems imageDTO={imageDTO} />
       </InvMenuList>
     );

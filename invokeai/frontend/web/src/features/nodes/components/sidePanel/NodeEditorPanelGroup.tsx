@@ -24,7 +24,7 @@ const NodeEditorPanelGroup = () => {
   }, []);
 
   return (
-    <Flex sx={{ flexDir: 'column', gap: 2, height: '100%', width: '100%' }}>
+    <Flex w="full" h="full" gap={2} flexDir="column">
       <QueueControls />
       <PanelGroup
         ref={panelGroupRef}
