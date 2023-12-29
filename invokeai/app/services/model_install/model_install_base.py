@@ -1,3 +1,6 @@
+# Copyright 2023 Lincoln D. Stein and the InvokeAI development team
+"""Baseclass definitions for the model installer."""
+
 import re
 import traceback
 from abc import ABC, abstractmethod

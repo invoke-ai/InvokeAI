@@ -78,7 +78,7 @@ class ModelMetadataStore:
             rows = self._cursor.fetchone()
             if not rows:
                 raise UnknownMetadataException("model metadata not found")
-            return ModelMetadataFetchBase.from_json(rows[0])  # see mypy typechecking issue in from_json() method
+            return ModelMetadataFetchBase.from_json(rows[0])
 
     def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:  # key, metadata
         """Dump out all the metadata."""

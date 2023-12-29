@@ -58,6 +58,4 @@ class ModelMetadataFetchBase(ABC):
     def from_json(cls, json: str) -> AnyModelRepoMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
         metadata = AnyModelRepoMetadataValidator.validate_json(json)
-        return (
-            metadata  # mypy complains that metadata is a <typing special form> and issues a type checking error. Why?
-        )
+        return metadata
