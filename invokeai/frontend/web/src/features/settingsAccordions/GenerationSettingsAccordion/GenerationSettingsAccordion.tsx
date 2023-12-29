@@ -25,7 +25,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelProps: InvLabelProps = {
-  w: '4rem',
+  minW: '4rem',
 };
 
 const badgesSelector = createMemoizedSelector(

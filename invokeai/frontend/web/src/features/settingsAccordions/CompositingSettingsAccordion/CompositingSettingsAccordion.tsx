@@ -20,7 +20,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const coherenceLabelProps: FormLabelProps = {
-  w: '4.5rem',
+  minW: '4.5rem',
 };
 
 export const CompositingSettingsAccordion = memo(() => {

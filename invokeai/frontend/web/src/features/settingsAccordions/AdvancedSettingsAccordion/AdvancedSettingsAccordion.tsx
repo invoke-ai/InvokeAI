@@ -12,7 +12,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelProps: InvLabelProps = {
-  w: '9.2rem',
+  minW: '9.2rem',
 };
 
 const labelProps2: InvLabelProps = {
