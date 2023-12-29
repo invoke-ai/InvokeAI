@@ -67,7 +67,6 @@ export const InvNumberInput = memo(
 
       const onBlur: FocusEventHandler<HTMLInputElement> = useCallback(
         (e) => {
-          console.log('blur!');
           if (!e.target.value) {
             // If the input is empty, we set it to the minimum value
             onChange(String(min), min);
