@@ -650,7 +650,9 @@ class ModelInstallService(ModelInstallServiceBase):
             assert install_job is not None
             assert excp is not None
             install_job.set_error(excp)
-            self._logger.info(f"Download {download_job.source} had an error. Cancelling {install_job.source}")
+            self._logger.error(
+                f"Cancelling {install_job.source} due to an error while downloading {download_job.source}: {str(excp)}"
+            )
             self._cancel_download_parts(install_job)
 
             # Let other threads know that the number of downloads has changed
@@ -662,7 +664,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if not install_job:
                 return
             self._downloads_changed_event.set()
-            self._logger.info(f"Download {download_job.source} cancelled.")
+            self._logger.warning(f"Download {download_job.source} cancelled.")
             # if install job has already registered an error, then do not replace its status with cancelled
             if not install_job.errored:
                 install_job.cancel()

@@ -398,11 +398,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def _signal_job_error(self, job: DownloadJob, excp: Optional[Exception] = None) -> None:
         job.status = DownloadJobStatus.ERROR
+        self._logger.error(f"{str(job.source)}: {traceback.format_exception(excp)}")
         if job.on_error:
             try:
                 job.on_error(job, excp)
             except Exception as e:
-                self._logger.error(traceback.format_exception(e))
+                self._logger.error(
+                    f"An error occurred while processing the on_error callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.error_type
             assert job.error

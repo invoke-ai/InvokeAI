@@ -5,10 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
-import requests
 from pydantic import BaseModel
 from requests.sessions import Session
-from requests_testadapter import TestAdapter
+from requests_testadapter import TestAdapter, TestSession
 
 import tests.data as test_data
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -122,7 +121,7 @@ def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadata
 
 @pytest.fixture
 def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
-    sess = requests.Session()
+    sess = TestSession()
     sess.mount(
         "https://huggingface.co/api/models/stabilityai/sdxl-turbo",
         TestAdapter(
@@ -180,7 +179,7 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
     for root, _, files in os.walk(diffusers_dir):
         for name in files:
             path = Path(root, name)
-            url_base = path.relative_to(diffusers_dir)
+            url_base = path.relative_to(diffusers_dir).as_posix()
             url = f"https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/{url_base}"
             with open(path, "rb") as f:
                 data = f.read()
