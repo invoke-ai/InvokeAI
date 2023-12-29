@@ -55,7 +55,7 @@ class ModelMetadataFetchBase(ABC):
         pass
 
     @classmethod
-    def from_json(self, json: str) -> AnyModelRepoMetadata:
+    def from_json(cls, json: str) -> AnyModelRepoMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
         metadata = AnyModelRepoMetadataValidator.validate_json(json)
         return (
