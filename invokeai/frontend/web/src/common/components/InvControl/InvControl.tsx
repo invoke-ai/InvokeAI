@@ -6,7 +6,7 @@ import {
   forwardRef,
 } from '@chakra-ui/react';
 import { InvControlGroupContext } from 'common/components/InvControl/InvControlGroup';
-import { memo, useContext } from 'react';
+import { memo, useContext, useMemo } from 'react';
 
 import { InvLabel } from './InvLabel';
 import type { InvControlProps } from './types';
@@ -18,9 +18,9 @@ export const InvControl = memo(
         children,
         helperText,
         feature,
-        orientation,
+        orientation: _orientation,
         renderInfoPopoverInPortal = true,
-        isDisabled,
+        isDisabled: _isDisabled,
         labelProps,
         label,
         error,
@@ -29,15 +29,24 @@ export const InvControl = memo(
 
       const ctx = useContext(InvControlGroupContext);
 
+      const orientation = useMemo(
+        () => _orientation ?? ctx.orientation,
+        [_orientation, ctx.orientation]
+      );
+
+      const isDisabled = useMemo(
+        () => _isDisabled ?? ctx.isDisabled,
+        [_isDisabled, ctx.isDisabled]
+      );
+
       return (
         <ChakraFormControl
           ref={ref}
-          variant="withHelperText"
-          orientation={orientation ?? ctx.orientation}
-          isDisabled={isDisabled ?? ctx.isDisabled}
+          orientation={orientation}
+          isDisabled={isDisabled}
           {...formControlProps}
         >
-          <Flex>
+          <Flex className="invcontrol-label-input-wrapper">
             {label && (
               <InvLabel
                 feature={feature}
@@ -53,26 +62,6 @@ export const InvControl = memo(
             <ChakraFormHelperText>{helperText}</ChakraFormHelperText>
           )}
           {error && <ChakraFormErrorMessage>{error}</ChakraFormErrorMessage>}
-        </ChakraFormControl>
-      );
-
-      return (
-        <ChakraFormControl
-          ref={ref}
-          isDisabled={isDisabled ?? ctx.isDisabled}
-          orientation={orientation ?? ctx.orientation}
-          {...formControlProps}
-        >
-          {label && (
-            <InvLabel
-              feature={feature}
-              renderInfoPopoverInPortal={renderInfoPopoverInPortal}
-              {...labelProps}
-            >
-              {label}
-            </InvLabel>
-          )}
-          {children}
         </ChakraFormControl>
       );
     }

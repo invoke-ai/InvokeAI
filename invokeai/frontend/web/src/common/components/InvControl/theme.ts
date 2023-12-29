@@ -13,29 +13,22 @@ const {
   defineMultiStyleConfig: defineFormMultiStyleConfig,
 } = createMultiStyleConfigHelpers(formParts.keys);
 
-const formBaseStyle = defineFormPartsStyle((props) => {
-  return {
-    container: {
+const formBaseStyle = defineFormPartsStyle((props) => ({
+  container: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 4,
+    h: 'unset',
+    '> .invcontrol-label-input-wrapper': {
       display: 'flex',
       flexDirection: props.orientation === 'vertical' ? 'column' : 'row',
       alignItems: props.orientation === 'vertical' ? 'flex-start' : 'center',
       gap: props.orientation === 'vertical' ? 2 : 4,
-    },
-  };
-});
-
-const withHelperText = defineFormPartsStyle(() => ({
-  container: {
-    flexDirection: 'column',
-    gap: 0,
-    h: 'unset',
-    '> div': {
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      h: 8,
+      minH: 8,
       w: 'full',
+      _invalid: {
+        color: 'error.300',
+      },
     },
   },
   helperText: {
@@ -48,9 +41,6 @@ const withHelperText = defineFormPartsStyle(() => ({
 
 export const formTheme = defineFormMultiStyleConfig({
   baseStyle: formBaseStyle,
-  variants: {
-    withHelperText,
-  },
 });
 
 const formLabelBaseStyle = defineStyle(() => {
@@ -65,6 +55,8 @@ const formLabelBaseStyle = defineStyle(() => {
     transitionDuration: 'normal',
     whiteSpace: 'nowrap',
     userSelect: 'none',
+    h: 'full',
+    alignItems: 'center',
     _disabled: {
       opacity: 0.4,
     },
