@@ -21,6 +21,8 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
 
+const borderDash = [4, 4];
+
 const boundingBoxPreviewSelector = createMemoizedSelector(
   [stateSelector],
   ({ canvas, generation }) => {
@@ -289,11 +291,11 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         anchorFill="rgba(212,216,234,1)"
         anchorSize={15}
         anchorStroke="rgb(42,42,42)"
-        borderDash={[4, 4]}
+        borderDash={borderDash}
         borderEnabled={true}
         borderStroke="black"
         draggable={false}
-        enabledAnchors={tool === 'move' ? undefined : []}
+        enabledAnchors={tool === 'move' ? undefined : emptyArray}
         flipEnabled={false}
         ignoreStroke={true}
         keepRatio={false}
@@ -311,3 +313,5 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 };
 
 export default memo(IAICanvasBoundingBox);
+
+const emptyArray: string[] = []

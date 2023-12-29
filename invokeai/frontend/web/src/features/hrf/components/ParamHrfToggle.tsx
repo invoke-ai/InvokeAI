@@ -1,6 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
+import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setHrfEnabled } from 'features/hrf/store/hrfSlice';
 import type { ChangeEvent } from 'react';
@@ -22,10 +23,12 @@ export default function ParamHrfToggle() {
   return (
     <InvControl
       label={t('hrf.enableHrf')}
-      labelProps={{ flexGrow: 1 }}
+      labelProps={labelProps}
       w="full"
     >
       <InvSwitch isChecked={hrfEnabled} onChange={handleHrfEnabled} />
     </InvControl>
   );
 }
+
+const labelProps: InvLabelProps = { flexGrow: 1 };

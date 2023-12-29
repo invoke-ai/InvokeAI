@@ -83,7 +83,7 @@ const MlsdImageProcessor = (props: Props) => {
           onReset={handleDetectResolutionReset}
           min={0}
           max={4096}
-          marks={[0, 4096]}
+          marks={marks0to4096}
           withNumberInput
         />
       </InvControl>
@@ -97,7 +97,7 @@ const MlsdImageProcessor = (props: Props) => {
           onReset={handleImageResolutionReset}
           min={0}
           max={4096}
-          marks={[0, 4096]}
+          marks={marks0to4096}
           withNumberInput
         />
       </InvControl>
@@ -109,7 +109,7 @@ const MlsdImageProcessor = (props: Props) => {
           min={0}
           max={1}
           step={0.01}
-          marks={[0, 1]}
+          marks={marks0to1}
           withNumberInput
         />
       </InvControl>
@@ -121,7 +121,7 @@ const MlsdImageProcessor = (props: Props) => {
           min={0}
           max={1}
           step={0.01}
-          marks={[0, 1]}
+          marks={marks0to1}
           withNumberInput
         />
       </InvControl>
@@ -130,3 +130,6 @@ const MlsdImageProcessor = (props: Props) => {
 };
 
 export default memo(MlsdImageProcessor);
+
+const marks0to4096 = [0, 4096];
+const marks0to1 = [0, 1];

@@ -7,7 +7,7 @@ import {
   controlAdapterBeginStepPctChanged,
   controlAdapterEndStepPctChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -55,6 +55,11 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
     );
   }, [dispatch, id]);
 
+  const value = useMemo<[number, number]>(
+    () => [stepPcts?.beginStepPct ?? 0, stepPcts?.endStepPct ?? 1],
+    [stepPcts]
+  );
+
   if (!stepPcts) {
     return null;
   }
@@ -67,8 +72,8 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
       orientation="vertical"
     >
       <InvRangeSlider
-        aria-label={['Begin Step %', 'End Step %']}
-        value={[stepPcts.beginStepPct, stepPcts.endStepPct]}
+        aria-label={ariaLabel}
+        value={value}
         onChange={onChange}
         onReset={onReset}
         min={0}
@@ -83,3 +88,5 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
 });
 
 ParamControlAdapterBeginEnd.displayName = 'ParamControlAdapterBeginEnd';
+
+const ariaLabel = ['Begin Step %', 'End Step %'];

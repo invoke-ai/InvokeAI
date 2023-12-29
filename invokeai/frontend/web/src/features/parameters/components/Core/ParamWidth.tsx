@@ -5,7 +5,7 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { widthChanged } from 'features/parameters/store/generationSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
@@ -48,6 +48,8 @@ export const ParamWidth = memo(() => {
     dispatch(widthChanged(initial));
   }, [dispatch, initial]);
 
+  const marks = useMemo(() => [min, initial, max], [min, initial, max]);
+
   return (
     <InvControl label={t('parameters.width')}>
       <InvSlider
@@ -58,7 +60,7 @@ export const ParamWidth = memo(() => {
         max={max}
         step={step}
         fineStep={fineStep}
-        marks={[min, initial, max]}
+        marks={marks}
       />
       <InvNumberInput
         value={width}

@@ -1,4 +1,4 @@
-import type { ChakraProps } from '@chakra-ui/react';
+import type { ChakraProps, CollapseProps } from '@chakra-ui/react';
 import { Collapse, Flex } from '@chakra-ui/react';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
@@ -63,6 +63,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
     [item.status]
   );
 
+  const icon = useMemo(() => (<FaTimes />), []);
   return (
     <Flex
       flexDir="column"
@@ -137,21 +138,22 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
               isDisabled={isCanceled}
               isLoading={isLoading}
               aria-label={t('queue.cancelItem')}
-              icon={<FaTimes />}
+              icon={icon}
             />
           </InvButtonGroup>
         </Flex>
       </Flex>
 
-      <Collapse
-        in={isOpen}
-        transition={{ enter: { duration: 0.1 }, exit: { duration: 0.1 } }}
-        unmountOnExit={true}
-      >
+      <Collapse in={isOpen} transition={transition} unmountOnExit={true}>
         <QueueItemDetail queueItemDTO={item} />
       </Collapse>
     </Flex>
   );
+};
+
+const transition: CollapseProps['transition'] = {
+  enter: { duration: 0.1 },
+  exit: { duration: 0.1 },
 };
 
 export default memo(QueueItemComponent);

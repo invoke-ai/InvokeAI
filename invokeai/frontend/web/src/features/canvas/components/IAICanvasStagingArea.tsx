@@ -7,6 +7,8 @@ import { Group, Rect } from 'react-konva';
 
 import IAICanvasImage from './IAICanvasImage';
 
+const dash = [4, 4]
+
 const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
   const {
     layerState,
@@ -69,7 +71,7 @@ const IAICanvasStagingArea = (props: Props) => {
             y={y}
             width={width}
             height={height}
-            dash={[4, 4]}
+            dash={dash}
             strokeWidth={1}
             stroke="black"
             strokeScaleEnabled={false}

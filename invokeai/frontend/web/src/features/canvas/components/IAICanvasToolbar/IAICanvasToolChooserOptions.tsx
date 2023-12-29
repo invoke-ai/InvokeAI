@@ -261,7 +261,7 @@ const IAICanvasToolChooserOptions = () => {
                     max={100}
                     step={1}
                     onChange={handleChangeBrushSize}
-                    marks={[1, 25, 50, 75, 100]}
+                    marks={marks}
                   />
                   <InvNumberInput
                     value={brushSize}
@@ -288,3 +288,5 @@ const IAICanvasToolChooserOptions = () => {
 };
 
 export default memo(IAICanvasToolChooserOptions);
+
+const marks = [1, 25, 50, 75, 100];
