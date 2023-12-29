@@ -9,6 +9,9 @@ import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSing
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import ParamBoundingBoxHeight from 'features/parameters/components/Canvas/BoundingBox/ParamBoundingBoxHeight';
 import ParamBoundingBoxWidth from 'features/parameters/components/Canvas/BoundingBox/ParamBoundingBoxWidth';
+import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
+import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
+import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
 import { ParamHeight } from 'features/parameters/components/Core/ParamHeight';
 import { ParamWidth } from 'features/parameters/components/Core/ParamWidth';
 import { AspectRatioPreviewWrapper } from 'features/parameters/components/ImageSize/AspectRatioPreviewWrapper';
@@ -40,6 +43,10 @@ const selector = createMemoizedSelector(
 
 const labelProps: InvLabelProps = {
   w: 12,
+};
+
+const scalingLabelProps: InvLabelProps = {
+  w: '4.5rem',
 };
 
 export const ImageSettingsAccordion = () => {
@@ -74,6 +81,15 @@ export const ImageSettingsAccordion = () => {
             {activeTabName === 'txt2img' && <HrfSettings />}
             {activeTabName === 'img2img' && <ImageToImageFit />}
             {activeTabName === 'img2img' && <ImageToImageStrength />}
+            {activeTabName === 'unifiedCanvas' && (
+              <>
+                <ParamScaleBeforeProcessing />
+                <InvControlGroup labelProps={scalingLabelProps}>
+                  <ParamScaledWidth />
+                  <ParamScaledHeight />
+                </InvControlGroup>
+              </>
+            )}
           </Flex>
         </InvExpander>
       </Flex>

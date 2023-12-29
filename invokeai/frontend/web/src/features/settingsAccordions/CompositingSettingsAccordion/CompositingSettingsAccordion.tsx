@@ -16,9 +16,6 @@ import ParamMaskBlur from 'features/parameters/components/Canvas/Compositing/Mas
 import ParamMaskBlurMethod from 'features/parameters/components/Canvas/Compositing/MaskAdjustment/ParamMaskBlurMethod';
 import ParamInfillMethod from 'features/parameters/components/Canvas/InfillAndScaling/ParamInfillMethod';
 import ParamInfillOptions from 'features/parameters/components/Canvas/InfillAndScaling/ParamInfillOptions';
-import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
-import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
-import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,7 +31,7 @@ export const CompositingSettingsAccordion = memo(() => {
       <InvTabs variant="collapse">
         <InvTabList>
           <InvTab>{t('accordions.compositing.coherenceTab')}</InvTab>
-          <InvTab>{t('accordions.compositing.infillMaskTab')}</InvTab>
+          <InvTab>{t('accordions.compositing.infillTab')}</InvTab>
         </InvTabList>
         <InvTabPanels>
           <InvTabPanel>
@@ -53,11 +50,6 @@ export const CompositingSettingsAccordion = memo(() => {
               <InvControlGroup labelProps={coherenceLabelProps}>
                 <ParamInfillMethod />
                 <ParamInfillOptions />
-              </InvControlGroup>
-              <ParamScaleBeforeProcessing />
-              <InvControlGroup labelProps={coherenceLabelProps}>
-                <ParamScaledWidth />
-                <ParamScaledHeight />
               </InvControlGroup>
             </Flex>
           </InvTabPanel>
