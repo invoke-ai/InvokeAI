@@ -77,7 +77,11 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
       }
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
     >
-      <Flex
+      <Editable
+        value={localTitle}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        as={Flex}
         ref={ref}
         position="relative"
         overflow="hidden"
@@ -86,24 +90,15 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
         gap={1}
         h="full"
       >
-        <Editable
-          value={localTitle}
-          onChange={handleChange}
-          onSubmit={handleSubmit}
-          as={Flex}
-          position="relative"
-          alignItems="center"
-          h="full"
-        >
-          <EditablePreview
-            fontWeight={isMissingInput ? 'bold' : 'normal'}
-            sx={editablePreviewStyles}
-            noOfLines={1}
-          />
-          <EditableInput className="nodrag" sx={editableInputStyles} />
-          <EditableControls />
-        </Editable>
-      </Flex>
+        <EditablePreview
+          fontWeight="semibold"
+          sx={editablePreviewStyles}
+          noOfLines={1}
+          color={isMissingInput ? 'error.300' : 'base.300'}
+        />
+        <EditableInput className="nodrag" sx={editableInputStyles} />
+        <EditableControls />
+      </Editable>
     </InvTooltip>
   );
 });

@@ -8,17 +8,20 @@ const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(parts.keys);
 
 const baseStylePreview = defineStyle({
-  fontSize: 'md',
+  fontSize: 'sm',
   borderRadius: 'md',
   py: '1',
   transitionProperty: 'common',
   transitionDuration: 'normal',
   color: 'base.100',
+  _invalid: {
+    color: 'error.300'
+  }
 });
 
 const baseStyleInput = defineStyle(() => ({
   color: 'base.100',
-  fontSize: 'md',
+  fontSize: 'sm',
   borderRadius: 'md',
   py: '1',
   transitionProperty: 'common',

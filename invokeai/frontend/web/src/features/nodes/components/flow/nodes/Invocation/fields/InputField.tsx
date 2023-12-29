@@ -79,38 +79,49 @@ const InputField = ({ nodeId, fieldName }: Props) => {
     );
   }
 
+  if (fieldTemplate.input === 'connection') {
+    return (
+      <InputFieldWrapper shouldDim={shouldDim}>
+        <InvControl isInvalid={isMissingInput} isDisabled={isConnected} px={2}>
+          <EditableFieldTitle
+            nodeId={nodeId}
+            fieldName={fieldName}
+            kind="input"
+            isMissingInput={isMissingInput}
+            withTooltip
+          />
+        </InvControl>
+
+        <FieldHandle
+          fieldTemplate={fieldTemplate}
+          handleType="target"
+          isConnectionInProgress={isConnectionInProgress}
+          isConnectionStartField={isConnectionStartField}
+          connectionError={connectionError}
+        />
+      </InputFieldWrapper>
+    );
+  }
+
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
       <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
         {(ref) => (
           <InvControl
+            ref={ref}
             isInvalid={isMissingInput}
             isDisabled={isConnected}
+            orientation="vertical"
             ps={fieldTemplate.input === 'direct' ? 0 : 2}
-            alignItems="stretch"
-            justifyContent="space-between"
-            flexDir="column"
-            gap={2}
-            h="full"
-            w="full"
+            pe={2}
           >
-            <InvLabel
-              ref={ref}
-              display="flex"
-              alignItems="center"
-              mb={0}
-              px={1}
-              gap={2}
-              h="full"
-            >
-              <EditableFieldTitle
-                nodeId={nodeId}
-                fieldName={fieldName}
-                kind="input"
-                isMissingInput={isMissingInput}
-                withTooltip
-              />
-            </InvLabel>
+            <EditableFieldTitle
+              nodeId={nodeId}
+              fieldName={fieldName}
+              kind="input"
+              isMissingInput={isMissingInput}
+              withTooltip
+            />
             <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
           </InvControl>
         )}
