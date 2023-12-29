@@ -1,6 +1,6 @@
 import type { FlexProps, SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex } from '@chakra-ui/react';
-import type { CSSProperties} from 'react';
+import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { PanelResizeHandle } from 'react-resizable-panels';
 

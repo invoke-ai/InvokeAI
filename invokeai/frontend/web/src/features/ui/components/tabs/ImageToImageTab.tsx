@@ -3,9 +3,18 @@ import InitialImageDisplay from 'features/parameters/components/ImageToImage/Ini
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import TextToImageTabMain from 'features/ui/components/tabs/TextToImageTab';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
+
+const panelGroupStyles: CSSProperties = {
+  height: '100%',
+  width: '100%',
+};
+const panelStyles: CSSProperties = {
+  position: 'relative',
+};
 
 const ImageToImageTab = () => {
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
@@ -25,7 +34,7 @@ const ImageToImageTab = () => {
         ref={panelGroupRef}
         autoSaveId="imageTab.content"
         direction="horizontal"
-        style={{ height: '100%', width: '100%' }}
+        style={panelGroupStyles}
         storage={panelStorage}
         units="percentages"
       >
@@ -34,7 +43,7 @@ const ImageToImageTab = () => {
           order={0}
           defaultSize={50}
           minSize={25}
-          style={{ position: 'relative' }}
+          style={panelStyles}
         >
           <InitialImageDisplay />
         </Panel>

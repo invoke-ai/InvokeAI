@@ -7,8 +7,9 @@ import { InvText } from 'common/components/InvText/wrapper';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
+import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
-import type { PropsWithChildren } from 'react';
+import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
@@ -106,25 +107,10 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           {isHovering && (
             <motion.div
               key="nextPrevButtons"
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-                transition: { duration: 0.1 },
-              }}
-              exit={{
-                opacity: 0,
-                transition: { duration: 0.1 },
-              }}
-              style={{
-                position: 'absolute',
-                top: 40,
-                left: -2,
-                right: -2,
-                bottom: 0,
-                pointerEvents: 'none',
-              }}
+              initial={initial}
+              animate={animate}
+              exit={exit}
+              style={styles}
             >
               <NextPrevImageButtons />
             </motion.div>
@@ -133,4 +119,24 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
       </Flex>
     </NodeWrapper>
   );
+};
+
+const initial: AnimationProps['initial'] = {
+  opacity: 0,
+};
+const animate: AnimationProps['animate'] = {
+  opacity: 1,
+  transition: { duration: 0.1 },
+};
+const exit: AnimationProps['exit'] = {
+  opacity: 0,
+  transition: { duration: 0.1 },
+};
+const styles: CSSProperties = {
+  position: 'absolute',
+  top: 40,
+  left: -2,
+  right: -2,
+  bottom: 0,
+  pointerEvents: 'none',
 };

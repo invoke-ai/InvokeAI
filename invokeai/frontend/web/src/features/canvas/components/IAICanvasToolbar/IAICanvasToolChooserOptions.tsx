@@ -31,8 +31,8 @@ import {
   FaEyeDropper,
   FaFillDrip,
   FaPaintBrush,
-  FaPlus,
   FaSlidersH,
+  FaTimes,
 } from 'react-icons/fa';
 
 export const selector = createMemoizedSelector(
@@ -230,7 +230,7 @@ const IAICanvasToolChooserOptions = () => {
       <InvIconButton
         aria-label={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
         tooltip={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
-        icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
+        icon={<FaTimes />}
         isDisabled={isStaging}
         onClick={handleEraseBoundingBox}
       />

@@ -1,3 +1,4 @@
+import type { ChakraProps } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -69,10 +70,14 @@ const LoRASelect = () => {
         noOptionsMessage={noOptionsMessage}
         onChange={onChange}
         data-testid="add-lora"
-        w="full"
+        sx={selectStyles}
       />
     </InvControl>
   );
 };
 
 export default memo(LoRASelect);
+
+const selectStyles: ChakraProps['sx'] = {
+  w: 'full',
+};

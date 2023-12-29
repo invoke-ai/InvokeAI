@@ -4,6 +4,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvText } from 'common/components/InvText/wrapper';
 import { STATUS_TRANSLATION_KEYS } from 'features/system/store/types';
+import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ResourceKey } from 'i18next';
 import { memo, useMemo, useRef } from 'react';
@@ -58,17 +59,9 @@ const StatusIndicator = () => {
         {isHovered && (
           <motion.div
             key="statusText"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.15 },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { delay: 0.8 },
-            }}
+            initial={initial}
+            animate={animate}
+            exit={exit}
           >
             <InvText
               fontSize="sm"
@@ -88,3 +81,15 @@ const StatusIndicator = () => {
 };
 
 export default memo(StatusIndicator);
+
+const initial: AnimationProps['initial'] = {
+  opacity: 0,
+};
+const animate: AnimationProps['animate'] = {
+  opacity: 1,
+  transition: { duration: 0.1 },
+};
+const exit: AnimationProps['exit'] = {
+  opacity: 0,
+  transition: { delay: 0.8 },
+};

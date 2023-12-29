@@ -23,8 +23,8 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
-import type { MouseEvent } from 'react';
-import { useCallback, useRef } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type {
   OnConnect,
@@ -75,6 +75,8 @@ const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
   };
 });
 
+const snapGrid: [number, number] = [25, 25];
+
 export const Flow = () => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.nodes.nodes);
@@ -86,6 +88,13 @@ export const Flow = () => {
   const isValidConnection = useIsValidConnection();
 
   const [borderRadius] = useToken('radii', ['base']);
+
+  const flowStyles = useMemo<CSSProperties>(
+    () => ({
+      borderRadius,
+    }),
+    [borderRadius]
+  );
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -266,10 +275,10 @@ export const Flow = () => {
       isValidConnection={isValidConnection}
       minZoom={0.1}
       snapToGrid={shouldSnapToGrid}
-      snapGrid={[25, 25]}
+      snapGrid={snapGrid}
       connectionRadius={30}
       proOptions={proOptions}
-      style={{ borderRadius }}
+      style={flowStyles}
       onPaneClick={handlePaneClick}
       deleteKeyCode={DELETE_KEYS}
       selectionMode={selectionMode}

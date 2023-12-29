@@ -5,7 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import type { CSSProperties} from 'react';
+import type { CSSProperties } from 'react';
 import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import type { BoardDTO } from 'services/api/types';

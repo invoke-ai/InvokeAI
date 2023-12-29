@@ -1,5 +1,6 @@
 import type { ChakraProps } from '@chakra-ui/react';
 import { Flex } from '@chakra-ui/react';
+import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import type {
@@ -14,19 +15,21 @@ type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
   withNumberInput?: boolean;
 };
 
-const colorPickerStyles: NonNullable<ChakraProps['sx']> = {
+const colorPickerPointerStyles: NonNullable<ChakraProps['sx']> = {
   width: 6,
   height: 6,
   borderColor: 'base.100',
 };
 
 const sx: ChakraProps['sx'] = {
-  '.react-colorful__hue-pointer': colorPickerStyles,
-  '.react-colorful__saturation-pointer': colorPickerStyles,
-  '.react-colorful__alpha-pointer': colorPickerStyles,
+  '.react-colorful__hue-pointer': colorPickerPointerStyles,
+  '.react-colorful__saturation-pointer': colorPickerPointerStyles,
+  '.react-colorful__alpha-pointer': colorPickerPointerStyles,
   gap: 2,
   flexDir: 'column',
 };
+
+const colorPickerStyles: CSSProperties = { width: '100%' };
 
 const numberInputWidth: ChakraProps['w'] = '4.2rem';
 
@@ -53,7 +56,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
       <RgbaColorPicker
         color={color}
         onChange={onChange}
-        style={{ width: '100%' }}
+        style={colorPickerStyles}
         {...rest}
       />
       {withNumberInput && (

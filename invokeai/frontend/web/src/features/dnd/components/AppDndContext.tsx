@@ -16,8 +16,9 @@ import type {
   TypesafeDraggableData,
 } from 'features/dnd/types';
 import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
+import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { PropsWithChildren } from 'react';
+import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 
 import { DndContextTypesafe } from './DndContextTypesafe';
@@ -90,29 +91,15 @@ const AppDndContext = (props: PropsWithChildren) => {
       <DragOverlay
         dropAnimation={null}
         modifiers={[scaledModifier]}
-        style={{
-          width: 'min-content',
-          height: 'min-content',
-          cursor: 'grabbing',
-          userSelect: 'none',
-          // expand overlay to prevent cursor from going outside it and displaying
-          padding: '10rem',
-        }}
+        style={dragOverlayStyles}
       >
         <AnimatePresence>
           {activeDragData && (
             <motion.div
               layout
               key="overlay-drag-image"
-              initial={{
-                opacity: 0,
-                scale: 0.7,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                transition: { duration: 0.1 },
-              }}
+              initial={initial}
+              animate={animate}
             >
               <DragPreview dragData={activeDragData} />
             </motion.div>
@@ -124,3 +111,22 @@ const AppDndContext = (props: PropsWithChildren) => {
 };
 
 export default memo(AppDndContext);
+
+const dragOverlayStyles: CSSProperties = {
+  width: 'min-content',
+  height: 'min-content',
+  cursor: 'grabbing',
+  userSelect: 'none',
+  // expand overlay to prevent cursor from going outside it and displaying
+  padding: '10rem',
+};
+
+const initial: AnimationProps['initial'] = {
+  opacity: 0,
+  scale: 0.7,
+};
+const animate: AnimationProps['animate'] = {
+  opacity: 1,
+  scale: 1,
+  transition: { duration: 0.1 },
+};

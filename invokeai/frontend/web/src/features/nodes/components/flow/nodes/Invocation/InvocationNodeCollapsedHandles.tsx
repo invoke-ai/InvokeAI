@@ -10,6 +10,8 @@ interface Props {
   nodeId: string;
 }
 
+const hiddenHandleStyles: CSSProperties = { visibility: 'hidden' };
+
 const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
   const data = useNodeData(nodeId);
   const { base600 } = useChakraThemeTokens();
@@ -26,6 +28,15 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
     [base600]
   );
 
+  const collapsedTargetStyles: CSSProperties = useMemo(
+    () => ({ ...dummyHandleStyles, left: '-0.5rem' }),
+    [dummyHandleStyles]
+  );
+  const collapsedSourceStyles: CSSProperties = useMemo(
+    () => ({ ...dummyHandleStyles, right: '-0.5rem' }),
+    [dummyHandleStyles]
+  );
+
   if (!isInvocationNodeData(data)) {
     return null;
   }
@@ -37,7 +48,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
         id={`${data.id}-collapsed-target`}
         isConnectable={false}
         position={Position.Left}
-        style={{ ...dummyHandleStyles, left: '-0.5rem' }}
+        style={collapsedTargetStyles}
       />
       {map(data.inputs, (input) => (
         <Handle
@@ -46,7 +57,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
           id={input.name}
           isConnectable={false}
           position={Position.Left}
-          style={{ visibility: 'hidden' }}
+          style={hiddenHandleStyles}
         />
       ))}
       <Handle
@@ -54,7 +65,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
         id={`${data.id}-collapsed-source`}
         isConnectable={false}
         position={Position.Right}
-        style={{ ...dummyHandleStyles, right: '-0.5rem' }}
+        style={collapsedSourceStyles}
       />
       {map(data.outputs, (output) => (
         <Handle
@@ -63,7 +74,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
           id={output.name}
           isConnectable={false}
           position={Position.Right}
-          style={{ visibility: 'hidden' }}
+          style={hiddenHandleStyles}
         />
       ))}
     </>

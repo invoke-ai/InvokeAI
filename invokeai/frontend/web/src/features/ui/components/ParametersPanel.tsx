@@ -13,7 +13,13 @@ import { ImageSettingsAccordion } from 'features/settingsAccordions/ImageSetting
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
+import type { CSSProperties } from 'react';
 import { memo } from 'react';
+
+const overlayScrollbarsStyles: CSSProperties = {
+  height: '100%',
+  width: '100%',
+};
 
 const ParametersPanel = () => {
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -28,7 +34,7 @@ const ParametersPanel = () => {
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
           <OverlayScrollbarsComponent
             defer
-            style={{ height: '100%', width: '100%' }}
+            style={overlayScrollbarsStyles}
             options={overlayScrollbarsParams.options}
           >
             <Flex gap={2} flexDirection="column" h="full" w="full">

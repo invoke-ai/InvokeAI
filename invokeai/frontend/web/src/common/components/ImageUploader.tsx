@@ -4,6 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -155,17 +156,9 @@ const ImageUploader = (props: ImageUploaderProps) => {
         {isDragActive && isHandlingUpload && (
           <motion.div
             key="image-upload-overlay"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.1 },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 0.1 },
-            }}
+            initial={initial}
+            animate={animate}
+            exit={exit}
           >
             <ImageUploadOverlay
               isDragAccept={isDragAccept}
@@ -180,3 +173,15 @@ const ImageUploader = (props: ImageUploaderProps) => {
 };
 
 export default memo(ImageUploader);
+
+const initial: AnimationProps['initial'] = {
+  opacity: 0,
+};
+const animate: AnimationProps['animate'] = {
+  opacity: 1,
+  transition: { duration: 0.1 },
+};
+const exit: AnimationProps['exit'] = {
+  opacity: 0,
+  transition: { duration: 0.1 },
+};

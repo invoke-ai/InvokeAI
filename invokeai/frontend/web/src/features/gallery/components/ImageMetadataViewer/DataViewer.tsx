@@ -4,7 +4,7 @@ import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import type { CSSProperties} from 'react';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy, FaDownload } from 'react-icons/fa';

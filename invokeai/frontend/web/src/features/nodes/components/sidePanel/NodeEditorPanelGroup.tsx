@@ -4,12 +4,15 @@ import { Flex } from '@chakra-ui/react';
 import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import InspectorPanel from './inspector/InspectorPanel';
 import WorkflowPanel from './workflow/WorkflowPanel';
+
+const panelGroupStyles: CSSProperties = { height: '100%', width: '100%' };
 
 const NodeEditorPanelGroup = () => {
   const [isTopPanelCollapsed, setIsTopPanelCollapsed] = useState(false);
@@ -31,7 +34,7 @@ const NodeEditorPanelGroup = () => {
         id="workflow-panel-group"
         autoSaveId="workflow-panel-group"
         direction="vertical"
-        style={{ height: '100%', width: '100%' }}
+        style={panelGroupStyles}
         storage={panelStorage}
       >
         <Panel

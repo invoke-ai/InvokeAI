@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import type { EdgeProps } from 'reactflow';
 import { BaseEdge, getBezierPath } from 'reactflow';
@@ -42,19 +43,18 @@ const InvocationDefaultEdge = ({
     targetPosition,
   });
 
-  return (
-    <BaseEdge
-      path={edgePath}
-      markerEnd={markerEnd}
-      style={{
-        strokeWidth: isSelected ? 3 : 2,
-        stroke,
-        opacity: isSelected ? 0.8 : 0.5,
-        animation: shouldAnimate ? 'dashdraw 0.5s linear infinite' : undefined,
-        strokeDasharray: shouldAnimate ? 5 : 'none',
-      }}
-    />
+  const edgeStyles = useMemo<CSSProperties>(
+    () => ({
+      strokeWidth: isSelected ? 3 : 2,
+      stroke,
+      opacity: isSelected ? 0.8 : 0.5,
+      animation: shouldAnimate ? 'dashdraw 0.5s linear infinite' : undefined,
+      strokeDasharray: shouldAnimate ? 5 : 'none',
+    }),
+    [isSelected, shouldAnimate, stroke]
   );
+
+  return <BaseEdge path={edgePath} markerEnd={markerEnd} style={edgeStyles} />;
 };
 
 export default memo(InvocationDefaultEdge);
