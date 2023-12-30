@@ -29,7 +29,7 @@ const QueueControls = () => {
         {isPauseEnabled && <PauseProcessorButton asIconButton />} */}
         <ClearQueueButton asIconButton />
       </InvButtonGroup>
-      <Flex h={1} w="full">
+      <Flex h={2} w="full">
         <ProgressBar />
       </Flex>
     </Flex>
