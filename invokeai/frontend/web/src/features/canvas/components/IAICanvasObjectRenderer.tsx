@@ -59,6 +59,7 @@ const IAICanvasObjectRenderer = () => {
                 clipY={obj.clip.y}
                 clipWidth={obj.clip.width}
                 clipHeight={obj.clip.height}
+                listening={false}
               >
                 {line}
               </Group>
@@ -75,6 +76,7 @@ const IAICanvasObjectRenderer = () => {
               width={obj.width}
               height={obj.height}
               fill={rgbaColorToString(obj.color)}
+              listening={false}
             />
           );
         } else if (isCanvasEraseRect(obj)) {
@@ -87,6 +89,7 @@ const IAICanvasObjectRenderer = () => {
               height={obj.height}
               fill="rgb(255, 255, 255)"
               globalCompositeOperation="destination-out"
+              listening={false}
             />
           );
         }

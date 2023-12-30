@@ -4,8 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { range } from 'lodash-es';
-import type { ReactNode } from 'react';
-import { memo, useCallback, useLayoutEffect, useState } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
 
 const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
@@ -16,7 +15,6 @@ const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
 const IAICanvasGrid = () => {
   const { stageScale, stageCoordinates, stageDimensions } =
     useAppSelector(selector);
-  const [gridLines, setGridLines] = useState<ReactNode[]>([]);
   const [gridLineColor] = useToken('colors', ['base.800']);
 
   const unscale = useCallback(
@@ -26,7 +24,7 @@ const IAICanvasGrid = () => {
     [stageScale]
   );
 
-  useLayoutEffect(() => {
+  const gridLines = useMemo(() => {
     const { width, height } = stageDimensions;
     const { x, y } = stageCoordinates;
 
@@ -77,6 +75,7 @@ const IAICanvasGrid = () => {
         points={[0, 0, 0, ySize]}
         stroke={gridLineColor}
         strokeWidth={1}
+        listening={false}
       />
     ));
     const yLines = range(0, ySteps).map((i) => (
@@ -87,13 +86,14 @@ const IAICanvasGrid = () => {
         points={[0, 0, xSize, 0]}
         stroke={gridLineColor}
         strokeWidth={1}
+        listening={false}
       />
     ));
 
-    setGridLines(xLines.concat(yLines));
-  }, [stageScale, stageCoordinates, stageDimensions, unscale, gridLineColor]);
+    return xLines.concat(yLines);
+  }, [stageCoordinates, stageDimensions, unscale, gridLineColor]);
 
-  return <Group>{gridLines}</Group>;
+  return <Group listening={false}>{gridLines}</Group>;
 };
 
 export default memo(IAICanvasGrid);

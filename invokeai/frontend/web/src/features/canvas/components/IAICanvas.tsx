@@ -210,7 +210,7 @@ const IAICanvas = () => {
           onWheel={handleWheel}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
-          <Layer id="grid" visible={shouldShowGrid}>
+          <Layer id="grid" visible={shouldShowGrid} listening={false}>
             <IAICanvasGrid />
           </Layer>
 
@@ -230,17 +230,21 @@ const IAICanvas = () => {
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
-          <Layer>
+          <Layer listening={false}>
             <IAICanvasBoundingBoxOverlay />
           </Layer>
-          <Layer id="preview" imageSmoothingEnabled={shouldAntialias}>
+          <Layer
+            id="preview"
+            listening={false}
+            imageSmoothingEnabled={shouldAntialias}
+          >
             {!isStaging && (
               <IAICanvasToolPreview
                 visible={tool !== 'move'}
                 listening={false}
               />
             )}
-            <IAICanvasStagingArea visible={isStaging} />
+            <IAICanvasStagingArea listening={false} visible={isStaging} />
             {shouldShowIntermediates && <IAICanvasIntermediateImage />}
             <IAICanvasBoundingBox
               visible={shouldShowBoundingBox && !isStaging}

@@ -9,7 +9,7 @@ import { Group, Line } from 'react-konva';
 export const canvasLinesSelector = createMemoizedSelector(
   [stateSelector],
   ({ canvas }) => {
-    return { objects: canvas.layerState.objects };
+    return canvas.layerState.objects.filter(isCanvasMaskLine);
   }
 );
 
@@ -22,11 +22,11 @@ type InpaintingCanvasLinesProps = GroupConfig;
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
   const { ...rest } = props;
-  const { objects } = useAppSelector(canvasLinesSelector);
+  const lines = useAppSelector(canvasLinesSelector);
 
   return (
     <Group listening={false} {...rest}>
-      {objects.filter(isCanvasMaskLine).map((line, i) => (
+      {lines.map((line, i) => (
         <Line
           key={i}
           points={line.points}
