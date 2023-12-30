@@ -283,7 +283,6 @@ export const Flow = memo(() => {
       onPaneClick={handlePaneClick}
       deleteKeyCode={DELETE_KEYS}
       selectionMode={selectionMode}
-      onlyRenderVisibleElements
     >
       <Background />
     </ReactFlow>
