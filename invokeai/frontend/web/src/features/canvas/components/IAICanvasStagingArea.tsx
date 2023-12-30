@@ -56,7 +56,7 @@ const IAICanvasStagingArea = (props: Props) => {
         <IAICanvasImage canvasImage={currentStagingAreaImage} />
       )}
       {shouldShowStagingOutline && (
-        <Group>
+        <Group listening={false}>
           <Rect
             x={x}
             y={y}
@@ -65,6 +65,7 @@ const IAICanvasStagingArea = (props: Props) => {
             strokeWidth={1}
             stroke="white"
             strokeScaleEnabled={false}
+            listening={false}
           />
           <Rect
             x={x}
@@ -75,6 +76,7 @@ const IAICanvasStagingArea = (props: Props) => {
             strokeWidth={1}
             stroke="black"
             strokeScaleEnabled={false}
+            listening={false}
           />
         </Group>
       )}
