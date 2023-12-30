@@ -12,7 +12,7 @@ export const initialGalleryState: GalleryState = {
   shouldAutoSwitch: true,
   autoAssignBoardOnClick: true,
   autoAddBoardId: 'none',
-  galleryImageMinimumWidth: 96,
+  galleryImageMinimumWidth: 90,
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',

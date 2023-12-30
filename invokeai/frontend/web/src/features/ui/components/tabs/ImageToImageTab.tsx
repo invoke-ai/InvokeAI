@@ -46,7 +46,10 @@ const ImageToImageTab = () => {
         >
           <InitialImageDisplay />
         </Panel>
-        <ResizeHandle onDoubleClick={handleDoubleClickHandle} />
+        <ResizeHandle
+          orientation="vertical"
+          onDoubleClick={handleDoubleClickHandle}
+        />
         <Panel
           id="imageTab.content.selectedImage"
           order={1}

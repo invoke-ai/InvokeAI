@@ -1,103 +1,84 @@
-import type { FlexProps, SystemStyleObject } from '@chakra-ui/react';
-import { Box, Flex } from '@chakra-ui/react';
-import type { CSSProperties } from 'react';
-import { memo, useMemo } from 'react';
+import { Box, defineStyleConfig, Flex, useStyleConfig } from '@chakra-ui/react';
+import { memo } from 'react';
+import type { PanelResizeHandleProps } from 'react-resizable-panels';
 import { PanelResizeHandle } from 'react-resizable-panels';
 
-type ResizeHandleProps = Omit<FlexProps, 'direction'> & {
-  direction?: 'horizontal' | 'vertical';
-  collapsedDirection?: 'top' | 'bottom' | 'left' | 'right';
-  isCollapsed?: boolean;
+type ResizeHandleProps = PanelResizeHandleProps & {
+  orientation: 'horizontal' | 'vertical';
 };
 
 const ResizeHandle = (props: ResizeHandleProps) => {
-  const {
-    direction = 'horizontal',
-    collapsedDirection,
-    isCollapsed = false,
-    ...rest
-  } = props;
-
-  const resizeHandleStyles = useMemo<CSSProperties>(() => {
-    if (direction === 'horizontal') {
-      return {
-        visibility: isCollapsed ? 'hidden' : 'visible',
-        width: isCollapsed ? 0 : 'auto',
-      };
-    }
-    return {
-      visibility: isCollapsed ? 'hidden' : 'visible',
-      width: isCollapsed ? 0 : 'auto',
-    };
-  }, [direction, isCollapsed]);
-
-  const resizeHandleWrapperStyles = useMemo<SystemStyleObject>(() => {
-    if (direction === 'horizontal') {
-      return {
-        w: collapsedDirection ? 2.5 : 4,
-        h: 'full',
-        justifyContent: collapsedDirection
-          ? collapsedDirection === 'left'
-            ? 'flex-start'
-            : 'flex-end'
-          : 'center',
-        alignItems: 'center',
-        div: {
-          bg: 'base.850',
-        },
-        _hover: {
-          div: { bg: 'base.700' },
-        },
-      };
-    }
-    return {
-      w: 'full',
-      h: collapsedDirection ? 2.5 : 4,
-      alignItems: collapsedDirection
-        ? collapsedDirection === 'top'
-          ? 'flex-start'
-          : 'flex-end'
-        : 'center',
-      justifyContent: 'center',
-      div: {
-        bg: 'base.850',
-      },
-      _hover: {
-        div: { bg: 'base.700' },
-      },
-    };
-  }, [collapsedDirection, direction]);
-  const resizeInnerStyles = useMemo<SystemStyleObject>(() => {
-    if (direction === 'horizontal') {
-      return {
-        w: 1,
-        h: 'calc(100% - 1rem)',
-        borderRadius: 'base',
-        transitionProperty: 'common',
-        transitionDuration: 'normal',
-      };
-    }
-
-    return {
-      h: 1,
-      w: 'calc(100% - 1rem)',
-      borderRadius: 'base',
-      transitionProperty: 'common',
-      transitionDuration: 'normal',
-    };
-  }, [direction]);
+  const { orientation, ...rest } = props;
+  const styles = useStyleConfig('ResizeHandle', { orientation });
 
   return (
-    <PanelResizeHandle style={resizeHandleStyles}>
-      <Flex
-        className="resize-handle-horizontal"
-        sx={resizeHandleWrapperStyles}
-        {...rest}
-      >
-        <Box sx={resizeInnerStyles} />
+    <PanelResizeHandle {...rest}>
+      <Flex __css={styles} data-orientation={orientation}>
+        <Box className="resize-handle-inner" data-orientation={orientation} />
+        <Box
+          className="resize-handle-drag-handle"
+          data-orientation={orientation}
+        />
       </Flex>
     </PanelResizeHandle>
   );
 };
 
 export default memo(ResizeHandle);
+
+export const resizeHandleTheme = defineStyleConfig({
+  // The styles all Cards have in common
+  baseStyle: () => ({
+    display: 'flex',
+    pos: 'relative',
+    '&[data-orientation="horizontal"]': {
+      w: 'full',
+      h: 5,
+    },
+    '&[data-orientation="vertical"]': { w: 5, h: 'full' },
+    alignItems: 'center',
+    justifyContent: 'center',
+    div: {
+      bg: 'base.800',
+    },
+    _hover: {
+      div: { bg: 'base.700' },
+    },
+    _active: {
+      div: { bg: 'base.600' },
+    },
+    transitionProperty: 'common',
+    transitionDuration: 'normal',
+    '.resize-handle-inner': {
+      '&[data-orientation="horizontal"]': {
+        w: 'calc(100% - 1rem)',
+        h: '2px',
+      },
+      '&[data-orientation="vertical"]': {
+        w: '2px',
+        h: 'calc(100% - 1rem)',
+      },
+      borderRadius: 'base',
+      transitionProperty: 'inherit',
+      transitionDuration: 'inherit',
+    },
+    '.resize-handle-drag-handle': {
+      pos: 'absolute',
+      borderRadius: '2px',
+      transitionProperty: 'inherit',
+      transitionDuration: 'inherit',
+      '&[data-orientation="horizontal"]': {
+        w: '20px',
+        h: '6px',
+        insetInlineStart: '50%',
+        transform: 'translate(-50%, 0)',
+      },
+      '&[data-orientation="vertical"]': {
+        w: '6px',
+        h: '20px',
+        insetBlockStart: '50%',
+        transform: 'translate(0, -50%)',
+      },
+    },
+  }),
+});

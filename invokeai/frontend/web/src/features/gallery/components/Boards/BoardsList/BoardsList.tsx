@@ -63,7 +63,7 @@ const BoardsList = (props: Props) => {
             <Grid
               className="list-container"
               data-testid="boards-list"
-              gridTemplateColumns="repeat(auto-fill, minmax(108px, 1fr))"
+              gridTemplateColumns="repeat(auto-fill, minmax(90px, 1fr))"
               maxH={346}
             >
               <GridItem p={1.5} data-testid="no-board">
