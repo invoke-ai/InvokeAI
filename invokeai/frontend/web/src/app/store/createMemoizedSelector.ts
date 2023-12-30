@@ -10,3 +10,10 @@ export const createMemoizedSelector = createSelectorCreator({
     resultEqualityCheck: isEqual,
   },
 });
+
+/**
+ * A memoized selector creator that uses LRU cache default shallow equality check.
+ */
+export const createLruSelector = createSelectorCreator({
+  memoize: lruMemoize,
+});
