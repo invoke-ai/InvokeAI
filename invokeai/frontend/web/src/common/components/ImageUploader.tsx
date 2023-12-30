@@ -6,15 +6,22 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
-import type { FileRejection } from 'react-dropzone';
+import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
 import ImageUploadOverlay from './ImageUploadOverlay';
+
+const accept: Accept = {
+  'image/png': ['.png'],
+  'image/jpeg': ['.jpg', '.jpeg', '.png'],
+};
+
+const dropzoneRootProps = { style: {} };
 
 const selector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
@@ -38,12 +45,7 @@ const selector = createMemoizedSelector(
   }
 );
 
-type ImageUploaderProps = {
-  children: ReactNode;
-};
-
-const ImageUploader = (props: ImageUploaderProps) => {
-  const { children } = props;
+const ImageUploader = (props: PropsWithChildren) => {
   const { autoAddBoardId, postUploadAction } = useAppSelector(selector);
   const toaster = useAppToaster();
   const { t } = useTranslation();
@@ -111,7 +113,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     isDragActive,
     inputRef,
   } = useDropzone({
-    accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
+    accept,
     noClick: true,
     onDrop,
     onDragOver,
@@ -149,9 +151,9 @@ const ImageUploader = (props: ImageUploaderProps) => {
   }, []);
 
   return (
-    <Box {...getRootProps({ style: {} })} onKeyDown={handleKeyDown}>
+    <Box {...getRootProps(dropzoneRootProps)} onKeyDown={handleKeyDown}>
       <input {...getInputProps()} />
-      {children}
+      {props.children}
       <AnimatePresence>
         {isDragActive && isHandlingUpload && (
           <motion.div

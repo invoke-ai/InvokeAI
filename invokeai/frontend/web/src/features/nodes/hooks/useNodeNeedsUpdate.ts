@@ -11,20 +11,15 @@ export const useNodeNeedsUpdate = (nodeId: string) => {
       createMemoizedSelector(stateSelector, ({ nodes }) => {
         const node = nodes.nodes.find((node) => node.id === nodeId);
         const template = nodes.nodeTemplates[node?.data.type ?? ''];
-        return { node, template };
+        if (isInvocationNode(node) && template) {
+          return getNeedsUpdate(node, template);
+        }
+        return false;
       }),
     [nodeId]
   );
 
-  const { node, template } = useAppSelector(selector);
-
-  const needsUpdate = useMemo(
-    () =>
-      isInvocationNode(node) && template
-        ? getNeedsUpdate(node, template)
-        : false,
-    [node, template]
-  );
+  const needsUpdate = useAppSelector(selector);
 
   return needsUpdate;
 };
