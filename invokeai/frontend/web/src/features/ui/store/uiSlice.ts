@@ -12,7 +12,6 @@ export const initialUIState: UIState = {
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
   shouldAutoChangeDimensions: false,
-  globalMenuCloseTrigger: 0,
   panels: {},
 };
 
@@ -41,9 +40,6 @@ export const uiSlice = createSlice({
     setShouldAutoChangeDimensions: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoChangeDimensions = action.payload;
     },
-    bumpGlobalMenuCloseTrigger: (state) => {
-      state.globalMenuCloseTrigger += 1;
-    },
     panelsChanged: (
       state,
       action: PayloadAction<{ name: string; value: string }>
@@ -65,7 +61,6 @@ export const {
   setShouldHidePreview,
   setShouldShowProgressInViewer,
   setShouldAutoChangeDimensions,
-  bumpGlobalMenuCloseTrigger,
   panelsChanged,
 } = uiSlice.actions;
 
