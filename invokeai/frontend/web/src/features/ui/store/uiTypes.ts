@@ -19,6 +19,5 @@ export interface UIState {
   shouldHidePreview: boolean;
   shouldShowProgressInViewer: boolean;
   shouldAutoChangeDimensions: boolean;
-  globalMenuCloseTrigger: number;
   panels: Record<string, string>;
 }

@@ -3,7 +3,4 @@ import type { UIState } from './uiTypes';
 /**
  * UI slice persist denylist
  */
-export const uiPersistDenylist: (keyof UIState)[] = [
-  'shouldShowImageDetails',
-  'globalMenuCloseTrigger',
-];
+export const uiPersistDenylist: (keyof UIState)[] = ['shouldShowImageDetails'];

@@ -2,6 +2,7 @@ import { useToken } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import {
   connectionEnded,
@@ -22,7 +23,6 @@ import {
   viewportChanged,
 } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
-import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -157,9 +157,10 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
+  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
   const handlePaneClick = useCallback(() => {
-    dispatch(bumpGlobalMenuCloseTrigger());
-  }, [dispatch]);
+    onCloseGlobal();
+  }, [onCloseGlobal]);
 
   const onInit: OnInit = useCallback((flow) => {
     $flow.set(flow);

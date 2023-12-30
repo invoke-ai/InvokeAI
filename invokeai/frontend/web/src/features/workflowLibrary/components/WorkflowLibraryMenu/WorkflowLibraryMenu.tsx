@@ -22,11 +22,12 @@ const WorkflowLibraryMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuCloseTrigger(onClose);
+
   const isWorkflowLibraryEnabled =
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
-    <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
+    <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose} isLazy>
       <InvMenuButton
         as={InvIconButton}
         aria-label={t('workflows.workflowEditorMenu')}

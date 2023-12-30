@@ -4,6 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
+import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { nodeExclusivelySelected } from 'features/nodes/store/nodesSlice';
 import {
@@ -11,7 +12,6 @@ import {
   NODE_WIDTH,
 } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { bumpGlobalMenuCloseTrigger } from 'features/ui/store/uiSlice';
 import type { MouseEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 
@@ -48,15 +48,16 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const dispatch = useAppDispatch();
 
   const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
+  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
         dispatch(nodeExclusivelySelected(nodeId));
       }
-      dispatch(bumpGlobalMenuCloseTrigger());
+      onCloseGlobal();
     },
-    [dispatch, nodeId]
+    [dispatch, onCloseGlobal, nodeId]
   );
 
   return (
