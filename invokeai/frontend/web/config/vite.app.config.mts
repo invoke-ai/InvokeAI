@@ -1,6 +1,6 @@
 import type { UserConfig } from 'vite';
 
-import { commonPlugins } from './common';
+import { commonPlugins } from './common.mjs';
 
 export const appConfig: UserConfig = {
   base: './',
