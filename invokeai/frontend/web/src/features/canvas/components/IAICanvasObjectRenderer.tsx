@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   isCanvasBaseImage,
@@ -13,21 +11,8 @@ import { Group, Line, Rect } from 'react-konva';
 
 import IAICanvasImage from './IAICanvasImage';
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
-  const {
-    layerState: { objects },
-  } = canvas;
-  return {
-    objects,
-  };
-});
-
 const IAICanvasObjectRenderer = () => {
-  const { objects } = useAppSelector(selector);
-
-  if (!objects) {
-    return null;
-  }
+  const objects = useAppSelector((state) => state.canvas.layerState.objects);
 
   return (
     <Group name="outpainting-objects" listening={false}>
