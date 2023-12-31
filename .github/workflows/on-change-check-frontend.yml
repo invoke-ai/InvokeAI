@@ -1,3 +1,8 @@
+# This workflow runs of `check-frontend.yml` on push or pull request.
+#
+# The actual checks are in a separate workflow to support simpler workflow
+# composition without awkward or complicated conditionals.
+
 name: 'On change: run check-frontend'
 
 on:
