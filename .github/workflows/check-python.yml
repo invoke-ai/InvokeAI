@@ -1,3 +1,9 @@
+# This workflow runs the python code quality checks.
+#
+# It may be triggered via dispatch, or by another workflow.
+#
+# TODO: Add mypy or pyright to the checks.
+
 name: 'Check: python'
 
 on:
