@@ -233,11 +233,7 @@ const IAICanvas = () => {
           <Layer listening={false}>
             <IAICanvasBoundingBoxOverlay />
           </Layer>
-          <Layer
-            id="preview"
-            listening={false}
-            imageSmoothingEnabled={shouldAntialias}
-          >
+          <Layer id="preview" imageSmoothingEnabled={shouldAntialias}>
             {!isStaging && (
               <IAICanvasToolPreview
                 visible={tool !== 'move'}
