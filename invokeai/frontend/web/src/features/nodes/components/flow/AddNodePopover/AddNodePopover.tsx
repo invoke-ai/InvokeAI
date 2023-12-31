@@ -65,6 +65,8 @@ const AddNodePopover = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
   const selectRef = useRef<SelectInstance<InvSelectOption> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const fieldFilter = useAppSelector(
     (state) => state.nodes.connectionStartFieldType
   );
@@ -201,6 +203,7 @@ const AddNodePopover = () => {
       closeDelay={0}
       closeOnBlur={true}
       returnFocusOnClose={true}
+      initialFocusRef={inputRef}
     >
       <InvPopoverAnchor>
         <Flex
@@ -230,6 +233,7 @@ const AddNodePopover = () => {
             onChange={onChange}
             onMenuClose={onClose}
             onKeyDown={onKeyDown}
+            inputRef={inputRef}
           />
         </InvPopoverBody>
       </InvPopoverContent>
