@@ -104,19 +104,7 @@ const GALLERY_MIN_SIZE_PCT = 20;
 const OPTIONS_PANEL_MIN_SIZE_PX = 430;
 const OPTIONS_PANEL_MIN_SIZE_PCT = 20;
 
-const optionsPanelUsePanelOptions: UsePanelOptions = {
-  unit: 'pixels',
-  minSize: OPTIONS_PANEL_MIN_SIZE_PX,
-  fallbackMinSizePct: OPTIONS_PANEL_MIN_SIZE_PCT,
-  panelGroupID: 'app',
-};
-
-const galleryPanelUsePanelOptions: UsePanelOptions = {
-  unit: 'pixels',
-  minSize: GALLERY_MIN_SIZE_PX,
-  fallbackMinSizePct: GALLERY_MIN_SIZE_PCT,
-  panelGroupID: 'app',
-};
+const appPanelGroupId = 'app-panel-group';
 
 const InvokeTabs = () => {
   const activeTabIndex = useAppSelector(activeTabIndexSelector);
@@ -124,7 +112,7 @@ const InvokeTabs = () => {
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const panelGroupHandleRef = useRef<ImperativePanelGroupHandle>(null);
+  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const handleClickTab = useCallback((e: MouseEvent<HTMLElement>) => {
     if (e.target instanceof HTMLElement) {
       e.target.blur();
@@ -168,6 +156,28 @@ const InvokeTabs = () => {
       dispatch(setActiveTab(tab.id));
     },
     [dispatch, enabledTabs]
+  );
+
+  const optionsPanelUsePanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      unit: 'pixels',
+      minSize: OPTIONS_PANEL_MIN_SIZE_PX,
+      fallbackMinSizePct: OPTIONS_PANEL_MIN_SIZE_PCT,
+      panelGroupRef,
+      panelGroupDirection: 'horizontal',
+    }),
+    []
+  );
+
+  const galleryPanelUsePanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      unit: 'pixels',
+      minSize: GALLERY_MIN_SIZE_PX,
+      fallbackMinSizePct: GALLERY_MIN_SIZE_PCT,
+      panelGroupRef,
+      panelGroupDirection: 'horizontal',
+    }),
+    []
   );
 
   const panelStorage = usePanelStorage();
@@ -227,8 +237,8 @@ const InvokeTabs = () => {
         <Spacer />
       </InvTabList>
       <PanelGroup
-        ref={panelGroupHandleRef}
-        id="app"
+        ref={panelGroupRef}
+        id={appPanelGroupId}
         autoSaveId="app"
         direction="horizontal"
         style={panelStyles}
@@ -237,7 +247,7 @@ const InvokeTabs = () => {
         {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
           <>
             <Panel
-              id="options"
+              id="options-panel"
               ref={optionsPanelRef}
               order={0}
               defaultSize={optionsPanelMinSize}
@@ -253,12 +263,13 @@ const InvokeTabs = () => {
               )}
             </Panel>
             <ResizeHandle
+              id="options-main-handle"
               onDoubleClick={resetOptionsPanel}
               orientation="vertical"
             />
           </>
         )}
-        <Panel id="main" order={1} minSize={20}>
+        <Panel id="main-panel" order={1} minSize={20}>
           <InvTabPanels w="full" h="full">
             {tabPanels}
           </InvTabPanels>
@@ -266,11 +277,12 @@ const InvokeTabs = () => {
         {!NO_GALLERY_TABS.includes(activeTabName) && (
           <>
             <ResizeHandle
+              id="main-gallery-handle"
               onDoubleClick={resetGalleryPanel}
               orientation="vertical"
             />
             <Panel
-              id="gallery"
+              id="gallery-panel"
               ref={galleryPanelRef}
               order={2}
               defaultSize={galleryPanelMinSize}
