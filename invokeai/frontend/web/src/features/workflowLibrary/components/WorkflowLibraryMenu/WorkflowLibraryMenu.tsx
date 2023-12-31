@@ -27,7 +27,7 @@ const WorkflowLibraryMenu = () => {
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
-    <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose} isLazy>
+    <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
       <InvMenuButton
         as={InvIconButton}
         aria-label={t('workflows.workflowEditorMenu')}
