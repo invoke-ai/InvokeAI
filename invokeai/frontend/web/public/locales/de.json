@@ -760,7 +760,6 @@
         "w": "W",
         "addControlNet": "$t(common.controlNet) hinzufügen",
         "none": "Kein",
-        "incompatibleBaseModel": "Inkompatibles Basismodell:",
         "enableControlnet": "Aktiviere ControlNet",
         "detectResolution": "Auflösung erkennen",
         "controlNetT2IMutexDesc": "$t(common.controlNet) und $t(common.t2iAdapter) zur gleichen Zeit wird nicht unterstützt.",

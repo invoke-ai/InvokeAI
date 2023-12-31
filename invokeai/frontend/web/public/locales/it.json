@@ -1178,7 +1178,6 @@
         "w": "W",
         "processor": "Processore",
         "none": "Nessuno",
-        "incompatibleBaseModel": "Modello base incompatibile:",
         "pidiDescription": "Elaborazione immagini PIDI",
         "fill": "Riempie",
         "colorMapDescription": "Genera una mappa dei colori dall'immagine",

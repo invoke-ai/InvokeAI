@@ -1071,7 +1071,6 @@
         "processor": "Verwerker",
         "addControlNet": "Voeg $t(common.controlNet) toe",
         "none": "Geen",
-        "incompatibleBaseModel": "Niet-compatibel basismodel:",
         "enableControlnet": "Schakel ControlNet in",
         "detectResolution": "Herken resolutie",
         "controlNetT2IMutexDesc": "Gelijktijdig gebruik van $t(common.controlNet) en $t(common.t2iAdapter) wordt op dit moment niet ondersteund.",
