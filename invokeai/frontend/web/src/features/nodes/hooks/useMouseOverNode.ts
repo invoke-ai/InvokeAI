@@ -1,16 +1,17 @@
-import { useStore } from '@nanostores/react';
 import { atom } from 'nanostores';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export const $mouseOverNode = atom<string | null>(null);
 
 export const useMouseOverNode = (nodeId: string) => {
-  const mouseOverNode = useStore($mouseOverNode);
+  const [isMouseOverNode, setIsMouseOverNode] = useState(false);
 
-  const isMouseOverNode = useMemo(
-    () => mouseOverNode === nodeId,
-    [mouseOverNode, nodeId]
-  );
+  useEffect(() => {
+    const unsubscribe = $mouseOverNode.subscribe((v) => {
+      setIsMouseOverNode(v === nodeId);
+    });
+    return unsubscribe;
+  }, [isMouseOverNode, nodeId]);
 
   const handleMouseOver = useCallback(() => {
     $mouseOverNode.set(nodeId);
