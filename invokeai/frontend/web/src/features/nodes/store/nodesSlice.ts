@@ -8,7 +8,6 @@ import type {
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
-  FieldIdentifier,
   FieldValue,
   FloatFieldValue,
   ImageFieldValue,
@@ -116,8 +115,6 @@ export const initialNodesState: NodesState = {
   selectedEdges: [],
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
-  mouseOverField: null,
-  mouseOverNode: null,
   nodesToCopy: [],
   edgesToCopy: [],
   selectionMode: SelectionMode.Partial,
@@ -272,11 +269,18 @@ const nodesSlice = createSlice({
 
       state.connectionMade = true;
     },
-    connectionEnded: (state, action) => {
+    connectionEnded: (
+      state,
+      action: PayloadAction<{
+        cursorPosition: XYPosition;
+        mouseOverNodeId: string | null;
+      }>
+    ) => {
+      const { cursorPosition, mouseOverNodeId } = action.payload;
       if (!state.connectionMade) {
-        if (state.mouseOverNode) {
+        if (mouseOverNodeId) {
           const nodeIndex = state.nodes.findIndex(
-            (n) => n.id === state.mouseOverNode
+            (n) => n.id === mouseOverNodeId
           );
           const mouseOverNode = state.nodes?.[nodeIndex];
           if (mouseOverNode && state.connectionStartParams) {
@@ -308,7 +312,7 @@ const nodesSlice = createSlice({
           state.connectionStartParams = null;
           state.connectionStartFieldType = null;
         } else {
-          state.addNewNodePosition = action.payload.cursorPosition;
+          state.addNewNodePosition = cursorPosition;
           state.isAddNodePopoverOpen = true;
         }
       } else {
@@ -681,15 +685,6 @@ const nodesSlice = createSlice({
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
     },
-    mouseOverFieldChanged: (
-      state,
-      action: PayloadAction<FieldIdentifier | null>
-    ) => {
-      state.mouseOverField = action.payload;
-    },
-    mouseOverNodeChanged: (state, action: PayloadAction<string | null>) => {
-      state.mouseOverNode = action.payload;
-    },
     selectedAll: (state) => {
       state.nodes = applyNodeChanges(
         state.nodes.map((n) => ({ id: n.id, type: 'select', selected: true })),
@@ -929,8 +924,6 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  mouseOverFieldChanged,
-  mouseOverNodeChanged,
   nodeAdded,
   nodeReplaced,
   nodeEditorReset,

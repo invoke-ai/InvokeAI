@@ -1,4 +1,4 @@
-import type { FieldIdentifier, FieldType } from 'features/nodes/types/field';
+import type { FieldType } from 'features/nodes/types/field';
 import type {
   AnyNode,
   InvocationNodeEdge,
@@ -32,8 +32,6 @@ export type NodesState = {
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
   isReady: boolean;
-  mouseOverField: FieldIdentifier | null;
-  mouseOverNode: string | null;
   nodesToCopy: AnyNode[];
   edgesToCopy: InvocationNodeEdge[];
   isAddNodePopoverOpen: boolean;
