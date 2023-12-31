@@ -1,9 +1,8 @@
 import { useToken } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
+import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
   connectionEnded,
   connectionMade,
@@ -67,14 +66,6 @@ const nodeTypes = {
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
 const proOptions: ProOptions = { hideAttribution: true };
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
-  const { shouldSnapToGrid, selectionMode } = nodes;
-  return {
-    shouldSnapToGrid,
-    selectionMode,
-  };
-});
-
 const snapGrid: [number, number] = [25, 25];
 
 export const Flow = memo(() => {
@@ -82,9 +73,12 @@ export const Flow = memo(() => {
   const nodes = useAppSelector((state) => state.nodes.nodes);
   const edges = useAppSelector((state) => state.nodes.edges);
   const viewport = useAppSelector((state) => state.nodes.viewport);
-  const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
+  const shouldSnapToGrid = useAppSelector(
+    (state) => state.nodes.shouldSnapToGrid
+  );
+  const selectionMode = useAppSelector((state) => state.nodes.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
-  const cursorPosition = useRef<XYPosition>();
+  const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();
 
   const [borderRadius] = useToken('radii', ['base']);
@@ -125,7 +119,15 @@ export const Flow = memo(() => {
   );
 
   const onConnectEnd: OnConnectEnd = useCallback(() => {
-    dispatch(connectionEnded({ cursorPosition: cursorPosition.current }));
+    if (!cursorPosition.current) {
+      return;
+    }
+    dispatch(
+      connectionEnded({
+        cursorPosition: cursorPosition.current,
+        mouseOverNodeId: $mouseOverNode.get(),
+      })
+    );
   }, [dispatch]);
 
   const onEdgesDelete: OnEdgesDelete = useCallback(
@@ -169,10 +171,11 @@ export const Flow = memo(() => {
 
   const onMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
     if (flowWrapper.current?.getBoundingClientRect()) {
-      cursorPosition.current = $flow.get()?.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
+      cursorPosition.current =
+        $flow.get()?.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        }) ?? null;
     }
   }, []);
 
@@ -245,6 +248,9 @@ export const Flow = memo(() => {
   });
 
   useHotkeys(['Ctrl+v', 'Meta+v'], (e) => {
+    if (!cursorPosition.current) {
+      return;
+    }
     e.preventDefault();
     dispatch(selectionPasted({ cursorPosition: cursorPosition.current }));
   });

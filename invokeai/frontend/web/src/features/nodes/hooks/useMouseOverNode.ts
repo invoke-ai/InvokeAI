@@ -1,29 +1,24 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { mouseOverNodeChanged } from 'features/nodes/store/nodesSlice';
+import { useStore } from '@nanostores/react';
+import { atom } from 'nanostores';
 import { useCallback, useMemo } from 'react';
 
+export const $mouseOverNode = atom<string | null>(null);
+
 export const useMouseOverNode = (nodeId: string) => {
-  const dispatch = useAppDispatch();
-  const selector = useMemo(
-    () =>
-      createMemoizedSelector(
-        stateSelector,
-        ({ nodes }) => nodes.mouseOverNode === nodeId
-      ),
-    [nodeId]
+  const mouseOverNode = useStore($mouseOverNode);
+
+  const isMouseOverNode = useMemo(
+    () => mouseOverNode === nodeId,
+    [mouseOverNode, nodeId]
   );
 
-  const isMouseOverNode = useAppSelector(selector);
-
   const handleMouseOver = useCallback(() => {
-    !isMouseOverNode && dispatch(mouseOverNodeChanged(nodeId));
-  }, [dispatch, nodeId, isMouseOverNode]);
+    $mouseOverNode.set(nodeId);
+  }, [nodeId]);
 
   const handleMouseOut = useCallback(() => {
-    isMouseOverNode && dispatch(mouseOverNodeChanged(null));
-  }, [dispatch, isMouseOverNode]);
+    $mouseOverNode.set(null);
+  }, []);
 
   return { isMouseOverNode, handleMouseOver, handleMouseOut };
 };
