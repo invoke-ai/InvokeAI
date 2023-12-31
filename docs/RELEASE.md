@@ -1,4 +1,4 @@
-# Release Workflow
+# Release Process
 
 The app is published in twice, in different build formats.
 
@@ -11,7 +11,7 @@ Make a developer call-out for PRs to merge. Merge and test things out.
 
 While the release workflow does not include end-to-end tests, it does pause before publishing so you can download and test the final build.
 
-## Workflow Overview
+## Release Workflow
 
 The `release.yml` workflow runs a number of jobs to handle code checks, tests, build and publish on PyPI.
 
@@ -110,7 +110,9 @@ rm -rf ~/.test-invokeai-dist
 
 Publishes the distribution on the production PyPI index, using the `pypi` GitHub environment.
 
-## Publish the GitHub RC with installer
+## Publish the GitHub Release with installer
+
+Once the release is published to PyPI, it's time to publish the GitHub release.
 
 1. [Draft a new release] on GitHub, choosing the tag that triggered the release.
 2. Write the release notes, describing important changes. The **Generate release notes** button automatically inserts the changelog and new contributors, and you can copy/paste the intro from previous releases.
