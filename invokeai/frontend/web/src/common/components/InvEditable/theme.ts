@@ -15,8 +15,8 @@ const baseStylePreview = defineStyle({
   transitionDuration: 'normal',
   color: 'base.100',
   _invalid: {
-    color: 'error.300'
-  }
+    color: 'error.300',
+  },
 });
 
 const baseStyleInput = defineStyle(() => ({
