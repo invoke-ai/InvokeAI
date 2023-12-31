@@ -21,12 +21,11 @@ type InpaintingCanvasLinesProps = GroupConfig;
  * Uses globalCompositeOperation to handle the brush and eraser tools.
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
-  const { ...rest } = props;
-  const lines = useAppSelector(canvasLinesSelector);
+  const objects = useAppSelector((state) => state.canvas.layerState.objects);
 
   return (
-    <Group listening={false} {...rest}>
-      {lines.map((line, i) => (
+    <Group listening={false} {...props}>
+      {objects.filter(isCanvasMaskLine).map((line, i) => (
         <Line
           key={i}
           points={line.points}

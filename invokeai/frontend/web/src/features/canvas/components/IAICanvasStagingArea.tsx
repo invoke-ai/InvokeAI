@@ -39,7 +39,6 @@ const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
 type Props = GroupConfig;
 
 const IAICanvasStagingArea = (props: Props) => {
-  const { ...rest } = props;
   const {
     currentStagingAreaImage,
     shouldShowStagingImage,
@@ -51,7 +50,7 @@ const IAICanvasStagingArea = (props: Props) => {
   } = useAppSelector(selector);
 
   return (
-    <Group {...rest}>
+    <Group {...props}>
       {shouldShowStagingImage && currentStagingAreaImage && (
         <IAICanvasImage canvasImage={currentStagingAreaImage} />
       )}

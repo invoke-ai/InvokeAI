@@ -110,7 +110,6 @@ const canvasBrushPreviewSelector = createMemoizedSelector(
  * Draws a black circle around the canvas brush preview.
  */
 const IAICanvasToolPreview = (props: GroupConfig) => {
-  const { ...rest } = props;
   const {
     brushX,
     brushY,
@@ -133,7 +132,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
   }
 
   return (
-    <Group listening={false} {...clip} {...rest}>
+    <Group listening={false} {...clip} {...props}>
       {tool === 'colorPicker' ? (
         <>
           <Circle
@@ -143,6 +142,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             stroke={brushColorString}
             strokeWidth={COLOR_PICKER_STROKE_RADIUS}
             strokeScaleEnabled={false}
+            listening={false}
           />
           <Circle
             x={brushX}
@@ -151,6 +151,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             stroke={colorPickerColorString}
             strokeWidth={COLOR_PICKER_STROKE_RADIUS}
             strokeScaleEnabled={false}
+            listening={false}
           />
         </>
       ) : (
@@ -163,6 +164,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             globalCompositeOperation={
               tool === 'eraser' ? 'destination-out' : 'source-out'
             }
+            listening={false}
           />
           <Circle
             x={brushX}
