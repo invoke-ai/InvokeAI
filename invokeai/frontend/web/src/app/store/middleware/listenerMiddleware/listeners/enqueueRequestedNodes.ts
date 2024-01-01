@@ -1,8 +1,6 @@
 import { enqueueRequested } from 'app/store/actions';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
-import {
-  buildWorkflowRight,
-} from 'features/nodes/util/workflow/buildWorkflow';
+import { buildWorkflowRight } from 'features/nodes/util/workflow/buildWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
 
