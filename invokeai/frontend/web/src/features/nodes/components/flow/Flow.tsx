@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   connectionEnded,
   connectionMade,
@@ -80,7 +81,7 @@ export const Flow = memo(() => {
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();
-
+  useWorkflowWatcher();
   const [borderRadius] = useToken('radii', ['base']);
 
   const flowStyles = useMemo<CSSProperties>(

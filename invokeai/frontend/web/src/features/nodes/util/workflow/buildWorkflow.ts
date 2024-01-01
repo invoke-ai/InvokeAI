@@ -2,19 +2,23 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import type { NodesState, WorkflowsState } from 'features/nodes/store/types';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
-import type { WorkflowV2 } from 'features/nodes/types/workflow';
-import { zWorkflowEdge, zWorkflowNode } from 'features/nodes/types/workflow';
-import i18n from 'i18next';
+import type {
+  WorkflowV2} from 'features/nodes/types/workflow';
+import {
+  zWorkflowEdge,
+  zWorkflowNode,
+} from 'features/nodes/types/workflow';
+import i18n from 'i18n';
 import { cloneDeep, omit } from 'lodash-es';
 import { fromZodError } from 'zod-validation-error';
 
-type BuildWorkflowArg = {
+export type BuildWorkflowArg = {
   nodes: NodesState['nodes'];
   edges: NodesState['edges'];
   workflow: WorkflowsState;
 };
 
-type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV2;
+export type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV2;
 
 export const buildWorkflow: BuildWorkflowFunction = ({
   nodes,
