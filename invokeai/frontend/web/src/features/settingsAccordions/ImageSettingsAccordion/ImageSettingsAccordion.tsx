@@ -81,7 +81,8 @@ export const ImageSettingsAccordion = memo(() => {
             </Flex>
             {activeTabName === 'txt2img' && <HrfSettings />}
             {activeTabName === 'img2img' && <ImageToImageFit />}
-            {activeTabName === 'img2img' && <ImageToImageStrength />}
+            {activeTabName === 'img2img' ||
+              (activeTabName === 'unifiedCanvas' && <ImageToImageStrength />)}
             {activeTabName === 'unifiedCanvas' && (
               <>
                 <ParamScaleBeforeProcessing />
