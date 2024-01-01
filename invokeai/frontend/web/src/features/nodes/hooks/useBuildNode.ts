@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   DRAG_HANDLE_CLASSNAME,
@@ -16,17 +14,14 @@ import { useCallback } from 'react';
 import type { Node } from 'reactflow';
 import { useReactFlow } from 'reactflow';
 
-const templatesSelector = createMemoizedSelector(
-  [(state: RootState) => state.nodes],
-  (nodes) => nodes.nodeTemplates
-);
-
 export const SHARED_NODE_PROPERTIES: Partial<Node> = {
   dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
 };
 
 export const useBuildNode = () => {
-  const nodeTemplates = useAppSelector(templatesSelector);
+  const nodeTemplates = useAppSelector(
+    (state) => state.nodeTemplates.templates
+  );
 
   const flow = useReactFlow();
 

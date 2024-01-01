@@ -53,4 +53,4 @@ export const AspectRatioSelect = memo(() => {
 
 AspectRatioSelect.displayName = 'AspectRatioSelect';
 
-const selectStyles: SystemStyleObject = { minW: 48 };
+const selectStyles: SystemStyleObject = { minW: 24 };

@@ -1,7 +1,7 @@
 import type { ToastId } from '@chakra-ui/react';
 import { useToast } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
+import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   workflowIDChanged,
   workflowSaved,
@@ -30,12 +30,15 @@ const isWorkflowWithID = (
 export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const workflow = useWorkflow();
   const [updateWorkflow, updateWorkflowResult] = useUpdateWorkflowMutation();
   const [createWorkflow, createWorkflowResult] = useCreateWorkflowMutation();
   const toast = useToast();
   const toastRef = useRef<ToastId | undefined>();
   const saveWorkflow = useCallback(async () => {
+    const workflow = $builtWorkflow.get();
+    if (!workflow) {
+      return;
+    }
     toastRef.current = toast({
       title: t('workflows.savingWorkflow'),
       status: 'loading',
@@ -64,7 +67,7 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
         isClosable: true,
       });
     }
-  }, [workflow, updateWorkflow, dispatch, toast, t, createWorkflow]);
+  }, [updateWorkflow, dispatch, toast, t, createWorkflow]);
   return {
     saveWorkflow,
     isLoading: updateWorkflowResult.isLoading || createWorkflowResult.isLoading,

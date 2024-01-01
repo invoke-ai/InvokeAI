@@ -39,7 +39,6 @@ const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
 type Props = GroupConfig;
 
 const IAICanvasStagingArea = (props: Props) => {
-  const { ...rest } = props;
   const {
     currentStagingAreaImage,
     shouldShowStagingImage,
@@ -51,12 +50,12 @@ const IAICanvasStagingArea = (props: Props) => {
   } = useAppSelector(selector);
 
   return (
-    <Group {...rest}>
+    <Group {...props}>
       {shouldShowStagingImage && currentStagingAreaImage && (
         <IAICanvasImage canvasImage={currentStagingAreaImage} />
       )}
       {shouldShowStagingOutline && (
-        <Group>
+        <Group listening={false}>
           <Rect
             x={x}
             y={y}
@@ -65,6 +64,7 @@ const IAICanvasStagingArea = (props: Props) => {
             strokeWidth={1}
             stroke="white"
             strokeScaleEnabled={false}
+            listening={false}
           />
           <Rect
             x={x}
@@ -75,6 +75,7 @@ const IAICanvasStagingArea = (props: Props) => {
             strokeWidth={1}
             stroke="black"
             strokeScaleEnabled={false}
+            listening={false}
           />
         </Group>
       )}

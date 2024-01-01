@@ -9,9 +9,8 @@ export const useNodeTemplateByType = (type: string) => {
     () =>
       createMemoizedSelector(
         stateSelector,
-        ({ nodes }): InvocationTemplate | undefined => {
-          const nodeTemplate = nodes.nodeTemplates[type];
-          return nodeTemplate;
+        ({ nodeTemplates }): InvocationTemplate | undefined => {
+          return nodeTemplates.templates[type];
         }
       ),
     [type]

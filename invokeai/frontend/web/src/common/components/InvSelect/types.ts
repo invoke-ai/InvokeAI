@@ -28,6 +28,7 @@ export type InvSelectProps = ChakraReactSelectProps<
   selectRef?: React.RefObject<
     SelectInstance<InvSelectOption, false, GroupBase<InvSelectOption>>
   >;
+  inputRef?: React.MutableRefObject<HTMLInputElement | null>;
 };
 export type CustomChakraStylesConfig = ChakraStylesConfig<
   InvSelectOption,

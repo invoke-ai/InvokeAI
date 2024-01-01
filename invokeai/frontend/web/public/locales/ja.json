@@ -590,7 +590,6 @@
         "processor": "プロセッサー",
         "addControlNet": "$t(common.controlNet)を追加",
         "none": "なし",
-        "incompatibleBaseModel": "互換性のないベースモデル:",
         "enableControlnet": "コントロールネットを有効化",
         "detectResolution": "検出解像度",
         "controlNetT2IMutexDesc": "$t(common.controlNet)と$t(common.t2iAdapter)の同時使用は現在サポートされていません。",

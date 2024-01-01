@@ -1,6 +1,4 @@
 import { Flex, FormLabel, forwardRef } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import { InvControlGroupContext } from 'common/components/InvControl/InvControlGroup';
@@ -8,18 +6,16 @@ import { memo, useContext } from 'react';
 
 import type { InvLabelProps } from './types';
 
-const selector = createSelector(
-  stateSelector,
-  ({ system }) => system.shouldEnableInformationalPopovers
-);
-
 export const InvLabel = memo(
   forwardRef<InvLabelProps, typeof FormLabel>(
     (
       { feature, renderInfoPopoverInPortal, children, ...rest }: InvLabelProps,
       ref
     ) => {
-      const shouldEnableInformationalPopovers = useAppSelector(selector);
+      const shouldEnableInformationalPopovers = useAppSelector(
+        (state) => state.system.shouldEnableInformationalPopovers
+      );
+
       const ctx = useContext(InvControlGroupContext);
       if (feature && shouldEnableInformationalPopovers) {
         return (

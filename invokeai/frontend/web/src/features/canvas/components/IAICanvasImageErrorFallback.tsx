@@ -13,13 +13,14 @@ const IAICanvasImageErrorFallback = ({
   const [rectFill, textFill] = useToken('colors', ['base.500', 'base.900']);
   const { t } = useTranslation();
   return (
-    <Group>
+    <Group listening={false}>
       <Rect
         x={canvasImage.x}
         y={canvasImage.y}
         width={canvasImage.width}
         height={canvasImage.height}
         fill={rectFill}
+        listening={false}
       />
       <Text
         x={canvasImage.x}
@@ -33,6 +34,7 @@ const IAICanvasImageErrorFallback = ({
         fontStyle="600"
         text={t('common.imageFailedToLoad')}
         fill={textFill}
+        listening={false}
       />
     </Group>
   );

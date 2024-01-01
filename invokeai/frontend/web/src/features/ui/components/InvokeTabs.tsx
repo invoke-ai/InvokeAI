@@ -1,4 +1,4 @@
-import { Flex, Spacer } from '@chakra-ui/react';
+import { Spacer } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -13,6 +13,7 @@ import {
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
@@ -22,15 +23,15 @@ import {
 } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCube, FaFont, FaImage } from 'react-icons/fa';
 import { FaCircleNodes, FaList } from 'react-icons/fa6';
 import { MdGridOn } from 'react-icons/md';
+import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
-import FloatingGalleryButton from './FloatingGalleryButton';
 import ParametersPanel from './ParametersPanel';
 import ImageTab from './tabs/ImageToImageTab';
 import ModelManagerTab from './tabs/ModelManagerTab';
@@ -98,7 +99,12 @@ const enabledTabsSelector = createMemoizedSelector(
 export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
+const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;
+const OPTIONS_PANEL_MIN_SIZE_PX = 430;
+const OPTIONS_PANEL_MIN_SIZE_PCT = 20;
+
+const appPanelGroupId = 'app-panel-group';
 
 const InvokeTabs = () => {
   const activeTabIndex = useAppSelector(activeTabIndexSelector);
@@ -106,7 +112,7 @@ const InvokeTabs = () => {
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-
+  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const handleClickTab = useCallback((e: MouseEvent<HTMLElement>) => {
     if (e.target instanceof HTMLElement) {
       e.target.blur();
@@ -152,6 +158,42 @@ const InvokeTabs = () => {
     [dispatch, enabledTabs]
   );
 
+  const optionsPanelUsePanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      unit: 'pixels',
+      minSize: OPTIONS_PANEL_MIN_SIZE_PX,
+      fallbackMinSizePct: OPTIONS_PANEL_MIN_SIZE_PCT,
+      panelGroupRef,
+      panelGroupDirection: 'horizontal',
+    }),
+    []
+  );
+
+  const galleryPanelUsePanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      unit: 'pixels',
+      minSize: GALLERY_MIN_SIZE_PX,
+      fallbackMinSizePct: GALLERY_MIN_SIZE_PCT,
+      panelGroupRef,
+      panelGroupDirection: 'horizontal',
+    }),
+    []
+  );
+
+  const panelStorage = usePanelStorage();
+
+  const {
+    ref: optionsPanelRef,
+    minSize: optionsPanelMinSize,
+    isCollapsed: isOptionsPanelCollapsed,
+    onCollapse: onCollapseOptionsPanel,
+    onExpand: onExpandOptionsPanel,
+    reset: resetOptionsPanel,
+    expand: expandOptionsPanel,
+    collapse: collapseOptionsPanel,
+    toggle: toggleOptionsPanel,
+  } = usePanel(optionsPanelUsePanelOptions);
+
   const {
     ref: galleryPanelRef,
     minSize: galleryPanelMinSize,
@@ -160,12 +202,25 @@ const InvokeTabs = () => {
     onExpand: onExpandGalleryPanel,
     reset: resetGalleryPanel,
     expand: expandGalleryPanel,
+    collapse: collapseGalleryPanel,
     toggle: toggleGalleryPanel,
-  } = usePanel(GALLERY_MIN_SIZE_PCT);
+  } = usePanel(galleryPanelUsePanelOptions);
 
   useHotkeys('g', toggleGalleryPanel, []);
-
-  const panelStorage = usePanelStorage();
+  useHotkeys('t', toggleOptionsPanel, []);
+  useHotkeys(
+    'f',
+    () => {
+      if (isOptionsPanelCollapsed || isGalleryPanelCollapsed) {
+        expandOptionsPanel();
+        expandGalleryPanel();
+      } else {
+        collapseOptionsPanel();
+        collapseGalleryPanel();
+      }
+    },
+    [isOptionsPanelCollapsed, isGalleryPanelCollapsed]
+  );
 
   return (
     <InvTabs
@@ -182,35 +237,54 @@ const InvokeTabs = () => {
         <Spacer />
       </InvTabList>
       <PanelGroup
-        id="app"
+        ref={panelGroupRef}
+        id={appPanelGroupId}
         autoSaveId="app"
         direction="horizontal"
         style={panelStyles}
         storage={panelStorage}
       >
-        <Panel id="main" order={0} minSize={50}>
-          <Flex w="full" h="full" gap={4}>
-            {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
-              <Flex h="full" w={434} flexShrink={0}>
-                {activeTabName === 'nodes' ? (
-                  <NodeEditorPanelGroup />
-                ) : (
-                  <ParametersPanel />
-                )}
-              </Flex>
-            )}
-            <InvTabPanels w="full" h="full">
-              {tabPanels}
-            </InvTabPanels>
-          </Flex>
+        {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
+          <>
+            <Panel
+              id="options-panel"
+              ref={optionsPanelRef}
+              order={0}
+              defaultSize={optionsPanelMinSize}
+              minSize={optionsPanelMinSize}
+              onCollapse={onCollapseOptionsPanel}
+              onExpand={onExpandOptionsPanel}
+              collapsible
+            >
+              {activeTabName === 'nodes' ? (
+                <NodeEditorPanelGroup />
+              ) : (
+                <ParametersPanel />
+              )}
+            </Panel>
+            <ResizeHandle
+              id="options-main-handle"
+              onDoubleClick={resetOptionsPanel}
+              orientation="vertical"
+            />
+          </>
+        )}
+        <Panel id="main-panel" order={1} minSize={20}>
+          <InvTabPanels w="full" h="full">
+            {tabPanels}
+          </InvTabPanels>
         </Panel>
         {!NO_GALLERY_TABS.includes(activeTabName) && (
           <>
-            <ResizeHandle onDoubleClick={resetGalleryPanel} />
+            <ResizeHandle
+              id="main-gallery-handle"
+              onDoubleClick={resetGalleryPanel}
+              orientation="vertical"
+            />
             <Panel
-              id="gallery"
+              id="gallery-panel"
               ref={galleryPanelRef}
-              order={1}
+              order={2}
               defaultSize={galleryPanelMinSize}
               minSize={galleryPanelMinSize}
               onCollapse={onCollapseGalleryPanel}
@@ -219,10 +293,6 @@ const InvokeTabs = () => {
             >
               <ImageGalleryContent />
             </Panel>
-            <FloatingGalleryButton
-              isGalleryCollapsed={isGalleryPanelCollapsed}
-              expandGallery={expandGalleryPanel}
-            />
           </>
         )}
       </PanelGroup>

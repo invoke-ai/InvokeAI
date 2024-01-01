@@ -24,6 +24,7 @@ import { tabsTheme } from 'common/components/InvTabs/theme';
 import { textTheme } from 'common/components/InvText/theme';
 import { textareaTheme } from 'common/components/InvTextarea/theme';
 import { tooltipTheme } from 'common/components/InvTooltip/theme';
+import { resizeHandleTheme } from 'features/ui/components/tabs/ResizeHandle';
 
 import {
   InvokeAIColors,
@@ -117,6 +118,7 @@ export const theme: ThemeOverride = {
     Textarea: textareaTheme,
     Tooltip: tooltipTheme,
     FormError: formErrorTheme,
+    ResizeHandle: resizeHandleTheme,
   },
   space: space,
   sizes: space,

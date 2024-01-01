@@ -9,7 +9,7 @@ import { Group, Line } from 'react-konva';
 export const canvasLinesSelector = createMemoizedSelector(
   [stateSelector],
   ({ canvas }) => {
-    return { objects: canvas.layerState.objects };
+    return canvas.layerState.objects.filter(isCanvasMaskLine);
   }
 );
 
@@ -21,11 +21,10 @@ type InpaintingCanvasLinesProps = GroupConfig;
  * Uses globalCompositeOperation to handle the brush and eraser tools.
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
-  const { ...rest } = props;
-  const { objects } = useAppSelector(canvasLinesSelector);
+  const objects = useAppSelector((state) => state.canvas.layerState.objects);
 
   return (
-    <Group listening={false} {...rest}>
+    <Group listening={false} {...props}>
       {objects.filter(isCanvasMaskLine).map((line, i) => (
         <Line
           key={i}

@@ -19,11 +19,11 @@ import { useTranslation } from 'react-i18next';
 import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
 const aestheticLabelProps: InvLabelProps = {
-  w: '9.2rem',
+  minW: '9.2rem',
 };
 
 const stepsScaleLabelProps: InvLabelProps = {
-  w: '5rem',
+  minW: '5rem',
 };
 
 const selector = createMemoizedSelector(stateSelector, (state) => {

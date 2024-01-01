@@ -125,7 +125,7 @@ const IAICanvasMaskOptions = () => {
   );
 
   return (
-    <InvPopover>
+    <InvPopover isLazy>
       <InvPopoverTrigger>
         <InvIconButton
           aria-label={t('unifiedCanvas.maskingOptions')}

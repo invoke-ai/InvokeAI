@@ -13,39 +13,49 @@ import type { AnyResult } from 'services/events/types';
 
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
-  const lastSelectedNodeId =
-    nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(
+  stateSelector,
+  ({ nodes, nodeTemplates }) => {
+    const lastSelectedNodeId =
+      nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-  const lastSelectedNode = nodes.nodes.find(
-    (node) => node.id === lastSelectedNodeId
-  );
+    const lastSelectedNode = nodes.nodes.find(
+      (node) => node.id === lastSelectedNodeId
+    );
 
-  const lastSelectedNodeTemplate = lastSelectedNode
-    ? nodes.nodeTemplates[lastSelectedNode.data.type]
-    : undefined;
+    const lastSelectedNodeTemplate = lastSelectedNode
+      ? nodeTemplates.templates[lastSelectedNode.data.type]
+      : undefined;
 
-  const nes =
-    nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
+    const nes =
+      nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
 
-  return {
-    node: lastSelectedNode,
-    template: lastSelectedNodeTemplate,
-    nes,
-  };
-});
+    if (
+      !isInvocationNode(lastSelectedNode) ||
+      !nes ||
+      !lastSelectedNodeTemplate
+    ) {
+      return;
+    }
+
+    return {
+      outputs: nes.outputs,
+      outputType: lastSelectedNodeTemplate.outputType,
+    };
+  }
+);
 
 const InspectorOutputsTab = () => {
-  const { node, template, nes } = useAppSelector(selector);
+  const data = useAppSelector(selector);
   const { t } = useTranslation();
 
-  if (!node || !nes || !isInvocationNode(node)) {
+  if (!data) {
     return (
       <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
     );
   }
 
-  if (nes.outputs.length === 0) {
+  if (data.outputs.length === 0) {
     return (
       <IAINoContentFallback label={t('nodes.noOutputRecorded')} icon={null} />
     );
@@ -63,15 +73,15 @@ const InspectorOutputsTab = () => {
           h="full"
           w="full"
         >
-          {template?.outputType === 'image_output' ? (
-            nes.outputs.map((result, i) => (
+          {data.outputType === 'image_output' ? (
+            data.outputs.map((result, i) => (
               <ImageOutputPreview
                 key={getKey(result, i)}
                 output={result as ImageOutput}
               />
             ))
           ) : (
-            <DataViewer data={nes.outputs} label={t('nodes.nodeOutputs')} />
+            <DataViewer data={data.outputs} label={t('nodes.nodeOutputs')} />
           )}
         </Flex>
       </ScrollableContent>

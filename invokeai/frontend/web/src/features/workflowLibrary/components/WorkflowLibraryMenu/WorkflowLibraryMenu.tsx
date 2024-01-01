@@ -22,6 +22,7 @@ const WorkflowLibraryMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuCloseTrigger(onClose);
+
   const isWorkflowLibraryEnabled =
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
 

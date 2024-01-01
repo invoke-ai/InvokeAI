@@ -68,7 +68,7 @@ const GallerySettingsPopover = () => {
   );
 
   return (
-    <InvPopover>
+    <InvPopover isLazy>
       <InvPopoverTrigger>
         <InvIconButton
           tooltip={t('gallery.gallerySettings')}

@@ -1149,7 +1149,6 @@
         "crop": "裁剪",
         "processor": "处理器",
         "none": "无",
-        "incompatibleBaseModel": "不兼容的基础模型：",
         "enableControlnet": "启用 ControlNet",
         "detectResolution": "检测分辨率",
         "pidiDescription": "像素差分 (PIDI) 图像处理",

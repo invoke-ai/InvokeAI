@@ -4,7 +4,7 @@ import type {
   StylesConfig,
 } from 'chakra-react-select';
 import { Select as ChakraReactSelect } from 'chakra-react-select';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 
 import { CustomMenuList } from './CustomMenuList';
 import { CustomOption } from './CustomOption';
@@ -29,7 +29,7 @@ const components: SelectComponentsConfig<
 };
 
 export const InvSelect = memo((props: InvSelectProps) => {
-  const { sx, selectRef, ...rest } = props;
+  const { sx, selectRef, inputRef, ...rest } = props;
   const chakraStyles = useMemo<CustomChakraStylesConfig>(
     () => ({
       container: (provided, _state) => ({ ...provided, w: 'full', ...sx }),
@@ -54,6 +54,13 @@ export const InvSelect = memo((props: InvSelectProps) => {
     }),
     [sx]
   );
+
+  useEffect(() => {
+    if (!inputRef) {
+      return;
+    }
+    inputRef.current = selectRef?.current?.inputRef ?? null;
+  }, [inputRef, selectRef]);
 
   return (
     <ChakraReactSelect<InvSelectOption, false, GroupBase<InvSelectOption>>

@@ -7,13 +7,13 @@ import { useMemo } from 'react';
 export const useNodeTemplateTitle = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) => {
+      createMemoizedSelector(stateSelector, ({ nodes, nodeTemplates }) => {
         const node = nodes.nodes.find((node) => node.id === nodeId);
         if (!isInvocationNode(node)) {
           return false;
         }
         const nodeTemplate = node
-          ? nodes.nodeTemplates[node.data.type]
+          ? nodeTemplates.templates[node.data.type]
           : undefined;
 
         return nodeTemplate?.title;

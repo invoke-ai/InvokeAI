@@ -1,4 +1,5 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -9,6 +10,12 @@ import useCanvasMouseMove from 'features/canvas/hooks/useCanvasMouseMove';
 import useCanvasMouseOut from 'features/canvas/hooks/useCanvasMouseOut';
 import useCanvasMouseUp from 'features/canvas/hooks/useCanvasMouseUp';
 import useCanvasWheel from 'features/canvas/hooks/useCanvasZoom';
+import {
+  $isModifyingBoundingBox,
+  $isMouseOverBoundingBox,
+  $isMovingStage,
+  $isTransformingBoundingBox,
+} from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { canvasResized } from 'features/canvas/store/canvasSlice';
 import {
@@ -40,46 +47,27 @@ const selector = createMemoizedSelector(
       isMaskEnabled,
       stageScale,
       shouldShowBoundingBox,
-      isTransformingBoundingBox,
-      isMouseOverBoundingBox,
-      isMovingBoundingBox,
       stageDimensions,
       stageCoordinates,
       tool,
-      isMovingStage,
       shouldShowIntermediates,
-      shouldShowGrid,
       shouldRestrictStrokesToBox,
+      shouldShowGrid,
       shouldAntialias,
     } = canvas;
 
-    let stageCursor: string | undefined = 'none';
-
-    if (tool === 'move' || isStaging) {
-      if (isMovingStage) {
-        stageCursor = 'grabbing';
-      } else {
-        stageCursor = 'grab';
-      }
-    } else if (isTransformingBoundingBox) {
-      stageCursor = undefined;
-    } else if (shouldRestrictStrokesToBox && !isMouseOverBoundingBox) {
-      stageCursor = 'default';
-    }
-
     return {
       isMaskEnabled,
-      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       shouldShowBoundingBox,
       shouldShowGrid,
       stageCoordinates,
-      stageCursor,
       stageDimensions,
       stageScale,
       tool,
       isStaging,
       shouldShowIntermediates,
       shouldAntialias,
+      shouldRestrictStrokesToBox,
     };
   }
 );
@@ -91,29 +79,51 @@ const ChakraStage = chakra(Stage, {
 const IAICanvas = () => {
   const {
     isMaskEnabled,
-    isModifyingBoundingBox,
     shouldShowBoundingBox,
     shouldShowGrid,
     stageCoordinates,
-    stageCursor,
     stageDimensions,
     stageScale,
     tool,
     isStaging,
     shouldShowIntermediates,
     shouldAntialias,
+    shouldRestrictStrokesToBox,
   } = useAppSelector(selector);
   useCanvasHotkeys();
   const dispatch = useAppDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const canvasBaseLayerRef = useRef<Konva.Layer | null>(null);
-
+  const isModifyingBoundingBox = useStore($isModifyingBoundingBox);
+  const isMovingStage = useStore($isMovingStage);
+  const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
+  const isMouseOverBoundingBox = useStore($isMouseOverBoundingBox);
   const canvasStageRefCallback = useCallback((el: Konva.Stage) => {
     setCanvasStage(el as Konva.Stage);
     stageRef.current = el;
   }, []);
-
+  const stageCursor = useMemo(() => {
+    if (tool === 'move' || isStaging) {
+      if (isMovingStage) {
+        return 'grabbing';
+      } else {
+        return 'grab';
+      }
+    } else if (isTransformingBoundingBox) {
+      return undefined;
+    } else if (shouldRestrictStrokesToBox && !isMouseOverBoundingBox) {
+      return 'default';
+    }
+    return 'none';
+  }, [
+    isMouseOverBoundingBox,
+    isMovingStage,
+    isStaging,
+    isTransformingBoundingBox,
+    shouldRestrictStrokesToBox,
+    tool,
+  ]);
   const canvasBaseLayerRefCallback = useCallback((el: Konva.Layer) => {
     setCanvasBaseLayer(el as Konva.Layer);
     canvasBaseLayerRef.current = el;
@@ -132,10 +142,9 @@ const IAICanvas = () => {
     didMouseMoveRef,
     lastCursorPositionRef
   );
-  const handleMouseOut = useCanvasMouseOut();
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
-
+  const handleMouseOut = useCanvasMouseOut();
   const handleContextMenu = useCallback(
     (e: KonvaEventObject<MouseEvent>) => e.evt.preventDefault(),
     []
@@ -210,7 +219,7 @@ const IAICanvas = () => {
           onWheel={handleWheel}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
-          <Layer id="grid" visible={shouldShowGrid}>
+          <Layer id="grid" visible={shouldShowGrid} listening={false}>
             <IAICanvasGrid />
           </Layer>
 
@@ -230,7 +239,7 @@ const IAICanvas = () => {
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
-          <Layer>
+          <Layer listening={false}>
             <IAICanvasBoundingBoxOverlay />
           </Layer>
           <Layer id="preview" imageSmoothingEnabled={shouldAntialias}>
@@ -240,7 +249,7 @@ const IAICanvas = () => {
                 listening={false}
               />
             )}
-            <IAICanvasStagingArea visible={isStaging} />
+            <IAICanvasStagingArea listening={false} visible={isStaging} />
             {shouldShowIntermediates && <IAICanvasIntermediateImage />}
             <IAICanvasBoundingBox
               visible={shouldShowBoundingBox && !isStaging}

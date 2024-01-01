@@ -7,12 +7,12 @@ import { useMemo } from 'react';
 export const useFieldInputKind = (nodeId: string, fieldName: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) => {
+      createMemoizedSelector(stateSelector, ({ nodes, nodeTemplates }) => {
         const node = nodes.nodes.find((node) => node.id === nodeId);
         if (!isInvocationNode(node)) {
           return;
         }
-        const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
+        const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
         const fieldTemplate = nodeTemplate?.inputs[fieldName];
         return fieldTemplate?.input;
       }),

@@ -3,7 +3,7 @@ import type { UserConfig } from 'vite';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import dts from 'vite-plugin-dts';
 
-import { commonPlugins } from './common';
+import { commonPlugins } from './common.mjs';
 
 export const packageConfig: UserConfig = {
   base: './',

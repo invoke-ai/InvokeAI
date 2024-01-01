@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { workflowLoaded } from 'features/nodes/store/actions';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -8,7 +9,6 @@ import type {
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
-  FieldIdentifier,
   FieldValue,
   FloatFieldValue,
   ImageFieldValue,
@@ -42,7 +42,6 @@ import {
 } from 'features/nodes/types/field';
 import type {
   AnyNode,
-  InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import {
@@ -98,7 +97,6 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
 export const initialNodesState: NodesState = {
   nodes: [],
   edges: [],
-  nodeTemplates: {},
   isReady: false,
   connectionStartParams: null,
   connectionStartFieldType: null,
@@ -116,8 +114,6 @@ export const initialNodesState: NodesState = {
   selectedEdges: [],
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
-  mouseOverField: null,
-  mouseOverNode: null,
   nodesToCopy: [],
   edgesToCopy: [],
   selectionMode: SelectionMode.Partial,
@@ -272,11 +268,18 @@ const nodesSlice = createSlice({
 
       state.connectionMade = true;
     },
-    connectionEnded: (state, action) => {
+    connectionEnded: (
+      state,
+      action: PayloadAction<{
+        cursorPosition: XYPosition;
+        mouseOverNodeId: string | null;
+      }>
+    ) => {
+      const { cursorPosition, mouseOverNodeId } = action.payload;
       if (!state.connectionMade) {
-        if (state.mouseOverNode) {
+        if (mouseOverNodeId) {
           const nodeIndex = state.nodes.findIndex(
-            (n) => n.id === state.mouseOverNode
+            (n) => n.id === mouseOverNodeId
           );
           const mouseOverNode = state.nodes?.[nodeIndex];
           if (mouseOverNode && state.connectionStartParams) {
@@ -308,7 +311,7 @@ const nodesSlice = createSlice({
           state.connectionStartParams = null;
           state.connectionStartFieldType = null;
         } else {
-          state.addNewNodePosition = action.payload.cursorPosition;
+          state.addNewNodePosition = cursorPosition;
           state.isAddNodePopoverOpen = true;
         }
       } else {
@@ -652,13 +655,6 @@ const nodesSlice = createSlice({
     shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowMinimapPanel = action.payload;
     },
-    nodeTemplatesBuilt: (
-      state,
-      action: PayloadAction<Record<string, InvocationTemplate>>
-    ) => {
-      state.nodeTemplates = action.payload;
-      state.isReady = true;
-    },
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
@@ -680,15 +676,6 @@ const nodesSlice = createSlice({
     },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
-    },
-    mouseOverFieldChanged: (
-      state,
-      action: PayloadAction<FieldIdentifier | null>
-    ) => {
-      state.mouseOverField = action.payload;
-    },
-    mouseOverNodeChanged: (state, action: PayloadAction<string | null>) => {
-      state.mouseOverNode = action.payload;
     },
     selectedAll: (state) => {
       state.nodes = applyNodeChanges(
@@ -898,6 +885,9 @@ const nodesSlice = createSlice({
         });
       }
     });
+    builder.addCase(nodeTemplatesBuilt, (state) => {
+      state.isReady = true;
+    });
   },
 });
 
@@ -929,8 +919,6 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  mouseOverFieldChanged,
-  mouseOverNodeChanged,
   nodeAdded,
   nodeReplaced,
   nodeEditorReset,
@@ -942,7 +930,6 @@ export const {
   nodeOpacityChanged,
   nodesChanged,
   nodesDeleted,
-  nodeTemplatesBuilt,
   nodeUseCacheChanged,
   notesNodeValueChanged,
   selectedAll,

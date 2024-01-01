@@ -33,7 +33,7 @@ const zWorkflowMetaVersion = z.object({
  * - Workflow schema version bumped to 2.0.0
  */
 const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
-  const invocationTemplates = $store.get()?.getState().nodes.nodeTemplates;
+  const invocationTemplates = $store.get()?.getState().nodeTemplates.templates;
 
   if (!invocationTemplates) {
     throw new Error(t('app.storeNotInitialized'));
