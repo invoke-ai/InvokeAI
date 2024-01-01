@@ -1,29 +1,31 @@
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import {
+  $cursorPosition,
+  $isMovingBoundingBox,
+  $isTransformingBoundingBox,
+} from 'features/canvas/store/canvasNanostore';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import {
   COLOR_PICKER_SIZE,
   COLOR_PICKER_STROKE_RADIUS,
 } from 'features/canvas/util/constants';
 import type { GroupConfig } from 'konva/lib/Group';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Circle, Group } from 'react-konva';
 
 const canvasBrushPreviewSelector = createMemoizedSelector(
   stateSelector,
   ({ canvas }) => {
     const {
-      cursorPosition,
       brushSize,
       colorPickerColor,
       maskColor,
       brushColor,
       tool,
       layer,
-      shouldShowBrush,
-      isMovingBoundingBox,
-      isTransformingBoundingBox,
       stageScale,
       stageDimensions,
       boundingBoxCoordinates,
@@ -80,9 +82,6 @@ const canvasBrushPreviewSelector = createMemoizedSelector(
     //   : undefined;
 
     return {
-      cursorPosition,
-      brushX: cursorPosition ? cursorPosition.x : stageDimensions.width / 2,
-      brushY: cursorPosition ? cursorPosition.y : stageDimensions.height / 2,
       radius: brushSize / 2,
       colorPickerOuterRadius: COLOR_PICKER_SIZE / stageScale,
       colorPickerInnerRadius:
@@ -92,16 +91,10 @@ const canvasBrushPreviewSelector = createMemoizedSelector(
       colorPickerColorString: rgbaColorToString(colorPickerColor),
       tool,
       layer,
-      shouldShowBrush,
-      shouldDrawBrushPreview:
-        !(
-          isMovingBoundingBox ||
-          isTransformingBoundingBox ||
-          !cursorPosition
-        ) && shouldShowBrush,
       strokeWidth: 1.5 / stageScale,
       dotRadius: 1.5 / stageScale,
       clip,
+      stageDimensions,
     };
   }
 );
@@ -111,13 +104,10 @@ const canvasBrushPreviewSelector = createMemoizedSelector(
  */
 const IAICanvasToolPreview = (props: GroupConfig) => {
   const {
-    brushX,
-    brushY,
     radius,
     maskColorString,
     tool,
     layer,
-    shouldDrawBrushPreview,
     dotRadius,
     strokeWidth,
     brushColorString,
@@ -125,7 +115,27 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
     colorPickerInnerRadius,
     colorPickerOuterRadius,
     clip,
+    stageDimensions,
   } = useAppSelector(canvasBrushPreviewSelector);
+
+  const cursorPosition = useStore($cursorPosition);
+  const isMovingBoundingBox = useStore($isMovingBoundingBox);
+  const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
+
+  const brushX = useMemo<number>(
+    () => (cursorPosition ? cursorPosition.x : stageDimensions.width / 2),
+    [cursorPosition, stageDimensions]
+  );
+  const brushY = useMemo<number>(
+    () => (cursorPosition ? cursorPosition.y : stageDimensions.height / 2),
+    [cursorPosition, stageDimensions]
+  );
+
+  const shouldDrawBrushPreview = useMemo(
+    () =>
+      !(isMovingBoundingBox || isTransformingBoundingBox || !cursorPosition),
+    [cursorPosition, isMovingBoundingBox, isTransformingBoundingBox]
+  );
 
   if (!shouldDrawBrushPreview) {
     return null;

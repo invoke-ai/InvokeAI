@@ -1,10 +1,13 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import {
+  resetCanvasInteractionState,
+  resetToolInteractionState,
+} from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
-  resetCanvasInteractionState,
   setIsMaskEnabled,
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
@@ -20,7 +23,6 @@ const selector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector, isStagingSelector],
   ({ canvas }, activeTabName, isStaging) => {
     const {
-      cursorPosition,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
@@ -30,7 +32,6 @@ const selector = createMemoizedSelector(
 
     return {
       activeTabName,
-      isCursorOnCanvas: Boolean(cursorPosition),
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
@@ -102,7 +103,7 @@ const useInpaintingCanvasHotkeys = () => {
   useHotkeys(
     'esc',
     () => {
-      dispatch(resetCanvasInteractionState());
+      resetCanvasInteractionState();
     },
     {
       enabled: () => true,
@@ -134,6 +135,7 @@ const useInpaintingCanvasHotkeys = () => {
       if (tool !== 'move') {
         previousToolRef.current = tool;
         dispatch(setTool('move'));
+        resetToolInteractionState();
       }
 
       if (
