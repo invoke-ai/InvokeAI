@@ -95,6 +95,7 @@ export const InvContextMenu = typedMemo(
               isOpen={isDeferredOpen}
               gutter={0}
               onClose={onCloseHandler}
+              placement="auto-end"
               {...props.menuProps}
             >
               <InvMenuButton
