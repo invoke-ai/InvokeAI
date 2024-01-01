@@ -9,6 +9,7 @@ export const createMemoizedSelector = createSelectorCreator({
   memoizeOptions: {
     resultEqualityCheck: isEqual,
   },
+  argsMemoize: lruMemoize,
 });
 
 /**
@@ -16,4 +17,5 @@ export const createMemoizedSelector = createSelectorCreator({
  */
 export const createLruSelector = createSelectorCreator({
   memoize: lruMemoize,
+  argsMemoize: lruMemoize,
 });
