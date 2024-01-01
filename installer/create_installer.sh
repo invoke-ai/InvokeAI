@@ -9,10 +9,6 @@ BRED="\033[1;31m"
 RED="\033[31m"
 RESET="\033[0m"
 
-function is_bin_in_path {
-    builtin type -P "$1" &>/dev/null
-}
-
 function git_show {
     git show -s --format=oneline --abbrev-commit "$1" | cat
 }
@@ -26,23 +22,9 @@ fi
 
 cd "$(dirname "$0")"
 
-echo
-echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
-echo "The current working directory is $(pwd)"
-read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
-echo
-
-# Some machines only have `python3` in PATH, others have `python` - make an alias.
-# We can use a function to approximate an alias within a non-interactive shell.
-if ! is_bin_in_path python && is_bin_in_path python3; then
-    function python {
-        python3 "$@"
-    }
-fi
-
 VERSION=$(
     cd ..
-    python -c "from invokeai.version import __version__ as version; print(version)"
+    python3 -c "from invokeai.version import __version__ as version; print(version)"
 )
 VERSION="v${VERSION}"
 
@@ -78,13 +60,13 @@ echo
 
 # install the 'build' package in the user site packages, if needed
 # could be improved by using a temporary venv, but it's tiny and harmless
-if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
+if [[ $(python3 -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
     pip install --user build
 fi
 
 rm -rf ../build
 
-python -m build --outdir dist/ ../.
+python3 -m build --outdir dist/ ../.
 
 # ----------------------
 
