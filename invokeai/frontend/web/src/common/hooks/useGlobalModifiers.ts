@@ -1,27 +1,18 @@
-import { atom, map } from 'nanostores';
+import { atom } from 'nanostores';
 import { useCallback, useEffect } from 'react';
 
-export type Modifiers = {
-  shift: boolean;
-  ctrl: boolean;
-  meta: boolean;
-  alt: boolean;
-};
-
-export const $modifiers = map<Modifiers>({
-  shift: false,
-  ctrl: false,
-  meta: false,
-  alt: false,
-});
+export const $shift = atom(false);
+export const $ctrl = atom(false);
+export const $meta = atom(false);
+export const $alt = atom(false);
 
 const $subscribers = atom(0);
 
 const listener = (e: KeyboardEvent) => {
-  $modifiers.setKey('shift', e.shiftKey);
-  $modifiers.setKey('ctrl', e.ctrlKey);
-  $modifiers.setKey('alt', e.altKey);
-  $modifiers.setKey('meta', e.metaKey);
+  $shift.set(e.shiftKey);
+  $ctrl.set(e.ctrlKey);
+  $alt.set(e.altKey);
+  $meta.set(e.metaKey);
 };
 
 export const useGlobalModifiersInit = () => {
@@ -46,16 +37,16 @@ export const useGlobalModifiersInit = () => {
 
 export const useGlobalModifiersSetters = () => {
   const setShift = useCallback((shift: boolean) => {
-    $modifiers.setKey('shift', shift);
+    $shift.set(shift);
   }, []);
-  const setCtrl = useCallback((shift: boolean) => {
-    $modifiers.setKey('ctrl', shift);
+  const setCtrl = useCallback((ctrl: boolean) => {
+    $ctrl.set(ctrl);
   }, []);
-  const setAlt = useCallback((shift: boolean) => {
-    $modifiers.setKey('alt', shift);
+  const setAlt = useCallback((alt: boolean) => {
+    $alt.set(alt);
   }, []);
-  const setMeta = useCallback((shift: boolean) => {
-    $modifiers.setKey('meta', shift);
+  const setMeta = useCallback((meta: boolean) => {
+    $meta.set(meta);
   }, []);
   return { setShift, setCtrl, setAlt, setMeta };
 };

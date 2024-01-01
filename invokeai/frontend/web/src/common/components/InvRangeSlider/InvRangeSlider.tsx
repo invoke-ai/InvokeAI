@@ -9,7 +9,7 @@ import {
 import { useStore } from '@nanostores/react';
 import type { InvFormattedMark } from 'common/components/InvSlider/types';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
-import { $modifiers } from 'common/hooks/useGlobalModifiers';
+import { $shift } from 'common/hooks/useGlobalModifiers';
 import { AnimatePresence } from 'framer-motion';
 import { memo, useCallback, useMemo, useState } from 'react';
 
@@ -35,10 +35,10 @@ export const InvRangeSlider = memo(
       const [isMouseOverSlider, setIsMouseOverSlider] = useState(false);
       const [isChanging, setIsChanging] = useState(false);
 
-      const modifiers = useStore($modifiers);
+      const shift = useStore($shift);
       const step = useMemo(
-        () => (modifiers.shift ? _fineStep ?? _step : _step),
-        [modifiers.shift, _fineStep, _step]
+        () => (shift ? _fineStep ?? _step : _step),
+        [shift, _fineStep, _step]
       );
       const controlProps = useFormControl({});
 
