@@ -9,10 +9,6 @@ BRED="\033[1;31m"
 RED="\033[31m"
 RESET="\033[0m"
 
-function is_bin_in_path {
-    builtin type -P "$1" &>/dev/null
-}
-
 function does_tag_exist {
     git rev-parse --quiet --verify "refs/tags/$1" >/dev/null
 }
@@ -25,17 +21,9 @@ function git_show {
     git show -s --format='%h %s' $1
 }
 
-# Some machines only have `python3` in PATH, others have `python` - make an alias.
-# We can use a function to approximate an alias within a non-interactive shell.
-if ! is_bin_in_path python && is_bin_in_path python3; then
-    function python {
-        python3 "$@"
-    }
-fi
-
 VERSION=$(
     cd ..
-    python -c "from invokeai.version import __version__ as version; print(version)"
+    python3 -c "from invokeai.version import __version__ as version; print(version)"
 )
 PATCH=""
 MAJOR_VERSION=$(echo $VERSION | sed 's/\..*$//')
