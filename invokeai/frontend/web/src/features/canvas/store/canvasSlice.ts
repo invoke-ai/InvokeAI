@@ -36,6 +36,11 @@ import {
   isCanvasMaskLine,
 } from './canvasTypes';
 
+/**
+ * The maximum history length to keep in the past/future layer states.
+ */
+const MAX_HISTORY = 128;
+
 export const initialLayerState: CanvasLayerState = {
   objects: [],
   stagingArea: {
@@ -52,21 +57,11 @@ export const initialCanvasState: CanvasState = {
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
   colorPickerColor: { r: 90, g: 90, b: 255, a: 1 },
-  cursorPosition: null,
   futureLayerStates: [],
-  isDrawing: false,
   isMaskEnabled: true,
-  isMouseOverBoundingBox: false,
-  isMoveBoundingBoxKeyHeld: false,
-  isMoveStageKeyHeld: false,
-  isMovingBoundingBox: false,
-  isMovingStage: false,
-  isTransformingBoundingBox: false,
   layer: 'base',
   layerState: initialLayerState,
   maskColor: { r: 255, g: 90, b: 90, a: 1 },
-  maxHistory: 128,
-  minimumStageScale: 1,
   pastLayerStates: [],
   scaledBoundingBoxDimensions: { width: 512, height: 512 },
   shouldAntialias: true,
@@ -77,10 +72,7 @@ export const initialCanvasState: CanvasState = {
   shouldPreserveMaskedArea: false,
   shouldRestrictStrokesToBox: true,
   shouldShowBoundingBox: true,
-  shouldShowBrush: true,
-  shouldShowBrushPreview: false,
   shouldShowCanvasDebugInfo: false,
-  shouldShowCheckboardTransparency: false,
   shouldShowGrid: true,
   shouldShowIntermediates: true,
   shouldShowStagingImage: true,
@@ -98,14 +90,7 @@ export const canvasSlice = createSlice({
   initialState: initialCanvasState,
   reducers: {
     setTool: (state, action: PayloadAction<CanvasTool>) => {
-      const tool = action.payload;
       state.tool = action.payload;
-      if (tool !== 'move') {
-        state.isTransformingBoundingBox = false;
-        state.isMouseOverBoundingBox = false;
-        state.isMovingBoundingBox = false;
-        state.isMovingStage = false;
-      }
     },
     setLayer: (state, action: PayloadAction<CanvasLayer>) => {
       state.layer = action.payload;
@@ -145,21 +130,6 @@ export const canvasSlice = createSlice({
     setIsMaskEnabled: (state, action: PayloadAction<boolean>) => {
       state.isMaskEnabled = action.payload;
       state.layer = action.payload ? 'mask' : 'base';
-    },
-    setShouldShowCheckboardTransparency: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
-      state.shouldShowCheckboardTransparency = action.payload;
-    },
-    setShouldShowBrushPreview: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowBrushPreview = action.payload;
-    },
-    setShouldShowBrush: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowBrush = action.payload;
-    },
-    setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
-      state.cursorPosition = action.payload;
     },
     setInitialCanvasImage: (state, action: PayloadAction<ImageDTO>) => {
       const image = action.payload;
@@ -273,9 +243,6 @@ export const canvasSlice = createSlice({
     ) => {
       state.shouldDarkenOutsideBoundingBox = action.payload;
     },
-    setIsDrawing: (state, action: PayloadAction<boolean>) => {
-      state.isDrawing = action.payload;
-    },
     clearCanvasHistory: (state) => {
       state.pastLayerStates = [];
       state.futureLayerStates = [];
@@ -288,21 +255,6 @@ export const canvasSlice = createSlice({
     },
     setShouldShowBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBox = action.payload;
-    },
-    setIsTransformingBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state.isTransformingBoundingBox = action.payload;
-    },
-    setIsMovingBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state.isMovingBoundingBox = action.payload;
-    },
-    setIsMouseOverBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state.isMouseOverBoundingBox = action.payload;
-    },
-    setIsMoveBoundingBoxKeyHeld: (state, action: PayloadAction<boolean>) => {
-      state.isMoveBoundingBoxKeyHeld = action.payload;
-    },
-    setIsMoveStageKeyHeld: (state, action: PayloadAction<boolean>) => {
-      state.isMoveStageKeyHeld = action.payload;
     },
     canvasBatchIdAdded: (state, action: PayloadAction<string>) => {
       state.batchIds.push(action.payload);
@@ -333,7 +285,7 @@ export const canvasSlice = createSlice({
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      if (state.pastLayerStates.length > state.maxHistory) {
+      if (state.pastLayerStates.length > MAX_HISTORY) {
         state.pastLayerStates.shift();
       }
 
@@ -352,7 +304,7 @@ export const canvasSlice = createSlice({
     discardStagedImages: (state) => {
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      if (state.pastLayerStates.length > state.maxHistory) {
+      if (state.pastLayerStates.length > MAX_HISTORY) {
         state.pastLayerStates.shift();
       }
 
@@ -371,7 +323,7 @@ export const canvasSlice = createSlice({
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      if (state.pastLayerStates.length > state.maxHistory) {
+      if (state.pastLayerStates.length > MAX_HISTORY) {
         state.pastLayerStates.shift();
       }
 
@@ -390,7 +342,7 @@ export const canvasSlice = createSlice({
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      if (state.pastLayerStates.length > state.maxHistory) {
+      if (state.pastLayerStates.length > MAX_HISTORY) {
         state.pastLayerStates.shift();
       }
 
@@ -419,7 +371,7 @@ export const canvasSlice = createSlice({
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      if (state.pastLayerStates.length > state.maxHistory) {
+      if (state.pastLayerStates.length > MAX_HISTORY) {
         state.pastLayerStates.shift();
       }
 
@@ -461,7 +413,7 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates.unshift(cloneDeep(state.layerState));
 
-      if (state.futureLayerStates.length > state.maxHistory) {
+      if (state.futureLayerStates.length > MAX_HISTORY) {
         state.futureLayerStates.pop();
       }
 
@@ -476,7 +428,7 @@ export const canvasSlice = createSlice({
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      if (state.pastLayerStates.length > state.maxHistory) {
+      if (state.pastLayerStates.length > MAX_HISTORY) {
         state.pastLayerStates.shift();
       }
 
@@ -484,9 +436,6 @@ export const canvasSlice = createSlice({
     },
     setShouldShowGrid: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGrid = action.payload;
-    },
-    setIsMovingStage: (state, action: PayloadAction<boolean>) => {
-      state.isMovingStage = action.payload;
     },
     setShouldSnapToGrid: (state, action: PayloadAction<boolean>) => {
       state.shouldSnapToGrid = action.payload;
@@ -653,7 +602,7 @@ export const canvasSlice = createSlice({
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
-      if (state.pastLayerStates.length > state.maxHistory) {
+      if (state.pastLayerStates.length > MAX_HISTORY) {
         state.pastLayerStates.shift();
       }
 
@@ -773,23 +722,6 @@ export const canvasSlice = createSlice({
 
       state.layerState.objects = [action.payload];
     },
-    resetCanvasInteractionState: (state) => {
-      state.cursorPosition = null;
-      state.isDrawing = false;
-      state.isMouseOverBoundingBox = false;
-      state.isMoveBoundingBoxKeyHeld = false;
-      state.isMoveStageKeyHeld = false;
-      state.isMovingBoundingBox = false;
-      state.isMovingStage = false;
-      state.isTransformingBoundingBox = false;
-    },
-    mouseLeftCanvas: (state) => {
-      state.cursorPosition = null;
-      state.isDrawing = false;
-      state.isMouseOverBoundingBox = false;
-      state.isMovingBoundingBox = false;
-      state.isTransformingBoundingBox = false;
-    },
   },
   extraReducers: (builder) => {
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
@@ -848,12 +780,10 @@ export const {
   commitStagingAreaImage,
   discardStagedImages,
   fitBoundingBoxToStage,
-  mouseLeftCanvas,
   nextStagingAreaImage,
   prevStagingAreaImage,
   redo,
   resetCanvas,
-  resetCanvasInteractionState,
   resetCanvasView,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
@@ -863,16 +793,8 @@ export const {
   setBrushColor,
   setBrushSize,
   setColorPickerColor,
-  setCursorPosition,
   setInitialCanvasImage,
-  setIsDrawing,
   setIsMaskEnabled,
-  setIsMouseOverBoundingBox,
-  setIsMoveBoundingBoxKeyHeld,
-  setIsMoveStageKeyHeld,
-  setIsMovingBoundingBox,
-  setIsMovingStage,
-  setIsTransformingBoundingBox,
   setLayer,
   setMaskColor,
   setMergedCanvas,
@@ -882,10 +804,7 @@ export const {
   setShouldLockBoundingBox,
   setShouldPreserveMaskedArea,
   setShouldShowBoundingBox,
-  setShouldShowBrush,
-  setShouldShowBrushPreview,
   setShouldShowCanvasDebugInfo,
-  setShouldShowCheckboardTransparency,
   setShouldShowGrid,
   setShouldShowIntermediates,
   setShouldShowStagingImage,

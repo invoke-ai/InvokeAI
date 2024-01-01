@@ -12,6 +12,7 @@ import {
   InvPopoverTrigger,
 } from 'common/components/InvPopover/wrapper';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { resetToolInteractionState } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   addEraseRect,
@@ -176,12 +177,15 @@ const IAICanvasToolChooserOptions = () => {
 
   const handleSelectBrushTool = useCallback(() => {
     dispatch(setTool('brush'));
+    resetToolInteractionState();
   }, [dispatch]);
   const handleSelectEraserTool = useCallback(() => {
     dispatch(setTool('eraser'));
+    resetToolInteractionState();
   }, [dispatch]);
   const handleSelectColorPickerTool = useCallback(() => {
     dispatch(setTool('colorPicker'));
+    resetToolInteractionState();
   }, [dispatch]);
   const handleFillRect = useCallback(() => {
     dispatch(addFillRect());
