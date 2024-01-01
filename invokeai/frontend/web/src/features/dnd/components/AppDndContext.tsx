@@ -1,28 +1,19 @@
-import {
-  DragOverlay,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
+import { MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { logger } from 'app/logging/logger';
 import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
-import { useScaledModifer } from 'features/dnd/hooks/useScaledCenteredModifer';
+import DndOverlay from 'features/dnd/components/DndOverlay';
 import type {
   DragEndEvent,
   DragStartEvent,
   TypesafeDraggableData,
 } from 'features/dnd/types';
 import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
-import type { AnimationProps } from 'framer-motion';
-import { AnimatePresence, motion } from 'framer-motion';
-import type { CSSProperties, PropsWithChildren } from 'react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo, useCallback, useState } from 'react';
 
 import { DndContextTypesafe } from './DndContextTypesafe';
-import DragPreview from './DragPreview';
 
 const AppDndContext = (props: PropsWithChildren) => {
   const [activeDragData, setActiveDragData] =
@@ -77,9 +68,6 @@ const AppDndContext = (props: PropsWithChildren) => {
 
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  const scaledModifier = useScaledModifer();
-  const modifiers = useMemo(() => [scaledModifier], [scaledModifier]);
-
   return (
     <DndContextTypesafe
       onDragStart={handleDragStart}
@@ -89,45 +77,9 @@ const AppDndContext = (props: PropsWithChildren) => {
       autoScroll={false}
     >
       {props.children}
-      <DragOverlay
-        dropAnimation={null}
-        modifiers={modifiers}
-        style={dragOverlayStyles}
-      >
-        <AnimatePresence>
-          {activeDragData && (
-            <motion.div
-              layout
-              key="overlay-drag-image"
-              initial={initial}
-              animate={animate}
-            >
-              <DragPreview dragData={activeDragData} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </DragOverlay>
+      <DndOverlay activeDragData={activeDragData} />
     </DndContextTypesafe>
   );
 };
 
 export default memo(AppDndContext);
-
-const dragOverlayStyles: CSSProperties = {
-  width: 'min-content',
-  height: 'min-content',
-  cursor: 'grabbing',
-  userSelect: 'none',
-  // expand overlay to prevent cursor from going outside it and displaying
-  padding: '10rem',
-};
-
-const initial: AnimationProps['initial'] = {
-  opacity: 0,
-  scale: 0.7,
-};
-const animate: AnimationProps['animate'] = {
-  opacity: 1,
-  scale: 1,
-  transition: { duration: 0.1 },
-};
