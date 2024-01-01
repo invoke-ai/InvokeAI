@@ -15,17 +15,13 @@ While the release workflow does not include end-to-end tests, it does pause befo
 
 The `release.yml` workflow runs a number of jobs to handle code checks, tests, build and publish on PyPI.
 
-It is triggered on **tag push**, when the tag matches `v*.*.*`. It doesn't matter if you've prepped a release branch like `release/v3.5.0` or are releasing from `main` - it works the same.
+It is triggered on **tag push**, when the tag matches `v*`. It doesn't matter if you've prepped a release branch like `release/v3.5.0` or are releasing from `main` - it works the same.
 
 > Because commits are reference-counted, it is safe to create a release branch, tag it, let the workflow run, then delete the branch. So long as the tag exists, that commit will exist.
 
 ### Triggering the Workflow
 
 Run `make tag-release` to tag the current commit and kick off the workflow.
-
-This script actually makes two tags - one for the specific version, and a `vX-latest` tag that changes with each release.
-
-Because the release workflow only triggers on the pattern `v*.*.*`, the workflow will only run once when running this script.
 
 The release may also be run [manually].
 
