@@ -1,6 +1,6 @@
 import { forwardRef, NumberInput as ChakraNumberInput } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
-import { $modifiers } from 'common/hooks/useGlobalModifiers';
+import { $shift } from 'common/hooks/useGlobalModifiers';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { stopPastePropagation } from 'common/util/stopPastePropagation';
 import { clamp } from 'lodash-es';
@@ -29,10 +29,10 @@ export const InvNumberInput = memo(
 
       const [valueAsString, setValueAsString] = useState<string>(String(value));
       const [valueAsNumber, setValueAsNumber] = useState<number>(value);
-      const modifiers = useStore($modifiers);
+      const shift = useStore($shift);
       const step = useMemo(
-        () => (modifiers.shift ? _fineStep ?? _step : _step),
-        [modifiers.shift, _fineStep, _step]
+        () => (shift ? _fineStep ?? _step : _step),
+        [shift, _fineStep, _step]
       );
       const isInteger = useMemo(
         () => Number.isInteger(_step) && Number.isInteger(_fineStep ?? 1),

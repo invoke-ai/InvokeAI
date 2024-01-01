@@ -6,7 +6,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
-import { $modifiers } from 'common/hooks/useGlobalModifiers';
+import { $shift } from 'common/hooks/useGlobalModifiers';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import type {
   ImageDraggableData,
@@ -42,7 +42,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const { imageName, virtuosoContext } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const { shift } = useStore($modifiers);
+  const shift = useStore($shift);
   const { t } = useTranslation();
 
   const { handleClick, isSelected, selection, selectionCount } =
