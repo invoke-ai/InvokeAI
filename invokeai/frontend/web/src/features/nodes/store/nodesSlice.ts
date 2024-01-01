@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { workflowLoaded } from 'features/nodes/store/actions';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -41,7 +42,6 @@ import {
 } from 'features/nodes/types/field';
 import type {
   AnyNode,
-  InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import {
@@ -97,7 +97,6 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
 export const initialNodesState: NodesState = {
   nodes: [],
   edges: [],
-  nodeTemplates: {},
   isReady: false,
   connectionStartParams: null,
   connectionStartFieldType: null,
@@ -656,13 +655,6 @@ const nodesSlice = createSlice({
     shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowMinimapPanel = action.payload;
     },
-    nodeTemplatesBuilt: (
-      state,
-      action: PayloadAction<Record<string, InvocationTemplate>>
-    ) => {
-      state.nodeTemplates = action.payload;
-      state.isReady = true;
-    },
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
@@ -893,6 +885,9 @@ const nodesSlice = createSlice({
         });
       }
     });
+    builder.addCase(nodeTemplatesBuilt, (state) => {
+      state.isReady = true;
+    });
   },
 });
 
@@ -935,7 +930,6 @@ export const {
   nodeOpacityChanged,
   nodesChanged,
   nodesDeleted,
-  nodeTemplatesBuilt,
   nodeUseCacheChanged,
   notesNodeValueChanged,
   selectedAll,

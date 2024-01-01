@@ -16,7 +16,6 @@ import type {
 export type NodesState = {
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
-  nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   connectionStartFieldType: FieldType | null;
   connectionMade: boolean;
@@ -41,4 +40,8 @@ export type NodesState = {
 
 export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
   isTouched: boolean;
+};
+
+export type NodeTemplatesState = {
+  templates: Record<string, InvocationTemplate>;
 };

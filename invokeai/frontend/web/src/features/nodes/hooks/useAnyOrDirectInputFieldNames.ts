@@ -10,12 +10,12 @@ import { useMemo } from 'react';
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) => {
+      createMemoizedSelector(stateSelector, ({ nodes, nodeTemplates }) => {
         const node = nodes.nodes.find((node) => node.id === nodeId);
         if (!isInvocationNode(node)) {
           return [];
         }
-        const nodeTemplate = nodes.nodeTemplates[node.data.type];
+        const nodeTemplate = nodeTemplates.templates[node.data.type];
         if (!nodeTemplate) {
           return [];
         }

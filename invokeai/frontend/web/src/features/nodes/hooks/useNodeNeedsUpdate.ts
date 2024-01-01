@@ -8,9 +8,9 @@ import { useMemo } from 'react';
 export const useNodeNeedsUpdate = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) => {
+      createMemoizedSelector(stateSelector, ({ nodes, nodeTemplates }) => {
         const node = nodes.nodes.find((node) => node.id === nodeId);
-        const template = nodes.nodeTemplates[node?.data.type ?? ''];
+        const template = nodeTemplates.templates[node?.data.type ?? ''];
         if (isInvocationNode(node) && template) {
           return getNeedsUpdate(node, template);
         }

@@ -1,6 +1,6 @@
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import type { Graph } from 'services/api/types';
 

@@ -13,34 +13,37 @@ import type { AnyResult } from 'services/events/types';
 
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
-  const lastSelectedNodeId =
-    nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(
+  stateSelector,
+  ({ nodes, nodeTemplates }) => {
+    const lastSelectedNodeId =
+      nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-  const lastSelectedNode = nodes.nodes.find(
-    (node) => node.id === lastSelectedNodeId
-  );
+    const lastSelectedNode = nodes.nodes.find(
+      (node) => node.id === lastSelectedNodeId
+    );
 
-  const lastSelectedNodeTemplate = lastSelectedNode
-    ? nodes.nodeTemplates[lastSelectedNode.data.type]
-    : undefined;
+    const lastSelectedNodeTemplate = lastSelectedNode
+      ? nodeTemplates.templates[lastSelectedNode.data.type]
+      : undefined;
 
-  const nes =
-    nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
+    const nes =
+      nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
 
-  if (
-    !isInvocationNode(lastSelectedNode) ||
-    !nes ||
-    !lastSelectedNodeTemplate
-  ) {
-    return;
+    if (
+      !isInvocationNode(lastSelectedNode) ||
+      !nes ||
+      !lastSelectedNodeTemplate
+    ) {
+      return;
+    }
+
+    return {
+      outputs: nes.outputs,
+      outputType: lastSelectedNodeTemplate.outputType,
+    };
   }
-
-  return {
-    outputs: nes.outputs,
-    outputType: lastSelectedNodeTemplate.outputType,
-  };
-});
+);
 
 const InspectorOutputsTab = () => {
   const data = useAppSelector(selector);

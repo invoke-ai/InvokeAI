@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';

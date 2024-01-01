@@ -15,11 +15,11 @@ export const addSocketConnectedEventListener = () => {
 
       log.debug('Connected');
 
-      const { nodes, config, system } = getState();
+      const { nodeTemplates, config, system } = getState();
 
       const { disabledTabs } = config;
 
-      if (!size(nodes.nodeTemplates) && !disabledTabs.includes('nodes')) {
+      if (!size(nodeTemplates.templates) && !disabledTabs.includes('nodes')) {
         dispatch(receivedOpenAPISchema());
       }
 
