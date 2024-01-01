@@ -14,28 +14,31 @@ import { useTranslation } from 'react-i18next';
 
 import EditableNodeTitle from './details/EditableNodeTitle';
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
-  const lastSelectedNodeId =
-    nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(
+  stateSelector,
+  ({ nodes, nodeTemplates }) => {
+    const lastSelectedNodeId =
+      nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-  const lastSelectedNode = nodes.nodes.find(
-    (node) => node.id === lastSelectedNodeId
-  );
+    const lastSelectedNode = nodes.nodes.find(
+      (node) => node.id === lastSelectedNodeId
+    );
 
-  const lastSelectedNodeTemplate = lastSelectedNode
-    ? nodes.nodeTemplates[lastSelectedNode.data.type]
-    : undefined;
+    const lastSelectedNodeTemplate = lastSelectedNode
+      ? nodeTemplates.templates[lastSelectedNode.data.type]
+      : undefined;
 
-  if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {
-    return;
+    if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {
+      return;
+    }
+
+    return {
+      nodeId: lastSelectedNode.data.id,
+      nodeVersion: lastSelectedNode.data.version,
+      templateTitle: lastSelectedNodeTemplate.title,
+    };
   }
-
-  return {
-    nodeId: lastSelectedNode.data.id,
-    nodeVersion: lastSelectedNode.data.version,
-    templateTitle: lastSelectedNodeTemplate.title,
-  };
-});
+);
 
 const InspectorDetailsTab = () => {
   const data = useAppSelector(selector);

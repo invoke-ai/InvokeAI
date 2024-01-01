@@ -12,7 +12,14 @@ import { getConnectedEdges } from 'reactflow';
 const selector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
   (
-    { controlAdapters, generation, system, nodes, dynamicPrompts },
+    {
+      controlAdapters,
+      generation,
+      system,
+      nodes,
+      nodeTemplates,
+      dynamicPrompts,
+    },
     activeTabName
   ) => {
     const { initialImage, model } = generation;
@@ -41,7 +48,7 @@ const selector = createMemoizedSelector(
             return;
           }
 
-          const nodeTemplate = nodes.nodeTemplates[node.data.type];
+          const nodeTemplate = nodeTemplates.templates[node.data.type];
 
           if (!nodeTemplate) {
             // Node type not found

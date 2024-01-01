@@ -14,6 +14,7 @@ import hrfReducer from 'features/hrf/store/hrfSlice';
 import loraReducer from 'features/lora/store/loraSlice';
 import modelmanagerReducer from 'features/modelManager/store/modelManagerSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
+import nodeTemplatesReducer from 'features/nodes/store/nodeTemplatesSlice';
 import workflowReducer from 'features/nodes/store/workflowSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
@@ -42,6 +43,7 @@ const allReducers = {
   gallery: galleryReducer,
   generation: generationReducer,
   nodes: nodesReducer,
+  nodeTemplates: nodeTemplatesReducer,
   postprocessing: postprocessingReducer,
   system: systemReducer,
   config: configReducer,

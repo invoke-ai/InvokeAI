@@ -6,22 +6,25 @@ import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataView
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
-  const lastSelectedNodeId =
-    nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(
+  stateSelector,
+  ({ nodes, nodeTemplates }) => {
+    const lastSelectedNodeId =
+      nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-  const lastSelectedNode = nodes.nodes.find(
-    (node) => node.id === lastSelectedNodeId
-  );
+    const lastSelectedNode = nodes.nodes.find(
+      (node) => node.id === lastSelectedNodeId
+    );
 
-  const lastSelectedNodeTemplate = lastSelectedNode
-    ? nodes.nodeTemplates[lastSelectedNode.data.type]
-    : undefined;
+    const lastSelectedNodeTemplate = lastSelectedNode
+      ? nodeTemplates.templates[lastSelectedNode.data.type]
+      : undefined;
 
-  return {
-    template: lastSelectedNodeTemplate,
-  };
-});
+    return {
+      template: lastSelectedNodeTemplate,
+    };
+  }
+);
 
 const NodeTemplateInspector = () => {
   const { template } = useAppSelector(selector);

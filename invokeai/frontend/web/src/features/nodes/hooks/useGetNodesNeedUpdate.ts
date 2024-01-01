@@ -4,19 +4,15 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 
-const selector = createMemoizedSelector(stateSelector, (state) => {
-  const nodes = state.nodes.nodes;
-  const templates = state.nodes.nodeTemplates;
-
-  const needsUpdate = nodes.filter(isInvocationNode).some((node) => {
-    const template = templates[node.data.type];
+const selector = createMemoizedSelector(stateSelector, (state) =>
+  state.nodes.nodes.filter(isInvocationNode).some((node) => {
+    const template = state.nodeTemplates.templates[node.data.type];
     if (!template) {
       return false;
     }
     return getNeedsUpdate(node, template);
-  });
-  return needsUpdate;
-});
+  })
+);
 
 export const useGetNodesNeedUpdate = () => {
   const getNeedsUpdate = useAppSelector(selector);

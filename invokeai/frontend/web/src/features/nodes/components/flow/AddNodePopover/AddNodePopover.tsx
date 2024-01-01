@@ -74,57 +74,60 @@ const AddNodePopover = () => {
     (state) => state.nodes.connectionStartParams?.handleType
   );
 
-  const selector = createMemoizedSelector([stateSelector], ({ nodes }) => {
-    // If we have a connection in progress, we need to filter the node choices
-    const filteredNodeTemplates = fieldFilter
-      ? filter(nodes.nodeTemplates, (template) => {
-          const handles =
-            handleFilter == 'source' ? template.inputs : template.outputs;
+  const selector = createMemoizedSelector(
+    [stateSelector],
+    ({ nodeTemplates }) => {
+      // If we have a connection in progress, we need to filter the node choices
+      const filteredNodeTemplates = fieldFilter
+        ? filter(nodeTemplates.templates, (template) => {
+            const handles =
+              handleFilter == 'source' ? template.inputs : template.outputs;
 
-          return some(handles, (handle) => {
-            const sourceType =
-              handleFilter == 'source' ? fieldFilter : handle.type;
-            const targetType =
-              handleFilter == 'target' ? fieldFilter : handle.type;
+            return some(handles, (handle) => {
+              const sourceType =
+                handleFilter == 'source' ? fieldFilter : handle.type;
+              const targetType =
+                handleFilter == 'target' ? fieldFilter : handle.type;
 
-            return validateSourceAndTargetTypes(sourceType, targetType);
-          });
-        })
-      : map(nodes.nodeTemplates);
+              return validateSourceAndTargetTypes(sourceType, targetType);
+            });
+          })
+        : map(nodeTemplates.templates);
 
-    const options: InvSelectOption[] = map(
-      filteredNodeTemplates,
-      (template) => {
-        return {
-          label: template.title,
-          value: template.type,
-          description: template.description,
-          tags: template.tags,
-        };
+      const options: InvSelectOption[] = map(
+        filteredNodeTemplates,
+        (template) => {
+          return {
+            label: template.title,
+            value: template.type,
+            description: template.description,
+            tags: template.tags,
+          };
+        }
+      );
+
+      //We only want these nodes if we're not filtered
+      if (fieldFilter === null) {
+        options.push({
+          label: t('nodes.currentImage'),
+          value: 'current_image',
+          description: t('nodes.currentImageDescription'),
+          tags: ['progress'],
+        });
+
+        options.push({
+          label: t('nodes.notes'),
+          value: 'notes',
+          description: t('nodes.notesDescription'),
+          tags: ['notes'],
+        });
       }
-    );
 
-    //We only want these nodes if we're not filtered
-    if (fieldFilter === null) {
-      options.push({
-        label: t('nodes.currentImage'),
-        value: 'current_image',
-        description: t('nodes.currentImageDescription'),
-        tags: ['progress'],
-      });
+      options.sort((a, b) => a.label.localeCompare(b.label));
 
-      options.push({
-        label: t('nodes.notes'),
-        value: 'notes',
-        description: t('nodes.notesDescription'),
-        tags: ['notes'],
-      });
+      return { options };
     }
-
-    options.sort((a, b) => a.label.localeCompare(b.label));
-
-    return { options };
-  });
+  );
 
   const { options } = useAppSelector(selector);
   const isOpen = useAppSelector((state) => state.nodes.isAddNodePopoverOpen);
