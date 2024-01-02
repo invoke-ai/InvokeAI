@@ -13,3 +13,9 @@ export const zAspectRatioID = z.enum([
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: string): v is AspectRatioID =>
   zAspectRatioID.safeParse(v).success;
+
+export type AspectRatioState = {
+  id: AspectRatioID;
+  value: number;
+  isLocked: boolean;
+};

@@ -10,8 +10,7 @@ import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
 import floorCoordinates from 'features/canvas/util/floorCoordinates';
 import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundingBoxDimensions';
 import roundDimensionsTo64 from 'features/canvas/util/roundDimensionsTo64';
-import { ASPECT_RATIO_MAP } from 'features/parameters/components/ImageSize/constants';
-import { aspectRatioSelected } from 'features/parameters/store/generationSlice';
+import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
@@ -83,6 +82,11 @@ export const initialCanvasState: CanvasState = {
   stageScale: 1,
   tool: 'brush',
   batchIds: [],
+  aspectRatio: {
+    id: '1:1',
+    value: 1,
+    isLocked: false,
+  },
 };
 
 export const canvasSlice = createSlice({
@@ -198,8 +202,14 @@ export const canvasSlice = createSlice({
       state.stageScale = newScale;
       state.stageCoordinates = newCoordinates;
     },
-    setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
-      const newDimensions = roundDimensionsTo64(action.payload);
+    setBoundingBoxDimensions: (
+      state,
+      action: PayloadAction<Partial<Dimensions>>
+    ) => {
+      const newDimensions = roundDimensionsTo64({
+        ...state.boundingBoxDimensions,
+        ...action.payload,
+      });
       state.boundingBoxDimensions = newDimensions;
 
       if (state.boundingBoxScaleMethod === 'auto') {
@@ -722,6 +732,21 @@ export const canvasSlice = createSlice({
 
       state.layerState.objects = [action.payload];
     },
+    aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
+      state.aspectRatio = action.payload;
+      // if (action.payload.id !== 'Free') {
+      //   state.boundingBoxDimensions.height = roundToMultiple(
+      //     state.boundingBoxDimensions.width /
+      //       ASPECT_RATIO_MAP[action.payload.id].ratio,
+      //     64
+      //   );
+      //   state.scaledBoundingBoxDimensions.height = roundToMultiple(
+      //     state.scaledBoundingBoxDimensions.width /
+      //       ASPECT_RATIO_MAP[action.payload.id].ratio,
+      //     64
+      //   );
+      // }
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
@@ -733,21 +758,6 @@ export const canvasSlice = createSlice({
       if (batch_status.in_progress === 0 && batch_status.pending === 0) {
         state.batchIds = state.batchIds.filter(
           (id) => id !== batch_status.batch_id
-        );
-      }
-    });
-    builder.addCase(aspectRatioSelected, (state, action) => {
-      const aspectRatioID = action.payload;
-      if (aspectRatioID !== 'Free') {
-        state.boundingBoxDimensions.height = roundToMultiple(
-          state.boundingBoxDimensions.width /
-            ASPECT_RATIO_MAP[aspectRatioID].ratio,
-          64
-        );
-        state.scaledBoundingBoxDimensions.height = roundToMultiple(
-          state.scaledBoundingBoxDimensions.width /
-            ASPECT_RATIO_MAP[aspectRatioID].ratio,
-          64
         );
       }
     });
@@ -823,6 +833,7 @@ export const {
   canvasResized,
   canvasBatchIdAdded,
   canvasBatchIdsReset,
+  aspectRatioChanged,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

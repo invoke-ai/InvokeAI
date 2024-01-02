@@ -1,29 +1,55 @@
 import { Flex, Icon } from '@chakra-ui/react';
 import { useSize } from '@chakra-ui/react-use-size';
+import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { FaImage } from 'react-icons/fa';
 
 import {
   BOX_SIZE_CSS_CALC,
   ICON_CONTAINER_STYLES,
+  ICON_HIGH_CUTOFF,
+  ICON_LOW_CUTOFF,
   MOTION_ICON_ANIMATE,
   MOTION_ICON_EXIT,
   MOTION_ICON_INITIAL,
 } from './constants';
-import { useAspectRatioPreviewState } from './hooks';
-import type { AspectRatioPreviewProps } from './types';
 
-export const AspectRatioPreview = (props: AspectRatioPreviewProps) => {
-  const { width: _width, height: _height, icon = FaImage } = props;
+export type AspectRatioPreviewProps = {
+  width: number;
+  height: number;
+};
+
+export const AspectRatioPreview = () => {
+  const ctx = useImageSizeContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const containerSize = useSize(containerRef);
 
-  const { width, height, shouldShowIcon } = useAspectRatioPreviewState({
-    width: _width,
-    height: _height,
-    containerSize,
-  });
+  const shouldShowIcon = useMemo(
+    () =>
+      ctx.aspectRatioState.value < ICON_HIGH_CUTOFF &&
+      ctx.aspectRatioState.value > ICON_LOW_CUTOFF,
+    [ctx.aspectRatioState.value]
+  );
+
+  const { width, height } = useMemo(() => {
+    if (!containerSize) {
+      return { width: 0, height: 0 };
+    }
+
+    let width = ctx.width;
+    let height = ctx.height;
+
+    if (ctx.width > ctx.height) {
+      width = containerSize.width;
+      height = width / ctx.aspectRatioState.value;
+    } else {
+      height = containerSize.height;
+      width = height * ctx.aspectRatioState.value;
+    }
+
+    return { width, height };
+  }, [containerSize, ctx.width, ctx.height, ctx.aspectRatioState.value]);
 
   return (
     <Flex
@@ -50,7 +76,7 @@ export const AspectRatioPreview = (props: AspectRatioPreviewProps) => {
               exit={MOTION_ICON_EXIT}
               style={ICON_CONTAINER_STYLES}
             >
-              <Icon as={icon} color="base.700" boxSize={BOX_SIZE_CSS_CALC} />
+              <Icon as={FaImage} color="base.700" boxSize={BOX_SIZE_CSS_CALC} />
             </Flex>
           )}
         </AnimatePresence>
