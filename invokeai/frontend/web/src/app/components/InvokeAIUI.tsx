@@ -143,6 +143,15 @@ const InvokeAIUI = ({
 
   useEffect(() => {
     $store.set(store);
+    if (import.meta.env.MODE === 'development') {
+      window.$store = $store;
+    }
+    () => {
+      $store.set(undefined);
+      if (import.meta.env.MODE === 'development') {
+        window.$store = undefined;
+      }
+    };
   }, [store]);
 
   return (
