@@ -180,7 +180,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       onMouseLeave={handleMouseLeave}
       position="relative"
       w="full"
-      h={isSmall ? 28 : 366} // magic no touch
+      h={isSmall ? 32 : 366} // magic no touch
       alignItems="center"
       justifyContent="center"
     >
