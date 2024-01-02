@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     InputField,
     InvocationContext,
     MetadataField,
@@ -19,6 +18,7 @@ from invokeai.app.invocations.ip_adapter import IPAdapterModelField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
+from invokeai.app.shared.fields import FieldDescriptions
 
 from ...version import __version__
 
@@ -112,7 +112,7 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.0")
+@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.1")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 
@@ -127,6 +127,9 @@ class CoreMetadataInvocation(BaseInvocation):
     seed: Optional[int] = InputField(default=None, description="The seed used for noise generation")
     rand_device: Optional[str] = InputField(default=None, description="The device used for random number generation")
     cfg_scale: Optional[float] = InputField(default=None, description="The classifier-free guidance scale parameter")
+    cfg_rescale_multiplier: Optional[float] = InputField(
+        default=None, description=FieldDescriptions.cfg_rescale_multiplier
+    )
     steps: Optional[int] = InputField(default=None, description="The number of steps used for inference")
     scheduler: Optional[str] = InputField(default=None, description="The scheduler used for inference")
     seamless_x: Optional[bool] = InputField(default=None, description="Whether seamless tiling was used on the X axis")
@@ -160,13 +163,14 @@ class CoreMetadataInvocation(BaseInvocation):
     )
 
     # High resolution fix metadata.
-    hrf_width: Optional[int] = InputField(
+    hrf_enabled: Optional[bool] = InputField(
         default=None,
-        description="The high resolution fix height and width multipler.",
+        description="Whether or not high resolution fix was enabled.",
     )
-    hrf_height: Optional[int] = InputField(
+    # TODO: should this be stricter or do we just let the UI handle it?
+    hrf_method: Optional[str] = InputField(
         default=None,
-        description="The high resolution fix height and width multipler.",
+        description="The high resolution fix upscale method.",
     )
     hrf_strength: Optional[float] = InputField(
         default=None,

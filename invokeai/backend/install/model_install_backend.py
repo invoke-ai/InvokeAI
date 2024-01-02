@@ -120,7 +120,7 @@ class ModelInstall(object):
         be treated uniformly. It also sorts the models alphabetically
         by their name, to improve the display somewhat.
         """
-        model_dict = dict()
+        model_dict = {}
 
         # first populate with the entries in INITIAL_MODELS.yaml
         for key, value in self.datasets.items():
@@ -134,7 +134,7 @@ class ModelInstall(object):
             model_dict[key] = model_info
 
         # supplement with entries in models.yaml
-        installed_models = [x for x in self.mgr.list_models()]
+        installed_models = list(self.mgr.list_models())
 
         for md in installed_models:
             base = md["base_model"]
@@ -176,7 +176,7 @@ class ModelInstall(object):
     # logic here a little reversed to maintain backward compatibility
     def starter_models(self, all_models: bool = False) -> Set[str]:
         models = set()
-        for key, value in self.datasets.items():
+        for key, _value in self.datasets.items():
             name, base, model_type = ModelManager.parse_key(key)
             if all_models or model_type in [ModelType.Main, ModelType.Vae]:
                 models.add(key)
@@ -184,7 +184,7 @@ class ModelInstall(object):
 
     def recommended_models(self) -> Set[str]:
         starters = self.starter_models(all_models=True)
-        return set([x for x in starters if self.datasets[x].get("recommended", False)])
+        return {x for x in starters if self.datasets[x].get("recommended", False)}
 
     def default_model(self) -> str:
         starters = self.starter_models()
@@ -234,7 +234,7 @@ class ModelInstall(object):
         """
 
         if not models_installed:
-            models_installed = dict()
+            models_installed = {}
 
         model_path_id_or_url = str(model_path_id_or_url).strip("\"' ")
 
@@ -252,10 +252,14 @@ class ModelInstall(object):
 
         # folders style or similar
         elif path.is_dir() and any(
-            [
-                (path / x).exists()
-                for x in {"config.json", "model_index.json", "learned_embeds.bin", "pytorch_lora_weights.bin"}
-            ]
+            (path / x).exists()
+            for x in {
+                "config.json",
+                "model_index.json",
+                "learned_embeds.bin",
+                "pytorch_lora_weights.bin",
+                "pytorch_lora_weights.safetensors",
+            }
         ):
             models_installed.update({str(model_path_id_or_url): self._install_path(path)})
 
@@ -357,7 +361,7 @@ class ModelInstall(object):
                 for suffix in ["safetensors", "bin"]:
                     if f"{prefix}pytorch_lora_weights.{suffix}" in files:
                         location = self._download_hf_model(
-                            repo_id, ["pytorch_lora_weights.bin"], staging, subfolder=subfolder
+                            repo_id, [f"pytorch_lora_weights.{suffix}"], staging, subfolder=subfolder
                         )  # LoRA
                         break
                     elif (
@@ -427,17 +431,17 @@ class ModelInstall(object):
 
         rel_path = self.relative_to_root(path, self.config.models_path)
 
-        attributes = dict(
-            path=str(rel_path),
-            description=str(description),
-            model_format=info.format,
-        )
+        attributes = {
+            "path": str(rel_path),
+            "description": str(description),
+            "model_format": info.format,
+        }
         legacy_conf = None
         if info.model_type == ModelType.Main or info.model_type == ModelType.ONNX:
             attributes.update(
-                dict(
-                    variant=info.variant_type,
-                )
+                {
+                    "variant": info.variant_type,
+                }
             )
             if info.format == "checkpoint":
                 try:
@@ -468,7 +472,7 @@ class ModelInstall(object):
                 )
 
         if legacy_conf:
-            attributes.update(dict(config=str(legacy_conf)))
+            attributes.update({"config": str(legacy_conf)})
         return attributes
 
     def relative_to_root(self, path: Path, root: Optional[Path] = None) -> Path:
@@ -513,7 +517,7 @@ class ModelInstall(object):
     def _download_hf_model(self, repo_id: str, files: List[str], staging: Path, subfolder: None) -> Path:
         _, name = repo_id.split("/")
         location = staging / name
-        paths = list()
+        paths = []
         for filename in files:
             filePath = Path(filename)
             p = hf_download_with_resume(

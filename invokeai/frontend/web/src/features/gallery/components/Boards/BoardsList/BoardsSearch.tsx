@@ -1,33 +1,18 @@
 import { CloseIcon } from '@chakra-ui/icons';
-import {
-  IconButton,
-  Input,
-  InputGroup,
-  InputRightElement,
-} from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Input, InputGroup, InputRightElement } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
-import {
-  ChangeEvent,
-  KeyboardEvent,
-  memo,
-  useCallback,
-  useEffect,
-  useRef,
-} from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const { boardSearchText } = gallery;
-    return { boardSearchText };
-  },
-  defaultSelectorOptions
-);
+const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
+  const { boardSearchText } = gallery;
+  return { boardSearchText };
+});
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();
@@ -83,9 +68,9 @@ const BoardsSearch = () => {
       />
       {boardSearchText && boardSearchText.length && (
         <InputRightElement>
-          <IconButton
+          <InvIconButton
             onClick={clearBoardSearch}
-            size="xs"
+            size="sm"
             variant="ghost"
             aria-label={t('boards.clearSearch')}
             opacity={0.5}

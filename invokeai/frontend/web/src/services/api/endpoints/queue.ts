@@ -1,14 +1,16 @@
-import {
-  AnyAction,
+import type {
   EntityState,
   ThunkDispatch,
-  createEntityAdapter,
+  UnknownAction,
 } from '@reduxjs/toolkit';
-import { $queueId } from 'features/queue/store/queueNanoStore';
+import { createEntityAdapter } from '@reduxjs/toolkit';
+import { $queueId } from 'app/store/nanostores/queueId';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
-import { ApiTagDescription, api } from '..';
-import { components, paths } from '../schema';
+import type { components, paths } from 'services/api/schema';
+
+import type { ApiTagDescription } from '..';
+import { api } from '..';
 
 const getListQueueItemsUrl = (
   queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']
@@ -33,9 +35,10 @@ export type SessionQueueItemStatus = NonNullable<
 >;
 
 export const queueItemsAdapter = createEntityAdapter<
-  components['schemas']['SessionQueueItemDTO']
+  components['schemas']['SessionQueueItemDTO'],
+  string
 >({
-  selectId: (queueItem) => queueItem.item_id,
+  selectId: (queueItem) => String(queueItem.item_id),
   sortComparer: (a, b) => {
     // Sort by priority in descending order
     if (a.priority > b.priority) {
@@ -236,7 +239,7 @@ export const queueApi = api.injectEndpoints({
               undefined,
               (draft) => {
                 queueItemsAdapter.updateOne(draft, {
-                  id: item_id,
+                  id: String(item_id),
                   changes: {
                     status: data.status,
                     completed_at: data.completed_at,
@@ -281,7 +284,7 @@ export const queueApi = api.injectEndpoints({
       invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
     }),
     listQueueItems: build.query<
-      EntityState<components['schemas']['SessionQueueItemDTO']> & {
+      EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
         has_more: boolean;
       },
       { cursor?: number; priority?: number } | undefined
@@ -331,8 +334,10 @@ export const {
   useGetBatchStatusQuery,
 } = queueApi;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resetListQueryData = (dispatch: ThunkDispatch<any, any, AnyAction>) => {
+const resetListQueryData = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dispatch: ThunkDispatch<any, any, UnknownAction>
+) => {
   dispatch(
     queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
       // remove all items from the list

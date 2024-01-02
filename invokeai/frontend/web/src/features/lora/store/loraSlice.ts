@@ -1,8 +1,9 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { LoRAModelParam } from 'features/parameters/types/parameterSchemas';
-import { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
+import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 
-export type LoRA = LoRAModelParam & {
+export type LoRA = ParameterLoRAModel & {
   id: string;
   weight: number;
 };

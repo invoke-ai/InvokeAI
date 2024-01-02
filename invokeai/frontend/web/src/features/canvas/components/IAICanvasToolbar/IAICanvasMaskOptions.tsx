@@ -1,16 +1,20 @@
-import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Box, Flex } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
-import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+  InvPopover,
+  InvPopoverBody,
+  InvPopoverContent,
+  InvPopoverTrigger,
+} from 'common/components/InvPopover/wrapper';
+import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
   setIsMaskEnabled,
@@ -19,16 +23,16 @@ import {
   setShouldPreserveMaskedArea,
 } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { isEqual } from 'lodash-es';
-import { memo } from 'react';
-
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
 
-export const selector = createSelector(
-  [canvasSelector, isStagingSelector],
-  (canvas, isStaging) => {
+export const selector = createMemoizedSelector(
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } =
       canvas;
 
@@ -40,11 +44,6 @@ export const selector = createSelector(
       shouldPreserveMaskedArea,
       isStaging,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 const IAICanvasMaskOptions = () => {
@@ -95,60 +94,82 @@ const IAICanvasMaskOptions = () => {
     [isMaskEnabled]
   );
 
-  const handleToggleMaskLayer = () => {
+  const handleToggleMaskLayer = useCallback(() => {
     dispatch(setLayer(layer === 'mask' ? 'base' : 'mask'));
-  };
+  }, [dispatch, layer]);
 
-  const handleClearMask = () => dispatch(clearMask());
+  const handleClearMask = useCallback(() => {
+    dispatch(clearMask());
+  }, [dispatch]);
 
-  const handleToggleEnableMask = () =>
+  const handleToggleEnableMask = useCallback(() => {
     dispatch(setIsMaskEnabled(!isMaskEnabled));
+  }, [dispatch, isMaskEnabled]);
 
-  const handleSaveMask = async () => {
+  const handleSaveMask = useCallback(async () => {
     dispatch(canvasMaskSavedToGallery());
-  };
+  }, [dispatch]);
+
+  const handleChangePreserveMaskedArea = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldPreserveMaskedArea(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangeMaskColor = useCallback(
+    (newColor: RgbaColor) => {
+      dispatch(setMaskColor(newColor));
+    },
+    [dispatch]
+  );
 
   return (
-    <IAIPopover
-      triggerComponent={
-        <ButtonGroup>
-          <IAIIconButton
-            aria-label={t('unifiedCanvas.maskingOptions')}
-            tooltip={t('unifiedCanvas.maskingOptions')}
-            icon={<FaMask />}
-            isChecked={layer === 'mask'}
-            isDisabled={isStaging}
-          />
-        </ButtonGroup>
-      }
-    >
-      <Flex direction="column" gap={2}>
-        <IAISimpleCheckbox
-          label={`${t('unifiedCanvas.enableMask')} (H)`}
-          isChecked={isMaskEnabled}
-          onChange={handleToggleEnableMask}
+    <InvPopover isLazy>
+      <InvPopoverTrigger>
+        <InvIconButton
+          aria-label={t('unifiedCanvas.maskingOptions')}
+          tooltip={t('unifiedCanvas.maskingOptions')}
+          icon={<FaMask />}
+          isChecked={layer === 'mask'}
+          isDisabled={isStaging}
         />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.preserveMaskedArea')}
-          isChecked={shouldPreserveMaskedArea}
-          onChange={(e) =>
-            dispatch(setShouldPreserveMaskedArea(e.target.checked))
-          }
-        />
-        <Box sx={{ paddingTop: 2, paddingBottom: 2 }}>
-          <IAIColorPicker
-            color={maskColor}
-            onChange={(newColor) => dispatch(setMaskColor(newColor))}
-          />
-        </Box>
-        <IAIButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
-          Save Mask
-        </IAIButton>
-        <IAIButton size="sm" leftIcon={<FaTrash />} onClick={handleClearMask}>
-          {t('unifiedCanvas.clearMask')} (Shift+C)
-        </IAIButton>
-      </Flex>
-    </IAIPopover>
+      </InvPopoverTrigger>
+      <InvPopoverContent>
+        <InvPopoverBody>
+          <Flex direction="column" gap={2}>
+            <InvControl label={`${t('unifiedCanvas.enableMask')} (H)`}>
+              <InvCheckbox
+                isChecked={isMaskEnabled}
+                onChange={handleToggleEnableMask}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.preserveMaskedArea')}>
+              <InvCheckbox
+                isChecked={shouldPreserveMaskedArea}
+                onChange={handleChangePreserveMaskedArea}
+              />
+            </InvControl>
+            <Box pt={2} pb={2}>
+              <IAIColorPicker
+                color={maskColor}
+                onChange={handleChangeMaskColor}
+              />
+            </Box>
+            <InvButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
+              {t('unifiedCanvas.saveMask')}
+            </InvButton>
+            <InvButton
+              size="sm"
+              leftIcon={<FaTrash />}
+              onClick={handleClearMask}
+            >
+              {t('unifiedCanvas.clearMask')}
+            </InvButton>
+          </Flex>
+        </InvPopoverBody>
+      </InvPopoverContent>
+    </InvPopover>
   );
 };
 

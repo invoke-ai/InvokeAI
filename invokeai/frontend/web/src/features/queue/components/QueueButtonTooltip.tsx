@@ -1,33 +1,45 @@
-import { Divider, Flex, ListItem, Text, UnorderedList } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Divider, Flex, ListItem, UnorderedList } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { InvText } from 'common/components/InvText/wrapper';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const tooltipSelector = createSelector(
+const StyledDivider = () => <Divider opacity={0.2} borderColor="base.900" />;
+
+const tooltipSelector = createMemoizedSelector(
   [stateSelector],
-  ({ gallery }) => {
+  ({ gallery, dynamicPrompts, generation }) => {
     const { autoAddBoardId } = gallery;
+    const { iterations, positivePrompt } = generation;
+    const promptsCount = getShouldProcessPrompt(positivePrompt)
+      ? dynamicPrompts.prompts.length
+      : 1;
     return {
       autoAddBoardId,
+      promptsCount,
+      iterations,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 type Props = {
   prepend?: boolean;
 };
 
-const QueueButtonTooltipContent = ({ prepend = false }: Props) => {
+export const QueueButtonTooltip = memo(({ prepend = false }: Props) => {
   const { t } = useTranslation();
   const { isReady, reasons } = useIsReadyToEnqueue();
-  const { autoAddBoardId } = useAppSelector(tooltipSelector);
+  const isLoadingDynamicPrompts = useAppSelector(
+    (state) => state.dynamicPrompts.isLoading
+  );
+  const { autoAddBoardId, promptsCount, iterations } =
+    useAppSelector(tooltipSelector);
   const autoAddBoardName = useBoardName(autoAddBoardId);
   const [_, { isLoading }] = useEnqueueBatchMutation({
     fixedCacheKey: 'enqueueBatch',
@@ -37,6 +49,9 @@ const QueueButtonTooltipContent = ({ prepend = false }: Props) => {
     if (isLoading) {
       return t('queue.enqueueing');
     }
+    if (isLoadingDynamicPrompts) {
+      return t('dynamicPrompts.loading');
+    }
     if (isReady) {
       if (prepend) {
         return t('queue.queueFront');
@@ -44,39 +59,39 @@ const QueueButtonTooltipContent = ({ prepend = false }: Props) => {
       return t('queue.queueBack');
     }
     return t('queue.notReady');
-  }, [isLoading, isReady, prepend, t]);
+  }, [isLoading, isLoadingDynamicPrompts, isReady, prepend, t]);
 
   return (
     <Flex flexDir="column" gap={1}>
-      <Text fontWeight={600}>{label}</Text>
+      <InvText fontWeight="semibold">{label}</InvText>
+      <InvText>
+        {t('queue.queueCountPrediction', {
+          promptsCount,
+          iterations,
+          count: Math.min(promptsCount * iterations, 10000),
+        })}
+      </InvText>
       {reasons.length > 0 && (
-        <UnorderedList>
-          {reasons.map((reason, i) => (
-            <ListItem key={`${reason}.${i}`}>
-              <Text fontWeight={400}>{reason}</Text>
-            </ListItem>
-          ))}
-        </UnorderedList>
+        <>
+          <StyledDivider />
+          <UnorderedList>
+            {reasons.map((reason, i) => (
+              <ListItem key={`${reason}.${i}`}>
+                <InvText>{reason}</InvText>
+              </ListItem>
+            ))}
+          </UnorderedList>
+        </>
       )}
       <StyledDivider />
-      <Text fontWeight={400} fontStyle="oblique 10deg">
+      <InvText fontStyle="oblique 10deg">
         {t('parameters.invoke.addingImagesTo')}{' '}
-        <Text as="span" fontWeight={600}>
+        <InvText as="span" fontWeight="semibold">
           {autoAddBoardName || t('boards.uncategorized')}
-        </Text>
-      </Text>
+        </InvText>
+      </InvText>
     </Flex>
   );
-};
+});
 
-export default memo(QueueButtonTooltipContent);
-
-const StyledDivider = memo(() => (
-  <Divider
-    opacity={0.2}
-    borderColor="base.50"
-    _dark={{ borderColor: 'base.900' }}
-  />
-));
-
-StyledDivider.displayName = 'StyledDivider';
+QueueButtonTooltip.displayName = 'QueueButtonTooltip';

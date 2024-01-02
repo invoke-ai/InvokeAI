@@ -1,4 +1,4 @@
-import { GenerationState } from './generationSlice';
+import type { GenerationState } from './types';
 
 /**
  * Generation slice persist denylist

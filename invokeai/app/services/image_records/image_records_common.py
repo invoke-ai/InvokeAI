@@ -90,25 +90,24 @@ class ImageRecordDeleteException(Exception):
 
 
 IMAGE_DTO_COLS = ", ".join(
-    list(
-        map(
-            lambda c: "images." + c,
-            [
-                "image_name",
-                "image_origin",
-                "image_category",
-                "width",
-                "height",
-                "session_id",
-                "node_id",
-                "is_intermediate",
-                "created_at",
-                "updated_at",
-                "deleted_at",
-                "starred",
-            ],
-        )
-    )
+    [
+        "images." + c
+        for c in [
+            "image_name",
+            "image_origin",
+            "image_category",
+            "width",
+            "height",
+            "session_id",
+            "node_id",
+            "has_workflow",
+            "is_intermediate",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+            "starred",
+        ]
+    ]
 )
 
 
@@ -147,6 +146,7 @@ class ImageRecord(BaseModelExcludeNull):
     """The node ID that generated this image, if it is a generated image."""
     starred: bool = Field(description="Whether this image is starred.")
     """Whether this image is starred."""
+    has_workflow: bool = Field(description="Whether this image has a workflow.")
 
 
 class ImageRecordChanges(BaseModelExcludeNull, extra="allow"):
@@ -190,6 +190,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     deleted_at = image_dict.get("deleted_at", get_iso_timestamp())
     is_intermediate = image_dict.get("is_intermediate", False)
     starred = image_dict.get("starred", False)
+    has_workflow = image_dict.get("has_workflow", False)
 
     return ImageRecord(
         image_name=image_name,
@@ -204,4 +205,5 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         deleted_at=deleted_at,
         is_intermediate=is_intermediate,
         starred=starred,
+        has_workflow=has_workflow,
     )

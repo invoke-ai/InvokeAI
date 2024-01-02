@@ -1,9 +1,10 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
-import { isEqual, isString } from 'lodash-es';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import type { RootState } from 'app/store/store';
+import { isString } from 'lodash-es';
+
 import { tabMap } from './tabMap';
 
-export const activeTabNameSelector = createSelector(
+export const activeTabNameSelector = createMemoizedSelector(
   (state: RootState) => state,
   /**
    * Previously `activeTab` was an integer, but now it's a string.
@@ -12,21 +13,11 @@ export const activeTabNameSelector = createSelector(
   ({ ui }) => (isString(ui.activeTab) ? ui.activeTab : 'txt2img')
 );
 
-export const activeTabIndexSelector = createSelector(
+export const activeTabIndexSelector = createMemoizedSelector(
   (state: RootState) => state,
   ({ ui, config }) => {
     const tabs = tabMap.filter((t) => !config.disabledTabs.includes(t));
     const idx = tabs.indexOf(ui.activeTab);
     return idx === -1 ? 0 : idx;
-  }
-);
-
-export const uiSelector = createSelector(
-  (state: RootState) => state.ui,
-  (ui) => ui,
-  {
-    memoizeOptions: {
-      equalityCheck: isEqual,
-    },
   }
 );

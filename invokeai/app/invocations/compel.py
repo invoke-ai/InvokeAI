@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
@@ -7,6 +6,7 @@ from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ExtraConditioningInfo,
@@ -16,10 +16,10 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import ModelNotFoundException, ModelType
 from ...backend.util.devices import torch_dtype
+from ..util.ti_utils import extract_ti_triggers_from_prompt
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -87,7 +87,7 @@ class CompelInvocation(BaseInvocation):
         # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
-        for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
+        for trigger in extract_ti_triggers_from_prompt(self.prompt):
             name = trigger[1:-1]
             try:
                 ti_list.append(
@@ -108,13 +108,15 @@ class CompelInvocation(BaseInvocation):
                 print(f'Warn: trigger: "{trigger}" not found')
 
         with (
-            ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),
             ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
                 tokenizer,
                 ti_manager,
             ),
-            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),
             text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+            # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),
         ):
             compel = Compel(
                 tokenizer=tokenizer,
@@ -208,7 +210,7 @@ class SDXLPromptInvocationBase:
         # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
-        for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", prompt):
+        for trigger in extract_ti_triggers_from_prompt(prompt):
             name = trigger[1:-1]
             try:
                 ti_list.append(
@@ -229,13 +231,15 @@ class SDXLPromptInvocationBase:
                 print(f'Warn: trigger: "{trigger}" not found')
 
         with (
-            ModelPatcher.apply_lora(text_encoder_info.context.model, _lora_loader(), lora_prefix),
             ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (
                 tokenizer,
                 ti_manager,
             ),
-            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, clip_field.skipped_layers),
             text_encoder_info as text_encoder,
+            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+            # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
+            ModelPatcher.apply_clip_skip(text_encoder_info.context.model, clip_field.skipped_layers),
         ):
             compel = Compel(
                 tokenizer=tokenizer,

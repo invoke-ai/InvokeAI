@@ -1,5 +1,9 @@
-import { components } from 'services/api/schema';
+import type { InvSelectOption } from 'common/components/InvSelect/types';
+import type { LoRAModelFormat } from 'services/api/types';
 
+/**
+ * Mapping of model type to human readable name
+ */
 export const MODEL_TYPE_MAP = {
   any: 'Any',
   'sd-1': 'Stable Diffusion 1.x',
@@ -8,6 +12,9 @@ export const MODEL_TYPE_MAP = {
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
 };
 
+/**
+ * Mapping of model type to (short) human readable name
+ */
 export const MODEL_TYPE_SHORT_MAP = {
   any: 'Any',
   'sd-1': 'SD1',
@@ -16,7 +23,10 @@ export const MODEL_TYPE_SHORT_MAP = {
   'sdxl-refiner': 'SDXLR',
 };
 
-export const clipSkipMap = {
+/**
+ * Mapping of model type to CLIP skip parameter constraints
+ */
+export const CLIP_SKIP_MAP = {
   any: {
     maxClip: 0,
     markers: [],
@@ -39,11 +49,41 @@ export const clipSkipMap = {
   },
 };
 
-type LoRAModelFormatMap = {
-  [key in components['schemas']['LoRAModelFormat']]: string;
-};
-
-export const LORA_MODEL_FORMAT_MAP: LoRAModelFormatMap = {
+/**
+ * Mapping of LoRA format to human readable name
+ */
+export const LORA_MODEL_FORMAT_MAP: {
+  [key in LoRAModelFormat]: string;
+} = {
   lycoris: 'LyCORIS',
   diffusers: 'Diffusers',
 };
+
+/**
+ * Mapping of schedulers to human readable name
+ */
+export const SCHEDULER_OPTIONS: InvSelectOption[] = [
+  { value: 'euler', label: 'Euler' },
+  { value: 'deis', label: 'DEIS' },
+  { value: 'ddim', label: 'DDIM' },
+  { value: 'ddpm', label: 'DDPM' },
+  { value: 'dpmpp_sde', label: 'DPM++ SDE' },
+  { value: 'dpmpp_2s', label: 'DPM++ 2S' },
+  { value: 'dpmpp_2m', label: 'DPM++ 2M' },
+  { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
+  { value: 'heun', label: 'Heun' },
+  { value: 'kdpm_2', label: 'KDPM 2' },
+  { value: 'lms', label: 'LMS' },
+  { value: 'pndm', label: 'PNDM' },
+  { value: 'unipc', label: 'UniPC' },
+  { value: 'euler_k', label: 'Euler Karras' },
+  { value: 'dpmpp_sde_k', label: 'DPM++ SDE Karras' },
+  { value: 'dpmpp_2s_k', label: 'DPM++ 2S Karras' },
+  { value: 'dpmpp_2m_k', label: 'DPM++ 2M Karras' },
+  { value: 'dpmpp_2m_sde_k', label: 'DPM++ 2M SDE Karras' },
+  { value: 'heun_k', label: 'Heun Karras' },
+  { value: 'lms_k', label: 'LMS Karras' },
+  { value: 'euler_a', label: 'Euler Ancestral' },
+  { value: 'kdpm_2_a', label: 'KDPM 2 Ancestral' },
+  { value: 'lcm', label: 'LCM' },
+].sort((a, b) => a.label.localeCompare(b.label));

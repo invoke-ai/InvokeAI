@@ -1,34 +1,30 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { useStore } from '@nanostores/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+  $isDrawing,
+  setIsDrawing,
+  setIsMovingStage,
+} from 'features/canvas/store/canvasNanostore';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   // addPointToCurrentEraserLine,
   addPointToCurrentLine,
-  setIsDrawing,
-  setIsMovingStage,
 } from 'features/canvas/store/canvasSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { isEqual } from 'lodash-es';
+import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
+import type Konva from 'konva';
+import type { MutableRefObject } from 'react';
+import { useCallback } from 'react';
 
-import { MutableRefObject, useCallback } from 'react';
-import getScaledCursorPosition from '../util/getScaledCursorPosition';
-
-const selector = createSelector(
-  [activeTabNameSelector, canvasSelector, isStagingSelector],
-  (activeTabName, canvas, isStaging) => {
-    const { tool, isDrawing } = canvas;
+const selector = createMemoizedSelector(
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     return {
-      tool,
-      isDrawing,
-      activeTabName,
+      tool: canvas.tool,
       isStaging,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasMouseUp = (
@@ -36,11 +32,12 @@ const useCanvasMouseUp = (
   didMouseMoveRef: MutableRefObject<boolean>
 ) => {
   const dispatch = useAppDispatch();
-  const { tool, isDrawing, isStaging } = useAppSelector(selector);
+  const isDrawing = useStore($isDrawing);
+  const { tool, isStaging } = useAppSelector(selector);
 
   return useCallback(() => {
     if (tool === 'move' || isStaging) {
-      dispatch(setIsMovingStage(false));
+      setIsMovingStage(false);
       return;
     }
 
@@ -63,7 +60,7 @@ const useCanvasMouseUp = (
     } else {
       didMouseMoveRef.current = false;
     }
-    dispatch(setIsDrawing(false));
+    setIsDrawing(false);
   }, [didMouseMoveRef, dispatch, isDrawing, isStaging, stageRef, tool]);
 };
 

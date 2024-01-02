@@ -1,10 +1,11 @@
 // TODO: enable this at some point
 import { useAppSelector } from 'app/store/storeHooks';
+import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
+import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
+import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
-import { Connection, Node, useReactFlow } from 'reactflow';
-import { validateSourceAndTargetTypes } from '../store/util/validateSourceAndTargetTypes';
-import { getIsGraphAcyclic } from '../store/util/getIsGraphAcyclic';
-import { InvocationNodeData } from '../types/types';
+import type { Connection, Node } from 'reactflow';
+import { useReactFlow } from 'reactflow';
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
@@ -34,10 +35,10 @@ export const useIsValidConnection = () => {
         return false;
       }
 
-      const sourceType = sourceNode.data.outputs[sourceHandle]?.type;
-      const targetType = targetNode.data.inputs[targetHandle]?.type;
+      const sourceField = sourceNode.data.outputs[sourceHandle];
+      const targetField = targetNode.data.inputs[targetHandle];
 
-      if (!sourceType || !targetType) {
+      if (!sourceField || !targetField) {
         // something has gone terribly awry
         return false;
       }
@@ -70,12 +71,13 @@ export const useIsValidConnection = () => {
           return edge.target === target && edge.targetHandle === targetHandle;
         }) &&
         // except CollectionItem inputs can have multiples
-        targetType !== 'CollectionItem'
+        targetField.type.name !== 'CollectionItemField'
       ) {
         return false;
       }
 
-      if (!validateSourceAndTargetTypes(sourceType, targetType)) {
+      // Must use the originalType here if it exists
+      if (!validateSourceAndTargetTypes(sourceField.type, targetField.type)) {
         return false;
       }
 

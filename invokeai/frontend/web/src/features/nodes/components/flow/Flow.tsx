@@ -1,31 +1,9 @@
 import { useToken } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { $flow } from 'features/nodes/store/reactFlowInstance';
-import { contextMenusClosed } from 'features/ui/store/uiSlice';
-import { MouseEvent, useCallback, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
-import {
-  Background,
-  OnConnect,
-  OnConnectEnd,
-  OnConnectStart,
-  OnEdgeUpdateFunc,
-  OnEdgesChange,
-  OnEdgesDelete,
-  OnInit,
-  OnMoveEnd,
-  OnNodesChange,
-  OnNodesDelete,
-  OnSelectionChangeFunc,
-  ProOptions,
-  ReactFlow,
-  ReactFlowProps,
-  XYPosition,
-} from 'reactflow';
-import { useIsValidConnection } from '../../hooks/useIsValidConnection';
+import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
+import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   connectionEnded,
   connectionMade,
@@ -43,7 +21,29 @@ import {
   selectionCopied,
   selectionPasted,
   viewportChanged,
-} from '../../store/nodesSlice';
+} from 'features/nodes/store/nodesSlice';
+import { $flow } from 'features/nodes/store/reactFlowInstance';
+import type { CSSProperties, MouseEvent } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import type {
+  OnConnect,
+  OnConnectEnd,
+  OnConnectStart,
+  OnEdgesChange,
+  OnEdgesDelete,
+  OnEdgeUpdateFunc,
+  OnInit,
+  OnMoveEnd,
+  OnNodesChange,
+  OnNodesDelete,
+  OnSelectionChangeFunc,
+  ProOptions,
+  ReactFlowProps,
+  XYPosition,
+} from 'reactflow';
+import { Background, ReactFlow } from 'reactflow';
+
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
 import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
@@ -67,29 +67,29 @@ const nodeTypes = {
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
 const proOptions: ProOptions = { hideAttribution: true };
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const { shouldSnapToGrid, selectionMode } = nodes;
-    return {
-      shouldSnapToGrid,
-      selectionMode,
-    };
-  },
-  defaultSelectorOptions
-);
+const snapGrid: [number, number] = [25, 25];
 
-export const Flow = () => {
+export const Flow = memo(() => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.nodes.nodes);
   const edges = useAppSelector((state) => state.nodes.edges);
   const viewport = useAppSelector((state) => state.nodes.viewport);
-  const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
+  const shouldSnapToGrid = useAppSelector(
+    (state) => state.nodes.shouldSnapToGrid
+  );
+  const selectionMode = useAppSelector((state) => state.nodes.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
-  const cursorPosition = useRef<XYPosition>();
+  const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();
-
+  useWorkflowWatcher();
   const [borderRadius] = useToken('radii', ['base']);
+
+  const flowStyles = useMemo<CSSProperties>(
+    () => ({
+      borderRadius,
+    }),
+    [borderRadius]
+  );
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -120,7 +120,15 @@ export const Flow = () => {
   );
 
   const onConnectEnd: OnConnectEnd = useCallback(() => {
-    dispatch(connectionEnded({ cursorPosition: cursorPosition.current }));
+    if (!cursorPosition.current) {
+      return;
+    }
+    dispatch(
+      connectionEnded({
+        cursorPosition: cursorPosition.current,
+        mouseOverNodeId: $mouseOverNode.get(),
+      })
+    );
   }, [dispatch]);
 
   const onEdgesDelete: OnEdgesDelete = useCallback(
@@ -152,9 +160,10 @@ export const Flow = () => {
     [dispatch]
   );
 
+  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
   const handlePaneClick = useCallback(() => {
-    dispatch(contextMenusClosed());
-  }, [dispatch]);
+    onCloseGlobal();
+  }, [onCloseGlobal]);
 
   const onInit: OnInit = useCallback((flow) => {
     $flow.set(flow);
@@ -162,13 +171,12 @@ export const Flow = () => {
   }, []);
 
   const onMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
-    const bounds = flowWrapper.current?.getBoundingClientRect();
-    if (bounds) {
-      const pos = $flow.get()?.project({
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top,
-      });
-      cursorPosition.current = pos;
+    if (flowWrapper.current?.getBoundingClientRect()) {
+      cursorPosition.current =
+        $flow.get()?.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        }) ?? null;
     }
   }, []);
 
@@ -241,6 +249,9 @@ export const Flow = () => {
   });
 
   useHotkeys(['Ctrl+v', 'Meta+v'], (e) => {
+    if (!cursorPosition.current) {
+      return;
+    }
     e.preventDefault();
     dispatch(selectionPasted({ cursorPosition: cursorPosition.current }));
   });
@@ -272,10 +283,10 @@ export const Flow = () => {
       isValidConnection={isValidConnection}
       minZoom={0.1}
       snapToGrid={shouldSnapToGrid}
-      snapGrid={[25, 25]}
+      snapGrid={snapGrid}
       connectionRadius={30}
       proOptions={proOptions}
-      style={{ borderRadius }}
+      style={flowStyles}
       onPaneClick={handlePaneClick}
       deleteKeyCode={DELETE_KEYS}
       selectionMode={selectionMode}
@@ -283,4 +294,6 @@ export const Flow = () => {
       <Background />
     </ReactFlow>
   );
-};
+});
+
+Flow.displayName = 'Flow';

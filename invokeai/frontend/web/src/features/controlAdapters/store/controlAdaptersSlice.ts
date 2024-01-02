@@ -1,41 +1,41 @@
-import {
-  PayloadAction,
-  Update,
-  createEntityAdapter,
-  createSlice,
-  isAnyOf,
-} from '@reduxjs/toolkit';
-import {
-  ControlNetModelParam,
-  IPAdapterModelParam,
-  T2IAdapterModelParam,
+import type { PayloadAction, Update } from '@reduxjs/toolkit';
+import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
+import type {
+  ParameterControlNetModel,
+  ParameterIPAdapterModel,
+  ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, merge, uniq } from 'lodash-es';
 import { appSocketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
-import { buildControlAdapter } from '../util/buildControlAdapter';
+
 import { controlAdapterImageProcessed } from './actions';
 import {
   CONTROLNET_MODEL_DEFAULT_PROCESSORS as CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS,
   CONTROLNET_PROCESSORS,
 } from './constants';
-import {
+import type {
   ControlAdapterConfig,
   ControlAdapterProcessorType,
-  ControlAdapterType,
   ControlAdaptersState,
+  ControlAdapterType,
   ControlMode,
   ControlNetConfig,
   RequiredControlAdapterProcessorNode,
   ResizeMode,
   T2IAdapterConfig,
+} from './types';
+import {
   isControlNet,
   isControlNetOrT2IAdapter,
   isIPAdapter,
   isT2IAdapter,
 } from './types';
 
-export const caAdapter = createEntityAdapter<ControlAdapterConfig>();
+export const caAdapter = createEntityAdapter<ControlAdapterConfig, string>({
+  selectId: (ca) => ca.id,
+});
 
 export const {
   selectById: selectControlAdapterById,
@@ -88,61 +88,6 @@ export const selectValidT2IAdapters = (controlAdapters: ControlAdaptersState) =>
           (ca.processorType === 'none' && Boolean(ca.controlImage)))
     );
 
-// TODO: I think we can safely remove this?
-// const disableAllIPAdapters = (
-//   state: ControlAdaptersState,
-//   exclude?: string
-// ) => {
-//   const updates: Update<ControlAdapterConfig>[] = selectAllIPAdapters(state)
-//     .filter((ca) => ca.id !== exclude)
-//     .map((ca) => ({
-//       id: ca.id,
-//       changes: { isEnabled: false },
-//     }));
-//   caAdapter.updateMany(state, updates);
-// };
-
-const disableAllControlNets = (
-  state: ControlAdaptersState,
-  exclude?: string
-) => {
-  const updates: Update<ControlAdapterConfig>[] = selectAllControlNets(state)
-    .filter((ca) => ca.id !== exclude)
-    .map((ca) => ({
-      id: ca.id,
-      changes: { isEnabled: false },
-    }));
-  caAdapter.updateMany(state, updates);
-};
-
-const disableAllT2IAdapters = (
-  state: ControlAdaptersState,
-  exclude?: string
-) => {
-  const updates: Update<ControlAdapterConfig>[] = selectAllT2IAdapters(state)
-    .filter((ca) => ca.id !== exclude)
-    .map((ca) => ({
-      id: ca.id,
-      changes: { isEnabled: false },
-    }));
-  caAdapter.updateMany(state, updates);
-};
-
-const disableIncompatibleControlAdapters = (
-  state: ControlAdaptersState,
-  type: ControlAdapterType,
-  exclude?: string
-) => {
-  if (type === 'controlnet') {
-    // we cannot do controlnet + t2i adapter, if we are enabled a controlnet, disable all t2is
-    disableAllT2IAdapters(state, exclude);
-  }
-  if (type === 't2i_adapter') {
-    // we cannot do controlnet + t2i adapter, if we are enabled a t2i, disable controlnets
-    disableAllControlNets(state, exclude);
-  }
-};
-
 export const controlAdaptersSlice = createSlice({
   name: 'controlAdapters',
   initialState: initialControlAdapterState,
@@ -158,7 +103,6 @@ export const controlAdaptersSlice = createSlice({
       ) => {
         const { id, type, overrides } = action.payload;
         caAdapter.addOne(state, buildControlAdapter(id, type, overrides));
-        disableIncompatibleControlAdapters(state, type, id);
       },
       prepare: ({
         type,
@@ -175,8 +119,6 @@ export const controlAdaptersSlice = createSlice({
       action: PayloadAction<ControlAdapterConfig>
     ) => {
       caAdapter.addOne(state, action.payload);
-      const { type, id } = action.payload;
-      disableIncompatibleControlAdapters(state, type, id);
     },
     controlAdapterDuplicated: {
       reducer: (
@@ -196,8 +138,6 @@ export const controlAdaptersSlice = createSlice({
           isEnabled: true,
         });
         caAdapter.addOne(state, newControlAdapter);
-        const { type } = newControlAdapter;
-        disableIncompatibleControlAdapters(state, type, newId);
       },
       prepare: (id: string) => {
         return { payload: { id, newId: uuidv4() } };
@@ -217,7 +157,6 @@ export const controlAdaptersSlice = createSlice({
           state,
           buildControlAdapter(id, type, { controlImage })
         );
-        disableIncompatibleControlAdapters(state, type, id);
       },
       prepare: (payload: {
         type: ControlAdapterType;
@@ -235,12 +174,6 @@ export const controlAdaptersSlice = createSlice({
     ) => {
       const { id, isEnabled } = action.payload;
       caAdapter.updateOne(state, { id, changes: { isEnabled } });
-      if (isEnabled) {
-        // we are enabling a control adapter. due to limitations in the current system, we may need to disable other adapters
-        // TODO: disable when multiple IP adapters are supported
-        const ca = selectControlAdapterById(state, id);
-        ca && disableIncompatibleControlAdapters(state, ca.type, id);
-      }
     },
     controlAdapterImageChanged: (
       state,
@@ -310,9 +243,9 @@ export const controlAdaptersSlice = createSlice({
       action: PayloadAction<{
         id: string;
         model:
-          | ControlNetModelParam
-          | T2IAdapterModelParam
-          | IPAdapterModelParam;
+          | ParameterControlNetModel
+          | ParameterT2IAdapterModel
+          | ParameterIPAdapterModel;
       }>
     ) => {
       const { id, model } = action.payload;
@@ -326,7 +259,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const update: Update<ControlNetConfig | T2IAdapterConfig> = {
+      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
         id,
         changes: { model },
       };
@@ -465,7 +398,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const update: Update<ControlNetConfig | T2IAdapterConfig> = {
+      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
         id,
         changes: { shouldAutoConfig: !cn.shouldAutoConfig },
       };

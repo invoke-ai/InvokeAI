@@ -1,42 +1,18 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { isEqual } from 'lodash-es';
-
-import { Group, Line, Rect } from 'react-konva';
 import {
   isCanvasBaseImage,
   isCanvasBaseLine,
   isCanvasEraseRect,
   isCanvasFillRect,
-} from '../store/canvasTypes';
-import IAICanvasImage from './IAICanvasImage';
+} from 'features/canvas/store/canvasTypes';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { memo } from 'react';
+import { Group, Line, Rect } from 'react-konva';
 
-const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    const {
-      layerState: { objects },
-    } = canvas;
-    return {
-      objects,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import IAICanvasImage from './IAICanvasImage';
 
 const IAICanvasObjectRenderer = () => {
-  const { objects } = useAppSelector(selector);
-
-  if (!objects) {
-    return null;
-  }
+  const objects = useAppSelector((state) => state.canvas.layerState.objects);
 
   return (
     <Group name="outpainting-objects" listening={false}>
@@ -68,6 +44,7 @@ const IAICanvasObjectRenderer = () => {
                 clipY={obj.clip.y}
                 clipWidth={obj.clip.width}
                 clipHeight={obj.clip.height}
+                listening={false}
               >
                 {line}
               </Group>
@@ -84,6 +61,7 @@ const IAICanvasObjectRenderer = () => {
               width={obj.width}
               height={obj.height}
               fill={rgbaColorToString(obj.color)}
+              listening={false}
             />
           );
         } else if (isCanvasEraseRect(obj)) {
@@ -96,6 +74,7 @@ const IAICanvasObjectRenderer = () => {
               height={obj.height}
               fill="rgb(255, 255, 255)"
               globalCompositeOperation="destination-out"
+              listening={false}
             />
           );
         }

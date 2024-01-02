@@ -1,12 +1,12 @@
-import { EntityState } from '@reduxjs/toolkit';
-import {
-  ControlNetModelParam,
-  IPAdapterModelParam,
-  T2IAdapterModelParam,
+import type { EntityState } from '@reduxjs/toolkit';
+import type {
+  ParameterControlNetModel,
+  ParameterIPAdapterModel,
+  ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
 import { isObject } from 'lodash-es';
-import { components } from 'services/api/schema';
-import {
+import type { components } from 'services/api/schema';
+import type {
   CannyImageProcessorInvocation,
   ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
@@ -21,7 +21,8 @@ import {
   PidiImageProcessorInvocation,
   ZoeDepthImageProcessorInvocation,
 } from 'services/api/types';
-import { O } from 'ts-toolbelt';
+import type { O } from 'ts-toolbelt';
+import { z } from 'zod';
 
 /**
  * Any ControlNet processor node
@@ -370,15 +371,21 @@ export type ControlMode = NonNullable<
   components['schemas']['ControlNetInvocation']['control_mode']
 >;
 
-export type ResizeMode = NonNullable<
-  components['schemas']['ControlNetInvocation']['resize_mode']
->;
+export const zResizeMode = z.enum([
+  'just_resize',
+  'crop_resize',
+  'fill_resize',
+  'just_resize_simple',
+]);
+export type ResizeMode = z.infer<typeof zResizeMode>;
+export const isResizeMode = (v: unknown): v is ResizeMode =>
+  zResizeMode.safeParse(v).success;
 
 export type ControlNetConfig = {
   type: 'controlnet';
   id: string;
   isEnabled: boolean;
-  model: ControlNetModelParam | null;
+  model: ParameterControlNetModel | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -395,7 +402,7 @@ export type T2IAdapterConfig = {
   type: 't2i_adapter';
   id: string;
   isEnabled: boolean;
-  model: T2IAdapterModelParam | null;
+  model: ParameterT2IAdapterModel | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -412,7 +419,7 @@ export type IPAdapterConfig = {
   id: string;
   isEnabled: boolean;
   controlImage: string | null;
-  model: IPAdapterModelParam | null;
+  model: ParameterIPAdapterModel | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -425,7 +432,7 @@ export type ControlAdapterConfig =
 
 export type ControlAdapterType = ControlAdapterConfig['type'];
 
-export type ControlAdaptersState = EntityState<ControlAdapterConfig> & {
+export type ControlAdaptersState = EntityState<ControlAdapterConfig, string> & {
   pendingControlImages: string[];
 };
 

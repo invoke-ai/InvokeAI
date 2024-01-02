@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { AppConfig, PartialAppConfig } from 'app/types/invokeai';
+import type { AppConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash-es';
 
 export const initialConfigState: AppConfig = {
@@ -70,7 +70,7 @@ export const initialConfigState: AppConfig = {
       coarseStep: 0.05,
     },
     hrfStrength: {
-      initial: 0.7,
+      initial: 0.45,
       min: 0,
       sliderMax: 1,
       inputMax: 1,

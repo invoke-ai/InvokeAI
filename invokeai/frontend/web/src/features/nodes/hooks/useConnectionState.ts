@@ -1,14 +1,15 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import { useMemo } from 'react';
+
 import { useFieldType } from './useFieldType.ts';
 
-const selectIsConnectionInProgress = createSelector(
+const selectIsConnectionInProgress = createMemoizedSelector(
   stateSelector,
   ({ nodes }) =>
-    nodes.currentConnectionFieldType !== null &&
+    nodes.connectionStartFieldType !== null &&
     nodes.connectionStartParams !== null
 );
 
@@ -27,7 +28,7 @@ export const useConnectionState = ({
 
   const selectIsConnected = useMemo(
     () =>
-      createSelector(stateSelector, ({ nodes }) =>
+      createMemoizedSelector(stateSelector, ({ nodes }) =>
         Boolean(
           nodes.edges.filter((edge) => {
             return (
@@ -54,7 +55,7 @@ export const useConnectionState = ({
 
   const selectIsConnectionStartField = useMemo(
     () =>
-      createSelector(stateSelector, ({ nodes }) =>
+      createMemoizedSelector(stateSelector, ({ nodes }) =>
         Boolean(
           nodes.connectionStartParams?.nodeId === nodeId &&
             nodes.connectionStartParams?.handleId === fieldName &&

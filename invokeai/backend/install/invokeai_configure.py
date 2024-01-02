@@ -32,7 +32,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionS
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 from tqdm import tqdm
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 
@@ -197,7 +197,7 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
 
 def download_conversion_models():
     target_dir = config.models_path / "core/convert"
-    kwargs = dict()  # for future use
+    kwargs = {}  # for future use
     try:
         logger.info("Downloading core tokenizers and text encoders")
 
@@ -252,26 +252,26 @@ def download_conversion_models():
 def download_realesrgan():
     logger.info("Installing ESRGAN Upscaling models...")
     URLs = [
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
-            dest="core/upscaling/realesrgan/RealESRGAN_x4plus.pth",
-            description="RealESRGAN_x4plus.pth",
-        ),
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
-            dest="core/upscaling/realesrgan/RealESRGAN_x4plus_anime_6B.pth",
-            description="RealESRGAN_x4plus_anime_6B.pth",
-        ),
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
-            dest="core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
-            description="ESRGAN_SRx4_DF2KOST_official.pth",
-        ),
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
-            dest="core/upscaling/realesrgan/RealESRGAN_x2plus.pth",
-            description="RealESRGAN_x2plus.pth",
-        ),
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+            "dest": "core/upscaling/realesrgan/RealESRGAN_x4plus.pth",
+            "description": "RealESRGAN_x4plus.pth",
+        },
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+            "dest": "core/upscaling/realesrgan/RealESRGAN_x4plus_anime_6B.pth",
+            "description": "RealESRGAN_x4plus_anime_6B.pth",
+        },
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            "dest": "core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            "description": "ESRGAN_SRx4_DF2KOST_official.pth",
+        },
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+            "dest": "core/upscaling/realesrgan/RealESRGAN_x2plus.pth",
+            "description": "RealESRGAN_x2plus.pth",
+        },
     ]
     for model in URLs:
         download_with_progress_bar(model["url"], config.models_path / model["dest"], model["description"])
@@ -680,7 +680,7 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
         if program_opts.default_only
         else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
         if program_opts.yes_to_all
-        else list(),
+        else [],
     )
 
 

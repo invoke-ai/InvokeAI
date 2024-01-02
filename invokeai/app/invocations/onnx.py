@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Borisov Sergey (https://github.com/StAlKeR7779)
 
 import inspect
-import re
 
 # from contextlib import ExitStack
 from typing import List, Literal, Union
@@ -14,16 +13,17 @@ from tqdm import tqdm
 
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 
 from ...backend.model_management import ONNXModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import choose_torch_device
+from ..util.ti_utils import extract_ti_triggers_from_prompt
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -31,7 +31,6 @@ from .baseinvocation import (
     UIComponent,
     UIType,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -54,7 +53,7 @@ ORT_TO_NP_TYPE = {
     "tensor(double)": np.float64,
 }
 
-PRECISION_VALUES = Literal[tuple(list(ORT_TO_NP_TYPE.keys()))]
+PRECISION_VALUES = Literal[tuple(ORT_TO_NP_TYPE.keys())]
 
 
 @invocation("prompt_onnx", title="ONNX Prompt (Raw)", tags=["prompt", "onnx"], category="conditioning", version="1.0.0")
@@ -79,7 +78,7 @@ class ONNXPromptInvocation(BaseInvocation):
             ]
 
             ti_list = []
-            for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
+            for trigger in extract_ti_triggers_from_prompt(self.prompt):
                 name = trigger[1:-1]
                 try:
                     ti_list.append(
@@ -252,7 +251,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
         scheduler.set_timesteps(self.steps)
         latents = latents * np.float64(scheduler.init_noise_sigma)
 
-        extra_step_kwargs = dict()
+        extra_step_kwargs = {}
         if "eta" in set(inspect.signature(scheduler.step).parameters.keys()):
             extra_step_kwargs.update(
                 eta=0.0,
@@ -326,9 +325,9 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     title="ONNX Latents to Image",
     tags=["latents", "image", "vae", "onnx"],
     category="image",
-    version="1.0.0",
+    version="1.2.0",
 )
-class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
@@ -378,7 +377,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

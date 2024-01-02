@@ -9,8 +9,9 @@ import {
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '..';
 import { imagesSelectors } from 'services/api/util';
+
+import { startAppListening } from '..';
 
 export const addBoardIdSelectedListener = () => {
   startAppListening({
@@ -49,11 +50,14 @@ export const addBoardIdSelectedListener = () => {
 
       if (isSuccess) {
         // the board was just changed - we can select the first image
-        const { data: boardImagesData } = imagesApi.endpoints.listImages.select(
-          queryArgs
-        )(getState());
+        const { data: boardImagesData } =
+          imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-        if (boardImagesData) {
+        if (
+          boardImagesData &&
+          boardIdSelected.match(action) &&
+          action.payload.selectedImageName
+        ) {
           const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
           const selectedImage = imagesSelectors.selectById(
             boardImagesData,

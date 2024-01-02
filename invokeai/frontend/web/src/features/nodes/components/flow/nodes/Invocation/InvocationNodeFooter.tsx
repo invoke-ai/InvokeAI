@@ -1,9 +1,9 @@
 import { Flex } from '@chakra-ui/react';
 import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
-import { useFeatureStatus } from '../../../../../system/hooks/useFeatureStatus';
-import EmbedWorkflowCheckbox from './EmbedWorkflowCheckbox';
+
 import SaveToGalleryCheckbox from './SaveToGalleryCheckbox';
 import UseCacheCheckbox from './UseCacheCheckbox';
 
@@ -18,17 +18,14 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
     <Flex
       className={DRAG_HANDLE_CLASSNAME}
       layerStyle="nodeFooter"
-      sx={{
-        w: 'full',
-        borderBottomRadius: 'base',
-        px: 2,
-        py: 0,
-        h: 6,
-        justifyContent: 'space-between',
-      }}
+      w="full"
+      borderBottomRadius="base"
+      px={2}
+      py={0}
+      h={8}
+      justifyContent="space-between"
     >
       {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
-      {hasImageOutput && <EmbedWorkflowCheckbox nodeId={nodeId} />}
       {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
     </Flex>
   );

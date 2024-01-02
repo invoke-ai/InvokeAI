@@ -8,11 +8,11 @@ from PIL import Image, ImageOps
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, WithWorkflow, invocation
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, invocation
 
 
-@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.0.0")
-class CvInpaintInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.2.0")
+class CvInpaintInvocation(BaseInvocation, WithMetadata):
     """Simple inpaint using opencv."""
 
     image: ImageField = InputField(description="The image to inpaint")
@@ -41,7 +41,7 @@ class CvInpaintInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

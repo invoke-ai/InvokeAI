@@ -1,10 +1,11 @@
-import { canvasDownloadedAsImage } from 'features/canvas/store/actions';
-import { startAppListening } from '..';
 import { $logger } from 'app/logging/logger';
+import { canvasDownloadedAsImage } from 'features/canvas/store/actions';
 import { downloadBlob } from 'features/canvas/util/downloadBlob';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
+
+import { startAppListening } from '..';
 
 export const addCanvasDownloadedAsImageListener = () => {
   startAppListening({

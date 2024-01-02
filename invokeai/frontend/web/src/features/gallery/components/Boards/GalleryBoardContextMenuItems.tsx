@@ -1,7 +1,8 @@
-import { MenuItem } from '@chakra-ui/react';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
-import { BoardDTO } from 'services/api/types';
+import type { BoardDTO } from 'services/api/types';
 
 type Props = {
   board: BoardDTO;
@@ -9,6 +10,7 @@ type Props = {
 };
 
 const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
+  const { t } = useTranslation();
   const handleDelete = useCallback(() => {
     if (!setBoardToDelete) {
       return;
@@ -18,24 +20,9 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
 
   return (
     <>
-      {board.image_count > 0 && (
-        <>
-          {/* <MenuItem
-                    isDisabled={!board.image_count}
-                    icon={<FaImages />}
-                    onClickCapture={handleAddBoardToBatch}
-                  >
-                    Add Board to Batch
-                  </MenuItem> */}
-        </>
-      )}
-      <MenuItem
-        sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
-        icon={<FaTrash />}
-        onClick={handleDelete}
-      >
-        Delete Board
-      </MenuItem>
+      <InvMenuItem color="error.300" icon={<FaTrash />} onClick={handleDelete}>
+        {t('boards.deleteBoard')}
+      </InvMenuItem>
     </>
   );
 };

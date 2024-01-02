@@ -1,30 +1,28 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+  resetCanvasInteractionState,
+  resetToolInteractionState,
+} from 'features/canvas/store/canvasNanostore';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
-  resetCanvasInteractionState,
   setIsMaskEnabled,
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
   setTool,
 } from 'features/canvas/store/canvasSlice';
+import type { CanvasTool } from 'features/canvas/store/canvasTypes';
+import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash-es';
-
 import { useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { CanvasTool } from '../store/canvasTypes';
-import { getCanvasStage } from '../util/konvaInstanceProvider';
 
-const selector = createSelector(
-  [canvasSelector, activeTabNameSelector, isStagingSelector],
-  (canvas, activeTabName, isStaging) => {
+const selector = createMemoizedSelector(
+  [stateSelector, activeTabNameSelector, isStagingSelector],
+  ({ canvas }, activeTabName, isStaging) => {
     const {
-      cursorPosition,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
@@ -34,7 +32,6 @@ const selector = createSelector(
 
     return {
       activeTabName,
-      isCursorOnCanvas: Boolean(cursorPosition),
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
@@ -42,11 +39,6 @@ const selector = createSelector(
       isMaskEnabled,
       shouldSnapToGrid,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 
@@ -111,7 +103,7 @@ const useInpaintingCanvasHotkeys = () => {
   useHotkeys(
     'esc',
     () => {
-      dispatch(resetCanvasInteractionState());
+      resetCanvasInteractionState();
     },
     {
       enabled: () => true,
@@ -143,6 +135,7 @@ const useInpaintingCanvasHotkeys = () => {
       if (tool !== 'move') {
         previousToolRef.current = tool;
         dispatch(setTool('move'));
+        resetToolInteractionState();
       }
 
       if (

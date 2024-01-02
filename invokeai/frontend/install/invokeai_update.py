@@ -4,6 +4,7 @@ pip install <path_to_git_source>.
 """
 import os
 import platform
+from distutils.version import LooseVersion
 
 import pkg_resources
 import psutil
@@ -31,10 +32,6 @@ else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 
-def get_versions() -> dict:
-    return requests.get(url=INVOKE_AI_REL).json()
-
-
 def invokeai_is_running() -> bool:
     for p in psutil.process_iter():
         try:
@@ -48,6 +45,20 @@ def invokeai_is_running() -> bool:
         except (psutil.AccessDenied, psutil.NoSuchProcess):
             continue
     return False
+
+
+def get_pypi_versions():
+    url = "https://pypi.org/pypi/invokeai/json"
+    try:
+        data = requests.get(url).json()
+    except Exception:
+        raise Exception("Unable to fetch version information from PyPi")
+
+    versions = list(data["releases"].keys())
+    versions.sort(key=LooseVersion, reverse=True)
+    latest_version = [v for v in versions if "rc" not in v][0]
+    latest_release_candidate = [v for v in versions if "rc" in v][0]
+    return latest_version, latest_release_candidate, versions
 
 
 def welcome(latest_release: str, latest_prerelease: str):
@@ -89,44 +100,35 @@ def get_extras():
 
 
 def main():
-    versions = get_versions()
-    released_versions = [x for x in versions if not (x["draft"] or x["prerelease"])]
-    prerelease_versions = [x for x in versions if not x["draft"] and x["prerelease"]]
-    latest_release = released_versions[0]["tag_name"] if len(released_versions) else None
-    latest_prerelease = prerelease_versions[0]["tag_name"] if len(prerelease_versions) else None
-
     if invokeai_is_running():
         print(":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
         input("Press any key to continue...")
         return
 
+    latest_release, latest_prerelease, versions = get_pypi_versions()
+
     welcome(latest_release, latest_prerelease)
 
-    tag = None
-    branch = None
-    release = None
-    choice = Prompt.ask("Choice:", choices=["1", "2", "3", "4"], default="1")
+    release = latest_release
+    choice = Prompt.ask("Choice:", choices=["1", "2", "3"], default="1")
 
     if choice == "1":
         release = latest_release
     elif choice == "2":
         release = latest_prerelease
     elif choice == "3":
-        while not tag:
-            tag = Prompt.ask("Enter an InvokeAI tag name")
-    elif choice == "4":
-        while not branch:
-            branch = Prompt.ask("Enter an InvokeAI branch name")
+        while True:
+            release = Prompt.ask("Enter an InvokeAI version")
+            release.strip()
+            if release in versions:
+                break
+            print(f":exclamation: [bold red]'{release}' is not a recognized InvokeAI release.[/red bold]")
 
     extras = get_extras()
 
-    print(f":crossed_fingers: Upgrading to [yellow]{tag or release or branch}[/yellow]")
-    if release:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_SRC}/{release}.zip" --use-pep517 --upgrade'
-    elif tag:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_TAG}/{tag}.zip" --use-pep517 --upgrade'
-    else:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_BRANCH}/{branch}.zip" --use-pep517 --upgrade'
+    print(f":crossed_fingers: Upgrading to [yellow]{release}[/yellow]")
+    cmd = f'pip install "invokeai{extras}=={release}" --use-pep517 --upgrade'
+
     print("")
     print("")
     if os.system(cmd) == 0:

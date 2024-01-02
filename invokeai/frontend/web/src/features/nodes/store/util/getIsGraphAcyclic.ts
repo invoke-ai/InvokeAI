@@ -1,5 +1,5 @@
 import graphlib from '@dagrejs/graphlib';
-import { Edge, Node } from 'reactflow';
+import type { Edge, Node } from 'reactflow';
 
 export const getIsGraphAcyclic = (
   source: string,

@@ -4,6 +4,7 @@ import {
   appSocketQueueItemStatusChanged,
   socketQueueItemStatusChanged,
 } from 'services/events/actions';
+
 import { startAppListening } from '../..';
 
 export const addSocketQueueItemStatusChangedEventListener = () => {
@@ -24,7 +25,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
           queueItemsAdapter.updateOne(draft, {
-            id: queue_item.item_id,
+            id: String(queue_item.item_id),
             changes: queue_item,
           });
         })

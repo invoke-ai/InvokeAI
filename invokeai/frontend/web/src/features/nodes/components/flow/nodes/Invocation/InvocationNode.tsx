@@ -1,14 +1,15 @@
 import { Flex, Grid, GridItem } from '@chakra-ui/react';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useAnyOrDirectInputFieldNames } from 'features/nodes/hooks/useAnyOrDirectInputFieldNames';
 import { useConnectionInputFieldNames } from 'features/nodes/hooks/useConnectionInputFieldNames';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
+import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 import { memo } from 'react';
-import NodeWrapper from '../common/NodeWrapper';
-import InvocationNodeFooter from './InvocationNodeFooter';
-import InvocationNodeHeader from './InvocationNodeHeader';
+
 import InputField from './fields/InputField';
 import OutputField from './fields/OutputField';
-import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
+import InvocationNodeFooter from './InvocationNodeFooter';
+import InvocationNodeHeader from './InvocationNodeHeader';
 
 type Props = {
   nodeId: string;
@@ -37,16 +38,14 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
         <>
           <Flex
             layerStyle="nodeBody"
-            sx={{
-              flexDirection: 'column',
-              w: 'full',
-              h: 'full',
-              py: 2,
-              gap: 1,
-              borderBottomRadius: withFooter ? 0 : 'base',
-            }}
+            flexDirection="column"
+            w="full"
+            h="full"
+            py={2}
+            gap={1}
+            borderBottomRadius={withFooter ? 0 : 'base'}
           >
-            <Flex sx={{ flexDir: 'column', px: 2, w: 'full', h: 'full' }}>
+            <Flex flexDir="column" px={2} w="full" h="full">
               <Grid gridTemplateColumns="1fr auto" gridAutoRows="1fr">
                 {inputConnectionFieldNames.map((fieldName, i) => (
                   <GridItem

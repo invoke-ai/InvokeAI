@@ -1,16 +1,16 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { MouseEvent, useCallback, useMemo } from 'react';
+import { selectionChanged } from 'features/gallery/store/gallerySlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import type { MouseEvent } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
-import { selectionChanged } from '../store/gallerySlice';
 
-const selector = createSelector(
+const selector = createMemoizedSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
   ({ gallery }, queryArgs) => {
     const selection = gallery.selection;
@@ -19,8 +19,7 @@ const selector = createSelector(
       queryArgs,
       selection,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 export const useMultiselect = (imageDTO?: ImageDTO) => {

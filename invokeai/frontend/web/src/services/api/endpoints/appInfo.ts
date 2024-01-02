@@ -1,6 +1,7 @@
+import type { paths } from 'services/api/schema';
+import type { AppConfig, AppVersion } from 'services/api/types';
+
 import { api } from '..';
-import { paths } from '../schema';
-import { AppConfig, AppVersion } from '../types';
 
 export const appInfoApi = api.injectEndpoints({
   endpoints: (build) => ({

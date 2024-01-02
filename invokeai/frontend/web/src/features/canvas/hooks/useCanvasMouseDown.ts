@@ -1,34 +1,31 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
-import {
-  addLine,
   setIsDrawing,
   setIsMovingStage,
-} from 'features/canvas/store/canvasSlice';
+} from 'features/canvas/store/canvasNanostore';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import { addLine } from 'features/canvas/store/canvasSlice';
+import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { KonvaEventObject } from 'konva/lib/Node';
-import { isEqual } from 'lodash-es';
+import type Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import type { MutableRefObject } from 'react';
+import { useCallback } from 'react';
 
-import { MutableRefObject, useCallback } from 'react';
-import getScaledCursorPosition from '../util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
 
-const selector = createSelector(
-  [activeTabNameSelector, canvasSelector, isStagingSelector],
-  (activeTabName, canvas, isStaging) => {
+const selector = createMemoizedSelector(
+  [activeTabNameSelector, stateSelector, isStagingSelector],
+  (activeTabName, { canvas }, isStaging) => {
     const { tool } = canvas;
     return {
       tool,
       activeTabName,
       isStaging,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
@@ -45,7 +42,7 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       stageRef.current.container().focus();
 
       if (tool === 'move' || isStaging) {
-        dispatch(setIsMovingStage(true));
+        setIsMovingStage(true);
         return;
       }
 
@@ -62,7 +59,7 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       e.evt.preventDefault();
 
-      dispatch(setIsDrawing(true));
+      setIsDrawing(true);
 
       // Add a new line starting from the current cursor position.
       dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));

@@ -45,6 +45,7 @@ InvokeAI:
     ram: 13.5
     vram: 0.25
     lazy_offload: true
+    log_memory_usage: false
   Device:
     device: auto
     precision: auto
@@ -172,10 +173,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, TypeAdapter
+from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
 from .config_base import InvokeAISettings
@@ -187,28 +189,24 @@ DEFAULT_MAX_VRAM = 0.5
 
 
 class Categories(object):
-    WebServer = dict(category="Web Server")
-    Features = dict(category="Features")
-    Paths = dict(category="Paths")
-    Logging = dict(category="Logging")
-    Development = dict(category="Development")
-    Other = dict(category="Other")
-    ModelCache = dict(category="Model Cache")
-    Device = dict(category="Device")
-    Generation = dict(category="Generation")
-    Queue = dict(category="Queue")
-    Nodes = dict(category="Nodes")
-    MemoryPerformance = dict(category="Memory/Performance")
+    """Category headers for configuration variable groups."""
+
+    WebServer: JsonDict = {"category": "Web Server"}
+    Features: JsonDict = {"category": "Features"}
+    Paths: JsonDict = {"category": "Paths"}
+    Logging: JsonDict = {"category": "Logging"}
+    Development: JsonDict = {"category": "Development"}
+    Other: JsonDict = {"category": "Other"}
+    ModelCache: JsonDict = {"category": "Model Cache"}
+    Device: JsonDict = {"category": "Device"}
+    Generation: JsonDict = {"category": "Generation"}
+    Queue: JsonDict = {"category": "Queue"}
+    Nodes: JsonDict = {"category": "Nodes"}
+    MemoryPerformance: JsonDict = {"category": "Memory/Performance"}
 
 
 class InvokeAIAppConfig(InvokeAISettings):
-    """
-    Generate images using Stable Diffusion. Use "invokeai" to launch
-    the command-line client (recommended for experts only), or
-    "invokeai-web" to launch the web server. Global options
-    can be changed by editing the file "INVOKEAI_ROOT/invokeai.yaml" or by
-    setting environment variables INVOKEAI_<setting>.
-    """
+    """Configuration object for InvokeAI App."""
 
     singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
     singleton_init: ClassVar[Optional[Dict]] = None
@@ -223,6 +221,9 @@ class InvokeAIAppConfig(InvokeAISettings):
     allow_credentials   : bool = Field(default=True, description="Allow CORS credentials", json_schema_extra=Categories.WebServer)
     allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS", json_schema_extra=Categories.WebServer)
     allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS", json_schema_extra=Categories.WebServer)
+    # SSL options correspond to https://www.uvicorn.org/settings/#https
+    ssl_certfile        : Optional[Path] = Field(default=None, description="SSL certificate file (for HTTPS)", json_schema_extra=Categories.WebServer)
+    ssl_keyfile         : Optional[Path] = Field(default=None, description="SSL key file", json_schema_extra=Categories.WebServer)
 
     # FEATURES
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", json_schema_extra=Categories.Features)
@@ -233,15 +234,12 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # PATHS
     root                : Optional[Path] = Field(default=None, description='InvokeAI runtime root directory', json_schema_extra=Categories.Paths)
-    autoimport_dir      : Optional[Path] = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
-    lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
-    embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
-    controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
-    conf_path           : Optional[Path] = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
-    models_dir          : Optional[Path] = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
-    legacy_conf_dir     : Optional[Path] = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
-    db_dir              : Optional[Path] = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
-    outdir              : Optional[Path] = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
+    autoimport_dir      : Path = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
+    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
+    models_dir          : Path = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
+    legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
+    db_dir              : Path = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
+    outdir              : Path = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', json_schema_extra=Categories.Paths)
     custom_nodes_dir    : Path = Field(default=Path('nodes'), description='Path to directory for custom nodes', json_schema_extra=Categories.Paths)
     from_file           : Optional[Path] = Field(default=None, description='Take command input from the indicated file (command-line client only)', json_schema_extra=Categories.Paths)
@@ -261,6 +259,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     ram                 : float = Field(default=7.5, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
     vram                : float = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", json_schema_extra=Categories.ModelCache, )
+    log_memory_usage    : bool = Field(default=False, description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.", json_schema_extra=Categories.ModelCache)
 
     # DEVICE
     device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Generation device", json_schema_extra=Categories.Device)
@@ -283,11 +282,15 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
-    free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
     max_cache_size      : Optional[float] = Field(default=None, gt=0, description="Maximum memory amount used by model cache for rapid switching", json_schema_extra=Categories.MemoryPerformance)
     max_vram_cache_size : Optional[float] = Field(default=None, ge=0, description="Amount of VRAM reserved for model storage", json_schema_extra=Categories.MemoryPerformance)
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", json_schema_extra=Categories.MemoryPerformance)
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", json_schema_extra=Categories.MemoryPerformance)
+    lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
+    embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+    controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+    # this is not referred to in the source code and can be removed entirely
+    #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
 
     # See InvokeAIAppConfig subclass below for CACHE and DEVICE categories
     # fmt: on
@@ -301,8 +304,8 @@ class InvokeAIAppConfig(InvokeAISettings):
         clobber=False,
     ):
         """
-        Update settings with contents of init file, environment, and
-        command-line settings.
+        Update settings with contents of init file, environment, and command-line settings.
+
         :param conf: alternate Omegaconf dictionary object
         :param argv: aternate sys.argv list
         :param clobber: ovewrite any initialization parameters passed during initialization
@@ -334,10 +337,8 @@ class InvokeAIAppConfig(InvokeAISettings):
                 )
 
     @classmethod
-    def get_config(cls, **kwargs) -> InvokeAIAppConfig:
-        """
-        This returns a singleton InvokeAIAppConfig configuration object.
-        """
+    def get_config(cls, **kwargs: Dict[str, Any]) -> InvokeAIAppConfig:
+        """Return a singleton InvokeAIAppConfig configuration object."""
         if (
             cls.singleton_config is None
             or type(cls.singleton_config) is not cls
@@ -349,21 +350,17 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     @property
     def root_path(self) -> Path:
-        """
-        Path to the runtime root directory
-        """
+        """Path to the runtime root directory."""
         if self.root:
             root = Path(self.root).expanduser().absolute()
         else:
             root = self.find_root().expanduser().absolute()
         self.root = root  # insulate ourselves from relative paths that may change
-        return root
+        return root.resolve()
 
     @property
     def root_dir(self) -> Path:
-        """
-        Alias for above.
-        """
+        """Alias for above."""
         return self.root_path
 
     def _resolve(self, partial_path: Path) -> Path:
@@ -371,108 +368,95 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     @property
     def init_file_path(self) -> Path:
-        """
-        Path to invokeai.yaml
-        """
-        return self._resolve(INIT_FILE)
+        """Path to invokeai.yaml."""
+        resolved_path = self._resolve(INIT_FILE)
+        assert resolved_path is not None
+        return resolved_path
 
     @property
-    def output_path(self) -> Path:
-        """
-        Path to defaults outputs directory.
-        """
+    def output_path(self) -> Optional[Path]:
+        """Path to defaults outputs directory."""
         return self._resolve(self.outdir)
 
     @property
     def db_path(self) -> Path:
-        """
-        Path to the invokeai.db file.
-        """
-        return self._resolve(self.db_dir) / DB_FILE
+        """Path to the invokeai.db file."""
+        db_dir = self._resolve(self.db_dir)
+        assert db_dir is not None
+        return db_dir / DB_FILE
 
     @property
     def model_conf_path(self) -> Path:
-        """
-        Path to models configuration file.
-        """
+        """Path to models configuration file."""
         return self._resolve(self.conf_path)
 
     @property
     def legacy_conf_path(self) -> Path:
-        """
-        Path to directory of legacy configuration files (e.g. v1-inference.yaml)
-        """
+        """Path to directory of legacy configuration files (e.g. v1-inference.yaml)."""
         return self._resolve(self.legacy_conf_dir)
 
     @property
     def models_path(self) -> Path:
-        """
-        Path to the models directory
-        """
+        """Path to the models directory."""
         return self._resolve(self.models_dir)
 
     @property
     def custom_nodes_path(self) -> Path:
-        """
-        Path to the custom nodes directory
-        """
-        return self._resolve(self.custom_nodes_dir)
+        """Path to the custom nodes directory."""
+        custom_nodes_path = self._resolve(self.custom_nodes_dir)
+        assert custom_nodes_path is not None
+        return custom_nodes_path
 
     # the following methods support legacy calls leftover from the Globals era
     @property
     def full_precision(self) -> bool:
-        """Return true if precision set to float32"""
+        """Return true if precision set to float32."""
         return self.precision == "float32"
 
     @property
     def try_patchmatch(self) -> bool:
-        """Return true if patchmatch true"""
+        """Return true if patchmatch true."""
         return self.patchmatch
 
     @property
     def nsfw_checker(self) -> bool:
-        """NSFW node is always active and disabled from Web UIe"""
+        """Return value for NSFW checker. The NSFW node is always active and disabled from Web UI."""
         return True
 
     @property
     def invisible_watermark(self) -> bool:
-        """invisible watermark node is always active and disabled from Web UIe"""
+        """Return value of invisible watermark. It is always active and disabled from Web UI."""
         return True
 
     @property
     def ram_cache_size(self) -> Union[Literal["auto"], float]:
+        """Return the ram cache size using the legacy or modern setting."""
         return self.max_cache_size or self.ram
 
     @property
     def vram_cache_size(self) -> Union[Literal["auto"], float]:
+        """Return the vram cache size using the legacy or modern setting."""
         return self.max_vram_cache_size or self.vram
 
     @property
     def use_cpu(self) -> bool:
+        """Return true if the device is set to CPU or the always_use_cpu flag is set."""
         return self.always_use_cpu or self.device == "cpu"
 
     @property
     def disable_xformers(self) -> bool:
-        """
-        Return true if enable_xformers is false (reversed logic)
-        and attention type is not set to xformers.
-        """
+        """Return true if enable_xformers is false (reversed logic) and attention type is not set to xformers."""
         disabled_in_config = not self.xformers_enabled
         return disabled_in_config and self.attention_type != "xformers"
 
     @staticmethod
     def find_root() -> Path:
-        """
-        Choose the runtime root directory when not specified on command line or
-        init file.
-        """
+        """Choose the runtime root directory when not specified on command line or init file."""
         return _find_root()
 
 
 def get_invokeai_config(**kwargs) -> InvokeAIAppConfig:
-    """
-    Legacy function which returns InvokeAIAppConfig.get_config()
-    """
+    """Legacy function which returns InvokeAIAppConfig.get_config()."""
     return InvokeAIAppConfig.get_config(**kwargs)
 
 
@@ -480,7 +464,7 @@ def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ["INVOKEAI_ROOT"])
-    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
+    elif any((venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]):
         root = (venv.parent).resolve()
     else:
         root = Path("~/invokeai").expanduser().resolve()

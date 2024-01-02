@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 export const canvasSavedToGallery = createAction('canvas/canvasSavedToGallery');
 

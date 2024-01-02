@@ -1,38 +1,34 @@
 import {
   Box,
-  ButtonGroup,
   Flex,
   Tab,
   TabList,
   Tabs,
-  VStack,
   useDisclosure,
+  VStack,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIButton from 'common/components/IAIButton';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaImages, FaServer } from 'react-icons/fa';
-import { galleryViewChanged } from '../store/gallerySlice';
+
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
-import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [stateSelector],
-  (state) => {
-    const { galleryView } = state.gallery;
+const selector = createMemoizedSelector([stateSelector], (state) => {
+  const { galleryView } = state.gallery;
 
-    return {
-      galleryView,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    galleryView,
+  };
+});
 
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
@@ -54,22 +50,18 @@ const ImageGalleryContent = () => {
   return (
     <VStack
       layerStyle="first"
-      sx={{
-        flexDirection: 'column',
-        h: 'full',
-        w: 'full',
-        borderRadius: 'base',
-        p: 2,
-      }}
+      flexDirection="column"
+      h="full"
+      w="full"
+      borderRadius="base"
+      p={2}
     >
-      <Box sx={{ w: 'full' }}>
+      <Box w="full">
         <Flex
           ref={resizeObserverRef}
-          sx={{
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
-          }}
+          alignItems="center"
+          justifyContent="space-between"
+          gap={2}
         >
           <GalleryBoardName
             isOpen={isBoardListOpen}
@@ -82,53 +74,38 @@ const ImageGalleryContent = () => {
         </Box>
       </Box>
       <Flex ref={galleryGridRef} direction="column" gap={2} h="full" w="full">
-        <Flex
-          sx={{
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
-          }}
-        >
+        <Flex alignItems="center" justifyContent="space-between" gap={2}>
           <Tabs
             index={galleryView === 'images' ? 0 : 1}
             variant="unstyled"
             size="sm"
-            sx={{ w: 'full' }}
+            w="full"
           >
             <TabList>
-              <ButtonGroup
-                isAttached
-                sx={{
-                  w: 'full',
-                }}
-              >
+              <InvButtonGroup w="full">
                 <Tab
-                  as={IAIButton}
+                  as={InvButton}
                   size="sm"
                   isChecked={galleryView === 'images'}
                   onClick={handleClickImages}
-                  sx={{
-                    w: 'full',
-                  }}
+                  w="full"
                   leftIcon={<FaImages />}
                   data-testid="images-tab"
                 >
-                  {t('gallery.images')}
+                  {t('parameters.images')}
                 </Tab>
                 <Tab
-                  as={IAIButton}
+                  as={InvButton}
                   size="sm"
                   isChecked={galleryView === 'assets'}
                   onClick={handleClickAssets}
-                  sx={{
-                    w: 'full',
-                  }}
+                  w="full"
                   leftIcon={<FaServer />}
                   data-testid="assets-tab"
                 >
                   {t('gallery.assets')}
                 </Tab>
-              </ButtonGroup>
+              </InvButtonGroup>
             </TabList>
           </Tabs>
         </Flex>

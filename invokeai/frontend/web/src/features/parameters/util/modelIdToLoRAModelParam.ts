@@ -1,14 +1,15 @@
 import { logger } from 'app/logging/logger';
-import { LoRAModelParam, zLoRAModel } from '../types/parameterSchemas';
+import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
+import { zParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToLoRAModelParam = (
   loraModelId: string
-): LoRAModelParam | undefined => {
+): ParameterLoRAModel | undefined => {
   const log = logger('models');
 
   const [base_model, _model_type, model_name] = loraModelId.split('/');
 
-  const result = zLoRAModel.safeParse({
+  const result = zParameterLoRAModel.safeParse({
     base_model,
     model_name,
   });

@@ -1,3 +1,4 @@
+import type { ControlAdapterType } from 'features/controlAdapters/store/types';
 import { useMemo } from 'react';
 import {
   controlNetModelsAdapter,
@@ -7,7 +8,6 @@ import {
   useGetIPAdapterModelsQuery,
   useGetT2IAdapterModelsQuery,
 } from 'services/api/endpoints/models';
-import { ControlAdapterType } from '../store/types';
 
 export const useControlAdapterModels = (type?: ControlAdapterType) => {
   const { data: controlNetModelsData } = useGetControlNetModelsQuery();

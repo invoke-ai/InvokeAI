@@ -1,33 +1,28 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAISlider from 'common/components/IAISlider';
-import { memo, useCallback } from 'react';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import {
   maxPromptsChanged,
   maxPromptsReset,
-} from '../store/dynamicPromptsSlice';
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 
-const selector = createSelector(
-  stateSelector,
-  (state) => {
-    const { maxPrompts, combinatorial } = state.dynamicPrompts;
-    const { min, sliderMax, inputMax } =
-      state.config.sd.dynamicPrompts.maxPrompts;
+const selector = createMemoizedSelector(stateSelector, (state) => {
+  const { maxPrompts, combinatorial } = state.dynamicPrompts;
+  const { min, sliderMax, inputMax } =
+    state.config.sd.dynamicPrompts.maxPrompts;
 
-    return {
-      maxPrompts,
-      min,
-      sliderMax,
-      inputMax,
-      isDisabled: !combinatorial,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    maxPrompts,
+    min,
+    sliderMax,
+    inputMax,
+    isDisabled: !combinatorial,
+  };
+});
 
 const ParamDynamicPromptsMaxPrompts = () => {
   const { maxPrompts, min, sliderMax, inputMax, isDisabled } =
@@ -47,21 +42,23 @@ const ParamDynamicPromptsMaxPrompts = () => {
   }, [dispatch]);
 
   return (
-    <IAIInformationalPopover feature="dynamicPromptsMaxPrompts">
-      <IAISlider
-        label={t('dynamicPrompts.maxPrompts')}
-        isDisabled={isDisabled}
+    <InvControl
+      label={t('dynamicPrompts.maxPrompts')}
+      isDisabled={isDisabled}
+      feature="dynamicPromptsMaxPrompts"
+      renderInfoPopoverInPortal={false}
+    >
+      <InvSlider
         min={min}
         max={sliderMax}
         value={maxPrompts}
         onChange={handleChange}
-        sliderNumberInputProps={{ max: inputMax }}
-        withSliderMarks
-        withInput
-        withReset
-        handleReset={handleReset}
+        onReset={handleReset}
+        marks
+        withNumberInput
+        numberInputMax={inputMax}
       />
-    </IAIInformationalPopover>
+    </InvControl>
   );
 };
 

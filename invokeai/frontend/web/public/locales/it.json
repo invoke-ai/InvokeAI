@@ -89,7 +89,32 @@
         "t2iAdapter": "Adattatore T2I",
         "controlAdapter": "Adattatore di Controllo",
         "controlNet": "ControlNet",
-        "auto": "Automatico"
+        "auto": "Automatico",
+        "simple": "Semplice",
+        "details": "Dettagli",
+        "format": "formato",
+        "unknown": "Sconosciuto",
+        "folder": "Cartella",
+        "error": "Errore",
+        "installed": "Installato",
+        "template": "Schema",
+        "outputs": "Uscite",
+        "data": "Dati",
+        "somethingWentWrong": "Qualcosa è andato storto",
+        "copyError": "$t(gallery.copy) Errore",
+        "input": "Ingresso",
+        "notInstalled": "Non $t(common.installed)",
+        "unknownError": "Errore sconosciuto",
+        "updated": "Aggiornato",
+        "save": "Salva",
+        "created": "Creato",
+        "prevPage": "Pagina precedente",
+        "delete": "Elimina",
+        "orderBy": "Ordinato per",
+        "nextPage": "Pagina successiva",
+        "saveAs": "Salva come",
+        "unsaved": "Non salvato",
+        "direction": "Direzione"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -108,7 +133,6 @@
         "deleteImage": "Elimina l'immagine",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
         "deleteImageBin": "Le immagini eliminate verranno spostate nel Cestino del tuo sistema operativo.",
-        "images": "Immagini",
         "assets": "Risorse",
         "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
@@ -120,7 +144,17 @@
         "setCurrentImage": "Imposta come immagine corrente",
         "preparingDownload": "Preparazione del download",
         "preparingDownloadFailed": "Problema durante la preparazione del download",
-        "downloadSelection": "Scarica gli elementi selezionati"
+        "downloadSelection": "Scarica gli elementi selezionati",
+        "noImageSelected": "Nessuna immagine selezionata",
+        "deleteSelection": "Elimina la selezione",
+        "image": "immagine",
+        "drop": "Rilascia",
+        "unstarImage": "Rimuovi preferenza immagine",
+        "dropOrUpload": "$t(gallery.drop) o carica",
+        "starImage": "Immagine preferita",
+        "dropToUpload": "$t(gallery.drop) per aggiornare",
+        "problemDeletingImagesDesc": "Impossibile eliminare una o più immagini",
+        "problemDeletingImages": "Problema durante l'eliminazione delle immagini"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti rapidi",
@@ -395,7 +429,7 @@
         "deleteModel": "Elimina modello",
         "deleteConfig": "Elimina configurazione",
         "deleteMsg1": "Sei sicuro di voler eliminare questo modello da InvokeAI?",
-        "deleteMsg2": "Questo eliminerà il modello dal disco se si trova nella cartella principale di InvokeAI. Se utilizzi una cartella personalizzata, il modello NON verrà eliminato dal disco.",
+        "deleteMsg2": "Questo eliminerà il modello dal disco se si trova nella cartella principale di InvokeAI. Se invece utilizzi una cartella personalizzata, il modello NON verrà eliminato dal disco.",
         "formMessageDiffusersModelLocation": "Ubicazione modelli diffusori",
         "formMessageDiffusersModelLocationDesc": "Inseriscine almeno uno.",
         "formMessageDiffusersVAELocation": "Ubicazione file VAE",
@@ -429,7 +463,7 @@
         "mergedModelSaveLocation": "Ubicazione salvataggio",
         "convertToDiffusersHelpText1": "Questo modello verrà convertito nel formato 🧨 Diffusore.",
         "custom": "Personalizzata",
-        "convertToDiffusersHelpText3": "Il file checkpoint su disco SARÀ eliminato se si trova nella cartella principale di InvokeAI. Se si trova in una posizione personalizzata, NON verrà eliminato.",
+        "convertToDiffusersHelpText3": "Il file Checkpoint su disco verrà eliminato se si trova nella cartella principale di InvokeAI. Se si trova invece in una posizione personalizzata, NON verrà eliminato.",
         "v1": "v1",
         "pathToCustomConfig": "Percorso alla configurazione personalizzata",
         "modelThree": "Modello 3",
@@ -456,7 +490,7 @@
         "modelDeleteFailed": "Impossibile eliminare il modello",
         "noCustomLocationProvided": "Nessuna posizione personalizzata fornita",
         "convertingModelBegin": "Conversione del modello. Attendere prego.",
-        "importModels": "Importa modelli",
+        "importModels": "Importa Modelli",
         "modelsSynced": "Modelli sincronizzati",
         "modelSyncFailed": "Sincronizzazione modello non riuscita",
         "settings": "Impostazioni",
@@ -474,7 +508,9 @@
         "closeAdvanced": "Chiudi Avanzate",
         "modelType": "Tipo di modello",
         "customConfigFileLocation": "Posizione del file di configurazione personalizzato",
-        "vaePrecision": "Precisione VAE"
+        "vaePrecision": "Precisione VAE",
+        "noModelSelected": "Nessun modello selezionato",
+        "conversionNotSupported": "Conversione non supportata"
     },
     "parameters": {
         "images": "Immagini",
@@ -601,7 +637,12 @@
         "seamlessX": "Senza cuciture X",
         "seamlessY": "Senza cuciture Y",
         "imageActions": "Azioni Immagine",
-        "aspectRatioFree": "Libere"
+        "aspectRatioFree": "Libere",
+        "maskEdge": "Maschera i bordi",
+        "unmasked": "No maschera",
+        "cfgRescaleMultiplier": "Moltiplicatore riscala CFG",
+        "cfgRescale": "Riscala CFG",
+        "useSize": "Usa Dimensioni"
     },
     "settings": {
         "models": "Modelli",
@@ -642,7 +683,11 @@
         "clearIntermediatesWithCount_one": "Cancella {{count}} immagine intermedia",
         "clearIntermediatesWithCount_many": "Cancella {{count}} immagini intermedie",
         "clearIntermediatesWithCount_other": "Cancella {{count}} immagini intermedie",
-        "clearIntermediatesDisabled": "La coda deve essere vuota per cancellare le immagini intermedie"
+        "clearIntermediatesDisabled": "La coda deve essere vuota per cancellare le immagini intermedie",
+        "enableNSFWChecker": "Abilita controllo NSFW",
+        "enableInvisibleWatermark": "Abilita filigrana invisibile",
+        "enableInformationalPopovers": "Abilita testo informativo a comparsa",
+        "reloadingIn": "Ricaricando in"
     },
     "toast": {
         "tempFoldersEmptied": "Cartella temporanea svuotata",
@@ -685,7 +730,6 @@
         "nodesLoadedFailed": "Impossibile caricare i nodi",
         "nodesSaved": "Nodi salvati",
         "nodesLoaded": "Nodi caricati",
-        "nodesCleared": "Nodi cancellati",
         "problemCopyingImage": "Impossibile copiare l'immagine",
         "nodesNotValidGraph": "Grafico del nodo InvokeAI non valido",
         "nodesCorruptedGraph": "Impossibile caricare. Il grafico sembra essere danneggiato.",
@@ -724,10 +768,15 @@
         "setNodeField": "Imposta come campo nodo",
         "problemSavingMask": "Problema nel salvataggio della maschera",
         "problemSavingCanvasDesc": "Impossibile salvare la tela",
-        "setCanvasInitialImage": "Imposta come immagine iniziale della tela",
+        "setCanvasInitialImage": "Imposta l'immagine iniziale della tela",
         "workflowLoaded": "Flusso di lavoro caricato",
         "setIPAdapterImage": "Imposta come immagine per l'Adattatore IP",
-        "problemSavingMaskDesc": "Impossibile salvare la maschera"
+        "problemSavingMaskDesc": "Impossibile salvare la maschera",
+        "setAsCanvasInitialImage": "Imposta come immagine iniziale della tela",
+        "invalidUpload": "Caricamento non valido",
+        "problemDeletingWorkflow": "Problema durante l'eliminazione del flusso di lavoro",
+        "workflowDeleted": "Flusso di lavoro eliminato",
+        "problemRetrievingWorkflow": "Problema nel recupero del flusso di lavoro"
     },
     "tooltip": {
         "feature": {
@@ -751,7 +800,7 @@
         "maskingOptions": "Opzioni di mascheramento",
         "enableMask": "Abilita maschera",
         "preserveMaskedArea": "Mantieni area mascherata",
-        "clearMask": "Elimina la maschera",
+        "clearMask": "Cancella maschera (Shift+C)",
         "brush": "Pennello",
         "eraser": "Cancellino",
         "fillBoundingBox": "Riempi rettangolo di selezione",
@@ -804,7 +853,8 @@
         "betaPreserveMasked": "Conserva quanto mascherato",
         "antialiasing": "Anti aliasing",
         "showResultsOn": "Mostra i risultati (attivato)",
-        "showResultsOff": "Mostra i risultati (disattivato)"
+        "showResultsOff": "Mostra i risultati (disattivato)",
+        "saveMask": "Salva $t(unifiedCanvas.mask)"
     },
     "accessibility": {
         "modelSelect": "Seleziona modello",
@@ -828,7 +878,10 @@
         "modifyConfig": "Modifica configurazione",
         "menu": "Menu",
         "showGalleryPanel": "Mostra il pannello Galleria",
-        "loadMore": "Carica altro"
+        "loadMore": "Carica altro",
+        "mode": "Modalità",
+        "resetUI": "$t(accessibility.reset) l'Interfaccia Utente",
+        "createIssue": "Segnala un problema"
     },
     "ui": {
         "hideProgressImages": "Nascondi avanzamento immagini",
@@ -846,11 +899,8 @@
         "zoomInNodes": "Ingrandire",
         "fitViewportNodes": "Adatta vista",
         "showGraphNodes": "Mostra sovrapposizione grafico",
-        "resetWorkflowDesc2": "Reimpostare il flusso di lavoro cancellerà tutti i nodi, i bordi e i dettagli del flusso di lavoro.",
         "reloadNodeTemplates": "Ricarica i modelli di nodo",
         "loadWorkflow": "Importa flusso di lavoro JSON",
-        "resetWorkflow": "Reimposta flusso di lavoro",
-        "resetWorkflowDesc": "Sei sicuro di voler reimpostare questo flusso di lavoro?",
         "downloadWorkflow": "Esporta flusso di lavoro JSON",
         "scheduler": "Campionatore",
         "addNode": "Aggiungi nodo",
@@ -909,7 +959,7 @@
         "unknownNode": "Nodo sconosciuto",
         "vaeFieldDescription": "Sotto modello VAE.",
         "booleanPolymorphicDescription": "Una raccolta di booleani.",
-        "missingTemplate": "Modello mancante",
+        "missingTemplate": "Nodo non valido: nodo {{node}} di tipo {{type}} modello mancante (non installato?)",
         "outputSchemaNotFound": "Schema di output non trovato",
         "colorFieldDescription": "Un colore RGBA.",
         "maybeIncompatible": "Potrebbe essere incompatibile con quello installato",
@@ -948,7 +998,7 @@
         "cannotConnectOutputToOutput": "Impossibile collegare Output ad Output",
         "booleanCollection": "Raccolta booleana",
         "cannotConnectToSelf": "Impossibile connettersi a se stesso",
-        "mismatchedVersion": "Ha una versione non corrispondente",
+        "mismatchedVersion": "Nodo non valido: il nodo {{node}} di tipo {{type}} ha una versione non corrispondente (provare ad aggiornare?)",
         "outputNode": "Nodo di Output",
         "loadingNodes": "Caricamento nodi...",
         "oNNXModelFieldDescription": "Campo del modello ONNX.",
@@ -1025,7 +1075,46 @@
         "imageFieldDescription": "Le immagini possono essere passate tra i nodi.",
         "unableToParseEdge": "Impossibile analizzare il bordo",
         "latentsCollectionDescription": "Le immagini latenti possono essere passate tra i nodi.",
-        "imageCollection": "Raccolta Immagini"
+        "imageCollection": "Raccolta Immagini",
+        "loRAModelField": "LoRA",
+        "updateAllNodes": "Aggiorna i nodi",
+        "unableToUpdateNodes_one": "Impossibile aggiornare {{count}} nodo",
+        "unableToUpdateNodes_many": "Impossibile aggiornare {{count}} nodi",
+        "unableToUpdateNodes_other": "Impossibile aggiornare {{count}} nodi",
+        "addLinearView": "Aggiungi alla vista Lineare",
+        "outputFieldInInput": "Campo di uscita in ingresso",
+        "unableToMigrateWorkflow": "Impossibile migrare il flusso di lavoro",
+        "unableToUpdateNode": "Impossibile aggiornare nodo",
+        "unknownErrorValidatingWorkflow": "Errore sconosciuto durante la convalida del flusso di lavoro",
+        "collectionFieldType": "{{name}} Raccolta",
+        "collectionOrScalarFieldType": "{{name}} Raccolta|Scalare",
+        "nodeVersion": "Versione Nodo",
+        "inputFieldTypeParseError": "Impossibile analizzare il tipo di campo di input {{node}}.{{field}} ({{message}})",
+        "unsupportedArrayItemType": "Tipo di elemento dell'array non supportato \"{{type}}\"",
+        "targetNodeFieldDoesNotExist": "Connessione non valida: il campo di destinazione/input {{node}}.{{field}} non esiste",
+        "unsupportedMismatchedUnion": "tipo CollectionOrScalar non corrispondente con tipi di base {{firstType}} e {{secondType}}",
+        "allNodesUpdated": "Tutti i nodi sono aggiornati",
+        "sourceNodeDoesNotExist": "Connessione non valida: il nodo di origine/output {{node}} non esiste",
+        "unableToExtractEnumOptions": "Impossibile estrarre le opzioni enum",
+        "unableToParseFieldType": "Impossibile analizzare il tipo di campo",
+        "unrecognizedWorkflowVersion": "Versione dello schema del flusso di lavoro non riconosciuta {{version}}",
+        "outputFieldTypeParseError": "Impossibile analizzare il tipo di campo di output {{node}}.{{field}} ({{message}})",
+        "sourceNodeFieldDoesNotExist": "Connessione non valida: il campo di origine/output {{node}}.{{field}} non esiste",
+        "unableToGetWorkflowVersion": "Impossibile ottenere la versione dello schema del flusso di lavoro",
+        "nodePack": "Pacchetto di nodi",
+        "unableToExtractSchemaNameFromRef": "Impossibile estrarre il nome dello schema dal riferimento",
+        "unknownOutput": "Output sconosciuto: {{name}}",
+        "unknownNodeType": "Tipo di nodo sconosciuto",
+        "targetNodeDoesNotExist": "Connessione non valida: il nodo di destinazione/input {{node}} non esiste",
+        "unknownFieldType": "$t(nodes.unknownField) tipo: {{type}}",
+        "deletedInvalidEdge": "Eliminata connessione non valida {{source}} -> {{target}}",
+        "unknownInput": "Input sconosciuto: {{name}}",
+        "prototypeDesc": "Questa invocazione è un prototipo. Potrebbe subire modifiche sostanziali durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento.",
+        "betaDesc": "Questa invocazione è in versione beta. Fino a quando non sarà stabile, potrebbe subire modifiche importanti durante gli aggiornamenti dell'app. Abbiamo intenzione di supportare questa invocazione a lungo termine.",
+        "newWorkflow": "Nuovo flusso di lavoro",
+        "newWorkflowDesc": "Creare un nuovo flusso di lavoro?",
+        "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate.",
+        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1043,7 +1132,14 @@
         "noMatching": "Nessuna bacheca corrispondente",
         "selectBoard": "Seleziona una Bacheca",
         "uncategorized": "Non categorizzato",
-        "downloadBoard": "Scarica la bacheca"
+        "downloadBoard": "Scarica la bacheca",
+        "deleteBoardOnly": "solo la Bacheca",
+        "deleteBoard": "Elimina Bacheca",
+        "deleteBoardAndImages": "Bacheca e Immagini",
+        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate",
+        "movingImagesToBoard_one": "Spostare {{count}} immagine nella bacheca:",
+        "movingImagesToBoard_many": "Spostare {{count}} immagini nella bacheca:",
+        "movingImagesToBoard_other": "Spostare {{count}} immagini nella bacheca:"
     },
     "controlnet": {
         "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
@@ -1082,9 +1178,8 @@
         "w": "W",
         "processor": "Processore",
         "none": "Nessuno",
-        "incompatibleBaseModel": "Modello base incompatibile:",
         "pidiDescription": "Elaborazione immagini PIDI",
-        "fill": "Riempire",
+        "fill": "Riempie",
         "colorMapDescription": "Genera una mappa dei colori dall'immagine",
         "lineartAnimeDescription": "Elaborazione lineart in stile anime",
         "imageResolution": "Risoluzione dell'immagine",
@@ -1117,7 +1212,8 @@
         "megaControl": "Mega ControlNet",
         "minConfidence": "Confidenza minima",
         "scribble": "Scribble",
-        "amult": "Angolo di illuminazione"
+        "amult": "Angolo di illuminazione",
+        "coarse": "Approssimativo"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1178,12 +1274,15 @@
         "clearQueueAlertDialog2": "Sei sicuro di voler cancellare la coda?",
         "item": "Elemento",
         "graphFailedToQueue": "Impossibile mettere in coda il grafico",
-        "queueMaxExceeded": "È stato superato il limite massimo di {{max_queue_size}} e {{skip}} elementi verrebbero saltati"
+        "queueMaxExceeded": "È stato superato il limite massimo di {{max_queue_size}} e {{skip}} elementi verrebbero saltati",
+        "batchFieldValues": "Valori Campi Lotto",
+        "time": "Tempo"
     },
     "embedding": {
         "noMatchingEmbedding": "Nessun Incorporamento corrispondente",
         "addEmbedding": "Aggiungi Incorporamento",
-        "incompatibleModel": "Modello base incompatibile:"
+        "incompatibleModel": "Modello base incompatibile:",
+        "noEmbeddingsLoaded": "Nessun incorporamento caricato"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1192,7 +1291,12 @@
         "noLoRAsAvailable": "Nessun LoRA disponibile",
         "noModelsAvailable": "Nessun modello disponibile",
         "selectModel": "Seleziona un modello",
-        "selectLoRA": "Seleziona un LoRA"
+        "selectLoRA": "Seleziona un LoRA",
+        "noRefinerModelsInstalled": "Nessun modello SDXL Refiner installato",
+        "noLoRAsInstalled": "Nessun LoRA installato",
+        "esrganModel": "Modello ESRGAN",
+        "addLora": "Aggiungi LoRA",
+        "noLoRAsLoaded": "Nessuna LoRA caricata"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1208,7 +1312,8 @@
         "enable": "Abilita",
         "clear": "Svuota",
         "maxCacheSize": "Dimensione max cache",
-        "cacheSize": "Dimensione cache"
+        "cacheSize": "Dimensione cache",
+        "useCache": "Usa Cache"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -1224,7 +1329,8 @@
         "promptsWithCount_one": "{{count}} Prompt",
         "promptsWithCount_many": "{{count}} Prompt",
         "promptsWithCount_other": "{{count}} Prompt",
-        "dynamicPrompts": "Prompt dinamici"
+        "dynamicPrompts": "Prompt dinamici",
+        "promptsPreview": "Anteprima dei prompt"
     },
     "popovers": {
         "paramScheduler": {
@@ -1437,6 +1543,12 @@
                 "ControlNet fornisce una guida al processo di generazione, aiutando a creare immagini con composizione, struttura o stile controllati, a seconda del modello selezionato."
             ],
             "heading": "ControlNet"
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "Moltiplicatore di riscala CFG",
+            "paragraphs": [
+                "Moltiplicatore di riscala per la guida CFG, utilizzato per modelli addestrati utilizzando SNR a terminale zero (ztsnr). Valore suggerito 0.7."
+            ]
         }
     },
     "sdxl": {
@@ -1484,5 +1596,49 @@
         "scheduler": "Campionatore",
         "recallParameters": "Richiama i parametri",
         "noRecallParameters": "Nessun parametro da richiamare trovato"
+    },
+    "hrf": {
+        "enableHrf": "Abilita Correzione Alta Risoluzione",
+        "upscaleMethod": "Metodo di ampliamento",
+        "enableHrfTooltip": "Genera con una risoluzione iniziale inferiore, esegue l'ampliamento alla risoluzione di base, quindi esegue Immagine a Immagine.",
+        "metadata": {
+            "strength": "Forza della Correzione Alta Risoluzione",
+            "enabled": "Correzione Alta Risoluzione Abilitata",
+            "method": "Metodo della Correzione Alta Risoluzione"
+        },
+        "hrf": "Correzione Alta Risoluzione",
+        "hrfStrength": "Forza della Correzione Alta Risoluzione",
+        "strengthTooltip": "Valori più bassi comportano meno dettagli, il che può ridurre potenziali artefatti."
+    },
+    "workflows": {
+        "saveWorkflowAs": "Salva flusso di lavoro come",
+        "workflowEditorMenu": "Menu dell'editor del flusso di lavoro",
+        "noSystemWorkflows": "Nessun flusso di lavoro del sistema",
+        "workflowName": "Nome del flusso di lavoro",
+        "noUserWorkflows": "Nessun flusso di lavoro utente",
+        "defaultWorkflows": "Flussi di lavoro predefiniti",
+        "saveWorkflow": "Salva flusso di lavoro",
+        "openWorkflow": "Apri flusso di lavoro",
+        "clearWorkflowSearchFilter": "Cancella il filtro di ricerca del flusso di lavoro",
+        "workflowLibrary": "Libreria",
+        "noRecentWorkflows": "Nessun flusso di lavoro recente",
+        "workflowSaved": "Flusso di lavoro salvato",
+        "workflowIsOpen": "Il flusso di lavoro è aperto",
+        "unnamedWorkflow": "Flusso di lavoro senza nome",
+        "savingWorkflow": "Salvataggio del flusso di lavoro...",
+        "problemLoading": "Problema durante il caricamento dei flussi di lavoro",
+        "loading": "Caricamento dei flussi di lavoro",
+        "searchWorkflows": "Cerca flussi di lavoro",
+        "problemSavingWorkflow": "Problema durante il salvataggio del flusso di lavoro",
+        "deleteWorkflow": "Elimina flusso di lavoro",
+        "workflows": "Flussi di lavoro",
+        "noDescription": "Nessuna descrizione",
+        "userWorkflows": "I miei flussi di lavoro",
+        "newWorkflowCreated": "Nuovo flusso di lavoro creato",
+        "downloadWorkflow": "Salva su file",
+        "uploadWorkflow": "Carica da file"
+    },
+    "app": {
+        "storeNotInitialized": "Il negozio non è inizializzato"
     }
 }

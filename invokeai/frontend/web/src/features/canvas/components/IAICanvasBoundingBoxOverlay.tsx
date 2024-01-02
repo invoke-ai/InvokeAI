@@ -1,38 +1,28 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isEqual } from 'lodash-es';
-
-import { Group, Rect } from 'react-konva';
-import { canvasSelector } from '../store/canvasSelectors';
 import { memo } from 'react';
+import { Group, Rect } from 'react-konva';
 
-const selector = createSelector(
-  canvasSelector,
-  (canvas) => {
-    const {
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      stageDimensions,
-      stageScale,
-      shouldDarkenOutsideBoundingBox,
-      stageCoordinates,
-    } = canvas;
+const selector = createMemoizedSelector(stateSelector, ({ canvas }) => {
+  const {
+    boundingBoxCoordinates,
+    boundingBoxDimensions,
+    stageDimensions,
+    stageScale,
+    shouldDarkenOutsideBoundingBox,
+    stageCoordinates,
+  } = canvas;
 
-    return {
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      shouldDarkenOutsideBoundingBox,
-      stageCoordinates,
-      stageDimensions,
-      stageScale,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+  return {
+    boundingBoxCoordinates,
+    boundingBoxDimensions,
+    shouldDarkenOutsideBoundingBox,
+    stageCoordinates,
+    stageDimensions,
+    stageScale,
+  };
+});
 const IAICanvasBoundingBoxOverlay = () => {
   const {
     boundingBoxCoordinates,
@@ -44,7 +34,7 @@ const IAICanvasBoundingBoxOverlay = () => {
   } = useAppSelector(selector);
 
   return (
-    <Group>
+    <Group listening={false}>
       <Rect
         offsetX={stageCoordinates.x / stageScale}
         offsetY={stageCoordinates.y / stageScale}

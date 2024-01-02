@@ -1,5 +1,5 @@
+import { $authToken } from 'app/store/nanostores/authToken';
 import { useCallback } from 'react';
-import { $authToken } from 'services/api/client';
 
 /**
  * Converts an image URL to a Blob by creating an <img /> element, drawing it to canvas

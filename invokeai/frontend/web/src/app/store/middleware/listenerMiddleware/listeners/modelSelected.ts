@@ -7,16 +7,17 @@ import {
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
+  heightChanged,
   modelChanged,
-  setHeight,
-  setWidth,
   vaeSelected,
+  widthChanged,
 } from 'features/parameters/store/generationSlice';
-import { zMainOrOnnxModel } from 'features/parameters/types/parameterSchemas';
+import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
+
 import { startAppListening } from '..';
 
 export const addModelSelectedListener = () => {
@@ -26,7 +27,7 @@ export const addModelSelectedListener = () => {
       const log = logger('models');
 
       const state = getState();
-      const result = zMainOrOnnxModel.safeParse(action.payload);
+      const result = zParameterModel.safeParse(action.payload);
 
       if (!result.success) {
         log.error(
@@ -89,12 +90,12 @@ export const addModelSelectedListener = () => {
         state.ui.shouldAutoChangeDimensions
       ) {
         if (['sdxl', 'sdxl-refiner'].includes(newModel.base_model)) {
-          dispatch(setWidth(1024));
-          dispatch(setHeight(1024));
+          dispatch(widthChanged(1024));
+          dispatch(heightChanged(1024));
           dispatch(setBoundingBoxDimensions({ width: 1024, height: 1024 }));
         } else {
-          dispatch(setWidth(512));
-          dispatch(setHeight(512));
+          dispatch(widthChanged(512));
+          dispatch(heightChanged(512));
           dispatch(setBoundingBoxDimensions({ width: 512, height: 512 }));
         }
       }

@@ -1,9 +1,11 @@
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { RequiredMidasDepthImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { RequiredMidasDepthImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
+
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor
@@ -45,32 +47,30 @@ const MidasDepthProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <IAISlider
-        label={t('controlnet.amult')}
-        value={a_mult}
-        onChange={handleAMultChanged}
-        handleReset={handleAMultReset}
-        withReset
-        min={0}
-        max={20}
-        step={0.01}
-        withInput
-        withSliderMarks
-        isDisabled={!isEnabled}
-      />
-      <IAISlider
-        label={t('controlnet.bgth')}
-        value={bg_th}
-        onChange={handleBgThChanged}
-        handleReset={handleBgThReset}
-        withReset
-        min={0}
-        max={20}
-        step={0.01}
-        withInput
-        withSliderMarks
-        isDisabled={!isEnabled}
-      />
+      <InvControl label={t('controlnet.amult')} isDisabled={!isEnabled}>
+        <InvSlider
+          value={a_mult}
+          onChange={handleAMultChanged}
+          onReset={handleAMultReset}
+          min={0}
+          max={20}
+          step={0.01}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.bgth')} isDisabled={!isEnabled}>
+        <InvSlider
+          value={bg_th}
+          onChange={handleBgThChanged}
+          onReset={handleBgThReset}
+          min={0}
+          max={20}
+          step={0.01}
+          marks
+          withNumberInput
+        />
+      </InvControl>
     </ProcessorWrapper>
   );
 };

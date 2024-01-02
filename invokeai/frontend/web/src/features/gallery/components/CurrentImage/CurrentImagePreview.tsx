@@ -1,27 +1,29 @@
-import { Box, Flex, Image } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { Box, Flex } from '@chakra-ui/react';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import {
+import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
+import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
+import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
+import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import { isEqual } from 'lodash-es';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import ImageMetadataViewer from '../ImageMetadataViewer/ImageMetadataViewer';
-import NextPrevImageButtons from '../NextPrevImageButtons';
-import { useTranslation } from 'react-i18next';
 
-export const imagesSelector = createSelector(
+export const imagesSelector = createMemoizedSelector(
   [stateSelector, selectLastSelectedImage],
   ({ ui, system }, lastSelectedImage) => {
     const {
@@ -29,20 +31,14 @@ export const imagesSelector = createSelector(
       shouldHidePreview,
       shouldShowProgressInViewer,
     } = ui;
-    const { denoiseProgress, shouldAntialiasProgressImage } = system;
+    const { denoiseProgress } = system;
     return {
       shouldShowImageDetails,
       shouldHidePreview,
       imageName: lastSelectedImage?.image_name,
-      denoiseProgress,
+      hasDenoiseProgress: Boolean(denoiseProgress),
       shouldShowProgressInViewer,
-      shouldAntialiasProgressImage,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 
@@ -50,9 +46,8 @@ const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
     imageName,
-    denoiseProgress,
+    hasDenoiseProgress,
     shouldShowProgressInViewer,
-    shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
   const {
@@ -135,31 +130,14 @@ const CurrentImagePreview = () => {
     <Flex
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}
-      sx={{
-        width: 'full',
-        height: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-      }}
+      width="full"
+      height="full"
+      alignItems="center"
+      justifyContent="center"
+      position="relative"
     >
-      {denoiseProgress?.progress_image && shouldShowProgressInViewer ? (
-        <Image
-          src={denoiseProgress.progress_image.dataURL}
-          width={denoiseProgress.progress_image.width}
-          height={denoiseProgress.progress_image.height}
-          draggable={false}
-          data-testid="progress-image"
-          sx={{
-            objectFit: 'contain',
-            maxWidth: 'full',
-            maxHeight: 'full',
-            height: 'auto',
-            position: 'absolute',
-            borderRadius: 'base',
-            imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
-          }}
-        />
+      {hasDenoiseProgress && shouldShowProgressInViewer ? (
+        <ProgressImage />
       ) : (
         <IAIDndImage
           imageDTO={imageDTO}
@@ -170,20 +148,21 @@ const CurrentImagePreview = () => {
           useThumbailFallback
           dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={
-            <IAINoContentFallback icon={FaImage} label="No image selected" />
+            <IAINoContentFallback
+              icon={FaImage}
+              label={t('gallery.noImageSelected')}
+            />
           }
           dataTestId="image-preview"
         />
       )}
       {shouldShowImageDetails && imageDTO && (
         <Box
-          sx={{
-            position: 'absolute',
-            top: '0',
-            width: 'full',
-            height: 'full',
-            borderRadius: 'base',
-          }}
+          position="absolute"
+          top="0"
+          width="full"
+          height="full"
+          borderRadius="base"
         >
           <ImageMetadataViewer image={imageDTO} />
         </Box>
@@ -192,24 +171,10 @@ const CurrentImagePreview = () => {
         {!shouldShowImageDetails && imageDTO && shouldShowNextPrevButtons && (
           <motion.div
             key="nextPrevButtons"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.1 },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 0.1 },
-            }}
-            style={{
-              position: 'absolute',
-              top: '0',
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none',
-            }}
+            initial={initial}
+            animate={animate}
+            exit={exit}
+            style={motionStyles}
           >
             <NextPrevImageButtons />
           </motion.div>
@@ -220,3 +185,22 @@ const CurrentImagePreview = () => {
 };
 
 export default memo(CurrentImagePreview);
+
+const initial: AnimationProps['initial'] = {
+  opacity: 0,
+};
+const animate: AnimationProps['animate'] = {
+  opacity: 1,
+  transition: { duration: 0.1 },
+};
+const exit: AnimationProps['exit'] = {
+  opacity: 0,
+  transition: { duration: 0.1 },
+};
+const motionStyles: CSSProperties = {
+  position: 'absolute',
+  top: '0',
+  width: '100%',
+  height: '100%',
+  pointerEvents: 'none',
+};

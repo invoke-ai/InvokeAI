@@ -1,17 +1,14 @@
 import { logger } from 'app/logging/logger';
-import {
-  MainModelParam,
-  OnnxModelParam,
-  zMainOrOnnxModel,
-} from 'features/parameters/types/parameterSchemas';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
+import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToMainModelParam = (
   mainModelId: string
-): OnnxModelParam | MainModelParam | undefined => {
+): ParameterModel | undefined => {
   const log = logger('models');
   const [base_model, model_type, model_name] = mainModelId.split('/');
 
-  const result = zMainOrOnnxModel.safeParse({
+  const result = zParameterModel.safeParse({
     base_model,
     model_name,
     model_type,

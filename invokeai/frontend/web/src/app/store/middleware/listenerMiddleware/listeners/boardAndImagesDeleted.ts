@@ -4,6 +4,7 @@ import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
+
 import { startAppListening } from '..';
 
 export const addDeleteBoardAndImagesFulfilledListener = () => {

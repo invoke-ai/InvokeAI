@@ -32,9 +32,9 @@ sd-1/main/Analog-Diffusion:
    description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
    repo_id: wavymulder/Analog-Diffusion
    recommended: False
-sd-1/main/Deliberate:
+sd-1/main/Deliberate_v5:
    description: Versatile model that produces detailed images up to 768px (4.27 GB)
-   repo_id: XpucT/Deliberate
+   path: https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v5.safetensors
    recommended: False
 sd-1/main/Dungeons-and-Diffusion:
    description: Dungeons & Dragons characters (2.13 GB)

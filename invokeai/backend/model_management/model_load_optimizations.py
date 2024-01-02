@@ -17,7 +17,7 @@ def skip_torch_weight_init():
     completely unnecessary if the intent is to load checkpoint weights from disk for the layer. This context manager
     monkey-patches common torch layers to skip the weight initialization step.
     """
-    torch_modules = [torch.nn.Linear, torch.nn.modules.conv._ConvNd]
+    torch_modules = [torch.nn.Linear, torch.nn.modules.conv._ConvNd, torch.nn.Embedding]
     saved_functions = [m.reset_parameters for m in torch_modules]
 
     try:
@@ -26,5 +26,5 @@ def skip_torch_weight_init():
 
         yield None
     finally:
-        for torch_module, saved_function in zip(torch_modules, saved_functions):
+        for torch_module, saved_function in zip(torch_modules, saved_functions, strict=True):
             torch_module.reset_parameters = saved_function

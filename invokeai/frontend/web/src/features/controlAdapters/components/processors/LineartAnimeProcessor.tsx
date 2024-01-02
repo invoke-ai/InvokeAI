@@ -1,9 +1,11 @@
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { RequiredLineartAnimeImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { RequiredLineartAnimeImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
+
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.lineart_anime_image_processor
@@ -49,30 +51,34 @@ const LineartAnimeProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <IAISlider
+      <InvControl
         label={t('controlnet.detectResolution')}
-        value={detect_resolution}
-        onChange={handleDetectResolutionChanged}
-        handleReset={handleDetectResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
+      >
+        <InvSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          onReset={handleDetectResolutionReset}
+          min={0}
+          max={4096}
+          withNumberInput
+          marks
+        />
+      </InvControl>
+      <InvControl
         label={t('controlnet.imageResolution')}
-        value={image_resolution}
-        onChange={handleImageResolutionChanged}
-        handleReset={handleImageResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
+      >
+        <InvSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          onReset={handleImageResolutionReset}
+          min={0}
+          max={4096}
+          withNumberInput
+          marks
+        />
+      </InvControl>
     </ProcessorWrapper>
   );
 };

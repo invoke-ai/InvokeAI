@@ -1,34 +1,32 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { useStore } from '@nanostores/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
-import {
-  addPointToCurrentLine,
+  $isDrawing,
   setCursorPosition,
-} from 'features/canvas/store/canvasSlice';
+} from 'features/canvas/store/canvasNanostore';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
+import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { Vector2d } from 'konva/lib/types';
-import { isEqual } from 'lodash-es';
+import type Konva from 'konva';
+import type { Vector2d } from 'konva/lib/types';
+import type { MutableRefObject } from 'react';
+import { useCallback } from 'react';
 
-import { MutableRefObject, useCallback } from 'react';
-import getScaledCursorPosition from '../util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
 
-const selector = createSelector(
-  [activeTabNameSelector, canvasSelector, isStagingSelector],
-  (activeTabName, canvas, isStaging) => {
-    const { tool, isDrawing } = canvas;
+const selector = createMemoizedSelector(
+  [activeTabNameSelector, stateSelector, isStagingSelector],
+  (activeTabName, { canvas }, isStaging) => {
+    const { tool } = canvas;
     return {
       tool,
-      isDrawing,
       activeTabName,
       isStaging,
     };
-  },
-  { memoizeOptions: { resultEqualityCheck: isEqual } }
+  }
 );
 
 const useCanvasMouseMove = (
@@ -37,7 +35,8 @@ const useCanvasMouseMove = (
   lastCursorPositionRef: MutableRefObject<Vector2d>
 ) => {
   const dispatch = useAppDispatch();
-  const { isDrawing, tool, isStaging } = useAppSelector(selector);
+  const isDrawing = useStore($isDrawing);
+  const { tool, isStaging } = useAppSelector(selector);
   const { updateColorUnderCursor } = useColorPicker();
 
   return useCallback(() => {
@@ -51,7 +50,7 @@ const useCanvasMouseMove = (
       return;
     }
 
-    dispatch(setCursorPosition(scaledCursorPosition));
+    setCursorPosition(scaledCursorPosition);
 
     lastCursorPositionRef.current = scaledCursorPosition;
 

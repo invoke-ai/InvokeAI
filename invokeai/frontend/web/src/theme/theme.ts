@@ -1,26 +1,45 @@
-import { ThemeOverride, ToastProviderProps } from '@chakra-ui/react';
-import { InvokeAIColors } from './colors/colors';
-import { accordionTheme } from './components/accordion';
-import { buttonTheme } from './components/button';
-import { checkboxTheme } from './components/checkbox';
-import { editableTheme } from './components/editable';
-import { formLabelTheme } from './components/formLabel';
-import { inputTheme } from './components/input';
-import { menuTheme } from './components/menu';
-import { modalTheme } from './components/modal';
-import { numberInputTheme } from './components/numberInput';
-import { popoverTheme } from './components/popover';
-import { progressTheme } from './components/progress';
-import { no_scrollbar } from './components/scrollbar';
-import { selectTheme } from './components/select';
-import { skeletonTheme } from './components/skeleton';
-import { sliderTheme } from './components/slider';
-import { switchTheme } from './components/switch';
-import { tabsTheme } from './components/tabs';
-import { textTheme } from './components/text';
-import { textareaTheme } from './components/textarea';
-import { tooltipTheme } from './components/tooltip';
-import { reactflowStyles } from './custom/reactflow';
+import type { ThemeOverride, ToastProviderProps } from '@chakra-ui/react';
+import { accordionTheme } from 'common/components/InvAccordion/theme';
+import { badgeTheme } from 'common/components/InvBadge/theme';
+import { buttonTheme } from 'common/components/InvButton/theme';
+import { cardTheme } from 'common/components/InvCard/theme';
+import { checkboxTheme } from 'common/components/InvCheckbox/theme';
+import {
+  formErrorTheme,
+  formLabelTheme,
+  formTheme,
+} from 'common/components/InvControl/theme';
+import { editableTheme } from 'common/components/InvEditable/theme';
+import { headingTheme } from 'common/components/InvHeading/theme';
+import { inputTheme } from 'common/components/InvInput/theme';
+import { menuTheme } from 'common/components/InvMenu/theme';
+import { modalTheme } from 'common/components/InvModal/theme';
+import { numberInputTheme } from 'common/components/InvNumberInput/theme';
+import { popoverTheme } from 'common/components/InvPopover/theme';
+import { progressTheme } from 'common/components/InvProgress/theme';
+import { skeletonTheme } from 'common/components/InvSkeleton/theme';
+import { sliderTheme } from 'common/components/InvSlider/theme';
+import { switchTheme } from 'common/components/InvSwitch/theme';
+import { tabsTheme } from 'common/components/InvTabs/theme';
+import { textTheme } from 'common/components/InvText/theme';
+import { textareaTheme } from 'common/components/InvTextarea/theme';
+import { tooltipTheme } from 'common/components/InvTooltip/theme';
+import { resizeHandleTheme } from 'features/ui/components/tabs/ResizeHandle';
+
+import {
+  InvokeAIColors,
+  layerStyleBody,
+  layerStyleDanger,
+  layerStyleFirst,
+  layerStyleNodeBody,
+  layerStyleNodeFooter,
+  layerStyleNodeHeader,
+  layerStyleSecond,
+  layerStyleThird,
+} from './colors';
+import { reactflowStyles } from './reactflow';
+import { no_scrollbar } from './scrollbar';
+import { space } from './space';
 
 export const theme: ThemeOverride = {
   config: {
@@ -29,126 +48,112 @@ export const theme: ThemeOverride = {
     useSystemColorMode: false,
   },
   layerStyles: {
-    body: {
-      bg: 'base.50',
-      color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.50' },
-    },
-    first: {
-      bg: 'base.100',
-      color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.850', color: 'base.100' },
-    },
-    second: {
-      bg: 'base.200',
-      color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
-    },
-    third: {
-      bg: 'base.300',
-      color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.750', color: 'base.100' },
-    },
-    nodeBody: {
-      bg: 'base.100',
-      color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
-    },
-    nodeHeader: {
-      bg: 'base.200',
-      color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.100' },
-    },
-    nodeFooter: {
-      bg: 'base.200',
-      color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.100' },
-    },
+    body: layerStyleBody,
+    first: layerStyleFirst,
+    second: layerStyleSecond,
+    third: layerStyleThird,
+    nodeBody: layerStyleNodeBody,
+    nodeHeader: layerStyleNodeHeader,
+    nodeFooter: layerStyleNodeFooter,
+    danger: layerStyleDanger,
   },
   styles: {
     global: () => ({
-      layerStyle: 'body',
+      body: { bg: 'base.900', color: 'base.50' },
       '*': { ...no_scrollbar },
       ...reactflowStyles,
     }),
   },
+  radii: {
+    base: '4px',
+    lg: '8px',
+    md: '4px',
+    sm: '2px',
+  },
   direction: 'ltr',
   fonts: {
-    body: `'Inter Variable', sans-serif`,
-    heading: `'Inter Variable', sans-serif`,
+    body: "'Inter Variable', sans-serif",
+    heading: "'Inter Variable', sans-serif",
   },
   shadows: {
-    light: {
-      accent: `0 0 10px 0 var(--invokeai-colors-accent-300)`,
-      accentHover: `0 0 10px 0 var(--invokeai-colors-accent-400)`,
-      ok: `0 0 7px var(--invokeai-colors-ok-600)`,
-      working: `0 0 7px var(--invokeai-colors-working-600)`,
-      error: `0 0 7px var(--invokeai-colors-error-600)`,
-    },
-    dark: {
-      accent: `0 0 10px 0 var(--invokeai-colors-accent-600)`,
-      accentHover: `0 0 10px 0 var(--invokeai-colors-accent-500)`,
-      ok: `0 0 7px var(--invokeai-colors-ok-400)`,
-      working: `0 0 7px var(--invokeai-colors-working-400)`,
-      error: `0 0 7px var(--invokeai-colors-error-400)`,
-    },
-    selected: {
-      light:
-        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
-      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-500)',
-    },
-    hoverSelected: {
-      light:
-        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-500)',
-      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
-    },
-    hoverUnselected: {
-      light:
-        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 3px var(--invokeai-colors-accent-500)',
-      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 3px var(--invokeai-colors-accent-400)',
-    },
-    nodeSelected: {
-      light: `0 0 0 3px var(--invokeai-colors-accent-400)`,
-      dark: `0 0 0 3px var(--invokeai-colors-accent-500)`,
-    },
-    nodeHovered: {
-      light: `0 0 0 2px var(--invokeai-colors-accent-500)`,
-      dark: `0 0 0 2px var(--invokeai-colors-accent-400)`,
-    },
-    nodeHoveredSelected: {
-      light: `0 0 0 3px var(--invokeai-colors-accent-500)`,
-      dark: `0 0 0 3px var(--invokeai-colors-accent-400)`,
-    },
-    nodeInProgress: {
-      light:
-        '0 0 0 2px var(--invokeai-colors-accent-500), 0 0 10px 2px var(--invokeai-colors-accent-600)',
-      dark: '0 0 0 2px var(--invokeai-colors-yellow-400), 0 0 20px 2px var(--invokeai-colors-orange-700)',
-    },
+    blue: '0 0 10px 0 var(--invokeai-colors-blue-600)',
+    blueHover: '0 0 10px 0 var(--invokeai-colors-blue-500)',
+    ok: '0 0 7px var(--invokeai-colors-ok-400)',
+    working: '0 0 7px var(--invokeai-colors-working-400)',
+    error: '0 0 7px var(--invokeai-colors-error-400)',
+    selected:
+      '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-blue-500)',
+    hoverSelected:
+      '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-blue-400)',
+    hoverUnselected:
+      '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 3px var(--invokeai-colors-blue-400)',
+    nodeSelected: '0 0 0 3px var(--invokeai-colors-blue-500)',
+    nodeHovered: '0 0 0 2px var(--invokeai-colors-blue-400)',
+    nodeHoveredSelected: '0 0 0 3px var(--invokeai-colors-blue-400)',
+    nodeInProgress:
+      '0 0 0 2px var(--invokeai-colors-yellow-400), 0 0 20px 2px var(--invokeai-colors-orange-700)',
   },
   colors: InvokeAIColors,
   components: {
-    Button: buttonTheme, // Button and IconButton
-    Input: inputTheme,
-    Editable: editableTheme,
-    Textarea: textareaTheme,
-    Tabs: tabsTheme,
-    Progress: progressTheme,
     Accordion: accordionTheme,
+    Badge: badgeTheme,
+    Button: buttonTheme,
+    Card: cardTheme,
+    Checkbox: checkboxTheme,
+    Editable: editableTheme,
+    Form: formTheme,
     FormLabel: formLabelTheme,
-    Switch: switchTheme,
+    Heading: headingTheme,
+    Input: inputTheme,
+    Menu: menuTheme,
+    Modal: modalTheme,
     NumberInput: numberInputTheme,
-    Select: selectTheme,
+    Popover: popoverTheme,
+    Progress: progressTheme,
     Skeleton: skeletonTheme,
     Slider: sliderTheme,
-    Popover: popoverTheme,
-    Modal: modalTheme,
-    Checkbox: checkboxTheme,
-    Menu: menuTheme,
+    Switch: switchTheme,
+    Tabs: tabsTheme, // WIP
     Text: textTheme,
+    Textarea: textareaTheme,
     Tooltip: tooltipTheme,
+    FormError: formErrorTheme,
+    ResizeHandle: resizeHandleTheme,
   },
+  space: space,
+  sizes: space,
+  fontSizes: {
+    xs: '0.65rem',
+    sm: '0.75rem',
+    md: '0.9rem',
+    lg: '1.025rem',
+    xl: '1.15rem',
+    '2xl': '1.3rem',
+    '3xl': '1.575rem',
+    '4xl': '1.925rem',
+    '5xl': '2.5rem',
+    '6xl': '3.25rem',
+    '7xl': '4rem',
+    '8xl': '6rem',
+    '9xl': '8rem',
+  },
+  // fontSizes: {
+  //   xs: '0.5rem',
+  //   sm: '0.75rem',
+  //   md: '0.875rem',
+  //   lg: '1rem',
+  //   xl: '1.125rem',
+  //   '2xl': '1.25rem',
+  //   '3xl': '1.5rem',
+  //   '4xl': '1.875rem',
+  //   '5xl': '2.25rem',
+  //   '6xl': '3rem',
+  //   '7xl': '3.75rem',
+  //   '8xl': '4.5rem',
+  //   '9xl': '6rem',
+  // },
 };
 
 export const TOAST_OPTIONS: ToastProviderProps = {
-  defaultOptions: { isClosable: true },
+  defaultOptions: { isClosable: true, position: 'bottom-right' },
 };

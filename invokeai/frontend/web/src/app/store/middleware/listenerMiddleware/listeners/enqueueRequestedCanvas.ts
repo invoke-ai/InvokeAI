@@ -10,11 +10,12 @@ import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
-import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
-import { prepareLinearUIBatch } from 'features/nodes/util/graphBuilders/buildLinearBatchConfig';
+import { buildCanvasGraph } from 'features/nodes/util/graph/buildCanvasGraph';
+import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
+
 import { startAppListening } from '..';
 
 /**

@@ -1,4 +1,4 @@
-import { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@chakra-ui/react';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
@@ -11,8 +11,9 @@ import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
+import { imagesApi } from 'services/api/endpoints/images';
+
 import { startAppListening } from '..';
-import { imagesApi } from '../../../../../services/api/endpoints/images';
 
 export const addImageUploadedFulfilledListener = () => {
   startAppListening({
@@ -79,7 +80,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: t('toast.setCanvasInitialImage'),
+            description: t('toast.setAsCanvasInitialImage'),
           })
         );
         return;

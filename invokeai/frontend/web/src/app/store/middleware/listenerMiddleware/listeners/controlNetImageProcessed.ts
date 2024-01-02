@@ -8,14 +8,14 @@ import {
   selectControlAdapterById,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { SAVE_IMAGE } from 'features/nodes/util/graphBuilders/constants';
+import { isImageOutput } from 'features/nodes/types/common';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import { isImageOutput } from 'services/api/guards';
-import { BatchConfig, ImageDTO } from 'services/api/types';
+import type { BatchConfig, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
+
 import { startAppListening } from '..';
 
 export const addControlNetImageProcessedListener = () => {
@@ -38,6 +38,7 @@ export const addControlNetImageProcessedListener = () => {
       // ControlNet one-off procressing graph is just the processor node, no edges.
       // Also we need to grab the image.
 
+      const nodeId = ca.processorNode.id;
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
@@ -46,27 +47,10 @@ export const addControlNetImageProcessedListener = () => {
               [ca.processorNode.id]: {
                 ...ca.processorNode,
                 is_intermediate: true,
+                use_cache: false,
                 image: { image_name: ca.controlImage },
               },
-              [SAVE_IMAGE]: {
-                id: SAVE_IMAGE,
-                type: 'save_image',
-                is_intermediate: true,
-                use_cache: false,
-              },
             },
-            edges: [
-              {
-                source: {
-                  node_id: ca.processorNode.id,
-                  field: 'image',
-                },
-                destination: {
-                  node_id: SAVE_IMAGE,
-                  field: 'image',
-                },
-              },
-            ],
           },
           runs: 1,
         },
@@ -90,7 +74,7 @@ export const addControlNetImageProcessedListener = () => {
             socketInvocationComplete.match(action) &&
             action.payload.data.queue_batch_id ===
               enqueueResult.batch.batch_id &&
-            action.payload.data.source_node_id === SAVE_IMAGE
+            action.payload.data.source_node_id === nodeId
         );
 
         // We still have to check the output type
@@ -126,20 +110,9 @@ export const addControlNetImageProcessedListener = () => {
           t('queue.graphFailedToQueue')
         );
 
-        // handle usage-related errors
         if (error instanceof Object) {
           if ('data' in error && 'status' in error) {
             if (error.status === 403) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const detail = (error.data as any)?.detail || 'Unknown Error';
-              dispatch(
-                addToast({
-                  title: t('queue.graphFailedToQueue'),
-                  status: 'error',
-                  description: detail,
-                  duration: 15000,
-                })
-              );
               dispatch(pendingControlImagesCleared());
               dispatch(controlAdapterImageChanged({ id, controlImage: null }));
               return;

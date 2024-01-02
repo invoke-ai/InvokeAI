@@ -1,7 +1,8 @@
+import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
-import { useResumeProcessor } from '../hooks/useResumeProcessor';
+
 import QueueButton from './common/QueueButton';
 
 type Props = {

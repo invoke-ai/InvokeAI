@@ -1,19 +1,21 @@
-import { Heading, Text } from '@chakra-ui/react';
+import { Heading } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvText } from 'common/components/InvText/wrapper';
+import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { useCallback } from 'react';
+import { addToast } from 'features/system/store/systemSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import IAIButton from '../../../../common/components/IAIButton';
 import {
   useClearIntermediatesMutation,
   useGetIntermediatesCountQuery,
-} from '../../../../services/api/endpoints/images';
-import { resetCanvas } from '../../../canvas/store/canvasSlice';
-import { addToast } from '../../store/systemSlice';
+} from 'services/api/endpoints/images';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+
 import StyledFlex from './StyledFlex';
 
-export default function SettingsClearIntermediates() {
+const SettingsClearIntermediates = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -62,7 +64,7 @@ export default function SettingsClearIntermediates() {
   return (
     <StyledFlex>
       <Heading size="sm">{t('settings.clearIntermediates')}</Heading>
-      <IAIButton
+      <InvButton
         tooltip={
           hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined
         }
@@ -74,10 +76,18 @@ export default function SettingsClearIntermediates() {
         {t('settings.clearIntermediatesWithCount', {
           count: intermediatesCount ?? 0,
         })}
-      </IAIButton>
-      <Text fontWeight="bold">{t('settings.clearIntermediatesDesc1')}</Text>
-      <Text variant="subtext">{t('settings.clearIntermediatesDesc2')}</Text>
-      <Text variant="subtext">{t('settings.clearIntermediatesDesc3')}</Text>
+      </InvButton>
+      <InvText fontWeight="bold">
+        {t('settings.clearIntermediatesDesc1')}
+      </InvText>
+      <InvText variant="subtext">
+        {t('settings.clearIntermediatesDesc2')}
+      </InvText>
+      <InvText variant="subtext">
+        {t('settings.clearIntermediatesDesc3')}
+      </InvText>
     </StyledFlex>
   );
-}
+};
+
+export default memo(SettingsClearIntermediates);

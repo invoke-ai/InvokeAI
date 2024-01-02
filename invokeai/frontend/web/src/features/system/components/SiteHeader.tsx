@@ -1,13 +1,14 @@
+import { Flex, Spacer, useDisclosure } from '@chakra-ui/react';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import {
-  Flex,
-  Menu,
-  MenuButton,
-  MenuGroup,
-  MenuItem,
-  MenuList,
-  Spacer,
-} from '@chakra-ui/react';
-import IAIIconButton from 'common/components/IAIIconButton';
+  InvMenu,
+  InvMenuButton,
+  InvMenuGroup,
+} from 'common/components/InvMenu/wrapper';
+import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,8 +19,7 @@ import {
   FaGithub,
   FaKeyboard,
 } from 'react-icons/fa';
-import { menuListMotionProps } from 'theme/components/menu';
-import { useFeatureStatus } from '../hooks/useFeatureStatus';
+
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 import InvokeAILogoComponent from './InvokeAILogoComponent';
 import SettingsModal from './SettingsModal/SettingsModal';
@@ -27,6 +27,8 @@ import StatusIndicator from './StatusIndicator';
 
 const SiteHeader = () => {
   const { t } = useTranslation();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  useGlobalMenuCloseTrigger(onClose);
 
   const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
   const isDiscordLinkEnabled = useFeatureStatus('discordLink').isFeatureEnabled;
@@ -36,71 +38,66 @@ const SiteHeader = () => {
   const discordLink = 'https://discord.gg/ZmtBAhwWhy';
 
   return (
-    <Flex
-      sx={{
-        gap: 2,
-        alignItems: 'center',
-      }}
-    >
+    <Flex gap={2} alignItems="center">
       <InvokeAILogoComponent />
       <Spacer />
       <StatusIndicator />
 
-      <Menu>
-        <MenuButton
-          as={IAIIconButton}
+      <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
+        <InvMenuButton
+          as={InvIconButton}
           variant="link"
           aria-label={t('accessibility.menu')}
           icon={<FaBars />}
-          sx={{ boxSize: 8 }}
+          boxSize={8}
         />
-        <MenuList motionProps={menuListMotionProps}>
-          <MenuGroup title={t('common.communityLabel')}>
+        <InvMenuList>
+          <InvMenuGroup title={t('common.communityLabel')}>
             {isGithubLinkEnabled && (
-              <MenuItem
+              <InvMenuItem
                 as="a"
                 href={githubLink}
                 target="_blank"
                 icon={<FaGithub />}
               >
                 {t('common.githubLabel')}
-              </MenuItem>
+              </InvMenuItem>
             )}
             {isBugLinkEnabled && (
-              <MenuItem
+              <InvMenuItem
                 as="a"
                 href={`${githubLink}/issues`}
                 target="_blank"
                 icon={<FaBug />}
               >
                 {t('common.reportBugLabel')}
-              </MenuItem>
+              </InvMenuItem>
             )}
             {isDiscordLinkEnabled && (
-              <MenuItem
+              <InvMenuItem
                 as="a"
                 href={discordLink}
                 target="_blank"
                 icon={<FaDiscord />}
               >
                 {t('common.discordLabel')}
-              </MenuItem>
+              </InvMenuItem>
             )}
-          </MenuGroup>
-          <MenuGroup title={t('common.settingsLabel')}>
+          </InvMenuGroup>
+          <InvMenuGroup title={t('common.settingsLabel')}>
             <HotkeysModal>
-              <MenuItem as="button" icon={<FaKeyboard />}>
+              <InvMenuItem as="button" icon={<FaKeyboard />}>
                 {t('common.hotkeysLabel')}
-              </MenuItem>
+              </InvMenuItem>
             </HotkeysModal>
             <SettingsModal>
-              <MenuItem as="button" icon={<FaCog />}>
+              <InvMenuItem as="button" icon={<FaCog />}>
                 {t('common.settingsLabel')}
-              </MenuItem>
+              </InvMenuItem>
             </SettingsModal>
-          </MenuGroup>
-        </MenuList>
-      </Menu>
+          </InvMenuGroup>
+        </InvMenuList>
+      </InvMenu>
     </Flex>
   );
 };

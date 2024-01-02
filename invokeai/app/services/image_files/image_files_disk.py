@@ -7,8 +7,9 @@ from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
-from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
+from invokeai.app.invocations.baseinvocation import MetadataField
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 from .image_files_base import ImageFileStorageBase
@@ -25,7 +26,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
     __invoker: Invoker
 
     def __init__(self, output_folder: Union[str, Path]):
-        self.__cache = dict()
+        self.__cache = {}
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
 
@@ -56,7 +57,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         image: PILImageType,
         image_name: str,
         metadata: Optional[MetadataField] = None,
-        workflow: Optional[WorkflowField] = None,
+        workflow: Optional[WorkflowWithoutID] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
@@ -64,12 +65,19 @@ class DiskImageFileStorage(ImageFileStorageBase):
             image_path = self.get_path(image_name)
 
             pnginfo = PngImagePlugin.PngInfo()
+            info_dict = {}
 
             if metadata is not None:
-                pnginfo.add_text("invokeai_metadata", metadata.model_dump_json())
+                metadata_json = metadata.model_dump_json()
+                info_dict["invokeai_metadata"] = metadata_json
+                pnginfo.add_text("invokeai_metadata", metadata_json)
             if workflow is not None:
-                pnginfo.add_text("invokeai_workflow", workflow.model_dump_json())
+                workflow_json = workflow.model_dump_json()
+                info_dict["invokeai_workflow"] = workflow_json
+                pnginfo.add_text("invokeai_workflow", workflow_json)
 
+            # When saving the image, the image object's info field is not populated. We need to set it
+            image.info = info_dict
             image.save(
                 image_path,
                 "PNG",
@@ -120,6 +128,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """Validates the path given for an image or thumbnail."""
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()
+
+    def get_workflow(self, image_name: str) -> WorkflowWithoutID | None:
+        image = self.get(image_name)
+        workflow = image.info.get("invokeai_workflow", None)
+        if workflow is not None:
+            return WorkflowWithoutID.model_validate_json(workflow)
+        return None
 
     def __validate_storage_folders(self) -> None:
         """Checks if the required output folders exist and create them if they don't"""

@@ -1,26 +1,28 @@
-import { EntityState, createEntityAdapter } from '@reduxjs/toolkit';
+import type { EntityState } from '@reduxjs/toolkit';
+import { createEntityAdapter } from '@reduxjs/toolkit';
 import { cloneDeep } from 'lodash-es';
-import {
+import queryString from 'query-string';
+import type { operations, paths } from 'services/api/schema';
+import type {
   AnyModelConfig,
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
-  IPAdapterModelConfig,
-  T2IAdapterModelConfig,
   DiffusersModelConfig,
   ImportModelConfig,
+  IPAdapterModelConfig,
   LoRAModelConfig,
   MainModelConfig,
-  OnnxModelConfig,
   MergeModelConfig,
+  ModelType,
+  OnnxModelConfig,
+  T2IAdapterModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
-  ModelType,
 } from 'services/api/types';
 
-import queryString from 'query-string';
-import { ApiTagDescription, LIST_TAG, api } from '..';
-import { operations, paths } from '../schema';
+import type { ApiTagDescription } from '..';
+import { api, LIST_TAG } from '..';
 
 export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
 export type CheckpointModelConfigEntity = CheckpointModelConfig & {
@@ -52,7 +54,7 @@ export type TextualInversionModelConfigEntity = TextualInversionModelConfig & {
 
 export type VaeModelConfigEntity = VaeModelConfig & { id: string };
 
-type AnyModelConfigEntity =
+export type AnyModelConfigEntity =
   | MainModelConfigEntity
   | OnnxModelConfigEntity
   | LoRAModelConfigEntity
@@ -136,7 +138,6 @@ type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-
 const onnxModelsAdapter = createEntityAdapter<OnnxModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
@@ -167,7 +168,8 @@ export const getModelId = ({
   base_model,
   model_type,
   model_name,
-}: AnyModelConfig) => `${base_model}/${model_type}/${model_name}`;
+}: Pick<AnyModelConfig, 'base_model' | 'model_name' | 'model_type'>) =>
+  `${base_model}/${model_type}/${model_name}`;
 
 const createModelEntities = <T extends AnyModelConfigEntity>(
   models: AnyModelConfig[]
@@ -186,7 +188,7 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getOnnxModels: build.query<
-      EntityState<OnnxModelConfigEntity>,
+      EntityState<OnnxModelConfigEntity, string>,
       BaseModelType[]
     >({
       query: (base_models) => {
@@ -226,7 +228,7 @@ export const modelsApi = api.injectEndpoints({
       },
     }),
     getMainModels: build.query<
-      EntityState<MainModelConfigEntity>,
+      EntityState<MainModelConfigEntity, string>,
       BaseModelType[]
     >({
       query: (base_models) => {
@@ -345,7 +347,10 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
+    getLoRAModels: build.query<
+      EntityState<LoRAModelConfigEntity, string>,
+      void
+    >({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
       providesTags: (result) => {
         const tags: ApiTagDescription[] = [
@@ -400,7 +405,7 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
     }),
     getControlNetModels: build.query<
-      EntityState<ControlNetModelConfigEntity>,
+      EntityState<ControlNetModelConfigEntity, string>,
       void
     >({
       query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
@@ -432,7 +437,7 @@ export const modelsApi = api.injectEndpoints({
       },
     }),
     getIPAdapterModels: build.query<
-      EntityState<IPAdapterModelConfigEntity>,
+      EntityState<IPAdapterModelConfigEntity, string>,
       void
     >({
       query: () => ({ url: 'models/', params: { model_type: 'ip_adapter' } }),
@@ -464,7 +469,7 @@ export const modelsApi = api.injectEndpoints({
       },
     }),
     getT2IAdapterModels: build.query<
-      EntityState<T2IAdapterModelConfigEntity>,
+      EntityState<T2IAdapterModelConfigEntity, string>,
       void
     >({
       query: () => ({ url: 'models/', params: { model_type: 't2i_adapter' } }),
@@ -495,7 +500,7 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
-    getVaeModels: build.query<EntityState<VaeModelConfigEntity>, void>({
+    getVaeModels: build.query<EntityState<VaeModelConfigEntity, string>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
       providesTags: (result) => {
         const tags: ApiTagDescription[] = [
@@ -525,7 +530,7 @@ export const modelsApi = api.injectEndpoints({
       },
     }),
     getTextualInversionModels: build.query<
-      EntityState<TextualInversionModelConfigEntity>,
+      EntityState<TextualInversionModelConfigEntity, string>,
       void
     >({
       query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),

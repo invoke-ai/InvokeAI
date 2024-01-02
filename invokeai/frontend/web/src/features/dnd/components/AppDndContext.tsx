@@ -1,21 +1,19 @@
-import {
-  DragOverlay,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
+import { MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { logger } from 'app/logging/logger';
 import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
-import { AnimatePresence, motion } from 'framer-motion';
-import { PropsWithChildren, memo, useCallback, useState } from 'react';
-import { useScaledModifer } from '../hooks/useScaledCenteredModifer';
-import { DragEndEvent, DragStartEvent, TypesafeDraggableData } from '../types';
-import { customPointerWithin } from '../util/customPointerWithin';
+import DndOverlay from 'features/dnd/components/DndOverlay';
+import type {
+  DragEndEvent,
+  DragStartEvent,
+  TypesafeDraggableData,
+} from 'features/dnd/types';
+import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
+import type { PropsWithChildren } from 'react';
+import { memo, useCallback, useState } from 'react';
+
 import { DndContextTypesafe } from './DndContextTypesafe';
-import DragPreview from './DragPreview';
 
 const AppDndContext = (props: PropsWithChildren) => {
   const [activeDragData, setActiveDragData] =
@@ -70,8 +68,6 @@ const AppDndContext = (props: PropsWithChildren) => {
 
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  const scaledModifier = useScaledModifer();
-
   return (
     <DndContextTypesafe
       onDragStart={handleDragStart}
@@ -81,38 +77,7 @@ const AppDndContext = (props: PropsWithChildren) => {
       autoScroll={false}
     >
       {props.children}
-      <DragOverlay
-        dropAnimation={null}
-        modifiers={[scaledModifier]}
-        style={{
-          width: 'min-content',
-          height: 'min-content',
-          cursor: 'grabbing',
-          userSelect: 'none',
-          // expand overlay to prevent cursor from going outside it and displaying
-          padding: '10rem',
-        }}
-      >
-        <AnimatePresence>
-          {activeDragData && (
-            <motion.div
-              layout
-              key="overlay-drag-image"
-              initial={{
-                opacity: 0,
-                scale: 0.7,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                transition: { duration: 0.1 },
-              }}
-            >
-              <DragPreview dragData={activeDragData} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </DragOverlay>
+      <DndOverlay activeDragData={activeDragData} />
     </DndContextTypesafe>
   );
 };

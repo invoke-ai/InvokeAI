@@ -1,10 +1,11 @@
-import { UseToastOptions } from '@chakra-ui/react';
-import { EntityState } from '@reduxjs/toolkit';
-import { components, paths } from './schema';
+import type { UseToastOptions } from '@chakra-ui/react';
+import type { EntityState } from '@reduxjs/toolkit';
+import type { components, paths } from 'services/api/schema';
+import type { O } from 'ts-toolbelt';
 
 type s = components['schemas'];
 
-export type ImageCache = EntityState<ImageDTO>;
+export type ImageCache = EntityState<ImageDTO, string>;
 
 export type ListImagesArgs = NonNullable<
   paths['/api/v1/images/']['get']['parameters']['query']
@@ -27,8 +28,9 @@ export type BatchConfig =
 
 export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
 
-export type _InputField = s['_InputField'];
-export type _OutputField = s['_OutputField'];
+export type InputFieldJSONSchemaExtra = s['InputFieldJSONSchemaExtra'];
+export type OutputFieldJSONSchemaExtra = s['OutputFieldJSONSchemaExtra'];
+export type InvocationJSONSchemaExtra = s['UIConfigBase'];
 
 // App Info
 export type AppVersion = s['AppVersion'];
@@ -48,17 +50,20 @@ export type OffsetPaginatedResults_ImageDTO_ =
   s['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
-export type ModelType = s['ModelType'];
+export type ModelType =
+  s['invokeai__backend__model_management__models__base__ModelType'];
 export type SubModelType = s['SubModelType'];
-export type BaseModelType = s['BaseModelType'];
+export type BaseModelType =
+  s['invokeai__backend__model_management__models__base__BaseModelType'];
 export type MainModelField = s['MainModelField'];
 export type OnnxModelField = s['OnnxModelField'];
 export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
+export type LoRAModelFormat = s['LoRAModelFormat'];
 export type ControlNetModelField = s['ControlNetModelField'];
 export type IPAdapterModelField = s['IPAdapterModelField'];
 export type T2IAdapterModelField = s['T2IAdapterModelField'];
-export type ModelsList = s['ModelsList'];
+export type ModelsList = s['invokeai__app__api__routers__models__ModelsList'];
 export type ControlField = s['ControlField'];
 export type IPAdapterField = s['IPAdapterField'];
 
@@ -103,11 +108,16 @@ export type ImportModelConfig = s['Body_import_model'];
 
 // Graphs
 export type Graph = s['Graph'];
+export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 export type Edge = s['Edge'];
 export type GraphExecutionState = s['GraphExecutionState'];
 export type Batch = s['Batch'];
 export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
 export type SessionQueueItem = s['SessionQueueItem'];
+export type WorkflowRecordOrderBy = s['WorkflowRecordOrderBy'];
+export type SQLiteDirection = s['SQLiteDirection'];
+export type WorkflowDTO = s['WorkflowRecordDTO'];
+export type WorkflowRecordListItemDTO = s['WorkflowRecordListItemDTO'];
 
 // General nodes
 export type CollectInvocation = s['CollectInvocation'];
@@ -127,7 +137,6 @@ export type CompelInvocation = s['CompelInvocation'];
 export type DynamicPromptInvocation = s['DynamicPromptInvocation'];
 export type NoiseInvocation = s['NoiseInvocation'];
 export type DenoiseLatentsInvocation = s['DenoiseLatentsInvocation'];
-export type ResizeLatentsInvocation = s['ResizeLatentsInvocation'];
 export type ONNXTextToLatentsInvocation = s['ONNXTextToLatentsInvocation'];
 export type SDXLLoraLoaderInvocation = s['SDXLLoraLoaderInvocation'];
 export type ImageToLatentsInvocation = s['ImageToLatentsInvocation'];
@@ -141,7 +150,7 @@ export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
-export type SaveImageInvocation = s['SaveImageInvocation'];
+export type LinearUIOutputInvocation = s['LinearUIOutputInvocation'];
 export type MetadataInvocation = s['MetadataInvocation'];
 export type CoreMetadataInvocation = s['CoreMetadataInvocation'];
 export type MetadataItemInvocation = s['MetadataItemInvocation'];

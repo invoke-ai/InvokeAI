@@ -137,7 +137,7 @@ def dest_path(dest=None) -> Path:
         path_completer = PathCompleter(
             only_directories=True,
             expanduser=True,
-            get_paths=lambda: [browse_start],
+            get_paths=lambda: [browse_start],  # noqa: B023
             # get_paths=lambda: [".."].extend(list(browse_start.iterdir()))
         )
 
@@ -149,7 +149,7 @@ def dest_path(dest=None) -> Path:
             completer=path_completer,
             default=str(browse_start) + os.sep,
             vi_mode=True,
-            complete_while_typing=True
+            complete_while_typing=True,
             # Test that this is not needed on Windows
             # complete_style=CompleteStyle.READLINE_LIKE,
         )

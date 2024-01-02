@@ -8,6 +8,10 @@ from pydantic_core import to_jsonable_python
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
+from invokeai.app.services.workflow_records.workflow_records_common import (
+    WorkflowWithoutID,
+    WorkflowWithoutIDValidator,
+)
 from invokeai.app.util.misc import uuid_string
 
 # region Errors
@@ -66,6 +70,9 @@ class Batch(BaseModel):
     batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
     data: Optional[BatchDataCollection] = Field(default=None, description="The batch data collection.")
     graph: Graph = Field(description="The graph to initialize the session with")
+    workflow: Optional[WorkflowWithoutID] = Field(
+        default=None, description="The workflow to initialize the session with"
+    )
     runs: int = Field(
         default=1, ge=1, description="Int stating how many times to iterate through all possible batch indices"
     )
@@ -129,12 +136,12 @@ class Batch(BaseModel):
         return v
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "graph",
                 "runs",
             ]
-        )
+        }
     )
 
 
@@ -164,6 +171,14 @@ def get_session(queue_item_dict: dict) -> GraphExecutionState:
     return session
 
 
+def get_workflow(queue_item_dict: dict) -> Optional[WorkflowWithoutID]:
+    workflow_raw = queue_item_dict.get("workflow", None)
+    if workflow_raw is not None:
+        workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw, strict=False)
+        return workflow
+    return None
+
+
 class SessionQueueItemWithoutGraph(BaseModel):
     """Session queue item without the full graph. Used for serialization."""
 
@@ -191,8 +206,8 @@ class SessionQueueItemWithoutGraph(BaseModel):
         return SessionQueueItemDTO(**queue_item_dict)
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "item_id",
                 "status",
                 "batch_id",
@@ -203,7 +218,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
                 "created_at",
                 "updated_at",
             ]
-        )
+        }
     )
 
 
@@ -213,17 +228,21 @@ class SessionQueueItemDTO(SessionQueueItemWithoutGraph):
 
 class SessionQueueItem(SessionQueueItemWithoutGraph):
     session: GraphExecutionState = Field(description="The fully-populated session to be executed")
+    workflow: Optional[WorkflowWithoutID] = Field(
+        default=None, description="The workflow associated with this queue item"
+    )
 
     @classmethod
     def queue_item_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItem":
         # must parse these manually
         queue_item_dict["field_values"] = get_field_values(queue_item_dict)
         queue_item_dict["session"] = get_session(queue_item_dict)
+        queue_item_dict["workflow"] = get_workflow(queue_item_dict)
         return SessionQueueItem(**queue_item_dict)
 
     model_config = ConfigDict(
-        json_schema_extra=dict(
-            required=[
+        json_schema_extra={
+            "required": [
                 "item_id",
                 "status",
                 "batch_id",
@@ -235,7 +254,7 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
                 "created_at",
                 "updated_at",
             ]
-        )
+        }
     )
 
 
@@ -334,7 +353,7 @@ def populate_graph(graph: Graph, node_field_values: Iterable[NodeFieldValue]) ->
 
 def create_session_nfv_tuples(
     batch: Batch, maximum: int
-) -> Generator[tuple[GraphExecutionState, list[NodeFieldValue]], None, None]:
+) -> Generator[tuple[GraphExecutionState, list[NodeFieldValue], Optional[WorkflowWithoutID]], None, None]:
     """
     Create all graph permutations from the given batch data and graph. Yields tuples
     of the form (graph, batch_data_items) where batch_data_items is the list of BatchDataItems
@@ -355,7 +374,7 @@ def create_session_nfv_tuples(
                 for item in batch_datum.items
             ]
             node_field_values_to_zip.append(node_field_values)
-        data.append(list(zip(*node_field_values_to_zip)))  # type: ignore [arg-type]
+        data.append(list(zip(*node_field_values_to_zip, strict=True)))  # type: ignore [arg-type]
 
     # create generator to yield session,nfv tuples
     count = 0
@@ -365,7 +384,7 @@ def create_session_nfv_tuples(
                 return
             flat_node_field_values = list(chain.from_iterable(d))
             graph = populate_graph(batch.graph, flat_node_field_values)
-            yield (GraphExecutionState(graph=graph), flat_node_field_values)
+            yield (GraphExecutionState(graph=graph), flat_node_field_values, batch.workflow)
             count += 1
 
 
@@ -383,7 +402,7 @@ def calc_session_count(batch: Batch) -> int:
         for batch_datum in batch_datum_list:
             batch_data_items = range(len(batch_datum.items))
             to_zip.append(batch_data_items)
-        data.append(list(zip(*to_zip)))
+        data.append(list(zip(*to_zip, strict=True)))
     data_product = list(product(*data))
     return len(data_product) * batch.runs
 
@@ -391,12 +410,14 @@ def calc_session_count(batch: Batch) -> int:
 class SessionQueueValueToInsert(NamedTuple):
     """A tuple of values to insert into the session_queue table"""
 
+    # Careful with the ordering of this - it must match the insert statement
     queue_id: str  # queue_id
     session: str  # session json
     session_id: str  # session_id
     batch_id: str  # batch_id
     field_values: Optional[str]  # field_values json
     priority: int  # priority
+    workflow: Optional[str]  # workflow json
 
 
 ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
@@ -404,7 +425,7 @@ ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
 
 def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new_queue_items: int) -> ValuesToInsert:
     values_to_insert: ValuesToInsert = []
-    for session, field_values in create_session_nfv_tuples(batch, max_new_queue_items):
+    for session, field_values, workflow in create_session_nfv_tuples(batch, max_new_queue_items):
         # sessions must have unique id
         session.id = uuid_string()
         values_to_insert.append(
@@ -416,6 +437,7 @@ def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new
                 # must use pydantic_encoder bc field_values is a list of models
                 json.dumps(field_values, default=to_jsonable_python) if field_values else None,  # field_values (json)
                 priority,  # priority
+                json.dumps(workflow, default=to_jsonable_python) if workflow else None,  # workflow (json)
             )
         )
     return values_to_insert

@@ -1,31 +1,31 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { useStore } from '@nanostores/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  $cursorPosition,
+  $isMovingBoundingBox,
+  $isTransformingBoundingBox,
+} from 'features/canvas/store/canvasNanostore';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { GroupConfig } from 'konva/lib/Group';
-import { isEqual } from 'lodash-es';
-
-import { Circle, Group } from 'react-konva';
 import {
   COLOR_PICKER_SIZE,
   COLOR_PICKER_STROKE_RADIUS,
-} from '../util/constants';
-import { memo } from 'react';
+} from 'features/canvas/util/constants';
+import type { GroupConfig } from 'konva/lib/Group';
+import { memo, useMemo } from 'react';
+import { Circle, Group } from 'react-konva';
 
-const canvasBrushPreviewSelector = createSelector(
-  canvasSelector,
-  (canvas) => {
+const canvasBrushPreviewSelector = createMemoizedSelector(
+  stateSelector,
+  ({ canvas }) => {
     const {
-      cursorPosition,
       brushSize,
       colorPickerColor,
       maskColor,
       brushColor,
       tool,
       layer,
-      shouldShowBrush,
-      isMovingBoundingBox,
-      isTransformingBoundingBox,
       stageScale,
       stageDimensions,
       boundingBoxCoordinates,
@@ -82,9 +82,6 @@ const canvasBrushPreviewSelector = createSelector(
     //   : undefined;
 
     return {
-      cursorPosition,
-      brushX: cursorPosition ? cursorPosition.x : stageDimensions.width / 2,
-      brushY: cursorPosition ? cursorPosition.y : stageDimensions.height / 2,
       radius: brushSize / 2,
       colorPickerOuterRadius: COLOR_PICKER_SIZE / stageScale,
       colorPickerInnerRadius:
@@ -94,22 +91,11 @@ const canvasBrushPreviewSelector = createSelector(
       colorPickerColorString: rgbaColorToString(colorPickerColor),
       tool,
       layer,
-      shouldShowBrush,
-      shouldDrawBrushPreview:
-        !(
-          isMovingBoundingBox ||
-          isTransformingBoundingBox ||
-          !cursorPosition
-        ) && shouldShowBrush,
       strokeWidth: 1.5 / stageScale,
       dotRadius: 1.5 / stageScale,
       clip,
+      stageDimensions,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 
@@ -117,15 +103,11 @@ const canvasBrushPreviewSelector = createSelector(
  * Draws a black circle around the canvas brush preview.
  */
 const IAICanvasToolPreview = (props: GroupConfig) => {
-  const { ...rest } = props;
   const {
-    brushX,
-    brushY,
     radius,
     maskColorString,
     tool,
     layer,
-    shouldDrawBrushPreview,
     dotRadius,
     strokeWidth,
     brushColorString,
@@ -133,14 +115,34 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
     colorPickerInnerRadius,
     colorPickerOuterRadius,
     clip,
+    stageDimensions,
   } = useAppSelector(canvasBrushPreviewSelector);
+
+  const cursorPosition = useStore($cursorPosition);
+  const isMovingBoundingBox = useStore($isMovingBoundingBox);
+  const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
+
+  const brushX = useMemo<number>(
+    () => (cursorPosition ? cursorPosition.x : stageDimensions.width / 2),
+    [cursorPosition, stageDimensions]
+  );
+  const brushY = useMemo<number>(
+    () => (cursorPosition ? cursorPosition.y : stageDimensions.height / 2),
+    [cursorPosition, stageDimensions]
+  );
+
+  const shouldDrawBrushPreview = useMemo(
+    () =>
+      !(isMovingBoundingBox || isTransformingBoundingBox || !cursorPosition),
+    [cursorPosition, isMovingBoundingBox, isTransformingBoundingBox]
+  );
 
   if (!shouldDrawBrushPreview) {
     return null;
   }
 
   return (
-    <Group listening={false} {...clip} {...rest}>
+    <Group listening={false} {...clip} {...props}>
       {tool === 'colorPicker' ? (
         <>
           <Circle
@@ -150,6 +152,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             stroke={brushColorString}
             strokeWidth={COLOR_PICKER_STROKE_RADIUS}
             strokeScaleEnabled={false}
+            listening={false}
           />
           <Circle
             x={brushX}
@@ -158,6 +161,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             stroke={colorPickerColorString}
             strokeWidth={COLOR_PICKER_STROKE_RADIUS}
             strokeScaleEnabled={false}
+            listening={false}
           />
         </>
       ) : (
@@ -170,6 +174,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             globalCompositeOperation={
               tool === 'eraser' ? 'destination-out' : 'source-out'
             }
+            listening={false}
           />
           <Circle
             x={brushX}

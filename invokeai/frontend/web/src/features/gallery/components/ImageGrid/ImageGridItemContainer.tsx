@@ -1,5 +1,7 @@
-import { Box, FlexProps, forwardRef } from '@chakra-ui/react';
-import { PropsWithChildren, memo } from 'react';
+import type { FlexProps } from '@chakra-ui/react';
+import { Box, forwardRef } from '@chakra-ui/react';
+import type { PropsWithChildren } from 'react';
+import { memo } from 'react';
 
 type ItemContainerProps = PropsWithChildren & FlexProps;
 const ItemContainer = forwardRef((props: ItemContainerProps, ref) => (

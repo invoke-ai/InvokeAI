@@ -1,19 +1,20 @@
-import { useColorModeValue } from '@chakra-ui/react';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
-import { isInvocationNodeData } from 'features/nodes/types/types';
+import { isInvocationNodeData } from 'features/nodes/types/invocation';
 import { map } from 'lodash-es';
-import { CSSProperties, memo, useMemo } from 'react';
+import type { CSSProperties } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 
 interface Props {
   nodeId: string;
 }
 
+const hiddenHandleStyles: CSSProperties = { visibility: 'hidden' };
+
 const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
   const data = useNodeData(nodeId);
-  const { base400, base600 } = useChakraThemeTokens();
-  const backgroundColor = useColorModeValue(base400, base600);
+  const { base600 } = useChakraThemeTokens();
 
   const dummyHandleStyles: CSSProperties = useMemo(
     () => ({
@@ -21,10 +22,19 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
       borderRadius: '3px',
       width: '1rem',
       height: '1rem',
-      backgroundColor,
+      backgroundColor: base600,
       zIndex: -1,
     }),
-    [backgroundColor]
+    [base600]
+  );
+
+  const collapsedTargetStyles: CSSProperties = useMemo(
+    () => ({ ...dummyHandleStyles, left: '-0.5rem' }),
+    [dummyHandleStyles]
+  );
+  const collapsedSourceStyles: CSSProperties = useMemo(
+    () => ({ ...dummyHandleStyles, right: '-0.5rem' }),
+    [dummyHandleStyles]
   );
 
   if (!isInvocationNodeData(data)) {
@@ -38,7 +48,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
         id={`${data.id}-collapsed-target`}
         isConnectable={false}
         position={Position.Left}
-        style={{ ...dummyHandleStyles, left: '-0.5rem' }}
+        style={collapsedTargetStyles}
       />
       {map(data.inputs, (input) => (
         <Handle
@@ -47,7 +57,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
           id={input.name}
           isConnectable={false}
           position={Position.Left}
-          style={{ visibility: 'hidden' }}
+          style={hiddenHandleStyles}
         />
       ))}
       <Handle
@@ -55,7 +65,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
         id={`${data.id}-collapsed-source`}
         isConnectable={false}
         position={Position.Right}
-        style={{ ...dummyHandleStyles, right: '-0.5rem' }}
+        style={collapsedSourceStyles}
       />
       {map(data.outputs, (output) => (
         <Handle
@@ -64,7 +74,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
           id={output.name}
           isConnectable={false}
           position={Position.Right}
-          style={{ visibility: 'hidden' }}
+          style={hiddenHandleStyles}
         />
       ))}
     </>

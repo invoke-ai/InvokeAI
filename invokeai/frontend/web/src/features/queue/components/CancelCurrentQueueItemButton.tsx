@@ -1,9 +1,10 @@
+import type { ChakraProps } from '@chakra-ui/react';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
-import { useCancelCurrentQueueItem } from '../hooks/useCancelCurrentQueueItem';
+
 import QueueButton from './common/QueueButton';
-import { ChakraProps } from '@chakra-ui/react';
 
 type Props = {
   asIconButton?: boolean;

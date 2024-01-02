@@ -1,10 +1,10 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import {
+import type {
   UseDraggableTypesafeArguments,
   UseDraggableTypesafeReturnValue,
   UseDroppableTypesafeArguments,
   UseDroppableTypesafeReturnValue,
-} from '../types';
+} from 'features/dnd/types';
 
 export function useDroppableTypesafe(props: UseDroppableTypesafeArguments) {
   return useDroppable(props) as UseDroppableTypesafeReturnValue;

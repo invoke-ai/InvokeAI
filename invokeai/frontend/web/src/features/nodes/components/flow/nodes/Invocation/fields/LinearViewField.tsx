@@ -1,23 +1,18 @@
-import {
-  Flex,
-  FormControl,
-  FormLabel,
-  Icon,
-  Spacer,
-  Tooltip,
-} from '@chakra-ui/react';
+import { Flex, Icon, Spacer } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { workflowExposedFieldRemoved } from 'features/nodes/store/nodesSlice';
+import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaInfoCircle, FaTrash } from 'react-icons/fa';
+
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
-import { useTranslation } from 'react-i18next';
 
 type Props = {
   nodeId: string;
@@ -38,54 +33,44 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
       onMouseEnter={handleMouseOver}
       onMouseLeave={handleMouseOut}
       layerStyle="second"
-      sx={{
-        position: 'relative',
-        borderRadius: 'base',
-        w: 'full',
-        p: 2,
-      }}
+      position="relative"
+      borderRadius="base"
+      w="full"
+      p={4}
+      flexDir="column"
     >
-      <FormControl as={Flex} sx={{ flexDir: 'column', gap: 1, flexShrink: 1 }}>
-        <FormLabel
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            mb: 0,
-          }}
+      <Flex>
+        <EditableFieldTitle
+          nodeId={nodeId}
+          fieldName={fieldName}
+          kind="input"
+        />
+        <Spacer />
+        <InvTooltip
+          label={
+            <FieldTooltipContent
+              nodeId={nodeId}
+              fieldName={fieldName}
+              kind="input"
+            />
+          }
+          openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
+          placement="top"
         >
-          <EditableFieldTitle
-            nodeId={nodeId}
-            fieldName={fieldName}
-            kind="input"
-          />
-          <Spacer />
-          <Tooltip
-            label={
-              <FieldTooltipContent
-                nodeId={nodeId}
-                fieldName={fieldName}
-                kind="input"
-              />
-            }
-            openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-            placement="top"
-            hasArrow
-          >
-            <Flex h="full" alignItems="center">
-              <Icon as={FaInfoCircle} />
-            </Flex>
-          </Tooltip>
-          <IAIIconButton
-            aria-label={t('nodes.removeLinearView')}
-            tooltip={t('nodes.removeLinearView')}
-            variant="ghost"
-            size="sm"
-            onClick={handleRemoveField}
-            icon={<FaTrash />}
-          />
-        </FormLabel>
-        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
-      </FormControl>
+          <Flex h="full" alignItems="center">
+            <Icon fontSize="sm" color="base.300" as={FaInfoCircle} />
+          </Flex>
+        </InvTooltip>
+        <InvIconButton
+          aria-label={t('nodes.removeLinearView')}
+          tooltip={t('nodes.removeLinearView')}
+          variant="ghost"
+          size="sm"
+          onClick={handleRemoveField}
+          icon={<FaTrash />}
+        />
+      </Flex>
+      <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       <NodeSelectionOverlay isSelected={false} isHovered={isMouseOverNode} />
     </Flex>
   );

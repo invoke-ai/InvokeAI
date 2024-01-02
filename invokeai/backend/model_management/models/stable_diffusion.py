@@ -110,7 +110,7 @@ class StableDiffusion1Model(DiffusersModel):
                 return StableDiffusion1ModelFormat.Diffusers
 
         if os.path.isfile(model_path):
-            if any([model_path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+            if any(model_path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]):
                 return StableDiffusion1ModelFormat.Checkpoint
 
         raise InvalidModelException(f"Not a valid model: {model_path}")
@@ -221,7 +221,7 @@ class StableDiffusion2Model(DiffusersModel):
                 return StableDiffusion2ModelFormat.Diffusers
 
         if os.path.isfile(model_path):
-            if any([model_path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+            if any(model_path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]):
                 return StableDiffusion2ModelFormat.Checkpoint
 
         raise InvalidModelException(f"Not a valid model: {model_path}")

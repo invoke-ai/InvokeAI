@@ -1,23 +1,23 @@
-import { MenuItem } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaDownload, FaFolder, FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
   useBulkDownloadImagesMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
-} from '../../../../services/api/endpoints/images';
-import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
-import { addToast } from '../../../system/store/systemSlice';
-import { useTranslation } from 'react-i18next';
+} from 'services/api/endpoints/images';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
@@ -59,7 +59,13 @@ const MultipleSelectionMenuItems = () => {
         addToast({
           title: t('gallery.preparingDownload'),
           status: 'success',
-          ...(response.response ? { description: response.response } : {}),
+          ...(response.response
+            ? {
+                description: response.response,
+                duration: null,
+                isClosable: true,
+              }
+            : {}),
         })
       );
     } catch {
@@ -83,36 +89,36 @@ const MultipleSelectionMenuItems = () => {
   return (
     <>
       {areAllStarred && (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleUnstarSelection}
         >
           {customStarUi ? customStarUi.off.text : `Unstar All`}
-        </MenuItem>
+        </InvMenuItem>
       )}
       {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStar />}
           onClickCapture={handleStarSelection}
         >
           {customStarUi ? customStarUi.on.text : `Star All`}
-        </MenuItem>
+        </InvMenuItem>
       )}
       {isBulkDownloadEnabled && (
-        <MenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
+        <InvMenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
           {t('gallery.downloadSelection')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
-        Change Board
-      </MenuItem>
-      <MenuItem
-        sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
+      <InvMenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
+        {t('boards.changeBoard')}
+      </InvMenuItem>
+      <InvMenuItem
+        color="error.300"
         icon={<FaTrash />}
         onClickCapture={handleDeleteSelection}
       >
-        Delete Selection
-      </MenuItem>
+        {t('gallery.deleteSelection')}
+      </InvMenuItem>
     </>
   );
 };

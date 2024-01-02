@@ -1,30 +1,29 @@
-import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import {
-  IAIContextMenu,
-  IAIContextMenuProps,
-} from 'common/components/IAIContextMenu';
+import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
+import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
+import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
-import { BoardId } from 'features/gallery/store/types';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import type { BoardId } from 'features/gallery/store/types';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { addToast } from 'features/system/store/systemSlice';
+import type { MouseEvent } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaDownload, FaPlus } from 'react-icons/fa';
+import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import { BoardDTO } from 'services/api/types';
-import { menuListMotionProps } from 'theme/components/menu';
+import type { BoardDTO } from 'services/api/types';
+
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
-import NoBoardContextMenuItems from './NoBoardContextMenuItems';
-import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
-import { useBulkDownloadImagesMutation } from '../../../../services/api/endpoints/images';
-import { addToast } from '../../../system/store/systemSlice';
 
 type Props = {
   board?: BoardDTO;
   board_id: BoardId;
-  children: IAIContextMenuProps<HTMLDivElement>['children'];
+  children: InvContextMenuProps<HTMLDivElement>['children'];
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
 
@@ -39,15 +38,11 @@ const BoardContextMenu = ({
 
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ gallery }) => {
-          const isAutoAdd = gallery.autoAddBoardId === board_id;
-          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-          return { isAutoAdd, autoAssignBoardOnClick };
-        },
-        defaultSelectorOptions
-      ),
+      createMemoizedSelector(stateSelector, ({ gallery }) => {
+        const isAutoAdd = gallery.autoAddBoardId === board_id;
+        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+        return { isAutoAdd, autoAssignBoardOnClick };
+      }),
     [board_id]
   );
 
@@ -73,7 +68,13 @@ const BoardContextMenu = ({
         addToast({
           title: t('gallery.preparingDownload'),
           status: 'success',
-          ...(response.response ? { description: response.response } : {}),
+          ...(response.response
+            ? {
+                description: response.response,
+                duration: null,
+                isClosable: true,
+              }
+            : {}),
         })
       );
     } catch {
@@ -90,48 +91,50 @@ const BoardContextMenu = ({
     e.preventDefault();
   }, []);
 
-  return (
-    <IAIContextMenu<HTMLDivElement>
-      menuProps={{ size: 'sm', isLazy: true }}
-      menuButtonProps={{
-        bg: 'transparent',
-        _hover: { bg: 'transparent' },
-      }}
-      renderMenu={() => (
-        <MenuList
-          sx={{ visibility: 'visible !important' }}
-          motionProps={menuListMotionProps}
-          onContextMenu={skipEvent}
-        >
-          <MenuGroup title={boardName}>
-            <MenuItem
-              icon={<FaPlus />}
-              isDisabled={isAutoAdd || autoAssignBoardOnClick}
-              onClick={handleSetAutoAdd}
+  const renderMenuFunc = useCallback(
+    () => (
+      <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+        <InvMenuGroup title={boardName}>
+          <InvMenuItem
+            icon={<FaPlus />}
+            isDisabled={isAutoAdd || autoAssignBoardOnClick}
+            onClick={handleSetAutoAdd}
+          >
+            {t('boards.menuItemAutoAdd')}
+          </InvMenuItem>
+          {isBulkDownloadEnabled && (
+            <InvMenuItem
+              icon={<FaDownload />}
+              onClickCapture={handleBulkDownload}
             >
-              {t('boards.menuItemAutoAdd')}
-            </MenuItem>
-            {isBulkDownloadEnabled && (
-              <MenuItem
-                icon={<FaDownload />}
-                onClickCapture={handleBulkDownload}
-              >
-                {t('boards.downloadBoard')}
-              </MenuItem>
-            )}
-            {!board && <NoBoardContextMenuItems />}
-            {board && (
-              <GalleryBoardContextMenuItems
-                board={board}
-                setBoardToDelete={setBoardToDelete}
-              />
-            )}
-          </MenuGroup>
-        </MenuList>
-      )}
-    >
-      {children}
-    </IAIContextMenu>
+              {t('boards.downloadBoard')}
+            </InvMenuItem>
+          )}
+          {board && (
+            <GalleryBoardContextMenuItems
+              board={board}
+              setBoardToDelete={setBoardToDelete}
+            />
+          )}
+        </InvMenuGroup>
+      </InvMenuList>
+    ),
+    [
+      autoAssignBoardOnClick,
+      board,
+      boardName,
+      handleBulkDownload,
+      handleSetAutoAdd,
+      isAutoAdd,
+      isBulkDownloadEnabled,
+      setBoardToDelete,
+      skipEvent,
+      t,
+    ]
+  );
+
+  return (
+    <InvContextMenu renderMenu={renderMenuFunc}>{children}</InvContextMenu>
   );
 };
 

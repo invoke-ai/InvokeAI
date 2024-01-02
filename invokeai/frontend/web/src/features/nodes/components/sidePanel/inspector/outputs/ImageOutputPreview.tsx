@@ -1,7 +1,7 @@
 import IAIDndImage from 'common/components/IAIDndImage';
 import { memo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { ImageOutput } from 'services/api/types';
+import type { ImageOutput } from 'services/api/types';
 
 type Props = {
   output: ImageOutput;

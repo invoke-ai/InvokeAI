@@ -1,12 +1,15 @@
 import { Flex } from '@chakra-ui/react';
-import { PropsWithChildren } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo } from 'react';
 
 type Props = PropsWithChildren;
 
-export default function ProcessorWrapper(props: Props) {
+const ProcessorWrapper = (props: Props) => {
   return (
-    <Flex sx={{ flexDirection: 'column', gap: 2, pb: 2 }}>
+    <Flex flexDir="column" gap={4}>
       {props.children}
     </Flex>
   );
-}
+};
+
+export default memo(ProcessorWrapper);

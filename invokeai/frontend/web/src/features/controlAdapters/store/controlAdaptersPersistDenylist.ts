@@ -1,4 +1,4 @@
-import { ControlAdaptersState } from './types';
+import type { ControlAdaptersState } from './types';
 
 /**
  * ControlNet slice persist denylist

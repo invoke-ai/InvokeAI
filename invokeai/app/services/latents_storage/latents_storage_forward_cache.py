@@ -5,6 +5,8 @@ from typing import Dict, Optional
 
 import torch
 
+from invokeai.app.services.invoker import Invoker
+
 from .latents_storage_base import LatentsStorageBase
 
 
@@ -19,9 +21,21 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
     def __init__(self, underlying_storage: LatentsStorageBase, max_cache_size: int = 20):
         super().__init__()
         self.__underlying_storage = underlying_storage
-        self.__cache = dict()
+        self.__cache = {}
         self.__cache_ids = Queue()
         self.__max_cache_size = max_cache_size
+
+    def start(self, invoker: Invoker) -> None:
+        self._invoker = invoker
+        start_op = getattr(self.__underlying_storage, "start", None)
+        if callable(start_op):
+            start_op(invoker)
+
+    def stop(self, invoker: Invoker) -> None:
+        self._invoker = invoker
+        stop_op = getattr(self.__underlying_storage, "stop", None)
+        if callable(stop_op):
+            stop_op(invoker)
 
     def get(self, name: str) -> torch.Tensor:
         cache_item = self.__get_cache(name)

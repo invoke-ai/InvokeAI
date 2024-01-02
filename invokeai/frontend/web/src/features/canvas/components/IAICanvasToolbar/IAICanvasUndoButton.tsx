@@ -1,17 +1,15 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { FaUndo } from 'react-icons/fa';
-
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { undo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-
-import { isEqual } from 'lodash-es';
+import { memo, useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { stateSelector } from 'app/store/store';
+import { FaUndo } from 'react-icons/fa';
 
-const canvasUndoSelector = createSelector(
+const canvasUndoSelector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
   ({ canvas }, activeTabName) => {
     const { pastLayerStates } = canvas;
@@ -20,24 +18,19 @@ const canvasUndoSelector = createSelector(
       canUndo: pastLayerStates.length > 0,
       activeTabName,
     };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
   }
 );
 
-export default function IAICanvasUndoButton() {
+const IAICanvasUndoButton = () => {
   const dispatch = useAppDispatch();
 
   const { t } = useTranslation();
 
   const { canUndo, activeTabName } = useAppSelector(canvasUndoSelector);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     dispatch(undo());
-  };
+  }, [dispatch]);
 
   useHotkeys(
     ['meta+z', 'ctrl+z'],
@@ -52,7 +45,7 @@ export default function IAICanvasUndoButton() {
   );
 
   return (
-    <IAIIconButton
+    <InvIconButton
       aria-label={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       tooltip={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       icon={<FaUndo />}
@@ -60,4 +53,6 @@ export default function IAICanvasUndoButton() {
       isDisabled={!canUndo}
     />
   );
-}
+};
+
+export default memo(IAICanvasUndoButton);

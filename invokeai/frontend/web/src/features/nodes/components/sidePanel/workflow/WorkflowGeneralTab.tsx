@@ -1,10 +1,12 @@
-import { Flex, FormControl, FormLabel } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Flex } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIInput from 'common/components/IAIInput';
-import IAITextarea from 'common/components/IAITextarea';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
   workflowAuthorChanged,
   workflowContactChanged,
@@ -13,29 +15,24 @@ import {
   workflowNotesChanged,
   workflowTagsChanged,
   workflowVersionChanged,
-} from 'features/nodes/store/nodesSlice';
-import { ChangeEvent, memo, useCallback } from 'react';
-import ScrollableContent from '../ScrollableContent';
+} from 'features/nodes/store/workflowSlice';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
-    const { author, name, description, tags, version, contact, notes } =
-      nodes.workflow;
+const selector = createMemoizedSelector(stateSelector, ({ workflow }) => {
+  const { author, name, description, tags, version, contact, notes } = workflow;
 
-    return {
-      name,
-      author,
-      description,
-      tags,
-      version,
-      contact,
-      notes,
-    };
-  },
-  defaultSelectorOptions
-);
+  return {
+    name,
+    author,
+    description,
+    tags,
+    version,
+    contact,
+    notes,
+  };
+});
 
 const WorkflowGeneralTab = () => {
   const { author, name, description, tags, version, contact, notes } =
@@ -90,61 +87,49 @@ const WorkflowGeneralTab = () => {
 
   return (
     <ScrollableContent>
-      <Flex
-        sx={{
-          flexDir: 'column',
-          alignItems: 'flex-start',
-          gap: 2,
-          h: 'full',
-        }}
-      >
-        <Flex sx={{ gap: 2, w: 'full' }}>
-          <IAIInput
-            label={t('nodes.workflowName')}
-            value={name}
-            onChange={handleChangeName}
-          />
-          <IAIInput
-            label={t('nodes.workflowVersion')}
-            value={version}
-            onChange={handleChangeVersion}
-          />
-        </Flex>
-        <Flex sx={{ gap: 2, w: 'full' }}>
-          <IAIInput
-            label={t('nodes.workflowAuthor')}
-            value={author}
-            onChange={handleChangeAuthor}
-          />
-          <IAIInput
-            label={t('nodes.workflowContact')}
-            value={contact}
-            onChange={handleChangeContact}
-          />
-        </Flex>
-        <IAIInput
-          label={t('nodes.workflowTags')}
-          value={tags}
-          onChange={handleChangeTags}
-        />
-        <FormControl as={Flex} sx={{ flexDir: 'column' }}>
-          <FormLabel>{t('nodes.workflowDescription')}</FormLabel>
-          <IAITextarea
+      <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
+        <InvControlGroup orientation="vertical">
+          <Flex gap={2} w="full">
+            <InvControl label={t('nodes.workflowName')}>
+              <InvInput value={name} onChange={handleChangeName} />
+            </InvControl>
+            <InvControl label={t('nodes.workflowVersion')}>
+              <InvInput value={version} onChange={handleChangeVersion} />
+            </InvControl>
+          </Flex>
+          <Flex gap={2} w="full">
+            <InvControl label={t('nodes.workflowAuthor')}>
+              <InvInput value={author} onChange={handleChangeAuthor} />
+            </InvControl>
+            <InvControl label={t('nodes.workflowContact')}>
+              <InvInput value={contact} onChange={handleChangeContact} />
+            </InvControl>
+          </Flex>
+          <InvControl label={t('nodes.workflowTags')}>
+            <InvInput value={tags} onChange={handleChangeTags} />
+          </InvControl>
+        </InvControlGroup>
+        <InvControl
+          label={t('nodes.workflowDescription')}
+          orientation="vertical"
+        >
+          <InvTextarea
             onChange={handleChangeDescription}
             value={description}
             fontSize="sm"
-            sx={{ resize: 'none' }}
+            resize="none"
+            rows={3}
           />
-        </FormControl>
-        <FormControl as={Flex} sx={{ flexDir: 'column', h: 'full' }}>
-          <FormLabel>{t('nodes.workflowNotes')}</FormLabel>
-          <IAITextarea
+        </InvControl>
+        <InvControl label={t('nodes.workflowNotes')} orientation="vertical">
+          <InvTextarea
             onChange={handleChangeNotes}
             value={notes}
             fontSize="sm"
-            sx={{ h: 'full', resize: 'none' }}
+            resize="none"
+            rows={10}
           />
-        </FormControl>
+        </InvControl>
       </Flex>
     </ScrollableContent>
   );

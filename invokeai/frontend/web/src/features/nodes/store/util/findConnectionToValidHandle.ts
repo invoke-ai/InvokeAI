@@ -1,20 +1,19 @@
-import { Connection, HandleType } from 'reactflow';
-import { Node, Edge } from 'reactflow';
-import {
+import type {
+  FieldInputInstance,
+  FieldOutputInstance,
   FieldType,
-  InputFieldValue,
-  OutputFieldValue,
-} from 'features/nodes/types/types';
+} from 'features/nodes/types/field';
+import type { Connection, Edge, HandleType, Node } from 'reactflow';
 
-import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
+import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
 const isValidConnection = (
   edges: Edge[],
   handleCurrentType: HandleType,
   handleCurrentFieldType: FieldType,
   node: Node,
-  handle: InputFieldValue | OutputFieldValue
+  handle: FieldInputInstance | FieldOutputInstance
 ) => {
   let isValidConnection = true;
   if (handleCurrentType === 'source') {

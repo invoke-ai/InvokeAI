@@ -1,8 +1,8 @@
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaPlus } from 'react-icons/fa';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
-import { useTranslation } from 'react-i18next';
 
 const AddBoardButton = () => {
   const { t } = useTranslation();
@@ -13,7 +13,7 @@ const AddBoardButton = () => {
   }, [createBoard, DEFAULT_BOARD_NAME]);
 
   return (
-    <IAIIconButton
+    <InvIconButton
       icon={<FaPlus />}
       isLoading={isLoading}
       tooltip={t('boards.addBoard')}

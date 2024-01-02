@@ -1,4 +1,7 @@
+import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterProcessorNode } from 'features/controlAdapters/hooks/useControlAdapterProcessorNode';
 import { memo } from 'react';
+
 import CannyProcessor from './processors/CannyProcessor';
 import ColorMapProcessor from './processors/ColorMapProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
@@ -12,8 +15,6 @@ import NormalBaeProcessor from './processors/NormalBaeProcessor';
 import OpenposeProcessor from './processors/OpenposeProcessor';
 import PidiProcessor from './processors/PidiProcessor';
 import ZoeDepthProcessor from './processors/ZoeDepthProcessor';
-import { useControlAdapterIsEnabled } from '../hooks/useControlAdapterIsEnabled';
-import { useControlAdapterProcessorNode } from '../hooks/useControlAdapterProcessorNode';
 
 export type Props = {
   id: string;
