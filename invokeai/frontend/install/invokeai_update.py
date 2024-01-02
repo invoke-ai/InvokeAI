@@ -57,12 +57,9 @@ def welcome(latest_release: str, latest_prerelease: str):
         yield ""
         yield "This script will update InvokeAI to the latest release, or to the development version of your choice."
         yield ""
-        yield "When updating to an arbitrary tag or branch, be aware that the front end may be mismatched to the backend,"
-        yield "making the web frontend unusable. Please downgrade to the latest release if this happens."
-        yield ""
         yield "[bold yellow]Options:"
         yield f"""[1] Update to the latest [bold]official release[/bold] ([italic]{latest_release}[/italic])
-[2] Update to the latest [bold]pre-release[/bold] (may be buggy; caveat emptor!) ([italic]{latest_prerelease}[/italic])
+[2] Update to the latest [bold]pre-release[/bold] (may be buggy, database backups are recommended; caveat emptor!) ([italic]{latest_prerelease}[/italic])
 [2] Manually enter the [bold]tag name[/bold] for the version you wish to update to
 [3] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
 
