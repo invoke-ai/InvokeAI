@@ -232,7 +232,7 @@ const InvokeTabs = () => {
       gap={4}
       isLazy
     >
-      <InvTabList gap={4} flexDir="column">
+      <InvTabList gap={4} pt={4} flexDir="column">
         {tabs}
         <Spacer />
       </InvTabList>
@@ -255,6 +255,7 @@ const InvokeTabs = () => {
               onCollapse={onCollapseOptionsPanel}
               onExpand={onExpandOptionsPanel}
               collapsible
+              style={paddingTop4}
             >
               {activeTabName === 'nodes' ? (
                 <NodeEditorPanelGroup />
@@ -269,7 +270,7 @@ const InvokeTabs = () => {
             />
           </>
         )}
-        <Panel id="main-panel" order={1} minSize={20}>
+        <Panel id="main-panel" order={1} minSize={20} style={paddingTop4}>
           <InvTabPanels w="full" h="full">
             {tabPanels}
           </InvTabPanels>
@@ -290,6 +291,7 @@ const InvokeTabs = () => {
               onCollapse={onCollapseGalleryPanel}
               onExpand={onExpandGalleryPanel}
               collapsible
+              style={paddingTop4}
             >
               <ImageGalleryContent />
             </Panel>
@@ -301,3 +303,5 @@ const InvokeTabs = () => {
 };
 
 export default memo(InvokeTabs);
+
+const paddingTop4: CSSProperties = { paddingTop: '8px' };
