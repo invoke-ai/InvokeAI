@@ -713,18 +713,6 @@ export const canvasSlice = createSlice({
     },
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
-      // if (action.payload.id !== 'Free') {
-      //   state.boundingBoxDimensions.height = roundToMultiple(
-      //     state.boundingBoxDimensions.width /
-      //       ASPECT_RATIO_MAP[action.payload.id].ratio,
-      //     64
-      //   );
-      //   state.scaledBoundingBoxDimensions.height = roundToMultiple(
-      //     state.scaledBoundingBoxDimensions.width /
-      //       ASPECT_RATIO_MAP[action.payload.id].ratio,
-      //     64
-      //   );
-      // }
     },
   },
   extraReducers: (builder) => {
