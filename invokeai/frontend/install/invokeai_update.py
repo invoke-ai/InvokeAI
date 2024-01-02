@@ -59,7 +59,7 @@ def welcome(latest_release: str, latest_prerelease: str):
         yield ""
         yield "[bold yellow]Options:"
         yield f"""[1] Update to the latest [bold]official release[/bold] ([italic]{latest_release}[/italic])
-[2] Update to the latest [bold]pre-release[/bold] (may be buggy, database backups are recommended; caveat emptor!) ([italic]{latest_prerelease}[/italic])
+[2] Update to the latest [bold]pre-release[/bold] (may be buggy, database backups are recommended before installation; caveat emptor!) ([italic]{latest_prerelease}[/italic])
 [2] Manually enter the [bold]tag name[/bold] for the version you wish to update to
 [3] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
 
