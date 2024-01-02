@@ -65,7 +65,7 @@ export const useGroupedModelInvSelect = <T extends AnyModelConfigEntity>(
         .flatMap((o) => o.options)
         .find((m) =>
           selectedModel ? m.value === getModelId(selectedModel) : false
-        ),
+        ) ?? null,
     [options, selectedModel]
   );
 
