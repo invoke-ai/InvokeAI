@@ -13,6 +13,9 @@ const BLUE = { H: 200, S: 76 };
 const GREEN = { H: 110, S: 69 };
 const RED = { H: 16, S: 92 };
 
+export const getArbitraryBaseColor = (lightness: number) =>
+  `hsl(${BASE.H} ${BASE.S}% ${lightness}%)`;
+
 export const InvokeAIColors: InvokeAIThemeColors = {
   base: generateColorPalette(BASE.H, BASE.S),
   baseAlpha: generateColorPalette(BASE.H, BASE.S, true),

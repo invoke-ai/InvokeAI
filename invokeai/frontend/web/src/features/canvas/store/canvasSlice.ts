@@ -9,7 +9,7 @@ import calculateScale from 'features/canvas/util/calculateScale';
 import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
 import floorCoordinates from 'features/canvas/util/floorCoordinates';
 import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundingBoxDimensions';
-import roundDimensionsTo64 from 'features/canvas/util/roundDimensionsTo64';
+import roundDimensionsToMultiple from 'features/canvas/util/roundDimensionsToMultiple';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
@@ -39,6 +39,9 @@ import {
  * The maximum history length to keep in the past/future layer states.
  */
 const MAX_HISTORY = 128;
+
+export const CANVAS_GRID_SIZE_FINE = 8;
+export const CANVAS_GRID_SIZE_COARSE = 64;
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -141,15 +144,24 @@ export const canvasSlice = createSlice({
       const { stageDimensions } = state;
 
       const newBoundingBoxDimensions = {
-        width: roundDownToMultiple(clamp(width, 64, 512), 64),
-        height: roundDownToMultiple(clamp(height, 64, 512), 64),
+        width: roundDownToMultiple(
+          clamp(width, CANVAS_GRID_SIZE_FINE, 512),
+          CANVAS_GRID_SIZE_FINE
+        ),
+        height: roundDownToMultiple(
+          clamp(height, CANVAS_GRID_SIZE_FINE, 512),
+          CANVAS_GRID_SIZE_FINE
+        ),
       };
 
       const newBoundingBoxCoordinates = {
-        x: roundToMultiple(width / 2 - newBoundingBoxDimensions.width / 2, 64),
+        x: roundToMultiple(
+          width / 2 - newBoundingBoxDimensions.width / 2,
+          CANVAS_GRID_SIZE_FINE
+        ),
         y: roundToMultiple(
           height / 2 - newBoundingBoxDimensions.height / 2,
-          64
+          CANVAS_GRID_SIZE_FINE
         ),
       };
 
@@ -206,10 +218,13 @@ export const canvasSlice = createSlice({
       state,
       action: PayloadAction<Partial<Dimensions>>
     ) => {
-      const newDimensions = roundDimensionsTo64({
-        ...state.boundingBoxDimensions,
-        ...action.payload,
-      });
+      const newDimensions = roundDimensionsToMultiple(
+        {
+          ...state.boundingBoxDimensions,
+          ...action.payload,
+        },
+        CANVAS_GRID_SIZE_FINE
+      );
       state.boundingBoxDimensions = newDimensions;
 
       if (state.boundingBoxScaleMethod === 'auto') {
@@ -649,18 +664,24 @@ export const canvasSlice = createSlice({
           scaledStageHeight
       ) {
         const newBoundingBoxDimensions = {
-          width: roundDownToMultiple(clamp(scaledStageWidth, 64, 512), 64),
-          height: roundDownToMultiple(clamp(scaledStageHeight, 64, 512), 64),
+          width: roundDownToMultiple(
+            clamp(scaledStageWidth, CANVAS_GRID_SIZE_FINE, 512),
+            CANVAS_GRID_SIZE_FINE
+          ),
+          height: roundDownToMultiple(
+            clamp(scaledStageHeight, CANVAS_GRID_SIZE_FINE, 512),
+            CANVAS_GRID_SIZE_FINE
+          ),
         };
 
         const newBoundingBoxCoordinates = {
           x: roundToMultiple(
             scaledStageWidth / 2 - newBoundingBoxDimensions.width / 2,
-            64
+            CANVAS_GRID_SIZE_FINE
           ),
           y: roundToMultiple(
             scaledStageHeight / 2 - newBoundingBoxDimensions.height / 2,
-            64
+            CANVAS_GRID_SIZE_FINE
           ),
         };
 
