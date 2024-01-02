@@ -39,6 +39,7 @@ interface Props extends PropsWithChildren {
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
+  useNewLogo?: boolean;
 }
 
 const InvokeAIUI = ({
@@ -53,6 +54,7 @@ const InvokeAIUI = ({
   customStarUi,
   socketOptions,
   isDebugging = false,
+  useNewLogo = false,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -146,7 +148,7 @@ const InvokeAIUI = ({
   return (
     <React.StrictMode>
       <Provider store={store}>
-        <React.Suspense fallback={<Loading />}>
+        <React.Suspense fallback={<Loading useNewLogo={!!useNewLogo} />}>
           <ThemeLocaleProvider>
             <AppDndContext>
               <App config={config} selectedImage={selectedImage} />
