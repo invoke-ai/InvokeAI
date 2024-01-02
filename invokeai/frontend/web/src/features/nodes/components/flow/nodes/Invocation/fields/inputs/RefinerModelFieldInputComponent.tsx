@@ -45,6 +45,7 @@ const RefinerModelFieldInputComponent = (props: Props) => {
       modelEntities: data,
       onChange: _onChange,
       isLoading,
+      selectedModel: field.value,
     });
 
   return (

@@ -32,7 +32,6 @@ export const tagTypes = [
   'Model',
   'T2IAdapterModel',
   'MainModel',
-  'OnnxModel',
   'VaeModel',
   'IPAdapterModel',
   'TextualInversionModel',

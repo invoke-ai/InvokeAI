@@ -18,7 +18,6 @@ export const RANDOM_INT = 'rand_int';
 export const RANGE_OF_SIZE = 'range_of_size';
 export const ITERATE = 'iterate';
 export const MAIN_MODEL_LOADER = 'main_model_loader';
-export const ONNX_MODEL_LOADER = 'onnx_model_loader';
 export const VAE_LOADER = 'vae_loader';
 export const LORA_LOADER = 'lora_loader';
 export const CLIP_SKIP = 'clip_skip';

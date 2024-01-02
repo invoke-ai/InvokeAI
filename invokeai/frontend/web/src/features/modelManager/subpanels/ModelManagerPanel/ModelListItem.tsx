@@ -14,7 +14,6 @@ import { useTranslation } from 'react-i18next';
 import type {
   LoRAModelConfigEntity,
   MainModelConfigEntity,
-  OnnxModelConfigEntity,
 } from 'services/api/endpoints/models';
 import {
   useDeleteLoRAModelsMutation,
@@ -22,7 +21,7 @@ import {
 } from 'services/api/endpoints/models';
 
 type ModelListItemProps = {
-  model: MainModelConfigEntity | OnnxModelConfigEntity | LoRAModelConfigEntity;
+  model: MainModelConfigEntity | LoRAModelConfigEntity;
   isSelected: boolean;
   setSelectedModelId: (v: string | undefined) => void;
 };
@@ -44,7 +43,6 @@ const ModelListItem = (props: ModelListItemProps) => {
     const method = {
       main: deleteMainModel,
       lora: deleteLoRAModel,
-      onnx: deleteMainModel,
     }[model.model_type];
 
     method(model)

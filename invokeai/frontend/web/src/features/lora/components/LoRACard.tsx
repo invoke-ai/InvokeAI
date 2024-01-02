@@ -9,10 +9,7 @@ import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput'
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { InvText } from 'common/components/InvText/wrapper';
 import type { LoRA } from 'features/lora/store/loraSlice';
-import {
-  loraRemoved,
-  loraWeightChanged,
-} from 'features/lora/store/loraSlice';
+import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { FaTrashCan } from 'react-icons/fa6';
 
