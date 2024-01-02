@@ -2,7 +2,7 @@ import os
 from builtins import float
 from typing import List, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -15,6 +15,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType
 from invokeai.backend.model_management.models.ip_adapter import get_ip_adapter_image_encoder_model_id
@@ -39,13 +40,23 @@ class IPAdapterField(BaseModel):
     ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
     image_encoder_model: CLIPVisionModelField = Field(description="The name of the CLIP image encoder model.")
     weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
-    # weight: float = Field(default=1.0, ge=0, description="The weight of the IP-Adapter.")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
     end_step_percent: float = Field(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
     )
+
+    @field_validator("weight")
+    @classmethod
+    def validate_ip_adapter_weight(cls, v):
+        validate_weights(v)
+        return v
+
+    @model_validator(mode="after")
+    def validate_begin_end_step_percent(self):
+        validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
+        return self
 
 
 @invocation_output("ip_adapter_output")
@@ -54,7 +65,7 @@ class IPAdapterOutput(BaseInvocationOutput):
     ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.1.0")
+@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.1.1")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
@@ -64,17 +75,26 @@ class IPAdapterInvocation(BaseInvocation):
         description="The IP-Adapter model.", title="IP-Adapter Model", input=Input.Direct, ui_order=-1
     )
 
-    # weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
     weight: Union[float, List[float]] = InputField(
-        default=1, ge=-1, description="The weight given to the IP-Adapter", title="Weight"
+        default=1, description="The weight given to the IP-Adapter", title="Weight"
     )
-
     begin_step_percent: float = InputField(
-        default=0, ge=-1, le=2, description="When the IP-Adapter is first applied (% of total steps)"
+        default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
     end_step_percent: float = InputField(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
     )
+
+    @field_validator("weight")
+    @classmethod
+    def validate_ip_adapter_weight(cls, v):
+        validate_weights(v)
+        return v
+
+    @model_validator(mode="after")
+    def validate_begin_end_step_percent(self):
+        validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
+        return self
 
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
