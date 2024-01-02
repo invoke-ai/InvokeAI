@@ -3,7 +3,11 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $shift } from 'common/hooks/useGlobalModifiers';
-import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
+import {
+  roundDownToMultiple,
+  roundDownToMultipleMin,
+  roundToMultiple,
+} from 'common/util/roundDownToMultiple';
 import {
   $isDrawing,
   $isMovingBoundingBox,
@@ -145,7 +149,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     }
 
     const rect = shapeRef.current;
-    
+
     const scaleX = rect.scaleX();
     const scaleY = rect.scaleY();
 
@@ -157,18 +161,18 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const y = Math.round(rect.y());
 
     if (aspectRatio.isLocked) {
-      const newHeight = roundToMultipleMin(width / aspectRatio.value, gridSize);
+      const newHeight = roundDownToMultipleMin(width / aspectRatio.value, gridSize);
       dispatch(
         setBoundingBoxDimensions({
-          width: roundToMultipleMin(width, gridSize),
+          width: roundDownToMultipleMin(width, gridSize),
           height: newHeight,
         })
       );
     } else {
       dispatch(
         setBoundingBoxDimensions({
-          width: roundToMultipleMin(width, gridSize),
-          height: roundToMultipleMin(height, gridSize),
+          width: roundDownToMultipleMin(width, gridSize),
+          height: roundDownToMultipleMin(height, gridSize),
         })
       );
       dispatch(
@@ -182,8 +186,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
     dispatch(
       setBoundingBoxCoordinates({
-        x: shouldSnapToGrid ? roundToMultiple(x, gridSize) : x,
-        y: shouldSnapToGrid ? roundToMultiple(y, gridSize) : y,
+        x: shouldSnapToGrid ? roundDownToMultiple(x, gridSize) : x,
+        y: shouldSnapToGrid ? roundDownToMultiple(y, gridSize) : y,
       })
     );
 
@@ -208,11 +212,11 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
        * Konva does not transform with width or height. It transforms the anchor point
        * and scale factor. This is then sent to the shape's onTransform listeners.
        *
-       * We need to snap the new dimensions to steps of 64. But because the whole
-       * stage is scaled, our actual desired step is actually 64 * the stage scale.
+       * We need to snap the new dimensions to steps of 8 (or 64). But because the whole
+       * stage is scaled, our actual desired step is actually 8 (or 64) * the stage scale.
        *
        * Additionally, we need to ensure we offset the position so that we snap to a
-       * multiple of 64 that is aligned with the grid, and not from the absolute zero
+       * multiple of 8 (or 64) that is aligned with the grid, and not from the absolute zero
        * coordinate.
        */
 
@@ -221,9 +225,10 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       const offsetY = oldPos.y % scaledStep;
 
       const newCoordinates = {
-        x: roundToMultiple(newPos.x, scaledStep) + offsetX,
-        y: roundToMultiple(newPos.y, scaledStep) + offsetY,
+        x: roundDownToMultiple(newPos.x, scaledStep) + offsetX,
+        y: roundDownToMultiple(newPos.y, scaledStep) + offsetY,
       };
+      console.log({ oldPos, newPos, newCoordinates });
 
       return newCoordinates;
     },
@@ -270,6 +275,37 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     setIsMouseOverBoundingBox(false);
   }, []);
 
+  const stroke = useMemo(() => {
+    if (
+      isMouseOverBoundingBoxOutline ||
+      isMovingBoundingBox ||
+      isTransformingBoundingBox
+    ) {
+      return 'rgba(255,255,255,0.5)';
+    }
+    return 'white';
+  }, [
+    isMouseOverBoundingBoxOutline,
+    isMovingBoundingBox,
+    isTransformingBoundingBox,
+  ]);
+
+  const strokeWidth = useMemo(() => {
+    if (
+      isMouseOverBoundingBoxOutline ||
+      isMovingBoundingBox ||
+      isTransformingBoundingBox
+    ) {
+      return 6 / stageScale;
+    }
+    return 1 / stageScale;
+  }, [
+    isMouseOverBoundingBoxOutline,
+    isMovingBoundingBox,
+    isTransformingBoundingBox,
+    stageScale,
+  ]);
+
   return (
     <Group {...rest}>
       <Rect
@@ -299,20 +335,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         onTransform={handleOnTransform}
         onTransformEnd={handleEndedTransforming}
         ref={shapeRef}
-        stroke={
-          isMouseOverBoundingBoxOutline ||
-          isMovingBoundingBox ||
-          isTransformingBoundingBox
-            ? 'rgba(255,255,255,0.5)'
-            : 'white'
-        }
-        strokeWidth={
-          isMouseOverBoundingBoxOutline ||
-          isMovingBoundingBox ||
-          isTransformingBoundingBox
-            ? 6 / stageScale
-            : 1 / stageScale
-        }
+        stroke={stroke}
+        strokeWidth={strokeWidth}
         width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
