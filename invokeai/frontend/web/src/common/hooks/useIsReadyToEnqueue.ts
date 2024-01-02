@@ -88,7 +88,10 @@ const selector = createMemoizedSelector(
         });
       }
     } else {
-      if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
+      if (
+        dynamicPrompts.prompts.length === 0 &&
+        getShouldProcessPrompt(positivePrompt)
+      ) {
         reasons.push(i18n.t('parameters.invoke.noPrompts'));
       }
 

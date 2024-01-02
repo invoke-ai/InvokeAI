@@ -30,14 +30,12 @@ import type {
   Dimensions,
 } from './canvasTypes';
 import { isCanvasAnyLine, isCanvasMaskLine } from './canvasTypes';
+import { CANVAS_GRID_SIZE_FINE } from './constants';
 
 /**
  * The maximum history length to keep in the past/future layer states.
  */
 const MAX_HISTORY = 128;
-
-export const CANVAS_GRID_SIZE_FINE = 8;
-export const CANVAS_GRID_SIZE_COARSE = 64;
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],

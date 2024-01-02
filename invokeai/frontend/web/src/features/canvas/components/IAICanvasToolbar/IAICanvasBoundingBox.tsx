@@ -18,12 +18,14 @@ import {
 } from 'features/canvas/store/canvasNanostore';
 import {
   aspectRatioChanged,
-  CANVAS_GRID_SIZE_COARSE,
-  CANVAS_GRID_SIZE_FINE,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
+import {
+  CANVAS_GRID_SIZE_COARSE,
+  CANVAS_GRID_SIZE_FINE,
+} from 'features/canvas/store/constants';
 import type Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -161,7 +163,10 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const y = Math.round(rect.y());
 
     if (aspectRatio.isLocked) {
-      const newHeight = roundDownToMultipleMin(width / aspectRatio.value, gridSize);
+      const newHeight = roundDownToMultipleMin(
+        width / aspectRatio.value,
+        gridSize
+      );
       dispatch(
         setBoundingBoxDimensions({
           width: roundDownToMultipleMin(width, gridSize),
