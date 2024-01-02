@@ -23,7 +23,7 @@ const invokeAI = definePartsStyle(() => ({
     bg: 'base.800',
     shadow: 'dark-lg',
     border: 'none',
-    p: 1,
+    p: 2,
   },
   item: {
     // this will style the MenuItem and MenuItemOption components
