@@ -61,6 +61,7 @@ const NumberFieldInputComponent = (
 
   return (
     <InvNumberInput
+      defaultValue={fieldTemplate.default}
       onChange={handleValueChanged}
       value={field.value}
       min={min ?? -NUMPY_RAND_MAX}
