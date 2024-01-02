@@ -29,10 +29,6 @@ const ParamHrfStrength = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleHrfStrengthReset = useCallback(() => {
-    dispatch(setHrfStrength(initial));
-  }, [dispatch, initial]);
-
   const handleHrfStrengthChange = useCallback(
     (v: number) => {
       dispatch(setHrfStrength(v));
@@ -48,10 +44,10 @@ const ParamHrfStrength = () => {
         step={step}
         fineStep={fineStep}
         value={hrfStrength}
+        defaultValue={initial}
         onChange={handleHrfStrengthChange}
         marks
         withNumberInput
-        onReset={handleHrfStrengthReset}
       />
     </InvControl>
   );

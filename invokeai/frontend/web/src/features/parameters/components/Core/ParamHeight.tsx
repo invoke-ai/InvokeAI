@@ -44,18 +44,14 @@ export const ParamHeight = memo(() => {
     [ctx]
   );
 
-  const onReset = useCallback(() => {
-    ctx.heightChanged(initial);
-  }, [ctx, initial]);
-
   const marks = useMemo(() => [min, initial, max], [min, initial, max]);
 
   return (
     <InvControl label={t('parameters.height')}>
       <InvSlider
         value={ctx.height}
+        defaultValue={initial}
         onChange={onChange}
-        onReset={onReset}
         min={min}
         max={max}
         step={step}
@@ -69,6 +65,7 @@ export const ParamHeight = memo(() => {
         max={inputMax}
         step={step}
         fineStep={fineStep}
+        defaultValue={initial}
       />
     </InvControl>
   );

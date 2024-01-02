@@ -34,20 +34,16 @@ const ParamSDXLRefinerCFGScale = () => {
     [dispatch]
   );
 
-  const onReset = useCallback(() => {
-    dispatch(setRefinerCFGScale(initial));
-  }, [dispatch, initial]);
-
   return (
     <InvControl label={t('sdxl.cfgScale')}>
       <InvSlider
         value={refinerCFGScale}
+        defaultValue={initial}
         min={min}
         max={sliderMax}
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
-        onReset={onReset}
         withNumberInput
         numberInputMax={inputMax}
         marks={marks}

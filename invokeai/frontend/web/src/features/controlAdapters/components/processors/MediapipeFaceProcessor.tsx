@@ -37,21 +37,13 @@ const MediapipeFaceProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleMaxFacesReset = useCallback(() => {
-    processorChanged(controlNetId, { max_faces: DEFAULTS.max_faces });
-  }, [controlNetId, processorChanged]);
-
-  const handleMinConfidenceReset = useCallback(() => {
-    processorChanged(controlNetId, { min_confidence: DEFAULTS.min_confidence });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
       <InvControl label={t('controlnet.maxFaces')} isDisabled={!isEnabled}>
         <InvSlider
           value={max_faces}
           onChange={handleMaxFacesChanged}
-          onReset={handleMaxFacesReset}
+          defaultValue={DEFAULTS.max_faces}
           min={1}
           max={20}
           marks
@@ -62,7 +54,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         <InvSlider
           value={min_confidence}
           onChange={handleMinConfidenceChanged}
-          onReset={handleMinConfidenceReset}
+          defaultValue={DEFAULTS.min_confidence}
           min={0}
           max={1}
           step={0.01}

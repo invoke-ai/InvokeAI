@@ -39,18 +39,6 @@ const LineartProcessor = (props: LineartProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleCoarseChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       processorChanged(controlNetId, { coarse: e.target.checked });
@@ -67,7 +55,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         <InvSlider
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          onReset={handleDetectResolutionReset}
+          defaultValue={DEFAULTS.detect_resolution}
           min={0}
           max={4096}
           marks
@@ -81,7 +69,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         <InvSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          onReset={handleImageResolutionReset}
+          defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
           marks

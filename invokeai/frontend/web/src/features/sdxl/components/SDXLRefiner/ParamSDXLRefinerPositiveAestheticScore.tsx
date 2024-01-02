@@ -17,11 +17,6 @@ const ParamSDXLRefinerPositiveAestheticScore = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(
-    () => dispatch(setRefinerPositiveAestheticScore(6)),
-    [dispatch]
-  );
-
   return (
     <InvControl label={t('sdxl.posAestheticScore')}>
       <InvSlider
@@ -30,8 +25,8 @@ const ParamSDXLRefinerPositiveAestheticScore = () => {
         max={10}
         fineStep={0.1}
         onChange={handleChange}
-        onReset={handleReset}
         value={refinerPositiveAestheticScore}
+        defaultValue={6}
         withNumberInput
         marks
       />

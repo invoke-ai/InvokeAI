@@ -50,10 +50,6 @@ const GallerySettingsPopover = () => {
     [dispatch]
   );
 
-  const handleResetGalleryImageMinimumWidth = useCallback(() => {
-    dispatch(setGalleryImageMinimumWidth(64));
-  }, [dispatch]);
-
   const handleChangeAutoSwitch = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldAutoSwitchChanged(e.target.checked));
@@ -86,7 +82,7 @@ const GallerySettingsPopover = () => {
                 onChange={handleChangeGalleryImageMinimumWidth}
                 min={45}
                 max={256}
-                onReset={handleResetGalleryImageMinimumWidth}
+                defaultValue={90}
               />
             </InvControl>
             <InvControl label={t('gallery.autoSwitchNewImages')}>

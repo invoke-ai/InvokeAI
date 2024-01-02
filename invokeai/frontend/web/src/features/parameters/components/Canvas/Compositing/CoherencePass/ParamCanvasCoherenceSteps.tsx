@@ -20,10 +20,6 @@ const ParamCanvasCoherenceSteps = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setCanvasCoherenceSteps(20));
-  }, [dispatch]);
-
   return (
     <InvControl
       label={t('parameters.coherenceSteps')}
@@ -34,8 +30,8 @@ const ParamCanvasCoherenceSteps = () => {
         max={100}
         step={1}
         value={canvasCoherenceSteps}
+        defaultValue={20}
         onChange={handleChange}
-        onReset={handleReset}
         withNumberInput
         numberInputMax={999}
         marks

@@ -31,6 +31,7 @@ export const ParamSeedNumberInput = memo(() => {
         onChange={handleChangeSeed}
         value={seed}
         flexGrow={1}
+        defaultValue={0}
       />
     </InvControl>
   );

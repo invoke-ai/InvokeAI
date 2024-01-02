@@ -39,18 +39,6 @@ const PidiProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleScribbleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       processorChanged(controlNetId, { scribble: e.target.checked });
@@ -74,7 +62,7 @@ const PidiProcessor = (props: Props) => {
         <InvSlider
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          onReset={handleDetectResolutionReset}
+          defaultValue={DEFAULTS.detect_resolution}
           min={0}
           max={4096}
           marks
@@ -88,7 +76,7 @@ const PidiProcessor = (props: Props) => {
         <InvSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          onReset={handleImageResolutionReset}
+          defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
           marks

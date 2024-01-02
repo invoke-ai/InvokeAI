@@ -30,12 +30,6 @@ const CannyProcessor = (props: CannyProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleLowThresholdReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      low_threshold: DEFAULTS.low_threshold,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleHighThresholdChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { high_threshold: v });
@@ -43,19 +37,13 @@ const CannyProcessor = (props: CannyProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleHighThresholdReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      high_threshold: DEFAULTS.high_threshold,
-    });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
       <InvControl label={t('controlnet.lowThreshold')} isDisabled={!isEnabled}>
         <InvSlider
           value={low_threshold}
           onChange={handleLowThresholdChanged}
-          onReset={handleLowThresholdReset}
+          defaultValue={DEFAULTS.low_threshold}
           min={0}
           max={255}
           withNumberInput
@@ -65,7 +53,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         <InvSlider
           value={high_threshold}
           onChange={handleHighThresholdChanged}
-          onReset={handleHighThresholdReset}
+          defaultValue={DEFAULTS.high_threshold}
           min={0}
           max={255}
           withNumberInput

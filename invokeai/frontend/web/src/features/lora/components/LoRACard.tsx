@@ -12,7 +12,6 @@ import type { LoRA } from 'features/lora/store/loraSlice';
 import {
   loraRemoved,
   loraWeightChanged,
-  loraWeightReset,
 } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { FaTrashCan } from 'react-icons/fa6';
@@ -31,10 +30,6 @@ export const LoRACard = memo((props: LoRACardProps) => {
     },
     [dispatch, lora.id]
   );
-
-  const onReset = useCallback(() => {
-    dispatch(loraWeightReset(lora.id));
-  }, [dispatch, lora.id]);
 
   const handleRemoveLora = useCallback(() => {
     dispatch(loraRemoved(lora.id));
@@ -61,8 +56,8 @@ export const LoRACard = memo((props: LoRACardProps) => {
           min={-1}
           max={2}
           step={0.01}
-          onReset={onReset}
           marks={marks}
+          defaultValue={0.75}
         />
         <InvNumberInput
           value={lora.weight}
@@ -72,6 +67,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           step={0.01}
           w={20}
           flexShrink={0}
+          defaultValue={0.75}
         />
       </InvCardBody>
     </InvCard>

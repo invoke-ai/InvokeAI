@@ -17,11 +17,6 @@ const ParamCFGRescaleMultiplier = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(
-    () => dispatch(setCfgRescaleMultiplier(0)),
-    [dispatch]
-  );
-
   return (
     <InvControl
       label={t('parameters.cfgRescaleMultiplier')}
@@ -29,12 +24,12 @@ const ParamCFGRescaleMultiplier = () => {
     >
       <InvSlider
         value={cfgRescaleMultiplier}
+        defaultValue={0}
         min={0}
         max={0.99}
         step={0.1}
         fineStep={0.01}
         onChange={handleChange}
-        onReset={handleReset}
         withNumberInput
         marks
       />

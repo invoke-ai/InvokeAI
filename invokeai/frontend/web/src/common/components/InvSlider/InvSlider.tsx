@@ -10,6 +10,7 @@ import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput'
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { $shift } from 'common/hooks/useGlobalModifiers';
 import { AnimatePresence } from 'framer-motion';
+import { isNil } from 'lodash-es';
 import { memo, useCallback, useMemo, useState } from 'react';
 
 import { InvSliderMark } from './InvSliderMark';
@@ -23,7 +24,8 @@ export const InvSlider = memo((props: InvSliderProps) => {
     step: _step = 1,
     fineStep: _fineStep,
     onChange,
-    onReset,
+    onReset: _onReset,
+    defaultValue,
     formatValue = (v: number) => v.toString(),
     marks: _marks,
     withThumbTooltip: withTooltip = false,
@@ -59,6 +61,16 @@ export const InvSlider = memo((props: InvSliderProps) => {
     }
     return [];
   }, [_marks, formatValue, max, min]);
+
+  const onReset = useCallback(() => {
+    if (!isNil(defaultValue)) {
+      onChange(defaultValue);
+    }
+    if (_onReset) {
+      _onReset();
+    }
+  }, [defaultValue, onChange, _onReset]);
+
   return (
     <>
       <ChakraSlider
@@ -103,6 +115,7 @@ export const InvSlider = memo((props: InvSliderProps) => {
       {withNumberInput && (
         <InvNumberInput
           value={value}
+          defaultValue={defaultValue}
           min={numberInputMin}
           max={numberInputMax}
           step={step}
