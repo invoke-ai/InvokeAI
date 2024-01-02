@@ -1,6 +1,6 @@
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { CANVAS_GRID_SIZE_FINE } from 'features/canvas/store/canvasSlice';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
+import { CANVAS_GRID_SIZE_FINE } from 'features/canvas/store/constants';
 
 const getScaledBoundingBoxDimensions = (dimensions: Dimensions) => {
   const { width, height } = dimensions;

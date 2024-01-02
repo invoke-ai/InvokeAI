@@ -4,7 +4,10 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { CANVAS_GRID_SIZE_COARSE, CANVAS_GRID_SIZE_FINE } from 'features/canvas/store/canvasSlice';
+import {
+  CANVAS_GRID_SIZE_COARSE,
+  CANVAS_GRID_SIZE_FINE,
+} from 'features/canvas/store/constants';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

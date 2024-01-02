@@ -14,9 +14,7 @@ export const ImageSizeCanvas = memo(() => {
   const { width, height } = useAppSelector(
     (state) => state.canvas.boundingBoxDimensions
   );
-  const aspectRatioState = useAppSelector(
-    (state) => state.canvas.aspectRatio
-  );
+  const aspectRatioState = useAppSelector((state) => state.canvas.aspectRatio);
 
   const onChangeWidth = useCallback(
     (width: number) => {
