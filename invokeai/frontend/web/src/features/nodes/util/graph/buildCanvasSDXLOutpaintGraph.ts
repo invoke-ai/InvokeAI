@@ -46,7 +46,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { getSDXLStylePrompts } from './getSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Outpaint graph.
@@ -103,8 +103,8 @@ export const buildCanvasSDXLOutpaintGraph = (
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
-    buildSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } =
+    getSDXLStylePrompts(state);
 
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_OUTPAINT_GRAPH,
@@ -118,13 +118,13 @@ export const buildCanvasSDXLOutpaintGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: joinedPositiveStylePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: joinedNegativeStylePrompt,
+        style: negativeStylePrompt,
       },
       [MASK_FROM_ALPHA]: {
         type: 'tomask',

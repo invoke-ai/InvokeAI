@@ -14,7 +14,7 @@ const baseStyle = defineStyle((props) => ({
   wordBreak: 'break-all',
   whiteSpace: 'nowrap',
   textOverflow: 'ellipsis',
-  overflow: 'hidden'
+  overflow: 'hidden',
 }));
 
 export const badgeTheme = defineStyleConfig({

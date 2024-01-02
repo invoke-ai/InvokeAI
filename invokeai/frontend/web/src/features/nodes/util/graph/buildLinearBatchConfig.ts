@@ -19,7 +19,7 @@ export const prepareLinearUIBatch = (
   prepend: boolean
 ): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
-  const { shouldConcatSDXLStylePrompt, positiveStylePrompt } = state.sdxl;
+  const { shouldConcatSDXLStylePrompt } = state.sdxl;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];
@@ -118,15 +118,11 @@ export const prepareLinearUIBatch = (
   }
 
   if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
-    const stylePrompts = extendedPrompts.map((p) =>
-      [p, positiveStylePrompt].join(' ')
-    );
-
     if (graph.nodes[POSITIVE_CONDITIONING]) {
       firstBatchDatumList.push({
         node_path: POSITIVE_CONDITIONING,
         field_name: 'style',
-        items: stylePrompts,
+        items: extendedPrompts,
       });
     }
 

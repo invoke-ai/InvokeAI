@@ -1223,7 +1223,7 @@
     },
     "sdxl": {
         "cfgScale": "CFG Scale",
-        "concatPromptStyle": "Concatenating Prompt & Style",
+        "concatPromptStyle": "Linking Prompt & Style",
         "freePromptStyle": "Manual Style Prompting",
         "denoisingStrength": "Denoising Strength",
         "loading": "Loading...",
