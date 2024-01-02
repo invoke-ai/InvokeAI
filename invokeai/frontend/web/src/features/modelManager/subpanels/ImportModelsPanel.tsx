@@ -32,6 +32,7 @@ const ImportModelsPanel = () => {
           isChecked={addModelTab == 'scan'}
           size="sm"
           width="100%"
+          isDisabled
         >
           {t('modelManager.scanForModels')}
         </InvButton>
