@@ -24,6 +24,7 @@ export const InvNumberInput = memo(
         fineStep: _fineStep,
         onChange: _onChange,
         numberInputFieldProps,
+        defaultValue,
         ...rest
       } = props;
 
@@ -69,7 +70,7 @@ export const InvNumberInput = memo(
         (e) => {
           if (!e.target.value) {
             // If the input is empty, we set it to the minimum value
-            onChange(String(min), min);
+            onChange(String(defaultValue ?? min), Number(defaultValue) ?? min);
           } else {
             // Otherwise, we round the value to the nearest multiple if integer, else 3 decimals
             const roundedValue = isInteger
@@ -83,6 +84,7 @@ export const InvNumberInput = memo(
         [
           _fineStep,
           _step,
+          defaultValue,
           isInteger,
           max,
           min,
@@ -107,10 +109,11 @@ export const InvNumberInput = memo(
       return (
         <ChakraNumberInput
           ref={ref}
+          value={valueAsString}
+          defaultValue={defaultValue}
           min={min}
           max={max}
           step={step}
-          value={valueAsString}
           onChange={onChange}
           clampValueOnBlur={false}
           isValidCharacter={isValidCharacter}
