@@ -1,7 +1,7 @@
 import { defineStyle, defineStyleConfig } from '@chakra-ui/react';
 
 const baseStyle = defineStyle((props) => ({
-  fontSize: '10px',
+  fontSize: '9px',
   px: 2,
   py: 1,
   minW: 4,
@@ -11,6 +11,10 @@ const baseStyle = defineStyle((props) => ({
   color: 'base.900',
   fontWeight: 'bold',
   letterSpacing: 0.5,
+  wordBreak: 'break-all',
+  whiteSpace: 'nowrap',
+  textOverflow: 'ellipsis',
+  overflow: 'hidden'
 }));
 
 export const badgeTheme = defineStyleConfig({
