@@ -24,13 +24,34 @@ import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
-  ({ generation, hrf }, activeTabName) => {
-    const { aspectRatio, width, height, shouldRandomizeSeed } = generation;
+  ({ generation, canvas, hrf }, activeTabName) => {
+    const { shouldRandomizeSeed } = generation;
     const { hrfEnabled } = hrf;
-    const badges = [`${width}×${height}`, aspectRatio.id];
+    const badges: string[] = [];
+
+    if (activeTabName === 'unifiedCanvas') {
+      const {
+        aspectRatio,
+        boundingBoxDimensions: { width, height },
+      } = canvas;
+      badges.push(`${width}×${height}`);
+      badges.push(aspectRatio.id);
+      if (aspectRatio.isLocked) {
+        badges.push('locked');
+      }
+    } else {
+      const { aspectRatio, width, height } = generation;
+      badges.push(`${width}×${height}`);
+      badges.push(aspectRatio.id);
+      if (aspectRatio.isLocked) {
+        badges.push('locked');
+      }
+    }
+
     if (!shouldRandomizeSeed) {
       badges.push('Manual Seed');
     }
+
     if (hrfEnabled) {
       badges.push('HiRes Fix');
     }
