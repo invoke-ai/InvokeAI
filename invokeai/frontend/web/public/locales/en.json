@@ -365,7 +365,8 @@
         "back": "back",
         "batchFailedToQueue": "Failed to Queue Batch",
         "graphQueued": "Graph queued",
-        "graphFailedToQueue": "Failed to queue graph"
+        "graphFailedToQueue": "Failed to queue graph",
+        "openQueue": "Open Queue"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",
