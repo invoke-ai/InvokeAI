@@ -3,10 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $shift } from 'common/hooks/useGlobalModifiers';
-import {
-  roundDownToMultiple,
-  roundToMultiple,
-} from 'common/util/roundDownToMultiple';
+import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import {
   $isDrawing,
   $isMovingBoundingBox,
@@ -16,6 +13,7 @@ import {
   setIsTransformingBoundingBox,
 } from 'features/canvas/store/canvasNanostore';
 import {
+  aspectRatioChanged,
   CANVAS_GRID_SIZE_COARSE,
   CANVAS_GRID_SIZE_FINE,
   setBoundingBoxCoordinates,
@@ -34,16 +32,15 @@ const borderDash = [4, 4];
 
 const boundingBoxPreviewSelector = createMemoizedSelector(
   [stateSelector],
-  ({ canvas, generation }) => {
+  ({ canvas }) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
       stageScale,
       tool,
       shouldSnapToGrid,
+      aspectRatio,
     } = canvas;
-
-    const { aspectRatio } = generation;
 
     return {
       boundingBoxCoordinates,
@@ -98,9 +95,13 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     [gridSize, stageScale]
   );
 
-  useHotkeys('N', () => {
-    dispatch(setShouldSnapToGrid(!shouldSnapToGrid));
-  });
+  useHotkeys(
+    'N',
+    () => {
+      dispatch(setShouldSnapToGrid(!shouldSnapToGrid));
+    },
+    [shouldSnapToGrid]
+  );
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
@@ -144,7 +145,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     }
 
     const rect = shapeRef.current;
-
+    
     const scaleX = rect.scaleX();
     const scaleY = rect.scaleY();
 
@@ -155,40 +156,52 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const x = Math.round(rect.x());
     const y = Math.round(rect.y());
 
-    if (aspectRatio) {
-      const newHeight = roundToMultiple(width / aspectRatio.value, gridSize);
+    if (aspectRatio.isLocked) {
+      const newHeight = roundToMultipleMin(width / aspectRatio.value, gridSize);
       dispatch(
         setBoundingBoxDimensions({
-          width: width,
+          width: roundToMultipleMin(width, gridSize),
           height: newHeight,
         })
       );
     } else {
       dispatch(
         setBoundingBoxDimensions({
-          width,
-          height,
+          width: roundToMultipleMin(width, gridSize),
+          height: roundToMultipleMin(height, gridSize),
+        })
+      );
+      dispatch(
+        aspectRatioChanged({
+          isLocked: false,
+          id: 'Free',
+          value: width / height,
         })
       );
     }
 
     dispatch(
       setBoundingBoxCoordinates({
-        x: shouldSnapToGrid ? roundDownToMultiple(x, gridSize) : x,
-        y: shouldSnapToGrid ? roundDownToMultiple(y, gridSize) : y,
+        x: shouldSnapToGrid ? roundToMultiple(x, gridSize) : x,
+        y: shouldSnapToGrid ? roundToMultiple(y, gridSize) : y,
       })
     );
 
     // Reset the scale now that the coords/dimensions have been un-scaled
     rect.scaleX(1);
     rect.scaleY(1);
-  }, [aspectRatio, dispatch, shouldSnapToGrid, gridSize]);
+  }, [
+    aspectRatio.isLocked,
+    aspectRatio.value,
+    dispatch,
+    shouldSnapToGrid,
+    gridSize,
+  ]);
 
   const anchorDragBoundFunc = useCallback(
     (
       oldPos: Vector2d, // old absolute position of anchor point
       newPos: Vector2d, // new absolute position (potentially) of anchor point
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _e: MouseEvent
     ) => {
       /**
@@ -208,8 +221,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       const offsetY = oldPos.y % scaledStep;
 
       const newCoordinates = {
-        x: roundDownToMultiple(newPos.x, scaledStep) + offsetX,
-        y: roundDownToMultiple(newPos.y, scaledStep) + offsetY,
+        x: roundToMultiple(newPos.x, scaledStep) + offsetX,
+        y: roundToMultiple(newPos.y, scaledStep) + offsetY,
       };
 
       return newCoordinates;
@@ -287,9 +300,19 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         onTransformEnd={handleEndedTransforming}
         ref={shapeRef}
         stroke={
-          isMouseOverBoundingBoxOutline ? 'rgba(255,255,255,0.7)' : 'white'
+          isMouseOverBoundingBoxOutline ||
+          isMovingBoundingBox ||
+          isTransformingBoundingBox
+            ? 'rgba(255,255,255,0.5)'
+            : 'white'
         }
-        strokeWidth={(isMouseOverBoundingBoxOutline ? 8 : 1) / stageScale}
+        strokeWidth={
+          isMouseOverBoundingBoxOutline ||
+          isMovingBoundingBox ||
+          isTransformingBoundingBox
+            ? 6 / stageScale
+            : 1 / stageScale
+        }
         width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
@@ -316,6 +339,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         onTransformEnd={handleEndedTransforming}
         ref={transformerRef}
         rotateEnabled={false}
+        shiftBehavior="none"
       />
     </Group>
   );
