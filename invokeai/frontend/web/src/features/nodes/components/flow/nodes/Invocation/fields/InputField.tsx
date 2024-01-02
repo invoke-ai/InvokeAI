@@ -112,17 +112,18 @@ const InputField = ({ nodeId, fieldName }: Props) => {
             isInvalid={isMissingInput}
             isDisabled={isConnected}
             orientation="vertical"
-            ps={fieldTemplate.input === 'direct' ? 0 : 2}
-            pe={2}
+            px={2}
           >
-            <EditableFieldTitle
-              nodeId={nodeId}
-              fieldName={fieldName}
-              kind="input"
-              isMissingInput={isMissingInput}
-              withTooltip
-            />
-            <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+            <Flex flexDir="column" w="full" gap={1}>
+              <EditableFieldTitle
+                nodeId={nodeId}
+                fieldName={fieldName}
+                kind="input"
+                isMissingInput={isMissingInput}
+                withTooltip
+              />
+              <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+            </Flex>
           </InvControl>
         )}
       </FieldContextMenu>
