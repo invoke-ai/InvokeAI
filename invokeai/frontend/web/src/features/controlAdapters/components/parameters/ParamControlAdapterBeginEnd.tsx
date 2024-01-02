@@ -78,10 +78,12 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
         onReset={onReset}
         min={0}
         max={1}
-        step={0.01}
+        step={0.05}
+        fineStep={0.01}
         minStepsBetweenThumbs={5}
         formatValue={formatPct}
         marks
+        withThumbTooltip
       />
     </InvControl>
   );

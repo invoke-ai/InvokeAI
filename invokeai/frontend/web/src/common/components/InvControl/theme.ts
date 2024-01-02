@@ -19,15 +19,21 @@ const formBaseStyle = defineFormPartsStyle((props) => ({
     alignItems: 'flex-start',
     gap: 4,
     h: 'unset',
-    '> .invcontrol-label-input-wrapper': {
+    '> .invcontrol-label-wrapper': {
       display: 'flex',
       flexDirection: props.orientation === 'vertical' ? 'column' : 'row',
       alignItems: props.orientation === 'vertical' ? 'flex-start' : 'center',
-      gap: props.orientation === 'vertical' ? 2 : 4,
+      gap: props.orientation === 'vertical' ? 0 : 4,
       minH: 8,
       w: 'full',
       _invalid: {
         color: 'error.300',
+      },
+      '> .invcontrol-input-wrapper': {
+        w: 'full',
+        display: 'flex',
+        gap: 4,
+        justifyContent: 'flex-end',
       },
     },
   },

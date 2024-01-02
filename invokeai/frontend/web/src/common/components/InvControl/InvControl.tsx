@@ -46,7 +46,7 @@ export const InvControl = memo(
           isDisabled={isDisabled}
           {...formControlProps}
         >
-          <Flex className="invcontrol-label-input-wrapper">
+          <Flex className="invcontrol-label-wrapper">
             {label && (
               <InvLabel
                 feature={feature}
@@ -56,7 +56,7 @@ export const InvControl = memo(
                 {label}
               </InvLabel>
             )}
-            {children}
+            <Flex className="invcontrol-input-wrapper">{children}</Flex>
           </Flex>
           {helperText && (
             <ChakraFormHelperText>{helperText}</ChakraFormHelperText>

@@ -144,7 +144,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
 
       <Flex w="full" flexDir="column" gap={4}>
         <Flex gap={4} w="full" alignItems="center">
-          <Flex flexDir="column" gap={4} h={32} w="full">
+          <Flex flexDir="column" gap={2} h={32} w="full">
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>
