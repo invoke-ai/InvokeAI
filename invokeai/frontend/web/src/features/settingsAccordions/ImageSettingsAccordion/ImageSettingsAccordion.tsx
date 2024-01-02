@@ -86,9 +86,9 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {activeTabName === 'img2img' && <ImageToImageFit />}
             {(activeTabName === 'img2img' ||
               activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
+            {activeTabName === 'img2img' && <ImageToImageFit />}
             {activeTabName === 'txt2img' && <HrfSettings />}
             {activeTabName === 'unifiedCanvas' && (
               <>
