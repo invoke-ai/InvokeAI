@@ -5,7 +5,6 @@ import {
   zIPAdapterField,
   zLoRAModelField,
   zMainModelField,
-  zONNXModelField,
   zSDXLRefinerModelField,
   zT2IAdapterField,
   zVAEModelField,
@@ -23,10 +22,7 @@ const zControlNetMetadataItem = zControlField.deepPartial();
 const zIPAdapterMetadataItem = zIPAdapterField.deepPartial();
 const zT2IAdapterMetadataItem = zT2IAdapterField.deepPartial();
 const zSDXLRefinerModelMetadataItem = zSDXLRefinerModelField.deepPartial();
-const zModelMetadataItem = z.union([
-  zMainModelField.deepPartial(),
-  zONNXModelField.deepPartial(),
-]);
+const zModelMetadataItem = zMainModelField.deepPartial();
 const zVAEModelMetadataItem = zVAEModelField.deepPartial();
 export type LoRAMetadataItem = z.infer<typeof zLoRAMetadataItem>;
 export type ControlNetMetadataItem = z.infer<typeof zControlNetMetadataItem>;

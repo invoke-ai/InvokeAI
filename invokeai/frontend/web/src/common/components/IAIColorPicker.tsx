@@ -70,7 +70,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               step={1}
               w={numberInputWidth}
               defaultValue={90}
-              />
+            />
           </InvControl>
           <InvControl label="Green">
             <InvNumberInput
@@ -81,7 +81,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               step={1}
               w={numberInputWidth}
               defaultValue={90}
-              />
+            />
           </InvControl>
           <InvControl label="Blue">
             <InvNumberInput
@@ -92,7 +92,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               step={1}
               w={numberInputWidth}
               defaultValue={255}
-              />
+            />
           </InvControl>
           <InvControl label="Alpha">
             <InvNumberInput

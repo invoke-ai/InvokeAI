@@ -7,7 +7,7 @@ import {
   zImageField,
   zIPAdapterModelField,
   zLoRAModelField,
-  zMainOrONNXModelField,
+  zMainModelField,
   zSchedulerField,
   zT2IAdapterModelField,
   zVAEModelField,
@@ -430,7 +430,7 @@ export const isColorFieldInputTemplate = (
 export const zMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('MainModelField'),
 });
-export const zMainModelFieldValue = zMainOrONNXModelField.optional();
+export const zMainModelFieldValue = zMainModelField.optional();
 export const zMainModelFieldInputInstance = zFieldInputInstanceBase.extend({
   type: zMainModelFieldType,
   value: zMainModelFieldValue,

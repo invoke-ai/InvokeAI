@@ -13,12 +13,10 @@ import { ALL_BASE_MODELS } from 'services/api/constants';
 import type {
   LoRAModelConfigEntity,
   MainModelConfigEntity,
-  OnnxModelConfigEntity,
 } from 'services/api/endpoints/models';
 import {
   useGetLoRAModelsQuery,
   useGetMainModelsQuery,
-  useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
 
 import ModelListItem from './ModelListItem';
@@ -28,9 +26,9 @@ type ModelListProps = {
   setSelectedModelId: (name: string | undefined) => void;
 };
 
-type ModelFormat = 'all' | 'checkpoint' | 'diffusers' | 'olive' | 'onnx';
+type ModelFormat = 'all' | 'checkpoint' | 'diffusers';
 
-type ModelType = 'main' | 'lora' | 'onnx';
+type ModelType = 'main' | 'lora';
 
 type CombinedModelFormat = ModelFormat | 'lora';
 
@@ -77,26 +75,6 @@ const ModelList = (props: ModelListProps) => {
     }
   );
 
-  const { filteredOnnxModels, isLoadingOnnxModels } = useGetOnnxModelsQuery(
-    ALL_BASE_MODELS,
-    {
-      selectFromResult: ({ data, isLoading }) => ({
-        filteredOnnxModels: modelsFilter(data, 'onnx', 'onnx', nameFilter),
-        isLoadingOnnxModels: isLoading,
-      }),
-    }
-  );
-
-  const { filteredOliveModels, isLoadingOliveModels } = useGetOnnxModelsQuery(
-    ALL_BASE_MODELS,
-    {
-      selectFromResult: ({ data, isLoading }) => ({
-        filteredOliveModels: modelsFilter(data, 'onnx', 'olive', nameFilter),
-        isLoadingOliveModels: isLoading,
-      }),
-    }
-  );
-
   const handleSearchFilter = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setNameFilter(e.target.value);
   }, []);
@@ -125,20 +103,6 @@ const ModelList = (props: ModelListProps) => {
             isChecked={modelFormatFilter === 'checkpoint'}
           >
             {t('modelManager.checkpointModels')}
-          </InvButton>
-          <InvButton
-            size="sm"
-            onClick={setModelFormatFilter.bind(null, 'onnx')}
-            isChecked={modelFormatFilter === 'onnx'}
-          >
-            {t('modelManager.onnxModels')}
-          </InvButton>
-          <InvButton
-            size="sm"
-            onClick={setModelFormatFilter.bind(null, 'olive')}
-            isChecked={modelFormatFilter === 'olive'}
-          >
-            {t('modelManager.oliveModels')}
           </InvButton>
           <InvButton
             size="sm"
@@ -202,34 +166,6 @@ const ModelList = (props: ModelListProps) => {
                 key="loras"
               />
             )}
-          {/* Olive List */}
-          {isLoadingOliveModels && (
-            <FetchingModelsLoader loadingMessage="Loading Olives..." />
-          )}
-          {['all', 'olive'].includes(modelFormatFilter) &&
-            !isLoadingOliveModels &&
-            filteredOliveModels.length > 0 && (
-              <ModelListWrapper
-                title="Olives"
-                modelList={filteredOliveModels}
-                selected={{ selectedModelId, setSelectedModelId }}
-                key="olive"
-              />
-            )}
-          {/* Onnx List */}
-          {isLoadingOnnxModels && (
-            <FetchingModelsLoader loadingMessage="Loading ONNX..." />
-          )}
-          {['all', 'onnx'].includes(modelFormatFilter) &&
-            !isLoadingOnnxModels &&
-            filteredOnnxModels.length > 0 && (
-              <ModelListWrapper
-                title="ONNX"
-                modelList={filteredOnnxModels}
-                selected={{ selectedModelId, setSelectedModelId }}
-                key="onnx"
-              />
-            )}
         </Flex>
       </Flex>
     </Flex>
@@ -238,12 +174,7 @@ const ModelList = (props: ModelListProps) => {
 
 export default memo(ModelList);
 
-const modelsFilter = <
-  T extends
-    | MainModelConfigEntity
-    | LoRAModelConfigEntity
-    | OnnxModelConfigEntity,
->(
+const modelsFilter = <T extends MainModelConfigEntity | LoRAModelConfigEntity>(
   data: EntityState<T, string> | undefined,
   model_type: ModelType,
   model_format: ModelFormat | undefined,
@@ -282,10 +213,7 @@ StyledModelContainer.displayName = 'StyledModelContainer';
 
 type ModelListWrapperProps = {
   title: string;
-  modelList:
-    | MainModelConfigEntity[]
-    | LoRAModelConfigEntity[]
-    | OnnxModelConfigEntity[];
+  modelList: MainModelConfigEntity[] | LoRAModelConfigEntity[];
   selected: ModelListProps;
 };
 

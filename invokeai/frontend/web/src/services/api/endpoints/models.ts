@@ -15,7 +15,6 @@ import type {
   MainModelConfig,
   MergeModelConfig,
   ModelType,
-  OnnxModelConfig,
   T2IAdapterModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
@@ -31,8 +30,6 @@ export type CheckpointModelConfigEntity = CheckpointModelConfig & {
 export type MainModelConfigEntity =
   | DiffusersModelConfigEntity
   | CheckpointModelConfigEntity;
-
-export type OnnxModelConfigEntity = OnnxModelConfig & { id: string };
 
 export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
 
@@ -56,7 +53,6 @@ export type VaeModelConfigEntity = VaeModelConfig & { id: string };
 
 export type AnyModelConfigEntity =
   | MainModelConfigEntity
-  | OnnxModelConfigEntity
   | LoRAModelConfigEntity
   | ControlNetModelConfigEntity
   | IPAdapterModelConfigEntity
@@ -138,9 +134,6 @@ type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-const onnxModelsAdapter = createEntityAdapter<OnnxModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
-});
 export const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
@@ -187,46 +180,6 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getOnnxModels: build.query<
-      EntityState<OnnxModelConfigEntity, string>,
-      BaseModelType[]
-    >({
-      query: (base_models) => {
-        const params = {
-          model_type: 'onnx',
-          base_models,
-        };
-
-        const query = queryString.stringify(params, { arrayFormat: 'none' });
-        return `models/?${query}`;
-      },
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'OnnxModel', id: LIST_TAG },
-          'Model',
-        ];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'OnnxModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: OnnxModelConfig[] }) => {
-        const entities = createModelEntities<OnnxModelConfigEntity>(
-          response.models
-        );
-        return onnxModelsAdapter.setAll(
-          onnxModelsAdapter.getInitialState(),
-          entities
-        );
-      },
-    }),
     getMainModels: build.query<
       EntityState<MainModelConfigEntity, string>,
       BaseModelType[]
@@ -583,7 +536,6 @@ export const modelsApi = api.injectEndpoints({
 
 export const {
   useGetMainModelsQuery,
-  useGetOnnxModelsQuery,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
   useGetT2IAdapterModelsQuery,

@@ -137,10 +137,11 @@ const fieldValueReducer = <T extends FieldValue>(
     return;
   }
   const input = node.data?.inputs[fieldName];
-  if (!input || nodeIndex < 0 || !schema.safeParse(value).success) {
+  const result = schema.safeParse(value);
+  if (!input || nodeIndex < 0 || !result.success) {
     return;
   }
-  input.value = value;
+  input.value = result.data;
 };
 
 const nodesSlice = createSlice({
