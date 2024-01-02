@@ -1218,7 +1218,8 @@
             "perIterationDesc": "Use a different seed for each iteration",
             "perPromptLabel": "Seed per Image",
             "perPromptDesc": "Use a different seed for each image"
-        }
+        },
+        "loading": "Generating Dynamic Prompts..."
     },
     "sdxl": {
         "cfgScale": "CFG Scale",

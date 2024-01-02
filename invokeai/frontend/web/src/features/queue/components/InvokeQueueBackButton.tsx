@@ -41,6 +41,9 @@ const selector = createMemoizedSelector([stateSelector], (state) => {
 });
 
 export const InvokeQueueBackButton = memo(() => {
+  const isLoadingDynamicPrompts = useAppSelector(
+    (state) => state.dynamicPrompts.isLoading
+  );
   const { queueBack, isLoading, isDisabled } = useQueueBack();
   const { iterations, step, fineStep } = useAppSelector(selector);
   const dispatch = useAppDispatch();
@@ -73,7 +76,8 @@ export const InvokeQueueBackButton = memo(() => {
       </IAIInformationalPopover>
       <InvButton
         onClick={queueBack}
-        isLoading={isLoading}
+        isLoading={isLoading || isLoadingDynamicPrompts}
+        loadingText={invoke}
         isDisabled={isDisabled}
         rightIcon={<IoSparkles />}
         tooltip={<QueueButtonTooltip />}
@@ -83,8 +87,10 @@ export const InvokeQueueBackButton = memo(() => {
         size="lg"
         w="calc(100% - 60px)"
         flexShrink={0}
+        justifyContent="space-between"
+        spinnerPlacement="end"
       >
-        {invoke}
+        <span>{invoke}</span>
         <Spacer />
       </InvButton>
     </Flex>

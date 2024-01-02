@@ -3,6 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
@@ -22,7 +23,7 @@ const selector = createMemoizedSelector(
     },
     activeTabName
   ) => {
-    const { initialImage, model } = generation;
+    const { initialImage, model, positivePrompt } = generation;
 
     const { isConnected } = system;
 
@@ -87,7 +88,7 @@ const selector = createMemoizedSelector(
         });
       }
     } else {
-      if (dynamicPrompts.prompts.length === 0) {
+      if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
         reasons.push(i18n.t('parameters.invoke.noPrompts'));
       }
 
