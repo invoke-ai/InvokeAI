@@ -24,9 +24,10 @@ from controlnet_aux import (
 )
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
+from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.shared.fields import FieldDescriptions
 
@@ -75,16 +76,15 @@ class ControlField(BaseModel):
     resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
 
     @field_validator("control_weight")
+    @classmethod
     def validate_control_weight(cls, v):
-        """Validate that all control weights in the valid range"""
-        if isinstance(v, list):
-            for i in v:
-                if i < -1 or i > 2:
-                    raise ValueError("Control weights must be within -1 to 2 range")
-        else:
-            if v < -1 or v > 2:
-                raise ValueError("Control weights must be within -1 to 2 range")
+        validate_weights(v)
         return v
+
+    @model_validator(mode="after")
+    def validate_begin_end_step_percent(self):
+        validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
+        return self
 
 
 @invocation_output("control_output")
@@ -95,23 +95,34 @@ class ControlOutput(BaseInvocationOutput):
     control: ControlField = OutputField(description=FieldDescriptions.control)
 
 
-@invocation("controlnet", title="ControlNet", tags=["controlnet"], category="controlnet", version="1.1.0")
+@invocation("controlnet", title="ControlNet", tags=["controlnet"], category="controlnet", version="1.1.1")
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
     image: ImageField = InputField(description="The control image")
     control_model: ControlNetModelField = InputField(description=FieldDescriptions.controlnet_model, input=Input.Direct)
     control_weight: Union[float, List[float]] = InputField(
-        default=1.0, description="The weight given to the ControlNet"
+        default=1.0, ge=-1, le=2, description="The weight given to the ControlNet"
     )
     begin_step_percent: float = InputField(
-        default=0, ge=-1, le=2, description="When the ControlNet is first applied (% of total steps)"
+        default=0, ge=0, le=1, description="When the ControlNet is first applied (% of total steps)"
     )
     end_step_percent: float = InputField(
         default=1, ge=0, le=1, description="When the ControlNet is last applied (% of total steps)"
     )
     control_mode: CONTROLNET_MODE_VALUES = InputField(default="balanced", description="The control mode used")
     resize_mode: CONTROLNET_RESIZE_VALUES = InputField(default="just_resize", description="The resize mode used")
+
+    @field_validator("control_weight")
+    @classmethod
+    def validate_control_weight(cls, v):
+        validate_weights(v)
+        return v
+
+    @model_validator(mode="after")
+    def validate_begin_end_step_percent(self) -> "ControlNetInvocation":
+        validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
+        return self
 
     def invoke(self, context: InvocationContext) -> ControlOutput:
         return ControlOutput(
