@@ -1,19 +1,19 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { sizeReset } from 'features/parameters/store/generationSlice';
+import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoSparkles } from 'react-icons/io5';
 
 export const SetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
+  const ctx = useImageSizeContext();
   const optimalDimension = useAppSelector((state) =>
     state.generation.model?.base_model === 'sdxl' ? 1024 : 512
   );
-  const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    dispatch(sizeReset(optimalDimension));
-  }, [dispatch, optimalDimension]);
+    ctx.sizeReset(optimalDimension, optimalDimension);
+  }, [ctx, optimalDimension]);
 
   return (
     <InvIconButton
