@@ -41,10 +41,6 @@ const ParamBoundingBoxWidth = () => {
     [ctx]
   );
 
-  const onReset = useCallback(() => {
-    ctx.heightChanged(initial);
-  }, [ctx, initial]);
-
   return (
     <InvControl label={t('parameters.height')} isDisabled={isStaging}>
       <InvSlider
@@ -53,8 +49,8 @@ const ParamBoundingBoxWidth = () => {
         step={CANVAS_GRID_SIZE_COARSE}
         fineStep={CANVAS_GRID_SIZE_FINE}
         value={ctx.height}
+        defaultValue={initial}
         onChange={onChange}
-        onReset={onReset}
         marks
         withNumberInput
         numberInputMax={4096}

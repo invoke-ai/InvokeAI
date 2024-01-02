@@ -30,12 +30,6 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleColorMapTileSizeReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      color_map_tile_size: DEFAULTS.color_map_tile_size,
-    });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
       <InvControl
@@ -44,8 +38,8 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
       >
         <InvSlider
           value={color_map_tile_size}
+          defaultValue={DEFAULTS.color_map_tile_size}
           onChange={handleColorMapTileSizeChanged}
-          onReset={handleColorMapTileSizeReset}
           min={1}
           max={256}
           step={1}

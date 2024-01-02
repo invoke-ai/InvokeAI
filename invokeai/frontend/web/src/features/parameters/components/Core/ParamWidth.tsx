@@ -43,10 +43,6 @@ export const ParamWidth = memo(() => {
     [ctx]
   );
 
-  const onReset = useCallback(() => {
-    ctx.widthChanged(initial);
-  }, [ctx, initial]);
-
   const marks = useMemo(() => [min, initial, max], [min, initial, max]);
 
   return (
@@ -54,7 +50,7 @@ export const ParamWidth = memo(() => {
       <InvSlider
         value={ctx.width}
         onChange={onChange}
-        onReset={onReset}
+        defaultValue={initial}
         min={min}
         max={max}
         step={step}
@@ -68,6 +64,7 @@ export const ParamWidth = memo(() => {
         max={inputMax}
         step={step}
         fineStep={fineStep}
+        defaultValue={initial}
       />
     </InvControl>
   );

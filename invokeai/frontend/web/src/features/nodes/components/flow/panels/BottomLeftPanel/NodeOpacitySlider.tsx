@@ -22,12 +22,12 @@ const NodeOpacitySlider = () => {
       <InvSlider
         aria-label={t('nodes.nodeOpacity')}
         value={nodeOpacity}
+        defaultValue={1}
         min={0.5}
         max={1}
         step={0.01}
         onChange={handleChange}
         orientation="vertical"
-        defaultValue={30}
         h="calc(100% - 0.5rem)"
       />
     </Flex>

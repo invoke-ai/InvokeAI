@@ -23,21 +23,18 @@ const ParamSymmetryHorizontal = () => {
     },
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setHorizontalSymmetrySteps(0));
-  }, [dispatch]);
 
   return (
     <InvControl label={t('parameters.hSymmetryStep')}>
       <InvSlider
         value={horizontalSymmetrySteps}
+        defaultValue={0}
         onChange={handleChange}
         min={0}
         max={steps}
         step={1}
         withNumberInput
         marks
-        onReset={handleReset}
       />
     </InvControl>
   );

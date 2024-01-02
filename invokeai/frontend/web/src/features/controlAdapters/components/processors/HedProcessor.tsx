@@ -49,18 +49,6 @@ const HedPreprocessor = (props: HedProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
       <InvControl
@@ -69,8 +57,8 @@ const HedPreprocessor = (props: HedProcessorProps) => {
       >
         <InvSlider
           value={detect_resolution}
+          defaultValue={DEFAULTS.detect_resolution}
           onChange={handleDetectResolutionChanged}
-          onReset={handleDetectResolutionReset}
           min={0}
           max={4096}
           marks
@@ -84,7 +72,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         <InvSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          onReset={handleImageResolutionReset}
+          defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
           marks

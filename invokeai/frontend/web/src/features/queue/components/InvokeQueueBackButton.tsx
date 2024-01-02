@@ -64,6 +64,7 @@ export const InvokeQueueBackButton = memo(() => {
           max={999}
           onChange={handleChange}
           value={iterations}
+          defaultValue={1}
           numberInputFieldProps={numberInputFieldProps}
           pos="absolute"
           insetInlineEnd={0}

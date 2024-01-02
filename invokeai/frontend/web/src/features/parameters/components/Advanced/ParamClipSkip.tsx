@@ -24,10 +24,6 @@ const ParamClipSkip = () => {
     [dispatch]
   );
 
-  const handleClipSkipReset = useCallback(() => {
-    dispatch(setClipSkip(0));
-  }, [dispatch]);
-
   const max = useMemo(() => {
     if (!model) {
       return CLIP_SKIP_MAP['sd-1'].maxClip;
@@ -50,11 +46,11 @@ const ParamClipSkip = () => {
     <InvControl label={t('parameters.clipSkip')} feature="clipSkip">
       <InvSlider
         value={clipSkip}
+        defaultValue={0}
         min={0}
         max={max}
         step={1}
         onChange={handleClipSkipChange}
-        onReset={handleClipSkipReset}
         withNumberInput
         marks={sliderMarks}
       />

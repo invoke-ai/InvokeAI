@@ -266,6 +266,7 @@ const IAICanvasToolChooserOptions = () => {
                     step={1}
                     onChange={handleChangeBrushSize}
                     marks={marks}
+                    defaultValue={50}
                   />
                   <InvNumberInput
                     value={brushSize}
@@ -273,6 +274,7 @@ const IAICanvasToolChooserOptions = () => {
                     max={500}
                     step={1}
                     onChange={handleChangeBrushSize}
+                    defaultValue={50}
                   />
                 </InvControl>
               </Flex>

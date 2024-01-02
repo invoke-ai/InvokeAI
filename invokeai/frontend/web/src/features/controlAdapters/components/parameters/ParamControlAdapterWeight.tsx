@@ -27,9 +27,6 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
     },
     [dispatch, id]
   );
-  const onReset = useCallback(() => {
-    dispatch(controlAdapterWeightChanged({ id, weight: 1 }));
-  }, [dispatch, id]);
 
   if (isNil(weight)) {
     // should never happen
@@ -46,7 +43,7 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
         <InvSlider
           value={weight}
           onChange={onChange}
-          onReset={onReset}
+          defaultValue={1}
           min={0}
           max={2}
           step={0.05}
@@ -57,12 +54,12 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
         <InvNumberInput
           value={weight}
           onChange={onChange}
-          onReset={onReset}
           min={-1}
           max={2}
           step={0.05}
           fineStep={0.01}
           maxW={20}
+          defaultValue={1}
         />
       </InvControl>
     </InvControlGroup>
