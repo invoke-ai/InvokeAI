@@ -8,6 +8,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
 import { useClearStorage } from 'common/hooks/useClearStorage';
+import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useGlobalModifiersInit } from 'common/hooks/useGlobalModifiers';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
@@ -44,6 +45,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   // singleton!
   useSocketIO();
   useGlobalModifiersInit();
+  useGlobalHotkeys();
 
   const handleReset = useCallback(() => {
     clearStorage();
