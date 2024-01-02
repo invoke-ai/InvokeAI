@@ -1,6 +1,6 @@
 import { Flex, Image, Spinner } from '@chakra-ui/react';
-import InvokeAILogoImage from 'assets/images/logo.png';
 import InvokeAILogoNew from 'assets/images/invoke-key-wht-lrg.svg';
+import InvokeAILogoImage from 'assets/images/logo.png';
 import { memo } from 'react';
 
 // This component loads before the theme so we cannot use theme tokens here
