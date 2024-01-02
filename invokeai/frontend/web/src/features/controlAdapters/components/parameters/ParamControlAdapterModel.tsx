@@ -11,13 +11,14 @@ import { useControlAdapterModelEntities } from 'features/controlAdapters/hooks/u
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { pick } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   ControlNetModelConfigEntity,
   IPAdapterModelConfigEntity,
   T2IAdapterModelConfigEntity,
 } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 type ParamControlAdapterModelProps = {
   id: string;
@@ -33,7 +34,9 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const controlAdapterType = useControlAdapterType(id);
   const model = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
-
+  const currentBaseModel = useAppSelector(
+    (state) => state.generation.model?.base_model
+  );
   const { mainModel } = useAppSelector(selector);
   const { t } = useTranslation();
 
@@ -60,14 +63,29 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
     [dispatch, id]
   );
 
+  const selectedModel = useMemo(
+    () =>
+      model && controlAdapterType
+        ? { ...model, model_type: controlAdapterType }
+        : null,
+    [controlAdapterType, model]
+  );
+
+  const getIsDisabled = useCallback(
+    (model: AnyModelConfig): boolean => {
+      const isCompatible = currentBaseModel === model.base_model;
+      const hasMainModel = Boolean(currentBaseModel);
+      return !hasMainModel || !isCompatible;
+    },
+    [currentBaseModel]
+  );
+
   const { options, value, onChange, noOptionsMessage } =
     useGroupedModelInvSelect({
       modelEntities: models,
       onChange: _onChange,
-      selectedModel:
-        model && controlAdapterType
-          ? { ...model, model_type: controlAdapterType }
-          : null,
+      selectedModel,
+      getIsDisabled,
     });
 
   return (
