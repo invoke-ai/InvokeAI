@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { $shift } from 'common/hooks/useGlobalModifiers';
 import {
   roundDownToMultiple,
   roundToMultiple,
@@ -15,6 +16,8 @@ import {
   setIsTransformingBoundingBox,
 } from 'features/canvas/store/canvasNanostore';
 import {
+  CANVAS_GRID_SIZE_COARSE,
+  CANVAS_GRID_SIZE_FINE,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setShouldSnapToGrid,
@@ -23,7 +26,7 @@ import type Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
 
@@ -58,12 +61,10 @@ type IAICanvasBoundingBoxPreviewProps = GroupConfig;
 
 const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   const { ...rest } = props;
-
   const dispatch = useAppDispatch();
   const {
     boundingBoxCoordinates,
     boundingBoxDimensions,
-
     stageScale,
     shouldSnapToGrid,
     tool,
@@ -73,6 +74,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRef = useRef<Konva.Rect>(null);
+  const shift = useStore($shift);
   const isDrawing = useStore($isDrawing);
   const isMovingBoundingBox = useStore($isMovingBoundingBox);
   const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
@@ -87,7 +89,14 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     transformerRef.current.getLayer()?.batchDraw();
   }, []);
 
-  const scaledStep = 64 * stageScale;
+  const gridSize = useMemo(
+    () => (shift ? CANVAS_GRID_SIZE_FINE : CANVAS_GRID_SIZE_COARSE),
+    [shift]
+  );
+  const scaledStep = useMemo(
+    () => gridSize * stageScale,
+    [gridSize, stageScale]
+  );
 
   useHotkeys('N', () => {
     dispatch(setShouldSnapToGrid(!shouldSnapToGrid));
@@ -108,8 +117,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       const dragX = e.target.x();
       const dragY = e.target.y();
 
-      const newX = roundToMultiple(dragX, 64);
-      const newY = roundToMultiple(dragY, 64);
+      const newX = roundToMultiple(dragX, gridSize);
+      const newY = roundToMultiple(dragY, gridSize);
 
       e.target.x(newX);
       e.target.y(newY);
@@ -121,7 +130,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         })
       );
     },
-    [dispatch, shouldSnapToGrid]
+    [dispatch, gridSize, shouldSnapToGrid]
   );
 
   const handleOnTransform = useCallback(() => {
@@ -147,7 +156,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const y = Math.round(rect.y());
 
     if (aspectRatio) {
-      const newHeight = roundToMultiple(width / aspectRatio.value, 64);
+      const newHeight = roundToMultiple(width / aspectRatio.value, gridSize);
       dispatch(
         setBoundingBoxDimensions({
           width: width,
@@ -165,15 +174,15 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
     dispatch(
       setBoundingBoxCoordinates({
-        x: shouldSnapToGrid ? roundDownToMultiple(x, 64) : x,
-        y: shouldSnapToGrid ? roundDownToMultiple(y, 64) : y,
+        x: shouldSnapToGrid ? roundDownToMultiple(x, gridSize) : x,
+        y: shouldSnapToGrid ? roundDownToMultiple(y, gridSize) : y,
       })
     );
 
     // Reset the scale now that the coords/dimensions have been un-scaled
     rect.scaleX(1);
     rect.scaleY(1);
-  }, [dispatch, shouldSnapToGrid, aspectRatio]);
+  }, [aspectRatio, dispatch, shouldSnapToGrid, gridSize]);
 
   const anchorDragBoundFunc = useCallback(
     (
