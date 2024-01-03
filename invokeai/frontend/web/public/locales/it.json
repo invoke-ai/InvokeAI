@@ -182,10 +182,6 @@
             "title": "Appunta le opzioni",
             "desc": "Blocca il pannello delle opzioni"
         },
-        "toggleViewer": {
-            "title": "Attiva/disattiva visualizzatore",
-            "desc": "Apre e chiude il visualizzatore immagini"
-        },
         "toggleGallery": {
             "title": "Attiva/disattiva Galleria",
             "desc": "Apre e chiude il pannello della galleria"
@@ -245,10 +241,6 @@
         "nextImage": {
             "title": "Immagine successiva",
             "desc": "Visualizza l'immagine successiva nella galleria"
-        },
-        "toggleGalleryPin": {
-            "title": "Attiva/disattiva il blocco della galleria",
-            "desc": "Blocca/sblocca la galleria dall'interfaccia utente"
         },
         "increaseGalleryThumbSize": {
             "title": "Aumenta dimensione immagini nella galleria",

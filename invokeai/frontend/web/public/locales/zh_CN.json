@@ -189,10 +189,6 @@
             "title": "常开选项卡",
             "desc": "保持选项浮窗常开"
         },
-        "toggleViewer": {
-            "title": "切换图像查看器",
-            "desc": "打开或关闭图像查看器"
-        },
         "toggleGallery": {
             "title": "切换图库",
             "desc": "打开或关闭图库"
@@ -252,10 +248,6 @@
         "nextImage": {
             "title": "下一张图像",
             "desc": "显示图库中的下一张图像"
-        },
-        "toggleGalleryPin": {
-            "title": "切换图库常开",
-            "desc": "开关图库在界面中的常开模式"
         },
         "increaseGalleryThumbSize": {
             "title": "增大预览尺寸",

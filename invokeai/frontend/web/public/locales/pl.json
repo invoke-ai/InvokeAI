@@ -86,10 +86,6 @@
             "title": "Przypnij opcje",
             "desc": "Przypina panel opcji"
         },
-        "toggleViewer": {
-            "title": "Przełącz podgląd",
-            "desc": "Otwiera lub zamyka widok podglądu"
-        },
         "toggleGallery": {
             "title": "Przełącz galerię",
             "desc": "Wysuwa lub chowa galerię"
@@ -149,10 +145,6 @@
         "nextImage": {
             "title": "Następny obraz",
             "desc": "Aktywuje następny obraz z galerii"
-        },
-        "toggleGalleryPin": {
-            "title": "Przypnij galerię",
-            "desc": "Przypina lub odpina widok galerii"
         },
         "increaseGalleryThumbSize": {
             "title": "Powiększ obrazy",
