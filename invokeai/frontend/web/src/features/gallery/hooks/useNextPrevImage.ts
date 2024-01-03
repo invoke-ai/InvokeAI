@@ -45,6 +45,7 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
 
     const lastSelectedImage =
       state.gallery.selection[state.gallery.selection.length - 1];
+    
 
     const isFetching = status === 'pending';
 
@@ -70,17 +71,29 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
     const currentImageIndex = images.findIndex(
       (i) => i.image_name === lastSelectedImage.image_name
     );
+    const widthOfGalleryImage = Object.values(document.getElementsByClassName("gallerygrid-image"))[0]?.clientWidth
+    const widthOfGalleryGrid = document.getElementById("gallery-grid")?.clientWidth
+
+    
+    const imagesPerRow = Math.floor((widthOfGalleryGrid ?? 0) / (widthOfGalleryImage ?? 1))
+    
+
     const nextImageIndex = clamp(currentImageIndex + 1, 0, images.length - 1);
     const prevImageIndex = clamp(currentImageIndex - 1, 0, images.length - 1);
+    const topImageIndex = clamp(currentImageIndex - imagesPerRow,0, images.length - 1)
 
     const nextImageId = images[nextImageIndex]?.image_name;
     const prevImageId = images[prevImageIndex]?.image_name;
+    const topImageId = images[topImageIndex]?.image_name
 
     const nextImage = nextImageId
       ? selectors.selectById(data, nextImageId)
       : undefined;
     const prevImage = prevImageId
       ? selectors.selectById(data, prevImageId)
+      : undefined;
+    const topImage = topImageId  
+      ? selectors.selectById(data, topImageId)
       : undefined;
 
     const imagesLength = images.length;
@@ -95,6 +108,8 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
       nextImageIndex,
       prevImageIndex,
       queryArgs,
+      topImageIndex,
+      topImage
     };
   }
 );
@@ -112,6 +127,8 @@ export const useNextPrevImage = () => {
     queryArgs,
     loadedImagesCount,
     currentImageIndex,
+    topImageIndex,
+    topImage
   } = useAppSelector(nextPrevImageButtonsSelector);
 
   const handlePrevImage = useCallback(() => {
@@ -154,6 +171,27 @@ export const useNextPrevImage = () => {
     }
   }, [dispatch, nextImage, nextImageIndex]);
 
+  const handleTopImage = useCallback(() => {
+    topImage && dispatch(imageSelected(topImage));
+    const range = $useNextPrevImageState.get().virtuosoRangeRef?.current;
+    const virtuoso = $useNextPrevImageState.get().virtuosoRef?.current;
+
+    if (!range || !virtuoso) {
+      return;
+    }
+
+    if (
+      topImageIndex !== undefined &&
+      (topImageIndex < range.startIndex || topImageIndex > range.endIndex)
+    ) {
+      virtuoso.scrollToIndex({
+        index: topImageIndex,
+        behavior: 'smooth',
+        align: getScrollToIndexAlign(topImageIndex, range),
+      });
+    }
+  },[dispatch, topImage, topImageIndex])
+
   const [listImages] = useLazyListImagesQuery();
 
   const handleLoadMoreImages = useCallback(() => {
@@ -172,5 +210,6 @@ export const useNextPrevImage = () => {
     areMoreImagesAvailable,
     handleLoadMoreImages,
     isFetching,
+    handleTopImage
   };
 };

@@ -136,7 +136,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" data-testid={`image-${imageDTO.image_name}`}>
+    <Box w="full" h="full" className='gallerygrid-image' data-testid={`image-${imageDTO.image_name}`}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
