@@ -46,9 +46,11 @@ const InputField = ({ nodeId, fieldName }: Props) => {
       return true;
     }
 
-    if (!doesFieldHaveValue && !isConnected && fieldTemplate.input === 'any') {
+    if (!doesFieldHaveValue && !isConnected && fieldTemplate.input !== 'connection') {
       return true;
     }
+
+    return false
   }, [fieldTemplate, isConnected, doesFieldHaveValue]);
 
   if (!fieldTemplate || !fieldInstance) {
