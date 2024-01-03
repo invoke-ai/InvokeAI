@@ -68,10 +68,14 @@ export type UsePanelReturn = {
    */
   onExpand: PanelOnExpand;
   /**
-   * Reset the panel to the minSize. If the panel is already at the minSize, collapse it.
-   * This can be provided to the `onDoubleClick` prop of the panel's nearest resize handle.
+   * Reset the panel to the minSize.
    */
   reset: () => void;
+  /**
+   * Reset the panel to the minSize. If the panel is already at the minSize, collapse it.
+   * This should be passed to the `onDoubleClick` prop of the panel's nearest resize handle.
+   */
+  onDoubleClickHandle: () => void;
   /**
    * Toggle the panel between collapsed and expanded.
    */
@@ -183,6 +187,10 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
   );
 
   const reset = useCallback(() => {
+    panelHandleRef.current?.resize(_minSize);
+  }, [_minSize]);
+
+  const onDoubleClickHandle = useCallback(() => {
     // If the panel is really super close to the min size, collapse it
     if (Math.abs((panelHandleRef.current?.getSize() ?? 0) - _minSize) < 0.01) {
       collapse();
@@ -204,6 +212,7 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
     expand,
     collapse,
     resize,
+    onDoubleClickHandle,
   };
 };
 

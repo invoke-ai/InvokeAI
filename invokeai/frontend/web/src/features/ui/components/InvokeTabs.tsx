@@ -192,6 +192,7 @@ const InvokeTabs = () => {
     expand: expandOptionsPanel,
     collapse: collapseOptionsPanel,
     toggle: toggleOptionsPanel,
+    onDoubleClickHandle: onDoubleClickOptionsPanelHandle,
   } = usePanel(optionsPanelUsePanelOptions);
 
   const {
@@ -204,10 +205,19 @@ const InvokeTabs = () => {
     expand: expandGalleryPanel,
     collapse: collapseGalleryPanel,
     toggle: toggleGalleryPanel,
+    onDoubleClickHandle: onDoubleClickGalleryPanelHandle,
   } = usePanel(galleryPanelUsePanelOptions);
 
-  useHotkeys('g', toggleGalleryPanel, []);
-  useHotkeys(['t', 'o'], toggleOptionsPanel, []);
+  useHotkeys('g', toggleGalleryPanel, [toggleGalleryPanel]);
+  useHotkeys(['t', 'o'], toggleOptionsPanel, [toggleOptionsPanel]);
+  useHotkeys(
+    'shift+r',
+    () => {
+      resetOptionsPanel();
+      resetGalleryPanel();
+    },
+    [resetOptionsPanel, resetGalleryPanel]
+  );
   useHotkeys(
     'f',
     () => {
@@ -219,7 +229,14 @@ const InvokeTabs = () => {
         collapseGalleryPanel();
       }
     },
-    [isOptionsPanelCollapsed, isGalleryPanelCollapsed]
+    [
+      isOptionsPanelCollapsed,
+      isGalleryPanelCollapsed,
+      expandOptionsPanel,
+      expandGalleryPanel,
+      collapseOptionsPanel,
+      collapseGalleryPanel,
+    ]
   );
 
   return (
@@ -265,7 +282,7 @@ const InvokeTabs = () => {
             </Panel>
             <ResizeHandle
               id="options-main-handle"
-              onDoubleClick={resetOptionsPanel}
+              onDoubleClick={onDoubleClickOptionsPanelHandle}
               orientation="vertical"
             />
           </>
@@ -279,8 +296,8 @@ const InvokeTabs = () => {
           <>
             <ResizeHandle
               id="main-gallery-handle"
-              onDoubleClick={resetGalleryPanel}
               orientation="vertical"
+              onDoubleClick={onDoubleClickGalleryPanelHandle}
             />
             <Panel
               id="gallery-panel"
