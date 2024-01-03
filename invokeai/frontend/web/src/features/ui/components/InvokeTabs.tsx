@@ -207,7 +207,7 @@ const InvokeTabs = () => {
   } = usePanel(galleryPanelUsePanelOptions);
 
   useHotkeys('g', toggleGalleryPanel, []);
-  useHotkeys('t', toggleOptionsPanel, []);
+  useHotkeys(['t', 'o'], toggleOptionsPanel, []);
   useHotkeys(
     'f',
     () => {

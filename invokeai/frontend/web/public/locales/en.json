@@ -436,8 +436,12 @@
         },
         "appHotkeys": "App Hotkeys",
         "cancel": {
-            "desc": "Cancel image generation",
+            "desc": "Cancel current queue item",
             "title": "Cancel"
+        },
+        "cancelAndClear": {
+            "desc": "Cancel current queue item and clear all pending items",
+            "title": "Cancel and Clear"
         },
         "changeTabs": {
             "desc": "Switch to another workspace",

@@ -1,4 +1,6 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
+import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -41,6 +43,40 @@ export const useGlobalHotkeys = () => {
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
     [queueFront, isDisabledQueueFront, isLoadingQueueFront]
+  );
+
+  const {
+    cancelQueueItem,
+    isDisabled: isDisabledCancelQueueItem,
+    isLoading: isLoadingCancelQueueItem,
+  } = useCancelCurrentQueueItem();
+
+  useHotkeys(
+    ['shift+x', 'shift+enter'],
+    cancelQueueItem,
+    {
+      enabled: () => !isDisabledCancelQueueItem && !isLoadingCancelQueueItem,
+      preventDefault: true,
+      enableOnFormTags: ['input', 'textarea', 'select'],
+    },
+    [cancelQueueItem, isDisabledCancelQueueItem, isLoadingCancelQueueItem]
+  );
+
+  const {
+    clearQueue,
+    isDisabled: isDisabledClearQueue,
+    isLoading: isLoadingClearQueue,
+  } = useClearQueue();
+
+  useHotkeys(
+    ['ctrl+shift+x', 'meta+shift+x'],
+    clearQueue,
+    {
+      enabled: () => !isDisabledClearQueue && !isLoadingClearQueue,
+      preventDefault: true,
+      enableOnFormTags: ['input', 'textarea', 'select'],
+    },
+    [clearQueue, isDisabledClearQueue, isLoadingClearQueue]
   );
 
   useHotkeys(

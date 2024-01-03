@@ -69,6 +69,11 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
         hotkey: 'Shift+X',
       },
       {
+        title: t('hotkeys.cancelAndClear.title'),
+        desc: t('hotkeys.cancelAndClear.desc'),
+        hotkey: 'Shift+Ctrl+X / Shift+Cmd+X',
+      },
+      {
         title: t('hotkeys.focusPrompt.title'),
         desc: t('hotkeys.focusPrompt.desc'),
         hotkey: 'Alt+A',
@@ -76,7 +81,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
       {
         title: t('hotkeys.toggleOptions.title'),
         desc: t('hotkeys.toggleOptions.desc'),
-        hotkey: 'O',
+        hotkey: 'T / O',
       },
       {
         title: t('hotkeys.toggleGallery.title'),
