@@ -6,7 +6,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { KeyboardEvent, PropsWithChildren } from 'react';
+import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
@@ -118,6 +118,7 @@ const ImageUploader = (props: PropsWithChildren) => {
     onDrop,
     onDragOver,
     multiple: false,
+    noKeyboard: true,
   });
 
   useEffect(() => {
@@ -143,15 +144,8 @@ const ImageUploader = (props: PropsWithChildren) => {
     };
   }, [inputRef]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Bail out if user hits spacebar - do not open the uploader
-    if (e.key === ' ') {
-      return;
-    }
-  }, []);
-
   return (
-    <Box {...getRootProps(dropzoneRootProps)} onKeyDown={handleKeyDown}>
+    <Box {...getRootProps(dropzoneRootProps)}>
       <input {...getInputProps()} />
       {props.children}
       <AnimatePresence>
