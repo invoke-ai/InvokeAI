@@ -26,6 +26,8 @@ import {
   CANVAS_GRID_SIZE_COARSE,
   CANVAS_GRID_SIZE_FINE,
 } from 'features/canvas/store/constants';
+import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -37,8 +39,8 @@ import { Group, Rect, Transformer } from 'react-konva';
 const borderDash = [4, 4];
 
 const boundingBoxPreviewSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas }) => {
+  [stateSelector, selectOptimalDimension],
+  ({ canvas }, optimalDimension) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -56,6 +58,7 @@ const boundingBoxPreviewSelector = createMemoizedSelector(
       tool,
       hitStrokeWidth: 20 / stageScale,
       aspectRatio,
+      optimalDimension,
     };
   }
 );
@@ -73,6 +76,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     tool,
     hitStrokeWidth,
     aspectRatio,
+    optimalDimension,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -163,22 +167,25 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const y = Math.round(rect.y());
 
     if (aspectRatio.isLocked) {
-      const newHeight = roundDownToMultipleMin(
-        width / aspectRatio.value,
-        gridSize
-      );
+      const newDimensions = calculateNewSize(aspectRatio.value, width * height);
       dispatch(
-        setBoundingBoxDimensions({
-          width: roundDownToMultipleMin(width, gridSize),
-          height: newHeight,
-        })
+        setBoundingBoxDimensions(
+          {
+            width: roundDownToMultipleMin(newDimensions.width, gridSize),
+            height: roundDownToMultipleMin(newDimensions.height, gridSize),
+          },
+          optimalDimension
+        )
       );
     } else {
       dispatch(
-        setBoundingBoxDimensions({
-          width: roundDownToMultipleMin(width, gridSize),
-          height: roundDownToMultipleMin(height, gridSize),
-        })
+        setBoundingBoxDimensions(
+          {
+            width: roundDownToMultipleMin(width, gridSize),
+            height: roundDownToMultipleMin(height, gridSize),
+          },
+          optimalDimension
+        )
       );
       dispatch(
         aspectRatioChanged({
@@ -205,6 +212,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     dispatch,
     shouldSnapToGrid,
     gridSize,
+    optimalDimension,
   ]);
 
   const anchorDragBoundFunc = useCallback(
@@ -233,7 +241,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         x: roundDownToMultiple(newPos.x, scaledStep) + offsetX,
         y: roundDownToMultiple(newPos.y, scaledStep) + offsetY,
       };
-      console.log({ oldPos, newPos, newCoordinates });
 
       return newCoordinates;
     },

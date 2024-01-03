@@ -7,6 +7,7 @@ import ParamBoundingBoxHeight from 'features/parameters/components/Canvas/Boundi
 import ParamBoundingBoxWidth from 'features/parameters/components/Canvas/BoundingBox/ParamBoundingBoxWidth';
 import { ImageSize } from 'features/parameters/components/ImageSize/ImageSize';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
 export const ImageSizeCanvas = memo(() => {
@@ -15,19 +16,20 @@ export const ImageSizeCanvas = memo(() => {
     (state) => state.canvas.boundingBoxDimensions
   );
   const aspectRatioState = useAppSelector((state) => state.canvas.aspectRatio);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
 
   const onChangeWidth = useCallback(
     (width: number) => {
-      dispatch(setBoundingBoxDimensions({ width }));
+      dispatch(setBoundingBoxDimensions({ width }, optimalDimension));
     },
-    [dispatch]
+    [dispatch, optimalDimension]
   );
 
   const onChangeHeight = useCallback(
     (height: number) => {
-      dispatch(setBoundingBoxDimensions({ height }));
+      dispatch(setBoundingBoxDimensions({ height }, optimalDimension));
     },
-    [dispatch]
+    [dispatch, optimalDimension]
   );
 
   const onChangeAspectRatioState = useCallback(

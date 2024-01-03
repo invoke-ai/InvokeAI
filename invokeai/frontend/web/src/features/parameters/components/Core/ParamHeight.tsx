@@ -5,23 +5,17 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ generation, config }) => {
+  [stateSelector, selectOptimalDimension],
+  ({ config }, optimalDimension) => {
     const { min, sliderMax, inputMax, fineStep, coarseStep } = config.sd.height;
-    const { model } = generation;
-
-    const initial = ['sdxl', 'sdxl-refiner'].includes(
-      model?.base_model as string
-    )
-      ? 1024
-      : 512;
 
     return {
-      initial,
+      initial: optimalDimension,
       min,
       max: sliderMax,
       inputMax,

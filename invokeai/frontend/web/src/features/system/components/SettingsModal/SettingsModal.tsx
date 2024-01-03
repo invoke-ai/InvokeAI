@@ -27,10 +27,7 @@ import {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
-import {
-  setShouldAutoChangeDimensions,
-  setShouldShowProgressInViewer,
-} from 'features/ui/store/uiSlice';
+import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
 import type { ChangeEvent, ReactElement } from 'react';
 import { cloneElement, memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +51,7 @@ const selector = createMemoizedSelector(
       shouldEnableInformationalPopovers,
     } = system;
     const { shouldUseCpuNoise } = generation;
-    const { shouldShowProgressInViewer, shouldAutoChangeDimensions } = ui;
+    const { shouldShowProgressInViewer } = ui;
 
     return {
       shouldUseCpuNoise,
@@ -65,7 +62,6 @@ const selector = createMemoizedSelector(
       shouldAntialiasProgressImage,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
-      shouldAutoChangeDimensions,
       shouldEnableInformationalPopovers,
     };
   }
@@ -135,7 +131,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldAntialiasProgressImage,
     shouldUseNSFWChecker,
     shouldUseWatermarker,
-    shouldAutoChangeDimensions,
     shouldEnableInformationalPopovers,
   } = useAppSelector(selector);
 
@@ -188,12 +183,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleChangeShouldAntialiasProgressImage = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldAntialiasProgressImageChanged(e.target.checked));
-    },
-    [dispatch]
-  );
-  const handleChangeShouldAutoChangeDimensions = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(setShouldAutoChangeDimensions(e.target.checked));
     },
     [dispatch]
   );
@@ -278,12 +267,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   <InvSwitch
                     isChecked={shouldAntialiasProgressImage}
                     onChange={handleChangeShouldAntialiasProgressImage}
-                  />
-                </InvControl>
-                <InvControl label={t('settings.autoChangeDimensions')}>
-                  <InvSwitch
-                    isChecked={shouldAutoChangeDimensions}
-                    onChange={handleChangeShouldAutoChangeDimensions}
                   />
                 </InvControl>
                 <InvControl

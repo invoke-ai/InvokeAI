@@ -1,3 +1,4 @@
+import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
   ParameterCanvasCoherenceMode,
@@ -58,3 +59,9 @@ export interface GenerationState {
   shouldShowAdvancedOptions: boolean;
   aspectRatio: AspectRatioState;
 }
+
+export type PayloadActionWithOptimalDimension<T = void> = PayloadAction<
+  T,
+  string,
+  { optimalDimension: number }
+>;

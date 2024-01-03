@@ -5,18 +5,18 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas, generation }) => {
+  [stateSelector, selectOptimalDimension],
+  ({ canvas }, optimalDimension) => {
     const { boundingBoxScaleMethod, scaledBoundingBoxDimensions, aspectRatio } =
       canvas;
-    const { model } = generation;
 
     return {
-      model,
+      initial: optimalDimension,
       scaledBoundingBoxDimensions,
       aspectRatio,
       isManual: boundingBoxScaleMethod === 'manual',
@@ -26,12 +26,8 @@ const selector = createMemoizedSelector(
 
 const ParamScaledWidth = () => {
   const dispatch = useAppDispatch();
-  const { model, isManual, scaledBoundingBoxDimensions, aspectRatio } =
+  const { initial, isManual, scaledBoundingBoxDimensions, aspectRatio } =
     useAppSelector(selector);
-
-  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
-    ? 1024
-    : 512;
 
   const { t } = useTranslation();
 
