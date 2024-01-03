@@ -33,7 +33,7 @@ export const ImageSize = memo((props: ImageSizeProps) => {
             {heightComponent}
           </InvControlGroup>
         </Flex>
-        <Flex w="98px" h="98px" flexShrink={0} flexGrow={0}>
+        <Flex w="108px" h="108px" flexShrink={0} flexGrow={0}>
           <AspectRatioPreview />
         </Flex>
       </Flex>
