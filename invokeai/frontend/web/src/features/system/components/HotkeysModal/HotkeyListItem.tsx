@@ -35,7 +35,12 @@ const HotkeyListItem = (props: HotkeysModalProps) => {
                 </>
               ))}
               {index !== hotkeys.length - 1 && (
-                <InvText as="span" px={2} variant='subtext' fontWeight="semibold">
+                <InvText
+                  as="span"
+                  px={2}
+                  variant="subtext"
+                  fontWeight="semibold"
+                >
                   or
                 </InvText>
               )}
