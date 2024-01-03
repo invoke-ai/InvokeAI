@@ -25,9 +25,9 @@ const statusIndicatorSelector = createMemoizedSelector(
 );
 
 const COLOR_MAP = {
-  ok: 'green.400',
-  working: 'yellow.400',
-  error: 'red.400',
+  ok: 'invokeYellow.500',
+  working: 'blue.500',
+  error: 'red.500',
 };
 
 const StatusIndicator = () => {

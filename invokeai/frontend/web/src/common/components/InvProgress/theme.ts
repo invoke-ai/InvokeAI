@@ -8,7 +8,7 @@ const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
 
 const invokeAIFilledTrack = defineStyle((_props) => ({
-  bg: 'invokeYellow.500',
+  bg: 'blue.500',
 }));
 
 const invokeAITrack = defineStyle((_props) => {
