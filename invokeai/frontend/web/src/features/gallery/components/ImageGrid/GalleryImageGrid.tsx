@@ -142,7 +142,7 @@ const GalleryImageGrid = () => {
   if (isSuccess && currentData) {
     return (
       <>
-        <Box ref={rootRef} data-overlayscrollbars="" h="100%">
+        <Box ref={rootRef} data-overlayscrollbars="" h="100%" id='gallery-grid'>
           <VirtuosoGrid
             style={virtuosoStyles}
             data={currentData.ids}

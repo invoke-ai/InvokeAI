@@ -46,6 +46,7 @@ const CurrentImagePreview = () => {
     handleLoadMoreImages,
     areMoreImagesAvailable,
     isFetching,
+    handleTopImage
   } = useNextPrevImage();
 
   useHotkeys(
@@ -74,6 +75,14 @@ const CurrentImagePreview = () => {
       isFetching,
       handleNextImage,
     ]
+  );
+
+  useHotkeys(
+    'up',
+    () => {
+      handleTopImage();
+    },
+    [handleTopImage]
   );
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
