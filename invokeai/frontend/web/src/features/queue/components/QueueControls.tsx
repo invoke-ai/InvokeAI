@@ -18,6 +18,7 @@ const QueueControls = () => {
       position="relative"
       borderRadius="base"
       gap={2}
+      pt={2}
       flexDir="column"
     >
       <InvButtonGroup size="lg" isAttached={false}>
