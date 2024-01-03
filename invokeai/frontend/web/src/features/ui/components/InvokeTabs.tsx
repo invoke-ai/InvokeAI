@@ -251,9 +251,9 @@ const InvokeTabs = () => {
       gap={4}
       isLazy
     >
-      <Flex flexDir="column" alignItems="center" pt={2}>
+      <Flex flexDir="column" alignItems="center" pt={4}>
         <InvokeAILogoComponent />
-        <InvTabList gap={4} pt={8} pb={4} h="full" flexDir="column">
+        <InvTabList gap={4} pt={12} pb={4} h="full" flexDir="column">
           {tabs}
           <Spacer />
           <SettingsMenu />
