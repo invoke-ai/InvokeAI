@@ -81,10 +81,12 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
     const nextImageIndex = clamp(currentImageIndex + 1, 0, images.length - 1);
     const prevImageIndex = clamp(currentImageIndex - 1, 0, images.length - 1);
     const topImageIndex = clamp(currentImageIndex - imagesPerRow,0, images.length - 1)
+    const bottomImageIndex = clamp(currentImageIndex + imagesPerRow,0, images.length - 1)
 
     const nextImageId = images[nextImageIndex]?.image_name;
     const prevImageId = images[prevImageIndex]?.image_name;
     const topImageId = images[topImageIndex]?.image_name
+    const bottomImageId = images[bottomImageIndex]?.image_name
 
     const nextImage = nextImageId
       ? selectors.selectById(data, nextImageId)
@@ -95,6 +97,9 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
     const topImage = topImageId  
       ? selectors.selectById(data, topImageId)
       : undefined;
+    const bottomImage = bottomImageId  
+      ? selectors.selectById(data, bottomImageId)
+      : undefined;  
 
     const imagesLength = images.length;
 
@@ -109,7 +114,9 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
       prevImageIndex,
       queryArgs,
       topImageIndex,
-      topImage
+      topImage,
+      bottomImageIndex,
+      bottomImage
     };
   }
 );
@@ -128,7 +135,9 @@ export const useNextPrevImage = () => {
     loadedImagesCount,
     currentImageIndex,
     topImageIndex,
-    topImage
+    topImage,
+    bottomImageIndex,
+    bottomImage
   } = useAppSelector(nextPrevImageButtonsSelector);
 
   const handlePrevImage = useCallback(() => {
@@ -192,6 +201,27 @@ export const useNextPrevImage = () => {
     }
   },[dispatch, topImage, topImageIndex])
 
+  const handleBottomImage = useCallback(() => {
+    bottomImage && dispatch(imageSelected(bottomImage));
+    const range = $useNextPrevImageState.get().virtuosoRangeRef?.current;
+    const virtuoso = $useNextPrevImageState.get().virtuosoRef?.current;
+
+    if (!range || !virtuoso) {
+      return;
+    }
+
+    if (
+      bottomImageIndex !== undefined &&
+      (bottomImageIndex < range.startIndex || bottomImageIndex > range.endIndex)
+    ) {
+      virtuoso.scrollToIndex({
+        index: bottomImageIndex,
+        behavior: 'smooth',
+        align: getScrollToIndexAlign(bottomImageIndex, range),
+      });
+    }
+  },[dispatch, bottomImage, bottomImageIndex])
+
   const [listImages] = useLazyListImagesQuery();
 
   const handleLoadMoreImages = useCallback(() => {
@@ -210,6 +240,7 @@ export const useNextPrevImage = () => {
     areMoreImagesAvailable,
     handleLoadMoreImages,
     isFetching,
-    handleTopImage
+    handleTopImage,
+    handleBottomImage
   };
 };
