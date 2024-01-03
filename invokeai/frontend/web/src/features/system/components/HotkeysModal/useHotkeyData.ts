@@ -116,11 +116,6 @@ export const useHotkeyData = (): HotkeyGroup[] => {
           desc: t('hotkeys.deleteImage.desc'),
           hotkeys: [['Del']],
         },
-        {
-          title: t('hotkeys.closePanels.title'),
-          desc: t('hotkeys.closePanels.desc'),
-          hotkeys: [['Esc']],
-        },
       ],
     }),
     [t]
