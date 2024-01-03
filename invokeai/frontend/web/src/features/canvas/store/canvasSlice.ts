@@ -597,9 +597,12 @@ export const canvasSlice = createSlice({
     },
     setScaledBoundingBoxDimensions: (
       state,
-      action: PayloadAction<Dimensions>
+      action: PayloadAction<Partial<Dimensions>>
     ) => {
-      state.scaledBoundingBoxDimensions = action.payload;
+      state.scaledBoundingBoxDimensions = {
+        ...state.scaledBoundingBoxDimensions,
+        ...action.payload,
+      };
     },
     setBoundingBoxDimensions: {
       reducer: (
