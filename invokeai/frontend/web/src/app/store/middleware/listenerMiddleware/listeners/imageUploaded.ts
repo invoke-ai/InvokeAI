@@ -6,7 +6,10 @@ import {
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import {
+  initialImageChanged,
+  selectOptimalDimension,
+} from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
@@ -76,7 +79,9 @@ export const addImageUploadedFulfilledListener = () => {
       }
 
       if (postUploadAction?.type === 'SET_CANVAS_INITIAL_IMAGE') {
-        dispatch(setInitialCanvasImage(imageDTO));
+        dispatch(
+          setInitialCanvasImage(imageDTO, selectOptimalDimension(state))
+        );
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,

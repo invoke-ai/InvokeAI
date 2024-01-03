@@ -12,6 +12,7 @@ export const SwapDimensionsButton = memo(() => {
   }, [ctx]);
   return (
     <InvIconButton
+      tooltip={t('parameters.swapDimensions')}
       aria-label={t('parameters.swapDimensions')}
       onClick={onClick}
       variant="ghost"

@@ -1,5 +1,4 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -9,21 +8,15 @@ import {
   CANVAS_GRID_SIZE_FINE,
 } from 'features/canvas/store/constants';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ generation }, isStaging) => {
-    const { model } = generation;
-    const initial = ['sdxl', 'sdxl-refiner'].includes(
-      model?.base_model as string
-    )
-      ? 1024
-      : 512;
+  [selectOptimalDimension, isStagingSelector],
+  (optimalDimension, isStaging) => {
     return {
-      initial,
-      model,
+      initial: optimalDimension,
       isStaging,
     };
   }

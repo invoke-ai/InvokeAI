@@ -11,7 +11,6 @@ export const initialUIState: UIState = {
   shouldShowExistingModelsInSearch: false,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
-  shouldAutoChangeDimensions: false,
   panels: {},
 };
 
@@ -37,9 +36,6 @@ export const uiSlice = createSlice({
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    setShouldAutoChangeDimensions: (state, action: PayloadAction<boolean>) => {
-      state.shouldAutoChangeDimensions = action.payload;
-    },
     panelsChanged: (
       state,
       action: PayloadAction<{ name: string; value: string }>
@@ -60,7 +56,6 @@ export const {
   setShouldShowExistingModelsInSearch,
   setShouldHidePreview,
   setShouldShowProgressInViewer,
-  setShouldAutoChangeDimensions,
   panelsChanged,
 } = uiSlice.actions;
 

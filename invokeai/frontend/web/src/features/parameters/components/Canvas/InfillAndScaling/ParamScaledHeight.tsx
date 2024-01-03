@@ -5,18 +5,18 @@ import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ generation, canvas }) => {
+  [stateSelector, selectOptimalDimension],
+  ({ canvas }, optimalDimension) => {
     const { scaledBoundingBoxDimensions, boundingBoxScaleMethod, aspectRatio } =
       canvas;
-    const { model } = generation;
 
     return {
-      model,
+      optimalDimension,
       scaledBoundingBoxDimensions,
       isManual: boundingBoxScaleMethod === 'manual',
       aspectRatio,
@@ -26,12 +26,12 @@ const selector = createMemoizedSelector(
 
 const ParamScaledHeight = () => {
   const dispatch = useAppDispatch();
-  const { model, isManual, scaledBoundingBoxDimensions, aspectRatio } =
-    useAppSelector(selector);
-
-  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
-    ? 1024
-    : 512;
+  const {
+    isManual,
+    scaledBoundingBoxDimensions,
+    aspectRatio,
+    optimalDimension,
+  } = useAppSelector(selector);
 
   const { t } = useTranslation();
 
@@ -56,7 +56,7 @@ const ParamScaledHeight = () => {
 
   const handleResetScaledHeight = useCallback(() => {
     let resetWidth = scaledBoundingBoxDimensions.width;
-    const resetHeight = Math.floor(initial);
+    const resetHeight = Math.floor(optimalDimension);
 
     if (aspectRatio) {
       resetWidth = roundToMultiple(resetHeight * aspectRatio.value, 64);
@@ -68,7 +68,12 @@ const ParamScaledHeight = () => {
         height: resetHeight,
       })
     );
-  }, [aspectRatio, dispatch, initial, scaledBoundingBoxDimensions.width]);
+  }, [
+    aspectRatio,
+    dispatch,
+    optimalDimension,
+    scaledBoundingBoxDimensions.width,
+  ]);
 
   return (
     <InvControl isDisabled={!isManual} label={t('parameters.scaledHeight')}>
