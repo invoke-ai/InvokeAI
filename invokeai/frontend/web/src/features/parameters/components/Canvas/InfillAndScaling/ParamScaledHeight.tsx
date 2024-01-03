@@ -11,8 +11,9 @@ import { useTranslation } from 'react-i18next';
 const selector = createMemoizedSelector(
   [stateSelector],
   ({ generation, canvas }) => {
-    const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = canvas;
-    const { model, aspectRatio } = generation;
+    const { scaledBoundingBoxDimensions, boundingBoxScaleMethod, aspectRatio } =
+      canvas;
+    const { model } = generation;
 
     return {
       model,
