@@ -3,6 +3,7 @@ import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup'
 import ClearQueueButton from 'features/queue/components/ClearQueueButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
 import ProgressBar from 'features/system/components/ProgressBar';
+import StatusIndicator from 'features/system/components/StatusIndicator';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
@@ -29,8 +30,9 @@ const QueueControls = () => {
         {isPauseEnabled && <PauseProcessorButton asIconButton />} */}
         <ClearQueueButton asIconButton />
       </InvButtonGroup>
-      <Flex h={2} w="full">
-        <ProgressBar />
+      <Flex h={5} w="full" alignItems="center">
+        <StatusIndicator />
+        <ProgressBar height={2} />
       </Flex>
     </Flex>
   );

@@ -3,9 +3,8 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { STATUS_TRANSLATION_KEYS } from 'features/system/store/types';
-import type { AnimationProps } from 'framer-motion';
-import { AnimatePresence, motion } from 'framer-motion';
 import type { ResourceKey } from 'i18next';
 import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,15 +53,13 @@ const StatusIndicator = () => {
   const isHovered = useHoverDirty(ref);
 
   return (
-    <Flex ref={ref} h="full" px={2} alignItems="center" gap={5}>
-      <AnimatePresence>
-        {isHovered && (
-          <motion.div
-            key="statusText"
-            initial={initial}
-            animate={animate}
-            exit={exit}
-          >
+    <Flex ref={ref} alignItems="center" p={2} pl={0}>
+      <InvTooltip
+        left={10}
+        bottom={-24}
+        background="base.800"
+        label={
+          isHovered && (
             <InvText
               fontSize="sm"
               fontWeight="semibold"
@@ -72,24 +69,13 @@ const StatusIndicator = () => {
             >
               {t(statusTranslationKey as ResourceKey)}
             </InvText>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <Icon as={FaCircle} boxSize="0.5rem" color={COLOR_MAP[statusColor]} />
+          )
+        }
+      >
+        <Icon as={FaCircle} boxSize="0.6rem" color={COLOR_MAP[statusColor]} />
+      </InvTooltip>
     </Flex>
   );
 };
 
 export default memo(StatusIndicator);
-
-const initial: AnimationProps['initial'] = {
-  opacity: 0,
-};
-const animate: AnimationProps['animate'] = {
-  opacity: 1,
-  transition: { duration: 0.1 },
-};
-const exit: AnimationProps['exit'] = {
-  opacity: 0,
-  transition: { delay: 0.8 },
-};

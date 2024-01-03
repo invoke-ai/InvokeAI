@@ -2,6 +2,7 @@
 import { Flex, Image } from '@chakra-ui/react';
 import InvokeLogoYellow from 'assets/images/invoke-key-ylw-sm.svg';
 import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useRef } from 'react';
@@ -14,8 +15,29 @@ const InvokeAILogoComponent = () => {
   const isHovered = useHoverDirty(ref);
 
   return (
-    <Flex alignItems="center" gap={5} ps={1} ref={ref}>
+    <InvTooltip
+      placement="right"
+      label={
+        <Flex gap={3} alignItems="center">
+          <AnimatePresence>
+            {isHovered && appVersion && (
+              <motion.div
+                key="statusText"
+                initial={initial}
+                animate={animate}
+                exit={exit}
+              >
+                <InvText fontWeight="semibold" marginTop={1} color="base.900">
+                  v{appVersion.version}
+                </InvText>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Flex>
+      }
+    >
       <Image
+        ref={ref}
         src={InvokeLogoYellow}
         alt="invoke-logo"
         w="24px"
@@ -24,23 +46,7 @@ const InvokeAILogoComponent = () => {
         minH="24px"
         userSelect="none"
       />
-      <Flex gap={3} alignItems="center">
-        <AnimatePresence>
-          {isHovered && appVersion && (
-            <motion.div
-              key="statusText"
-              initial={initial}
-              animate={animate}
-              exit={exit}
-            >
-              <InvText fontWeight="semibold" marginTop={1} color="base.300">
-                v{appVersion.version}
-              </InvText>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Flex>
-    </Flex>
+    </InvTooltip>
   );
 };
 

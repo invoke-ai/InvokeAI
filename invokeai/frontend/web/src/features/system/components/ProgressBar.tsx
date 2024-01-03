@@ -16,7 +16,12 @@ const progressBarSelector = createMemoizedSelector(
   }
 );
 
-const ProgressBar = () => {
+type ProgressBarProps = {
+  height?: number | string;
+};
+
+const ProgressBar = (props: ProgressBarProps) => {
+  const { height = 'full' } = props;
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const { hasSteps, value, isConnected } = useAppSelector(progressBarSelector);
@@ -29,7 +34,7 @@ const ProgressBar = () => {
       isIndeterminate={
         isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps
       }
-      h="full"
+      h={height}
       w="full"
       colorScheme="invokeYellow"
     />
