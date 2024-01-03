@@ -1,0 +1,101 @@
+import { useDisclosure } from '@chakra-ui/react';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
+import {
+  InvMenu,
+  InvMenuButton,
+  InvMenuGroup,
+} from 'common/components/InvMenu/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  FaBars,
+  FaBug,
+  FaCog,
+  FaDiscord,
+  FaGithub,
+  FaKeyboard,
+} from 'react-icons/fa';
+
+import SettingsModal from './SettingsModal';
+
+const SettingsMenu = () => {
+  const { t } = useTranslation();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  useGlobalMenuCloseTrigger(onClose);
+
+  const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
+  const isDiscordLinkEnabled = useFeatureStatus('discordLink').isFeatureEnabled;
+  const isGithubLinkEnabled = useFeatureStatus('githubLink').isFeatureEnabled;
+
+  const githubLink = 'http://github.com/invoke-ai/InvokeAI';
+  const discordLink = 'https://discord.gg/ZmtBAhwWhy';
+
+  return (
+    <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
+      <InvTooltip label={t('common.preferencesLabel')} placement="right">
+        <InvMenuButton
+          as={InvIconButton}
+          variant="link"
+          aria-label={t('accessibility.menu')}
+          icon={<FaCog fontSize={20} />}
+          boxSize={8}
+        />
+      </InvTooltip>
+
+      <InvMenuList>
+        <InvMenuGroup title={t('common.communityLabel')}>
+          {isGithubLinkEnabled && (
+            <InvMenuItem
+              as="a"
+              href={githubLink}
+              target="_blank"
+              icon={<FaGithub />}
+            >
+              {t('common.githubLabel')}
+            </InvMenuItem>
+          )}
+          {isBugLinkEnabled && (
+            <InvMenuItem
+              as="a"
+              href={`${githubLink}/issues`}
+              target="_blank"
+              icon={<FaBug />}
+            >
+              {t('common.reportBugLabel')}
+            </InvMenuItem>
+          )}
+          {isDiscordLinkEnabled && (
+            <InvMenuItem
+              as="a"
+              href={discordLink}
+              target="_blank"
+              icon={<FaDiscord />}
+            >
+              {t('common.discordLabel')}
+            </InvMenuItem>
+          )}
+        </InvMenuGroup>
+        <InvMenuGroup title={t('common.settingsLabel')}>
+          <HotkeysModal>
+            <InvMenuItem as="button" icon={<FaKeyboard />}>
+              {t('common.hotkeysLabel')}
+            </InvMenuItem>
+          </HotkeysModal>
+          <SettingsModal>
+            <InvMenuItem as="button" icon={<FaBars />}>
+              {t('common.settingsLabel')}
+            </InvMenuItem>
+          </SettingsModal>
+        </InvMenuGroup>
+      </InvMenuList>
+    </InvMenu>
+  );
+};
+
+export default memo(SettingsMenu);

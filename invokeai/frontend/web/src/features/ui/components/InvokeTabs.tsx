@@ -1,4 +1,4 @@
-import { Spacer } from '@chakra-ui/react';
+import { Flex, Spacer } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -13,6 +13,8 @@ import {
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
+import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
@@ -249,10 +251,14 @@ const InvokeTabs = () => {
       gap={4}
       isLazy
     >
-      <InvTabList gap={4} pt={4} flexDir="column">
-        {tabs}
-        <Spacer />
-      </InvTabList>
+      <Flex flexDir="column" alignItems="center" pt={2}>
+        <InvokeAILogoComponent />
+        <InvTabList gap={4} pt={8} pb={4} h="full" flexDir="column">
+          {tabs}
+          <Spacer />
+          <SettingsMenu />
+        </InvTabList>
+      </Flex>
       <PanelGroup
         ref={panelGroupRef}
         id={appPanelGroupId}
@@ -272,7 +278,6 @@ const InvokeTabs = () => {
               onCollapse={onCollapseOptionsPanel}
               onExpand={onExpandOptionsPanel}
               collapsible
-              style={paddingTop4}
             >
               {activeTabName === 'nodes' ? (
                 <NodeEditorPanelGroup />
@@ -287,7 +292,7 @@ const InvokeTabs = () => {
             />
           </>
         )}
-        <Panel id="main-panel" order={1} minSize={20} style={paddingTop4}>
+        <Panel id="main-panel" order={1} minSize={20}>
           <InvTabPanels w="full" h="full">
             {tabPanels}
           </InvTabPanels>
@@ -308,7 +313,6 @@ const InvokeTabs = () => {
               onCollapse={onCollapseGalleryPanel}
               onExpand={onExpandGalleryPanel}
               collapsible
-              style={paddingTop4}
             >
               <ImageGalleryContent />
             </Panel>
@@ -320,5 +324,3 @@ const InvokeTabs = () => {
 };
 
 export default memo(InvokeTabs);
-
-const paddingTop4: CSSProperties = { paddingTop: '8px' };
