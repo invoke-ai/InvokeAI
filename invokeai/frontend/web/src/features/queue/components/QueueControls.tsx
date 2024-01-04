@@ -1,6 +1,6 @@
 import { Flex, Spacer } from '@chakra-ui/react';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import ClearQueueButton from 'features/queue/components/ClearQueueButton';
+import ClearQueueIconButton from 'features/queue/components/ClearQueueIconButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -28,7 +28,7 @@ const QueueControls = () => {
         {/* <CancelCurrentQueueItemButton asIconButton />
         {isResumeEnabled && <ResumeProcessorButton asIconButton />}
         {isPauseEnabled && <PauseProcessorButton asIconButton />} */}
-        <ClearQueueButton asIconButton />
+        <ClearQueueIconButton />
       </InvButtonGroup>
       <ProgressBar />
     </Flex>
