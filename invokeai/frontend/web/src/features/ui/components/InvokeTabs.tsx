@@ -149,6 +149,7 @@ const InvokeTabs = () => {
             variant="appTab"
             data-selected={activeTabName === tab.id}
             aria-label={t(tab.translationKey)}
+            data-testid={t(tab.translationKey)}
           />
         </InvTooltip>
       )),
