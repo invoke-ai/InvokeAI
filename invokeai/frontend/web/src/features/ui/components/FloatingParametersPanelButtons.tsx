@@ -31,12 +31,12 @@ const FloatingSidePanelButtons = (props: Props) => {
 
   const queueButtonIcon = useMemo(
     () =>
-      queueStatus?.processor.is_processing ? (
+      !isDisabled && queueStatus?.processor.is_processing ? (
         <SpinnerIcon animation={spinAnimationSlow} />
       ) : (
         <IoSparkles />
       ),
-    [queueStatus?.processor.is_processing]
+    [isDisabled, queueStatus?.processor.is_processing]
   );
 
   if (!props.panelApi.isCollapsed) {
@@ -57,8 +57,8 @@ const FloatingSidePanelButtons = (props: Props) => {
       >
         <InvButtonGroup orientation="vertical" flexGrow={3}>
           <InvIconButton
-            tooltip={t('parameters.showOptionsPanel')}
-            aria-label={t('parameters.showOptionsPanel')}
+            tooltip={t('accessibility.showOptionsPanel')}
+            aria-label={t('accessibility.showOptionsPanel')}
             onClick={props.panelApi.expand}
             sx={floatingButtonStyles}
             icon={<FaSlidersH />}
