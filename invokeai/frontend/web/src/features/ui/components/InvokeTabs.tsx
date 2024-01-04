@@ -254,8 +254,7 @@ const InvokeTabs = () => {
         </InvTabList>
         <Spacer />
         <StatusIndicator />
-        <SettingsMenu />
-        {customNavComponent}
+        {customNavComponent ? customNavComponent : <SettingsMenu />}
       </Flex>
       <PanelGroup
         ref={panelGroupRef}
