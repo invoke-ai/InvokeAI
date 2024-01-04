@@ -21,6 +21,7 @@ import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
+import { $customAppInfo } from 'app/store/nanostores/customAppInfo';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -41,6 +42,7 @@ interface Props extends PropsWithChildren {
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
+  customAppInfo?: string;
 }
 
 const InvokeAIUI = ({
@@ -56,6 +58,7 @@ const InvokeAIUI = ({
   customStarUi,
   socketOptions,
   isDebugging = false,
+  customAppInfo,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -129,6 +132,16 @@ const InvokeAIUI = ({
       $galleryHeader.set(undefined);
     };
   }, [galleryHeader]);
+
+  useEffect(() => {
+    if (customAppInfo) {
+      $customAppInfo.set(customAppInfo);
+    }
+
+    return () => {
+      $customAppInfo.set(undefined);
+    };
+  }, [customAppInfo]);
 
   useEffect(() => {
     if (socketOptions) {
