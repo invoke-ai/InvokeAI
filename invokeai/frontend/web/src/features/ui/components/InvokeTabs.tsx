@@ -243,12 +243,15 @@ const InvokeTabs = () => {
 
   return (
     <InvTabs
+      id="invoke-app-tabs"
       variant="appTabs"
       defaultIndex={activeTabIndex}
       index={activeTabIndex}
       onChange={handleTabChange}
-      flexGrow={1}
+      w="full"
+      h="full"
       gap={4}
+      p={4}
       isLazy
     >
       <Flex flexDir="column" alignItems="center" pt={4}>
