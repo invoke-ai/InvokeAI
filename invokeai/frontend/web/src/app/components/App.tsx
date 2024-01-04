@@ -1,11 +1,12 @@
-import { Flex, Grid } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
-import ImageUploader from 'common/components/ImageUploader';
+import ImageUploadOverlay from 'common/components/ImageUploadOverlay';
 import { useClearStorage } from 'common/hooks/useClearStorage';
+import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useGlobalModifiersInit } from 'common/hooks/useGlobalModifiers';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
@@ -14,6 +15,7 @@ import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicP
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
+import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
@@ -44,6 +46,9 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useGlobalModifiersInit();
   useGlobalHotkeys();
 
+  const { dropzone, isHandlingUpload, setIsHandlingUpload } =
+    useFullscreenDropzone();
+
   const handleReset = useCallback(() => {
     clearStorage();
     location.reload();
@@ -70,13 +75,25 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       onReset={handleReset}
       FallbackComponent={AppErrorBoundaryFallback}
     >
-      <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
-        <ImageUploader>
-          <Flex gap={4} p={4} w="full" h="full">
-            <InvokeTabs />
-          </Flex>
-        </ImageUploader>
-      </Grid>
+      <Box
+        id="invoke-app-wrapper"
+        w="100vw"
+        h="100vh"
+        position="relative"
+        overflow="hidden"
+        {...dropzone.getRootProps()}
+      >
+        <input {...dropzone.getInputProps()} />
+        <InvokeTabs />
+        <AnimatePresence>
+          {dropzone.isDragActive && isHandlingUpload && (
+            <ImageUploadOverlay
+              dropzone={dropzone}
+              setIsHandlingUpload={setIsHandlingUpload}
+            />
+          )}
+        </AnimatePresence>
+      </Box>
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
