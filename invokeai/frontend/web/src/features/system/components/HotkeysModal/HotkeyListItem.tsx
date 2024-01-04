@@ -1,7 +1,7 @@
-/* eslint-disable i18next/no-literal-string */
 import { Flex, Kbd, Spacer } from '@chakra-ui/react';
 import { InvText } from 'common/components/InvText/wrapper';
-import { memo } from 'react';
+import { Fragment, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface HotkeysModalProps {
   hotkeys: string[][];
@@ -10,6 +10,7 @@ interface HotkeysModalProps {
 }
 
 const HotkeyListItem = (props: HotkeysModalProps) => {
+  const { t } = useTranslation();
   const { title, hotkeys, description } = props;
   return (
     <Flex flexDir="column" gap={2} px={2}>
@@ -18,7 +19,7 @@ const HotkeyListItem = (props: HotkeysModalProps) => {
         <Spacer />
         {hotkeys.map((hotkey, index) => {
           return (
-            <>
+            <Fragment key={`${hotkey}-${index}`}>
               {hotkey.map((key, index) => (
                 <>
                   <Kbd
@@ -41,10 +42,10 @@ const HotkeyListItem = (props: HotkeysModalProps) => {
                   variant="subtext"
                   fontWeight="semibold"
                 >
-                  or
+                  {t('common.or')}
                 </InvText>
               )}
-            </>
+            </Fragment>
           );
         })}
       </Flex>
