@@ -45,6 +45,8 @@ import QueueTab from './tabs/QueueTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvasTab';
+import { useStore } from '@nanostores/react';
+import { $customNavComponent } from '../../../app/store/nanostores/customNavComponent';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -117,6 +119,7 @@ const InvokeTabs = () => {
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const customNavComponent = useStore($customNavComponent);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const handleClickTab = useCallback((e: MouseEvent<HTMLElement>) => {
     if (e.target instanceof HTMLElement) {
@@ -251,6 +254,7 @@ const InvokeTabs = () => {
         <Spacer />
         <StatusIndicator />
         <SettingsMenu />
+        {customNavComponent}
       </Flex>
       <PanelGroup
         ref={panelGroupRef}

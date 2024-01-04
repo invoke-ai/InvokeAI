@@ -6,7 +6,7 @@ import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { $headerComponent } from 'app/store/nanostores/headerComponent';
+import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
@@ -28,7 +28,7 @@ interface Props extends PropsWithChildren {
   apiUrl?: string;
   token?: string;
   config?: PartialAppConfig;
-  headerComponent?: ReactNode;
+  customNavComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
   queueId?: string;
@@ -45,7 +45,7 @@ const InvokeAIUI = ({
   apiUrl,
   token,
   config,
-  headerComponent,
+  customNavComponent,
   middleware,
   projectId,
   queueId,
@@ -108,14 +108,14 @@ const InvokeAIUI = ({
   }, [customStarUi]);
 
   useEffect(() => {
-    if (headerComponent) {
-      $headerComponent.set(headerComponent);
+    if (customNavComponent) {
+      $customNavComponent.set(customNavComponent);
     }
 
     return () => {
-      $headerComponent.set(undefined);
+      $customNavComponent.set(undefined);
     };
-  }, [headerComponent]);
+  }, [customNavComponent]);
 
   useEffect(() => {
     if (socketOptions) {
