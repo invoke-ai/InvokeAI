@@ -15,34 +15,34 @@ type Direction = 'horizontal' | 'vertical';
 
 export type UsePanelOptions =
   | {
-    /**
-     * The minimum size of the panel as a percentage.
-     */
-    minSize: number;
-    /**
-     * The unit of the minSize
-     */
-    unit: 'percentages';
-  }
+      /**
+       * The minimum size of the panel as a percentage.
+       */
+      minSize: number;
+      /**
+       * The unit of the minSize
+       */
+      unit: 'percentages';
+    }
   | {
-    /**
-     * The minimum size of the panel in pixels.
-     */
-    minSize: number;
-    /**
-     * The unit of the minSize.
-     */
-    unit: 'pixels';
-    /**
-     * The direction of the panel group.
-     * This is required to accurately calculate the available space for the panel, minus the space taken by the handles.
-     */
-    panelGroupDirection: Direction;
-    /**
-     * A ref to the panel group.
-     */
-    panelGroupRef: RefObject<ImperativePanelGroupHandle>;
-  };
+      /**
+       * The minimum size of the panel in pixels.
+       */
+      minSize: number;
+      /**
+       * The unit of the minSize.
+       */
+      unit: 'pixels';
+      /**
+       * The direction of the panel group.
+       * This is required to accurately calculate the available space for the panel, minus the space taken by the handles.
+       */
+      panelGroupDirection: Direction;
+      /**
+       * A ref to the panel group.
+       */
+      panelGroupRef: RefObject<ImperativePanelGroupHandle>;
+    };
 
 export type UsePanelReturn = {
   /**
