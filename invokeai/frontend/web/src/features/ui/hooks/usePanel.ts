@@ -125,14 +125,25 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
       _setMinSize(minSizePct);
 
-      // Resize if the current size is smaller than the new min size - happens when the window is resized smaller
-      if (panelHandleRef.current.getSize() < minSizePct) {
+      const currentSize = panelHandleRef.current.getSize();
+
+      // If currentSize is 0, the panel is collapsed, so we don't want to resize it
+      // If it's not 0, but less than the minSize, resize it
+      if (currentSize && currentSize < minSizePct) {
         panelHandleRef.current.resize(minSizePct);
       }
     });
 
     resizeObserver.observe(panelGroupElement);
     panelGroupHandleElements.forEach((el) => resizeObserver.observe(el));
+
+    // Resize the panel to the min size once on startup
+    const minSizePct = getSizeAsPercentage(
+      arg.minSize,
+      arg.panelGroupRef,
+      arg.panelGroupDirection
+    );
+    panelHandleRef.current?.resize(minSizePct);
 
     return () => {
       resizeObserver.disconnect();
