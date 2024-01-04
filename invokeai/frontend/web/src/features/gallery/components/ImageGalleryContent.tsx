@@ -6,9 +6,10 @@ import {
   Tabs,
   useDisclosure,
   VStack,
-  Text,
 } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
@@ -22,8 +23,6 @@ import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
-import { $galleryHeader } from '../../../app/store/nanostores/galleryHeader';
-import { useStore } from '@nanostores/react';
 
 const selector = createMemoizedSelector([stateSelector], (state) => {
   const { galleryView } = state.gallery;

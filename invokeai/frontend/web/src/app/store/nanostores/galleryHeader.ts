@@ -1,5 +1,5 @@
 import { atom } from 'nanostores';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 export const $galleryHeader = atom<ReactNode | undefined>(undefined);
 

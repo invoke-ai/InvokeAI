@@ -1,5 +1,7 @@
 import { Flex, Spacer } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
@@ -45,8 +47,6 @@ import QueueTab from './tabs/QueueTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvasTab';
-import { useStore } from '@nanostores/react';
-import { $customNavComponent } from '../../../app/store/nanostores/customNavComponent';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
