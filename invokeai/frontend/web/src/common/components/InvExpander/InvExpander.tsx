@@ -4,8 +4,20 @@ import { Collapse, Icon, useDisclosure } from '@chakra-ui/react';
 import type { InvExpanderProps } from 'common/components/InvExpander/types';
 import { InvText } from 'common/components/InvText/wrapper';
 import { t } from 'i18next';
-import { useMemo } from 'react';
 import { BiCollapseVertical, BiExpandVertical } from 'react-icons/bi';
+
+const buttonStyles: SystemStyleObject = {
+  color: 'base.400',
+  borderColor: 'base.400',
+  transitionDuration: 'normal',
+  transitionProperty: 'common',
+  ':hover, :hover *': {
+    transitionDuration: 'normal',
+    transitionProperty: 'common',
+    color: 'base.300',
+    borderColor: 'base.300',
+  },
+};
 
 export const InvExpander = ({
   children,
@@ -13,21 +25,7 @@ export const InvExpander = ({
   defaultIsOpen = false,
 }: InvExpanderProps) => {
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen });
-  const buttonStyles = useMemo<SystemStyleObject>(
-    () => ({
-      color: isOpen ? 'base.300' : 'base.400',
-      borderColor: isOpen ? 'base.300' : 'base.400',
-      transitionDuration: 'normal',
-      transitionProperty: 'common',
-      ':hover, :hover *': {
-        transitionDuration: 'normal',
-        transitionProperty: 'common',
-        color: isOpen ? 'base.200' : 'base.300',
-        borderColor: isOpen ? 'base.200' : 'base.300',
-      },
-    }),
-    [isOpen]
-  );
+
   return (
     <Flex flexDir="column" w="full">
       <Flex
