@@ -80,14 +80,7 @@ export const ImageSettingsAccordion = memo(() => {
           <ImageSizeLinear />
         )}
         <InvExpander>
-          <Flex
-            flexDirection="column"
-            gap={4}
-            p={4}
-            mb={4}
-            borderRadius={4}
-            background="base.750"
-          >
+          <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4}>
               <ParamSeedNumberInput />
               <ParamSeedShuffle />
