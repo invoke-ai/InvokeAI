@@ -15,6 +15,7 @@ import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
+import StatusIndicator from 'features/system/components/StatusIndicator';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
@@ -125,17 +126,17 @@ const InvokeTabs = () => {
     () =>
       enabledTabs.map((tab) => (
         <InvTooltip key={tab.id} label={t(tab.translationKey)} placement="end">
-          <InvTab
-            as={InvIconButton}
-            p={0}
-            onClick={handleClickTab}
-            icon={tab.icon}
-            size="md"
-            fontSize="24px"
-            variant="appTab"
-            data-selected={activeTabName === tab.id}
-            aria-label={t(tab.translationKey)}
-          ></InvTab>
+          <InvTab p={0}>
+            <InvIconButton
+              onClick={handleClickTab}
+              icon={tab.icon}
+              size="md"
+              fontSize="24px"
+              variant="appTab"
+              data-selected={activeTabName === tab.id}
+              aria-label={t(tab.translationKey)}
+            />
+          </InvTab>
         </InvTooltip>
       )),
     [enabledTabs, t, handleClickTab, activeTabName]
@@ -254,13 +255,14 @@ const InvokeTabs = () => {
       p={4}
       isLazy
     >
-      <Flex flexDir="column" alignItems="center" pt={4}>
+      <Flex flexDir="column" alignItems="center" pt={4} pb={2} gap={4}>
         <InvokeAILogoComponent />
-        <InvTabList gap={4} pt={12} pb={4} h="full" flexDir="column">
+        <InvTabList gap={4} pt={6} h="full" flexDir="column">
           {tabs}
-          <Spacer />
-          <SettingsMenu />
         </InvTabList>
+        <Spacer />
+        <StatusIndicator />
+        <SettingsMenu />
       </Flex>
       <PanelGroup
         ref={panelGroupRef}

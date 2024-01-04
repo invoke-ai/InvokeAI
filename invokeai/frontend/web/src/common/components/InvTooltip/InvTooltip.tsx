@@ -12,6 +12,7 @@ export const InvTooltip = memo(
           ref={ref}
           hasArrow={hasArrow}
           placement={placement}
+          arrowSize={8}
           {...rest}
         >
           {children}
