@@ -1,12 +1,12 @@
 /* eslint-disable i18next/no-literal-string */
 import { Image } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
+import { $logo } from 'app/store/nanostores/logo';
 import InvokeLogoYellow from 'assets/images/invoke-key-ylw-sm.svg';
 import { InvText } from 'common/components/InvText/wrapper';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { memo, useMemo, useRef } from 'react';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
-import { $logo } from '../../../app/store/nanostores/logo';
 
 const InvokeAILogoComponent = () => {
   const { data: appVersion } = useGetAppVersionQuery();
