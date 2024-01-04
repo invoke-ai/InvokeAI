@@ -129,7 +129,7 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
       // If currentSize is 0, the panel is collapsed, so we don't want to resize it
       // If it's not 0, but less than the minSize, resize it
-      if (currentSize && currentSize < minSizePct) {
+      if (currentSize > 0 && currentSize < minSizePct) {
         panelHandleRef.current.resize(minSizePct);
       }
     });
