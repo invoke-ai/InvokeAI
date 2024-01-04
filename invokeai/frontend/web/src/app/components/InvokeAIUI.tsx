@@ -9,6 +9,7 @@ import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
+import { $logo } from 'app/store/nanostores/logo';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
@@ -21,7 +22,6 @@ import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
-import { $logo } from 'app/store/nanostores/logo';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
