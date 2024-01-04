@@ -16,7 +16,7 @@ export const baseStyle = definePartsStyle(() => ({
   header: {
     fontWeight: 'semibold',
     fontSize: 'lg',
-    color: 'base.300'
+    color: 'base.300',
   },
   closeButton: {
     opacity: 0.5,
