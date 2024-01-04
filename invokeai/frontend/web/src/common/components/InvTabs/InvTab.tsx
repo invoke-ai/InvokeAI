@@ -11,7 +11,11 @@ export const InvTab = memo(
       <ChakraTab ref={ref} {...rest}>
         {children}
         <Spacer />
-        {badges?.map((b, i) => <InvBadge key={`${b}.${i}`} colorScheme='invokeYellow'>{b}</InvBadge>)}
+        {badges?.map((b, i) => (
+          <InvBadge key={`${b}.${i}`} colorScheme="invokeYellow">
+            {b}
+          </InvBadge>
+        ))}
       </ChakraTab>
     );
   })

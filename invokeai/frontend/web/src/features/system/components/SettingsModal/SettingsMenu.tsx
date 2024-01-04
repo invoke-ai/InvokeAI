@@ -12,13 +12,7 @@ import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  FaBug,
-  FaCog,
-  FaDiscord,
-  FaGithub,
-  FaKeyboard,
-} from 'react-icons/fa';
+import { FaBug, FaCog, FaDiscord, FaGithub, FaKeyboard } from 'react-icons/fa';
 import { FaWrench } from 'react-icons/fa6';
 
 import SettingsModal from './SettingsModal';
