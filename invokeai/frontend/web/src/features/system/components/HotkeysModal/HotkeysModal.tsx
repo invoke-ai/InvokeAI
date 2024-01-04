@@ -7,7 +7,6 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvHeading } from 'common/components/InvHeading/wrapper';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvInput } from 'common/components/InvInput/InvInput';
 import {
@@ -22,6 +21,7 @@ import {
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { HotkeyGroup } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import type { ChangeEventHandler, ReactElement } from 'react';
 import {
   cloneElement,
@@ -121,26 +121,9 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
             </InputGroup>
 
             <ScrollableContent>
-              {filteredHotkeyGroups.map((group) => (
-                <Flex key={group.title} pb={4} flexDir="column">
-                  <Flex
-                    ps={2}
-                    pb={4}
-                    position="sticky"
-                    zIndex={1}
-                    top={0}
-                    bg="base.800"
-                  >
-                    <InvHeading size="sm">{group.title}</InvHeading>
-                  </Flex>
-                  <Flex
-                    key={group.title}
-                    p={4}
-                    borderRadius="base"
-                    bg="base.750"
-                    flexDir="column"
-                    gap={4}
-                  >
+              <Flex flexDir="column" gap={4}>
+                {filteredHotkeyGroups.map((group) => (
+                  <StickyScrollable key={group.title} title={group.title}>
                     {group.hotkeyListItems.map((hotkey, i) => (
                       <Fragment key={i}>
                         <HotkeyListItem
@@ -151,15 +134,15 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                         {i < group.hotkeyListItems.length - 1 && <Divider />}
                       </Fragment>
                     ))}
-                  </Flex>
-                </Flex>
-              ))}
-              {!filteredHotkeyGroups.length && (
-                <IAINoContentFallback
-                  label={t('hotkeys.noHotkeysFound')}
-                  icon={null}
-                />
-              )}
+                  </StickyScrollable>
+                ))}
+                {!filteredHotkeyGroups.length && (
+                  <IAINoContentFallback
+                    label={t('hotkeys.noHotkeysFound')}
+                    icon={null}
+                  />
+                )}
+              </Flex>
             </ScrollableContent>
           </InvModalBody>
           <InvModalFooter />

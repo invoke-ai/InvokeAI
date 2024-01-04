@@ -4,7 +4,6 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvHeading } from 'common/components/InvHeading/wrapper';
 import {
   InvModal,
   InvModalBody,
@@ -16,8 +15,11 @@ import {
 } from 'common/components/InvModal/wrapper';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { InvText } from 'common/components/InvText/wrapper';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
+import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
+import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
@@ -33,10 +35,8 @@ import { cloneElement, memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 
-import SettingsClearIntermediates from './SettingsClearIntermediates';
 import { SettingsLanguageSelect } from './SettingsLanguageSelect';
 import { SettingsLogLevelSelect } from './SettingsLogLevelSelect';
-import StyledFlex from './StyledFlex';
 
 const selector = createMemoizedSelector(
   [stateSelector],
@@ -109,6 +109,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
           data?.watermarking_methods.includes('invisible_watermark') ?? false,
       }),
     });
+
+  const {
+    clearIntermediates,
+    hasPendingItems,
+    intermediatesCount,
+    isLoading: isLoadingClearIntermediates,
+  } = useClearIntermediates();
 
   const {
     isOpen: isSettingsModalOpen,
@@ -218,120 +225,143 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         isCentered
       >
         <InvModalOverlay />
-        <InvModalContent>
+        <InvModalContent maxH="80vh" h="80vh">
           <InvModalHeader bg="none">{t('common.settingsLabel')}</InvModalHeader>
           <InvModalCloseButton />
-          <InvModalBody>
-            <Flex gap={4} flexDir="column">
-              <StyledFlex>
-                <InvHeading size="sm">{t('settings.general')}</InvHeading>
-                <InvControl label={t('settings.confirmOnDelete')}>
-                  <InvSwitch
-                    isChecked={shouldConfirmOnDelete}
-                    onChange={handleChangeShouldConfirmOnDelete}
-                  />
-                </InvControl>
-              </StyledFlex>
-
-              <StyledFlex>
-                <InvHeading size="sm">{t('settings.generation')}</InvHeading>
-                <InvControl
-                  label={t('settings.enableNSFWChecker')}
-                  isDisabled={!isNSFWCheckerAvailable}
-                >
-                  <InvSwitch
-                    isChecked={shouldUseNSFWChecker}
-                    onChange={handleChangeShouldUseNSFWChecker}
-                  />
-                </InvControl>
-                <InvControl
-                  label={t('settings.enableInvisibleWatermark')}
-                  isDisabled={!isWatermarkerAvailable}
-                >
-                  <InvSwitch
-                    isChecked={shouldUseWatermarker}
-                    onChange={handleChangeShouldUseWatermarker}
-                  />
-                </InvControl>
-              </StyledFlex>
-
-              <StyledFlex>
-                <InvHeading size="sm">{t('settings.ui')}</InvHeading>
-                <InvControl label={t('settings.showProgressInViewer')}>
-                  <InvSwitch
-                    isChecked={shouldShowProgressInViewer}
-                    onChange={handleChangeShouldShowProgressInViewer}
-                  />
-                </InvControl>
-                <InvControl label={t('settings.antialiasProgressImages')}>
-                  <InvSwitch
-                    isChecked={shouldAntialiasProgressImage}
-                    onChange={handleChangeShouldAntialiasProgressImage}
-                  />
-                </InvControl>
-                <InvControl
-                  label={t('parameters.useCpuNoise')}
-                  feature="noiseUseCPU"
-                >
-                  <InvSwitch
-                    isChecked={shouldUseCpuNoise}
-                    onChange={handleChangeShouldUseCpuNoise}
-                  />
-                </InvControl>
-                {shouldShowLocalizationToggle && <SettingsLanguageSelect />}
-                <InvControl label={t('settings.enableInformationalPopovers')}>
-                  <InvSwitch
-                    isChecked={shouldEnableInformationalPopovers}
-                    onChange={handleChangeShouldEnableInformationalPopovers}
-                  />
-                </InvControl>
-              </StyledFlex>
-
-              {shouldShowDeveloperSettings && (
-                <StyledFlex>
-                  <InvHeading size="sm">{t('settings.developer')}</InvHeading>
-                  <InvControl label={t('settings.shouldLogToConsole')}>
+          <InvModalBody display="flex" flexDir="column" gap={4}>
+            <ScrollableContent>
+              <Flex flexDir="column" gap={4}>
+                <StickyScrollable title={t('settings.general')}>
+                  <InvControl label={t('settings.confirmOnDelete')}>
                     <InvSwitch
-                      isChecked={shouldLogToConsole}
-                      onChange={handleLogToConsoleChanged}
+                      isChecked={shouldConfirmOnDelete}
+                      onChange={handleChangeShouldConfirmOnDelete}
                     />
                   </InvControl>
-                  <SettingsLogLevelSelect />
-                  <InvControl label={t('settings.enableImageDebugging')}>
+                </StickyScrollable>
+
+                <StickyScrollable title={t('settings.generation')}>
+                  <InvControl
+                    label={t('settings.enableNSFWChecker')}
+                    isDisabled={!isNSFWCheckerAvailable}
+                  >
                     <InvSwitch
-                      isChecked={enableImageDebugging}
-                      onChange={handleChangeEnableImageDebugging}
+                      isChecked={shouldUseNSFWChecker}
+                      onChange={handleChangeShouldUseNSFWChecker}
                     />
                   </InvControl>
-                </StyledFlex>
-              )}
+                  <InvControl
+                    label={t('settings.enableInvisibleWatermark')}
+                    isDisabled={!isWatermarkerAvailable}
+                  >
+                    <InvSwitch
+                      isChecked={shouldUseWatermarker}
+                      onChange={handleChangeShouldUseWatermarker}
+                    />
+                  </InvControl>
+                </StickyScrollable>
 
-              {shouldShowClearIntermediates && <SettingsClearIntermediates />}
+                <StickyScrollable title={t('settings.ui')}>
+                  <InvControl label={t('settings.showProgressInViewer')}>
+                    <InvSwitch
+                      isChecked={shouldShowProgressInViewer}
+                      onChange={handleChangeShouldShowProgressInViewer}
+                    />
+                  </InvControl>
+                  <InvControl label={t('settings.antialiasProgressImages')}>
+                    <InvSwitch
+                      isChecked={shouldAntialiasProgressImage}
+                      onChange={handleChangeShouldAntialiasProgressImage}
+                    />
+                  </InvControl>
+                  <InvControl
+                    label={t('parameters.useCpuNoise')}
+                    feature="noiseUseCPU"
+                  >
+                    <InvSwitch
+                      isChecked={shouldUseCpuNoise}
+                      onChange={handleChangeShouldUseCpuNoise}
+                    />
+                  </InvControl>
+                  {shouldShowLocalizationToggle && <SettingsLanguageSelect />}
+                  <InvControl label={t('settings.enableInformationalPopovers')}>
+                    <InvSwitch
+                      isChecked={shouldEnableInformationalPopovers}
+                      onChange={handleChangeShouldEnableInformationalPopovers}
+                    />
+                  </InvControl>
+                </StickyScrollable>
 
-              <StyledFlex>
-                <InvHeading size="sm">{t('settings.resetWebUI')}</InvHeading>
-                <InvButton colorScheme="error" onClick={handleClickResetWebUI}>
-                  {t('settings.resetWebUI')}
-                </InvButton>
-                {shouldShowResetWebUiText && (
-                  <>
-                    <InvText variant="subtext">
-                      {t('settings.resetWebUIDesc1')}
-                    </InvText>
-                    <InvText variant="subtext">
-                      {t('settings.resetWebUIDesc2')}
-                    </InvText>
-                  </>
+                {shouldShowDeveloperSettings && (
+                  <StickyScrollable title={t('settings.developer')}>
+                    <InvControl label={t('settings.shouldLogToConsole')}>
+                      <InvSwitch
+                        isChecked={shouldLogToConsole}
+                        onChange={handleLogToConsoleChanged}
+                      />
+                    </InvControl>
+                    <SettingsLogLevelSelect />
+                    <InvControl label={t('settings.enableImageDebugging')}>
+                      <InvSwitch
+                        isChecked={enableImageDebugging}
+                        onChange={handleChangeEnableImageDebugging}
+                      />
+                    </InvControl>
+                  </StickyScrollable>
                 )}
-              </StyledFlex>
-            </Flex>
+
+                {shouldShowClearIntermediates && (
+                  <StickyScrollable title={t('settings.clearIntermediates')}>
+                    <InvButton
+                      tooltip={
+                        hasPendingItems
+                          ? t('settings.clearIntermediatesDisabled')
+                          : undefined
+                      }
+                      colorScheme="warning"
+                      onClick={clearIntermediates}
+                      isLoading={isLoadingClearIntermediates}
+                      isDisabled={!intermediatesCount || hasPendingItems}
+                    >
+                      {t('settings.clearIntermediatesWithCount', {
+                        count: intermediatesCount ?? 0,
+                      })}
+                    </InvButton>
+                    <InvText fontWeight="bold">
+                      {t('settings.clearIntermediatesDesc1')}
+                    </InvText>
+                    <InvText variant="subtext">
+                      {t('settings.clearIntermediatesDesc2')}
+                    </InvText>
+                    <InvText variant="subtext">
+                      {t('settings.clearIntermediatesDesc3')}
+                    </InvText>
+                  </StickyScrollable>
+                )}
+
+                <StickyScrollable title={t('settings.resetWebUI')}>
+                  <InvButton
+                    colorScheme="error"
+                    onClick={handleClickResetWebUI}
+                  >
+                    {t('settings.resetWebUI')}
+                  </InvButton>
+                  {shouldShowResetWebUiText && (
+                    <>
+                      <InvText variant="subtext">
+                        {t('settings.resetWebUIDesc1')}
+                      </InvText>
+                      <InvText variant="subtext">
+                        {t('settings.resetWebUIDesc2')}
+                      </InvText>
+                    </>
+                  )}
+                </StickyScrollable>
+              </Flex>
+            </ScrollableContent>
           </InvModalBody>
 
-          <InvModalFooter>
-            <InvButton onClick={onSettingsModalClose}>
-              {t('common.close')}
-            </InvButton>
-          </InvModalFooter>
+          <InvModalFooter />
         </InvModalContent>
       </InvModal>
 
