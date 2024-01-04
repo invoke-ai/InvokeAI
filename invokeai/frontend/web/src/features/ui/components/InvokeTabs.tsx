@@ -16,6 +16,8 @@ import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditor
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
 import StatusIndicator from 'features/system/components/StatusIndicator';
+import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
+import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
@@ -99,8 +101,8 @@ const enabledTabsSelector = createMemoizedSelector(
   }
 );
 
-export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
-export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+export const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+export const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;
@@ -121,6 +123,14 @@ const InvokeTabs = () => {
       e.target.blur();
     }
   }, []);
+  const shouldShowOptionsPanel = useMemo(
+    () => !NO_OPTIONS_PANEL_TABS.includes(activeTabName),
+    [activeTabName]
+  );
+  const shouldShowGalleryPanel = useMemo(
+    () => !NO_GALLERY_PANEL_TABS.includes(activeTabName),
+    [activeTabName]
+  );
 
   const tabs = useMemo(
     () =>
@@ -185,60 +195,38 @@ const InvokeTabs = () => {
 
   const panelStorage = usePanelStorage();
 
-  const {
-    ref: optionsPanelRef,
-    minSize: optionsPanelMinSize,
-    isCollapsed: isOptionsPanelCollapsed,
-    onCollapse: onCollapseOptionsPanel,
-    onExpand: onExpandOptionsPanel,
-    reset: resetOptionsPanel,
-    expand: expandOptionsPanel,
-    collapse: collapseOptionsPanel,
-    toggle: toggleOptionsPanel,
-    onDoubleClickHandle: onDoubleClickOptionsPanelHandle,
-  } = usePanel(optionsPanelUsePanelOptions);
+  const optionsPanel = usePanel(optionsPanelUsePanelOptions);
 
-  const {
-    ref: galleryPanelRef,
-    minSize: galleryPanelMinSize,
-    isCollapsed: isGalleryPanelCollapsed,
-    onCollapse: onCollapseGalleryPanel,
-    onExpand: onExpandGalleryPanel,
-    reset: resetGalleryPanel,
-    expand: expandGalleryPanel,
-    collapse: collapseGalleryPanel,
-    toggle: toggleGalleryPanel,
-    onDoubleClickHandle: onDoubleClickGalleryPanelHandle,
-  } = usePanel(galleryPanelUsePanelOptions);
+  const galleryPanel = usePanel(galleryPanelUsePanelOptions);
 
-  useHotkeys('g', toggleGalleryPanel, [toggleGalleryPanel]);
-  useHotkeys(['t', 'o'], toggleOptionsPanel, [toggleOptionsPanel]);
+  useHotkeys('g', galleryPanel.toggle, [galleryPanel.toggle]);
+  useHotkeys(['t', 'o'], optionsPanel.toggle, [optionsPanel.toggle]);
   useHotkeys(
     'shift+r',
     () => {
-      resetOptionsPanel();
-      resetGalleryPanel();
+      optionsPanel.reset();
+      galleryPanel.reset();
     },
-    [resetOptionsPanel, resetGalleryPanel]
+    [optionsPanel.reset, galleryPanel.reset]
   );
   useHotkeys(
     'f',
     () => {
-      if (isOptionsPanelCollapsed || isGalleryPanelCollapsed) {
-        expandOptionsPanel();
-        expandGalleryPanel();
+      if (optionsPanel.isCollapsed || galleryPanel.isCollapsed) {
+        optionsPanel.expand();
+        galleryPanel.expand();
       } else {
-        collapseOptionsPanel();
-        collapseGalleryPanel();
+        optionsPanel.collapse();
+        galleryPanel.collapse();
       }
     },
     [
-      isOptionsPanelCollapsed,
-      isGalleryPanelCollapsed,
-      expandOptionsPanel,
-      expandGalleryPanel,
-      collapseOptionsPanel,
-      collapseGalleryPanel,
+      optionsPanel.isCollapsed,
+      galleryPanel.isCollapsed,
+      optionsPanel.expand,
+      galleryPanel.expand,
+      optionsPanel.collapse,
+      galleryPanel.collapse,
     ]
   );
 
@@ -272,16 +260,16 @@ const InvokeTabs = () => {
         style={panelStyles}
         storage={panelStorage}
       >
-        {!NO_SIDE_PANEL_TABS.includes(activeTabName) && (
+        {shouldShowOptionsPanel && (
           <>
             <Panel
               id="options-panel"
-              ref={optionsPanelRef}
+              ref={optionsPanel.ref}
               order={0}
-              defaultSize={optionsPanelMinSize}
-              minSize={optionsPanelMinSize}
-              onCollapse={onCollapseOptionsPanel}
-              onExpand={onExpandOptionsPanel}
+              defaultSize={optionsPanel.minSize}
+              minSize={optionsPanel.minSize}
+              onCollapse={optionsPanel.onCollapse}
+              onExpand={optionsPanel.onExpand}
               collapsible
             >
               {activeTabName === 'nodes' ? (
@@ -292,7 +280,7 @@ const InvokeTabs = () => {
             </Panel>
             <ResizeHandle
               id="options-main-handle"
-              onDoubleClick={onDoubleClickOptionsPanelHandle}
+              onDoubleClick={optionsPanel.onDoubleClickHandle}
               orientation="vertical"
             />
           </>
@@ -302,21 +290,21 @@ const InvokeTabs = () => {
             {tabPanels}
           </InvTabPanels>
         </Panel>
-        {!NO_GALLERY_TABS.includes(activeTabName) && (
+        {shouldShowGalleryPanel && (
           <>
             <ResizeHandle
               id="main-gallery-handle"
               orientation="vertical"
-              onDoubleClick={onDoubleClickGalleryPanelHandle}
+              onDoubleClick={galleryPanel.onDoubleClickHandle}
             />
             <Panel
               id="gallery-panel"
-              ref={galleryPanelRef}
+              ref={galleryPanel.ref}
               order={2}
-              defaultSize={galleryPanelMinSize}
-              minSize={galleryPanelMinSize}
-              onCollapse={onCollapseGalleryPanel}
-              onExpand={onExpandGalleryPanel}
+              defaultSize={galleryPanel.minSize}
+              minSize={galleryPanel.minSize}
+              onCollapse={galleryPanel.onCollapse}
+              onExpand={galleryPanel.onExpand}
               collapsible
             >
               <ImageGalleryContent />
@@ -324,6 +312,12 @@ const InvokeTabs = () => {
           </>
         )}
       </PanelGroup>
+      {shouldShowOptionsPanel && (
+        <FloatingParametersPanelButtons panelApi={optionsPanel} />
+      )}
+      {shouldShowGalleryPanel && (
+        <FloatingGalleryButton panelApi={galleryPanel} />
+      )}
     </InvTabs>
   );
 };
