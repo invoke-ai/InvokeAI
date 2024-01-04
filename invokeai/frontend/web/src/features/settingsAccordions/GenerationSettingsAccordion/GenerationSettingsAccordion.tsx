@@ -66,14 +66,7 @@ export const GenerationSettingsAccordion = memo(() => {
               <SyncModelsIconButton />
             </Flex>
             <InvExpander>
-              <Flex
-                gap={4}
-                flexDir="column"
-                p={4}
-                mb={4}
-                borderRadius={4}
-                background="base.750"
-              >
+              <Flex gap={4} flexDir="column" pb={4}>
                 <InvControlGroup labelProps={labelProps}>
                   <ParamScheduler />
                   <ParamSteps />
