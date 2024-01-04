@@ -86,6 +86,7 @@
         "copyError": "$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
+        "or": "or",
         "checkpoint": "Checkpoint",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
@@ -156,6 +157,7 @@
         "save": "Save",
         "saveAs": "Save As",
         "settingsLabel": "Settings",
+        "preferencesLabel": "Preferences",
         "simple": "Simple",
         "somethingWentWrong": "Something went wrong",
         "statusConnected": "Connected",
@@ -426,6 +428,9 @@
         "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
     "hotkeys": {
+        "searchHotkeys": "Search Hotkeys",
+        "clearSearch": "Clear Search",
+        "noHotkeysFound": "No Hotkeys Found",
         "acceptStagingImage": {
             "desc": "Accept Current Staging Area Image",
             "title": "Accept Staging Image"
@@ -434,7 +439,7 @@
             "desc": "Opens the add node menu",
             "title": "Add Nodes"
         },
-        "appHotkeys": "App Hotkeys",
+        "appHotkeys": "App",
         "cancel": {
             "desc": "Cancel current queue item",
             "title": "Cancel"
@@ -499,8 +504,8 @@
             "desc": "Focus the prompt input area",
             "title": "Focus Prompt"
         },
-        "galleryHotkeys": "Gallery Hotkeys",
-        "generalHotkeys": "General Hotkeys",
+        "galleryHotkeys": "Gallery",
+        "generalHotkeys": "General",
         "hideMask": {
             "desc": "Hide and unhide mask",
             "title": "Hide Mask"
@@ -521,7 +526,7 @@
             "desc": "Generate an image",
             "title": "Invoke"
         },
-        "keyboardShortcuts": "Keyboard Shortcuts",
+        "keyboardShortcuts": "Hotkeys",
         "maximizeWorkSpace": {
             "desc": "Close panels and maximize work area",
             "title": "Maximize Workspace"
@@ -542,7 +547,7 @@
             "desc": "Next Staging Area Image",
             "title": "Next Staging Image"
         },
-        "nodesHotkeys": "Nodes Hotkeys",
+        "nodesHotkeys": "Nodes",
         "pinOptions": {
             "desc": "Pin the options panel",
             "title": "Pin Options"
@@ -611,31 +616,31 @@
             "desc": "Open and close the gallery drawer",
             "title": "Toggle Gallery"
         },
-        "toggleGalleryPin": {
-            "desc": "Pins and unpins the gallery to the UI",
-            "title": "Toggle Gallery Pin"
+        "toggleOptions": {
+            "desc": "Open and close the options panel",
+            "title": "Toggle Options"
+        },
+        "toggleOptionsAndGallery": {
+            "desc": "Open and close the options and gallery panels",
+            "title": "Toggle Options and Gallery"
+        },
+        "resetOptionsAndGallery": {
+            "desc": "Resets the options and gallery panels",
+            "title": "Reset Options and Gallery"
         },
         "toggleLayer": {
             "desc": "Toggles mask/base layer selection",
             "title": "Toggle Layer"
         },
-        "toggleOptions": {
-            "desc": "Open and close the options panel",
-            "title": "Toggle Options"
-        },
         "toggleSnap": {
             "desc": "Toggles Snap to Grid",
             "title": "Toggle Snap"
-        },
-        "toggleViewer": {
-            "desc": "Open and close Image Viewer",
-            "title": "Toggle Viewer"
         },
         "undoStroke": {
             "desc": "Undo a brush stroke",
             "title": "Undo Stroke"
         },
-        "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
+        "unifiedCanvasHotkeys": "Unified Canvas",
         "upscale": {
             "desc": "Upscale the current image",
             "title": "Upscale"
@@ -1076,6 +1081,11 @@
         "aspect": "Aspect",
         "aspectRatio": "Aspect Ratio",
         "aspectRatioFree": "Free",
+        "lockAspectRatio": "Lock Aspect Ratio",
+        "swapDimensions": "Swap Dimensions",
+        "setToOptimalSize": "Optimize size for model",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (may be too small)",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (may be too large)",
         "boundingBoxHeader": "Bounding Box",
         "boundingBoxHeight": "Bounding Box Height",
         "boundingBoxWidth": "Bounding Box Width",

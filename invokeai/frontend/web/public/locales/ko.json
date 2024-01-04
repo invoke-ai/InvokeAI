@@ -407,10 +407,6 @@
         "maxFaces": "Max Faces"
     },
     "hotkeys": {
-        "toggleGalleryPin": {
-            "title": "Gallery Pin 전환",
-            "desc": "갤러리를 UI에 고정했다가 풉니다"
-        },
         "toggleSnap": {
             "desc": "Snap을 Grid로 전환",
             "title": "Snap 전환"
@@ -599,10 +595,6 @@
         "addNodes": {
             "desc": "노드 추가 메뉴 열기",
             "title": "노드 추가"
-        },
-        "toggleViewer": {
-            "desc": "이미지 뷰어 열기 및 닫기",
-            "title": "Viewer 전환"
         },
         "undoStroke": {
             "title": "Stroke 실행 취소",

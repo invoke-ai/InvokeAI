@@ -1,27 +1,23 @@
 import type { ChakraProps } from '@chakra-ui/react';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
-
-import QueueButton from './common/QueueButton';
-
 type Props = {
-  asIconButton?: boolean;
   sx?: ChakraProps['sx'];
 };
 
-const CancelCurrentQueueItemButton = ({ asIconButton, sx }: Props) => {
+const CancelCurrentQueueItemIconButton = ({ sx }: Props) => {
   const { t } = useTranslation();
   const { cancelQueueItem, isLoading, isDisabled } =
     useCancelCurrentQueueItem();
 
   return (
-    <QueueButton
+    <InvIconButton
       isDisabled={isDisabled}
       isLoading={isLoading}
-      asIconButton={asIconButton}
-      label={t('queue.cancel')}
+      aria-label={t('queue.cancel')}
       tooltip={t('queue.cancelTooltip')}
       icon={<FaTimes />}
       onClick={cancelQueueItem}
@@ -31,4 +27,4 @@ const CancelCurrentQueueItemButton = ({ asIconButton, sx }: Props) => {
   );
 };
 
-export default memo(CancelCurrentQueueItemButton);
+export default memo(CancelCurrentQueueItemIconButton);

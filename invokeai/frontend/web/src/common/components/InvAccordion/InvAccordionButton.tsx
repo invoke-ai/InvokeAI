@@ -21,7 +21,7 @@ export const InvAccordionButton = (props: InvAccordionButtonProps) => {
       {children}
       <Spacer />
       {badges?.map((b, i) => (
-        <InvBadge key={`${b}.${i}`} variant="solid">
+        <InvBadge key={`${b}.${i}`} colorScheme="blue">
           {b}
         </InvBadge>
       ))}

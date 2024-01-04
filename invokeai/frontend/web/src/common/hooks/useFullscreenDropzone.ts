@@ -1,27 +1,19 @@
-import { Box } from '@chakra-ui/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import type { AnimationProps } from 'framer-motion';
-import { AnimatePresence, motion } from 'framer-motion';
-import type { PropsWithChildren } from 'react';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
-import ImageUploadOverlay from './ImageUploadOverlay';
-
 const accept: Accept = {
   'image/png': ['.png'],
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
-
-const dropzoneRootProps = { style: {} };
 
 const selector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
@@ -45,7 +37,7 @@ const selector = createMemoizedSelector(
   }
 );
 
-const ImageUploader = (props: PropsWithChildren) => {
+export const useFullscreenDropzone = () => {
   const { autoAddBoardId, postUploadAction } = useAppSelector(selector);
   const toaster = useAppToaster();
   const { t } = useTranslation();
@@ -105,14 +97,7 @@ const ImageUploader = (props: PropsWithChildren) => {
     setIsHandlingUpload(true);
   }, []);
 
-  const {
-    getRootProps,
-    getInputProps,
-    isDragAccept,
-    isDragReject,
-    isDragActive,
-    inputRef,
-  } = useDropzone({
+  const dropzone = useDropzone({
     accept,
     noClick: true,
     onDrop,
@@ -124,15 +109,17 @@ const ImageUploader = (props: PropsWithChildren) => {
   useEffect(() => {
     // This is a hack to allow pasting images into the uploader
     const handlePaste = async (e: ClipboardEvent) => {
-      if (!inputRef.current) {
+      if (!dropzone.inputRef.current) {
         return;
       }
 
       if (e.clipboardData?.files) {
-        // Set the files on the inputRef
-        inputRef.current.files = e.clipboardData.files;
+        // Set the files on the dropzone.inputRef
+        dropzone.inputRef.current.files = e.clipboardData.files;
         // Dispatch the change event, dropzone catches this and we get to use its own validation
-        inputRef.current?.dispatchEvent(new Event('change', { bubbles: true }));
+        dropzone.inputRef.current?.dispatchEvent(
+          new Event('change', { bubbles: true })
+        );
       }
     };
 
@@ -142,42 +129,7 @@ const ImageUploader = (props: PropsWithChildren) => {
     return () => {
       document.removeEventListener('paste', handlePaste);
     };
-  }, [inputRef]);
+  }, [dropzone.inputRef]);
 
-  return (
-    <Box {...getRootProps(dropzoneRootProps)}>
-      <input {...getInputProps()} />
-      {props.children}
-      <AnimatePresence>
-        {isDragActive && isHandlingUpload && (
-          <motion.div
-            key="image-upload-overlay"
-            initial={initial}
-            animate={animate}
-            exit={exit}
-          >
-            <ImageUploadOverlay
-              isDragAccept={isDragAccept}
-              isDragReject={isDragReject}
-              setIsHandlingUpload={setIsHandlingUpload}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Box>
-  );
-};
-
-export default memo(ImageUploader);
-
-const initial: AnimationProps['initial'] = {
-  opacity: 0,
-};
-const animate: AnimationProps['animate'] = {
-  opacity: 1,
-  transition: { duration: 0.1 },
-};
-const exit: AnimationProps['exit'] = {
-  opacity: 0,
-  transition: { duration: 0.1 },
+  return { dropzone, isHandlingUpload, setIsHandlingUpload };
 };

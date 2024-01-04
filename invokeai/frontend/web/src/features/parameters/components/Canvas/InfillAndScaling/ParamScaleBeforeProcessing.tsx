@@ -7,6 +7,7 @@ import type {
 } from 'common/components/InvSelect/types';
 import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
 import { isBoundingBoxScaleMethod } from 'features/canvas/store/canvasTypes';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,20 +19,20 @@ export const OPTIONS: InvSelectOption[] = [
 
 const ParamScaleBeforeProcessing = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const boundingBoxScaleMethod = useAppSelector(
     (state) => state.canvas.boundingBoxScaleMethod
   );
-
-  const { t } = useTranslation();
+  const optimalDimension = useAppSelector(selectOptimalDimension);
 
   const onChange = useCallback<InvSelectOnChange>(
     (v) => {
       if (!isBoundingBoxScaleMethod(v?.value)) {
         return;
       }
-      dispatch(setBoundingBoxScaleMethod(v.value));
+      dispatch(setBoundingBoxScaleMethod(v.value, optimalDimension));
     },
-    [dispatch]
+    [dispatch, optimalDimension]
   );
 
   const value = useMemo(

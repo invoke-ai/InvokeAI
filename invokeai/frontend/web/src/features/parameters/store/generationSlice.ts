@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
@@ -16,6 +17,10 @@ import type {
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
+import {
+  getIsSizeOptimal,
+  getOptimalDimension,
+} from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
@@ -198,15 +203,26 @@ export const generationSlice = createSlice({
       state.initialImage = { imageName: image_name, width, height };
     },
     modelChanged: (state, action: PayloadAction<ParameterModel | null>) => {
-      state.model = action.payload;
+      const newModel = action.payload;
+      state.model = newModel;
 
-      if (state.model === null) {
+      if (newModel === null) {
         return;
       }
 
       // Clamp ClipSkip Based On Selected Model
-      const { maxClip } = CLIP_SKIP_MAP[state.model.base_model];
+      const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
       state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+      const optimalDimension = getOptimalDimension(newModel);
+      if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
+        return;
+      }
+      const { width, height } = calculateNewSize(
+        state.aspectRatio.value,
+        optimalDimension * optimalDimension
+      );
+      state.width = width;
+      state.height = height;
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
@@ -259,6 +275,9 @@ export const generationSlice = createSlice({
       }
     });
   },
+  selectors: {
+    selectOptimalDimension: (slice) => getOptimalDimension(slice.model),
+  },
 });
 
 export const {
@@ -305,5 +324,7 @@ export const {
   widthChanged,
   heightChanged,
 } = generationSlice.actions;
+
+export const { selectOptimalDimension } = generationSlice.selectors;
 
 export default generationSlice.reducer;
