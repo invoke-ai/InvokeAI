@@ -41,11 +41,7 @@ type HotkeysModalProps = {
 };
 
 const HotkeysModal = ({ children }: HotkeysModalProps) => {
-  const {
-    isOpen: isHotkeyModalOpen,
-    onOpen: onHotkeysModalOpen,
-    onClose: onHotkeysModalClose,
-  } = useDisclosure();
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
   const [hotkeyFilter, setHotkeyFilter] = useState('');
   const clearHotkeyFilter = useCallback(() => setHotkeyFilter(''), []);
@@ -88,14 +84,9 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
   return (
     <>
       {cloneElement(children, {
-        onClick: onHotkeysModalOpen,
+        onClick: onOpen,
       })}
-      <InvModal
-        isOpen={isHotkeyModalOpen}
-        onClose={onHotkeysModalClose}
-        isCentered
-        size="2xl"
-      >
+      <InvModal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
         <InvModalOverlay />
         <InvModalContent maxH="80vh" h="80vh">
           <InvModalHeader>{t('hotkeys.keyboardShortcuts')}</InvModalHeader>
