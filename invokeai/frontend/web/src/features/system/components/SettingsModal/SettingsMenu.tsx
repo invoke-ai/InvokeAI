@@ -7,23 +7,21 @@ import {
   InvMenuButton,
   InvMenuGroup,
 } from 'common/components/InvMenu/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  FaBars,
   FaBug,
   FaCog,
   FaDiscord,
   FaGithub,
   FaKeyboard,
 } from 'react-icons/fa';
+import { FaWrench } from 'react-icons/fa6';
 
 import SettingsModal from './SettingsModal';
-
 const SettingsMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -38,15 +36,13 @@ const SettingsMenu = () => {
 
   return (
     <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
-      <InvTooltip label={t('common.preferencesLabel')} placement="right">
-        <InvMenuButton
-          as={InvIconButton}
-          variant="link"
-          aria-label={t('accessibility.menu')}
-          icon={<FaCog fontSize={20} />}
-          boxSize={8}
-        />
-      </InvTooltip>
+      <InvMenuButton
+        as={InvIconButton}
+        variant="link"
+        aria-label={t('accessibility.menu')}
+        icon={<FaCog fontSize={20} />}
+        boxSize={8}
+      />
 
       <InvMenuList>
         <InvMenuGroup title={t('common.communityLabel')}>
@@ -88,7 +84,7 @@ const SettingsMenu = () => {
             </InvMenuItem>
           </HotkeysModal>
           <SettingsModal>
-            <InvMenuItem as="button" icon={<FaBars />}>
+            <InvMenuItem as="button" icon={<FaWrench />}>
               {t('common.settingsLabel')}
             </InvMenuItem>
           </SettingsModal>
