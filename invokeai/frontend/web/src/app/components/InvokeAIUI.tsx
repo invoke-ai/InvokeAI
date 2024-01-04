@@ -4,7 +4,6 @@ import type { Middleware } from '@reduxjs/toolkit';
 import { $socketOptions } from 'app/hooks/useSocketIO';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { $customAppInfo } from 'app/store/nanostores/customAppInfo';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
@@ -22,6 +21,7 @@ import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
+import { $logo } from 'app/store/nanostores/logo';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -42,7 +42,7 @@ interface Props extends PropsWithChildren {
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
-  customAppInfo?: string;
+  logo?: ReactNode;
 }
 
 const InvokeAIUI = ({
@@ -58,7 +58,7 @@ const InvokeAIUI = ({
   customStarUi,
   socketOptions,
   isDebugging = false,
-  customAppInfo,
+  logo,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -134,14 +134,14 @@ const InvokeAIUI = ({
   }, [galleryHeader]);
 
   useEffect(() => {
-    if (customAppInfo) {
-      $customAppInfo.set(customAppInfo);
+    if (logo) {
+      $logo.set(logo);
     }
 
     return () => {
-      $customAppInfo.set(undefined);
+      $logo.set(undefined);
     };
-  }, [customAppInfo]);
+  }, [logo]);
 
   useEffect(() => {
     if (socketOptions) {
