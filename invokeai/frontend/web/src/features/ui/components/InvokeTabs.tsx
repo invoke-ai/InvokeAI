@@ -1,5 +1,7 @@
 import { Flex, Spacer } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
@@ -117,6 +119,7 @@ const InvokeTabs = () => {
   const enabledTabs = useAppSelector(enabledTabsSelector);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const customNavComponent = useStore($customNavComponent);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const handleClickTab = useCallback((e: MouseEvent<HTMLElement>) => {
     if (e.target instanceof HTMLElement) {
@@ -146,6 +149,7 @@ const InvokeTabs = () => {
             variant="appTab"
             data-selected={activeTabName === tab.id}
             aria-label={t(tab.translationKey)}
+            data-testid={t(tab.translationKey)}
           />
         </InvTooltip>
       )),
@@ -251,6 +255,7 @@ const InvokeTabs = () => {
         <Spacer />
         <StatusIndicator />
         <SettingsMenu />
+        {customNavComponent}
       </Flex>
       <PanelGroup
         ref={panelGroupRef}
