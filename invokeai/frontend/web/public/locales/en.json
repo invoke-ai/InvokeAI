@@ -86,6 +86,7 @@
         "copyError": "$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
+        "or": "or",
         "checkpoint": "Checkpoint",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
