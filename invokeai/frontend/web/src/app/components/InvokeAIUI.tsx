@@ -6,7 +6,6 @@ import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
@@ -20,6 +19,8 @@ import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
+import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
+import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -31,6 +32,7 @@ interface Props extends PropsWithChildren {
   customNavComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
+  galleryHeader?: ReactNode;
   queueId?: string;
   selectedImage?: {
     imageName: string;
@@ -48,6 +50,7 @@ const InvokeAIUI = ({
   customNavComponent,
   middleware,
   projectId,
+  galleryHeader,
   queueId,
   selectedImage,
   customStarUi,
@@ -116,6 +119,16 @@ const InvokeAIUI = ({
       $customNavComponent.set(undefined);
     };
   }, [customNavComponent]);
+
+  useEffect(() => {
+    if (galleryHeader) {
+      $galleryHeader.set(galleryHeader);
+    }
+
+    return () => {
+      $galleryHeader.set(undefined);
+    };
+  }, [galleryHeader]);
 
   useEffect(() => {
     if (socketOptions) {

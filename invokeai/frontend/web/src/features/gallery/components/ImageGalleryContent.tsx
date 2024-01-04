@@ -6,6 +6,7 @@ import {
   Tabs,
   useDisclosure,
   VStack,
+  Text,
 } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
@@ -21,6 +22,8 @@ import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
+import { $galleryHeader } from '../../../app/store/nanostores/galleryHeader';
+import { useStore } from '@nanostores/react';
 
 const selector = createMemoizedSelector([stateSelector], (state) => {
   const { galleryView } = state.gallery;
@@ -36,6 +39,7 @@ const ImageGalleryContent = () => {
   const galleryGridRef = useRef<HTMLDivElement>(null);
   const { galleryView } = useAppSelector(selector);
   const dispatch = useAppDispatch();
+  const galleryHeader = useStore($galleryHeader);
   const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } =
     useDisclosure({ defaultIsOpen: true });
 
@@ -56,6 +60,7 @@ const ImageGalleryContent = () => {
       borderRadius="base"
       p={2}
     >
+      {galleryHeader}
       <Box w="full">
         <Flex
           ref={resizeObserverRef}
