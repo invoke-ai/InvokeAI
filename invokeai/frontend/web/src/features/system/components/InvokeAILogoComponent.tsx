@@ -1,41 +1,23 @@
 /* eslint-disable i18next/no-literal-string */
-import { Flex, Image } from '@chakra-ui/react';
+import { Image } from '@chakra-ui/react';
 import InvokeLogoYellow from 'assets/images/invoke-key-ylw-sm.svg';
 import { InvText } from 'common/components/InvText/wrapper';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
-import type { AnimationProps } from 'framer-motion';
-import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useRef } from 'react';
-import { useHoverDirty } from 'react-use';
+import { memo, useMemo, useRef } from 'react';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
 const InvokeAILogoComponent = () => {
   const { data: appVersion } = useGetAppVersionQuery();
   const ref = useRef(null);
-  const isHovered = useHoverDirty(ref);
+  const tooltip = useMemo(() => {
+    if (appVersion) {
+      return <InvText fontWeight="semibold">v{appVersion.version}</InvText>;
+    }
+    return null;
+  }, [appVersion]);
 
   return (
-    <InvTooltip
-      placement="right"
-      label={
-        <Flex gap={3} alignItems="center">
-          <AnimatePresence>
-            {isHovered && appVersion && (
-              <motion.div
-                key="statusText"
-                initial={initial}
-                animate={animate}
-                exit={exit}
-              >
-                <InvText fontWeight="semibold" marginTop={1} color="base.900">
-                  v{appVersion.version}
-                </InvText>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Flex>
-      }
-    >
+    <InvTooltip placement="right" label={tooltip} p={1} px={2} gutter={16}>
       <Image
         ref={ref}
         src={InvokeLogoYellow}
@@ -51,15 +33,3 @@ const InvokeAILogoComponent = () => {
 };
 
 export default memo(InvokeAILogoComponent);
-
-const initial: AnimationProps['initial'] = {
-  opacity: 0,
-};
-const animate: AnimationProps['animate'] = {
-  opacity: 1,
-  transition: { duration: 0.1 },
-};
-const exit: AnimationProps['exit'] = {
-  opacity: 0,
-  transition: { delay: 0.8 },
-};
