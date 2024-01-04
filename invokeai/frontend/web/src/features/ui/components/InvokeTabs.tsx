@@ -136,17 +136,17 @@ const InvokeTabs = () => {
     () =>
       enabledTabs.map((tab) => (
         <InvTooltip key={tab.id} label={t(tab.translationKey)} placement="end">
-          <InvTab p={0}>
-            <InvIconButton
-              onClick={handleClickTab}
-              icon={tab.icon}
-              size="md"
-              fontSize="24px"
-              variant="appTab"
-              data-selected={activeTabName === tab.id}
-              aria-label={t(tab.translationKey)}
-            />
-          </InvTab>
+          <InvTab
+            as={InvIconButton}
+            p={0}
+            onClick={handleClickTab}
+            icon={tab.icon}
+            size="md"
+            fontSize="24px"
+            variant="appTab"
+            data-selected={activeTabName === tab.id}
+            aria-label={t(tab.translationKey)}
+          />
         </InvTooltip>
       )),
     [enabledTabs, t, handleClickTab, activeTabName]
