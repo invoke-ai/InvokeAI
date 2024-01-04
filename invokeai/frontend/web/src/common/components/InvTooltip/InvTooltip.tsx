@@ -3,6 +3,15 @@ import { memo } from 'react';
 
 import type { InvTooltipProps } from './types';
 
+const modifiers: InvTooltipProps['modifiers'] = [
+  {
+    name: 'preventOverflow',
+    options: {
+      padding: 12,
+    },
+  },
+];
+
 export const InvTooltip = memo(
   forwardRef<InvTooltipProps, typeof ChakraTooltip>(
     (props: InvTooltipProps, ref) => {
@@ -13,6 +22,7 @@ export const InvTooltip = memo(
           hasArrow={hasArrow}
           placement={placement}
           arrowSize={8}
+          modifiers={modifiers}
           {...rest}
         >
           {children}
