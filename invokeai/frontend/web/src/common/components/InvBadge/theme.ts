@@ -1,7 +1,7 @@
 import { defineStyle, defineStyleConfig } from '@chakra-ui/react';
 
 const baseStyle = defineStyle((props) => ({
-  fontSize: 10,
+  fontSize: 9,
   px: 2,
   py: 1,
   minW: 4,
@@ -10,7 +10,7 @@ const baseStyle = defineStyle((props) => ({
   bg: `${props.colorScheme}.200`,
   color: 'base.900',
   fontWeight: 'bold',
-  letterSpacing: 0.5,
+  letterSpacing: 0.6,
   wordBreak: 'break-all',
   whiteSpace: 'nowrap',
   textOverflow: 'ellipsis',
