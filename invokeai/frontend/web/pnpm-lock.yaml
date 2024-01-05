@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  reselect@5.0.1:
+    hash: kvbgwzjyy4x4fnh7znyocvb75q
+    path: patches/reselect@5.0.1.patch
+
 dependencies:
   '@chakra-ui/anatomy':
     specifier: ^2.2.2
@@ -4565,7 +4570,7 @@ packages:
       react-redux: 9.0.4(@types/react@18.2.46)(react@18.2.0)(redux@5.0.1)
       redux: 5.0.1
       redux-thunk: 3.1.0(redux@5.0.1)
-      reselect: 5.0.1
+      reselect: 5.0.1(patch_hash=kvbgwzjyy4x4fnh7znyocvb75q)
     dev: false
 
   /@roarr/browser-log-writer@1.3.0:
@@ -11932,9 +11937,10 @@ packages:
     hasBin: true
     dev: true
 
-  /reselect@5.0.1:
+  /reselect@5.0.1(patch_hash=kvbgwzjyy4x4fnh7znyocvb75q):
     resolution: {integrity: sha512-D72j2ubjgHpvuCiORWkOUxndHJrxDaSolheiz5CO+roz8ka97/4msh2E8F5qay4GawR5vzBt5MkbDHT+Rdy/Wg==}
     dev: false
+    patched: true
 
   /resize-observer-polyfill@1.5.1:
     resolution: {integrity: sha512-LwZrotdHOo12nQuZlHEmtuXdqGoOD0OhaxopaNFxWzInpEgaLWoVuAMbTzixuosCx2nEG58ngzW3vxdWoxIgdg==}
