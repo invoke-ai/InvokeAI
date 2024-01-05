@@ -28,7 +28,7 @@ const MinimapPanel = () => {
           zoomable
           nodeBorderRadius={15}
           sx={minimapStyles}
-          nodeColor="var(--invokeai-colors-blue-600)"
+          nodeColor="var(--invokeai-colors-base-600)"
           maskColor="var(--invokeai-colors-blackAlpha-600)"
         />
       )}

@@ -22,7 +22,7 @@ const PruneQueueButton = ({ asIconButton }: Props) => {
       tooltip={t('queue.pruneTooltip', { item_count: finishedCount })}
       icon={<BsStars />}
       onClick={pruneQueue}
-      colorScheme="blue"
+      colorScheme="invokeBlue"
     />
   );
 };

@@ -143,8 +143,8 @@ const FoundModelsList = () => {
               fontWeight="semibold"
               p={2}
               borderRadius={4}
-              color="blue.100"
-              bg="blue.600"
+              color="invokeBlue.100"
+              bg="invokeBlue.600"
             >
               {t('common.installed')}
             </InvText>
@@ -184,7 +184,7 @@ const FoundModelsList = () => {
           <InvText fontWeight="semibold">
             {t('modelManager.modelsFound')}: {foundModels.length}
           </InvText>
-          <InvText fontWeight="semibold" color="blue.200">
+          <InvText fontWeight="semibold" color="invokeBlue.200">
             {t('common.notInstalled')}: {filteredModels.length}
           </InvText>
         </Flex>
