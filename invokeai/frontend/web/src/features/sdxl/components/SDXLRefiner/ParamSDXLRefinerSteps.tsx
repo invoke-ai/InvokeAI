@@ -35,20 +35,16 @@ const ParamSDXLRefinerSteps = () => {
     [dispatch]
   );
 
-  const onReset = useCallback(() => {
-    dispatch(setRefinerSteps(initial));
-  }, [dispatch, initial]);
-
   return (
     <InvControl label={t('sdxl.steps')}>
       <InvSlider
         value={refinerSteps}
+        defaultValue={initial}
         min={min}
         max={sliderMax}
         step={step}
         fineStep={fineStep}
         onChange={onChange}
-        onReset={onReset}
         withNumberInput
         marks={marks}
         numberInputMax={inputMax}

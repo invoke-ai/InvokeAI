@@ -29,7 +29,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { getSDXLStylePrompts } from './getSDXLStylePrompt';
 import { addCoreMetadataNode } from './metadata';
 
 /**
@@ -59,12 +59,7 @@ export const buildLinearSDXLImageToImageGraph = (
     img2imgStrength: strength,
   } = state.generation;
 
-  const {
-    positiveStylePrompt,
-    negativeStylePrompt,
-    refinerModel,
-    refinerStart,
-  } = state.sdxl;
+  const { refinerModel, refinerStart } = state.sdxl;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -94,8 +89,8 @@ export const buildLinearSDXLImageToImageGraph = (
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
-    buildSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } =
+    getSDXLStylePrompts(state);
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -111,14 +106,14 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: joinedPositiveStylePrompt,
+        style: positiveStylePrompt,
         is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: joinedNegativeStylePrompt,
+        style: negativeStylePrompt,
         is_intermediate,
       },
       [NOISE]: {

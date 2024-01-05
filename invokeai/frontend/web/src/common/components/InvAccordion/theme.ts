@@ -23,7 +23,7 @@ const invokeAIButton = defineStyle((_props) => {
     fontSize: 'sm',
     border: 'none',
     borderRadius: 'base',
-    color: 'base.400',
+    color: 'base.300',
     _hover: {},
     _expanded: {
       borderBottomRadius: 'none',

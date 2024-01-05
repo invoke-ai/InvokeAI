@@ -51,26 +51,6 @@ const MlsdImageProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleThrDReset = useCallback(() => {
-    processorChanged(controlNetId, { thr_d: DEFAULTS.thr_d });
-  }, [controlNetId, processorChanged]);
-
-  const handleThrVReset = useCallback(() => {
-    processorChanged(controlNetId, { thr_v: DEFAULTS.thr_v });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
       <InvControl
@@ -80,7 +60,7 @@ const MlsdImageProcessor = (props: Props) => {
         <InvSlider
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          onReset={handleDetectResolutionReset}
+          defaultValue={DEFAULTS.detect_resolution}
           min={0}
           max={4096}
           marks={marks0to4096}
@@ -94,7 +74,7 @@ const MlsdImageProcessor = (props: Props) => {
         <InvSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          onReset={handleImageResolutionReset}
+          defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
           marks={marks0to4096}
@@ -105,7 +85,7 @@ const MlsdImageProcessor = (props: Props) => {
         <InvSlider
           value={thr_d}
           onChange={handleThrDChanged}
-          onReset={handleThrDReset}
+          defaultValue={DEFAULTS.thr_d}
           min={0}
           max={1}
           step={0.01}
@@ -117,7 +97,7 @@ const MlsdImageProcessor = (props: Props) => {
         <InvSlider
           value={thr_v}
           onChange={handleThrVChanged}
-          onReset={handleThrVReset}
+          defaultValue={DEFAULTS.thr_v}
           min={0}
           max={1}
           step={0.01}

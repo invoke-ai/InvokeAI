@@ -46,20 +46,16 @@ const ParamCFGScale = () => {
     [dispatch]
   );
 
-  const onReset = useCallback(() => {
-    dispatch(setCfgScale(initial));
-  }, [dispatch, initial]);
-
   return (
     <InvControl label={t('parameters.cfgScale')} feature="paramCFGScale">
       <InvSlider
         value={cfgScale}
+        defaultValue={initial}
         min={min}
         max={sliderMax}
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
-        onReset={onReset}
         withNumberInput
         marks={marks}
         numberInputMax={inputMax}

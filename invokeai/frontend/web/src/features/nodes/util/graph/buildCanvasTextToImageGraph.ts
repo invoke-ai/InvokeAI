@@ -78,7 +78,6 @@ export const buildCanvasTextToImageGraph = (
    */
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
-  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: CANVAS_TEXT_TO_IMAGE_GRAPH,
     nodes: {

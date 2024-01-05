@@ -76,7 +76,7 @@ const ParamESRGANModel = () => {
   );
 
   return (
-    <InvControl label={t('models.esrganModel')}>
+    <InvControl label={t('models.esrganModel')} orientation="vertical">
       <InvSelect value={value} onChange={onChange} options={options} />
     </InvControl>
   );

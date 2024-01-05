@@ -17,6 +17,7 @@ import type {
 } from 'features/dnd/types';
 import {
   heightChanged,
+  selectOptimalDimension,
   widthChanged,
 } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
@@ -37,8 +38,8 @@ type Props = {
 };
 
 const selector = createMemoizedSelector(
-  stateSelector,
-  ({ controlAdapters, gallery, system }) => {
+  [stateSelector, activeTabNameSelector, selectOptimalDimension],
+  ({ controlAdapters, gallery, system }, activeTabName, optimalDimension) => {
     const { pendingControlImages } = controlAdapters;
     const { autoAddBoardId } = gallery;
     const { isConnected } = system;
@@ -47,6 +48,8 @@ const selector = createMemoizedSelector(
       pendingControlImages,
       autoAddBoardId,
       isConnected,
+      activeTabName,
+      optimalDimension,
     };
   }
 );
@@ -55,13 +58,15 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
   const controlImageName = useControlAdapterControlImage(id);
   const processedControlImageName = useControlAdapterProcessedControlImage(id);
   const processorType = useControlAdapterProcessorType(id);
-
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const { pendingControlImages, autoAddBoardId, isConnected } =
-    useAppSelector(selector);
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const {
+    pendingControlImages,
+    autoAddBoardId,
+    isConnected,
+    activeTabName,
+    optimalDimension,
+  } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -113,16 +118,19 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 
     if (activeTabName === 'unifiedCanvas') {
       dispatch(
-        setBoundingBoxDimensions({
-          width: controlImage.width,
-          height: controlImage.height,
-        })
+        setBoundingBoxDimensions(
+          {
+            width: controlImage.width,
+            height: controlImage.height,
+          },
+          optimalDimension
+        )
       );
     } else {
       dispatch(widthChanged(controlImage.width));
       dispatch(heightChanged(controlImage.height));
     }
-  }, [controlImage, activeTabName, dispatch]);
+  }, [controlImage, activeTabName, dispatch, optimalDimension]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
@@ -180,7 +188,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       onMouseLeave={handleMouseLeave}
       position="relative"
       w="full"
-      h={isSmall ? 28 : 366} // magic no touch
+      h={isSmall ? 32 : 366} // magic no touch
       alignItems="center"
       justifyContent="center"
     >

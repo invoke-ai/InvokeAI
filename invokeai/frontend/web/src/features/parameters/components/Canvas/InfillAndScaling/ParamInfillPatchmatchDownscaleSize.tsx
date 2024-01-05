@@ -30,10 +30,6 @@ const ParamInfillPatchmatchDownscaleSize = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setInfillPatchmatchDownscaleSize(2));
-  }, [dispatch]);
-
   return (
     <InvControl
       isDisabled={infillMethod !== 'patchmatch'}
@@ -43,10 +39,10 @@ const ParamInfillPatchmatchDownscaleSize = () => {
         min={1}
         max={10}
         value={infillPatchmatchDownscaleSize}
+        defaultValue={1}
         onChange={handleChange}
         withNumberInput
         marks
-        onReset={handleReset}
       />
     </InvControl>
   );

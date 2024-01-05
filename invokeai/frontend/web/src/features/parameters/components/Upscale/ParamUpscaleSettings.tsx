@@ -37,7 +37,7 @@ const ParamUpscalePopover = (props: Props) => {
   }, [dispatch, imageDTO, isAllowedToUpscale, onClose]);
 
   return (
-    <InvPopover isOpen={isOpen} onClose={onClose}>
+    <InvPopover isOpen={isOpen} onClose={onClose} isLazy>
       <InvPopoverTrigger>
         <InvIconButton
           tooltip={t('parameters.upscale')}
@@ -47,7 +47,7 @@ const ParamUpscalePopover = (props: Props) => {
         />
       </InvPopoverTrigger>
       <InvPopoverContent>
-        <InvPopoverBody>
+        <InvPopoverBody minW={96}>
           <Flex flexDirection="column" gap={4}>
             <ParamESRGANModel />
             <InvButton

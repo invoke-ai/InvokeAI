@@ -3,16 +3,13 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import {
-  maxPromptsChanged,
-  maxPromptsReset,
-} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { maxPromptsChanged } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(stateSelector, (state) => {
   const { maxPrompts, combinatorial } = state.dynamicPrompts;
-  const { min, sliderMax, inputMax } =
+  const { min, sliderMax, inputMax, initial } =
     state.config.sd.dynamicPrompts.maxPrompts;
 
   return {
@@ -20,12 +17,13 @@ const selector = createMemoizedSelector(stateSelector, (state) => {
     min,
     sliderMax,
     inputMax,
+    initial,
     isDisabled: !combinatorial,
   };
 });
 
 const ParamDynamicPromptsMaxPrompts = () => {
-  const { maxPrompts, min, sliderMax, inputMax, isDisabled } =
+  const { maxPrompts, min, sliderMax, inputMax, initial, isDisabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -36,10 +34,6 @@ const ParamDynamicPromptsMaxPrompts = () => {
     },
     [dispatch]
   );
-
-  const handleReset = useCallback(() => {
-    dispatch(maxPromptsReset());
-  }, [dispatch]);
 
   return (
     <InvControl
@@ -52,8 +46,8 @@ const ParamDynamicPromptsMaxPrompts = () => {
         min={min}
         max={sliderMax}
         value={maxPrompts}
+        defaultValue={initial}
         onChange={handleChange}
-        onReset={handleReset}
         marks
         withNumberInput
         numberInputMax={inputMax}

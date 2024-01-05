@@ -65,7 +65,11 @@ export const IAINoContentFallback = memo((props: IAINoImageFallbackProps) => {
   return (
     <Flex sx={styles} {...rest}>
       {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
-      {props.label && <InvText textAlign="center">{props.label}</InvText>}
+      {props.label && (
+        <InvText textAlign="center" fontSize="md">
+          {props.label}
+        </InvText>
+      )}
     </Flex>
   );
 });

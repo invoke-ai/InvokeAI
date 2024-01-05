@@ -39,10 +39,6 @@ const ImageToImageStrength = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setImg2imgStrength(initial));
-  }, [dispatch, initial]);
-
   return (
     <InvControl
       label={`${t('parameters.denoisingStrength')}`}
@@ -54,8 +50,8 @@ const ImageToImageStrength = () => {
         min={min}
         max={sliderMax}
         onChange={handleChange}
-        onReset={handleReset}
         value={img2imgStrength}
+        defaultValue={initial}
         marks={marks}
         withNumberInput
         numberInputMax={inputMax}

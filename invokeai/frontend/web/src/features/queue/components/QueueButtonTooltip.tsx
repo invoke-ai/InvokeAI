@@ -4,6 +4,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvText } from 'common/components/InvText/wrapper';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
@@ -15,8 +16,10 @@ const tooltipSelector = createMemoizedSelector(
   [stateSelector],
   ({ gallery, dynamicPrompts, generation }) => {
     const { autoAddBoardId } = gallery;
-    const promptsCount = dynamicPrompts.prompts.length;
-    const { iterations } = generation;
+    const { iterations, positivePrompt } = generation;
+    const promptsCount = getShouldProcessPrompt(positivePrompt)
+      ? dynamicPrompts.prompts.length
+      : 1;
     return {
       autoAddBoardId,
       promptsCount,
@@ -32,6 +35,9 @@ type Props = {
 export const QueueButtonTooltip = memo(({ prepend = false }: Props) => {
   const { t } = useTranslation();
   const { isReady, reasons } = useIsReadyToEnqueue();
+  const isLoadingDynamicPrompts = useAppSelector(
+    (state) => state.dynamicPrompts.isLoading
+  );
   const { autoAddBoardId, promptsCount, iterations } =
     useAppSelector(tooltipSelector);
   const autoAddBoardName = useBoardName(autoAddBoardId);
@@ -43,6 +49,9 @@ export const QueueButtonTooltip = memo(({ prepend = false }: Props) => {
     if (isLoading) {
       return t('queue.enqueueing');
     }
+    if (isLoadingDynamicPrompts) {
+      return t('dynamicPrompts.loading');
+    }
     if (isReady) {
       if (prepend) {
         return t('queue.queueFront');
@@ -50,7 +59,7 @@ export const QueueButtonTooltip = memo(({ prepend = false }: Props) => {
       return t('queue.queueBack');
     }
     return t('queue.notReady');
-  }, [isLoading, isReady, prepend, t]);
+  }, [isLoading, isLoadingDynamicPrompts, isReady, prepend, t]);
 
   return (
     <Flex flexDir="column" gap={1}>

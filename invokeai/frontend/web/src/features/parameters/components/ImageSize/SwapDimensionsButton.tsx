@@ -1,18 +1,18 @@
-import { useAppDispatch } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { dimensionsSwapped } from 'features/parameters/store/generationSlice';
+import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoSwapVertical } from 'react-icons/io5';
 
 export const SwapDimensionsButton = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const ctx = useImageSizeContext();
   const onClick = useCallback(() => {
-    dispatch(dimensionsSwapped());
-  }, [dispatch]);
+    ctx.dimensionsSwapped();
+  }, [ctx]);
   return (
     <InvIconButton
+      tooltip={t('parameters.swapDimensions')}
       aria-label={t('parameters.swapDimensions')}
       onClick={onClick}
       variant="ghost"

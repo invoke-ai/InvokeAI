@@ -64,18 +64,18 @@ export const resizeHandleTheme = defineStyleConfig({
     },
     '.resize-handle-drag-handle': {
       pos: 'absolute',
-      borderRadius: '2px',
+      borderRadius: '1px',
       transitionProperty: 'inherit',
       transitionDuration: 'inherit',
       '&[data-orientation="horizontal"]': {
-        w: '20px',
+        w: '30px',
         h: '6px',
         insetInlineStart: '50%',
         transform: 'translate(-50%, 0)',
       },
       '&[data-orientation="vertical"]': {
         w: '6px',
-        h: '20px',
+        h: '30px',
         insetBlockStart: '50%',
         transform: 'translate(0, -50%)',
       },

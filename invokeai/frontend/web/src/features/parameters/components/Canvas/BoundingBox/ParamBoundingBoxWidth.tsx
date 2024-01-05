@@ -1,87 +1,49 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import {
+  CANVAS_GRID_SIZE_COARSE,
+  CANVAS_GRID_SIZE_FINE,
+} from 'features/canvas/store/constants';
+import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas, generation }, isStaging) => {
-    const { boundingBoxDimensions } = canvas;
-    const { model, aspectRatio } = generation;
+  [selectOptimalDimension, isStagingSelector],
+  (optimalDimension, isStaging) => {
     return {
-      model,
-      boundingBoxDimensions,
+      initial: optimalDimension,
       isStaging,
-      aspectRatio,
     };
   }
 );
 
 const ParamBoundingBoxWidth = () => {
-  const dispatch = useAppDispatch();
-  const { model, boundingBoxDimensions, isStaging, aspectRatio } =
-    useAppSelector(selector);
-
-  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
-    ? 1024
-    : 512;
-
+  const { isStaging, initial } = useAppSelector(selector);
+  const ctx = useImageSizeContext();
   const { t } = useTranslation();
 
-  const handleChangeWidth = useCallback(
+  const onChange = useCallback(
     (v: number) => {
-      dispatch(
-        setBoundingBoxDimensions({
-          ...boundingBoxDimensions,
-          width: Math.floor(v),
-        })
-      );
-      if (aspectRatio) {
-        const newHeight = roundToMultiple(v / aspectRatio.value, 64);
-        dispatch(
-          setBoundingBoxDimensions({
-            width: Math.floor(v),
-            height: newHeight,
-          })
-        );
-      }
+      ctx.widthChanged(v);
     },
-    [aspectRatio, boundingBoxDimensions, dispatch]
+    [ctx]
   );
-
-  const handleResetWidth = useCallback(() => {
-    dispatch(
-      setBoundingBoxDimensions({
-        ...boundingBoxDimensions,
-        width: Math.floor(initial),
-      })
-    );
-    if (aspectRatio) {
-      const newHeight = roundToMultiple(initial / aspectRatio.value, 64);
-      dispatch(
-        setBoundingBoxDimensions({
-          width: Math.floor(initial),
-          height: newHeight,
-        })
-      );
-    }
-  }, [aspectRatio, boundingBoxDimensions, dispatch, initial]);
 
   return (
     <InvControl label={t('parameters.width')} isDisabled={isStaging}>
       <InvSlider
         min={64}
         max={1536}
-        step={64}
-        value={boundingBoxDimensions.width}
-        onChange={handleChangeWidth}
-        onReset={handleResetWidth}
+        step={CANVAS_GRID_SIZE_COARSE}
+        fineStep={CANVAS_GRID_SIZE_FINE}
+        value={ctx.width}
+        defaultValue={initial}
+        onChange={onChange}
         withNumberInput
         numberInputMax={4096}
         marks

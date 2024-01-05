@@ -103,10 +103,6 @@
             "title": "Fixar Opções",
             "desc": "Fixar o painel de opções"
         },
-        "toggleViewer": {
-            "title": "Ativar Visualizador",
-            "desc": "Abrir e fechar o Visualizador de Imagens"
-        },
         "toggleGallery": {
             "title": "Ativar Galeria",
             "desc": "Abrir e fechar a gaveta da galeria"
@@ -166,10 +162,6 @@
         "nextImage": {
             "title": "Próxima Imagem",
             "desc": "Mostra a próxima imagem na galeria"
-        },
-        "toggleGalleryPin": {
-            "title": "Ativar Fixar Galeria",
-            "desc": "Fixa e desafixa a galeria na interface"
         },
         "increaseGalleryThumbSize": {
             "title": "Aumentar Tamanho da Galeria de Imagem",

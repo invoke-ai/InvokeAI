@@ -1,7 +1,7 @@
 import type { InvokeAIThemeColors } from 'theme/types';
 import { generateColorPalette } from 'theme/util/generateColorPalette';
 
-const BASE = { H: 220, S: 8 };
+const BASE = { H: 220, S: 12 };
 // const BASE = { H: 220, S: 16 };
 const WORKING = { H: 47, S: 42 };
 const GOLD = { H: 40, S: 70 };
@@ -12,6 +12,9 @@ const INVOKE_YELLOW = { H: 66, S: 92 };
 const BLUE = { H: 200, S: 76 };
 const GREEN = { H: 110, S: 69 };
 const RED = { H: 16, S: 92 };
+
+export const getArbitraryBaseColor = (lightness: number) =>
+  `hsl(${BASE.H} ${BASE.S}% ${lightness}%)`;
 
 export const InvokeAIColors: InvokeAIThemeColors = {
   base: generateColorPalette(BASE.H, BASE.S),

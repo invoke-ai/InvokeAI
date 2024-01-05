@@ -3,13 +3,15 @@ import { cssVar } from '@chakra-ui/theme-tools';
 
 const $arrowBg = cssVar('popper-arrow-bg');
 
-// define the base component styles
 const baseStyle = defineStyle(() => ({
   borderRadius: 'md',
   shadow: 'dark-lg',
   bg: 'base.200',
+  color: 'base.800',
   [$arrowBg.variable]: 'colors.base.200',
-  pb: 1.5,
+  pt: 1,
+  px: 2,
+  pb: 1,
 }));
 
 // export the component theme

@@ -29,10 +29,6 @@ const ParamInfillTileSize = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setInfillTileSize(32));
-  }, [dispatch]);
-
   return (
     <InvControl
       isDisabled={infillMethod !== 'tile'}
@@ -43,10 +39,10 @@ const ParamInfillTileSize = () => {
         max={64}
         numberInputMax={256}
         value={infillTileSize}
+        defaultValue={32}
         onChange={handleChange}
         withNumberInput
         marks
-        onReset={handleReset}
       />
     </InvControl>
   );

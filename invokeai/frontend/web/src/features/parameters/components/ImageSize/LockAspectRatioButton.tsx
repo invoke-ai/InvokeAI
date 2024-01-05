@@ -1,27 +1,24 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { isLockedToggled } from 'features/parameters/store/generationSlice';
+import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaLock, FaLockOpen } from 'react-icons/fa6';
 
 export const LockAspectRatioButton = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const isLocked = useAppSelector(
-    (state) => state.generation.aspectRatio.isLocked
-  );
+  const ctx = useImageSizeContext();
   const onClick = useCallback(() => {
-    dispatch(isLockedToggled());
-  }, [dispatch]);
+    ctx.isLockedToggled();
+  }, [ctx]);
 
   return (
     <InvIconButton
+      tooltip={t('parameters.lockAspectRatio')}
       aria-label={t('parameters.lockAspectRatio')}
       onClick={onClick}
-      variant={isLocked ? 'outline' : 'ghost'}
+      variant={ctx.aspectRatioState.isLocked ? 'outline' : 'ghost'}
       size="sm"
-      icon={isLocked ? <FaLock /> : <FaLockOpen />}
+      icon={ctx.aspectRatioState.isLocked ? <FaLock /> : <FaLockOpen />}
     />
   );
 });

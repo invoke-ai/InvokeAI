@@ -1,3 +1,4 @@
+import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import type { RgbaColor } from 'react-colorful';
 import { z } from 'zod';
@@ -150,6 +151,7 @@ export interface CanvasState {
   tool: CanvasTool;
   generationMode?: GenerationMode;
   batchIds: string[];
+  aspectRatio: AspectRatioState;
 }
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';

@@ -19,9 +19,6 @@ const ParamMaskBlur = () => {
     },
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setMaskBlur(16));
-  }, [dispatch]);
 
   return (
     <InvControl label={t('parameters.maskBlur')} feature="compositingBlur">
@@ -29,7 +26,7 @@ const ParamMaskBlur = () => {
         min={0}
         max={64}
         value={maskBlur}
-        onReset={handleReset}
+        defaultValue={16}
         onChange={handleChange}
         marks
         withNumberInput

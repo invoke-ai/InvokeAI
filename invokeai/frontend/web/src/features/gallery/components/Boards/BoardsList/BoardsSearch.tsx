@@ -67,14 +67,13 @@ const BoardsSearch = () => {
         data-testid="board-search-input"
       />
       {boardSearchText && boardSearchText.length && (
-        <InputRightElement>
+        <InputRightElement h="full" pe={2}>
           <InvIconButton
             onClick={clearBoardSearch}
             size="sm"
             variant="ghost"
             aria-label={t('boards.clearSearch')}
-            opacity={0.5}
-            icon={<CloseIcon boxSize={2} />}
+            icon={<CloseIcon boxSize={3} />}
           />
         </InputRightElement>
       )}

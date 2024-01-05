@@ -37,21 +37,13 @@ const MidasDepthProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleAMultReset = useCallback(() => {
-    processorChanged(controlNetId, { a_mult: DEFAULTS.a_mult });
-  }, [controlNetId, processorChanged]);
-
-  const handleBgThReset = useCallback(() => {
-    processorChanged(controlNetId, { bg_th: DEFAULTS.bg_th });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
       <InvControl label={t('controlnet.amult')} isDisabled={!isEnabled}>
         <InvSlider
           value={a_mult}
           onChange={handleAMultChanged}
-          onReset={handleAMultReset}
+          defaultValue={DEFAULTS.a_mult}
           min={0}
           max={20}
           step={0.01}
@@ -63,7 +55,7 @@ const MidasDepthProcessor = (props: Props) => {
         <InvSlider
           value={bg_th}
           onChange={handleBgThChanged}
-          onReset={handleBgThReset}
+          defaultValue={DEFAULTS.bg_th}
           min={0}
           max={20}
           step={0.01}

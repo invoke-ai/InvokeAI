@@ -23,11 +23,6 @@ const ParamSDXLRefinerStart = () => {
   );
   const { t } = useTranslation();
 
-  const handleReset = useCallback(
-    () => dispatch(setRefinerStart(0.8)),
-    [dispatch]
-  );
-
   return (
     <InvControl label={t('sdxl.refinerStart')}>
       <InvSlider
@@ -35,7 +30,7 @@ const ParamSDXLRefinerStart = () => {
         min={0}
         max={1}
         onChange={handleChange}
-        onReset={handleReset}
+        defaultValue={0.8}
         value={refinerStart}
         withNumberInput
         marks

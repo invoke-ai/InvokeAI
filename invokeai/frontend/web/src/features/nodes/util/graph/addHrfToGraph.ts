@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type {
   DenoiseLatentsInvocation,
   Edge,
@@ -66,26 +67,20 @@ function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
  * Adjusts the width and height to maintain the aspect ratio and constrains them by the model's dimension limits,
  * rounding down to the nearest multiple of 8.
  *
- * @param {string} baseModel The base model type, which determines the base dimension used in calculations.
+ * @param {number} optimalDimension The optimal dimension for the base model.
  * @param {number} width The current width to be adjusted for HRF.
  * @param {number} height The current height to be adjusted for HRF.
  * @return {{newWidth: number, newHeight: number}} The new width and height, adjusted and rounded as needed.
  */
 function calculateHrfRes(
-  baseModel: string,
+  optimalDimension: number,
   width: number,
   height: number
 ): { newWidth: number; newHeight: number } {
   const aspect = width / height;
-  let dimension;
-  if (baseModel == 'sdxl') {
-    dimension = 1024;
-  } else {
-    dimension = 512;
-  }
 
-  const minDimension = Math.floor(dimension * 0.5);
-  const modelArea = dimension * dimension; // Assuming square images for model_area
+  const minDimension = Math.floor(optimalDimension * 0.5);
+  const modelArea = optimalDimension * optimalDimension; // Assuming square images for model_area
 
   let initWidth;
   let initHeight;
@@ -126,11 +121,9 @@ export const addHrfToGraph = (
   const isAutoVae = !vae;
   const width = state.generation.width;
   const height = state.generation.height;
-  const baseModel = state.generation.model
-    ? state.generation.model.base_model
-    : 'sd1';
+  const optimalDimension = selectOptimalDimension(state);
   const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(
-    baseModel,
+    optimalDimension,
     width,
     height
   );

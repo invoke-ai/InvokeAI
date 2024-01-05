@@ -19,9 +19,6 @@ const ParamCanvasCoherenceStrength = () => {
     },
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setCanvasCoherenceStrength(0.3));
-  }, [dispatch]);
 
   return (
     <InvControl
@@ -33,8 +30,8 @@ const ParamCanvasCoherenceStrength = () => {
         max={1}
         step={0.01}
         value={canvasCoherenceStrength}
+        defaultValue={0.75}
         onChange={handleChange}
-        onReset={handleReset}
         withNumberInput
         numberInputMax={999}
         marks

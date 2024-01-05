@@ -1,28 +1,21 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { heightChanged } from 'features/parameters/store/generationSlice';
+import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ generation, config }) => {
+  [stateSelector, selectOptimalDimension],
+  ({ config }, optimalDimension) => {
     const { min, sliderMax, inputMax, fineStep, coarseStep } = config.sd.height;
-    const { model, height } = generation;
-
-    const initial = ['sdxl', 'sdxl-refiner'].includes(
-      model?.base_model as string
-    )
-      ? 1024
-      : 512;
 
     return {
-      initial,
-      height,
+      initial: optimalDimension,
       min,
       max: sliderMax,
       inputMax,
@@ -34,29 +27,25 @@ const selector = createMemoizedSelector(
 
 export const ParamHeight = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const { initial, height, min, max, inputMax, step, fineStep } =
+  const ctx = useImageSizeContext();
+  const { initial, min, max, inputMax, step, fineStep } =
     useAppSelector(selector);
 
   const onChange = useCallback(
     (v: number) => {
-      dispatch(heightChanged(v));
+      ctx.heightChanged(v);
     },
-    [dispatch]
+    [ctx]
   );
-
-  const onReset = useCallback(() => {
-    dispatch(heightChanged(initial));
-  }, [dispatch, initial]);
 
   const marks = useMemo(() => [min, initial, max], [min, initial, max]);
 
   return (
     <InvControl label={t('parameters.height')}>
       <InvSlider
-        value={height}
+        value={ctx.height}
+        defaultValue={initial}
         onChange={onChange}
-        onReset={onReset}
         min={min}
         max={max}
         step={step}
@@ -64,12 +53,13 @@ export const ParamHeight = memo(() => {
         marks={marks}
       />
       <InvNumberInput
-        value={height}
+        value={ctx.height}
         onChange={onChange}
         min={min}
         max={inputMax}
         step={step}
         fineStep={fineStep}
+        defaultValue={initial}
       />
     </InvControl>
   );

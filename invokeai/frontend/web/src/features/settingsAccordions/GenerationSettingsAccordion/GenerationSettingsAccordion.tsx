@@ -20,7 +20,7 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
-import { size, truncate } from 'lodash-es';
+import { size } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,9 +34,7 @@ const badgesSelector = createMemoizedSelector(
     const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
     const accordionBadges: (string | number)[] = [];
     if (generation.model) {
-      accordionBadges.push(
-        truncate(generation.model.model_name, { length: 24, omission: '...' })
-      );
+      accordionBadges.push(generation.model.model_name);
       accordionBadges.push(generation.model.base_model);
     }
 

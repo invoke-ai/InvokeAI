@@ -30,24 +30,12 @@ const ContentShuffleProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleImageResolutionChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { image_resolution: v });
     },
     [controlNetId, processorChanged]
   );
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
 
   const handleWChanged = useCallback(
     (v: number) => {
@@ -56,12 +44,6 @@ const ContentShuffleProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleWReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      w: DEFAULTS.w,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleHChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { h: v });
@@ -69,24 +51,12 @@ const ContentShuffleProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleHReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      h: DEFAULTS.h,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleFChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { f: v });
     },
     [controlNetId, processorChanged]
   );
-
-  const handleFReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      f: DEFAULTS.f,
-    });
-  }, [controlNetId, processorChanged]);
 
   return (
     <ProcessorWrapper>
@@ -96,8 +66,8 @@ const ContentShuffleProcessor = (props: Props) => {
       >
         <InvSlider
           value={detect_resolution}
+          defaultValue={DEFAULTS.detect_resolution}
           onChange={handleDetectResolutionChanged}
-          onReset={handleDetectResolutionReset}
           min={0}
           max={4096}
           marks
@@ -110,8 +80,8 @@ const ContentShuffleProcessor = (props: Props) => {
       >
         <InvSlider
           value={image_resolution}
+          defaultValue={DEFAULTS.image_resolution}
           onChange={handleImageResolutionChanged}
-          onReset={handleImageResolutionReset}
           min={0}
           max={4096}
           marks
@@ -121,8 +91,8 @@ const ContentShuffleProcessor = (props: Props) => {
       <InvControl label={t('controlnet.w')} isDisabled={!isEnabled}>
         <InvSlider
           value={w}
+          defaultValue={DEFAULTS.w}
           onChange={handleWChanged}
-          onReset={handleWReset}
           min={0}
           max={4096}
           marks
@@ -132,8 +102,8 @@ const ContentShuffleProcessor = (props: Props) => {
       <InvControl label={t('controlnet.h')} isDisabled={!isEnabled}>
         <InvSlider
           value={h}
+          defaultValue={DEFAULTS.h}
           onChange={handleHChanged}
-          onReset={handleHReset}
           min={0}
           max={4096}
           marks
@@ -143,8 +113,8 @@ const ContentShuffleProcessor = (props: Props) => {
       <InvControl label={t('controlnet.f')} isDisabled={!isEnabled}>
         <InvSlider
           value={f}
+          defaultValue={DEFAULTS.f}
           onChange={handleFChanged}
-          onReset={handleFReset}
           min={0}
           max={4096}
           marks

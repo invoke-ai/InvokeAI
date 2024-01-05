@@ -1,5 +1,7 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
+import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterWeight } from 'features/controlAdapters/hooks/useControlAdapterWeight';
@@ -12,12 +14,14 @@ type ParamControlAdapterWeightProps = {
   id: string;
 };
 
+const formatValue = (v: number) => v.toFixed(2);
+
 const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const weight = useControlAdapterWeight(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const handleWeightChanged = useCallback(
+  const onChange = useCallback(
     (weight: number) => {
       dispatch(controlAdapterWeightChanged({ id, weight }));
     },
@@ -30,21 +34,35 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
   }
 
   return (
-    <InvControl
-      label={t('controlnet.weight')}
-      isDisabled={!isEnabled}
-      feature="controlNetWeight"
-      orientation="vertical"
-    >
-      <InvSlider
-        value={weight}
-        onChange={handleWeightChanged}
-        min={0}
-        max={2}
-        step={0.01}
-        marks={marks}
-      />
-    </InvControl>
+    <InvControlGroup orientation="vertical">
+      <InvControl
+        label={t('controlnet.weight')}
+        isDisabled={!isEnabled}
+        feature="controlNetWeight"
+      >
+        <InvSlider
+          value={weight}
+          onChange={onChange}
+          defaultValue={1}
+          min={0}
+          max={2}
+          step={0.05}
+          fineStep={0.01}
+          marks={marks}
+          formatValue={formatValue}
+        />
+        <InvNumberInput
+          value={weight}
+          onChange={onChange}
+          min={-1}
+          max={2}
+          step={0.05}
+          fineStep={0.01}
+          maxW={20}
+          defaultValue={1}
+        />
+      </InvControl>
+    </InvControlGroup>
   );
 };
 
