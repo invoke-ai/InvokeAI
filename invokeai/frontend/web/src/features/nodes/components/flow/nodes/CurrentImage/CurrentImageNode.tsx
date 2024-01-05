@@ -1,6 +1,7 @@
 import { Flex, Image } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvText } from 'common/components/InvText/wrapper';
@@ -12,7 +13,6 @@ import { motion } from 'framer-motion';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSelector } from 'react-redux';
 import type { NodeProps } from 'reactflow';
 
 const selector = createMemoizedSelector(
@@ -28,7 +28,7 @@ const selector = createMemoizedSelector(
 );
 
 const CurrentImageNode = (props: NodeProps) => {
-  const { progressImage, imageDTO } = useSelector(selector);
+  const { progressImage, imageDTO } = useAppSelector(selector);
 
   if (progressImage) {
     return (
