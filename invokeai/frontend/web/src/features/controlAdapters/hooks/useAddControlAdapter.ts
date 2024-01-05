@@ -7,7 +7,7 @@ import { useControlAdapterModels } from './useControlAdapterModels';
 
 export const useAddControlAdapter = (type: ControlAdapterType) => {
   const baseModel = useAppSelector(
-    (state) => state.generation.model?.base_model
+    (s) => s.generation.model?.base_model
   );
   const dispatch = useAppDispatch();
 

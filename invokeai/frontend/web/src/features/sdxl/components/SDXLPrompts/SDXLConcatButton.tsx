@@ -8,7 +8,7 @@ import { FaLink, FaUnlink } from 'react-icons/fa';
 
 export const SDXLConcatButton = memo(() => {
   const shouldConcatSDXLStylePrompt = useAppSelector(
-    (state) => state.sdxl.shouldConcatSDXLStylePrompt
+    (s) => s.sdxl.shouldConcatSDXLStylePrompt
   );
 
   const dispatch = useAppDispatch();

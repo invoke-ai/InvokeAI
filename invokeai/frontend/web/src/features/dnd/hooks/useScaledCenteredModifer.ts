@@ -1,14 +1,14 @@
 import type { Modifier } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 
 const selectZoom = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ nodes }, activeTabName) =>
+  [selectNodesSlice, activeTabNameSelector],
+  (nodes, activeTabName) =>
     activeTabName === 'nodes' ? nodes.viewport.zoom : 1
 );
 

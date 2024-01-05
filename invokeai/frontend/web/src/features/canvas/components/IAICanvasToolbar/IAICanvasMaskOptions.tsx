@@ -1,6 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { InvButton } from 'common/components/InvButton/InvButton';
@@ -17,6 +16,7 @@ import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
+  selectCanvasSlice,
   setIsMaskEnabled,
   setLayer,
   setMaskColor,
@@ -31,8 +31,8 @@ import { useTranslation } from 'react-i18next';
 import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
 
 export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
+  [selectCanvasSlice, isStagingSelector],
+  (canvas, isStaging) => {
     const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } =
       canvas;
 

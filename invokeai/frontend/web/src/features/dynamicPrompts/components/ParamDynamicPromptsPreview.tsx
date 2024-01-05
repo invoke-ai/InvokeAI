@@ -1,26 +1,29 @@
 import type { ChakraProps } from '@chakra-ui/react';
 import { Flex, ListItem, OrderedList, Spinner } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCircleExclamation } from 'react-icons/fa6';
 
-const selector = createMemoizedSelector(stateSelector, (state) => {
-  const { isLoading, isError, prompts, parsingError } = state.dynamicPrompts;
+const selector = createMemoizedSelector(
+  selectDynamicPromptsSlice,
+  (dynamicPrompts) => {
+    const { isLoading, isError, prompts, parsingError } = dynamicPrompts;
 
-  return {
-    prompts,
-    parsingError,
-    isError,
-    isLoading,
-  };
-});
+    return {
+      prompts,
+      parsingError,
+      isError,
+      isLoading,
+    };
+  }
+);
 
 const listItemStyles: ChakraProps['sx'] = {
   '&::marker': { color: 'base.500' },

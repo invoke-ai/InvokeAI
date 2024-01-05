@@ -16,7 +16,7 @@ type Props = {
 
 const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
   const { t } = useTranslation();
-  const workflowId = useAppSelector((state) => state.workflow.id);
+  const workflowId = useAppSelector((s) => s.workflow.id);
   const { onClose } = useWorkflowLibraryModalContext();
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow({});
   const { getAndLoadWorkflow, getAndLoadWorkflowResult } =

@@ -1,26 +1,33 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { maxPromptsChanged } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import {
+  maxPromptsChanged,
+  selectDynamicPromptsSlice,
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(stateSelector, (state) => {
-  const { maxPrompts, combinatorial } = state.dynamicPrompts;
-  const { min, sliderMax, inputMax, initial } =
-    state.config.sd.dynamicPrompts.maxPrompts;
+const selector = createMemoizedSelector(
+  selectDynamicPromptsSlice,
+  selectConfigSlice,
+  (dynamicPrompts, config) => {
+    const { maxPrompts, combinatorial } = dynamicPrompts;
+    const { min, sliderMax, inputMax, initial } =
+      config.sd.dynamicPrompts.maxPrompts;
 
-  return {
-    maxPrompts,
-    min,
-    sliderMax,
-    inputMax,
-    initial,
-    isDisabled: !combinatorial,
-  };
-});
+    return {
+      maxPrompts,
+      min,
+      sliderMax,
+      inputMax,
+      initial,
+      isDisabled: !combinatorial,
+    };
+  }
+);
 
 const ParamDynamicPromptsMaxPrompts = () => {
   const { maxPrompts, min, sliderMax, inputMax, initial, isDisabled } =

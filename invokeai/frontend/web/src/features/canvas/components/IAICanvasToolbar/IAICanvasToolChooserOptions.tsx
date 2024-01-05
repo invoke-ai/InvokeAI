@@ -1,6 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -17,6 +16,7 @@ import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   addEraseRect,
   addFillRect,
+  selectCanvasSlice,
   setBrushColor,
   setBrushSize,
   setTool,
@@ -37,8 +37,8 @@ import {
 } from 'react-icons/fa';
 
 export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
+  [selectCanvasSlice, isStagingSelector],
+  (canvas, isStaging) => {
     const { tool, brushColor, brushSize } = canvas;
 
     return {

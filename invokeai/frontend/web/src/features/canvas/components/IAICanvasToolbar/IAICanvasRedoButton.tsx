@@ -1,8 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { redo } from 'features/canvas/store/canvasSlice';
+import { redo, selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -10,8 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { FaRedo } from 'react-icons/fa';
 
 const canvasRedoSelector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ canvas }, activeTabName) => {
+  [selectCanvasSlice, activeTabNameSelector],
+  (canvas, activeTabName) => {
     const { futureLayerStates } = canvas;
 
     return {

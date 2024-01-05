@@ -8,7 +8,7 @@ import {
 } from 'services/api/endpoints/queue';
 
 export const useCancelBatch = (batch_id: string) => {
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const { isCanceled } = useGetBatchStatusQuery(
     { batch_id },
     {

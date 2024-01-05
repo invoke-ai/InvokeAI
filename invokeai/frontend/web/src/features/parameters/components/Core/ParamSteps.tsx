@@ -1,18 +1,20 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import {
   clampSymmetrySteps,
+  selectGenerationSlice,
   setSteps,
 } from 'features/parameters/store/generationSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ generation, config }) => {
+  selectGenerationSlice,
+  selectConfigSlice,
+  (generation, config) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
       config.sd.steps;
     const { steps } = generation;

@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 
 import type { NodeTemplatesState } from './types';
@@ -24,3 +25,6 @@ const nodesTemplatesSlice = createSlice({
 export const { nodeTemplatesBuilt } = nodesTemplatesSlice.actions;
 
 export default nodesTemplatesSlice.reducer;
+
+export const selectNodeTemplatesSlice = (state: RootState) =>
+  state.nodeTemplates;

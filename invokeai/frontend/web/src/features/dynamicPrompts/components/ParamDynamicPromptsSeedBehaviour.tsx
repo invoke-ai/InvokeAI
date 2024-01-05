@@ -16,7 +16,7 @@ const ParamDynamicPromptsSeedBehaviour = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const seedBehaviour = useAppSelector(
-    (state) => state.dynamicPrompts.seedBehaviour
+    (s) => s.dynamicPrompts.seedBehaviour
   );
 
   const options = useMemo<InvSelectOption[]>(() => {

@@ -1,12 +1,12 @@
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   $cursorPosition,
   $isMovingBoundingBox,
   $isTransformingBoundingBox,
 } from 'features/canvas/store/canvasNanostore';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import {
   COLOR_PICKER_SIZE,
@@ -17,8 +17,8 @@ import { memo, useMemo } from 'react';
 import { Circle, Group } from 'react-konva';
 
 const canvasBrushPreviewSelector = createMemoizedSelector(
-  stateSelector,
-  ({ canvas }) => {
+  selectCanvasSlice,
+  (canvas) => {
     const {
       brushSize,
       colorPickerColor,

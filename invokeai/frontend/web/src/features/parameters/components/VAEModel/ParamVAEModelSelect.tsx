@@ -1,17 +1,19 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { vaeSelected } from 'features/parameters/store/generationSlice';
+import {
+  selectGenerationSlice,
+  vaeSelected,
+} from 'features/parameters/store/generationSlice';
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VaeModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
+const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
   const { model, vae } = generation;
   return { model, vae };
 });

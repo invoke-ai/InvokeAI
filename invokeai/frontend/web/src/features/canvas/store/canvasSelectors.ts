@@ -1,13 +1,13 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
-import { stateSelector } from 'app/store/store';
 
+import { selectCanvasSlice } from './canvasSlice';
 import type { CanvasImage } from './canvasTypes';
 import { isCanvasBaseImage } from './canvasTypes';
 
 export const isStagingSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas }) =>
+  selectCanvasSlice,
+  (canvas) =>
     canvas.batchIds.length > 0 ||
     canvas.layerState.stagingArea.images.length > 0
 );

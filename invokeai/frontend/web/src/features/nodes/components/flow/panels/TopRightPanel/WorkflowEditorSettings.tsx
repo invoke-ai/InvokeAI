@@ -1,6 +1,5 @@
 import { Divider, Flex, Heading, useDisclosure } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import {
@@ -15,17 +14,16 @@ import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
-  shouldAnimateEdgesChanged,
+ selectNodesSlice,  shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
   shouldSnapToGridChanged,
-  shouldValidateGraphChanged,
-} from 'features/nodes/store/nodesSlice';
+  shouldValidateGraphChanged } from 'features/nodes/store/nodesSlice';
 import type { ChangeEvent, ReactNode } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SelectionMode } from 'reactflow';
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
   const {
     shouldAnimateEdges,
     shouldValidateGraph,

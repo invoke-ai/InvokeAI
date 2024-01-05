@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
@@ -7,24 +5,22 @@ import type {
   InvSelectOnChange,
   InvSelectOption,
 } from 'common/components/InvSelect/types';
-import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
+import {
+  autoAddBoardIdChanged,
+} from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
-const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
-  const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-
-  return {
-    autoAddBoardId,
-    autoAssignBoardOnClick,
-  };
-});
-
 const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
+  const autoAddBoardId = useAppSelector(
+    (s) => s.gallery.autoAddBoardId
+  );
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
   const { options, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
       const options: InvSelectOption[] = [

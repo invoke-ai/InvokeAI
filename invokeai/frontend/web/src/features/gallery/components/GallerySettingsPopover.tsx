@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -15,6 +14,7 @@ import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import {
   autoAssignBoardOnClickChanged,
+  selectGallerySlice,
   setGalleryImageMinimumWidth,
   shouldAutoSwitchChanged,
 } from 'features/gallery/store/gallerySlice';
@@ -25,9 +25,9 @@ import { FaWrench } from 'react-icons/fa';
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
+const selector = createMemoizedSelector(selectGallerySlice, (gallery) => {
   const { galleryImageMinimumWidth, shouldAutoSwitch, autoAssignBoardOnClick } =
-    state.gallery;
+    gallery;
 
   return {
     galleryImageMinimumWidth,

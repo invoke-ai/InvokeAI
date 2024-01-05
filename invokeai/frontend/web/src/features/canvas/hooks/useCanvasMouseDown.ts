@@ -1,12 +1,11 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   setIsDrawing,
   setIsMovingStage,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { addLine } from 'features/canvas/store/canvasSlice';
+import { addLine, selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type Konva from 'konva';
@@ -17,11 +16,10 @@ import { useCallback } from 'react';
 import useColorPicker from './useColorUnderCursor';
 
 const selector = createMemoizedSelector(
-  [activeTabNameSelector, stateSelector, isStagingSelector],
-  (activeTabName, { canvas }, isStaging) => {
-    const { tool } = canvas;
+  [activeTabNameSelector, selectCanvasSlice, isStagingSelector],
+  (activeTabName, canvas, isStaging) => {
     return {
-      tool,
+      tool: canvas.tool,
       activeTabName,
       isStaging,
     };

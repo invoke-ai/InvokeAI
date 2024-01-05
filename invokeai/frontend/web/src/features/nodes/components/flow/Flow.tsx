@@ -71,13 +71,13 @@ const snapGrid: [number, number] = [25, 25];
 
 export const Flow = memo(() => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((state) => state.nodes.nodes);
-  const edges = useAppSelector((state) => state.nodes.edges);
-  const viewport = useAppSelector((state) => state.nodes.viewport);
+  const nodes = useAppSelector((s) => s.nodes.nodes);
+  const edges = useAppSelector((s) => s.nodes.edges);
+  const viewport = useAppSelector((s) => s.nodes.viewport);
   const shouldSnapToGrid = useAppSelector(
-    (state) => state.nodes.shouldSnapToGrid
+    (s) => s.nodes.shouldSnapToGrid
   );
-  const selectionMode = useAppSelector((state) => state.nodes.selectionMode);
+  const selectionMode = useAppSelector((s) => s.nodes.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();

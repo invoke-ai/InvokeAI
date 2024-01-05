@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -7,19 +5,12 @@ import { setInfillPatchmatchDownscaleSize } from 'features/parameters/store/gene
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([stateSelector], ({ generation }) => {
-  const { infillPatchmatchDownscaleSize, infillMethod } = generation;
-
-  return {
-    infillPatchmatchDownscaleSize,
-    infillMethod,
-  };
-});
-
 const ParamInfillPatchmatchDownscaleSize = () => {
   const dispatch = useAppDispatch();
-  const { infillPatchmatchDownscaleSize, infillMethod } =
-    useAppSelector(selector);
+  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
+  const infillPatchmatchDownscaleSize = useAppSelector(
+    (s) => s.generation.infillPatchmatchDownscaleSize
+  );
 
   const { t } = useTranslation();
 

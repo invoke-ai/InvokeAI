@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 
 type ModelManagerState = {
   searchFolder: string | null;
@@ -28,3 +29,5 @@ export const { setSearchFolder, setAdvancedAddScanModel } =
   modelManagerSlice.actions;
 
 export default modelManagerSlice.reducer;
+
+export const selectModelManagerSlice = (state: RootState) => state.modelmanager;

@@ -1,9 +1,11 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import {
+  selectCanvasSlice,
+  setScaledBoundingBoxDimensions,
+} from 'features/canvas/store/canvasSlice';
 import {
   CANVAS_GRID_SIZE_COARSE,
   CANVAS_GRID_SIZE_FINE,
@@ -13,8 +15,8 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [stateSelector, selectOptimalDimension],
-  ({ canvas }, optimalDimension) => {
+  [selectCanvasSlice, selectOptimalDimension],
+  (canvas, optimalDimension) => {
     const { boundingBoxScaleMethod, scaledBoundingBoxDimensions } = canvas;
 
     return {

@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -20,6 +19,7 @@ import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
   resetCanvasView,
+  selectCanvasSlice,
   setIsMaskEnabled,
   setLayer,
   setTool,
@@ -49,8 +49,8 @@ import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
 
 export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
+  [selectCanvasSlice, isStagingSelector],
+  (canvas, isStaging) => {
     const { tool, shouldCropToBoundingBoxOnSave, layer, isMaskEnabled } =
       canvas;
 

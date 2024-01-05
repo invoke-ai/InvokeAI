@@ -1,5 +1,4 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   resetCanvasInteractionState,
@@ -8,6 +7,7 @@ import {
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
+  selectCanvasSlice,
   setIsMaskEnabled,
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
@@ -20,8 +20,8 @@ import { useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector, isStagingSelector],
-  ({ canvas }, activeTabName, isStaging) => {
+  [selectCanvasSlice, activeTabNameSelector, isStagingSelector],
+  (canvas, activeTabName, isStaging) => {
     const {
       shouldLockBoundingBox,
       shouldShowBoundingBox,

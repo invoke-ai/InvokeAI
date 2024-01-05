@@ -1,11 +1,11 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { memo } from 'react';
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
   const lastSelectedNodeId =
     nodes.selectedNodes[nodes.selectedNodes.length - 1];
 

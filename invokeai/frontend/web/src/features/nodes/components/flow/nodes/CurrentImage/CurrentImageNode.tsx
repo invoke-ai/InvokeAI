@@ -1,13 +1,14 @@
 import { Flex, Image } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvText } from 'common/components/InvText/wrapper';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import type { CSSProperties, PropsWithChildren } from 'react';
@@ -16,8 +17,9 @@ import { useTranslation } from 'react-i18next';
 import type { NodeProps } from 'reactflow';
 
 const selector = createMemoizedSelector(
-  stateSelector,
-  ({ system, gallery }) => {
+  selectSystemSlice,
+  selectGallerySlice,
+  (system, gallery) => {
     const imageDTO = gallery.selection[gallery.selection.length - 1];
 
     return {

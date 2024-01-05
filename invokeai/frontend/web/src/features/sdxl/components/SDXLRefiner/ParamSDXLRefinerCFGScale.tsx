@@ -1,13 +1,13 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([stateSelector], ({ config }) => {
+const selector = createMemoizedSelector(selectConfigSlice, (config) => {
   const { min, inputMax, sliderMax, coarseStep, fineStep, initial } =
     config.sd.guidance;
 
@@ -23,7 +23,7 @@ const selector = createMemoizedSelector([stateSelector], ({ config }) => {
 });
 
 const ParamSDXLRefinerCFGScale = () => {
-  const refinerCFGScale = useAppSelector((state) => state.sdxl.refinerCFGScale);
+  const refinerCFGScale = useAppSelector((s) => s.sdxl.refinerCFGScale);
   const { marks, min, inputMax, sliderMax, coarseStep, fineStep, initial } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();

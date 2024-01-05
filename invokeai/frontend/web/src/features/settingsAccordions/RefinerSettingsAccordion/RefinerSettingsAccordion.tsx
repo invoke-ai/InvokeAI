@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
@@ -13,6 +12,7 @@ import ParamSDXLRefinerPositiveAestheticScore from 'features/sdxl/components/SDX
 import ParamSDXLRefinerScheduler from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerScheduler';
 import ParamSDXLRefinerStart from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerSteps';
+import { selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { isNil } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,10 +26,9 @@ const stepsScaleLabelProps: InvLabelProps = {
   minW: '5rem',
 };
 
-const selector = createMemoizedSelector(stateSelector, (state) => {
-  const { refinerModel } = state.sdxl;
+const selector = createMemoizedSelector(selectSdxlSlice, (sdxl) => {
   return {
-    badges: refinerModel ? ['Enabled'] : undefined,
+    badges: sdxl.refinerModel ? ['Enabled'] : undefined,
   };
 });
 

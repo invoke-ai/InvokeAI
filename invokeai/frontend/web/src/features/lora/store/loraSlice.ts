@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 
@@ -74,3 +75,5 @@ export const {
 } = loraSlice.actions;
 
 export default loraSlice.reducer;
+
+export const selectLoraSlice = (state: RootState) => state.lora;

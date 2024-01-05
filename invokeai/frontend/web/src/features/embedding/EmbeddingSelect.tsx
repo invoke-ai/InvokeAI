@@ -18,7 +18,7 @@ export const EmbeddingSelect = memo(
     const { t } = useTranslation();
 
     const currentBaseModel = useAppSelector(
-      (state) => state.generation.model?.base_model
+      (s) => s.generation.model?.base_model
     );
 
     const getIsDisabled = useCallback(

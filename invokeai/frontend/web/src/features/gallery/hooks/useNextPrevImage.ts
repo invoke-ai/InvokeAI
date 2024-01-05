@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
@@ -29,7 +29,7 @@ export const $useNextPrevImageState = map<UseNextPrevImageState>({
 });
 
 export const nextPrevImageButtonsSelector = createMemoizedSelector(
-  [stateSelector, selectListImagesBaseQueryArgs],
+  [(state: RootState) => state, selectListImagesBaseQueryArgs],
   (state, baseQueryArgs) => {
     const { data, status } =
       imagesApi.endpoints.listImages.select(baseQueryArgs)(state);

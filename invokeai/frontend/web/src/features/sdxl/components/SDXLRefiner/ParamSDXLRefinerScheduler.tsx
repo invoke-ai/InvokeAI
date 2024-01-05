@@ -12,7 +12,7 @@ const ParamSDXLRefinerScheduler = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const refinerScheduler = useAppSelector(
-    (state) => state.sdxl.refinerScheduler
+    (s) => s.sdxl.refinerScheduler
   );
 
   const onChange = useCallback<InvSelectOnChange>(

@@ -15,8 +15,8 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((state) => state.generation.positivePrompt);
-  const baseModel = useAppSelector((state) => state.generation.model)
+  const prompt = useAppSelector((s) => s.generation.positivePrompt);
+  const baseModel = useAppSelector((s) => s.generation.model)
     ?.base_model;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);

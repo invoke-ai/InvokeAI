@@ -1,18 +1,20 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import { useModelInvSelect } from 'common/components/InvSelect/useModelInvSelect';
-import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
+import {
+  refinerModelChanged,
+  selectSdxlSlice,
+} from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
 import type { MainModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createMemoizedSelector(stateSelector, (state) => ({
-  model: state.sdxl.refinerModel,
+const selector = createMemoizedSelector(selectSdxlSlice, (sdxl) => ({
+  model: sdxl.refinerModel,
 }));
 
 const optionsFilter = (model: MainModelConfigEntity) =>

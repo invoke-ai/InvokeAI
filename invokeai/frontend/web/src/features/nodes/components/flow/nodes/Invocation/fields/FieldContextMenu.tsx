@@ -1,5 +1,4 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
@@ -10,6 +9,7 @@ import { useFieldInputKind } from 'features/nodes/hooks/useFieldInputKind';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
 import {
+  selectWorkflowSlice,
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
 } from 'features/nodes/store/workflowSlice';
@@ -38,7 +38,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
 
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ workflow }) => {
+      createMemoizedSelector(selectWorkflowSlice, (workflow) => {
         const isExposed = Boolean(
           workflow.exposedFields.find(
             (f) => f.nodeId === nodeId && f.fieldName === fieldName

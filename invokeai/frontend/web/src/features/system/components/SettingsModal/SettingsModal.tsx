@@ -1,6 +1,5 @@
 import { Flex, useDisclosure } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -17,10 +16,14 @@ import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
-import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
+import {
+  selectGenerationSlice,
+  shouldUseCpuNoiseChanged,
+} from 'features/parameters/store/generationSlice';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
+  selectSystemSlice,
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
@@ -29,7 +32,10 @@ import {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
-import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
+import {
+  selectUiSlice,
+  setShouldShowProgressInViewer,
+} from 'features/ui/store/uiSlice';
 import type { ChangeEvent, ReactElement } from 'react';
 import { cloneElement, memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,8 +45,10 @@ import { SettingsLanguageSelect } from './SettingsLanguageSelect';
 import { SettingsLogLevelSelect } from './SettingsLogLevelSelect';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ system, ui, generation }) => {
+  selectSystemSlice,
+  selectUiSlice,
+  selectGenerationSlice,
+  (system, ui, generation) => {
     const {
       shouldConfirmOnDelete,
       enableImageDebugging,

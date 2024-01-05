@@ -10,7 +10,6 @@ import {
 } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { InvText } from 'common/components/InvText/wrapper';
@@ -22,6 +21,7 @@ import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMen
 import {
   autoAddBoardIdChanged,
   boardIdSelected,
+  selectGallerySlice,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -56,7 +56,7 @@ const GalleryBoard = ({
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ gallery }) => {
+      createMemoizedSelector(selectGallerySlice, (gallery) => {
         const isSelectedForAutoAdd = board.board_id === gallery.autoAddBoardId;
         const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
 

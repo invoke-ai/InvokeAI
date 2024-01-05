@@ -1,14 +1,14 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import type { ConnectionLineComponentProps } from 'reactflow';
 import { getBezierPath } from 'reactflow';
 
-const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
   const { shouldAnimateEdges, connectionStartFieldType, shouldColorEdges } =
     nodes;
 

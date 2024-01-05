@@ -1,12 +1,14 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
-import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
+import {
+  autoAddBoardIdChanged,
+  selectGallerySlice,
+} from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
@@ -38,7 +40,7 @@ const BoardContextMenu = ({
 
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ gallery }) => {
+      createMemoizedSelector(selectGallerySlice, (gallery) => {
         const isAutoAdd = gallery.autoAddBoardId === board_id;
         const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
         return { isAutoAdd, autoAssignBoardOnClick };

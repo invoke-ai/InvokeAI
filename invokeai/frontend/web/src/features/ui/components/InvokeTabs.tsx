@@ -2,7 +2,6 @@ import { Flex, Spacer } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvTab } from 'common/components/InvTabs/InvTab';
@@ -18,6 +17,7 @@ import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditor
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
 import StatusIndicator from 'features/system/components/StatusIndicator';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
@@ -95,12 +95,8 @@ const tabs: InvokeTabInfo[] = [
 ];
 
 const enabledTabsSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ config }) => {
-    const { disabledTabs } = config;
-    const enabledTabs = tabs.filter((tab) => !disabledTabs.includes(tab.id));
-    return enabledTabs;
-  }
+  selectConfigSlice,
+  (config) => tabs.filter((tab) => !config.disabledTabs.includes(tab.id))
 );
 
 export const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];

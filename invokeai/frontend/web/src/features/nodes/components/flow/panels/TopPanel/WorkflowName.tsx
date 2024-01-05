@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next';
 
 const TopCenterPanel = () => {
   const { t } = useTranslation();
-  const name = useAppSelector((state) => state.workflow.name);
-  const isTouched = useAppSelector((state) => state.workflow.isTouched);
+  const name = useAppSelector((s) => s.workflow.name);
+  const isTouched = useAppSelector((s) => s.workflow.isTouched);
   const isWorkflowLibraryEnabled =
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
 

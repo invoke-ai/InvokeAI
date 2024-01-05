@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 export const useCoreParametersCollapseLabel = () => {
   const { t } = useTranslation();
   const shouldRandomizeSeed = useAppSelector(
-    (state) => state.generation.shouldRandomizeSeed
+    (s) => s.generation.shouldRandomizeSeed
   );
-  const iterations = useAppSelector((state) => state.generation.iterations);
+  const iterations = useAppSelector((s) => s.generation.iterations);
 
   const iterationsLabel = useMemo(() => {
     if (iterations === 1) {

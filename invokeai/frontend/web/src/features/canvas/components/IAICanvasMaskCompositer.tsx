@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import type Konva from 'konva';
 import type { RectConfig } from 'konva/lib/shapes/Rect';
@@ -9,8 +9,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Rect } from 'react-konva';
 
 export const canvasMaskCompositerSelector = createMemoizedSelector(
-  stateSelector,
-  ({ canvas }) => {
+  selectCanvasSlice,
+  (canvas) => {
     const { maskColor, stageCoordinates, stageDimensions, stageScale } = canvas;
 
     return {

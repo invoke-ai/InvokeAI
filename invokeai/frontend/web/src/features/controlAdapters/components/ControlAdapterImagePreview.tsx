@@ -2,7 +2,6 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
@@ -10,16 +9,21 @@ import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
 import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
 import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
-import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  controlAdapterImageChanged,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import {
   heightChanged,
   selectOptimalDimension,
   widthChanged,
 } from 'features/parameters/store/generationSlice';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,8 +42,14 @@ type Props = {
 };
 
 const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector, selectOptimalDimension],
-  ({ controlAdapters, gallery, system }, activeTabName, optimalDimension) => {
+  [
+    selectControlAdaptersSlice,
+    selectGallerySlice,
+    selectSystemSlice,
+    activeTabNameSelector,
+    selectOptimalDimension,
+  ],
+  (controlAdapters, gallery, system, activeTabName, optimalDimension) => {
     const { pendingControlImages } = controlAdapters;
     const { autoAddBoardId } = gallery;
     const { isConnected } = system;

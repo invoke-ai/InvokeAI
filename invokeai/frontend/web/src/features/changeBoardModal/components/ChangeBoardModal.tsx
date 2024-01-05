@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -13,6 +12,7 @@ import { InvText } from 'common/components/InvText/wrapper';
 import {
   changeBoardReset,
   isModalOpenChanged,
+  selectChangeBoardModalSlice,
 } from 'features/changeBoardModal/store/slice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,8 +23,8 @@ import {
 } from 'services/api/endpoints/images';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ changeBoardModal }) => {
+  selectChangeBoardModalSlice,
+  (changeBoardModal) => {
     const { isModalOpen, imagesToChange } = changeBoardModal;
 
     return {

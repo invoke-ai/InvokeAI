@@ -1,12 +1,11 @@
 import type { ChakraProps } from '@chakra-ui/react';
 import { Box, useToken } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { nodeExclusivelySelected } from 'features/nodes/store/nodesSlice';
+import { nodeExclusivelySelected , selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,
@@ -29,8 +28,8 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const selectIsInProgress = useMemo(
     () =>
       createMemoizedSelector(
-        stateSelector,
-        ({ nodes }) =>
+        selectNodesSlice,
+        (nodes) =>
           nodes.nodeExecutionStates[nodeId]?.status ===
           zNodeStatus.enum.IN_PROGRESS
       ),
@@ -47,7 +46,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const dispatch = useAppDispatch();
 
-  const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
+  const opacity = useAppSelector((s) => s.nodes.nodeOpacity);
   const { onCloseGlobal } = useGlobalMenuCloseTrigger();
 
   const handleClick = useCallback(

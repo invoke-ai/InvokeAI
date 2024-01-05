@@ -1,10 +1,10 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 import { Badge, CircularProgress, Flex, Icon, Image } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvText } from 'common/components/InvText/wrapper';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -29,8 +29,8 @@ const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
   const selectNodeExecutionState = useMemo(
     () =>
       createMemoizedSelector(
-        stateSelector,
-        ({ nodes }) => nodes.nodeExecutionStates[nodeId]
+        selectNodesSlice,
+        (nodes) => nodes.nodeExecutionStates[nodeId]
       ),
     [nodeId]
   );

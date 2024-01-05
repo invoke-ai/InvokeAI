@@ -1,7 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import InvocationNode from 'features/nodes/components/flow/nodes/Invocation/InvocationNode';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import type { NodeProps } from 'reactflow';
@@ -14,7 +14,7 @@ const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
 
   const hasTemplateSelector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodeTemplates }) =>
+      createMemoizedSelector(selectNodeTemplatesSlice, (nodeTemplates) =>
         Boolean(nodeTemplates.templates[type])
       ),
     [type]

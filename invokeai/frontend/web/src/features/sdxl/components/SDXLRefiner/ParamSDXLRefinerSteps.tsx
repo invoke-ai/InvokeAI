@@ -1,13 +1,13 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setRefinerSteps } from 'features/sdxl/store/sdxlSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([stateSelector], ({ config }) => {
+const selector = createMemoizedSelector(selectConfigSlice, (config) => {
   const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
     config.sd.steps;
 
@@ -24,7 +24,7 @@ const selector = createMemoizedSelector([stateSelector], ({ config }) => {
 const ParamSDXLRefinerSteps = () => {
   const { initial, min, sliderMax, inputMax, step, fineStep, marks } =
     useAppSelector(selector);
-  const refinerSteps = useAppSelector((state) => state.sdxl.refinerSteps);
+  const refinerSteps = useAppSelector((s) => s.sdxl.refinerSteps);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

@@ -1,6 +1,4 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import IAIDroppable from 'common/components/IAIDroppable';
@@ -26,14 +24,12 @@ interface Props {
   isSelected: boolean;
 }
 
-const selector = createMemoizedSelector(stateSelector, ({ gallery }) => {
-  const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-  return { autoAddBoardId, autoAssignBoardOnClick };
-});
-
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: 'none' }));
