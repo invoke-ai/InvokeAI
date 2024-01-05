@@ -4,15 +4,14 @@ import {
   InvCardBody,
   InvCardHeader,
 } from 'common/components/InvCard/wrapper';
+import { InvLabel } from 'common/components/InvControl/InvLabel';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { InvText } from 'common/components/InvText/wrapper';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { FaTrashCan } from 'react-icons/fa6';
-import { InvLabel } from '../../../common/components/InvControl/InvLabel';
 
 type LoRACardProps = {
   lora: LoRA;
