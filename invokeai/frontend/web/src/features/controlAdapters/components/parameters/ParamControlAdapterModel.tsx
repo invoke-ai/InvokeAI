@@ -37,7 +37,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const currentBaseModel = useAppSelector(
     (s) => s.generation.model?.base_model
   );
-  const { mainModel } = useAppSelector(selectMainModel);
+  const mainModel = useAppSelector(selectMainModel);
   const { t } = useTranslation();
 
   const models = useControlAdapterModelEntities(controlAdapterType);

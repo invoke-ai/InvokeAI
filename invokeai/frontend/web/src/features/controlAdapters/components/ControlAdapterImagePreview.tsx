@@ -22,6 +22,7 @@ import {
   selectOptimalDimension,
   widthChanged,
 } from 'features/parameters/store/generationSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
@@ -51,7 +52,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
   const processorType = useControlAdapterProcessorType(id);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const isConnected = useAppSelector((s) => s.system.isConnected);
-  const activeTabName = useAppSelector(selectActiveTabname);
+  const activeTabName = useAppSelector(activeTabNameSelector);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const pendingControlImages = useAppSelector(selectPendingControlImages);
 
