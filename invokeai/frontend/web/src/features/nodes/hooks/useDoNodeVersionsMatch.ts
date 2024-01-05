@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { compareVersions } from 'compare-versions';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
@@ -9,7 +9,7 @@ import { useMemo } from 'react';
 export const useDoNodeVersionsMatch = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
+      createSelector(
         selectNodesSlice,
         selectNodeTemplatesSlice,
         (nodes, nodeTemplates) => {

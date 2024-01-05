@@ -99,7 +99,7 @@ import {
 import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
-const selector = createMemoizedSelector(
+const selectModel = createMemoizedSelector(
   selectGenerationSlice,
   (generation) => generation.model
 );
@@ -108,7 +108,7 @@ export const useRecallParameters = () => {
   const dispatch = useAppDispatch();
   const toaster = useAppToaster();
   const { t } = useTranslation();
-  const model = useAppSelector(selector);
+  const model = useAppSelector(selectModel);
 
   const parameterSetToast = useCallback(() => {
     toaster({

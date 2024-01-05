@@ -13,16 +13,17 @@ import { REFINER_BASE_MODELS } from 'services/api/constants';
 import type { MainModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createMemoizedSelector(selectSdxlSlice, (sdxl) => ({
-  model: sdxl.refinerModel,
-}));
+const selectModel = createMemoizedSelector(
+  selectSdxlSlice,
+  (sdxl) => sdxl.refinerModel
+);
 
 const optionsFilter = (model: MainModelConfigEntity) =>
   model.base_model === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
-  const { model } = useAppSelector(selector);
+  const model = useAppSelector(selectModel);
   const { t } = useTranslation();
   const { data, isLoading } = useGetMainModelsQuery(REFINER_BASE_MODELS);
   const _onChange = useCallback(

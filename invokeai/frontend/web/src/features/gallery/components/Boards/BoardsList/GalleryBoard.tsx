@@ -8,8 +8,8 @@ import {
   Icon,
   Image,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { InvText } from 'common/components/InvText/wrapper';
@@ -54,22 +54,19 @@ const GalleryBoard = ({
   setBoardToDelete,
 }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
-  const selector = useMemo(
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
+  const selectIsSelectedForAutoAdd = useMemo(
     () =>
-      createMemoizedSelector(selectGallerySlice, (gallery) => {
-        const isSelectedForAutoAdd = board.board_id === gallery.autoAddBoardId;
-        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-
-        return {
-          isSelectedForAutoAdd,
-          autoAssignBoardOnClick,
-        };
-      }),
+      createSelector(
+        selectGallerySlice,
+        (gallery) => board.board_id === gallery.autoAddBoardId
+      ),
     [board.board_id]
   );
 
-  const { isSelectedForAutoAdd, autoAssignBoardOnClick } =
-    useAppSelector(selector);
+  const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);

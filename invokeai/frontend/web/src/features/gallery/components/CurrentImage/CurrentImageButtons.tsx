@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -12,17 +12,15 @@ import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteIm
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
-  selectUiSlice,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
@@ -42,51 +40,29 @@ import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
-const currentImageButtonsSelector = createMemoizedSelector(
-  [
-    selectGallerySlice,
-    selectSystemSlice,
-    selectUiSlice,
-    selectConfigSlice,
-    activeTabNameSelector,
-  ],
-  (gallery, system, ui, config, activeTabName) => {
-    const { isConnected, shouldConfirmOnDelete, denoiseProgress } = system;
-
-    const {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-    } = ui;
-
-    const { shouldFetchMetadataFromApi } = config;
-
-    const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
-
-    return {
-      shouldConfirmOnDelete,
-      isConnected,
-      shouldDisableToolbarButtons:
-        Boolean(denoiseProgress?.progress_image) || !lastSelectedImage,
-      shouldShowImageDetails,
-      activeTabName,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-      lastSelectedImage,
-      shouldFetchMetadataFromApi,
-    };
+const selectShouldDisableToolbarButtons = createSelector(
+  selectSystemSlice,
+  selectGallerySlice,
+  selectLastSelectedImage,
+  (system, gallery, lastSelectedImage) => {
+    const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
+    return hasProgressImage || !lastSelectedImage;
   }
 );
 
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
-  const {
-    isConnected,
-    shouldDisableToolbarButtons,
-    shouldShowImageDetails,
-    lastSelectedImage,
-    shouldShowProgressInViewer,
-  } = useAppSelector(currentImageButtonsSelector);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const shouldShowImageDetails = useAppSelector(
+    (s) => s.ui.shouldShowImageDetails
+  );
+  const shouldShowProgressInViewer = useAppSelector(
+    (s) => s.ui.shouldShowProgressInViewer
+  );
+  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const shouldDisableToolbarButtons = useAppSelector(
+    selectShouldDisableToolbarButtons
+  );
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isQueueMutationInProgress = useIsQueueMutationInProgress();

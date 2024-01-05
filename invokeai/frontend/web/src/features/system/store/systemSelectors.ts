@@ -1,7 +1,7 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 
-export const languageSelector = createMemoizedSelector(
+export const languageSelector = createSelector(
   selectSystemSlice,
   (system) => system.language
 );

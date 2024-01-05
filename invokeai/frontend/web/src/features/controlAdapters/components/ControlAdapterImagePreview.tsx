@@ -17,14 +17,11 @@ import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import {
   heightChanged,
   selectOptimalDimension,
   widthChanged,
 } from 'features/parameters/store/generationSlice';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
@@ -41,42 +38,22 @@ type Props = {
   isSmall?: boolean;
 };
 
-const selector = createMemoizedSelector(
-  [
-    selectControlAdaptersSlice,
-    selectGallerySlice,
-    selectSystemSlice,
-    activeTabNameSelector,
-    selectOptimalDimension,
-  ],
-  (controlAdapters, gallery, system, activeTabName, optimalDimension) => {
-    const { pendingControlImages } = controlAdapters;
-    const { autoAddBoardId } = gallery;
-    const { isConnected } = system;
-
-    return {
-      pendingControlImages,
-      autoAddBoardId,
-      isConnected,
-      activeTabName,
-      optimalDimension,
-    };
-  }
+const selectPendingControlImages = createMemoizedSelector(
+  selectControlAdaptersSlice,
+  (controlAdapters) => controlAdapters.pendingControlImages
 );
 
 const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const controlImageName = useControlAdapterControlImage(id);
   const processedControlImageName = useControlAdapterProcessedControlImage(id);
   const processorType = useControlAdapterProcessorType(id);
-  const dispatch = useAppDispatch();
-  const { t } = useTranslation();
-  const {
-    pendingControlImages,
-    autoAddBoardId,
-    isConnected,
-    activeTabName,
-    optimalDimension,
-  } = useAppSelector(selector);
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const activeTabName = useAppSelector(selectActiveTabname);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const pendingControlImages = useAppSelector(selectPendingControlImages);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 

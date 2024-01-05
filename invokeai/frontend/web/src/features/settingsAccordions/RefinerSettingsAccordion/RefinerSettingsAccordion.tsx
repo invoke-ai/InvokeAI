@@ -26,16 +26,14 @@ const stepsScaleLabelProps: InvLabelProps = {
   minW: '5rem',
 };
 
-const selector = createMemoizedSelector(selectSdxlSlice, (sdxl) => {
-  return {
-    badges: sdxl.refinerModel ? ['Enabled'] : undefined,
-  };
-});
+const selectBadges = createMemoizedSelector(selectSdxlSlice, (sdxl) =>
+  sdxl.refinerModel ? ['Enabled'] : undefined
+);
 
 export const RefinerSettingsAccordion: React.FC = memo(() => {
   const { t } = useTranslation();
   const isRefinerAvailable = useIsRefinerAvailable();
-  const { badges } = useAppSelector(selector);
+  const badges = useAppSelector(selectBadges);
 
   if (!isRefinerAvailable) {
     return (

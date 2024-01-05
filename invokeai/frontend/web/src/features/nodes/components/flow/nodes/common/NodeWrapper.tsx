@@ -1,6 +1,6 @@
 import type { ChakraProps } from '@chakra-ui/react';
 import { Box, useToken } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
@@ -30,7 +30,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const selectIsInProgress = useMemo(
     () =>
-      createMemoizedSelector(
+      createSelector(
         selectNodesSlice,
         (nodes) =>
           nodes.nodeExecutionStates[nodeId]?.status ===

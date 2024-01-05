@@ -12,17 +12,15 @@ import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import type { MainModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createMemoizedSelector(
+const selectModel = createMemoizedSelector(
   selectGenerationSlice,
-  (generation) => ({
-    model: generation.model,
-  })
+  (generation) => generation.model
 );
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { model } = useAppSelector(selector);
+  const model = useAppSelector(selectModel);
   const { data, isLoading } = useGetMainModelsQuery(NON_REFINER_BASE_MODELS);
   const _onChange = useCallback(
     (model: MainModelConfigEntity | null) => {

@@ -6,12 +6,12 @@ import { selectLoraSlice } from 'features/lora/store/loraSlice';
 import { map } from 'lodash-es';
 import { memo } from 'react';
 
-const selector = createMemoizedSelector(selectLoraSlice, (lora) => {
-  return { lorasArray: map(lora.loras) };
-});
+const selectLoRAsArray = createMemoizedSelector(selectLoraSlice, (lora) =>
+  map(lora.loras)
+);
 
 export const LoRAList = memo(() => {
-  const { lorasArray } = useAppSelector(selector);
+  const lorasArray = useAppSelector(selectLoRAsArray);
 
   if (!lorasArray.length) {
     return null;

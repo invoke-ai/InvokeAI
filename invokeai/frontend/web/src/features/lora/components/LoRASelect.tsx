@@ -10,15 +10,16 @@ import { useTranslation } from 'react-i18next';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createMemoizedSelector(selectLoraSlice, (lora) => ({
-  addedLoRAs: lora.loras,
-}));
+const selectAddedLoRAs = createMemoizedSelector(
+  selectLoraSlice,
+  (lora) => lora.loras
+);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetLoRAModelsQuery();
   const { t } = useTranslation();
-  const { addedLoRAs } = useAppSelector(selector);
+  const addedLoRAs = useAppSelector(selectAddedLoRAs);
   const currentBaseModel = useAppSelector(
     (s) => s.generation.model?.base_model
   );

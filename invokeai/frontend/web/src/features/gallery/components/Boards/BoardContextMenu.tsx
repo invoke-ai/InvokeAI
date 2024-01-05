@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
@@ -37,18 +37,19 @@ const BoardContextMenu = ({
 }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-
-  const selector = useMemo(
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
+  const selectIsSelectedForAutoAdd = useMemo(
     () =>
-      createMemoizedSelector(selectGallerySlice, (gallery) => {
-        const isAutoAdd = gallery.autoAddBoardId === board_id;
-        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-        return { isAutoAdd, autoAssignBoardOnClick };
-      }),
-    [board_id]
+      createSelector(
+        selectGallerySlice,
+        (gallery) => board && board.board_id === gallery.autoAddBoardId
+      ),
+    [board]
   );
 
-  const { isAutoAdd, autoAssignBoardOnClick } = useAppSelector(selector);
+  const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const boardName = useBoardName(board_id);
   const isBulkDownloadEnabled =
     useFeatureStatus('bulkDownload').isFeatureEnabled;
@@ -99,7 +100,7 @@ const BoardContextMenu = ({
         <InvMenuGroup title={boardName}>
           <InvMenuItem
             icon={<FaPlus />}
-            isDisabled={isAutoAdd || autoAssignBoardOnClick}
+            isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick}
             onClick={handleSetAutoAdd}
           >
             {t('boards.menuItemAutoAdd')}
@@ -127,8 +128,8 @@ const BoardContextMenu = ({
       boardName,
       handleBulkDownload,
       handleSetAutoAdd,
-      isAutoAdd,
       isBulkDownloadEnabled,
+      isSelectedForAutoAdd,
       setBoardToDelete,
       skipEvent,
       t,

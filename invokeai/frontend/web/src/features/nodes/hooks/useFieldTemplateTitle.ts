@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
@@ -13,7 +13,7 @@ export const useFieldTemplateTitle = (
 ) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
+      createSelector(
         selectNodesSlice,
         selectNodeTemplatesSlice,
         (nodes, nodeTemplates) => {
@@ -28,7 +28,7 @@ export const useFieldTemplateTitle = (
     [fieldName, kind, nodeId]
   );
 
-  const fieldTemplate = useAppSelector(selector);
+  const fieldTemplateTitle = useAppSelector(selector);
 
-  return fieldTemplate;
+  return fieldTemplateTitle;
 };

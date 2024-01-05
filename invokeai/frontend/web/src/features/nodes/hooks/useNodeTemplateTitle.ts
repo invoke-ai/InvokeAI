@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 export const useNodeTemplateTitle = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
+      createSelector(
         selectNodesSlice,
         selectNodeTemplatesSlice,
         (nodes, nodeTemplates) => {

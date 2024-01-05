@@ -11,18 +11,9 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCircleExclamation } from 'react-icons/fa6';
 
-const selector = createMemoizedSelector(
+const selectPrompts = createMemoizedSelector(
   selectDynamicPromptsSlice,
-  (dynamicPrompts) => {
-    const { isLoading, isError, prompts, parsingError } = dynamicPrompts;
-
-    return {
-      prompts,
-      parsingError,
-      isError,
-      isLoading,
-    };
-  }
+  (dynamicPrompts) => dynamicPrompts.prompts
 );
 
 const listItemStyles: ChakraProps['sx'] = {
@@ -31,8 +22,10 @@ const listItemStyles: ChakraProps['sx'] = {
 
 const ParamDynamicPromptsPreview = () => {
   const { t } = useTranslation();
-  const { prompts, parsingError, isLoading, isError } =
-    useAppSelector(selector);
+  const parsingError = useAppSelector((s) => s.dynamicPrompts.parsingError);
+  const isError = useAppSelector((s) => s.dynamicPrompts.isError);
+  const isLoading = useAppSelector((s) => s.dynamicPrompts.isLoading);
+  const prompts = useAppSelector(selectPrompts);
 
   const label = useMemo(() => {
     let _label = `${t('dynamicPrompts.promptsPreview')} (${prompts.length})`;

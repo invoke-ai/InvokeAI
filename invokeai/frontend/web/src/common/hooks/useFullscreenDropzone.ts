@@ -1,7 +1,6 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
@@ -15,9 +14,9 @@ const accept: Accept = {
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
 
-const selector = createMemoizedSelector(
-  [selectGallerySlice, activeTabNameSelector],
-  (gallery, activeTabName) => {
+const selectPostUploadAction = createMemoizedSelector(
+  activeTabNameSelector,
+  (activeTabName) => {
     let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
     if (activeTabName === 'unifiedCanvas') {
@@ -28,19 +27,15 @@ const selector = createMemoizedSelector(
       postUploadAction = { type: 'SET_INITIAL_IMAGE' };
     }
 
-    const { autoAddBoardId } = gallery;
-
-    return {
-      autoAddBoardId,
-      postUploadAction,
-    };
+    return postUploadAction;
   }
 );
 
 export const useFullscreenDropzone = () => {
-  const { autoAddBoardId, postUploadAction } = useAppSelector(selector);
-  const toaster = useAppToaster();
   const { t } = useTranslation();
+  const toaster = useAppToaster();
+  const postUploadAction = useAppSelector(selectPostUploadAction);
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
 
   const [uploadImage] = useUploadImageMutation();

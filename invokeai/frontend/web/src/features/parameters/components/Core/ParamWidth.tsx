@@ -1,34 +1,21 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
-import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(
-  [selectConfigSlice, selectOptimalDimension],
-  (config, optimalDimension) => {
-    const { min, sliderMax, inputMax, fineStep, coarseStep } = config.sd.width;
-
-    return {
-      initial: optimalDimension,
-      min,
-      max: sliderMax,
-      step: coarseStep,
-      inputMax,
-      fineStep,
-    };
-  }
-);
 export const ParamWidth = memo(() => {
   const { t } = useTranslation();
   const ctx = useImageSizeContext();
-  const { initial, min, max, inputMax, step, fineStep } =
-    useAppSelector(selector);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const min = useAppSelector((s) => s.config.sd.width.min);
+  const sliderMax = useAppSelector((s) => s.config.sd.width.sliderMax);
+  const inputMax = useAppSelector((s) => s.config.sd.width.inputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.width.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.width.fineStep);
 
   const onChange = useCallback(
     (v: number) => {
@@ -37,17 +24,20 @@ export const ParamWidth = memo(() => {
     [ctx]
   );
 
-  const marks = useMemo(() => [min, initial, max], [min, initial, max]);
+  const marks = useMemo(
+    () => [min, optimalDimension, sliderMax],
+    [min, optimalDimension, sliderMax]
+  );
 
   return (
     <InvControl label={t('parameters.width')}>
       <InvSlider
         value={ctx.width}
         onChange={onChange}
-        defaultValue={initial}
+        defaultValue={optimalDimension}
         min={min}
-        max={max}
-        step={step}
+        max={sliderMax}
+        step={coarseStep}
         fineStep={fineStep}
         marks={marks}
       />
@@ -56,9 +46,9 @@ export const ParamWidth = memo(() => {
         onChange={onChange}
         min={min}
         max={inputMax}
-        step={step}
+        step={coarseStep}
         fineStep={fineStep}
-        defaultValue={initial}
+        defaultValue={optimalDimension}
       />
     </InvControl>
   );

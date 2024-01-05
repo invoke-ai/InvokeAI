@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 export const useIsIntermediate = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectNodesSlice, (nodes) => {
+      createSelector(selectNodesSlice, (nodes) => {
         const node = nodes.nodes.find((node) => node.id === nodeId);
         if (!isInvocationNode(node)) {
           return false;
@@ -17,6 +17,6 @@ export const useIsIntermediate = (nodeId: string) => {
     [nodeId]
   );
 
-  const is_intermediate = useAppSelector(selector);
-  return is_intermediate;
+  const isIntermediate = useAppSelector(selector);
+  return isIntermediate;
 };
