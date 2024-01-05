@@ -57,7 +57,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         );
       }
     }
-    dispatch(socketConnectionError({ error }))
+    dispatch(socketConnectionError({ error }));
   });
 
   /**
