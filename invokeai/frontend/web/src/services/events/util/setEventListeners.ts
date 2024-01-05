@@ -4,6 +4,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import {
   socketConnected,
+  socketConnectionError,
   socketDisconnected,
   socketGeneratorProgress,
   socketGraphExecutionStateComplete,
@@ -56,6 +57,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         );
       }
     }
+    dispatch(socketConnectionError({ error }))
   });
 
   /**

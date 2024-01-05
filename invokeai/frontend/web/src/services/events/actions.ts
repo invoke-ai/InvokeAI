@@ -28,10 +28,16 @@ export const socketConnected = createAction('socket/socketConnected');
 export const appSocketConnected = createAction('socket/appSocketConnected');
 
 /**
- * Socket.IO Disconnect
+ * Socket.IO Connection Error
  *
  * Do not use. Only for use in middleware.
  */
+export const socketConnectionError = createAction<{ error: Error }>('socket/socketConnectionError');/**
+
+* Socket.IO Disconnect
+*
+* Do not use. Only for use in middleware.
+*/
 export const socketDisconnected = createAction('socket/socketDisconnected');
 
 /**
