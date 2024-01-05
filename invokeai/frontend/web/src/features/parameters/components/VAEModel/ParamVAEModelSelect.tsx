@@ -23,11 +23,14 @@ const ParamVAEModelSelect = () => {
   const { t } = useTranslation();
   const { model, vae } = useAppSelector(selector);
   const { data, isLoading } = useGetVaeModelsQuery();
-  const getIsDisabled = (vae: VaeModelConfigEntity): boolean => {
-    const isCompatible = model?.base_model === vae.base_model;
-    const hasMainModel = Boolean(model?.base_model);
-    return !hasMainModel || !isCompatible;
-  };
+  const getIsDisabled = useCallback(
+    (vae: VaeModelConfigEntity): boolean => {
+      const isCompatible = model?.base_model === vae.base_model;
+      const hasMainModel = Boolean(model?.base_model);
+      return !hasMainModel || !isCompatible;
+    },
+    [model?.base_model]
+  );
   const _onChange = useCallback(
     (vae: VaeModelConfigEntity | null) => {
       dispatch(vaeSelected(vae ? pick(vae, 'base_model', 'model_name') : null));

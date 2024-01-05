@@ -20,11 +20,7 @@ import {
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
-import { selectConfigSlice } from 'features/system/store/configSlice';
-import {
-  selectSystemSlice,
-  setShouldConfirmOnDelete,
-} from 'features/system/store/systemSlice';
+import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { some } from 'lodash-es';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -32,10 +28,8 @@ import { useTranslation } from 'react-i18next';
 
 import ImageUsageMessage from './ImageUsageMessage';
 
-const selector = createMemoizedSelector(
+const selectImageUsages = createMemoizedSelector(
   [
-    selectSystemSlice,
-    selectConfigSlice,
     selectDeleteImageModalSlice,
     selectGenerationSlice,
     selectCanvasSlice,
@@ -44,8 +38,6 @@ const selector = createMemoizedSelector(
     selectImageUsage,
   ],
   (
-    system,
-    config,
     deleteImageModal,
     generation,
     canvas,
@@ -53,9 +45,7 @@ const selector = createMemoizedSelector(
     controlAdapters,
     imagesUsage
   ) => {
-    const { shouldConfirmOnDelete } = system;
-    const { canRestoreDeletedImagesFromBin } = config;
-    const { imagesToDelete, isModalOpen } = deleteImageModal;
+    const { imagesToDelete } = deleteImageModal;
 
     const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
       getImageUsage(generation, canvas, nodes, controlAdapters, image_name)
@@ -69,11 +59,8 @@ const selector = createMemoizedSelector(
     };
 
     return {
-      shouldConfirmOnDelete,
-      canRestoreDeletedImagesFromBin,
       imagesToDelete,
       imagesUsage,
-      isModalOpen,
       imageUsageSummary,
     };
   }
@@ -82,15 +69,15 @@ const selector = createMemoizedSelector(
 const DeleteImageModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const {
-    shouldConfirmOnDelete,
-    canRestoreDeletedImagesFromBin,
-    imagesToDelete,
-    imagesUsage,
-    isModalOpen,
-    imageUsageSummary,
-  } = useAppSelector(selector);
+  const shouldConfirmOnDelete = useAppSelector(
+    (s) => s.system.shouldConfirmOnDelete
+  );
+  const canRestoreDeletedImagesFromBin = useAppSelector(
+    (s) => s.config.canRestoreDeletedImagesFromBin
+  );
+  const isModalOpen = useAppSelector((s) => s.deleteImageModal.isModalOpen);
+  const { imagesToDelete, imagesUsage, imageUsageSummary } =
+    useAppSelector(selectImageUsages);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) =>

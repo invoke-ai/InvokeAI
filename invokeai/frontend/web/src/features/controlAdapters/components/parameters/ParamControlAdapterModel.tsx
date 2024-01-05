@@ -24,9 +24,10 @@ type ParamControlAdapterModelProps = {
   id: string;
 };
 
-const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
-  return { mainModel: generation.model };
-});
+const selectMainModel = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => generation.model
+);
 
 const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);
@@ -36,7 +37,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const currentBaseModel = useAppSelector(
     (s) => s.generation.model?.base_model
   );
-  const { mainModel } = useAppSelector(selector);
+  const { mainModel } = useAppSelector(selectMainModel);
   const { t } = useTranslation();
 
   const models = useControlAdapterModelEntities(controlAdapterType);

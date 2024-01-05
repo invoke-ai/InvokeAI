@@ -22,23 +22,17 @@ import {
   useRemoveImagesFromBoardMutation,
 } from 'services/api/endpoints/images';
 
-const selector = createMemoizedSelector(
+const selectImagesToChange = createMemoizedSelector(
   selectChangeBoardModalSlice,
-  (changeBoardModal) => {
-    const { isModalOpen, imagesToChange } = changeBoardModal;
-
-    return {
-      isModalOpen,
-      imagesToChange,
-    };
-  }
+  (changeBoardModal) => changeBoardModal.imagesToChange
 );
 
 const ChangeBoardModal = () => {
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
   const { data: boards, isFetching } = useListAllBoardsQuery();
-  const { imagesToChange, isModalOpen } = useAppSelector(selector);
+  const isModalOpen = useAppSelector((s) => s.changeBoardModal.isModalOpen);
+  const imagesToChange = useAppSelector(selectImagesToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();

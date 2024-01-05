@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import InvocationNode from 'features/nodes/components/flow/nodes/Invocation/InvocationNode';
 import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
@@ -14,15 +14,15 @@ const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
 
   const hasTemplateSelector = useMemo(
     () =>
-      createMemoizedSelector(selectNodeTemplatesSlice, (nodeTemplates) =>
+      createSelector(selectNodeTemplatesSlice, (nodeTemplates) =>
         Boolean(nodeTemplates.templates[type])
       ),
     [type]
   );
 
-  const nodeTemplate = useAppSelector(hasTemplateSelector);
+  const hasTemplate = useAppSelector(hasTemplateSelector);
 
-  if (!nodeTemplate) {
+  if (!hasTemplate) {
     return (
       <InvocationNodeUnknownFallback
         nodeId={nodeId}

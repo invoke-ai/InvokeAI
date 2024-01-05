@@ -1,6 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -13,8 +13,6 @@ import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { selectUiSlice } from 'features/ui/store/uiSlice';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
@@ -24,34 +22,22 @@ import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-export const imagesSelector = createMemoizedSelector(
-  selectUiSlice,
-  selectSystemSlice,
+const selectLastSelectedImageName = createSelector(
   selectLastSelectedImage,
-  (ui, system, lastSelectedImage) => {
-    const {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-    } = ui;
-    const { denoiseProgress } = system;
-    return {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      imageName: lastSelectedImage?.image_name,
-      hasDenoiseProgress: Boolean(denoiseProgress),
-      shouldShowProgressInViewer,
-    };
-  }
+  (lastSelectedImage) => lastSelectedImage?.image_name
 );
 
 const CurrentImagePreview = () => {
-  const {
-    shouldShowImageDetails,
-    imageName,
-    hasDenoiseProgress,
-    shouldShowProgressInViewer,
-  } = useAppSelector(imagesSelector);
+  const shouldShowImageDetails = useAppSelector(
+    (s) => s.ui.shouldShowImageDetails
+  );
+  const imageName = useAppSelector(selectLastSelectedImageName);
+  const hasDenoiseProgress = useAppSelector((s) =>
+    Boolean(s.system.denoiseProgress)
+  );
+  const shouldShowProgressInViewer = useAppSelector(
+    (s) => s.ui.shouldShowProgressInViewer
+  );
 
   const {
     handlePrevImage,

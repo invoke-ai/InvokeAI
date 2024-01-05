@@ -1,13 +1,11 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   setIsDrawing,
   setIsMovingStage,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { addLine, selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import { addLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { MutableRefObject } from 'react';
@@ -15,20 +13,10 @@ import { useCallback } from 'react';
 
 import useColorPicker from './useColorUnderCursor';
 
-const selector = createMemoizedSelector(
-  [activeTabNameSelector, selectCanvasSlice, isStagingSelector],
-  (activeTabName, canvas, isStaging) => {
-    return {
-      tool: canvas.tool,
-      activeTabName,
-      isStaging,
-    };
-  }
-);
-
 const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging } = useAppSelector(selector);
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const isStaging = useAppSelector(isStagingSelector);
   const { commitColorUnderCursor } = useColorPicker();
 
   return useCallback(

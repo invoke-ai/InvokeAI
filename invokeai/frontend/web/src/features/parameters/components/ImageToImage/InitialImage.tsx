@@ -11,28 +11,18 @@ import {
   clearInitialImage,
   selectGenerationSlice,
 } from 'features/parameters/store/generationSlice';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useEffect, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-const selector = createMemoizedSelector(
+const selectInitialImage = createMemoizedSelector(
   selectGenerationSlice,
-  selectSystemSlice,
-  (generation, system) => {
-    const { initialImage } = generation;
-    const { isConnected } = system;
-
-    return {
-      initialImage,
-      isResetButtonDisabled: !initialImage,
-      isConnected,
-    };
-  }
+  (generation) => generation.initialImage
 );
 
 const InitialImage = () => {
   const dispatch = useAppDispatch();
-  const { initialImage, isConnected } = useAppSelector(selector);
+  const initialImage = useAppSelector(selectInitialImage);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
 
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(
     initialImage?.imageName ?? skipToken

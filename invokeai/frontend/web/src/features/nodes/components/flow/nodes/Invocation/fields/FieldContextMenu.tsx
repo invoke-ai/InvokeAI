@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
@@ -36,16 +36,14 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     e.preventDefault();
   }, []);
 
-  const selector = useMemo(
+  const selectIsExposed = useMemo(
     () =>
-      createMemoizedSelector(selectWorkflowSlice, (workflow) => {
-        const isExposed = Boolean(
+      createSelector(selectWorkflowSlice, (workflow) => {
+        return Boolean(
           workflow.exposedFields.find(
             (f) => f.nodeId === nodeId && f.fieldName === fieldName
           )
         );
-
-        return { isExposed };
       }),
     [fieldName, nodeId]
   );
@@ -55,7 +53,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     [input]
   );
 
-  const { isExposed } = useAppSelector(selector);
+  const isExposed = useAppSelector(selectIsExposed);
 
   const handleExposeField = useCallback(() => {
     dispatch(workflowExposedFieldAdded({ nodeId, fieldName }));

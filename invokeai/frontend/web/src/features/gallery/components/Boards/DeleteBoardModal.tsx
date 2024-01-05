@@ -63,7 +63,8 @@ const DeleteBoardModal = (props: Props) => {
             isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
             isControlImage: some(allImageUsage, (i) => i.isControlImage),
           };
-          return { imageUsageSummary };
+
+          return imageUsageSummary;
         }
       ),
     [boardImageNames]
@@ -75,7 +76,7 @@ const DeleteBoardModal = (props: Props) => {
   const [deleteBoardAndImages, { isLoading: isDeleteBoardAndImagesLoading }] =
     useDeleteBoardAndImagesMutation();
 
-  const { imageUsageSummary } = useAppSelector(selectImageUsageSummary);
+  const imageUsageSummary = useAppSelector(selectImageUsageSummary);
 
   const handleDeleteBoardOnly = useCallback(() => {
     if (!boardToDelete) {

@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectControlAdapterById,
@@ -9,7 +9,7 @@ import { useMemo } from 'react';
 export const useControlAdapterIsEnabled = (id: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
+      createSelector(
         selectControlAdaptersSlice,
         (controlAdapters) =>
           selectControlAdapterById(controlAdapters, id)?.isEnabled ?? false

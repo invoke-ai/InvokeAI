@@ -61,8 +61,7 @@ const selector = createMemoizedSelector(
       isError = true;
     }
 
-    const controlAdapterIds =
-      selectControlAdapterIds(controlAdapters).map(String);
+    const controlAdapterIds = selectControlAdapterIds(controlAdapters);
 
     return {
       controlAdapterIds,

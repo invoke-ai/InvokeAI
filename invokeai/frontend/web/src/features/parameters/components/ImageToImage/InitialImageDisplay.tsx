@@ -17,13 +17,10 @@ import type { PostUploadAction } from 'services/api/types';
 
 import InitialImage from './InitialImage';
 
-const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
-  const { initialImage } = generation;
-  return {
-    isResetButtonDisabled: !initialImage,
-    initialImage,
-  };
-});
+const selectInitialImage = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => generation.initialImage
+);
 
 const postUploadAction: PostUploadAction = {
   type: 'SET_INITIAL_IMAGE',
@@ -32,7 +29,7 @@ const postUploadAction: PostUploadAction = {
 const InitialImageDisplay = () => {
   const { recallWidthAndHeight } = useRecallParameters();
   const { t } = useTranslation();
-  const { isResetButtonDisabled, initialImage } = useAppSelector(selector);
+  const initialImage = useAppSelector(selectInitialImage);
   const dispatch = useAppDispatch();
 
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
@@ -91,14 +88,14 @@ const InitialImageDisplay = () => {
           aria-label={`${t('parameters.useSize')} (Shift+D)`}
           icon={<FaRulerVertical />}
           onClick={handleUseSizeInitialImage}
-          isDisabled={isResetButtonDisabled}
+          isDisabled={!initialImage}
         />
         <InvIconButton
           tooltip="Reset Initial Image"
           aria-label="Reset Initial Image"
           icon={<FaUndo />}
           onClick={handleReset}
-          isDisabled={isResetButtonDisabled}
+          isDisabled={!initialImage}
         />
       </Flex>
       <InitialImage />
