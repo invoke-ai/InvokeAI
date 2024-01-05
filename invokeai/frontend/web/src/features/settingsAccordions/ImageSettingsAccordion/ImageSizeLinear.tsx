@@ -14,9 +14,7 @@ export const ImageSizeLinear = memo(() => {
   const dispatch = useAppDispatch();
   const width = useAppSelector((s) => s.generation.width);
   const height = useAppSelector((s) => s.generation.height);
-  const aspectRatioState = useAppSelector(
-    (s) => s.generation.aspectRatio
-  );
+  const aspectRatioState = useAppSelector((s) => s.generation.aspectRatio);
 
   const onChangeWidth = useCallback(
     (width: number) => {

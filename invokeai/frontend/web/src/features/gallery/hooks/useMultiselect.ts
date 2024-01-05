@@ -1,7 +1,10 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
+import {
+  selectGallerySlice,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';

@@ -2,6 +2,7 @@ import { Flex } from '@chakra-ui/react';
 import { memo } from 'react';
 
 import CurrentImageButtons from './CurrentImageButtons';
+import CurrentImagePreview from './CurrentImagePreview';
 
 const CurrentImageDisplay = () => {
   return (
@@ -15,7 +16,7 @@ const CurrentImageDisplay = () => {
       justifyContent="center"
     >
       <CurrentImageButtons />
-      {/* <CurrentImagePreview /> */}
+      <CurrentImagePreview />
     </Flex>
   );
 };

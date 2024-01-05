@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { AppFeature, SDFeature } from 'app/types/invokeai';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
@@ -7,17 +6,11 @@ import { useMemo } from 'react';
 export const useFeatureStatus = (
   feature: AppFeature | SDFeature | InvokeTabName
 ) => {
-  const disabledTabs = useAppSelector(
-    (state: RootState) => state.config.disabledTabs
-  );
+  const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
 
-  const disabledFeatures = useAppSelector(
-    (state: RootState) => state.config.disabledFeatures
-  );
+  const disabledFeatures = useAppSelector((s) => s.config.disabledFeatures);
 
-  const disabledSDFeatures = useAppSelector(
-    (state: RootState) => state.config.disabledSDFeatures
-  );
+  const disabledSDFeatures = useAppSelector((s) => s.config.disabledSDFeatures);
 
   const isFeatureDisabled = useMemo(
     () =>

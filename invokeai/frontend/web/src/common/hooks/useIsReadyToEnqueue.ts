@@ -1,10 +1,17 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  selectControlAdapterAll,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach } from 'lodash-es';
@@ -12,12 +19,12 @@ import { getConnectedEdges } from 'reactflow';
 
 const selector = createMemoizedSelector(
   [
-    (state: RootState) => state.controlAdapters,
-    (state: RootState) => state.generation,
-    (state: RootState) => state.system,
-    (state: RootState) => state.nodes,
-    (state: RootState) => state.nodeTemplates,
-    (state: RootState) => state.dynamicPrompts,
+    selectControlAdaptersSlice,
+    selectGenerationSlice,
+    selectSystemSlice,
+    selectNodesSlice,
+    selectNodeTemplatesSlice,
+    selectDynamicPromptsSlice,
     activeTabNameSelector,
   ],
   (

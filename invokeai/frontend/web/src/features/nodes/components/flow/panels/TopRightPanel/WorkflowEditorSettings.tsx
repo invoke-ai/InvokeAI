@@ -14,10 +14,12 @@ import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
- selectNodesSlice,  shouldAnimateEdgesChanged,
+  selectNodesSlice,
+  shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
   shouldSnapToGridChanged,
-  shouldValidateGraphChanged } from 'features/nodes/store/nodesSlice';
+  shouldValidateGraphChanged,
+} from 'features/nodes/store/nodesSlice';
 import type { ChangeEvent, ReactNode } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

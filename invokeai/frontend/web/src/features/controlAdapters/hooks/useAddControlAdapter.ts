@@ -6,9 +6,7 @@ import { useCallback, useMemo } from 'react';
 import { useControlAdapterModels } from './useControlAdapterModels';
 
 export const useAddControlAdapter = (type: ControlAdapterType) => {
-  const baseModel = useAppSelector(
-    (s) => s.generation.model?.base_model
-  );
+  const baseModel = useAppSelector((s) => s.generation.model?.base_model);
   const dispatch = useAppDispatch();
 
   const models = useControlAdapterModels(type);

@@ -7,13 +7,15 @@ import { InvInput } from 'common/components/InvInput/InvInput';
 import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
- selectWorkflowSlice,  workflowAuthorChanged,
+  selectWorkflowSlice,
+  workflowAuthorChanged,
   workflowContactChanged,
   workflowDescriptionChanged,
   workflowNameChanged,
   workflowNotesChanged,
   workflowTagsChanged,
-  workflowVersionChanged } from 'features/nodes/store/workflowSlice';
+  workflowVersionChanged,
+} from 'features/nodes/store/workflowSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

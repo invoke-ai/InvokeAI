@@ -74,9 +74,7 @@ export const Flow = memo(() => {
   const nodes = useAppSelector((s) => s.nodes.nodes);
   const edges = useAppSelector((s) => s.nodes.edges);
   const viewport = useAppSelector((s) => s.nodes.viewport);
-  const shouldSnapToGrid = useAppSelector(
-    (s) => s.nodes.shouldSnapToGrid
-  );
+  const shouldSnapToGrid = useAppSelector((s) => s.nodes.shouldSnapToGrid);
   const selectionMode = useAppSelector((s) => s.nodes.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition | null>(null);

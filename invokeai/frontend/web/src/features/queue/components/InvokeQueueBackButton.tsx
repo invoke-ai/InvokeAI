@@ -6,7 +6,10 @@ import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import type { InvNumberInputFieldProps } from 'common/components/InvNumberInput/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { selectGenerationSlice, setIterations } from 'features/parameters/store/generationSlice';
+import {
+  selectGenerationSlice,
+  setIterations,
+} from 'features/parameters/store/generationSlice';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
