@@ -453,7 +453,7 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
                 return BaseModelType.StableDiffusion2
             elif width == 2048:
                 return BaseModelType.StableDiffusionXL
-        raise InvalidModelConfigException("{self.model_path}: Unable to determine base type")
+        raise InvalidModelConfigException(f"{self.model_path}: Unable to determine base type")
 
 
 class IPAdapterCheckpointProbe(CheckpointProbeBase):
