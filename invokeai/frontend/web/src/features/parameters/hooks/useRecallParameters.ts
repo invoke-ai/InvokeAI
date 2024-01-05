@@ -87,10 +87,10 @@ import { isNil } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  controlNetModelsAdapter,
-  ipAdapterModelsAdapter,
-  loraModelsAdapter,
-  t2iAdapterModelsAdapter,
+  controlNetModelsAdapterSelectors,
+  ipAdapterModelsAdapterSelectors,
+  loraModelsAdapterSelectors,
+  t2iAdapterModelsAdapterSelectors,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
   useGetLoRAModelsQuery,
@@ -488,9 +488,10 @@ export const useRecallParameters = () => {
       const { base_model, model_name } = loraMetadataItem.lora;
 
       const matchingLoRA = loraModels
-        ? loraModelsAdapter
-            .getSelectors()
-            .selectById(loraModels, `${base_model}/lora/${model_name}`)
+        ? loraModelsAdapterSelectors.selectById(
+            loraModels,
+            `${base_model}/lora/${model_name}`
+          )
         : undefined;
 
       if (!matchingLoRA) {
@@ -553,12 +554,10 @@ export const useRecallParameters = () => {
       } = controlnetMetadataItem;
 
       const matchingControlNetModel = controlNetModels
-        ? controlNetModelsAdapter
-            .getSelectors()
-            .selectById(
-              controlNetModels,
-              `${control_model.base_model}/controlnet/${control_model.model_name}`
-            )
+        ? controlNetModelsAdapterSelectors.selectById(
+            controlNetModels,
+            `${control_model.base_model}/controlnet/${control_model.model_name}`
+          )
         : undefined;
 
       if (!matchingControlNetModel) {
@@ -649,12 +648,10 @@ export const useRecallParameters = () => {
       } = t2iAdapterMetadataItem;
 
       const matchingT2IAdapterModel = t2iAdapterModels
-        ? t2iAdapterModelsAdapter
-            .getSelectors()
-            .selectById(
-              t2iAdapterModels,
-              `${t2i_adapter_model.base_model}/t2i_adapter/${t2i_adapter_model.model_name}`
-            )
+        ? t2iAdapterModelsAdapterSelectors.selectById(
+            t2iAdapterModels,
+            `${t2i_adapter_model.base_model}/t2i_adapter/${t2i_adapter_model.model_name}`
+          )
         : undefined;
 
       if (!matchingT2IAdapterModel) {
@@ -738,12 +735,10 @@ export const useRecallParameters = () => {
       } = ipAdapterMetadataItem;
 
       const matchingIPAdapterModel = ipAdapterModels
-        ? ipAdapterModelsAdapter
-            .getSelectors()
-            .selectById(
-              ipAdapterModels,
-              `${ip_adapter_model.base_model}/ip_adapter/${ip_adapter_model.model_name}`
-            )
+        ? ipAdapterModelsAdapterSelectors.selectById(
+            ipAdapterModels,
+            `${ip_adapter_model.base_model}/ip_adapter/${ip_adapter_model.model_name}`
+          )
         : undefined;
 
       if (!matchingIPAdapterModel) {

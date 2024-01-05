@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { Components, ItemContent } from 'react-virtuoso';
 import { Virtuoso } from 'react-virtuoso';
 import {
-  queueItemsAdapter,
+  queueItemsAdapterSelectors,
   useListQueueItemsQuery,
 } from 'services/api/endpoints/queue';
 import type { SessionQueueItemDTO } from 'services/api/types';
@@ -77,7 +77,7 @@ const QueueList = () => {
     if (!listQueueItemsData) {
       return [];
     }
-    return queueItemsAdapter.getSelectors().selectAll(listQueueItemsData);
+    return queueItemsAdapterSelectors.selectAll(listQueueItemsData);
   }, [listQueueItemsData]);
 
   const handleLoadMore = useCallback(() => {

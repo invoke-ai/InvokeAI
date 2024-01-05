@@ -1,5 +1,6 @@
 import type { EntityState } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
+import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import { cloneDeep } from 'lodash-es';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
@@ -134,28 +135,48 @@ type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
+export const mainModelsAdapterSelectors = mainModelsAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 export const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
+export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 export const controlNetModelsAdapter =
   createEntityAdapter<ControlNetModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
+export const controlNetModelsAdapterSelectors =
+  controlNetModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 export const ipAdapterModelsAdapter =
   createEntityAdapter<IPAdapterModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
+export const ipAdapterModelsAdapterSelectors =
+  ipAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 export const t2iAdapterModelsAdapter =
   createEntityAdapter<T2IAdapterModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
+export const t2iAdapterModelsAdapterSelectors =
+  t2iAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 export const textualInversionModelsAdapter =
   createEntityAdapter<TextualInversionModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
+export const textualInversionModelsAdapterSelectors =
+  textualInversionModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 export const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
+export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 
 export const getModelId = ({
   base_model,
