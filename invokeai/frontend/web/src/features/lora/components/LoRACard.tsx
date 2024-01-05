@@ -12,6 +12,7 @@ import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { FaTrashCan } from 'react-icons/fa6';
+import { InvLabel } from '../../../common/components/InvControl/InvLabel';
 
 type LoRACardProps = {
   lora: LoRA;
@@ -35,9 +36,9 @@ export const LoRACard = memo((props: LoRACardProps) => {
   return (
     <InvCard variant="lora">
       <InvCardHeader>
-        <InvText noOfLines={1} wordBreak="break-all">
+        <InvLabel noOfLines={1} wordBreak="break-all">
           {lora.model_name}
-        </InvText>
+        </InvLabel>
         <InvIconButton
           aria-label="Remove LoRA"
           variant="ghost"
