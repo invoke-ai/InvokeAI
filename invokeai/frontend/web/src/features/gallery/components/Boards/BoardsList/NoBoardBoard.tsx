@@ -1,6 +1,6 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import InvokeAILogoImage from 'assets/images/logo.png';
+import InvokeLogoSVG from 'assets/images/invoke-key-wht-lrg.svg';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { InvText } from 'common/components/InvText/wrapper';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
@@ -101,10 +101,10 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                   alignItems="center"
                 >
                   <Image
-                    src={InvokeAILogoImage}
+                    src={InvokeLogoSVG}
                     alt="invoke-ai-logo"
-                    opacity={0.4}
-                    filter="grayscale(1)"
+                    opacity={0.7}
+                    mixBlendMode="overlay"
                     mt={-6}
                     w={16}
                     h={16}
