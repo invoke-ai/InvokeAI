@@ -44,7 +44,7 @@ def torch_dtype(device: torch.device) -> torch.dtype:
     if config.full_precision:
         return torch.float32
     if choose_precision(device) == "float16":
-        return torch.float16
+        return torch.bfloat16 if device.type == "cuda" else torch.float16
     else:
         return torch.float32
 
