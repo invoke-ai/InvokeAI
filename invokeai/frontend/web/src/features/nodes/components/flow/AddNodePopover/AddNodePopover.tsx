@@ -218,7 +218,7 @@ const AddNodePopover = () => {
         p={0}
         top={-1}
         shadow="dark-lg"
-        borderColor="blue.400"
+        borderColor="invokeBlue.400"
         borderWidth="2px"
         borderStyle="solid"
       >

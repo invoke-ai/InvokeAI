@@ -40,7 +40,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
       <Flex w="full" alignItems="center" gap={2} h={12}>
         <Flex flexDir="column" flexGrow={1} h="full">
           <Flex alignItems="center" w="full" h="50%">
-            <Heading size="sm" variant={isOpen ? 'blue' : undefined}>
+            <Heading size="sm" variant={isOpen ? 'invokeBlue' : undefined}>
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
             <Spacer />

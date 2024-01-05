@@ -27,7 +27,7 @@ const ProgressBar = () => {
       }
       h={2}
       w="full"
-      colorScheme="blue"
+      colorScheme="invokeBlue"
     />
   );
 };

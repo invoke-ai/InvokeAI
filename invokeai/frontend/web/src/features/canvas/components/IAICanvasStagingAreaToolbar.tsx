@@ -142,7 +142,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.previous')} (Left)`}
           icon={<FaArrowLeft />}
           onClick={handlePrevImage}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
           isDisabled={!shouldShowStagingImage}
         />
         <InvButton
@@ -156,7 +156,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.next')} (Right)`}
           icon={<FaArrowRight />}
           onClick={handleNextImage}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
           isDisabled={!shouldShowStagingImage}
         />
       </InvButtonGroup>
@@ -166,7 +166,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
           icon={<FaCheck />}
           onClick={handleAccept}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
         />
         <InvIconButton
           tooltip={
@@ -182,7 +182,7 @@ const IAICanvasStagingAreaToolbar = () => {
           data-alert={!shouldShowStagingImage}
           icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
           onClick={handleToggleShouldShowStagingImage}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
         />
         <InvIconButton
           tooltip={t('unifiedCanvas.saveToGallery')}
@@ -190,7 +190,7 @@ const IAICanvasStagingAreaToolbar = () => {
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<FaSave />}
           onClick={handleSaveToGallery}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
         />
         <InvIconButton
           tooltip={t('unifiedCanvas.discardAll')}

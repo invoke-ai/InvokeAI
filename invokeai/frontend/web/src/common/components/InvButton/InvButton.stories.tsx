@@ -28,7 +28,7 @@ const meta: Meta<typeof InvButton> = {
 export default meta;
 type Story = StoryObj<typeof InvButton>;
 
-const colorSchemes = ['base', 'invokeYellow', 'red', 'green', 'blue'] as const;
+const colorSchemes = ['base', 'invokeYellow', 'invokeRed', 'invokeGreen', 'invokeBlue'] as const;
 const variants = ['solid', 'outline', 'ghost', 'link'] as const;
 const sizes = ['xs', 'sm', 'md', 'lg'] as const;
 
