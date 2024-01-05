@@ -1,32 +1,33 @@
 import {
   createDraftSafeSelectorCreator,
   createSelectorCreator,
-  weakMapMemoize,
+  lruMemoize,
 } from '@reduxjs/toolkit';
 import type { GetSelectorsOptions } from '@reduxjs/toolkit/dist/entities/state_selectors';
+import { isEqual } from 'lodash-es';
 
 /**
  * A memoized selector creator that uses LRU cache and lodash's isEqual for equality check.
  */
 export const createMemoizedSelector = createSelectorCreator({
-  memoize: weakMapMemoize,
-  // memoizeOptions: {
-  //   resultEqualityCheck: isEqual,
-  // },
-  argsMemoize: weakMapMemoize,
+  memoize: lruMemoize,
+  memoizeOptions: {
+    resultEqualityCheck: isEqual,
+  },
+  argsMemoize: lruMemoize,
 });
 
 /**
  * A memoized selector creator that uses LRU cache default shallow equality check.
  */
 export const createLruSelector = createSelectorCreator({
-  memoize: weakMapMemoize,
-  argsMemoize: weakMapMemoize,
+  memoize: lruMemoize,
+  argsMemoize: lruMemoize,
 });
 
 export const createLruDraftSafeSelector = createDraftSafeSelectorCreator({
-  memoize: weakMapMemoize,
-  argsMemoize: weakMapMemoize,
+  memoize: lruMemoize,
+  argsMemoize: lruMemoize,
 });
 
 export const getSelectorsOptions: GetSelectorsOptions = {
