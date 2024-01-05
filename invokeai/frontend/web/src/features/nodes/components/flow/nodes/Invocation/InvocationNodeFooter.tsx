@@ -1,4 +1,6 @@
+import type { ChakraProps } from '@chakra-ui/react';
 import { Flex } from '@chakra-ui/react';
+import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -11,6 +13,8 @@ type Props = {
   nodeId: string;
 };
 
+const props: ChakraProps = { w: 'unset' };
+
 const InvocationNodeFooter = ({ nodeId }: Props) => {
   const hasImageOutput = useHasImageOutput(nodeId);
   const isCacheEnabled = useFeatureStatus('invocationCache').isFeatureEnabled;
@@ -20,13 +24,16 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
       layerStyle="nodeFooter"
       w="full"
       borderBottomRadius="base"
+      gap={4}
       px={2}
       py={0}
       h={8}
       justifyContent="space-between"
     >
-      {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
-      {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
+      <InvControlGroup controlProps={props} labelProps={props}>
+        {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
+        {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
+      </InvControlGroup>
     </Flex>
   );
 };

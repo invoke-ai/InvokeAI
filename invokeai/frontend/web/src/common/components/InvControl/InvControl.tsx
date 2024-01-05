@@ -45,6 +45,7 @@ export const InvControl = memo(
           orientation={orientation}
           isDisabled={isDisabled}
           {...formControlProps}
+          {...ctx.controlProps}
         >
           <Flex className="invcontrol-label-wrapper">
             {label && (
