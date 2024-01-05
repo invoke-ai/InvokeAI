@@ -53,9 +53,7 @@ export const addRequestedSingleImageDeletionListener = () => {
         const { data } =
           imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
-        const cachedImageDTOs = data
-          ? imagesSelectors.selectAll(data)
-          : [];
+        const cachedImageDTOs = data ? imagesSelectors.selectAll(data) : [];
 
         const deletedImageIndex = cachedImageDTOs.findIndex(
           (i) => i.image_name === image_name

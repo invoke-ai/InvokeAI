@@ -145,8 +145,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const firstModel = vaeModelsAdapterSelectors
-        .selectAll(action.payload)[0];
+      const firstModel = vaeModelsAdapterSelectors.selectAll(action.payload)[0];
 
       if (!firstModel) {
         // No custom VAEs loaded at all; use the default
