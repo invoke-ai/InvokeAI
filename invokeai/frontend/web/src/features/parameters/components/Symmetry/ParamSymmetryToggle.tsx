@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
@@ -8,7 +7,7 @@ import { memo, useCallback } from 'react';
 
 const ParamSymmetryToggle = () => {
   const shouldUseSymmetry = useAppSelector(
-    (state: RootState) => state.generation.shouldUseSymmetry
+    (s) => s.generation.shouldUseSymmetry
   );
 
   const dispatch = useAppDispatch();

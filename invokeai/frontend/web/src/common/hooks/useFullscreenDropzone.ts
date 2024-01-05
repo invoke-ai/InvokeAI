@@ -1,7 +1,7 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
@@ -16,7 +16,7 @@ const accept: Accept = {
 };
 
 const selector = createMemoizedSelector(
-  [(state: RootState) => state.gallery, activeTabNameSelector],
+  [selectGallerySlice, activeTabNameSelector],
   (gallery, activeTabName) => {
     let postUploadAction: PostUploadAction = { type: 'TOAST' };
 

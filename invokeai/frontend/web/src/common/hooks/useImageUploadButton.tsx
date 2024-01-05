@@ -32,9 +32,7 @@ export const useImageUploadButton = ({
   postUploadAction,
   isDisabled,
 }: UseImageUploadButtonArgs) => {
-  const autoAddBoardId = useAppSelector(
-    (s) => s.gallery.autoAddBoardId
-  );
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const [uploadImage] = useUploadImageMutation();
   const onDropAccepted = useCallback(
     (files: File[]) => {

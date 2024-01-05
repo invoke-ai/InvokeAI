@@ -20,7 +20,8 @@ import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   addNodePopoverClosed,
   addNodePopoverOpened,
-  nodeAdded } from 'features/nodes/store/nodesSlice';
+  nodeAdded,
+} from 'features/nodes/store/nodesSlice';
 import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import { filter, map, memoize, some } from 'lodash-es';
@@ -66,9 +67,7 @@ const AddNodePopover = () => {
   const selectRef = useRef<SelectInstance<InvSelectOption> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fieldFilter = useAppSelector(
-    (s) => s.nodes.connectionStartFieldType
-  );
+  const fieldFilter = useAppSelector((s) => s.nodes.connectionStartFieldType);
   const handleFilter = useAppSelector(
     (s) => s.nodes.connectionStartParams?.handleType
   );

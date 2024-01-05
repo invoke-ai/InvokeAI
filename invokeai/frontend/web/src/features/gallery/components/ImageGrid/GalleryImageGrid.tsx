@@ -44,9 +44,7 @@ const GalleryImageGrid = () => {
   const [initialize, osInstance] = useOverlayScrollbars(
     overlayScrollbarsParams
   );
-  const selectedBoardId = useAppSelector(
-    (s) => s.gallery.selectedBoardId
-  );
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
 

@@ -24,12 +24,8 @@ type Props = {
 
 const BoardsList = (props: Props) => {
   const { isOpen } = props;
-  const selectedBoardId = useAppSelector(
-    (s) => s.gallery.selectedBoardId
-  );
-  const boardSearchText = useAppSelector(
-    (s) => s.gallery.boardSearchText
-  );
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const { data: boards } = useListAllBoardsQuery();
   const filteredBoards = boardSearchText
     ? boards?.filter((board) =>

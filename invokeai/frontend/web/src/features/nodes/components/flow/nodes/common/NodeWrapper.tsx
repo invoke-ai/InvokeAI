@@ -5,7 +5,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { nodeExclusivelySelected , selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import {
+  nodeExclusivelySelected,
+  selectNodesSlice,
+} from 'features/nodes/store/nodesSlice';
 import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,

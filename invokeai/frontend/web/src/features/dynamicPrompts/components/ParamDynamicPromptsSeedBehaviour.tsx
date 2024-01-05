@@ -15,9 +15,7 @@ import { useTranslation } from 'react-i18next';
 const ParamDynamicPromptsSeedBehaviour = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const seedBehaviour = useAppSelector(
-    (s) => s.dynamicPrompts.seedBehaviour
-  );
+  const seedBehaviour = useAppSelector((s) => s.dynamicPrompts.seedBehaviour);
 
   const options = useMemo<InvSelectOption[]>(() => {
     return [
