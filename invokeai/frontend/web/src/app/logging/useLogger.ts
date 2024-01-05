@@ -1,23 +1,14 @@
 import { createLogWriter } from '@roarr/browser-log-writer';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { useEffect, useMemo } from 'react';
 import { ROARR, Roarr } from 'roarr';
 
 import type { LoggerNamespace } from './logger';
 import { $logger, BASE_CONTEXT, LOG_LEVEL_MAP, logger } from './logger';
-const selector = createMemoizedSelector(selectSystemSlice, (system) => {
-  const { consoleLogLevel, shouldLogToConsole } = system;
-
-  return {
-    consoleLogLevel,
-    shouldLogToConsole,
-  };
-});
 
 export const useLogger = (namespace: LoggerNamespace) => {
-  const { consoleLogLevel, shouldLogToConsole } = useAppSelector(selector);
+  const consoleLogLevel = useAppSelector((s) => s.system.consoleLogLevel);
+  const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
 
   // The provided Roarr browser log writer uses localStorage to config logging to console
   useEffect(() => {
