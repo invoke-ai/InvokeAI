@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
 import type { InvokeTabName } from './tabMap';
@@ -60,3 +61,5 @@ export const {
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
+
+export const selectUiSlice = (state: RootState) => state.ui;

@@ -1,10 +1,12 @@
 import { Divider, Flex, ListItem, UnorderedList } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvText } from 'common/components/InvText/wrapper';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
@@ -13,8 +15,10 @@ import { useBoardName } from 'services/api/hooks/useBoardName';
 const StyledDivider = () => <Divider opacity={0.2} borderColor="base.900" />;
 
 const tooltipSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ gallery, dynamicPrompts, generation }) => {
+  selectGallerySlice,
+  selectDynamicPromptsSlice,
+  selectGenerationSlice,
+  (gallery, dynamicPrompts, generation) => {
     const { autoAddBoardId } = gallery;
     const { iterations, positivePrompt } = generation;
     const promptsCount = getShouldProcessPrompt(positivePrompt)
@@ -36,7 +40,7 @@ export const QueueButtonTooltip = memo(({ prepend = false }: Props) => {
   const { t } = useTranslation();
   const { isReady, reasons } = useIsReadyToEnqueue();
   const isLoadingDynamicPrompts = useAppSelector(
-    (state) => state.dynamicPrompts.isLoading
+    (s) => s.dynamicPrompts.isLoading
   );
   const { autoAddBoardId, promptsCount, iterations } =
     useAppSelector(tooltipSelector);

@@ -167,10 +167,5 @@
     "vite-plugin-dts": "^3.7.0",
     "vite-plugin-eslint": "^1.8.1",
     "vite-tsconfig-paths": "^4.2.3"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "reselect@5.0.1": "patches/reselect@5.0.1.patch"
-    }
   }
 }

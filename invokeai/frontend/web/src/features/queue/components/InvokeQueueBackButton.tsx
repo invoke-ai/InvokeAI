@@ -1,13 +1,14 @@
 import { Flex, Spacer } from '@chakra-ui/layout';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import type { InvNumberInputFieldProps } from 'common/components/InvNumberInput/types';
-import { setIterations } from 'features/parameters/store/generationSlice';
+import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { selectGenerationSlice, setIterations } from 'features/parameters/store/generationSlice';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { IoSparkles } from 'react-icons/io5';
 
@@ -24,23 +25,28 @@ const numberInputFieldProps: InvNumberInputFieldProps = {
   fontWeight: 'semibold',
 };
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
-    state.config.sd.iterations;
-  const { iterations } = state.generation;
-  const isLoadingDynamicPrompts = state.dynamicPrompts.isLoading;
+const selector = createMemoizedSelector(
+  selectConfigSlice,
+  selectGenerationSlice,
+  selectDynamicPromptsSlice,
+  (config, generation, dynamicPrompts) => {
+    const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
+      config.sd.iterations;
+    const { iterations } = generation;
+    const isLoadingDynamicPrompts = dynamicPrompts.isLoading;
 
-  return {
-    iterations,
-    initial,
-    min,
-    sliderMax,
-    inputMax,
-    step: coarseStep,
-    fineStep,
-    isLoadingDynamicPrompts,
-  };
-});
+    return {
+      iterations,
+      initial,
+      min,
+      sliderMax,
+      inputMax,
+      step: coarseStep,
+      fineStep,
+      isLoadingDynamicPrompts,
+    };
+  }
+);
 
 export const InvokeQueueBackButton = memo(() => {
   const { queueBack, isLoading, isDisabled } = useQueueBack();

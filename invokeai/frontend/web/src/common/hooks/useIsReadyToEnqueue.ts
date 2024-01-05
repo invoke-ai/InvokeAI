@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
@@ -11,16 +11,22 @@ import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 
 const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
+  [
+    (state: RootState) => state.controlAdapters,
+    (state: RootState) => state.generation,
+    (state: RootState) => state.system,
+    (state: RootState) => state.nodes,
+    (state: RootState) => state.nodeTemplates,
+    (state: RootState) => state.dynamicPrompts,
+    activeTabNameSelector,
+  ],
   (
-    {
-      controlAdapters,
-      generation,
-      system,
-      nodes,
-      nodeTemplates,
-      dynamicPrompts,
-    },
+    controlAdapters,
+    generation,
+    system,
+    nodes,
+    nodeTemplates,
+    dynamicPrompts,
     activeTabName
   ) => {
     const { initialImage, model, positivePrompt } = generation;

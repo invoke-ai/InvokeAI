@@ -1,6 +1,7 @@
 import type { PayloadAction, Update } from '@reduxjs/toolkit';
 import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
+import type { RootState } from 'app/store/store';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import type {
   ParameterControlNetModel,
@@ -489,3 +490,6 @@ export const isAnyControlAdapterAdded = isAnyOf(
   controlAdapterAddedFromImage,
   controlAdapterRecalled
 );
+
+export const selectControlAdaptersSlice = (state: RootState) =>
+  state.controlAdapters;

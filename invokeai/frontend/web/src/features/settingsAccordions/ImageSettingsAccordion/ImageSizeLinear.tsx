@@ -12,10 +12,10 @@ import { memo, useCallback } from 'react';
 
 export const ImageSizeLinear = memo(() => {
   const dispatch = useAppDispatch();
-  const width = useAppSelector((state) => state.generation.width);
-  const height = useAppSelector((state) => state.generation.height);
+  const width = useAppSelector((s) => s.generation.width);
+  const height = useAppSelector((s) => s.generation.height);
   const aspectRatioState = useAppSelector(
-    (state) => state.generation.aspectRatio
+    (s) => s.generation.aspectRatio
   );
 
   const onChangeWidth = useCallback(

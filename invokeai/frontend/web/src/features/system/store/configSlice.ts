@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { AppConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash-es';
 
@@ -101,3 +102,5 @@ export const configSlice = createSlice({
 export const { configChanged } = configSlice.actions;
 
 export default configSlice.reducer;
+
+export const selectConfigSlice = (state: RootState) => state.config;

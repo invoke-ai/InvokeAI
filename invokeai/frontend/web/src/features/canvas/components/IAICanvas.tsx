@@ -1,7 +1,6 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import useCanvasDragMove from 'features/canvas/hooks/useCanvasDragMove';
 import useCanvasHotkeys from 'features/canvas/hooks/useCanvasHotkeys';
@@ -17,7 +16,10 @@ import {
   $isTransformingBoundingBox,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { canvasResized } from 'features/canvas/store/canvasSlice';
+import {
+  canvasResized,
+  selectCanvasSlice,
+} from 'features/canvas/store/canvasSlice';
 import {
   setCanvasBaseLayer,
   setCanvasStage,
@@ -41,8 +43,8 @@ import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
 import IAICanvasToolPreview from './IAICanvasToolPreview';
 
 const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
+  [selectCanvasSlice, isStagingSelector],
+  (canvas, isStaging) => {
     const {
       isMaskEnabled,
       stageScale,

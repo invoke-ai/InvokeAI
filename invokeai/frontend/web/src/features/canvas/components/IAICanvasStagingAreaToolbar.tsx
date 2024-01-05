@@ -1,7 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -11,6 +10,7 @@ import {
   discardStagedImages,
   nextStagingAreaImage,
   prevStagingAreaImage,
+  selectCanvasSlice,
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
@@ -29,7 +29,7 @@ import {
 } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   const {
     layerState: {
       stagingArea: { images, selectedImageIndex },

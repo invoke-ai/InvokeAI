@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import {
   roundDownToMultiple,
   roundToMultiple,
@@ -781,3 +782,5 @@ export const {
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
+
+export const selectCanvasSlice = (state: RootState) => state.canvas;

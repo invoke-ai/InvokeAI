@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { FieldType } from 'features/nodes/types/field';
 import i18n from 'i18next';
 import type { HandleType } from 'reactflow';
@@ -18,13 +18,13 @@ export const makeConnectionErrorSelector = (
   handleType: HandleType,
   fieldType?: FieldType
 ) => {
-  return createMemoizedSelector(stateSelector, (state): string | undefined => {
+  return createMemoizedSelector(selectNodesSlice, (nodesSlice) => {
     if (!fieldType) {
       return i18n.t('nodes.noFieldType');
     }
 
     const { connectionStartFieldType, connectionStartParams, nodes, edges } =
-      state.nodes;
+      nodesSlice;
 
     if (!connectionStartParams || !connectionStartFieldType) {
       return i18n.t('nodes.noConnectionInProgress');

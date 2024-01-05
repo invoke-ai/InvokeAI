@@ -1,6 +1,7 @@
 import type { UseToastOptions } from '@chakra-ui/react';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
@@ -214,3 +215,5 @@ const isAnyServerError = isAnyOf(
   appSocketSessionRetrievalError,
   appSocketInvocationRetrievalError
 );
+
+export const selectSystemSlice = (state: RootState) => state.system;

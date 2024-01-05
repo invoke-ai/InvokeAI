@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { ImageDTO } from 'services/api/types';
 
 import { initialState } from './initialState';
@@ -25,3 +26,6 @@ export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } =
   changeBoardModal.actions;
 
 export default changeBoardModal.reducer;
+
+export const selectChangeBoardModalSlice = (state: RootState) =>
+  state.changeBoardModal;

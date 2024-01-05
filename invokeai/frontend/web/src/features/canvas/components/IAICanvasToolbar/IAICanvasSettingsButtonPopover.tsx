@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -11,6 +10,7 @@ import {
 } from 'common/components/InvPopover/wrapper';
 import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 import {
+  selectCanvasSlice,
   setShouldAntialias,
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
@@ -29,8 +29,8 @@ import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
 
 export const canvasControlsSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas }) => {
+  [selectCanvasSlice],
+  (canvas) => {
     const {
       shouldAutoSave,
       shouldCropToBoundingBoxOnSave,

@@ -12,7 +12,7 @@ type DeleteImageButtonProps = Omit<InvIconButtonProps, 'aria-label'> & {
 export const DeleteImageButton = memo((props: DeleteImageButtonProps) => {
   const { onClick, isDisabled } = props;
   const { t } = useTranslation();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
 
   return (
     <InvIconButton

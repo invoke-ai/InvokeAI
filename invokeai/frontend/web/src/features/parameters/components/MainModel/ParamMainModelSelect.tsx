@@ -1,10 +1,10 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
 import { modelSelected } from 'features/parameters/store/actions';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,9 +12,12 @@ import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import type { MainModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createMemoizedSelector(stateSelector, (state) => ({
-  model: state.generation.model,
-}));
+const selector = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => ({
+    model: generation.model,
+  })
+);
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();

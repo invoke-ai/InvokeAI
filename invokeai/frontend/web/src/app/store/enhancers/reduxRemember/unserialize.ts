@@ -8,7 +8,6 @@ import { initialPostprocessingState } from 'features/parameters/store/postproces
 import { initialSDXLState } from 'features/sdxl/store/sdxlSlice';
 import { initialConfigState } from 'features/system/store/configSlice';
 import { initialSystemState } from 'features/system/store/systemSlice';
-import { initialHotkeysState } from 'features/ui/store/hotkeysSlice';
 import { initialUIState } from 'features/ui/store/uiSlice';
 import { defaultsDeep } from 'lodash-es';
 import type { UnserializeFunction } from 'redux-remember';
@@ -24,7 +23,6 @@ const initialStates: {
   system: initialSystemState,
   config: initialConfigState,
   ui: initialUIState,
-  hotkeys: initialHotkeysState,
   controlAdapters: initialControlAdapterState,
   dynamicPrompts: initialDynamicPromptsState,
   sdxl: initialSDXLState,

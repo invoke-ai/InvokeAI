@@ -1,6 +1,6 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,8 +16,8 @@ const accept: Accept = {
 };
 
 const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ gallery }, activeTabName) => {
+  [(state: RootState) => state.gallery, activeTabNameSelector],
+  (gallery, activeTabName) => {
     let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
     if (activeTabName === 'unifiedCanvas') {

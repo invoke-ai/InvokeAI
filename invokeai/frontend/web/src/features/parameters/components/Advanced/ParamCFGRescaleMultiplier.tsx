@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 const ParamCFGRescaleMultiplier = () => {
   const cfgRescaleMultiplier = useAppSelector(
-    (state) => state.generation.cfgRescaleMultiplier
+    (s) => s.generation.cfgRescaleMultiplier
   );
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

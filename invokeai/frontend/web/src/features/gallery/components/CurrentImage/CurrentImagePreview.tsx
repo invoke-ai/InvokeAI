@@ -1,7 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -14,6 +13,8 @@ import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
+import { selectUiSlice } from 'features/ui/store/uiSlice';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
@@ -24,8 +25,10 @@ import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 export const imagesSelector = createMemoizedSelector(
-  [stateSelector, selectLastSelectedImage],
-  ({ ui, system }, lastSelectedImage) => {
+  selectUiSlice,
+  selectSystemSlice,
+  selectLastSelectedImage,
+  (ui, system, lastSelectedImage) => {
     const {
       shouldShowImageDetails,
       shouldHidePreview,

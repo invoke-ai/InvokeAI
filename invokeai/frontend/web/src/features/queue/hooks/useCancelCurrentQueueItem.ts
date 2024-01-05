@@ -9,7 +9,7 @@ import {
 } from 'services/api/endpoints/queue';
 
 export const useCancelCurrentQueueItem = () => {
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const [trigger, { isLoading }] = useCancelQueueItemMutation();
   const dispatch = useAppDispatch();

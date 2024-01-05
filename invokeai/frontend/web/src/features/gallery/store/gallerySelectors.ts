@@ -12,7 +12,7 @@ export const gallerySelector = (state: RootState) => state.gallery;
 
 export const selectLastSelectedImage = createMemoizedSelector(
   (state: RootState) => state,
-  (state) => state.gallery.selection[state.gallery.selection.length - 1]
+  (s) => s.gallery.selection[state.gallery.selection.length - 1]
 );
 
 export const selectListImagesBaseQueryArgs = createMemoizedSelector(

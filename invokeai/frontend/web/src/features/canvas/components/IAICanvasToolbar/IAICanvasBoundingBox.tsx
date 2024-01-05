@@ -1,6 +1,5 @@
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $shift } from 'common/hooks/useGlobalModifiers';
 import {
@@ -18,6 +17,7 @@ import {
 } from 'features/canvas/store/canvasNanostore';
 import {
   aspectRatioChanged,
+  selectCanvasSlice,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setShouldSnapToGrid,
@@ -39,8 +39,8 @@ import { Group, Rect, Transformer } from 'react-konva';
 const borderDash = [4, 4];
 
 const boundingBoxPreviewSelector = createMemoizedSelector(
-  [stateSelector, selectOptimalDimension],
-  ({ canvas }, optimalDimension) => {
+  [selectCanvasSlice, selectOptimalDimension],
+  (canvas, optimalDimension) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,

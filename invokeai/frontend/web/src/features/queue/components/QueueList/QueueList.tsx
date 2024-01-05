@@ -1,6 +1,4 @@
 import { Flex, Heading } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
@@ -27,11 +25,6 @@ import type { ListContext } from './types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TableVirtuosoScrollerRef = (ref: HTMLElement | Window | null) => any;
 
-const selector = createMemoizedSelector(stateSelector, ({ queue }) => {
-  const { listCursor, listPriority } = queue;
-  return { listCursor, listPriority };
-});
-
 const computeItemKey = (index: number, item: SessionQueueItemDTO): number =>
   item.item_id;
 
@@ -46,7 +39,8 @@ const itemContent: ItemContent<SessionQueueItemDTO, ListContext> = (
 ) => <QueueItemComponent index={index} item={item} context={context} />;
 
 const QueueList = () => {
-  const { listCursor, listPriority } = useAppSelector(selector);
+  const listCursor = useAppSelector((s) => s.queue.listCursor);
+  const listPriority = useAppSelector((s) => s.queue.listPriority);
   const dispatch = useAppDispatch();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);

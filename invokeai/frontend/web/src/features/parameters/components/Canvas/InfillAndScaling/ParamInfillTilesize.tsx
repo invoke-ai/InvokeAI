@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -7,18 +5,10 @@ import { setInfillTileSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([stateSelector], ({ generation }) => {
-  const { infillTileSize, infillMethod } = generation;
-
-  return {
-    infillTileSize,
-    infillMethod,
-  };
-});
-
 const ParamInfillTileSize = () => {
   const dispatch = useAppDispatch();
-  const { infillTileSize, infillMethod } = useAppSelector(selector);
+  const infillTileSize = useAppSelector((s) => s.generation.infillTileSize);
+  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
 
   const { t } = useTranslation();
 

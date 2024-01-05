@@ -2,14 +2,15 @@ import {
   createLruSelector,
   createMemoizedSelector,
 } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 
 const progressImageSelector = createLruSelector(
-  [stateSelector],
-  ({ system, canvas }) => {
+  [selectSystemSlice, selectCanvasSlice],
+  (system, canvas) => {
     const { denoiseProgress } = system;
     const { batchIds } = canvas;
 
@@ -20,8 +21,8 @@ const progressImageSelector = createLruSelector(
 );
 
 const boundingBoxSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas }) => canvas.layerState.stagingArea.boundingBox
+  [selectCanvasSlice],
+  (canvas) => canvas.layerState.stagingArea.boundingBox
 );
 
 const IAICanvasIntermediateImage = () => {

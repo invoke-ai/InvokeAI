@@ -1,6 +1,6 @@
 import { createLogWriter } from '@roarr/browser-log-writer';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { RootState} from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useEffect, useMemo } from 'react';
 import { ROARR, Roarr } from 'roarr';
@@ -8,14 +8,17 @@ import { ROARR, Roarr } from 'roarr';
 import type { LoggerNamespace } from './logger';
 import { $logger, BASE_CONTEXT, LOG_LEVEL_MAP, logger } from './logger';
 
-const selector = createMemoizedSelector(stateSelector, ({ system }) => {
-  const { consoleLogLevel, shouldLogToConsole } = system;
+const selector = createMemoizedSelector(
+  (state: RootState) => state.system,
+  (system) => {
+    const { consoleLogLevel, shouldLogToConsole } = system;
 
-  return {
-    consoleLogLevel,
-    shouldLogToConsole,
-  };
-});
+    return {
+      consoleLogLevel,
+      shouldLogToConsole,
+    };
+  }
+);
 
 export const useLogger = (namespace: LoggerNamespace) => {
   const { consoleLogLevel, shouldLogToConsole } = useAppSelector(selector);

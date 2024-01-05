@@ -1,7 +1,6 @@
 import { Flex, Skeleton } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   InvAlertDialog,
@@ -13,9 +12,13 @@ import {
 } from 'common/components/InvAlertDialog/wrapper';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvText } from 'common/components/InvText/wrapper';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,26 +38,34 @@ const DeleteBoardModal = (props: Props) => {
   const { boardToDelete, setBoardToDelete } = props;
   const { t } = useTranslation();
   const canRestoreDeletedImagesFromBin = useAppSelector(
-    (state) => state.config.canRestoreDeletedImagesFromBin
+    (s) => s.config.canRestoreDeletedImagesFromBin
   );
   const { currentData: boardImageNames, isFetching: isFetchingBoardNames } =
     useListAllImageNamesForBoardQuery(boardToDelete?.board_id ?? skipToken);
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createMemoizedSelector([stateSelector], (state) => {
-        const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-          getImageUsage(state, imageName)
-        );
+      createMemoizedSelector(
+        [
+          selectGenerationSlice,
+          selectCanvasSlice,
+          selectNodesSlice,
+          selectControlAdaptersSlice,
+        ],
+        (generation, canvas, nodes, controlAdapters) => {
+          const allImageUsage = (boardImageNames ?? []).map((imageName) =>
+            getImageUsage(generation, canvas, nodes, controlAdapters, imageName)
+          );
 
-        const imageUsageSummary: ImageUsage = {
-          isInitialImage: some(allImageUsage, (i) => i.isInitialImage),
-          isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
-          isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-          isControlImage: some(allImageUsage, (i) => i.isControlImage),
-        };
-        return { imageUsageSummary };
-      }),
+          const imageUsageSummary: ImageUsage = {
+            isInitialImage: some(allImageUsage, (i) => i.isInitialImage),
+            isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
+            isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+            isControlImage: some(allImageUsage, (i) => i.isControlImage),
+          };
+          return { imageUsageSummary };
+        }
+      ),
     [boardImageNames]
   );
 

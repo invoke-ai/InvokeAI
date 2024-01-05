@@ -15,7 +15,7 @@ export const useClearQueue = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: queueStatus } = useGetQueueStatusQuery();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = useClearQueueMutation({
     fixedCacheKey: 'clearQueue',
   });

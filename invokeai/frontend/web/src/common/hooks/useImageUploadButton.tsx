@@ -33,7 +33,7 @@ export const useImageUploadButton = ({
   isDisabled,
 }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(
-    (state) => state.gallery.autoAddBoardId
+    (s) => s.gallery.autoAddBoardId
   );
   const [uploadImage] = useUploadImageMutation();
   const onDropAccepted = useCallback(

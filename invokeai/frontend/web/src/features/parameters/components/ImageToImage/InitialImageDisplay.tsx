@@ -1,12 +1,14 @@
 import { Flex, Spacer } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvText } from 'common/components/InvText/wrapper';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import {
+  clearInitialImage,
+  selectGenerationSlice,
+} from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -15,8 +17,8 @@ import type { PostUploadAction } from 'services/api/types';
 
 import InitialImage from './InitialImage';
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { initialImage } = state.generation;
+const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
+  const { initialImage } = generation;
   return {
     isResetButtonDisabled: !initialImage,
     initialImage,

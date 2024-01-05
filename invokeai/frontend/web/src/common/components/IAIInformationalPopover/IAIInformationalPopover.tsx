@@ -32,7 +32,7 @@ const IAIInformationalPopover = ({
   ...rest
 }: Props) => {
   const shouldEnableInformationalPopovers = useAppSelector(
-    (state) => state.system.shouldEnableInformationalPopovers
+    (s) => s.system.shouldEnableInformationalPopovers
   );
 
   const data = useMemo(() => POPOVER_DATA[feature], [feature]);

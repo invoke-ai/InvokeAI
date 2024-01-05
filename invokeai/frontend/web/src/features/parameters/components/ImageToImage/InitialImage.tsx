@@ -1,6 +1,5 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -8,20 +7,28 @@ import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import {
+  clearInitialImage,
+  selectGenerationSlice,
+} from 'features/parameters/store/generationSlice';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useEffect, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { initialImage } = state.generation;
-  const { isConnected } = state.system;
+const selector = createMemoizedSelector(
+  selectGenerationSlice,
+  selectSystemSlice,
+  (generation, system) => {
+    const { initialImage } = generation;
+    const { isConnected } = system;
 
-  return {
-    initialImage,
-    isResetButtonDisabled: !initialImage,
-    isConnected,
-  };
-});
+    return {
+      initialImage,
+      isResetButtonDisabled: !initialImage,
+      isConnected,
+    };
+  }
+);
 
 const InitialImage = () => {
   const dispatch = useAppDispatch();

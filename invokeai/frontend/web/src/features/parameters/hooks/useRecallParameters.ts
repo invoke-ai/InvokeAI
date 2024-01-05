@@ -1,6 +1,5 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import {
@@ -36,6 +35,7 @@ import {
 } from 'features/parameters/store/actions';
 import {
   heightChanged,
+  selectGenerationSlice,
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
@@ -100,8 +100,8 @@ import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createMemoizedSelector(
-  stateSelector,
-  ({ generation }) => generation.model
+  selectGenerationSlice,
+  (generation) => generation.model
 );
 
 export const useRecallParameters = () => {

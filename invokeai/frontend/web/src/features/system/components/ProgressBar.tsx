@@ -1,13 +1,13 @@
 import { Progress } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 const progressBarSelector = createMemoizedSelector(
-  stateSelector,
-  ({ system }) => {
+  selectSystemSlice,
+  (system) => {
     return {
       isConnected: system.isConnected,
       hasSteps: Boolean(system.denoiseProgress),

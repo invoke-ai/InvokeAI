@@ -39,7 +39,7 @@ const exit: AnimationProps['exit'] = {
 };
 
 const NodeEditor = () => {
-  const isReady = useAppSelector((state) => state.nodes.isReady);
+  const isReady = useAppSelector((s) => s.nodes.isReady);
   const { t } = useTranslation();
   return (
     <Flex
