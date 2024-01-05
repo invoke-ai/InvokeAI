@@ -168,10 +168,6 @@
             "title": "Optionen anheften",
             "desc": "Anheften des Optionsfeldes"
         },
-        "toggleViewer": {
-            "title": "Bildbetrachter umschalten",
-            "desc": "Bildbetrachter öffnen und schließen"
-        },
         "toggleGallery": {
             "title": "Galerie umschalten",
             "desc": "Öffnen und Schließen des Galerie-Schubfachs"
@@ -231,10 +227,6 @@
         "nextImage": {
             "title": "Nächstes Bild",
             "desc": "Nächstes Bild in Galerie anzeigen"
-        },
-        "toggleGalleryPin": {
-            "title": "Galerie anheften umschalten",
-            "desc": "Heftet die Galerie an die Benutzeroberfläche bzw. löst die sie"
         },
         "increaseGalleryThumbSize": {
             "title": "Größe der Galeriebilder erhöhen",

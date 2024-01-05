@@ -52,7 +52,7 @@ export const useGlobalHotkeys = () => {
   } = useCancelCurrentQueueItem();
 
   useHotkeys(
-    ['shift+x', 'shift+enter'],
+    ['shift+x'],
     cancelQueueItem,
     {
       enabled: () => !isDisabledCancelQueueItem && !isLoadingCancelQueueItem,

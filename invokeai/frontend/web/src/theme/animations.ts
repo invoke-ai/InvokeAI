@@ -10,3 +10,5 @@ export const spinKeyframes = keyframes`
 `;
 
 export const spinAnimation = `${spinKeyframes} 0.45s linear infinite`;
+
+export const spinAnimationSlow = `${spinKeyframes} 1s linear infinite`;

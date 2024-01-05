@@ -96,10 +96,6 @@
             "title": "Epinglage des options",
             "desc": "Epingler le panneau d'options"
         },
-        "toggleViewer": {
-            "title": "Affichage de la visionneuse",
-            "desc": "Afficher et masquer la visionneuse d'image"
-        },
         "toggleGallery": {
             "title": "Affichage de la galerie",
             "desc": "Afficher et masquer la galerie"
@@ -159,10 +155,6 @@
         "nextImage": {
             "title": "Image suivante",
             "desc": "Afficher l'image suivante dans la galerie"
-        },
-        "toggleGalleryPin": {
-            "title": "Activer/désactiver l'épinglage de la galerie",
-            "desc": "Épingle ou dépingle la galerie à l'interface"
         },
         "increaseGalleryThumbSize": {
             "title": "Augmenter la taille des miniatures de la galerie",

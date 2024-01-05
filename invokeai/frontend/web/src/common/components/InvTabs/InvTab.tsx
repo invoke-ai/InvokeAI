@@ -12,7 +12,7 @@ export const InvTab = memo(
         {children}
         <Spacer />
         {badges?.map((b, i) => (
-          <InvBadge key={`${b}.${i}`} colorScheme="blue">
+          <InvBadge key={`${b}.${i}`} colorScheme="invokeYellow">
             {b}
           </InvBadge>
         ))}

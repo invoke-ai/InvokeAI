@@ -25,13 +25,12 @@ const ProgressBar = () => {
     <Progress
       value={value}
       aria-label={t('accessibility.invokeProgressBar')}
-      hasStripe
       isIndeterminate={
         isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps
       }
-      h="full"
+      h={2}
       w="full"
-      colorScheme="invokeYellow"
+      colorScheme="blue"
     />
   );
 };

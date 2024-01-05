@@ -69,10 +69,12 @@ const predicate: AnyListenerPredicate<RootState> = (
   return isProcessorSelected && hasControlImage;
 };
 
+const DEBOUNCE_MS = 300;
+
 /**
  * Listener that automatically processes a ControlNet image when its processor parameters are changed.
  *
- * The network request is debounced by 1 second.
+ * The network request is debounced.
  */
 export const addControlNetAutoProcessListener = () => {
   startAppListening({
@@ -85,7 +87,7 @@ export const addControlNetAutoProcessListener = () => {
       cancelActiveListeners();
       log.trace('ControlNet auto-process triggered');
       // Delay before starting actual work
-      await delay(300);
+      await delay(DEBOUNCE_MS);
 
       dispatch(controlAdapterImageProcessed({ id }));
     },

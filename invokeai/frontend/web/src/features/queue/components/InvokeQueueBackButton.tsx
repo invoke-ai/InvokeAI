@@ -28,6 +28,7 @@ const selector = createMemoizedSelector([stateSelector], (state) => {
   const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
     state.config.sd.iterations;
   const { iterations } = state.generation;
+  const isLoadingDynamicPrompts = state.dynamicPrompts.isLoading;
 
   return {
     iterations,
@@ -37,15 +38,14 @@ const selector = createMemoizedSelector([stateSelector], (state) => {
     inputMax,
     step: coarseStep,
     fineStep,
+    isLoadingDynamicPrompts,
   };
 });
 
 export const InvokeQueueBackButton = memo(() => {
-  const isLoadingDynamicPrompts = useAppSelector(
-    (state) => state.dynamicPrompts.isLoading
-  );
   const { queueBack, isLoading, isDisabled } = useQueueBack();
-  const { iterations, step, fineStep } = useAppSelector(selector);
+  const { iterations, step, fineStep, isLoadingDynamicPrompts } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
   const handleChange = useCallback(
     (v: number) => {

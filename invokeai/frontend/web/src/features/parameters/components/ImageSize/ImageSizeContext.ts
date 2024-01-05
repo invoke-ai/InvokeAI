@@ -1,3 +1,4 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import {
@@ -8,6 +9,7 @@ import type {
   AspectRatioID,
   AspectRatioState,
 } from 'features/parameters/components/ImageSize/types';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { createContext, useCallback, useContext, useMemo } from 'react';
 
 export type ImageSizeContextInnerValue = {
@@ -28,7 +30,7 @@ export type ImageSizeContext = {
   widthChanged: (width: number) => void;
   heightChanged: (height: number) => void;
   isLockedToggled: () => void;
-  sizeReset: (width: number, height: number) => void;
+  setOptimalSize: () => void;
 };
 
 export const ImageSizeContext =
@@ -36,6 +38,7 @@ export const ImageSizeContext =
 
 export const useImageSizeContext = (): ImageSizeContext => {
   const _ctx = useContext(ImageSizeContext);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
 
   if (!_ctx) {
     throw new Error(
@@ -58,8 +61,7 @@ export const useImageSizeContext = (): ImageSizeContext => {
         state.value = ASPECT_RATIO_MAP[state.id].ratio;
         const { width, height } = calculateNewSize(
           state.value,
-          _ctx.width,
-          _ctx.height
+          _ctx.width * _ctx.height
         );
         _ctx.onChangeWidth(width);
         _ctx.onChangeHeight(height);
@@ -84,8 +86,7 @@ export const useImageSizeContext = (): ImageSizeContext => {
       // Else we need to calculate the new size
       const { width, height } = calculateNewSize(
         state.value,
-        _ctx.width,
-        _ctx.height
+        _ctx.width * _ctx.height
       );
       _ctx.onChangeWidth(width);
       _ctx.onChangeHeight(height);
@@ -141,15 +142,20 @@ export const useImageSizeContext = (): ImageSizeContext => {
     _ctx.onChangeAspectRatioState(state);
   }, [_ctx]);
 
-  const sizeReset = useCallback(
-    (width: number, height: number) => {
-      const state = { ...initialAspectRatioState };
-      _ctx.onChangeAspectRatioState(state);
+  const setOptimalSize = useCallback(() => {
+    if (_ctx.aspectRatioState.isLocked) {
+      const { width, height } = calculateNewSize(
+        _ctx.aspectRatioState.value,
+        optimalDimension * optimalDimension
+      );
       _ctx.onChangeWidth(width);
       _ctx.onChangeHeight(height);
-    },
-    [_ctx]
-  );
+    } else {
+      _ctx.onChangeAspectRatioState({ ...initialAspectRatioState });
+      _ctx.onChangeWidth(optimalDimension);
+      _ctx.onChangeHeight(optimalDimension);
+    }
+  }, [_ctx, optimalDimension]);
 
   const ctx = useMemo(
     () => ({
@@ -159,7 +165,7 @@ export const useImageSizeContext = (): ImageSizeContext => {
       widthChanged,
       heightChanged,
       isLockedToggled,
-      sizeReset,
+      setOptimalSize,
     }),
     [
       _ctx,
@@ -167,7 +173,7 @@ export const useImageSizeContext = (): ImageSizeContext => {
       dimensionsSwapped,
       heightChanged,
       isLockedToggled,
-      sizeReset,
+      setOptimalSize,
       widthChanged,
     ]
   );

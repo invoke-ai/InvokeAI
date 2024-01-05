@@ -80,7 +80,7 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
         max={1}
         step={0.05}
         fineStep={0.01}
-        minStepsBetweenThumbs={5}
+        minStepsBetweenThumbs={1}
         formatValue={formatPct}
         marks
         withThumbTooltip

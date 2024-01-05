@@ -13,6 +13,7 @@ export const LockAspectRatioButton = memo(() => {
 
   return (
     <InvIconButton
+      tooltip={t('parameters.lockAspectRatio')}
       aria-label={t('parameters.lockAspectRatio')}
       onClick={onClick}
       variant={ctx.aspectRatioState.isLocked ? 'outline' : 'ghost'}
