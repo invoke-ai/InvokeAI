@@ -21,6 +21,7 @@ from invokeai.app.services.model_records import (
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
+    ModelFormat,
     ModelType,
 )
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
@@ -55,7 +56,7 @@ async def list_model_records(
     base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
     model_name: Optional[str] = Query(default=None, description="Exact match on the name of the model"),
-    model_format: Optional[str] = Query(
+    model_format: Optional[ModelFormat] = Query(
         default=None, description="Exact match on the format of the model (e.g. 'diffusers')"
     ),
 ) -> ModelsList:
@@ -341,14 +342,44 @@ async def import_model(
     operation_id="list_model_install_jobs",
 )
 async def list_model_install_jobs() -> List[ModelInstallJob]:
-    """
-    Return list of model install jobs.
-
-    If the optional 'source' argument is provided, then the list will be filtered
-    for partial string matches against the install source.
-    """
+    """Return list of model install jobs."""
     jobs: List[ModelInstallJob] = ApiDependencies.invoker.services.model_install.list_jobs()
     return jobs
+
+
+@model_records_router.get(
+    "/import/{id}",
+    operation_id="get_model_install_job",
+    responses={
+        200: {"description": "Success"},
+        404: {"description": "No such job"},
+    },
+)
+async def get_model_install_job(id: int = Path(description="Model install id")) -> ModelInstallJob:
+    """Return model install job corresponding to the given source."""
+    try:
+        return ApiDependencies.invoker.services.model_install.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@model_records_router.delete(
+    "/import/{id}",
+    operation_id="cancel_model_install_job",
+    responses={
+        201: {"description": "The job was cancelled successfully"},
+        415: {"description": "No such job"},
+    },
+    status_code=201,
+)
+async def cancel_model_install_job(id: int = Path(description="Model install job ID")) -> None:
+    """Cancel the model install job(s) corresponding to the given job ID."""
+    installer = ApiDependencies.invoker.services.model_install
+    try:
+        job = installer.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+    installer.cancel_job(job)
 
 
 @model_records_router.patch(
@@ -360,9 +391,7 @@ async def list_model_install_jobs() -> List[ModelInstallJob]:
     },
 )
 async def prune_model_install_jobs() -> Response:
-    """
-    Prune all completed and errored jobs from the install job list.
-    """
+    """Prune all completed and errored jobs from the install job list."""
     ApiDependencies.invoker.services.model_install.prune_jobs()
     return Response(status_code=204)
 
@@ -377,7 +406,9 @@ async def prune_model_install_jobs() -> Response:
 )
 async def sync_models_to_config() -> Response:
     """
-    Traverse the models and autoimport directories. Model files without a corresponding
+    Traverse the models and autoimport directories.
+
+    Model files without a corresponding
     record in the database are added. Orphan records without a models file are deleted.
     """
     ApiDependencies.invoker.services.model_install.sync_to_config()

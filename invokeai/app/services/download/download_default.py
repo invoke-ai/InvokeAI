@@ -201,9 +201,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if not job.in_terminal_state:
                 self.cancel_job(job)
 
-    def _in_terminal_state(self, job: DownloadJob) -> bool:
-        return job.in_terminal_state
-
     def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
         self._stop_event.clear()

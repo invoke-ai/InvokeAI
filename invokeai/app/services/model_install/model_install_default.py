@@ -77,6 +77,7 @@ class ModelInstallService(ModelInstallServiceBase):
     _metadata_store: ModelMetadataStore
     _metadata_cache: Dict[ModelSource, Optional[AnyModelRepoMetadata]]
     _download_cache: Dict[AnyHttpUrl, ModelInstallJob]
+    _next_job_id: int = 0
 
     def __init__(
         self,
@@ -215,8 +216,15 @@ class ModelInstallService(ModelInstallServiceBase):
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         return self._install_jobs
 
-    def get_job(self, source: ModelSource) -> List[ModelInstallJob]:  # noqa D102
+    def get_job_by_source(self, source: ModelSource) -> List[ModelInstallJob]:  # noqa D102
         return [x for x in self._install_jobs if x.source == source]
+
+    def get_job_by_id(self, id: int) -> ModelInstallJob:  # noqa D102
+        jobs = [x for x in self._install_jobs if x.id == id]
+        if not jobs:
+            raise ValueError(f"No job with id {id} known")
+        assert len(jobs) == 1
+        return jobs[0]
 
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
         """Block until all installation jobs are done."""
@@ -232,7 +240,8 @@ class ModelInstallService(ModelInstallServiceBase):
     def cancel_job(self, job: ModelInstallJob) -> None:
         """Cancel the indicated job."""
         job.cancel()
-        self._cancel_download_parts(job)
+        with self._lock:
+            self._cancel_download_parts(job)
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
@@ -538,8 +547,15 @@ class ModelInstallService(ModelInstallServiceBase):
         precision = choose_precision(choose_torch_device())
         return ModelRepoVariant.FP16 if precision == "float16" else ModelRepoVariant.DEFAULT
 
+    def _next_id(self) -> int:
+        with self._lock:
+            id = self._next_job_id
+            self._next_job_id += 1
+        return id
+
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         return ModelInstallJob(
+            id=self._next_id(),
             source=source,
             config_in=config or {},
             local_path=Path(source.path),
@@ -556,6 +572,7 @@ class ModelInstallService(ModelInstallServiceBase):
             )
         )
         install_job = ModelInstallJob(
+            id=self._next_id(),
             source=source,
             config_in=config or {},
             local_path=tmpdir,  # local path may change once the download has started due to content-disposition handling
@@ -674,14 +691,14 @@ class ModelInstallService(ModelInstallServiceBase):
             self._downloads_changed_event.set()
 
     def _cancel_download_parts(self, install_job: ModelInstallJob) -> None:
-        with self._lock:
-            # on multipart downloads, _cancel_components() will get called repeatedly from the download callbacks
-            for s in install_job.download_parts:
-                self._download_queue.cancel_job(s)
+        # on multipart downloads, _cancel_components() will get called repeatedly from the download callbacks
+        # do not lock here because it gets called within a locked context
+        for s in install_job.download_parts:
+            self._download_queue.cancel_job(s)
 
-            if all(x.in_terminal_state for x in install_job.download_parts):
-                # When all parts have reached their terminal state, we finalize the job to clean up the temporary directory and other resources
-                self._install_queue.put(install_job)
+        if all(x.in_terminal_state for x in install_job.download_parts):
+            # When all parts have reached their terminal state, we finalize the job to clean up the temporary directory and other resources
+            self._install_queue.put(install_job)
 
     # ------------------------------------------------------------------------------------------------
     # Internal methods that put events on the event bus

@@ -105,7 +105,7 @@ class CivitaiModelSource(StringLikeSource):
 
 class HFModelSource(StringLikeSource):
     """
-    A HuggingFace repo_id or a Civitai version_id, with optional variant, sub-folder and access token.
+    A HuggingFace repo_id with optional variant, sub-folder and access token.
     Note that the variant option, if not provided to the constructor, will default to fp16, which is
     what people (almost) always want.
     """
@@ -157,6 +157,7 @@ ModelSource = Annotated[
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""
 
+    id: int = Field(default=-1, description="Unique ID for this job")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
     config_in: Dict[str, Any] = Field(
         default_factory=dict, description="Configuration information (e.g. 'description') to apply to model."
@@ -360,8 +361,12 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def get_job(self, source: ModelSource) -> List[ModelInstallJob]:
+    def get_job_by_source(self, source: ModelSource) -> List[ModelInstallJob]:
         """Return the ModelInstallJob(s) corresponding to the provided source."""
+
+    @abstractmethod
+    def get_job_by_id(self, id: int) -> ModelInstallJob:
+        """Return the ModelInstallJob corresponding to the provided id. Raises ValueError if no job has that ID."""
 
     @abstractmethod
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
@@ -383,9 +388,7 @@ class ModelInstallServiceBase(ABC):
         Wait for all pending installs to complete.
 
         This will block until all pending installs have
-        completed, been cancelled, or errored out. It will
-        block indefinitely if one or more jobs are in the
-        paused state.
+        completed, been cancelled, or errored out.
 
         :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
         installs do not complete within the indicated time.

@@ -116,15 +116,27 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
 
         version_json = version_sections[0]
         safe_thumbnails = [x["url"] for x in version_json["images"] if x["nsfw"] == "None"]
+
+        # Civitai has one "primary" file plus others such as VAEs. We only fetch the primary.
+        primary = [x for x in version_json["files"] if x.get("primary")]
+        assert len(primary) == 1
+        primary_file = primary[0]
+
+        url = primary_file["downloadUrl"]
+        if "?" not in url:  # work around apparent bug in civitai api
+            metadata_string = ""
+            for key, value in primary_file["metadata"].items():
+                if not value:
+                    continue
+                metadata_string += f"&{key}={value}"
+            url = url + f"?type={primary_file['type']}{metadata_string}"
         model_files = [
             RemoteModelFile(
-                url=x["downloadUrl"],
-                path=Path(x["name"]),
-                size=int(x["sizeKB"] * 1000),
-                sha256=x["hashes"]["SHA256"],
+                url=url,
+                path=Path(primary_file["name"]),
+                size=int(primary_file["sizeKB"] * 1024),
+                sha256=primary_file["hashes"]["SHA256"],
             )
-            for x in version_json["files"]
-            if x.get("primary", False)  # Civitai has one "primary" file plus others such as VAEs
         ]
         return CivitaiMetadata(
             id=model_json["id"],

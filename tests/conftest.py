@@ -5,7 +5,3 @@
 # We import the model_installer and torch_device fixtures here so that they can be used by all tests. Flake8 does not
 # play well with fixtures (F401 and F811), so this is cleaner than importing in all files that use these fixtures.
 from invokeai.backend.util.test_utils import model_installer, torch_device  # noqa: F401
-
-pytest_plugins = [
-    "tests.fixtures.sqlite_database",
-]
