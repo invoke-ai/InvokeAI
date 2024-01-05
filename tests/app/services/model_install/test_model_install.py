@@ -85,7 +85,7 @@ def test_background_install(
     assert isinstance(job, ModelInstallJob)
 
     # See if job is registered properly
-    assert job in mm2_installer.get_job(source)
+    assert job in mm2_installer.get_job_by_source(source)
 
     # test that the job object tracked installation correctly
     jobs = mm2_installer.wait_for_installs()
@@ -119,7 +119,7 @@ def test_background_install(
 
     # see if prune works properly
     mm2_installer.prune_jobs()
-    assert not mm2_installer.get_job(source)
+    assert not mm2_installer.get_job_by_source(source)
 
 
 def test_delete_install(

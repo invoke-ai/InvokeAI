@@ -656,6 +656,7 @@ The `ModelInstallJob` class has the following structure:
 
 | **Attribute** | **Type**        |  **Description** |
 |----------------|-----------------|------------------|
+| `id`           | `int`           | Integer ID for this job |
 | `status`       | `InstallStatus`  | An enum of [`waiting`, `downloading`, `running`, `completed`, `error` and `cancelled`]|
 | `config_in`    | `dict`          | Overriding configuration values provided by the caller |
 | `config_out`   | `AnyModelConfig`| After successful completion, contains the configuration record written to the database | 
@@ -779,10 +780,15 @@ time. An argument of 0 (the default) will block indefinitely.
 
 Return a list of all active and complete `ModelInstallJobs`.
 
-#### jobs = installer.get_job(source)
+#### jobs = installer.get_job_by_source(source)
 
 Return a list of `ModelInstallJob` corresponding to the indicated
 model source.
+
+#### jobs = installer.get_job_by_id(id)
+
+Return a list of `ModelInstallJob` corresponding to the indicated
+model id.
 
 #### jobs = installer.cancel_job(job)
 
