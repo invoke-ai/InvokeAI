@@ -178,6 +178,7 @@ nav:
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
     - Changelog: 'CHANGELOG.md'
     - Deprecated:
+      - InvokeAI 2.3: 'deprecated/2to3.md'
       - Command Line Interface: 'deprecated/CLI.md'
       - Variations: 'deprecated/VARIATIONS.md'
       - Translations: 'deprecated/TRANSLATION.md'
