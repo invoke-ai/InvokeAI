@@ -18,7 +18,7 @@ title: Home
       width: 100%;
       max-width: 100%;
       height: 50px;
-      background-color: #448AFF;
+      background-color: #35A4DB;
       color: #fff;
       font-size: 16px;
       border: none;
@@ -43,7 +43,7 @@ title: Home
 <div align="center" markdown>
 
 
-[![project logo](assets/invoke_ai_banner.png)](https://github.com/invoke-ai/InvokeAI)
+[![project logo](https://github.com/invoke-ai/InvokeAI/assets/31807370/6e3728c7-e90e-4711-905c-3b55844ff5be)](https://github.com/invoke-ai/InvokeAI)
 
 [![discord badge]][discord link]
 

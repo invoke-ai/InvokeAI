@@ -6,10 +6,17 @@ If you're not familiar with Diffusion, take a look at our [Diffusion Overview.](
 
 ## Features
 
+### Workflow Library
+The Workflow Library enables you to save workflows to the Invoke database, allowing you to easily creating, modify and share workflows as needed. 
+
+A curated set of workflows are provided by default - these are designed to help explain important nodes' usage in the Workflow Editor.
+
+![workflow_library](../assets/nodes/workflow_library.png)
+
 ### Linear View
 The Workflow Editor allows you to create a UI for your workflow, to make it easier to iterate on your generations. 
 
-To add an input to the Linear UI, right click on the input label and select "Add to Linear View".
+To add an input to the Linear UI, right click on the **input label** and select "Add to Linear View".
 
 The Linear UI View will also be part of the saved workflow, allowing you share workflows and enable other to use them, regardless of complexity. 
 
@@ -30,7 +37,7 @@ Any node or input field can be renamed in the workflow editor. If the input fiel
 Nodes have a "Use Cache" option in their footer. This allows for performance improvements by using the previously cached values during the workflow processing. 
 
 
-## Important Concepts 
+## Important Nodes & Concepts 
 
 There are several node grouping concepts that can be examined with a narrow focus. These (and other) groupings can be pieced together to make up functional graph setups, and are important to understanding how groups of nodes work together as part of a whole. Note that the screenshots below aren't examples of complete functioning node graphs (see Examples).
 
@@ -56,7 +63,7 @@ The ImageToLatents node takes in a pixel image and a VAE and outputs a latents. 
 
 It is common to want to use both the same seed (for continuity) and random seeds (for variety). To define a seed, simply enter it into the 'Seed' field on a noise node. Conversely, the RandomInt node generates a random integer between 'Low' and 'High', and can be used as input to the 'Seed' edge point on a noise node to randomize your seed.
 
-![groupsrandseed](../assets/nodes/groupsrandseed.png)
+![groupsrandseed](../assets/nodes/groupsnoise.png)
 
 ### ControlNet
 

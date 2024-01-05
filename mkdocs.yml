@@ -14,6 +14,9 @@ edit_uri: edit/main/docs/
 # Copyright
 copyright: Copyright &copy; 2023 InvokeAI Team
 
+extra_css:
+    - stylesheets/extra.css
+
 # Configuration
 theme:
   name: material
@@ -21,17 +24,18 @@ theme:
     repo: fontawesome/brands/github
     edit: material/file-document-edit-outline
   palette:
-    - media: '(prefers-color-scheme: light)'
-      scheme: default
-      toggle:
-        icon: material/lightbulb
-        name: Switch to dark mode
+    # - media: '(prefers-color-scheme: light)'
+    #   scheme: default
+    #   primary: custom
+    #   toggle:
+    #     icon: material/lightbulb
+    #     name: Switch to dark mode
     - media: '(prefers-color-scheme: dark)'
       scheme: slate
-      primary: blue
-      toggle:
-        icon: material/lightbulb-outline
-        name: Switch to light mode
+      primary: custom
+      # toggle:
+      #   icon: material/lightbulb-outline
+      #   name: Switch to light mode
   features:
     - navigation.instant
     - navigation.tabs
@@ -42,8 +46,7 @@ theme:
     - search.highlight
     - search.suggest
     - toc.integrate
-extra_css:
-  - stylesheets/extra.css
+
 
 # Extensions
 markdown_extensions:
