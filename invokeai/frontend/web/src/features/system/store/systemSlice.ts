@@ -82,7 +82,7 @@ export const systemSlice = createSlice({
       action: PayloadAction<boolean>
     ) {
       state.shouldEnableInformationalPopovers = action.payload;
-    }
+    },
   },
   extraReducers(builder) {
     /**
