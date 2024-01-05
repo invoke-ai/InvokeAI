@@ -88,7 +88,6 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
         alignItems="center"
         justifyContent="flex-start"
         gap={1}
-        h="full"
         w="full"
       >
         <EditablePreview
