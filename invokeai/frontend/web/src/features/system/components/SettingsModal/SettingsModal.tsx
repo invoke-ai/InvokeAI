@@ -37,11 +37,10 @@ import { SettingsLanguageSelect } from './SettingsLanguageSelect';
 import { SettingsLogLevelSelect } from './SettingsLogLevelSelect';
 
 type ConfigOptions = {
-  shouldShowDeveloperSettings: boolean;
-  shouldShowResetWebUiText: boolean;
-  shouldShowAdvancedOptionsSettings: boolean;
-  shouldShowClearIntermediates: boolean;
-  shouldShowLocalizationToggle: boolean;
+  shouldShowDeveloperSettings?: boolean;
+  shouldShowResetWebUiText?: boolean;
+  shouldShowClearIntermediates?: boolean;
+  shouldShowLocalizationToggle?: boolean;
 };
 
 type SettingsModalProps = {
@@ -84,7 +83,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     hasPendingItems,
     intermediatesCount,
     isLoading: isLoadingClearIntermediates,
-  } = useClearIntermediates();
+  } = useClearIntermediates(shouldShowClearIntermediates);
 
   const {
     isOpen: isSettingsModalOpen,
