@@ -1,5 +1,4 @@
 import { Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -19,7 +18,6 @@ import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
   resetCanvasView,
-  selectCanvasSlice,
   setIsMaskEnabled,
   setLayer,
   setTool,
@@ -48,27 +46,13 @@ import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
 
-export const selector = createMemoizedSelector(
-  [selectCanvasSlice, isStagingSelector],
-  (canvas, isStaging) => {
-    const { tool, shouldCropToBoundingBoxOnSave, layer, isMaskEnabled } =
-      canvas;
-
-    return {
-      isStaging,
-      isMaskEnabled,
-      tool,
-      layer,
-      shouldCropToBoundingBoxOnSave,
-    };
-  }
-);
-
 const IAICanvasToolbar = () => {
   const dispatch = useAppDispatch();
-  const { isStaging, isMaskEnabled, layer, tool } = useAppSelector(selector);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const layer = useAppSelector((s) => s.canvas.layer);
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const isStaging = useAppSelector(isStagingSelector);
   const canvasBaseLayer = getCanvasBaseLayer();
-
   const { t } = useTranslation();
   const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
