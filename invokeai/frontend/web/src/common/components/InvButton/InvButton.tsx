@@ -22,7 +22,11 @@ export const InvButton = memo(
       }
 
       return (
-        <Button ref={ref} colorScheme={isChecked ? 'invokeBlue' : 'base'} {...rest}>
+        <Button
+          ref={ref}
+          colorScheme={isChecked ? 'invokeBlue' : 'base'}
+          {...rest}
+        >
           {children}
         </Button>
       );
