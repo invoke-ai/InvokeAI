@@ -9,29 +9,28 @@ const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
     boundingBoxCoordinates,
     boundingBoxDimensions,
     stageDimensions,
-    stageScale,
-    shouldDarkenOutsideBoundingBox,
     stageCoordinates,
   } = canvas;
 
   return {
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    shouldDarkenOutsideBoundingBox,
     stageCoordinates,
     stageDimensions,
-    stageScale,
   };
 });
+
 const IAICanvasBoundingBoxOverlay = () => {
   const {
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    shouldDarkenOutsideBoundingBox,
     stageCoordinates,
     stageDimensions,
-    stageScale,
   } = useAppSelector(selector);
+  const shouldDarkenOutsideBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldDarkenOutsideBoundingBox
+  );
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
 
   return (
     <Group listening={false}>

@@ -1,4 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   resetCanvasInteractionState,
@@ -7,7 +6,6 @@ import {
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
-  selectCanvasSlice,
   setIsMaskEnabled,
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
@@ -16,49 +14,24 @@ import {
 import type { CanvasTool } from 'features/canvas/store/canvasTypes';
 import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-
-const selector = createMemoizedSelector(
-  [selectCanvasSlice, activeTabNameSelector, isStagingSelector],
-  (canvas, activeTabName, isStaging) => {
-    const {
-      shouldLockBoundingBox,
-      shouldShowBoundingBox,
-      tool,
-      isMaskEnabled,
-      shouldSnapToGrid,
-    } = canvas;
-
-    return {
-      activeTabName,
-      shouldLockBoundingBox,
-      shouldShowBoundingBox,
-      tool,
-      isStaging,
-      isMaskEnabled,
-      shouldSnapToGrid,
-    };
-  }
-);
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const {
-    activeTabName,
-    shouldShowBoundingBox,
-    tool,
-    isStaging,
-    isMaskEnabled,
-    shouldSnapToGrid,
-  } = useAppSelector(selector);
-
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const shouldShowBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldShowBoundingBox
+  );
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const isStaging = useAppSelector(isStagingSelector);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
   const previousToolRef = useRef<CanvasTool | null>(null);
-
   const canvasStage = getCanvasStage();
 
   // Beta Keys
-  const handleClearMask = () => dispatch(clearMask());
+  const handleClearMask = useCallback(() => dispatch(clearMask()), [dispatch]);
 
   useHotkeys(
     ['shift+c'],
