@@ -1,4 +1,3 @@
-import { DeleteIcon } from '@chakra-ui/icons';
 import { Badge, Flex, useDisclosure } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
@@ -11,6 +10,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiTrashSimpleBold } from 'react-icons/pi'
 import type {
   LoRAModelConfigEntity,
   MainModelConfigEntity,
@@ -109,7 +109,7 @@ const ModelListItem = (props: ModelListItemProps) => {
       </Flex>
       <InvIconButton
         onClick={onOpen}
-        icon={<DeleteIcon />}
+        icon={<PiTrashSimpleBold />}
         aria-label={t('modelManager.deleteConfig')}
         colorScheme="error"
       />

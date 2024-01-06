@@ -31,16 +31,7 @@ import { InvIconButton } from 'index';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import {
-  FaArrowsAlt,
-  FaCopy,
-  FaCrosshairs,
-  FaDownload,
-  FaLayerGroup,
-  FaSave,
-  FaTrash,
-  FaUpload,
-} from 'react-icons/fa';
+import { PiCopyBold, PiCrosshairSimpleBold, PiDownloadSimpleBold, PiFloppyDiskBold, PiHandGrabbingBold, PiStackBold, PiTrashSimpleBold, PiUploadSimpleBold } from 'react-icons/pi'
 
 import IAICanvasMaskOptions from './IAICanvasMaskOptions';
 import IAICanvasRedoButton from './IAICanvasRedoButton';
@@ -233,14 +224,14 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.move')} (V)`}
           tooltip={`${t('unifiedCanvas.move')} (V)`}
-          icon={<FaArrowsAlt />}
+          icon={<PiHandGrabbingBold />}
           isChecked={tool === 'move' || isStaging}
           onClick={handleSelectMoveTool}
         />
         <InvIconButton
           aria-label={`${t('unifiedCanvas.resetView')} (R)`}
           tooltip={`${t('unifiedCanvas.resetView')} (R)`}
-          icon={<FaCrosshairs />}
+          icon={<PiCrosshairSimpleBold />}
           onClick={handleClickResetCanvasView}
         />
       </InvButtonGroup>
@@ -249,14 +240,14 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
           tooltip={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
-          icon={<FaLayerGroup />}
+          icon={<PiStackBold />}
           onClick={handleMergeVisible}
           isDisabled={isStaging}
         />
         <InvIconButton
           aria-label={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
-          icon={<FaSave />}
+          icon={<PiFloppyDiskBold />}
           onClick={handleSaveToGallery}
           isDisabled={isStaging}
         />
@@ -264,7 +255,7 @@ const IAICanvasToolbar = () => {
           <InvIconButton
             aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
             tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
-            icon={<FaCopy />}
+            icon={<PiCopyBold />}
             onClick={handleCopyImageToClipboard}
             isDisabled={isStaging}
           />
@@ -272,7 +263,7 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
           tooltip={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
-          icon={<FaDownload />}
+          icon={<PiDownloadSimpleBold />}
           onClick={handleDownloadAsImage}
           isDisabled={isStaging}
         />
@@ -286,7 +277,7 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('common.upload')}`}
           tooltip={`${t('common.upload')}`}
-          icon={<FaUpload />}
+          icon={<PiUploadSimpleBold />}
           isDisabled={isStaging}
           {...getUploadButtonProps()}
         />
@@ -294,7 +285,7 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.clearCanvas')}`}
           tooltip={`${t('unifiedCanvas.clearCanvas')}`}
-          icon={<FaTrash />}
+          icon={<PiTrashSimpleBold />}
           onClick={handleResetCanvas}
           colorScheme="error"
           isDisabled={isStaging}

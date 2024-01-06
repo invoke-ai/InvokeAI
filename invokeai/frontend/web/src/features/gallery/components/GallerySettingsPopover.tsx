@@ -21,7 +21,7 @@ import {
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaWrench } from 'react-icons/fa';
+import { RiSettings4Fill } from 'react-icons/ri'
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
 
@@ -70,7 +70,7 @@ const GallerySettingsPopover = () => {
           tooltip={t('gallery.gallerySettings')}
           aria-label={t('gallery.gallerySettings')}
           size="sm"
-          icon={<FaWrench />}
+          icon={<RiSettings4Fill />}
         />
       </InvPopoverTrigger>
       <InvPopoverContent>

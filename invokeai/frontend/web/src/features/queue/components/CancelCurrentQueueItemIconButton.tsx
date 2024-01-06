@@ -3,7 +3,7 @@ import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTimes } from 'react-icons/fa';
+import { PiXBold } from 'react-icons/pi'
 type Props = {
   sx?: ChakraProps['sx'];
 };
@@ -19,7 +19,7 @@ const CancelCurrentQueueItemIconButton = ({ sx }: Props) => {
       isLoading={isLoading}
       aria-label={t('queue.cancel')}
       tooltip={t('queue.cancelTooltip')}
-      icon={<FaTimes />}
+      icon={<PiXBold size="16px" />}
       onClick={cancelQueueItem}
       colorScheme="error"
       sx={sx}

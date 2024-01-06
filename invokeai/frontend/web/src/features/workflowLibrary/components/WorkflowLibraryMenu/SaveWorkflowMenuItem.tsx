@@ -2,13 +2,13 @@ import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSave } from 'react-icons/fa';
+import { PiFloppyDiskBold } from 'react-icons/pi'
 
 const SaveLibraryWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const { saveWorkflow } = useSaveLibraryWorkflow();
   return (
-    <InvMenuItem as="button" icon={<FaSave />} onClick={saveWorkflow}>
+    <InvMenuItem as="button" icon={<PiFloppyDiskBold />} onClick={saveWorkflow}>
       {t('workflows.saveWorkflow')}
     </InvMenuItem>
   );

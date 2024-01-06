@@ -3,7 +3,7 @@ import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSync } from 'react-icons/fa';
+import { PiArrowsClockwiseBold } from 'react-icons/pi'
 
 import { useSyncModels } from './useSyncModels';
 
@@ -19,12 +19,12 @@ export const SyncModelsIconButton = memo(
 
     return (
       <InvIconButton
-        icon={<FaSync />}
+        icon={<PiArrowsClockwiseBold />}
         tooltip={t('modelManager.syncModels')}
         aria-label={t('modelManager.syncModels')}
         isLoading={isLoading}
         onClick={syncModels}
-        size="sm"
+        size="md"
         variant="ghost"
         {...props}
       />

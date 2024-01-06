@@ -28,7 +28,7 @@ export const CompositingSettingsAccordion = memo(() => {
 
   return (
     <InvSingleAccordion label={t('accordions.compositing.title')}>
-      <InvTabs variant="collapse">
+      <InvTabs isFitted>
         <InvTabList>
           <InvTab>{t('accordions.compositing.coherenceTab')}</InvTab>
           <InvTab>{t('accordions.compositing.infillTab')}</InvTab>

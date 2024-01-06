@@ -8,7 +8,7 @@ import {
 } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IoSparkles } from 'react-icons/io5';
+import { RiSparklingFill } from 'react-icons/ri'
 
 export const SetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
@@ -41,8 +41,8 @@ export const SetOptimalSizeButton = memo(() => {
       aria-label={t('parameters.setToOptimalSize')}
       onClick={onClick}
       variant="ghost"
-      size="sm"
-      icon={<IoSparkles />}
+      size="md"
+      icon={<RiSparklingFill />}
       colorScheme={isSizeTooSmall || isSizeTooLarge ? 'warning' : 'base'}
     />
   );

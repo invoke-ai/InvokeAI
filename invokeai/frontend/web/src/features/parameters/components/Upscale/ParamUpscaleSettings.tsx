@@ -13,7 +13,7 @@ import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToU
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExpand } from 'react-icons/fa';
+import { PiFrameCornersBold } from 'react-icons/pi'
 import type { ImageDTO } from 'services/api/types';
 
 import ParamESRGANModel from './ParamRealESRGANModel';
@@ -42,7 +42,7 @@ const ParamUpscalePopover = (props: Props) => {
         <InvIconButton
           tooltip={t('parameters.upscale')}
           onClick={onOpen}
-          icon={<FaExpand />}
+          icon={<PiFrameCornersBold />}
           aria-label={t('parameters.upscale')}
         />
       </InvPopoverTrigger>

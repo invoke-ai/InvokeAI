@@ -7,12 +7,7 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  FaExpand,
-  // FaInfo,
-  FaMapMarkerAlt,
-} from 'react-icons/fa';
-import { FaMagnifyingGlassMinus, FaMagnifyingGlassPlus } from 'react-icons/fa6';
+import { PiFrameCornersBold, PiMagnifyingGlassMinusBold, PiMagnifyingGlassPlusBold, PiMapPinBold } from 'react-icons/pi'
 import { useReactFlow } from 'reactflow';
 
 const ViewportControls = () => {
@@ -52,19 +47,19 @@ const ViewportControls = () => {
         tooltip={t('nodes.zoomInNodes')}
         aria-label={t('nodes.zoomInNodes')}
         onClick={handleClickedZoomIn}
-        icon={<FaMagnifyingGlassPlus />}
+        icon={<PiMagnifyingGlassPlusBold />}
       />
       <InvIconButton
         tooltip={t('nodes.zoomOutNodes')}
         aria-label={t('nodes.zoomOutNodes')}
         onClick={handleClickedZoomOut}
-        icon={<FaMagnifyingGlassMinus />}
+        icon={<PiMagnifyingGlassMinusBold />}
       />
       <InvIconButton
         tooltip={t('nodes.fitViewportNodes')}
         aria-label={t('nodes.fitViewportNodes')}
         onClick={handleClickedFitView}
-        icon={<FaExpand />}
+        icon={<PiFrameCornersBold />}
       />
       {/* <InvTooltip
         label={
@@ -93,7 +88,7 @@ const ViewportControls = () => {
         }
         isChecked={shouldShowMinimapPanel}
         onClick={handleClickedToggleMiniMapPanel}
-        icon={<FaMapMarkerAlt />}
+        icon={<PiMapPinBold />}
       />
     </InvButtonGroup>
   );

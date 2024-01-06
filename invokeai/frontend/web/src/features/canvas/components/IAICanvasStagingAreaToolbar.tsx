@@ -18,15 +18,7 @@ import { InvIconButton } from 'index';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import {
-  FaArrowLeft,
-  FaArrowRight,
-  FaCheck,
-  FaEye,
-  FaEyeSlash,
-  FaSave,
-  FaTimes,
-} from 'react-icons/fa';
+import { PiArrowLeftBold, PiArrowRightBold, PiCheckBold, PiEyeBold, PiEyeSlashBold, PiFloppyDiskBold, PiXBold } from 'react-icons/pi'
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
@@ -140,7 +132,7 @@ const IAICanvasStagingAreaToolbar = () => {
         <InvIconButton
           tooltip={`${t('unifiedCanvas.previous')} (Left)`}
           aria-label={`${t('unifiedCanvas.previous')} (Left)`}
-          icon={<FaArrowLeft />}
+          icon={<PiArrowLeftBold />}
           onClick={handlePrevImage}
           colorScheme="blue"
           isDisabled={!shouldShowStagingImage}
@@ -154,7 +146,7 @@ const IAICanvasStagingAreaToolbar = () => {
         <InvIconButton
           tooltip={`${t('unifiedCanvas.next')} (Right)`}
           aria-label={`${t('unifiedCanvas.next')} (Right)`}
-          icon={<FaArrowRight />}
+          icon={<PiArrowRightBold />}
           onClick={handleNextImage}
           colorScheme="blue"
           isDisabled={!shouldShowStagingImage}
@@ -164,7 +156,7 @@ const IAICanvasStagingAreaToolbar = () => {
         <InvIconButton
           tooltip={`${t('unifiedCanvas.accept')} (Enter)`}
           aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
-          icon={<FaCheck />}
+          icon={<PiCheckBold />}
           onClick={handleAccept}
           colorScheme="blue"
         />
@@ -180,7 +172,7 @@ const IAICanvasStagingAreaToolbar = () => {
               : t('unifiedCanvas.showResultsOff')
           }
           data-alert={!shouldShowStagingImage}
-          icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
+          icon={shouldShowStagingImage ? <PiEyeBold /> : <PiEyeSlashBold />}
           onClick={handleToggleShouldShowStagingImage}
           colorScheme="blue"
         />
@@ -188,14 +180,14 @@ const IAICanvasStagingAreaToolbar = () => {
           tooltip={t('unifiedCanvas.saveToGallery')}
           aria-label={t('unifiedCanvas.saveToGallery')}
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
-          icon={<FaSave />}
+          icon={<PiFloppyDiskBold />}
           onClick={handleSaveToGallery}
           colorScheme="blue"
         />
         <InvIconButton
           tooltip={t('unifiedCanvas.discardAll')}
           aria-label={t('unifiedCanvas.discardAll')}
-          icon={<FaTimes />}
+          icon={<PiXBold />}
           onClick={handleDiscardStagingArea}
           colorScheme="error"
           fontSize={20}

@@ -139,7 +139,7 @@ const DeleteBoardModal = (props: Props) => {
             </Flex>
           </InvAlertDialogBody>
           <InvAlertDialogFooter>
-            <Flex w="full" gap={2} justifyContent="space-between">
+            <Flex w="full" gap={2} justifyContent="end">
               <InvButton ref={cancelRef} onClick={handleClose}>
                 {t('boards.cancel')}
               </InvButton>

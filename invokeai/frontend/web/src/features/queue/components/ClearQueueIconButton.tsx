@@ -5,7 +5,7 @@ import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQu
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTrash } from 'react-icons/fa';
+import { PiTrashSimpleBold } from 'react-icons/pi'
 
 type Props = Omit<InvIconButtonProps, 'aria-label'>;
 
@@ -21,7 +21,7 @@ const ClearQueueIconButton = (props: Props) => {
         isLoading={isLoading}
         aria-label={t('queue.clear')}
         tooltip={t('queue.clearTooltip')}
-        icon={<FaTrash />}
+        icon={<PiTrashSimpleBold size="16px" />}
         colorScheme="error"
         onClick={disclosure.onOpen}
         data-testid={t('queue.clear')}

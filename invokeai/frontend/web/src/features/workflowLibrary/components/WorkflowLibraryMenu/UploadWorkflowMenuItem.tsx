@@ -3,7 +3,7 @@ import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadW
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { FaUpload } from 'react-icons/fa';
+import { PiUploadSimpleBold } from 'react-icons/pi'
 
 const UploadWorkflowMenuItem = () => {
   const { t } = useTranslation();
@@ -27,7 +27,7 @@ const UploadWorkflowMenuItem = () => {
     multiple: false,
   });
   return (
-    <InvMenuItem as="button" icon={<FaUpload />} {...getRootProps()}>
+    <InvMenuItem as="button" icon={<PiUploadSimpleBold />} {...getRootProps()}>
       {t('workflows.uploadWorkflow')}
       <input {...getInputProps()} />
     </InvMenuItem>

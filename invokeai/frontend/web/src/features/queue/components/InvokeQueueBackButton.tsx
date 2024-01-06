@@ -9,7 +9,7 @@ import type { InvNumberInputFieldProps } from 'common/components/InvNumberInput/
 import { setIterations } from 'features/parameters/store/generationSlice';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { memo, useCallback } from 'react';
-import { IoSparkles } from 'react-icons/io5';
+import { RiSparkling2Fill } from 'react-icons/ri'
 
 import { QueueButtonTooltip } from './QueueButtonTooltip';
 
@@ -80,7 +80,7 @@ export const InvokeQueueBackButton = memo(() => {
         isLoading={isLoading || isLoadingDynamicPrompts}
         loadingText={invoke}
         isDisabled={isDisabled}
-        rightIcon={<IoSparkles />}
+        rightIcon={<RiSparkling2Fill />}
         tooltip={<QueueButtonTooltip />}
         variant="solid"
         zIndex={1}

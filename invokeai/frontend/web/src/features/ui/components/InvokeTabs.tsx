@@ -33,9 +33,8 @@ import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaCube, FaFont, FaImage } from 'react-icons/fa';
-import { FaCircleNodes, FaList } from 'react-icons/fa6';
-import { MdGridOn } from 'react-icons/md';
+import { PiFlowArrowBold } from 'react-icons/pi'
+import { RiBox2Line, RiBrushLine, RiImage2Line, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -59,37 +58,37 @@ const tabs: InvokeTabInfo[] = [
   {
     id: 'txt2img',
     translationKey: 'common.txt2img',
-    icon: <FaFont />,
+    icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
   },
   {
     id: 'img2img',
     translationKey: 'common.img2img',
-    icon: <FaImage />,
+    icon: <RiImage2Line />,
     content: <ImageTab />,
   },
   {
     id: 'unifiedCanvas',
     translationKey: 'common.unifiedCanvas',
-    icon: <MdGridOn />,
+    icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
   },
   {
     id: 'nodes',
     translationKey: 'common.nodes',
-    icon: <FaCircleNodes />,
+    icon: <PiFlowArrowBold />,
     content: <NodesTab />,
   },
   {
     id: 'modelManager',
     translationKey: 'modelManager.modelManager',
-    icon: <FaCube />,
+    icon: <RiBox2Line />,
     content: <ModelManagerTab />,
   },
   {
     id: 'queue',
     translationKey: 'queue.queue',
-    icon: <FaList />,
+    icon: <RiPlayList2Fill />,
     content: <QueueTab />,
   },
 ];

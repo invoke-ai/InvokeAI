@@ -7,7 +7,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaUndo } from 'react-icons/fa';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi'
 
 const canvasUndoSelector = createMemoizedSelector(
   [stateSelector, activeTabNameSelector],
@@ -48,7 +48,7 @@ const IAICanvasUndoButton = () => {
     <InvIconButton
       aria-label={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       tooltip={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
-      icon={<FaUndo />}
+      icon={<PiArrowCounterClockwiseBold />}
       onClick={handleUndo}
       isDisabled={!canUndo}
     />
