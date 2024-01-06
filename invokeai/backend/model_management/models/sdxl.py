@@ -1,10 +1,15 @@
 import json
 import os
 from enum import Enum
+from pathlib import Path
 from typing import Literal, Optional
 
 from omegaconf import OmegaConf
 from pydantic import Field
+
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.model_management.detect_baked_in_vae import has_baked_in_sdxl_vae
+from invokeai.backend.util.logging import InvokeAILogger
 
 from .base import (
     BaseModelType,
@@ -116,17 +121,20 @@ class StableDiffusionXLModel(DiffusersModel):
         # The convert script adapted from the diffusers package uses
         # strings for the base model type. To avoid making too many
         # source code changes, we simply translate here
+        if Path(output_path).exists():
+            return output_path
+
         if isinstance(config, cls.CheckpointConfig):
             from invokeai.backend.model_management.models.stable_diffusion import _convert_ckpt_and_cache
 
             # Hack in VAE-fp16 fix - If model sdxl-vae-fp16-fix is installed,
-            # then we bake it into the converted model.
-            from invokeai.app.services.config import InvokeAIAppConfig
-
-            kwargs = dict()
+            # then we bake it into the converted model unless there is already
+            # a nonstandard VAE installed.
+            kwargs = {}
             app_config = InvokeAIAppConfig.get_config()
             vae_path = app_config.models_path / "sdxl/vae/sdxl-vae-fp16-fix"
-            if vae_path.exists():
+            if vae_path.exists() and not has_baked_in_sdxl_vae(Path(model_path)):
+                InvokeAILogger.get_logger().warning("No baked-in VAE detected. Inserting sdxl-vae-fp16-fix.")
                 kwargs["vae_path"] = vae_path
 
             return _convert_ckpt_and_cache(
