@@ -53,8 +53,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
     @classmethod
     def from_json(cls, json: str) -> HuggingFaceMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
-        metadata = AnyModelRepoMetadataValidator.validate_json(json)
-        assert isinstance(metadata, HuggingFaceMetadata)
+        metadata = HuggingFaceMetadata.model_validate_json(json)
         return metadata
 
     def from_id(self, id: str) -> AnyModelRepoMetadata:
