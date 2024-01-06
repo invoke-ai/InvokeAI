@@ -5,7 +5,7 @@ Abstract base class for storing and retrieving model configuration records.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Set, Tuple, Union
 
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
@@ -86,7 +86,7 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def list_all_metadata(self) -> List[AnyModelRepoMetadata]:
+    def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:
         """
         List metadata for all models that have it.
         """

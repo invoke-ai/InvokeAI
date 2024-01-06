@@ -111,7 +111,7 @@ async def get_model_metadata(
 ) -> Optional[AnyModelRepoMetadata]:
     """Get a model metadata object."""
     record_store = ApiDependencies.invoker.services.model_records
-    result: AnyModelRepoMetadata = record_store.get_metadata(key)
+    result = record_store.get_metadata(key)
     if not result:
         raise HTTPException(status_code=404, detail="No metadata for a model with this key")
     return result

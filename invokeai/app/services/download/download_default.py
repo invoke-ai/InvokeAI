@@ -5,10 +5,9 @@ import os
 import re
 import threading
 import traceback
-from logging import Logger
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 import requests
 from pydantic.networks import AnyHttpUrl
@@ -36,18 +35,6 @@ DOWNLOAD_CHUNK_SIZE = 100000
 
 class DownloadQueueService(DownloadQueueServiceBase):
     """Class for queued download of models."""
-
-    _jobs: Dict[int, DownloadJob]
-    _max_parallel_dl: int = 5
-    _worker_pool: Set[threading.Thread]
-    _queue: PriorityQueue[DownloadJob]
-    _stop_event: threading.Event
-    _lock: threading.Lock
-    _logger: Logger
-    _events: Optional[EventServiceBase] = None
-    _next_job_id: int = 0
-    _accept_download_requests: bool = False
-    _requests: requests.sessions.Session
 
     def __init__(
         self,

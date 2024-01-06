@@ -17,7 +17,7 @@ class Migration4Callback:
         cursor.execute(
             """--sql
             CREATE TABLE IF NOT EXISTS model_metadata (
-                id TEXT NOT NULL,
+                id TEXT NOT NULL PRIMARY KEY,
                 name TEXT GENERATED ALWAYS AS (json_extract(metadata, '$.name')) VIRTUAL NOT NULL,
                 author TEXT GENERATED ALWAYS AS (json_extract(metadata, '$.author')) VIRTUAL NOT NULL,
                 -- Serialized JSON representation of the whole metadata object,
@@ -26,7 +26,7 @@ class Migration4Callback:
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                FOREIGN KEY(id) REFERENCES model_config(id)
+                FOREIGN KEY(id) REFERENCES model_config(id) ON DELETE CASCADE
             );
             """
         )
@@ -35,11 +35,11 @@ class Migration4Callback:
         cursor.execute(
             """--sql
             CREATE TABLE IF NOT EXISTS model_tags (
-                id TEXT NOT NULL,
+                model_id TEXT NOT NULL,
                 tag_id INTEGER NOT NULL,
-                FOREIGN KEY(id) REFERENCES model_config(id),
-                FOREIGN KEY(tag_id) REFERENCES tags(tag_id),
-                UNIQUE(id,tag_id)
+                FOREIGN KEY(model_id) REFERENCES model_config(id) ON DELETE CASCADE,
+                FOREIGN KEY(tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE,
+                UNIQUE(model_id,tag_id)
             );
             """
         )
@@ -63,17 +63,6 @@ class Migration4Callback:
             BEGIN
                 UPDATE model_metadata SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
                     WHERE id = old.id;
-            END;
-            """
-        )
-        cursor.execute(
-            """--sql
-            CREATE TRIGGER IF NOT EXISTS model_config_deleted
-            AFTER DELETE
-            ON model_config
-            BEGIN
-                DELETE from model_metadata WHERE id=old.id;
-                DELETE from model_tags WHERE id=old.id;
             END;
             """
         )

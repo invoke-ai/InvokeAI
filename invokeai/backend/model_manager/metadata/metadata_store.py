@@ -15,9 +15,6 @@ from .metadata_base import AnyModelRepoMetadata, UnknownMetadataException
 class ModelMetadataStore:
     """Store, search and fetch model metadata retrieved from remote repositories."""
 
-    _db: SqliteDatabase
-    _cursor: sqlite3.Cursor
-
     def __init__(self, db: SqliteDatabase):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
@@ -129,8 +126,8 @@ class ModelMetadataStore:
                 for tag in tags:
                     self._cursor.execute(
                         """--sql
-                        SELECT a.id FROM model_tags AS a,
-                                               tags AS b
+                        SELECT a.model_id FROM model_tags AS a,
+                                                     tags AS b
                         WHERE a.tag_id=b.tag_id
                           AND b.tag_text=?;
                         """,
@@ -179,7 +176,7 @@ class ModelMetadataStore:
         self._cursor.execute(
             """--sql
             DELETE FROM model_tags
-            WHERE id=?;
+            WHERE model_id=?;
             """,
             (model_key,),
         )
@@ -207,7 +204,7 @@ class ModelMetadataStore:
             self._cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO model_tags (
-                   id,
+                   model_id,
                    tag_id
                   )
                 VALUES (?,?);

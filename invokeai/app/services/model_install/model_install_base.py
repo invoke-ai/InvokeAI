@@ -157,7 +157,7 @@ ModelSource = Annotated[
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""
 
-    id: int = Field(default=-1, description="Unique ID for this job")
+    id: int = Field(description="Unique ID for this job")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
     config_in: Dict[str, Any] = Field(
         default_factory=dict, description="Configuration information (e.g. 'description') to apply to model."
@@ -194,7 +194,6 @@ class ModelInstallJob(BaseModel):
 
     def cancel(self) -> None:
         """Call to cancel the job."""
-        self._cancelled = True
         self.status = InstallStatus.CANCELLED
 
     @property

@@ -34,7 +34,6 @@ from requests.sessions import Session
 
 from ..metadata_base import (
     AnyModelRepoMetadata,
-    AnyModelRepoMetadataValidator,
     CivitaiMetadata,
     CommercialUsage,
     LicenseRestrictions,
@@ -53,8 +52,6 @@ CIVITAI_MODEL_ENDPOINT = "https://civitai.com/api/v1/models/"
 
 class CivitaiMetadataFetch(ModelMetadataFetchBase):
     """Fetch model metadata from Civitai."""
-
-    _requests: Session
 
     def __init__(self, session: Optional[Session] = None):
         """

@@ -25,7 +25,6 @@ from requests.sessions import Session
 
 from ..metadata_base import (
     AnyModelRepoMetadata,
-    AnyModelRepoMetadataValidator,
     HuggingFaceMetadata,
     RemoteModelFile,
     UnknownMetadataException,
@@ -37,8 +36,6 @@ HF_MODEL_RE = r"https?://huggingface.co/([\w\-.]+/[\w\-.]+)"
 
 class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
     """Fetch model metadata from HuggingFace."""
-
-    _requests: Session
 
     def __init__(self, session: Optional[Session] = None):
         """

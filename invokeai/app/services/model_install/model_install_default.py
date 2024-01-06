@@ -4,7 +4,6 @@ import re
 import threading
 import time
 from hashlib import sha256
-from logging import Logger
 from pathlib import Path
 from queue import Empty, Queue
 from random import randbytes
@@ -13,7 +12,6 @@ from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Set, Union
 
 from huggingface_hub import HfFolder
-from pydantic.networks import AnyHttpUrl
 from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -58,27 +56,6 @@ TMPDIR_PREFIX = "tmpinstall_"
 class ModelInstallService(ModelInstallServiceBase):
     """class for InvokeAI model installation."""
 
-    _app_config: InvokeAIAppConfig
-    _record_store: ModelRecordServiceBase
-    _event_bus: Optional[EventServiceBase] = None
-    _install_queue: Queue[ModelInstallJob]
-    _install_jobs: List[ModelInstallJob]
-    _running: bool
-    _logger: Logger
-    _lock: threading.Lock
-    _stop_event: threading.Event
-    _cached_model_paths: Set[Path]
-    _session: Optional[
-        Session
-    ] = None  # This can be a customized requests.Session, for use during debugging or when internet not available.
-    _download_queue: DownloadQueueServiceBase
-    _downloads_changed_event: threading.Event
-    _models_installed: Set[str]
-    _metadata_store: ModelMetadataStore
-    _metadata_cache: Dict[ModelSource, Optional[AnyModelRepoMetadata]]
-    _download_cache: Dict[AnyHttpUrl, ModelInstallJob]
-    _next_job_id: int = 0
-
     def __init__(
         self,
         app_config: InvokeAIAppConfig,
@@ -111,6 +88,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._download_cache = {}
         self._running = False
         self._session = session
+        self._next_job_id = 0
         # There may not necessarily be a metadata store initialized
         # so we create one and initialize it with the same sql database
         # used by the record store service.
@@ -224,6 +202,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if not jobs:
             raise ValueError(f"No job with id {id} known")
         assert len(jobs) == 1
+        assert isinstance(jobs[0], ModelInstallJob)
         return jobs[0]
 
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
@@ -584,9 +563,9 @@ class ModelInstallService(ModelInstallServiceBase):
         install_job._install_tmpdir = tmpdir
         assert install_job.total_bytes is not None  # to avoid type checking complaints in the loop below
 
-        metadata = self._get_metadata(source)  #  may return None
+        metadata = self._get_metadata(source)  # may return None
         url_and_paths = self._get_download_urls(source, metadata)
-        self._metadata_cache[source] = metadata  #  save for installation time
+        self._metadata_cache[source] = metadata  # save for installation time
 
         # Add the user's access token to HuggingFace requests
         if isinstance(source, HFModelSource) and not source.access_token:

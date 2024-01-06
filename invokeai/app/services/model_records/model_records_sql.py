@@ -43,7 +43,7 @@ Typical usage:
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -64,9 +64,6 @@ from .model_records_base import (
 
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
-
-    _db: SqliteDatabase
-    _cursor: sqlite3.Cursor
 
     def __init__(self, db: SqliteDatabase):
         """
@@ -323,9 +320,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         keys = store.search_by_tag(tags)
         return [self.get_model(x) for x in keys]
 
-    def list_all_metadata(self) -> List[AnyModelRepoMetadata]:
-        """
-        List metadata for all models that have it.
-        """
+    def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:
+        """List metadata for all models that have it."""
         store = ModelMetadataStore(self._db)
         return store.list_all_metadata()
