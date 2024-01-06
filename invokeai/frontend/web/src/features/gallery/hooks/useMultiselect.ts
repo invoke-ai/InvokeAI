@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import {
   selectGallerySlice,
   selectionChanged,
@@ -8,29 +8,24 @@ import {
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';
-import { useListImagesQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
 
-const selector = createMemoizedSelector(
-  [selectGallerySlice, selectListImagesBaseQueryArgs],
-  (gallery, queryArgs) => {
-    return {
-      queryArgs,
-      selection: gallery.selection,
-    };
-  }
+const selectGallerySelection = createMemoizedSelector(
+  selectGallerySlice,
+  (gallery) => gallery.selection
 );
+
+const EMPTY_ARRAY: ImageDTO[] = [];
 
 export const useMultiselect = (imageDTO?: ImageDTO) => {
   const dispatch = useAppDispatch();
-  const { queryArgs, selection } = useAppSelector(selector);
-
-  const { imageDTOs } = useListImagesQuery(queryArgs, {
-    selectFromResult: (result) => ({
-      imageDTOs: result.data ? imagesSelectors.selectAll(result.data) : [],
-    }),
-  });
+  const selection = useAppSelector(selectGallerySelection);
+  const { data } = useGalleryImages().queryResult;
+  const imageDTOs = useMemo(
+    () => (data ? imagesSelectors.selectAll(data) : EMPTY_ARRAY),
+    [data]
+  );
 
   const isMultiSelectEnabled = useFeatureStatus('multiselect').isFeatureEnabled;
 

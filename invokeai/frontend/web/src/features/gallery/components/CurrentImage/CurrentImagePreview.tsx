@@ -11,13 +11,11 @@ import type {
 import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -37,61 +35,6 @@ const CurrentImagePreview = () => {
   );
   const shouldShowProgressInViewer = useAppSelector(
     (s) => s.ui.shouldShowProgressInViewer
-  );
-
-  const {
-    handlePrevImage,
-    handleNextImage,
-    isOnLastImage,
-    handleLoadMoreImages,
-    areMoreImagesAvailable,
-    isFetching,
-    handleTopImage,
-    handleBottomImage
-  } = useNextPrevImage();
-
-  useHotkeys(
-    'left',
-    () => {
-      handlePrevImage();
-    },
-    [handlePrevImage]
-  );
-
-  useHotkeys(
-    'right',
-    () => {
-      if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
-        handleLoadMoreImages();
-        return;
-      }
-      if (!isOnLastImage) {
-        handleNextImage();
-      }
-    },
-    [
-      isOnLastImage,
-      areMoreImagesAvailable,
-      handleLoadMoreImages,
-      isFetching,
-      handleNextImage,
-    ]
-  );
-
-  useHotkeys(
-    'up',
-    () => {
-      handleTopImage();
-    },
-    [handleTopImage]
-  );
-
-  useHotkeys(
-    'down',
-    () => {
-      handleBottomImage();
-    },
-    [handleBottomImage]
   );
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
