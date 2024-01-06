@@ -93,10 +93,10 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
       ? imagesSelectors.selectById(data, prevImageId)
       : undefined;
     const topImage = topImageId  
-      ? selectors.selectById(data, topImageId)
+      ? imagesSelectors.selectById(data, topImageId)
       : undefined;
     const bottomImage = bottomImageId  
-      ? selectors.selectById(data, bottomImageId)
+      ? imagesSelectors.selectById(data, bottomImageId)
       : undefined;  
 
     const imagesLength = images.length;
