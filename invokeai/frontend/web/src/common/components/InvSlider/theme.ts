@@ -4,7 +4,9 @@ import { createMultiStyleConfigHelpers, defineStyle } from '@chakra-ui/react';
 const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(parts.keys);
 
-const container = defineStyle(() => ({}));
+const container = defineStyle(() => ({
+  h: '28px',
+}));
 
 const track = defineStyle(() => {
   return {
@@ -49,7 +51,7 @@ const mark = defineStyle(() => {
   return {
     fontSize: '10px',
     color: 'base.400',
-    mt: 2,
+    mt: 4,
   };
 });
 

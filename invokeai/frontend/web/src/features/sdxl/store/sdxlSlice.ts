@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type {
   ParameterNegativeStylePromptSDXL,
   ParameterPositiveStylePromptSDXL,
@@ -93,3 +94,5 @@ export const {
 } = sdxlSlice.actions;
 
 export default sdxlSlice.reducer;
+
+export const selectSdxlSlice = (state: RootState) => state.sdxl;

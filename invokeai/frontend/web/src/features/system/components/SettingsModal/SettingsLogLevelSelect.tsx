@@ -10,12 +10,8 @@ import { useTranslation } from 'react-i18next';
 export const SettingsLogLevelSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const consoleLogLevel = useAppSelector(
-    (state) => state.system.consoleLogLevel
-  );
-  const shouldLogToConsole = useAppSelector(
-    (state) => state.system.shouldLogToConsole
-  );
+  const consoleLogLevel = useAppSelector((s) => s.system.consoleLogLevel);
+  const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
   const options = useMemo(
     () => zLogLevel.options.map((o) => ({ label: o, value: o })),
     []

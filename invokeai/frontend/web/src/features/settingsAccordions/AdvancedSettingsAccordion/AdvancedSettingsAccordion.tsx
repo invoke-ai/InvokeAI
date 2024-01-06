@@ -1,4 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSingleAccordion';
@@ -8,6 +10,7 @@ import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSea
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,11 +22,38 @@ const labelProps2: InvLabelProps = {
   flexGrow: 1,
 };
 
+const selectBadges = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => {
+    const badges: (string | number)[] = [];
+    if (generation.vae) {
+      let vaeBadge = generation.vae.model_name;
+      if (generation.vaePrecision === 'fp16') {
+        vaeBadge += ` ${generation.vaePrecision}`;
+      }
+      badges.push(vaeBadge);
+    } else if (generation.vaePrecision === 'fp16') {
+      badges.push(`VAE ${generation.vaePrecision}`);
+    }
+    if (generation.clipSkip) {
+      badges.push(`Skip ${generation.clipSkip}`);
+    }
+    if (generation.cfgRescaleMultiplier) {
+      badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
+    }
+    if (generation.seamlessXAxis || generation.seamlessYAxis) {
+      badges.push('seamless');
+    }
+    return badges;
+  }
+);
+
 export const AdvancedSettingsAccordion = memo(() => {
+  const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
 
   return (
-    <InvSingleAccordion label={t('accordions.advanced.title')}>
+    <InvSingleAccordion label={t('accordions.advanced.title')} badges={badges}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column">
         <Flex gap={4} w="full">
           <ParamVAEModelSelect />

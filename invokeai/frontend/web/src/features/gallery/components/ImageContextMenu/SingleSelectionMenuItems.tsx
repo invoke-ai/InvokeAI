@@ -2,7 +2,7 @@ import { Flex, Spinner } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
@@ -17,6 +17,7 @@ import {
 } from 'features/gallery/store/actions';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
@@ -49,12 +50,10 @@ type SingleSelectionMenuItemsProps = {
 
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
-
+  const optimalDimension = useAppSelector(selectOptimalDimension);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
   const toaster = useAppToaster();
-
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const customStarUi = useStore($customStarUI);
 
@@ -115,7 +114,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     flushSync(() => {
       dispatch(setActiveTab('unifiedCanvas'));
     });
-    dispatch(setInitialCanvasImage(imageDTO));
+    dispatch(setInitialCanvasImage(imageDTO, optimalDimension));
 
     toaster({
       title: t('toast.sentToUnifiedCanvas'),
@@ -123,7 +122,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       duration: 2500,
       isClosable: true,
     });
-  }, [dispatch, imageDTO, t, toaster]);
+  }, [dispatch, imageDTO, t, toaster, optimalDimension]);
 
   const handleUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);

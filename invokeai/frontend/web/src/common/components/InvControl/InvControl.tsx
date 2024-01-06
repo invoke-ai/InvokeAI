@@ -45,8 +45,9 @@ export const InvControl = memo(
           orientation={orientation}
           isDisabled={isDisabled}
           {...formControlProps}
+          {...ctx.controlProps}
         >
-          <Flex className="invcontrol-label-input-wrapper">
+          <Flex className="invcontrol-label-wrapper">
             {label && (
               <InvLabel
                 feature={feature}
@@ -56,7 +57,7 @@ export const InvControl = memo(
                 {label}
               </InvLabel>
             )}
-            {children}
+            <Flex className="invcontrol-input-wrapper">{children}</Flex>
           </Flex>
           {helperText && (
             <ChakraFormHelperText>{helperText}</ChakraFormHelperText>

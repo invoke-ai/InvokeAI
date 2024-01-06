@@ -1,12 +1,14 @@
 import { Flex, Spacer } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvText } from 'common/components/InvText/wrapper';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import {
+  clearInitialImage,
+  selectGenerationSlice,
+} from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -15,13 +17,10 @@ import type { PostUploadAction } from 'services/api/types';
 
 import InitialImage from './InitialImage';
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { initialImage } = state.generation;
-  return {
-    isResetButtonDisabled: !initialImage,
-    initialImage,
-  };
-});
+const selectInitialImage = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => generation.initialImage
+);
 
 const postUploadAction: PostUploadAction = {
   type: 'SET_INITIAL_IMAGE',
@@ -30,7 +29,7 @@ const postUploadAction: PostUploadAction = {
 const InitialImageDisplay = () => {
   const { recallWidthAndHeight } = useRecallParameters();
   const { t } = useTranslation();
-  const { isResetButtonDisabled, initialImage } = useAppSelector(selector);
+  const initialImage = useAppSelector(selectInitialImage);
   const dispatch = useAppDispatch();
 
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
@@ -89,14 +88,14 @@ const InitialImageDisplay = () => {
           aria-label={`${t('parameters.useSize')} (Shift+D)`}
           icon={<FaRulerVertical />}
           onClick={handleUseSizeInitialImage}
-          isDisabled={isResetButtonDisabled}
+          isDisabled={!initialImage}
         />
         <InvIconButton
           tooltip="Reset Initial Image"
           aria-label="Reset Initial Image"
           icon={<FaUndo />}
           onClick={handleReset}
-          isDisabled={isResetButtonDisabled}
+          isDisabled={!initialImage}
         />
       </Flex>
       <InitialImage />

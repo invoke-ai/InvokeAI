@@ -7,8 +7,8 @@ import {
   useDisclosure,
   VStack,
 } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { useStore } from '@nanostores/react';
+import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -22,20 +22,13 @@ import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { galleryView } = state.gallery;
-
-  return {
-    galleryView,
-  };
-});
-
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const galleryGridRef = useRef<HTMLDivElement>(null);
-  const { galleryView } = useAppSelector(selector);
+  const galleryView = useAppSelector((s) => s.gallery.galleryView);
   const dispatch = useAppDispatch();
+  const galleryHeader = useStore($galleryHeader);
   const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } =
     useDisclosure({ defaultIsOpen: true });
 
@@ -56,6 +49,7 @@ const ImageGalleryContent = () => {
       borderRadius="base"
       p={2}
     >
+      {galleryHeader}
       <Box w="full">
         <Flex
           ref={resizeObserverRef}

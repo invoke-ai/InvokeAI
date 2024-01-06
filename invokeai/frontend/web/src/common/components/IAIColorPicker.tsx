@@ -69,6 +69,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               max={255}
               step={1}
               w={numberInputWidth}
+              defaultValue={90}
             />
           </InvControl>
           <InvControl label="Green">
@@ -79,6 +80,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               max={255}
               step={1}
               w={numberInputWidth}
+              defaultValue={90}
             />
           </InvControl>
           <InvControl label="Blue">
@@ -89,6 +91,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               max={255}
               step={1}
               w={numberInputWidth}
+              defaultValue={255}
             />
           </InvControl>
           <InvControl label="Alpha">
@@ -99,6 +102,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               min={0}
               max={1}
               w={numberInputWidth}
+              defaultValue={1}
             />
           </InvControl>
         </Flex>

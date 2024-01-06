@@ -7,7 +7,7 @@ import {
 } from 'services/api/endpoints/boards';
 
 export const useBoardTotal = (board_id: BoardId) => {
-  const galleryView = useAppSelector((state) => state.gallery.galleryView);
+  const galleryView = useAppSelector((s) => s.gallery.galleryView);
 
   const { data: totalImages } = useGetBoardImagesTotalQuery(board_id);
   const { data: totalAssets } = useGetBoardAssetsTotalQuery(board_id);

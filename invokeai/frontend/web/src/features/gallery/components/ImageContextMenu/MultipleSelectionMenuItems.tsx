@@ -22,7 +22,7 @@ import {
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const selection = useAppSelector((state) => state.gallery.selection);
+  const selection = useAppSelector((s) => s.gallery.selection);
   const customStarUi = useStore($customStarUI);
 
   const isBulkDownloadEnabled =

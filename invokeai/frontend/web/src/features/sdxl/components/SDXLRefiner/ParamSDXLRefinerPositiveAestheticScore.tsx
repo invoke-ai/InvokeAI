@@ -7,18 +7,13 @@ import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerPositiveAestheticScore = () => {
   const refinerPositiveAestheticScore = useAppSelector(
-    (state) => state.sdxl.refinerPositiveAestheticScore
+    (s) => s.sdxl.refinerPositiveAestheticScore
   );
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleChange = useCallback(
     (v: number) => dispatch(setRefinerPositiveAestheticScore(v)),
-    [dispatch]
-  );
-
-  const handleReset = useCallback(
-    () => dispatch(setRefinerPositiveAestheticScore(6)),
     [dispatch]
   );
 
@@ -30,8 +25,8 @@ const ParamSDXLRefinerPositiveAestheticScore = () => {
         max={10}
         fineStep={0.1}
         onChange={handleChange}
-        onReset={handleReset}
         value={refinerPositiveAestheticScore}
+        defaultValue={6}
         withNumberInput
         marks
       />

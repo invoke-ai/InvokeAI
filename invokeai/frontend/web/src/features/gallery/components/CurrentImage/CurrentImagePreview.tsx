@@ -1,7 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -23,32 +22,22 @@ import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-export const imagesSelector = createMemoizedSelector(
-  [stateSelector, selectLastSelectedImage],
-  ({ ui, system }, lastSelectedImage) => {
-    const {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-    } = ui;
-    const { denoiseProgress } = system;
-    return {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      imageName: lastSelectedImage?.image_name,
-      hasDenoiseProgress: Boolean(denoiseProgress),
-      shouldShowProgressInViewer,
-    };
-  }
+const selectLastSelectedImageName = createSelector(
+  selectLastSelectedImage,
+  (lastSelectedImage) => lastSelectedImage?.image_name
 );
 
 const CurrentImagePreview = () => {
-  const {
-    shouldShowImageDetails,
-    imageName,
-    hasDenoiseProgress,
-    shouldShowProgressInViewer,
-  } = useAppSelector(imagesSelector);
+  const shouldShowImageDetails = useAppSelector(
+    (s) => s.ui.shouldShowImageDetails
+  );
+  const imageName = useAppSelector(selectLastSelectedImageName);
+  const hasDenoiseProgress = useAppSelector((s) =>
+    Boolean(s.system.denoiseProgress)
+  );
+  const shouldShowProgressInViewer = useAppSelector(
+    (s) => s.ui.shouldShowProgressInViewer
+  );
 
   const {
     handlePrevImage,

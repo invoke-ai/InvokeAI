@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -8,9 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 const ParamMaskBlur = () => {
   const dispatch = useAppDispatch();
-  const maskBlur = useAppSelector(
-    (state: RootState) => state.generation.maskBlur
-  );
+  const maskBlur = useAppSelector((s) => s.generation.maskBlur);
   const { t } = useTranslation();
 
   const handleChange = useCallback(
@@ -19,9 +16,6 @@ const ParamMaskBlur = () => {
     },
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setMaskBlur(16));
-  }, [dispatch]);
 
   return (
     <InvControl label={t('parameters.maskBlur')} feature="compositingBlur">
@@ -29,7 +23,7 @@ const ParamMaskBlur = () => {
         min={0}
         max={64}
         value={maskBlur}
-        onReset={handleReset}
+        defaultValue={16}
         onChange={handleChange}
         marks
         withNumberInput

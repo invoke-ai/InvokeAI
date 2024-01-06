@@ -17,7 +17,7 @@ import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { clamp, forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
-import { imagesAdapter } from 'services/api/util';
+import { imagesSelectors } from 'services/api/util';
 
 import { startAppListening } from '..';
 
@@ -53,9 +53,7 @@ export const addRequestedSingleImageDeletionListener = () => {
         const { data } =
           imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
-        const cachedImageDTOs = data
-          ? imagesAdapter.getSelectors().selectAll(data)
-          : [];
+        const cachedImageDTOs = data ? imagesSelectors.selectAll(data) : [];
 
         const deletedImageIndex = cachedImageDTOs.findIndex(
           (i) => i.image_name === image_name
@@ -187,7 +185,7 @@ export const addRequestedMultipleImageDeletionListener = () => {
           imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
         const newSelectedImageDTO = data
-          ? imagesAdapter.getSelectors().selectAll(data)[0]
+          ? imagesSelectors.selectAll(data)[0]
           : undefined;
 
         if (newSelectedImageDTO) {

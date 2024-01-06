@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -9,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 const ParamCanvasCoherenceStrength = () => {
   const dispatch = useAppDispatch();
   const canvasCoherenceStrength = useAppSelector(
-    (state: RootState) => state.generation.canvasCoherenceStrength
+    (s) => s.generation.canvasCoherenceStrength
   );
   const { t } = useTranslation();
 
@@ -19,9 +18,6 @@ const ParamCanvasCoherenceStrength = () => {
     },
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setCanvasCoherenceStrength(0.3));
-  }, [dispatch]);
 
   return (
     <InvControl
@@ -33,8 +29,8 @@ const ParamCanvasCoherenceStrength = () => {
         max={1}
         step={0.01}
         value={canvasCoherenceStrength}
+        defaultValue={0.75}
         onChange={handleChange}
-        onReset={handleReset}
         withNumberInput
         numberInputMax={999}
         marks

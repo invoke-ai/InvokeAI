@@ -70,8 +70,4 @@ export const resetToolInteractionState = () => {
 
 export const setCanvasInteractionStateMouseOut = () => {
   setCursorPosition(null);
-  setIsDrawing(false);
-  setIsMouseOverBoundingBox(false);
-  setIsMovingBoundingBox(false);
-  setIsTransformingBoundingBox(false);
 };

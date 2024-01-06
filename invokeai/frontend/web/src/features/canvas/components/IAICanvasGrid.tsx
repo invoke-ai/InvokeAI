@@ -1,21 +1,38 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
-import { useToken } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { range } from 'lodash-es';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
+import { getArbitraryBaseColor } from 'theme/colors';
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
-  const { stageScale, stageCoordinates, stageDimensions } = canvas;
-  return { stageScale, stageCoordinates, stageDimensions };
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return {
+    stageCoordinates: canvas.stageCoordinates,
+    stageDimensions: canvas.stageDimensions,
+  };
 });
 
+const baseGridLineColor = getArbitraryBaseColor(27);
+const fineGridLineColor = getArbitraryBaseColor(18);
+
 const IAICanvasGrid = () => {
-  const { stageScale, stageCoordinates, stageDimensions } =
-    useAppSelector(selector);
-  const [gridLineColor] = useToken('colors', ['base.800']);
+  const { stageCoordinates, stageDimensions } = useAppSelector(selector);
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
+
+  const gridSpacing = useMemo(() => {
+    if (stageScale >= 2) {
+      return 8;
+    }
+    if (stageScale >= 1 && stageScale < 2) {
+      return 16;
+    }
+    if (stageScale >= 0.5 && stageScale < 1) {
+      return 32;
+    }
+    return 64;
+  }, [stageScale]);
 
   const unscale = useCallback(
     (value: number) => {
@@ -40,15 +57,15 @@ const IAICanvasGrid = () => {
     };
 
     const gridOffset = {
-      x: Math.ceil(unscale(x) / 64) * 64,
-      y: Math.ceil(unscale(y) / 64) * 64,
+      x: Math.ceil(unscale(x) / gridSpacing) * gridSpacing,
+      y: Math.ceil(unscale(y) / gridSpacing) * gridSpacing,
     };
 
     const gridRect = {
       x1: -gridOffset.x,
       y1: -gridOffset.y,
-      x2: unscale(width) - gridOffset.x + 64,
-      y2: unscale(height) - gridOffset.y + 64,
+      x2: unscale(width) - gridOffset.x + gridSpacing,
+      y2: unscale(height) - gridOffset.y + gridSpacing,
     };
 
     const gridFullRect = {
@@ -58,40 +75,50 @@ const IAICanvasGrid = () => {
       y2: Math.max(stageRect.y2, gridRect.y2),
     };
 
-    const fullRect = gridFullRect;
-
     const // find the x & y size of the grid
-      xSize = fullRect.x2 - fullRect.x1,
-      ySize = fullRect.y2 - fullRect.y1,
+      xSize = gridFullRect.x2 - gridFullRect.x1,
+      ySize = gridFullRect.y2 - gridFullRect.y1,
       // compute the number of steps required on each axis.
-      xSteps = Math.round(xSize / 64) + 1,
-      ySteps = Math.round(ySize / 64) + 1;
+      xSteps = Math.round(xSize / gridSpacing) + 1,
+      ySteps = Math.round(ySize / gridSpacing) + 1;
 
-    const xLines = range(0, xSteps).map((i) => (
-      <KonvaLine
-        key={`x_${i}`}
-        x={fullRect.x1 + i * 64}
-        y={fullRect.y1}
-        points={[0, 0, 0, ySize]}
-        stroke={gridLineColor}
-        strokeWidth={1}
-        listening={false}
-      />
-    ));
-    const yLines = range(0, ySteps).map((i) => (
-      <KonvaLine
-        key={`y_${i}`}
-        x={fullRect.x1}
-        y={fullRect.y1 + i * 64}
-        points={[0, 0, xSize, 0]}
-        stroke={gridLineColor}
-        strokeWidth={1}
-        listening={false}
-      />
-    ));
+    const strokeWidth = unscale(1);
 
-    return xLines.concat(yLines);
-  }, [stageCoordinates, stageDimensions, unscale, gridLineColor]);
+    const gridLines: ReactElement[] = new Array(xSteps + ySteps);
+    let _x = 0;
+    let _y = 0;
+    for (let i = 0; i < xSteps; i++) {
+      _x = gridFullRect.x1 + i * gridSpacing;
+      gridLines.push(
+        <KonvaLine
+          key={`x_${i}`}
+          x={_x}
+          y={gridFullRect.y1}
+          points={[0, 0, 0, ySize]}
+          stroke={_x % 64 ? fineGridLineColor : baseGridLineColor}
+          strokeWidth={strokeWidth}
+          listening={false}
+        />
+      );
+    }
+
+    for (let i = 0; i < ySteps; i++) {
+      _y = gridFullRect.y1 + i * gridSpacing;
+      gridLines.push(
+        <KonvaLine
+          key={`y_${i}`}
+          x={gridFullRect.x1}
+          y={_y}
+          points={[0, 0, xSize, 0]}
+          stroke={_y % 64 ? fineGridLineColor : baseGridLineColor}
+          strokeWidth={strokeWidth}
+          listening={false}
+        />
+      );
+    }
+
+    return gridLines;
+  }, [stageDimensions, stageCoordinates, unscale, gridSpacing]);
 
   return <Group listening={false}>{gridLines}</Group>;
 };

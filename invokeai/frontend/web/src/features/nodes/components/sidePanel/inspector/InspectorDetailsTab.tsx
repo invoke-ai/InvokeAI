@@ -1,6 +1,5 @@
 import { Box, Flex, HStack } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -8,6 +7,8 @@ import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,8 +16,9 @@ import { useTranslation } from 'react-i18next';
 import EditableNodeTitle from './details/EditableNodeTitle';
 
 const selector = createMemoizedSelector(
-  stateSelector,
-  ({ nodes, nodeTemplates }) => {
+  selectNodesSlice,
+  selectNodeTemplatesSlice,
+  (nodes, nodeTemplates) => {
     const lastSelectedNodeId =
       nodes.selectedNodes[nodes.selectedNodes.length - 1];
 

@@ -12,7 +12,7 @@ export const getInputFilledStyles = (
   const bgHover = variant === 'darkFilled' ? 'base.750' : 'base.650';
   const error = 'error.600';
   const errorHover = 'error.500';
-  const fg = 'base.200';
+  const fg = 'base.100';
 
   const baseColors = {
     color: fg,
@@ -34,6 +34,7 @@ export const getInputFilledStyles = (
     _invalid,
   };
   const _disabled = {
+    opacity: 0.35,
     _hover: baseColors,
   };
   return {

@@ -1,9 +1,9 @@
 import type { ControlAdapterType } from 'features/controlAdapters/store/types';
 import { useMemo } from 'react';
 import {
-  controlNetModelsAdapter,
-  ipAdapterModelsAdapter,
-  t2iAdapterModelsAdapter,
+  controlNetModelsAdapterSelectors,
+  ipAdapterModelsAdapterSelectors,
+  t2iAdapterModelsAdapterSelectors,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
   useGetT2IAdapterModelsQuery,
@@ -14,7 +14,7 @@ export const useControlAdapterModels = (type?: ControlAdapterType) => {
   const controlNetModels = useMemo(
     () =>
       controlNetModelsData
-        ? controlNetModelsAdapter.getSelectors().selectAll(controlNetModelsData)
+        ? controlNetModelsAdapterSelectors.selectAll(controlNetModelsData)
         : [],
     [controlNetModelsData]
   );
@@ -23,7 +23,7 @@ export const useControlAdapterModels = (type?: ControlAdapterType) => {
   const t2iAdapterModels = useMemo(
     () =>
       t2iAdapterModelsData
-        ? t2iAdapterModelsAdapter.getSelectors().selectAll(t2iAdapterModelsData)
+        ? t2iAdapterModelsAdapterSelectors.selectAll(t2iAdapterModelsData)
         : [],
     [t2iAdapterModelsData]
   );
@@ -31,7 +31,7 @@ export const useControlAdapterModels = (type?: ControlAdapterType) => {
   const ipAdapterModels = useMemo(
     () =>
       ipAdapterModelsData
-        ? ipAdapterModelsAdapter.getSelectors().selectAll(ipAdapterModelsData)
+        ? ipAdapterModelsAdapterSelectors.selectAll(ipAdapterModelsData)
         : [],
     [ipAdapterModelsData]
   );

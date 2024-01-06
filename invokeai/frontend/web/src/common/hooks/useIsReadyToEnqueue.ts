@@ -1,28 +1,42 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  selectControlAdapterAll,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 
 const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
+  [
+    selectControlAdaptersSlice,
+    selectGenerationSlice,
+    selectSystemSlice,
+    selectNodesSlice,
+    selectNodeTemplatesSlice,
+    selectDynamicPromptsSlice,
+    activeTabNameSelector,
+  ],
   (
-    {
-      controlAdapters,
-      generation,
-      system,
-      nodes,
-      nodeTemplates,
-      dynamicPrompts,
-    },
+    controlAdapters,
+    generation,
+    system,
+    nodes,
+    nodeTemplates,
+    dynamicPrompts,
     activeTabName
   ) => {
-    const { initialImage, model } = generation;
+    const { initialImage, model, positivePrompt } = generation;
 
     const { isConnected } = system;
 
@@ -87,7 +101,10 @@ const selector = createMemoizedSelector(
         });
       }
     } else {
-      if (dynamicPrompts.prompts.length === 0) {
+      if (
+        dynamicPrompts.prompts.length === 0 &&
+        getShouldProcessPrompt(positivePrompt)
+      ) {
         reasons.push(i18n.t('parameters.invoke.noPrompts'));
       }
 

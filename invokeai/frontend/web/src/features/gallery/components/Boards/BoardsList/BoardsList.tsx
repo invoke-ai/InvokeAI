@@ -1,6 +1,4 @@
 import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
@@ -20,18 +18,14 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
-  const { selectedBoardId, boardSearchText } = gallery;
-  return { selectedBoardId, boardSearchText };
-});
-
 type Props = {
   isOpen: boolean;
 };
 
 const BoardsList = (props: Props) => {
   const { isOpen } = props;
-  const { selectedBoardId, boardSearchText } = useAppSelector(selector);
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const { data: boards } = useListAllBoardsQuery();
   const filteredBoards = boardSearchText
     ? boards?.filter((board) =>

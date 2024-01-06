@@ -1,32 +1,23 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import {
-  maxPromptsChanged,
-  maxPromptsReset,
-} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { maxPromptsChanged } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(stateSelector, (state) => {
-  const { maxPrompts, combinatorial } = state.dynamicPrompts;
-  const { min, sliderMax, inputMax } =
-    state.config.sd.dynamicPrompts.maxPrompts;
-
-  return {
-    maxPrompts,
-    min,
-    sliderMax,
-    inputMax,
-    isDisabled: !combinatorial,
-  };
-});
-
 const ParamDynamicPromptsMaxPrompts = () => {
-  const { maxPrompts, min, sliderMax, inputMax, isDisabled } =
-    useAppSelector(selector);
+  const maxPrompts = useAppSelector((s) => s.dynamicPrompts.maxPrompts);
+  const min = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.min);
+  const sliderMax = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMax
+  );
+  const inputMax = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.inputMax
+  );
+  const initial = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.initial
+  );
+  const isDisabled = useAppSelector((s) => !s.dynamicPrompts.combinatorial);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -36,10 +27,6 @@ const ParamDynamicPromptsMaxPrompts = () => {
     },
     [dispatch]
   );
-
-  const handleReset = useCallback(() => {
-    dispatch(maxPromptsReset());
-  }, [dispatch]);
 
   return (
     <InvControl
@@ -52,8 +39,8 @@ const ParamDynamicPromptsMaxPrompts = () => {
         min={min}
         max={sliderMax}
         value={maxPrompts}
+        defaultValue={initial}
         onChange={handleChange}
-        onReset={handleReset}
         marks
         withNumberInput
         numberInputMax={inputMax}

@@ -1,5 +1,4 @@
 import { logger } from 'app/logging/logger';
-import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterIsEnabledChanged,
   selectControlAdapterAll,
@@ -7,10 +6,8 @@ import {
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
-  heightChanged,
   modelChanged,
   vaeSelected,
-  widthChanged,
 } from 'features/parameters/store/generationSlice';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
@@ -81,22 +78,6 @@ export const addModelSelectedListener = () => {
               })
             )
           );
-        }
-      }
-
-      // Update Width / Height / Bounding Box Dimensions on Model Change
-      if (
-        state.generation.model?.base_model !== newModel.base_model &&
-        state.ui.shouldAutoChangeDimensions
-      ) {
-        if (['sdxl', 'sdxl-refiner'].includes(newModel.base_model)) {
-          dispatch(widthChanged(1024));
-          dispatch(heightChanged(1024));
-          dispatch(setBoundingBoxDimensions({ width: 1024, height: 1024 }));
-        } else {
-          dispatch(widthChanged(512));
-          dispatch(heightChanged(512));
-          dispatch(setBoundingBoxDimensions({ width: 512, height: 512 }));
         }
       }
 

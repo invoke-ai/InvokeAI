@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLPositiveStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((state) => state.sdxl.positiveStylePrompt);
+  const prompt = useAppSelector((s) => s.sdxl.positiveStylePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(

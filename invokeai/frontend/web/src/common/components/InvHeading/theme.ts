@@ -1,11 +1,11 @@
 import { defineStyle, defineStyleConfig } from '@chakra-ui/react';
 
-const blue = defineStyle(() => ({
-  color: 'blue.300',
+const invokeBlue = defineStyle(() => ({
+  color: 'invokeBlue.300',
 }));
 
 export const headingTheme = defineStyleConfig({
   variants: {
-    blue,
+    invokeBlue,
   },
 });

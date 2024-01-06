@@ -30,7 +30,7 @@ export const useGroupedModelInvSelect = <T extends AnyModelConfigEntity>(
 ): UseGroupedModelInvSelectReturn => {
   const { t } = useTranslation();
   const base_model = useAppSelector(
-    (state) => state.generation.model?.base_model ?? 'sdxl'
+    (s) => s.generation.model?.base_model ?? 'sdxl'
   );
   const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } =
     arg;
@@ -65,7 +65,7 @@ export const useGroupedModelInvSelect = <T extends AnyModelConfigEntity>(
         .flatMap((o) => o.options)
         .find((m) =>
           selectedModel ? m.value === getModelId(selectedModel) : false
-        ),
+        ) ?? null,
     [options, selectedModel]
   );
 

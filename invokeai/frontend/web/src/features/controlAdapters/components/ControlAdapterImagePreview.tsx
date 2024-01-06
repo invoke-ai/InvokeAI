@@ -2,7 +2,6 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
@@ -10,13 +9,17 @@ import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
 import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
 import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
-import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  controlAdapterImageChanged,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import {
   heightChanged,
+  selectOptimalDimension,
   widthChanged,
 } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
@@ -36,32 +39,22 @@ type Props = {
   isSmall?: boolean;
 };
 
-const selector = createMemoizedSelector(
-  stateSelector,
-  ({ controlAdapters, gallery, system }) => {
-    const { pendingControlImages } = controlAdapters;
-    const { autoAddBoardId } = gallery;
-    const { isConnected } = system;
-
-    return {
-      pendingControlImages,
-      autoAddBoardId,
-      isConnected,
-    };
-  }
+const selectPendingControlImages = createMemoizedSelector(
+  selectControlAdaptersSlice,
+  (controlAdapters) => controlAdapters.pendingControlImages
 );
 
 const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const controlImageName = useControlAdapterControlImage(id);
   const processedControlImageName = useControlAdapterProcessedControlImage(id);
   const processorType = useControlAdapterProcessorType(id);
-
-  const dispatch = useAppDispatch();
-  const { t } = useTranslation();
-
-  const { pendingControlImages, autoAddBoardId, isConnected } =
-    useAppSelector(selector);
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const activeTabName = useAppSelector(activeTabNameSelector);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const pendingControlImages = useAppSelector(selectPendingControlImages);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -113,16 +106,19 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 
     if (activeTabName === 'unifiedCanvas') {
       dispatch(
-        setBoundingBoxDimensions({
-          width: controlImage.width,
-          height: controlImage.height,
-        })
+        setBoundingBoxDimensions(
+          {
+            width: controlImage.width,
+            height: controlImage.height,
+          },
+          optimalDimension
+        )
       );
     } else {
       dispatch(widthChanged(controlImage.width));
       dispatch(heightChanged(controlImage.height));
     }
-  }, [controlImage, activeTabName, dispatch]);
+  }, [controlImage, activeTabName, dispatch, optimalDimension]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
@@ -180,7 +176,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       onMouseLeave={handleMouseLeave}
       position="relative"
       w="full"
-      h={isSmall ? 28 : 366} // magic no touch
+      h={isSmall ? 32 : 366} // magic no touch
       alignItems="center"
       justifyContent="center"
     >

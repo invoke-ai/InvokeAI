@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
@@ -16,7 +16,7 @@ import {
   useLazyListImagesQuery,
 } from 'services/api/endpoints/images';
 import type { ListImagesArgs } from 'services/api/types';
-import { imagesAdapter } from 'services/api/util';
+import { imagesSelectors } from 'services/api/util';
 
 export type UseNextPrevImageState = {
   virtuosoRef: RefObject<VirtuosoGridHandle> | undefined;
@@ -29,7 +29,7 @@ export const $useNextPrevImageState = map<UseNextPrevImageState>({
 });
 
 export const nextPrevImageButtonsSelector = createMemoizedSelector(
-  [stateSelector, selectListImagesBaseQueryArgs],
+  [(state: RootState) => state, selectListImagesBaseQueryArgs],
   (state, baseQueryArgs) => {
     const { data, status } =
       imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
@@ -64,9 +64,7 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
       limit: IMAGE_LIMIT,
     };
 
-    const selectors = imagesAdapter.getSelectors();
-
-    const images = selectors.selectAll(data);
+    const images = imagesSelectors.selectAll(data);
 
     const currentImageIndex = images.findIndex(
       (i) => i.image_name === lastSelectedImage.image_name
@@ -89,10 +87,10 @@ export const nextPrevImageButtonsSelector = createMemoizedSelector(
     const bottomImageId = images[bottomImageIndex]?.image_name
 
     const nextImage = nextImageId
-      ? selectors.selectById(data, nextImageId)
+      ? imagesSelectors.selectById(data, nextImageId)
       : undefined;
     const prevImage = prevImageId
-      ? selectors.selectById(data, prevImageId)
+      ? imagesSelectors.selectById(data, prevImageId)
       : undefined;
     const topImage = topImageId  
       ? selectors.selectById(data, topImageId)

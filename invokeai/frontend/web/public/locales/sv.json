@@ -129,10 +129,6 @@
             "title": "Växla inställningar",
             "desc": "Öppna och stäng alternativpanelen"
         },
-        "toggleViewer": {
-            "title": "Växla visaren",
-            "desc": "Öppna och stäng bildvisaren"
-        },
         "toggleGallery": {
             "title": "Växla galleri",
             "desc": "Öppna eller stäng galleribyrån"
@@ -192,10 +188,6 @@
         "nextImage": {
             "title": "Nästa bild",
             "desc": "Visa nästa bild"
-        },
-        "toggleGalleryPin": {
-            "title": "Växla gallerinål",
-            "desc": "Nålar fast eller nålar av galleriet i gränssnittet"
         },
         "increaseGalleryThumbSize": {
             "title": "Förstora galleriets bildstorlek",

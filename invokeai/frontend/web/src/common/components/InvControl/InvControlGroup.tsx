@@ -1,9 +1,10 @@
-import type { FormLabelProps } from '@chakra-ui/react';
+import type { FormControlProps, FormLabelProps } from '@chakra-ui/react';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo } from 'react';
 
 export type InvControlGroupProps = {
   labelProps?: FormLabelProps;
+  controlProps?: FormControlProps;
   isDisabled?: boolean;
   orientation?: 'horizontal' | 'vertical';
 };

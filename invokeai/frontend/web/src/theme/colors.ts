@@ -1,7 +1,7 @@
 import type { InvokeAIThemeColors } from 'theme/types';
 import { generateColorPalette } from 'theme/util/generateColorPalette';
 
-const BASE = { H: 220, S: 8 };
+const BASE = { H: 220, S: 12 };
 // const BASE = { H: 220, S: 16 };
 const WORKING = { H: 47, S: 42 };
 const GOLD = { H: 40, S: 70 };
@@ -9,9 +9,12 @@ const WARNING = { H: 28, S: 42 };
 const OK = { H: 113, S: 42 };
 const ERROR = { H: 0, S: 42 };
 const INVOKE_YELLOW = { H: 66, S: 92 };
-const BLUE = { H: 200, S: 76 };
-const GREEN = { H: 110, S: 69 };
-const RED = { H: 16, S: 92 };
+const INVOKE_BLUE = { H: 200, S: 76 };
+const INVOKE_GREEN = { H: 110, S: 69 };
+const INVOKE_RED = { H: 16, S: 92 };
+
+export const getArbitraryBaseColor = (lightness: number) =>
+  `hsl(${BASE.H} ${BASE.S}% ${lightness}%)`;
 
 export const InvokeAIColors: InvokeAIThemeColors = {
   base: generateColorPalette(BASE.H, BASE.S),
@@ -32,12 +35,12 @@ export const InvokeAIColors: InvokeAIThemeColors = {
     INVOKE_YELLOW.S,
     true
   ),
-  blue: generateColorPalette(BLUE.H, BLUE.S),
-  blueAlpha: generateColorPalette(BLUE.H, BLUE.S, true),
-  green: generateColorPalette(GREEN.H, GREEN.S),
-  greenAlpha: generateColorPalette(GREEN.H, GREEN.S, true),
-  red: generateColorPalette(RED.H, RED.S),
-  redAlpha: generateColorPalette(RED.H, RED.S, true),
+  invokeBlue: generateColorPalette(INVOKE_BLUE.H, INVOKE_BLUE.S),
+  invokeBlueAlpha: generateColorPalette(INVOKE_BLUE.H, INVOKE_BLUE.S, true),
+  invokeGreen: generateColorPalette(INVOKE_GREEN.H, INVOKE_GREEN.S),
+  invokeGreenAlpha: generateColorPalette(INVOKE_GREEN.H, INVOKE_GREEN.S, true),
+  invokeRed: generateColorPalette(INVOKE_RED.H, INVOKE_RED.S),
+  invokeRedAlpha: generateColorPalette(INVOKE_RED.H, INVOKE_RED.S, true),
 };
 
 export const layerStyleBody = {

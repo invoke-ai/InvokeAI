@@ -204,7 +204,7 @@ export const buttonTheme = defineStyleConfig({
         _hover: {
           bg: 'none',
           svg: {
-            fill: 'base.500',
+            fill: 'base.400',
           },
         },
         '&[data-selected="true"]': {

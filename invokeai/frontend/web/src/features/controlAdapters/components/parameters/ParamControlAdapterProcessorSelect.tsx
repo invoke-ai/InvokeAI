@@ -20,7 +20,7 @@ type Props = {
   id: string;
 };
 
-const selector = createMemoizedSelector(configSelector, (config) => {
+const selectOptions = createMemoizedSelector(configSelector, (config) => {
   const options: InvSelectOption[] = map(CONTROLNET_PROCESSORS, (p) => ({
     value: p.type,
     label: p.label,
@@ -47,7 +47,7 @@ const ParamControlAdapterProcessorSelect = ({ id }: Props) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const processorNode = useControlAdapterProcessorNode(id);
   const dispatch = useAppDispatch();
-  const options = useAppSelector(selector);
+  const options = useAppSelector(selectOptions);
   const { t } = useTranslation();
 
   const onChange = useCallback<InvSelectOnChange>(

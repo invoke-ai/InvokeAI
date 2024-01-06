@@ -21,7 +21,9 @@ x-invokeai: &invokeai
     ports:
       - "${INVOKEAI_PORT:-9090}:9090"
     volumes:
-      - ${INVOKEAI_ROOT:-~/invokeai}:${INVOKEAI_ROOT:-/invokeai}
+      - type: bind
+        source: ${HOST_INVOKEAI_ROOT:-${INVOKEAI_ROOT:-~/invokeai}}
+        target: ${INVOKEAI_ROOT:-/invokeai}
       - ${HF_HOME:-~/.cache/huggingface}:${HF_HOME:-/invokeai/.cache/huggingface}
       # - ${INVOKEAI_MODELS_DIR:-${INVOKEAI_ROOT:-/invokeai/models}}
       # - ${INVOKEAI_MODELS_CONFIG_PATH:-${INVOKEAI_ROOT:-/invokeai/configs/models.yaml}}

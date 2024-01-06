@@ -81,10 +81,6 @@
     "hotkeys": {
         "generalHotkeys": "Atalhos Gerais",
         "galleryHotkeys": "Atalhos da Galeria",
-        "toggleViewer": {
-            "title": "Ativar Visualizador",
-            "desc": "Abrir e fechar o Visualizador de Imagens"
-        },
         "maximizeWorkSpace": {
             "desc": "Fechar painéis e maximixar área de trabalho",
             "title": "Maximizar a Área de Trabalho"
@@ -231,10 +227,6 @@
         "deleteImage": {
             "title": "Apagar Imagem",
             "desc": "Apaga a imagem atual"
-        },
-        "toggleGalleryPin": {
-            "title": "Ativar Fixar Galeria",
-            "desc": "Fixa e desafixa a galeria na interface"
         },
         "increaseGalleryThumbSize": {
             "title": "Aumentar Tamanho da Galeria de Imagem",

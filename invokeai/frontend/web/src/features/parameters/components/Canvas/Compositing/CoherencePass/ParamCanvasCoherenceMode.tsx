@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
@@ -14,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 const ParamCanvasCoherenceMode = () => {
   const dispatch = useAppDispatch();
   const canvasCoherenceMode = useAppSelector(
-    (state: RootState) => state.generation.canvasCoherenceMode
+    (s) => s.generation.canvasCoherenceMode
   );
   const { t } = useTranslation();
 

@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -8,11 +7,9 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamClipSkip = () => {
-  const clipSkip = useAppSelector(
-    (state: RootState) => state.generation.clipSkip
-  );
+  const clipSkip = useAppSelector((s) => s.generation.clipSkip);
 
-  const { model } = useAppSelector((state: RootState) => state.generation);
+  const { model } = useAppSelector((s) => s.generation);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -23,10 +20,6 @@ const ParamClipSkip = () => {
     },
     [dispatch]
   );
-
-  const handleClipSkipReset = useCallback(() => {
-    dispatch(setClipSkip(0));
-  }, [dispatch]);
 
   const max = useMemo(() => {
     if (!model) {
@@ -50,11 +43,11 @@ const ParamClipSkip = () => {
     <InvControl label={t('parameters.clipSkip')} feature="clipSkip">
       <InvSlider
         value={clipSkip}
+        defaultValue={0}
         min={0}
         max={max}
         step={1}
         onChange={handleClipSkipChange}
-        onReset={handleClipSkipReset}
         withNumberInput
         marks={sliderMarks}
       />

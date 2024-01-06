@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
@@ -137,10 +138,11 @@ const fieldValueReducer = <T extends FieldValue>(
     return;
   }
   const input = node.data?.inputs[fieldName];
-  if (!input || nodeIndex < 0 || !schema.safeParse(value).success) {
+  const result = schema.safeParse(value);
+  if (!input || nodeIndex < 0 || !result.success) {
     return;
   }
-  input.value = value;
+  input.value = result.data;
 };
 
 const nodesSlice = createSlice({
@@ -986,3 +988,5 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
 );
 
 export default nodesSlice.reducer;
+
+export const selectNodesSlice = (state: RootState) => state.nodes;

@@ -1,5 +1,4 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
@@ -10,31 +9,35 @@ import { useControlAdapterModel } from 'features/controlAdapters/hooks/useContro
 import { useControlAdapterModelEntities } from 'features/controlAdapters/hooks/useControlAdapterModelEntities';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { pick } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   ControlNetModelConfigEntity,
   IPAdapterModelConfigEntity,
   T2IAdapterModelConfigEntity,
 } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 type ParamControlAdapterModelProps = {
   id: string;
 };
 
-const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
-  const { model } = generation;
-  return { mainModel: model };
-});
+const selectMainModel = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => generation.model
+);
 
 const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const controlAdapterType = useControlAdapterType(id);
   const model = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
-
-  const { mainModel } = useAppSelector(selector);
+  const currentBaseModel = useAppSelector(
+    (s) => s.generation.model?.base_model
+  );
+  const mainModel = useAppSelector(selectMainModel);
   const { t } = useTranslation();
 
   const models = useControlAdapterModelEntities(controlAdapterType);
@@ -60,14 +63,29 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
     [dispatch, id]
   );
 
+  const selectedModel = useMemo(
+    () =>
+      model && controlAdapterType
+        ? { ...model, model_type: controlAdapterType }
+        : null,
+    [controlAdapterType, model]
+  );
+
+  const getIsDisabled = useCallback(
+    (model: AnyModelConfig): boolean => {
+      const isCompatible = currentBaseModel === model.base_model;
+      const hasMainModel = Boolean(currentBaseModel);
+      return !hasMainModel || !isCompatible;
+    },
+    [currentBaseModel]
+  );
+
   const { options, value, onChange, noOptionsMessage } =
     useGroupedModelInvSelect({
       modelEntities: models,
       onChange: _onChange,
-      selectedModel:
-        model && controlAdapterType
-          ? { ...model, model_type: controlAdapterType }
-          : null,
+      selectedModel,
+      getIsDisabled,
     });
 
   return (

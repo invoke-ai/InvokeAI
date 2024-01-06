@@ -18,16 +18,17 @@ export const EmbeddingSelect = memo(
     const { t } = useTranslation();
 
     const currentBaseModel = useAppSelector(
-      (state) => state.generation.model?.base_model
+      (s) => s.generation.model?.base_model
     );
 
-    const getIsDisabled = (
-      embedding: TextualInversionModelConfigEntity
-    ): boolean => {
-      const isCompatible = currentBaseModel === embedding.base_model;
-      const hasMainModel = Boolean(currentBaseModel);
-      return !hasMainModel || !isCompatible;
-    };
+    const getIsDisabled = useCallback(
+      (embedding: TextualInversionModelConfigEntity): boolean => {
+        const isCompatible = currentBaseModel === embedding.base_model;
+        const hasMainModel = Boolean(currentBaseModel);
+        return !hasMainModel || !isCompatible;
+      },
+      [currentBaseModel]
+    );
     const { data, isLoading } = useGetTextualInversionModelsQuery();
 
     const _onChange = useCallback(
