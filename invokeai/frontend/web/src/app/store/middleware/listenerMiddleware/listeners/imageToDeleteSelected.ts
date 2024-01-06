@@ -4,6 +4,7 @@ import {
   imagesToDeleteSelected,
   isModalOpenChanged,
 } from 'features/deleteImageModal/store/slice';
+
 import { startAppListening } from '..';
 
 export const addImageToDeleteSelectedListener = () => {

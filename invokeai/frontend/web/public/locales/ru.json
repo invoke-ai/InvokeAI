@@ -189,10 +189,6 @@
             "title": "Закрепить параметры",
             "desc": "Закрепить панель параметров"
         },
-        "toggleViewer": {
-            "title": "Показать просмотр",
-            "desc": "Открывать и закрывать просмотрщик изображений"
-        },
         "toggleGallery": {
             "title": "Показать галерею",
             "desc": "Открывать и закрывать ящик галереи"
@@ -252,10 +248,6 @@
         "nextImage": {
             "title": "Следующее изображение",
             "desc": "Отображение следующего изображения в галерее"
-        },
-        "toggleGalleryPin": {
-            "title": "Закрепить галерею",
-            "desc": "Закрепляет и открепляет галерею"
         },
         "increaseGalleryThumbSize": {
             "title": "Увеличить размер миниатюр галереи",
@@ -523,7 +515,7 @@
     "parameters": {
         "images": "Изображения",
         "steps": "Шаги",
-        "cfgScale": "Точность следования запросу (CFG)",
+        "cfgScale": "Шкала точности (CFG)",
         "width": "Ширина",
         "height": "Высота",
         "seed": "Сид",
@@ -1162,7 +1154,6 @@
         "processor": "Процессор",
         "addControlNet": "Добавить $t(common.controlNet)",
         "none": "ничего",
-        "incompatibleBaseModel": "Несовместимая базовая модель:",
         "controlNetT2IMutexDesc": "$t(common.controlNet) и $t(common.t2iAdapter) одновременно в настоящее время не поддерживаются.",
         "ip_adapter": "$t(controlnet.controlAdapter_one) №{{number}} $t(common.ipAdapter)",
         "pidiDescription": "PIDI-обработка изображений",

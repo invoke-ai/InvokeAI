@@ -1,10 +1,10 @@
-import { ButtonGroup, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import {
   commitStagingAreaImage,
@@ -14,6 +14,7 @@ import {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
+import { InvIconButton } from 'index';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -135,39 +136,39 @@ const IAICanvasStagingAreaToolbar = () => {
       onMouseEnter={handleMouseOver}
       onMouseLeave={handleMouseOut}
     >
-      <ButtonGroup isAttached borderRadius="base" shadow="dark-lg">
-        <IAIIconButton
+      <InvButtonGroup borderRadius="base" shadow="dark-lg">
+        <InvIconButton
           tooltip={`${t('unifiedCanvas.previous')} (Left)`}
           aria-label={`${t('unifiedCanvas.previous')} (Left)`}
           icon={<FaArrowLeft />}
           onClick={handlePrevImage}
-          colorScheme="accent"
+          colorScheme="blue"
           isDisabled={!shouldShowStagingImage}
         />
-        <IAIButton
+        <InvButton
           colorScheme="base"
           pointerEvents="none"
           isDisabled={!shouldShowStagingImage}
           minW={20}
-        >{`${currentIndex + 1}/${total}`}</IAIButton>
-        <IAIIconButton
+        >{`${currentIndex + 1}/${total}`}</InvButton>
+        <InvIconButton
           tooltip={`${t('unifiedCanvas.next')} (Right)`}
           aria-label={`${t('unifiedCanvas.next')} (Right)`}
           icon={<FaArrowRight />}
           onClick={handleNextImage}
-          colorScheme="accent"
+          colorScheme="blue"
           isDisabled={!shouldShowStagingImage}
         />
-      </ButtonGroup>
-      <ButtonGroup isAttached borderRadius="base" shadow="dark-lg">
-        <IAIIconButton
+      </InvButtonGroup>
+      <InvButtonGroup borderRadius="base" shadow="dark-lg">
+        <InvIconButton
           tooltip={`${t('unifiedCanvas.accept')} (Enter)`}
           aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
           icon={<FaCheck />}
           onClick={handleAccept}
-          colorScheme="accent"
+          colorScheme="blue"
         />
-        <IAIIconButton
+        <InvIconButton
           tooltip={
             shouldShowStagingImage
               ? t('unifiedCanvas.showResultsOn')
@@ -181,17 +182,17 @@ const IAICanvasStagingAreaToolbar = () => {
           data-alert={!shouldShowStagingImage}
           icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
           onClick={handleToggleShouldShowStagingImage}
-          colorScheme="accent"
+          colorScheme="blue"
         />
-        <IAIIconButton
+        <InvIconButton
           tooltip={t('unifiedCanvas.saveToGallery')}
           aria-label={t('unifiedCanvas.saveToGallery')}
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<FaSave />}
           onClick={handleSaveToGallery}
-          colorScheme="accent"
+          colorScheme="blue"
         />
-        <IAIIconButton
+        <InvIconButton
           tooltip={t('unifiedCanvas.discardAll')}
           aria-label={t('unifiedCanvas.discardAll')}
           icon={<FaTimes />}
@@ -199,7 +200,7 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="error"
           fontSize={20}
         />
-      </ButtonGroup>
+      </InvButtonGroup>
     </Flex>
   );
 };

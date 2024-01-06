@@ -1,6 +1,6 @@
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { InvokeTabName } from 'features/ui/store/tabMap';
-import { O } from 'ts-toolbelt';
+import type { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { InvokeTabName } from 'features/ui/store/tabMap';
+import type { O } from 'ts-toolbelt';
 
 /**
  * A disable-able application feature

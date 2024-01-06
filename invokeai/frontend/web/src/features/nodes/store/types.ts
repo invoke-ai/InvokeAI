@@ -1,22 +1,21 @@
-import {
-  OnConnectStartParams,
-  SelectionMode,
-  Viewport,
-  XYPosition,
-} from 'reactflow';
-import { FieldIdentifier, FieldType } from 'features/nodes/types/field';
-import {
+import type { FieldType } from 'features/nodes/types/field';
+import type {
   AnyNode,
   InvocationNodeEdge,
   InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
-import { WorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import type {
+  OnConnectStartParams,
+  SelectionMode,
+  Viewport,
+  XYPosition,
+} from 'reactflow';
 
 export type NodesState = {
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
-  nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   connectionStartFieldType: FieldType | null;
   connectionMade: boolean;
@@ -32,8 +31,6 @@ export type NodesState = {
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
   isReady: boolean;
-  mouseOverField: FieldIdentifier | null;
-  mouseOverNode: string | null;
   nodesToCopy: AnyNode[];
   edgesToCopy: InvocationNodeEdge[];
   isAddNodePopoverOpen: boolean;
@@ -43,4 +40,8 @@ export type NodesState = {
 
 export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
   isTouched: boolean;
+};
+
+export type NodeTemplatesState = {
+  templates: Record<string, InvocationTemplate>;
 };

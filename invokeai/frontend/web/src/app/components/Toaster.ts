@@ -1,7 +1,8 @@
 import { useToast } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast, clearToastQueue } from 'features/system/store/systemSlice';
-import { MakeToastArg, makeToast } from 'features/system/util/makeToast';
+import type { MakeToastArg } from 'features/system/util/makeToast';
+import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useEffect } from 'react';
 
 /**

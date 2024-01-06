@@ -1,30 +1,34 @@
-import { Badge, Divider, Flex, Text } from '@chakra-ui/react';
-import { useForm } from '@mantine/form';
+import { Badge, Divider, Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineTextInput from 'common/components/IAIMantineInput';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
-import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
-import { useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import {
-  CheckpointModelConfigEntity,
-  useGetCheckpointConfigsQuery,
-  useUpdateMainModelsMutation,
-} from 'services/api/endpoints/models';
-import { CheckpointModelConfig } from 'services/api/types';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/CheckpointConfigsSelect';
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
+import { memo, useCallback, useEffect, useState } from 'react';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+import type { CheckpointModelConfigEntity } from 'services/api/endpoints/models';
+import {
+  useGetCheckpointConfigsQuery,
+  useUpdateMainModelsMutation,
+} from 'services/api/endpoints/models';
+import type { CheckpointModelConfig } from 'services/api/types';
+
 import ModelConvert from './ModelConvert';
 
 type CheckpointModelEditProps = {
   model: CheckpointModelConfigEntity;
 };
 
-export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
+const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
   const { model } = props;
 
   const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
@@ -41,8 +45,14 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const checkpointEditForm = useForm<CheckpointModelConfig>({
-    initialValues: {
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = useForm<CheckpointModelConfig>({
+    defaultValues: {
       model_name: model.model_name ? model.model_name : '',
       base_model: model.base_model,
       model_type: 'main',
@@ -53,10 +63,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
       config: model.config ? model.config : '',
       variant: model.variant,
     },
-    validate: {
-      path: (value) =>
-        value.trim().length === 0 ? 'Must provide a path' : null,
-    },
+    mode: 'onChange',
   });
 
   const handleChangeUseCustomConfig = useCallback(
@@ -64,8 +71,8 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
     []
   );
 
-  const editModelFormSubmitHandler = useCallback(
-    (values: CheckpointModelConfig) => {
+  const onSubmit = useCallback<SubmitHandler<CheckpointModelConfig>>(
+    (values) => {
       const responseBody = {
         base_model: model.base_model,
         model_name: model.model_name,
@@ -74,7 +81,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
       updateMainModel(responseBody)
         .unwrap()
         .then((payload) => {
-          checkpointEditForm.setValues(payload as CheckpointModelConfig);
+          reset(payload as CheckpointModelConfig, { keepDefaultValues: true });
           dispatch(
             addToast(
               makeToast({
@@ -85,7 +92,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
           );
         })
         .catch((_) => {
-          checkpointEditForm.reset();
+          reset();
           dispatch(
             addToast(
               makeToast({
@@ -96,38 +103,24 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
           );
         });
     },
-    [
-      checkpointEditForm,
-      dispatch,
-      model.base_model,
-      model.model_name,
-      t,
-      updateMainModel,
-    ]
+    [dispatch, model.base_model, model.model_name, reset, t, updateMainModel]
   );
 
   return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
-          <Text fontSize="lg" fontWeight="bold">
+          <InvText fontSize="lg" fontWeight="bold">
             {model.model_name}
-          </Text>
-          <Text fontSize="sm" color="base.400">
+          </InvText>
+          <InvText fontSize="sm" color="base.400">
             {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
-          </Text>
+          </InvText>
         </Flex>
         {![''].includes(model.base_model) ? (
           <ModelConvert model={model} />
         ) : (
-          <Badge
-            sx={{
-              p: 2,
-              borderRadius: 4,
-              bg: 'error.200',
-              _dark: { bg: 'error.400' },
-            }}
-          >
+          <Badge p={2} borderRadius={4} bg="error.400">
             {t('modelManager.conversionNotSupported')}
           </Badge>
         )}
@@ -139,64 +132,71 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
         maxHeight={window.innerHeight - 270}
         overflowY="scroll"
       >
-        <form
-          onSubmit={checkpointEditForm.onSubmit((values) =>
-            editModelFormSubmitHandler(values)
-          )}
-        >
+        <form onSubmit={handleSubmit(onSubmit)}>
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <IAIMantineTextInput
+            <InvControl
               label={t('modelManager.name')}
-              {...checkpointEditForm.getInputProps('model_name')}
+              isInvalid={Boolean(errors.model_name)}
+              error={errors.model_name?.message}
+            >
+              <InvInput
+                {...register('model_name', {
+                  validate: (value) =>
+                    value.trim().length > 3 || 'Must be at least 3 characters',
+                })}
+              />
+            </InvControl>
+            <InvControl label={t('modelManager.description')}>
+              <InvInput {...register('description')} />
+            </InvControl>
+            <BaseModelSelect<CheckpointModelConfig>
+              control={control}
+              name="base_model"
             />
-            <IAIMantineTextInput
-              label={t('modelManager.description')}
-              {...checkpointEditForm.getInputProps('description')}
+            <ModelVariantSelect<CheckpointModelConfig>
+              control={control}
+              name="variant"
             />
-            <BaseModelSelect
-              required
-              {...checkpointEditForm.getInputProps('base_model')}
-            />
-            <ModelVariantSelect
-              required
-              {...checkpointEditForm.getInputProps('variant')}
-            />
-            <IAIMantineTextInput
-              required
+            <InvControl
               label={t('modelManager.modelLocation')}
-              {...checkpointEditForm.getInputProps('path')}
-            />
-            <IAIMantineTextInput
-              label={t('modelManager.vaeLocation')}
-              {...checkpointEditForm.getInputProps('vae')}
-            />
+              isInvalid={Boolean(errors.path)}
+              error={errors.path?.message}
+            >
+              <InvInput
+                {...register('path', {
+                  validate: (value) =>
+                    value.trim().length > 0 || 'Must provide a path',
+                })}
+              />
+            </InvControl>
+            <InvControl label={t('modelManager.vaeLocation')}>
+              <InvInput {...register('vae')} />
+            </InvControl>
 
             <Flex flexDirection="column" gap={2}>
               {!useCustomConfig ? (
-                <CheckpointConfigsSelect
-                  required
-                  {...checkpointEditForm.getInputProps('config')}
-                />
+                <CheckpointConfigsSelect control={control} name="config" />
               ) : (
-                <IAIMantineTextInput
-                  required
-                  label={t('modelManager.config')}
-                  {...checkpointEditForm.getInputProps('config')}
-                />
+                <InvControl isRequired label={t('modelManager.config')}>
+                  <InvInput {...register('config')} />
+                </InvControl>
               )}
-              <IAISimpleCheckbox
-                isChecked={useCustomConfig}
-                onChange={handleChangeUseCustomConfig}
-                label="Use Custom Config"
-              />
+              <InvControl label="Use Custom Config">
+                <InvCheckbox
+                  isChecked={useCustomConfig}
+                  onChange={handleChangeUseCustomConfig}
+                />
+              </InvControl>
             </Flex>
 
-            <IAIButton type="submit" isLoading={isLoading}>
+            <InvButton type="submit" isLoading={isLoading}>
               {t('modelManager.updateModel')}
-            </IAIButton>
+            </InvButton>
           </Flex>
         </form>
       </Flex>
     </Flex>
   );
-}
+};
+
+export default memo(CheckpointModelEdit);

@@ -1,0 +1,22 @@
+import { Box, Flex } from '@chakra-ui/react';
+import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
+import { memo } from 'react';
+
+const TextToImageTab = () => {
+  return (
+    <Box
+      layerStyle="first"
+      position="relative"
+      w="full"
+      h="full"
+      p={2}
+      borderRadius="base"
+    >
+      <Flex w="full" h="full">
+        <CurrentImageDisplay />
+      </Flex>
+    </Box>
+  );
+};
+
+export default memo(TextToImageTab);

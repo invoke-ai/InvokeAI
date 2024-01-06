@@ -1,5 +1,9 @@
-import { RootState } from 'app/store/store';
-import { NonNullableGraph, SeamlessModeInvocation } from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type {
+  NonNullableGraph,
+  SeamlessModeInvocation,
+} from 'services/api/types';
+
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CANVAS_INPAINT_GRAPH,

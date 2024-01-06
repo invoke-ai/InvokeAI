@@ -1,25 +1,28 @@
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
-  addPointToCurrentLine,
+  $isDrawing,
   setCursorPosition,
-} from 'features/canvas/store/canvasSlice';
+} from 'features/canvas/store/canvasNanostore';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { Vector2d } from 'konva/lib/types';
-import { MutableRefObject, useCallback } from 'react';
+import type Konva from 'konva';
+import type { Vector2d } from 'konva/lib/types';
+import type { MutableRefObject } from 'react';
+import { useCallback } from 'react';
+
 import useColorPicker from './useColorUnderCursor';
 
 const selector = createMemoizedSelector(
   [activeTabNameSelector, stateSelector, isStagingSelector],
   (activeTabName, { canvas }, isStaging) => {
-    const { tool, isDrawing } = canvas;
+    const { tool } = canvas;
     return {
       tool,
-      isDrawing,
       activeTabName,
       isStaging,
     };
@@ -32,7 +35,8 @@ const useCanvasMouseMove = (
   lastCursorPositionRef: MutableRefObject<Vector2d>
 ) => {
   const dispatch = useAppDispatch();
-  const { isDrawing, tool, isStaging } = useAppSelector(selector);
+  const isDrawing = useStore($isDrawing);
+  const { tool, isStaging } = useAppSelector(selector);
   const { updateColorUnderCursor } = useColorPicker();
 
   return useCallback(() => {
@@ -46,7 +50,7 @@ const useCanvasMouseMove = (
       return;
     }
 
-    dispatch(setCursorPosition(scaledCursorPosition));
+    setCursorPosition(scaledCursorPosition);
 
     lastCursorPositionRef.current = scaledCursorPosition;
 

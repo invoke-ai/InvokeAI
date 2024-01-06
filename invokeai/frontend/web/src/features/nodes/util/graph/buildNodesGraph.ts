@@ -1,12 +1,10 @@
-import { NodesState } from 'features/nodes/store/types';
-import {
-  FieldInputInstance,
-  isColorFieldInputInstance,
-} from 'features/nodes/types/field';
+import type { NodesState } from 'features/nodes/store/types';
+import type { FieldInputInstance } from 'features/nodes/types/field';
+import { isColorFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { cloneDeep, omit, reduce } from 'lodash-es';
-import { Graph } from 'services/api/types';
-import { AnyInvocation } from 'services/events/types';
+import type { Graph } from 'services/api/types';
+import type { AnyInvocation } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

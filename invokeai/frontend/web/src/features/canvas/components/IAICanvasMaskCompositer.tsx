@@ -2,10 +2,10 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import Konva from 'konva';
-import { RectConfig } from 'konva/lib/shapes/Rect';
+import type Konva from 'konva';
+import type { RectConfig } from 'konva/lib/shapes/Rect';
 import { isNumber } from 'lodash-es';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Rect } from 'react-konva';
 
 export const canvasMaskCompositerSelector = createMemoizedSelector(
@@ -147,6 +147,11 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
     return () => clearInterval(timer);
   }, []);
 
+  const fillPatternScale = useMemo(
+    () => ({ x: 1 / stageScale, y: 1 / stageScale }),
+    [stageScale]
+  );
+
   if (
     !fillPatternImage ||
     !isNumber(stageCoordinates.x) ||
@@ -168,7 +173,7 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
       fillPatternImage={fillPatternImage}
       fillPatternOffsetY={!isNumber(offset) ? 0 : offset}
       fillPatternRepeat="repeat"
-      fillPatternScale={{ x: 1 / stageScale, y: 1 / stageScale }}
+      fillPatternScale={fillPatternScale}
       listening={true}
       globalCompositeOperation="source-in"
       {...rest}

@@ -34,7 +34,7 @@ const IAICanvasBoundingBoxOverlay = () => {
   } = useAppSelector(selector);
 
   return (
-    <Group>
+    <Group listening={false}>
       <Rect
         offsetX={stageCoordinates.x / stageScale}
         offsetY={stageCoordinates.y / stageScale}

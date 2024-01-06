@@ -1,7 +1,7 @@
-import { UseToastOptions } from '@chakra-ui/react';
-import { EntityState } from '@reduxjs/toolkit';
-import { components, paths } from './schema';
-import { O } from 'ts-toolbelt';
+import type { UseToastOptions } from '@chakra-ui/react';
+import type { EntityState } from '@reduxjs/toolkit';
+import type { components, paths } from 'services/api/schema';
+import type { O } from 'ts-toolbelt';
 
 type s = components['schemas'];
 
@@ -56,7 +56,6 @@ export type SubModelType = s['SubModelType'];
 export type BaseModelType =
   s['invokeai__backend__model_management__models__base__BaseModelType'];
 export type MainModelField = s['MainModelField'];
-export type OnnxModelField = s['OnnxModelField'];
 export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
 export type LoRAModelFormat = s['LoRAModelFormat'];
@@ -91,7 +90,6 @@ export type CheckpointModelConfig =
   | s['StableDiffusion1ModelCheckpointConfig']
   | s['StableDiffusion2ModelCheckpointConfig']
   | s['StableDiffusionXLModelCheckpointConfig'];
-export type OnnxModelConfig = s['ONNXStableDiffusion1ModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
@@ -100,8 +98,7 @@ export type AnyModelConfig =
   | IPAdapterModelConfig
   | T2IAdapterModelConfig
   | TextualInversionModelConfig
-  | MainModelConfig
-  | OnnxModelConfig;
+  | MainModelConfig;
 
 export type MergeModelConfig = s['Body_merge_models'];
 export type ImportModelConfig = s['Body_import_model'];
@@ -137,13 +134,11 @@ export type CompelInvocation = s['CompelInvocation'];
 export type DynamicPromptInvocation = s['DynamicPromptInvocation'];
 export type NoiseInvocation = s['NoiseInvocation'];
 export type DenoiseLatentsInvocation = s['DenoiseLatentsInvocation'];
-export type ONNXTextToLatentsInvocation = s['ONNXTextToLatentsInvocation'];
 export type SDXLLoraLoaderInvocation = s['SDXLLoraLoaderInvocation'];
 export type ImageToLatentsInvocation = s['ImageToLatentsInvocation'];
 export type LatentsToImageInvocation = s['LatentsToImageInvocation'];
 export type ImageCollectionInvocation = s['ImageCollectionInvocation'];
 export type MainModelLoaderInvocation = s['MainModelLoaderInvocation'];
-export type OnnxModelLoaderInvocation = s['OnnxModelLoaderInvocation'];
 export type LoraLoaderInvocation = s['LoraLoaderInvocation'];
 export type ESRGANInvocation = s['ESRGANInvocation'];
 export type DivideInvocation = s['DivideInvocation'];

@@ -2,12 +2,13 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { buildAdHocUpscaleGraph } from 'features/nodes/util/graph/buildAdHocUpscaleGraph';
+import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
+import type { BatchConfig, ImageDTO } from 'services/api/types';
+
 import { startAppListening } from '..';
-import { BatchConfig, ImageDTO } from 'services/api/types';
-import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
 
 export const upscaleRequested = createAction<{ imageDTO: ImageDTO }>(
   `upscale/upscaleRequested`

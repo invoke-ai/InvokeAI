@@ -1,12 +1,14 @@
 import { Switch } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldBooleanValueChanged } from 'features/nodes/store/nodesSlice';
-import {
+import type {
   BooleanFieldInputInstance,
   BooleanFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { FieldComponentProps } from './types';
-import { ChangeEvent, memo, useCallback } from 'react';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+
+import type { FieldComponentProps } from './types';
 
 const BooleanFieldInputComponent = (
   props: FieldComponentProps<

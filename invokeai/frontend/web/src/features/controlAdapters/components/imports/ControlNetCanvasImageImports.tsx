@@ -1,13 +1,13 @@
 import { Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import {
   canvasImageToControlAdapter,
   canvasMaskToControlAdapter,
 } from 'features/canvas/store/actions';
 import { memo, useCallback } from 'react';
-import { FaImage, FaMask } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { FaImage, FaMask } from 'react-icons/fa';
 
 type ControlNetCanvasImageImportsProps = {
   id: string;
@@ -29,19 +29,15 @@ const ControlNetCanvasImageImports = (
   }, [id, dispatch]);
 
   return (
-    <Flex
-      sx={{
-        gap: 2,
-      }}
-    >
-      <IAIIconButton
+    <Flex gap={2}>
+      <InvIconButton
         size="sm"
         icon={<FaImage />}
         tooltip={t('controlnet.importImageFromCanvas')}
         aria-label={t('controlnet.importImageFromCanvas')}
         onClick={handleImportImageFromCanvas}
       />
-      <IAIIconButton
+      <InvIconButton
         size="sm"
         icon={<FaMask />}
         tooltip={t('controlnet.importMaskFromCanvas')}

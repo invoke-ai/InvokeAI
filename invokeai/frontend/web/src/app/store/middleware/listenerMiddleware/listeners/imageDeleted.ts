@@ -18,6 +18,7 @@ import { clamp, forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
+
 import { startAppListening } from '..';
 
 export const addRequestedSingleImageDeletionListener = () => {

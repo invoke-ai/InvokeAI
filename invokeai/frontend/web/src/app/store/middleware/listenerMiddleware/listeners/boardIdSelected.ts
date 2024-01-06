@@ -9,8 +9,9 @@ import {
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '..';
 import { imagesSelectors } from 'services/api/util';
+
+import { startAppListening } from '..';
 
 export const addBoardIdSelectedListener = () => {
   startAppListening({

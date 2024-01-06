@@ -1,13 +1,14 @@
-import { createSlice, isAnyOf, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { workflowLoaded } from 'features/nodes/store/actions';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
-import {
+import type {
   BoardFieldValue,
   BooleanFieldValue,
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
-  FieldIdentifier,
   FieldValue,
   FloatFieldValue,
   ImageFieldValue,
@@ -20,6 +21,8 @@ import {
   StringFieldValue,
   T2IAdapterModelFieldValue,
   VAEModelFieldValue,
+} from 'features/nodes/types/field';
+import {
   zBoardFieldValue,
   zBooleanFieldValue,
   zColorFieldValue,
@@ -37,33 +40,36 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import {
+import type {
   AnyNode,
-  InvocationTemplate,
+  NodeExecutionState,
+} from 'features/nodes/types/invocation';
+import {
   isInvocationNode,
   isNotesNode,
-  NodeExecutionState,
   zNodeStatus,
 } from 'features/nodes/types/invocation';
 import { cloneDeep, forEach } from 'lodash-es';
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
+import type {
   Connection,
   Edge,
   EdgeChange,
   EdgeRemoveChange,
-  getConnectedEdges,
-  getIncomers,
-  getOutgoers,
   Node,
   NodeChange,
   OnConnectStartParams,
-  SelectionMode,
-  updateEdge,
   Viewport,
   XYPosition,
+} from 'reactflow';
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  getConnectedEdges,
+  getIncomers,
+  getOutgoers,
+  SelectionMode,
+  updateEdge,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import {
@@ -74,8 +80,9 @@ import {
   appSocketQueueItemStatusChanged,
 } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
-import { z } from 'zod';
-import { NodesState } from './types';
+import type { z } from 'zod';
+
+import type { NodesState } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
@@ -90,7 +97,6 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
 export const initialNodesState: NodesState = {
   nodes: [],
   edges: [],
-  nodeTemplates: {},
   isReady: false,
   connectionStartParams: null,
   connectionStartFieldType: null,
@@ -108,8 +114,6 @@ export const initialNodesState: NodesState = {
   selectedEdges: [],
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
-  mouseOverField: null,
-  mouseOverNode: null,
   nodesToCopy: [],
   edgesToCopy: [],
   selectionMode: SelectionMode.Partial,
@@ -133,10 +137,11 @@ const fieldValueReducer = <T extends FieldValue>(
     return;
   }
   const input = node.data?.inputs[fieldName];
-  if (!input || nodeIndex < 0 || !schema.safeParse(value).success) {
+  const result = schema.safeParse(value);
+  if (!input || nodeIndex < 0 || !result.success) {
     return;
   }
-  input.value = value;
+  input.value = result.data;
 };
 
 const nodesSlice = createSlice({
@@ -264,11 +269,18 @@ const nodesSlice = createSlice({
 
       state.connectionMade = true;
     },
-    connectionEnded: (state, action) => {
+    connectionEnded: (
+      state,
+      action: PayloadAction<{
+        cursorPosition: XYPosition;
+        mouseOverNodeId: string | null;
+      }>
+    ) => {
+      const { cursorPosition, mouseOverNodeId } = action.payload;
       if (!state.connectionMade) {
-        if (state.mouseOverNode) {
+        if (mouseOverNodeId) {
           const nodeIndex = state.nodes.findIndex(
-            (n) => n.id === state.mouseOverNode
+            (n) => n.id === mouseOverNodeId
           );
           const mouseOverNode = state.nodes?.[nodeIndex];
           if (mouseOverNode && state.connectionStartParams) {
@@ -300,7 +312,7 @@ const nodesSlice = createSlice({
           state.connectionStartParams = null;
           state.connectionStartFieldType = null;
         } else {
-          state.addNewNodePosition = action.payload.cursorPosition;
+          state.addNewNodePosition = cursorPosition;
           state.isAddNodePopoverOpen = true;
         }
       } else {
@@ -644,13 +656,6 @@ const nodesSlice = createSlice({
     shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowMinimapPanel = action.payload;
     },
-    nodeTemplatesBuilt: (
-      state,
-      action: PayloadAction<Record<string, InvocationTemplate>>
-    ) => {
-      state.nodeTemplates = action.payload;
-      state.isReady = true;
-    },
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
@@ -672,15 +677,6 @@ const nodesSlice = createSlice({
     },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
-    },
-    mouseOverFieldChanged: (
-      state,
-      action: PayloadAction<FieldIdentifier | null>
-    ) => {
-      state.mouseOverField = action.payload;
-    },
-    mouseOverNodeChanged: (state, action: PayloadAction<string | null>) => {
-      state.mouseOverNode = action.payload;
     },
     selectedAll: (state) => {
       state.nodes = applyNodeChanges(
@@ -890,6 +886,9 @@ const nodesSlice = createSlice({
         });
       }
     });
+    builder.addCase(nodeTemplatesBuilt, (state) => {
+      state.isReady = true;
+    });
   },
 });
 
@@ -921,8 +920,6 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  mouseOverFieldChanged,
-  mouseOverNodeChanged,
   nodeAdded,
   nodeReplaced,
   nodeEditorReset,
@@ -934,7 +931,6 @@ export const {
   nodeOpacityChanged,
   nodesChanged,
   nodesDeleted,
-  nodeTemplatesBuilt,
   nodeUseCacheChanged,
   notesNodeValueChanged,
   selectedAll,

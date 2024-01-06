@@ -1,4 +1,4 @@
-import { FieldType } from 'features/nodes/types/field';
+import type { FieldType } from 'features/nodes/types/field';
 import { isEqual } from 'lodash-es';
 
 /**

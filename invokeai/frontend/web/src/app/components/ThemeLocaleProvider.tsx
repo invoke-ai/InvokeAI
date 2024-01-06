@@ -1,23 +1,16 @@
-import {
-  ChakraProvider,
-  createLocalStorageManager,
-  extendTheme,
-} from '@chakra-ui/react';
-import { ReactNode, memo, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { TOAST_OPTIONS, theme as invokeAITheme } from 'theme/theme';
-
 import '@fontsource-variable/inter';
-import { MantineProvider } from '@mantine/core';
-import { useMantineTheme } from 'mantine-theme/theme';
 import 'overlayscrollbars/overlayscrollbars.css';
-import 'theme/css/overlayscrollbars.css';
+import 'common/components/OverlayScrollbars/overlayscrollbars.css';
+
+import { ChakraProvider, extendTheme } from '@chakra-ui/react';
+import type { ReactNode } from 'react';
+import { memo, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { theme as invokeAITheme, TOAST_OPTIONS } from 'theme/theme';
 
 type ThemeLocaleProviderProps = {
   children: ReactNode;
 };
-
-const manager = createLocalStorageManager('@@invokeai-color-mode');
 
 function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   const { i18n } = useTranslation();
@@ -35,18 +28,10 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
     document.body.dir = direction;
   }, [direction]);
 
-  const mantineTheme = useMantineTheme();
-
   return (
-    <MantineProvider theme={mantineTheme}>
-      <ChakraProvider
-        theme={theme}
-        colorModeManager={manager}
-        toastOptions={TOAST_OPTIONS}
-      >
-        {children}
-      </ChakraProvider>
-    </MantineProvider>
+    <ChakraProvider theme={theme} toastOptions={TOAST_OPTIONS}>
+      {children}
+    </ChakraProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
+import type { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
 import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
 import { useEffect, useRef } from 'react';
 

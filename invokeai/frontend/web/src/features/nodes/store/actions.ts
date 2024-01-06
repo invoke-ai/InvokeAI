@@ -1,6 +1,6 @@
 import { createAction, isAnyOf } from '@reduxjs/toolkit';
-import { WorkflowV2 } from 'features/nodes/types/workflow';
-import { Graph } from 'services/api/types';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import type { Graph } from 'services/api/types';
 
 export const textToImageGraphBuilt = createAction<Graph>(
   'nodes/textToImageGraphBuilt'

@@ -1,5 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
+import { InvButton } from 'common/components/InvButton/InvButton';
 import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
 import { memo, useCallback } from 'react';
@@ -19,13 +19,13 @@ const UpdateNodesButton = () => {
   }
 
   return (
-    <IAIButton
+    <InvButton
       leftIcon={<FaExclamationTriangle />}
       onClick={handleClickUpdateNodes}
       pointerEvents="auto"
     >
       {t('nodes.updateAllNodes')}
-    </IAIButton>
+    </InvButton>
   );
 };
 

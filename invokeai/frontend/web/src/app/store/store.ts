@@ -1,6 +1,5 @@
+import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import {
-  ThunkDispatch,
-  UnknownAction,
   autoBatchEnhancer,
   combineReducers,
   configureStore,
@@ -11,9 +10,11 @@ import controlAdaptersReducer from 'features/controlAdapters/store/controlAdapte
 import deleteImageModalReducer from 'features/deleteImageModal/store/slice';
 import dynamicPromptsReducer from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
+import hrfReducer from 'features/hrf/store/hrfSlice';
 import loraReducer from 'features/lora/store/loraSlice';
 import modelmanagerReducer from 'features/modelManager/store/modelManagerSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
+import nodeTemplatesReducer from 'features/nodes/store/nodeTemplatesSlice';
 import workflowReducer from 'features/nodes/store/workflowSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
@@ -21,12 +22,14 @@ import queueReducer from 'features/queue/store/queueSlice';
 import sdxlReducer from 'features/sdxl/store/sdxlSlice';
 import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
-import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
-import { Driver, rememberEnhancer, rememberReducer } from 'redux-remember';
+import type { Driver } from 'redux-remember';
+import { rememberEnhancer, rememberReducer } from 'redux-remember';
 import { api } from 'services/api';
+import { authToastMiddleware } from 'services/api/authToastMiddleware';
+
 import { STORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
 import { unserialize } from './enhancers/reduxRemember/unserialize';
@@ -34,18 +37,17 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
-import { authToastMiddleware } from 'services/api/authToastMiddleware';
 
 const allReducers = {
   canvas: canvasReducer,
   gallery: galleryReducer,
   generation: generationReducer,
   nodes: nodesReducer,
+  nodeTemplates: nodeTemplatesReducer,
   postprocessing: postprocessingReducer,
   system: systemReducer,
   config: configReducer,
   ui: uiReducer,
-  hotkeys: hotkeysReducer,
   controlAdapters: controlAdaptersReducer,
   dynamicPrompts: dynamicPromptsReducer,
   deleteImageModal: deleteImageModalReducer,
@@ -55,6 +57,7 @@ const allReducers = {
   sdxl: sdxlReducer,
   queue: queueReducer,
   workflow: workflowReducer,
+  hrf: hrfReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -76,6 +79,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'dynamicPrompts',
   'lora',
   'modelmanager',
+  'hrf',
 ];
 
 // Create a custom idb-keyval store (just needed to customize the name)
@@ -147,4 +151,6 @@ export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;
 export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
-export const stateSelector = (state: RootState) => state;
+export function stateSelector(state: RootState) {
+  return state;
+}

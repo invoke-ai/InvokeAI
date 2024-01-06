@@ -1,12 +1,12 @@
 import {
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-} from '@chakra-ui/react';
+  InvModal,
+  InvModalBody,
+  InvModalCloseButton,
+  InvModalContent,
+  InvModalFooter,
+  InvModalHeader,
+  InvModalOverlay,
+} from 'common/components/InvModal/wrapper';
 import WorkflowLibraryContent from 'features/workflowLibrary/components/WorkflowLibraryContent';
 import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import { memo } from 'react';
@@ -16,9 +16,9 @@ const WorkflowLibraryModal = () => {
   const { t } = useTranslation();
   const { isOpen, onClose } = useWorkflowLibraryModalContext();
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered>
-      <ModalOverlay />
-      <ModalContent
+    <InvModal isOpen={isOpen} onClose={onClose} isCentered>
+      <InvModalOverlay />
+      <InvModalContent
         w="80%"
         h="80%"
         minW="unset"
@@ -26,14 +26,14 @@ const WorkflowLibraryModal = () => {
         maxW="unset"
         maxH="unset"
       >
-        <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
+        <InvModalHeader>{t('workflows.workflowLibrary')}</InvModalHeader>
+        <InvModalCloseButton />
+        <InvModalBody>
           <WorkflowLibraryContent />
-        </ModalBody>
-        <ModalFooter />
-      </ModalContent>
-    </Modal>
+        </InvModalBody>
+        <InvModalFooter />
+      </InvModalContent>
+    </InvModal>
   );
 };
 

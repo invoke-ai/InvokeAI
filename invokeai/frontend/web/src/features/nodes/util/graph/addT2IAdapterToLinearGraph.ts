@@ -1,13 +1,14 @@
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { omit } from 'lodash-es';
-import {
+import type {
   CollectInvocation,
   CoreMetadataInvocation,
   NonNullableGraph,
   T2IAdapterField,
   T2IAdapterInvocation,
 } from 'services/api/types';
+
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
   T2I_ADAPTER_COLLECT,

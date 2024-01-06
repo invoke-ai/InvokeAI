@@ -6,16 +6,20 @@ import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
+import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '../';
 import { workflowExposedFieldAdded } from 'features/nodes/store/workflowSlice';
+import {
+  initialImageChanged,
+  selectOptimalDimension,
+} from 'features/parameters/store/generationSlice';
+import { imagesApi } from 'services/api/endpoints/images';
+
+import { startAppListening } from '../';
 
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;
@@ -25,7 +29,7 @@ export const dndDropped = createAction<{
 export const addImageDroppedListener = () => {
   startAppListening({
     actionCreator: dndDropped,
-    effect: async (action, { dispatch }) => {
+    effect: async (action, { dispatch, getState }) => {
       const log = logger('dnd');
       const { activeData, overData } = action.payload;
 
@@ -114,7 +118,12 @@ export const addImageDroppedListener = () => {
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(setInitialCanvasImage(activeData.payload.imageDTO));
+        dispatch(
+          setInitialCanvasImage(
+            activeData.payload.imageDTO,
+            selectOptimalDimension(getState())
+          )
+        );
         return;
       }
 

@@ -1,26 +1,27 @@
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import {
+  $isDrawing,
+  setIsDrawing,
+  setIsMovingStage,
+} from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   // addPointToCurrentEraserLine,
   addPointToCurrentLine,
-  setIsDrawing,
-  setIsMovingStage,
 } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { MutableRefObject, useCallback } from 'react';
+import type Konva from 'konva';
+import type { MutableRefObject } from 'react';
+import { useCallback } from 'react';
 
 const selector = createMemoizedSelector(
-  [activeTabNameSelector, stateSelector, isStagingSelector],
-  (activeTabName, { canvas }, isStaging) => {
-    const { tool, isDrawing } = canvas;
+  [stateSelector, isStagingSelector],
+  ({ canvas }, isStaging) => {
     return {
-      tool,
-      isDrawing,
-      activeTabName,
+      tool: canvas.tool,
       isStaging,
     };
   }
@@ -31,11 +32,12 @@ const useCanvasMouseUp = (
   didMouseMoveRef: MutableRefObject<boolean>
 ) => {
   const dispatch = useAppDispatch();
-  const { tool, isDrawing, isStaging } = useAppSelector(selector);
+  const isDrawing = useStore($isDrawing);
+  const { tool, isStaging } = useAppSelector(selector);
 
   return useCallback(() => {
     if (tool === 'move' || isStaging) {
-      dispatch(setIsMovingStage(false));
+      setIsMovingStage(false);
       return;
     }
 
@@ -58,7 +60,7 @@ const useCanvasMouseUp = (
     } else {
       didMouseMoveRef.current = false;
     }
-    dispatch(setIsDrawing(false));
+    setIsDrawing(false);
   }, [didMouseMoveRef, dispatch, isDrawing, isStaging, stageRef, tool]);
 };
 

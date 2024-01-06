@@ -1,6 +1,7 @@
-import { Box, BoxProps } from '@chakra-ui/react';
+import type { BoxProps } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { useDraggableTypesafe } from 'features/dnd/hooks/typesafeHooks';
-import { TypesafeDraggableData } from 'features/dnd/types';
+import type { TypesafeDraggableData } from 'features/dnd/types';
 import { memo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 

@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
@@ -10,11 +11,15 @@ import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/us
 import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
 import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
 import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
+import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
+import {
+  heightChanged,
+  selectOptimalDimension,
+  widthChanged,
+} from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +30,7 @@ import {
   useGetImageDTOQuery,
   useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/types';
+import type { PostUploadAction } from 'services/api/types';
 
 type Props = {
   id: string;
@@ -33,8 +38,8 @@ type Props = {
 };
 
 const selector = createMemoizedSelector(
-  stateSelector,
-  ({ controlAdapters, gallery, system }) => {
+  [stateSelector, activeTabNameSelector, selectOptimalDimension],
+  ({ controlAdapters, gallery, system }, activeTabName, optimalDimension) => {
     const { pendingControlImages } = controlAdapters;
     const { autoAddBoardId } = gallery;
     const { isConnected } = system;
@@ -43,6 +48,8 @@ const selector = createMemoizedSelector(
       pendingControlImages,
       autoAddBoardId,
       isConnected,
+      activeTabName,
+      optimalDimension,
     };
   }
 );
@@ -51,13 +58,15 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
   const controlImageName = useControlAdapterControlImage(id);
   const processedControlImageName = useControlAdapterProcessedControlImage(id);
   const processorType = useControlAdapterProcessorType(id);
-
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const { pendingControlImages, autoAddBoardId, isConnected } =
-    useAppSelector(selector);
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const {
+    pendingControlImages,
+    autoAddBoardId,
+    isConnected,
+    activeTabName,
+    optimalDimension,
+  } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -109,16 +118,19 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 
     if (activeTabName === 'unifiedCanvas') {
       dispatch(
-        setBoundingBoxDimensions({
-          width: controlImage.width,
-          height: controlImage.height,
-        })
+        setBoundingBoxDimensions(
+          {
+            width: controlImage.width,
+            height: controlImage.height,
+          },
+          optimalDimension
+        )
       );
     } else {
-      dispatch(setWidth(controlImage.width));
-      dispatch(setHeight(controlImage.height));
+      dispatch(widthChanged(controlImage.width));
+      dispatch(heightChanged(controlImage.height));
     }
-  }, [controlImage, activeTabName, dispatch]);
+  }, [controlImage, activeTabName, dispatch, optimalDimension]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
@@ -174,13 +186,11 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     <Flex
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      sx={{
-        position: 'relative',
-        w: 'full',
-        h: isSmall ? 28 : 366, // magic no touch
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      position="relative"
+      w="full"
+      h={isSmall ? 32 : 366} // magic no touch
+      alignItems="center"
+      justifyContent="center"
     >
       <IAIDndImage
         draggableData={draggableData}
@@ -191,17 +201,15 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       />
 
       <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          insetInlineStart: 0,
-          w: 'full',
-          h: 'full',
-          opacity: shouldShowProcessedImage ? 1 : 0,
-          transitionProperty: 'common',
-          transitionDuration: 'normal',
-          pointerEvents: 'none',
-        }}
+        position="absolute"
+        top={0}
+        insetInlineStart={0}
+        w="full"
+        h="full"
+        opacity={shouldShowProcessedImage ? 1 : 0}
+        transitionProperty="common"
+        transitionDuration="normal"
+        pointerEvents="none"
       >
         <IAIDndImage
           draggableData={draggableData}
@@ -221,38 +229,30 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
           onClick={handleSaveControlImage}
           icon={controlImage ? <FaSave size={16} /> : undefined}
           tooltip={t('controlnet.saveControlImage')}
-          styleOverrides={{ marginTop: 6 }}
+          styleOverrides={saveControlImageStyleOverrides}
         />
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
           icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
           tooltip={t('controlnet.setControlImageDimensions')}
-          styleOverrides={{ marginTop: 12 }}
+          styleOverrides={setControlImageDimensionsStyleOverrides}
         />
       </>
 
       {pendingControlImages.includes(id) && (
         <Flex
-          sx={{
-            position: 'absolute',
-            top: 0,
-            insetInlineStart: 0,
-            w: 'full',
-            h: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: 0.8,
-            borderRadius: 'base',
-            bg: 'base.400',
-            _dark: {
-              bg: 'base.900',
-            },
-          }}
+          position="absolute"
+          top={0}
+          insetInlineStart={0}
+          w="full"
+          h="full"
+          alignItems="center"
+          justifyContent="center"
+          opacity={0.8}
+          borderRadius="base"
+          bg="base.900"
         >
-          <Spinner
-            size="xl"
-            sx={{ color: 'base.100', _dark: { color: 'base.400' } }}
-          />
+          <Spinner size="xl" color="base.400" />
         </Flex>
       )}
     </Flex>
@@ -260,3 +260,6 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 };
 
 export default memo(ControlAdapterImagePreview);
+
+const saveControlImageStyleOverrides: SystemStyleObject = { mt: 6 };
+const setControlImageDimensionsStyleOverrides: SystemStyleObject = { mt: 12 };

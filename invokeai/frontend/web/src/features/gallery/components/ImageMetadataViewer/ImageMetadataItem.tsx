@@ -1,5 +1,8 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { Flex, IconButton, Link, Text, Tooltip } from '@chakra-ui/react';
+import { Flex, Link } from '@chakra-ui/react';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
@@ -39,8 +42,8 @@ const ImageMetadataItem = ({
   return (
     <Flex gap={2}>
       {onClick && (
-        <Tooltip label={`Recall ${label}`}>
-          <IconButton
+        <InvTooltip label={`Recall ${label}`}>
+          <InvIconButton
             aria-label={t('accessibility.useThisParameter')}
             icon={<IoArrowUndoCircleOutline />}
             size="xs"
@@ -48,11 +51,11 @@ const ImageMetadataItem = ({
             fontSize={20}
             onClick={onClick}
           />
-        </Tooltip>
+        </InvTooltip>
       )}
       {withCopy && (
-        <Tooltip label={`Copy ${label}`}>
-          <IconButton
+        <InvTooltip label={`Copy ${label}`}>
+          <InvIconButton
             aria-label={`Copy ${label}`}
             icon={<FaCopy />}
             size="xs"
@@ -60,20 +63,20 @@ const ImageMetadataItem = ({
             fontSize={14}
             onClick={handleCopy}
           />
-        </Tooltip>
+        </InvTooltip>
       )}
       <Flex direction={labelPosition ? 'column' : 'row'}>
-        <Text fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
+        <InvText fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
           {label}:
-        </Text>
+        </InvText>
         {isLink ? (
           <Link href={value.toString()} isExternal wordBreak="break-all">
             {value.toString()} <ExternalLinkIcon mx="2px" />
           </Link>
         ) : (
-          <Text overflowY="scroll" wordBreak="break-all">
+          <InvText overflowY="scroll" wordBreak="break-all">
             {value.toString()}
-          </Text>
+          </InvText>
         )}
       </Flex>
     </Flex>

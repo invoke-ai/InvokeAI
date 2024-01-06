@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { NonNullableGraph } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -22,7 +23,7 @@ import {
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
 } from './constants';
-import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { getSDXLStylePrompts } from './getSDXLStylePrompt';
 import { addCoreMetadataNode } from './metadata';
 
 export const buildLinearSDXLTextToImageGraph = (
@@ -46,12 +47,7 @@ export const buildLinearSDXLTextToImageGraph = (
     seamlessYAxis,
   } = state.generation;
 
-  const {
-    positiveStylePrompt,
-    negativeStylePrompt,
-    shouldUseSDXLRefiner,
-    refinerStart,
-  } = state.sdxl;
+  const { refinerModel, refinerStart } = state.sdxl;
 
   const use_cpu = shouldUseCpuNoise;
 
@@ -64,8 +60,8 @@ export const buildLinearSDXLTextToImageGraph = (
   const is_intermediate = true;
 
   // Construct Style Prompt
-  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
-    buildSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } =
+    getSDXLStylePrompts(state);
 
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
@@ -93,14 +89,14 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: joinedPositiveStylePrompt,
+        style: positiveStylePrompt,
         is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: joinedNegativeStylePrompt,
+        style: negativeStylePrompt,
         is_intermediate,
       },
       [NOISE]: {
@@ -119,7 +115,7 @@ export const buildLinearSDXLTextToImageGraph = (
         scheduler,
         steps,
         denoising_start: 0,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        denoising_end: refinerModel ? refinerStart : 1,
         is_intermediate,
       },
       [LATENTS_TO_IMAGE]: {
@@ -255,7 +251,7 @@ export const buildLinearSDXLTextToImageGraph = (
   }
 
   // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;

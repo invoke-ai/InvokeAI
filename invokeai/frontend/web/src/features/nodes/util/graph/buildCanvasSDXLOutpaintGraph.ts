@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   ImageDTO,
   ImageToLatentsInvocation,
   InfillPatchMatchInvocation,
@@ -8,6 +8,7 @@ import {
   NoiseInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -45,7 +46,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { getSDXLStylePrompts } from './getSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Outpaint graph.
@@ -75,13 +76,10 @@ export const buildCanvasSDXLOutpaintGraph = (
     infillMethod,
     seamlessXAxis,
     seamlessYAxis,
+    img2imgStrength: strength,
   } = state.generation;
 
-  const {
-    sdxlImg2ImgDenoisingStrength: strength,
-    shouldUseSDXLRefiner,
-    refinerStart,
-  } = state.sdxl;
+  const { refinerModel, refinerStart } = state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
@@ -105,8 +103,8 @@ export const buildCanvasSDXLOutpaintGraph = (
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
-    buildSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } =
+    getSDXLStylePrompts(state);
 
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_OUTPAINT_GRAPH,
@@ -120,13 +118,13 @@ export const buildCanvasSDXLOutpaintGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: joinedPositiveStylePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: joinedNegativeStylePrompt,
+        style: negativeStylePrompt,
       },
       [MASK_FROM_ALPHA]: {
         type: 'tomask',
@@ -166,10 +164,10 @@ export const buildCanvasSDXLOutpaintGraph = (
         steps: steps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: shouldUseSDXLRefiner
+        denoising_start: refinerModel
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        denoising_end: refinerModel ? refinerStart : 1,
       },
       [CANVAS_COHERENCE_NOISE]: {
         type: 'noise',
@@ -762,7 +760,7 @@ export const buildCanvasSDXLOutpaintGraph = (
   }
 
   // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     addSDXLRefinerToGraph(
       state,
       graph,

@@ -1,24 +1,26 @@
+import { skipToken } from '@reduxjs/toolkit/query';
+import { useAppToaster } from 'app/components/Toaster';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { useCallback, useEffect } from 'react';
-import { useAppToaster } from 'app/components/Toaster';
-import { useAppDispatch } from 'app/store/storeHooks';
 import {
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
 } from 'services/api/endpoints/images';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import { initialImageSelected } from 'features/parameters/store/actions';
+
 import { useRecallParameters } from './useRecallParameters';
-import { skipToken } from '@reduxjs/toolkit/query';
 
 export const usePreselectedImage = (selectedImage?: {
   imageName: string;
   action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
 }) => {
   const dispatch = useAppDispatch();
-
   const { recallAllParameters } = useRecallParameters();
+  const optimalDimension = useAppSelector(selectOptimalDimension);
   const toaster = useAppToaster();
 
   const { currentData: selectedImageDto } = useGetImageDTOQuery(
@@ -31,7 +33,7 @@ export const usePreselectedImage = (selectedImage?: {
 
   const handleSendToCanvas = useCallback(() => {
     if (selectedImageDto) {
-      dispatch(setInitialCanvasImage(selectedImageDto));
+      dispatch(setInitialCanvasImage(selectedImageDto, optimalDimension));
       dispatch(setActiveTab('unifiedCanvas'));
       toaster({
         title: t('toast.sentToUnifiedCanvas'),
@@ -40,7 +42,7 @@ export const usePreselectedImage = (selectedImage?: {
         isClosable: true,
       });
     }
-  }, [dispatch, toaster, selectedImageDto]);
+  }, [selectedImageDto, dispatch, optimalDimension, toaster]);
 
   const handleSendToImg2Img = useCallback(() => {
     if (selectedImageDto) {

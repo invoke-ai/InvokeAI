@@ -2,7 +2,8 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedImageWorkflow } from 'services/api/hooks/useDebouncedImageWorkflow';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
+
 import DataViewer from './DataViewer';
 
 type Props = {

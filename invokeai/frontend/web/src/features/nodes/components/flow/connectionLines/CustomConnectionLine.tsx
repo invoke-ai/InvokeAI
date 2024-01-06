@@ -3,8 +3,10 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
+import type { CSSProperties } from 'react';
 import { memo } from 'react';
-import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
+import type { ConnectionLineComponentProps } from 'reactflow';
+import { getBezierPath } from 'reactflow';
 
 const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
   const { shouldAnimateEdges, connectionStartFieldType, shouldColorEdges } =
@@ -25,6 +27,8 @@ const selector = createMemoizedSelector(stateSelector, ({ nodes }) => {
     className,
   };
 });
+
+const pathStyles: CSSProperties = { opacity: 0.8 };
 
 const CustomConnectionLine = ({
   fromX,
@@ -55,7 +59,7 @@ const CustomConnectionLine = ({
         strokeWidth={2}
         className={className}
         d={dAttr}
-        style={{ opacity: 0.8 }}
+        style={pathStyles}
       />
     </g>
   );

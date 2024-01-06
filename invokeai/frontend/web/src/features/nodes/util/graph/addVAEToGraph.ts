@@ -1,5 +1,6 @@
-import { RootState } from 'app/store/store';
-import { NonNullableGraph } from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { NonNullableGraph } from 'services/api/types';
+
 import {
   CANVAS_COHERENCE_INPAINT_CREATE_MASK,
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
@@ -13,7 +14,6 @@ import {
   INPAINT_IMAGE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
-  ONNX_MODEL_LOADER,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_CANVAS_OUTPAINT_GRAPH,
@@ -33,7 +33,7 @@ export const addVAEToGraph = (
 ): void => {
   const { vae, canvasCoherenceMode } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
-  const { shouldUseSDXLRefiner } = state.sdxl;
+  const { refinerModel } = state.sdxl;
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
@@ -49,7 +49,6 @@ export const addVAEToGraph = (
       vae_model: vae,
     };
   }
-  const isOnnxModel = modelLoaderNodeId == ONNX_MODEL_LOADER;
 
   if (
     graph.id === TEXT_TO_IMAGE_GRAPH ||
@@ -60,7 +59,7 @@ export const addVAEToGraph = (
     graph.edges.push({
       source: {
         node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-        field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        field: 'vae',
       },
       destination: {
         node_id: LATENTS_TO_IMAGE,
@@ -78,7 +77,7 @@ export const addVAEToGraph = (
     graph.edges.push({
       source: {
         node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-        field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        field: 'vae',
       },
       destination: {
         node_id: isUsingScaledDimensions ? LATENTS_TO_IMAGE : CANVAS_OUTPUT,
@@ -96,7 +95,7 @@ export const addVAEToGraph = (
     graph.edges.push({
       source: {
         node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-        field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        field: 'vae',
       },
       destination: {
         node_id: IMAGE_TO_LATENTS,
@@ -115,7 +114,7 @@ export const addVAEToGraph = (
       {
         source: {
           node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+          field: 'vae',
         },
         destination: {
           node_id: INPAINT_IMAGE,
@@ -125,7 +124,7 @@ export const addVAEToGraph = (
       {
         source: {
           node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+          field: 'vae',
         },
         destination: {
           node_id: INPAINT_CREATE_MASK,
@@ -135,7 +134,7 @@ export const addVAEToGraph = (
       {
         source: {
           node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+          field: 'vae',
         },
         destination: {
           node_id: LATENTS_TO_IMAGE,
@@ -149,7 +148,7 @@ export const addVAEToGraph = (
       graph.edges.push({
         source: {
           node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+          field: 'vae',
         },
         destination: {
           node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
@@ -159,7 +158,7 @@ export const addVAEToGraph = (
     }
   }
 
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     if (
       graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
       graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
@@ -167,7 +166,7 @@ export const addVAEToGraph = (
       graph.edges.push({
         source: {
           node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+          field: 'vae',
         },
         destination: {
           node_id: SDXL_REFINER_INPAINT_CREATE_MASK,

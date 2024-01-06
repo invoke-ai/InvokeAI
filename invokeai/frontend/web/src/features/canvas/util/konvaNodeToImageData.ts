@@ -1,5 +1,6 @@
-import Konva from 'konva';
-import { IRect } from 'konva/lib/types';
+import type Konva from 'konva';
+import type { IRect } from 'konva/lib/types';
+
 import { dataURLToImageData } from './dataURLToImageData';
 
 /**

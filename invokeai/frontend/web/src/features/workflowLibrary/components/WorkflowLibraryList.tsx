@@ -1,48 +1,57 @@
 import { CloseIcon } from '@chakra-ui/icons';
 import {
-  ButtonGroup,
   Divider,
   Flex,
-  IconButton,
-  Input,
   InputGroup,
   InputRightElement,
   Spacer,
 } from '@chakra-ui/react';
-import { SelectItem } from '@mantine/core';
-import IAIButton from 'common/components/IAIButton';
 import {
   IAINoContentFallback,
   IAINoContentFallbackWithSpinner,
 } from 'common/components/IAIImageFallback';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import ScrollableContent from 'features/nodes/components/sidePanel/ScrollableContent';
-import { WorkflowCategory } from 'features/nodes/types/workflow';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type {
+  InvSelectOnChange,
+  InvSelectOption,
+} from 'common/components/InvSelect/types';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import WorkflowLibraryListItem from 'features/workflowLibrary/components/WorkflowLibraryListItem';
 import WorkflowLibraryPagination from 'features/workflowLibrary/components/WorkflowLibraryPagination';
-import {
-  ChangeEvent,
-  KeyboardEvent,
-  memo,
-  useCallback,
-  useMemo,
-  useState,
-} from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
-import { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
+import type {
+  SQLiteDirection,
+  WorkflowRecordOrderBy,
+} from 'services/api/types';
 import { useDebounce } from 'use-debounce';
+import { z } from 'zod';
 
 const PER_PAGE = 10;
 
-const ORDER_BY_DATA: SelectItem[] = [
+const zOrderBy = z.enum(['opened_at', 'created_at', 'updated_at', 'name']);
+type OrderBy = z.infer<typeof zOrderBy>;
+const isOrderBy = (v: unknown): v is OrderBy => zOrderBy.safeParse(v).success;
+const ORDER_BY_OPTIONS: InvSelectOption[] = [
   { value: 'opened_at', label: 'Opened' },
   { value: 'created_at', label: 'Created' },
   { value: 'updated_at', label: 'Updated' },
   { value: 'name', label: 'Name' },
 ];
 
-const DIRECTION_DATA: SelectItem[] = [
+const zDirection = z.enum(['ASC', 'DESC']);
+type Direction = z.infer<typeof zDirection>;
+const isDirection = (v: unknown): v is Direction =>
+  zDirection.safeParse(v).success;
+const DIRECTION_OPTIONS: InvSelectOption[] = [
   { value: 'ASC', label: 'Ascending' },
   { value: 'DESC', label: 'Descending' },
 ];
@@ -80,25 +89,33 @@ const WorkflowLibraryList = () => {
   const { data, isLoading, isError, isFetching } =
     useListWorkflowsQuery(queryArg);
 
-  const handleChangeOrderBy = useCallback(
-    (value: string | null) => {
-      if (!value || value === order_by) {
+  const onChangeOrderBy = useCallback<InvSelectOnChange>(
+    (v) => {
+      if (!isOrderBy(v?.value) || v.value === order_by) {
         return;
       }
-      setOrderBy(value as WorkflowRecordOrderBy);
+      setOrderBy(v.value);
       setPage(0);
     },
     [order_by]
   );
+  const valueOrderBy = useMemo(
+    () => ORDER_BY_OPTIONS.find((o) => o.value === order_by),
+    [order_by]
+  );
 
-  const handleChangeDirection = useCallback(
-    (value: string | null) => {
-      if (!value || value === direction) {
+  const onChangeDirection = useCallback<InvSelectOnChange>(
+    (v) => {
+      if (!isDirection(v?.value) || v.value === direction) {
         return;
       }
-      setDirection(value as SQLiteDirection);
+      setDirection(v.value);
       setPage(0);
     },
+    [direction]
+  );
+  const valueDirection = useMemo(
+    () => DIRECTION_OPTIONS.find((o) => o.value === direction),
     [direction]
   );
 
@@ -140,55 +157,51 @@ const WorkflowLibraryList = () => {
   return (
     <>
       <Flex gap={4} alignItems="center" h={10} flexShrink={0} flexGrow={0}>
-        <ButtonGroup>
-          <IAIButton
+        <InvButtonGroup>
+          <InvButton
             variant={category === 'user' ? undefined : 'ghost'}
             onClick={handleSetUserCategory}
             isChecked={category === 'user'}
           >
             {t('workflows.userWorkflows')}
-          </IAIButton>
-          <IAIButton
+          </InvButton>
+          <InvButton
             variant={category === 'default' ? undefined : 'ghost'}
             onClick={handleSetDefaultCategory}
             isChecked={category === 'default'}
           >
             {t('workflows.defaultWorkflows')}
-          </IAIButton>
-        </ButtonGroup>
+          </InvButton>
+        </InvButtonGroup>
         <Spacer />
         {category === 'user' && (
           <>
-            <IAIMantineSelect
+            <InvControl
               label={t('common.orderBy')}
-              value={order_by}
-              data={ORDER_BY_DATA}
-              onChange={handleChangeOrderBy}
-              formControlProps={{
-                w: 48,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-              }}
-              disabled={isFetching}
-            />
-            <IAIMantineSelect
+              isDisabled={isFetching}
+              w={64}
+            >
+              <InvSelect
+                value={valueOrderBy}
+                options={ORDER_BY_OPTIONS}
+                onChange={onChangeOrderBy}
+              />
+            </InvControl>
+            <InvControl
               label={t('common.direction')}
-              value={direction}
-              data={DIRECTION_DATA}
-              onChange={handleChangeDirection}
-              formControlProps={{
-                w: 48,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-              }}
-              disabled={isFetching}
-            />
+              isDisabled={isFetching}
+              w={64}
+            >
+              <InvSelect
+                value={valueDirection}
+                options={DIRECTION_OPTIONS}
+                onChange={onChangeDirection}
+              />
+            </InvControl>
           </>
         )}
         <InputGroup w="20rem">
-          <Input
+          <InvInput
             placeholder={t('workflows.searchWorkflows')}
             value={query}
             onKeyDown={handleKeydownFilterText}
@@ -197,7 +210,7 @@ const WorkflowLibraryList = () => {
           />
           {query.trim().length && (
             <InputRightElement>
-              <IconButton
+              <InvIconButton
                 onClick={resetFilterText}
                 size="xs"
                 variant="ghost"

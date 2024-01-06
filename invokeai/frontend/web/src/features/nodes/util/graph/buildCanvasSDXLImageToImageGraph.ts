@@ -1,10 +1,11 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   ImageDTO,
   ImageToLatentsInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -29,7 +30,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
+import { getSDXLStylePrompts } from './getSDXLStylePrompt';
 import { addCoreMetadataNode } from './metadata';
 
 /**
@@ -53,13 +54,10 @@ export const buildCanvasSDXLImageToImageGraph = (
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
+    img2imgStrength: strength,
   } = state.generation;
 
-  const {
-    shouldUseSDXLRefiner,
-    refinerStart,
-    sdxlImg2ImgDenoisingStrength: strength,
-  } = state.sdxl;
+  const { refinerModel, refinerStart } = state.sdxl;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
@@ -83,8 +81,8 @@ export const buildCanvasSDXLImageToImageGraph = (
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
-    buildSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } =
+    getSDXLStylePrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -108,13 +106,13 @@ export const buildCanvasSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: joinedPositiveStylePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: joinedNegativeStylePrompt,
+        style: negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
@@ -142,10 +140,10 @@ export const buildCanvasSDXLImageToImageGraph = (
         cfg_scale,
         scheduler,
         steps,
-        denoising_start: shouldUseSDXLRefiner
+        denoising_start: refinerModel
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+        denoising_end: refinerModel ? refinerStart : 1,
       },
     },
     edges: [
@@ -346,6 +344,8 @@ export const buildCanvasSDXLImageToImageGraph = (
       scheduler,
       strength,
       init_image: initialImage.image_name,
+      positive_style_prompt: positiveStylePrompt,
+      negative_style_prompt: negativeStylePrompt,
     },
     CANVAS_OUTPUT
   );
@@ -357,7 +357,7 @@ export const buildCanvasSDXLImageToImageGraph = (
   }
 
   // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
+  if (refinerModel) {
     addSDXLRefinerToGraph(
       state,
       graph,

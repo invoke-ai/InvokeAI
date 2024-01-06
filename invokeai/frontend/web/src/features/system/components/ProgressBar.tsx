@@ -28,10 +28,9 @@ const ProgressBar = () => {
       isIndeterminate={
         isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps
       }
-      h="full"
+      h={2}
       w="full"
-      borderRadius={2}
-      colorScheme="accent"
+      colorScheme="blue"
     />
   );
 };

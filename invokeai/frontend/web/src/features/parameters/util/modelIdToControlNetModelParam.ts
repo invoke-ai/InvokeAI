@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { zParameterControlNetModel } from 'features/parameters/types/parameterSchemas';
-import { ControlNetModelField } from 'services/api/types';
+import type { ControlNetModelField } from 'services/api/types';
 
 export const modelIdToControlNetModelParam = (
   controlNetModelId: string

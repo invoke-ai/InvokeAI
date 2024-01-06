@@ -1,15 +1,22 @@
-import {
-  Flex,
-  Popover,
-  PopoverAnchor,
-  PopoverBody,
-  PopoverContent,
-} from '@chakra-ui/react';
+import 'reactflow/dist/style.css';
+
+import { Flex } from '@chakra-ui/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import type { SelectInstance } from 'chakra-react-select';
+import {
+  InvPopover,
+  InvPopoverAnchor,
+  InvPopoverBody,
+  InvPopoverContent,
+} from 'common/components/InvPopover/wrapper';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type {
+  InvSelectOnChange,
+  InvSelectOption,
+} from 'common/components/InvSelect/types';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   addNodePopoverClosed,
@@ -17,42 +24,48 @@ import {
   nodeAdded,
 } from 'features/nodes/store/nodesSlice';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
-import { filter, map, some } from 'lodash-es';
+import { filter, map, memoize, some } from 'lodash-es';
+import type { KeyboardEventHandler } from 'react';
 import { memo, useCallback, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
+import type { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
 import { useTranslation } from 'react-i18next';
-import 'reactflow/dist/style.css';
-import { AddNodePopoverSelectItem } from './AddNodePopoverSelectItem';
+import type { FilterOptionOption } from 'react-select/dist/declarations/src/filters';
 
-type NodeTemplate = {
-  label: string;
-  value: string;
-  description: string;
-  tags: string[];
-};
+const createRegex = memoize(
+  (inputValue: string) =>
+    new RegExp(
+      inputValue
+        .trim()
+        .replace(/[-[\]{}()*+!<=:?./\\^$|#,]/g, '')
+        .split(' ')
+        .join('.*'),
+      'gi'
+    )
+);
 
-const selectFilter = (value: string, item: NodeTemplate) => {
-  const regex = new RegExp(
-    value
-      .trim()
-      .replace(/[-[\]{}()*+!<=:?./\\^$|#,]/g, '')
-      .split(' ')
-      .join('.*'),
-    'gi'
-  );
-  return (
-    regex.test(item.label) ||
-    regex.test(item.description) ||
-    item.tags.some((tag) => regex.test(tag))
-  );
-};
+const filterOption = memoize(
+  (option: FilterOptionOption<InvSelectOption>, inputValue: string) => {
+    if (!inputValue) {
+      return true;
+    }
+    const regex = createRegex(inputValue);
+    return (
+      regex.test(option.label) ||
+      regex.test(option.data.description ?? '') ||
+      (option.data.tags ?? []).some((tag) => regex.test(tag))
+    );
+  }
+);
 
 const AddNodePopover = () => {
   const dispatch = useAppDispatch();
   const buildInvocation = useBuildNode();
   const toaster = useAppToaster();
   const { t } = useTranslation();
+  const selectRef = useRef<SelectInstance<InvSelectOption> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fieldFilter = useAppSelector(
     (state) => state.nodes.connectionStartFieldType
@@ -61,58 +74,63 @@ const AddNodePopover = () => {
     (state) => state.nodes.connectionStartParams?.handleType
   );
 
-  const selector = createMemoizedSelector([stateSelector], ({ nodes }) => {
-    // If we have a connection in progress, we need to filter the node choices
-    const filteredNodeTemplates = fieldFilter
-      ? filter(nodes.nodeTemplates, (template) => {
-          const handles =
-            handleFilter == 'source' ? template.inputs : template.outputs;
+  const selector = createMemoizedSelector(
+    [stateSelector],
+    ({ nodeTemplates }) => {
+      // If we have a connection in progress, we need to filter the node choices
+      const filteredNodeTemplates = fieldFilter
+        ? filter(nodeTemplates.templates, (template) => {
+            const handles =
+              handleFilter == 'source' ? template.inputs : template.outputs;
 
-          return some(handles, (handle) => {
-            const sourceType =
-              handleFilter == 'source' ? fieldFilter : handle.type;
-            const targetType =
-              handleFilter == 'target' ? fieldFilter : handle.type;
+            return some(handles, (handle) => {
+              const sourceType =
+                handleFilter == 'source' ? fieldFilter : handle.type;
+              const targetType =
+                handleFilter == 'target' ? fieldFilter : handle.type;
 
-            return validateSourceAndTargetTypes(sourceType, targetType);
-          });
-        })
-      : map(nodes.nodeTemplates);
+              return validateSourceAndTargetTypes(sourceType, targetType);
+            });
+          })
+        : map(nodeTemplates.templates);
 
-    const data: NodeTemplate[] = map(filteredNodeTemplates, (template) => {
-      return {
-        label: template.title,
-        value: template.type,
-        description: template.description,
-        tags: template.tags,
-      };
-    });
+      const options: InvSelectOption[] = map(
+        filteredNodeTemplates,
+        (template) => {
+          return {
+            label: template.title,
+            value: template.type,
+            description: template.description,
+            tags: template.tags,
+          };
+        }
+      );
 
-    //We only want these nodes if we're not filtered
-    if (fieldFilter === null) {
-      data.push({
-        label: t('nodes.currentImage'),
-        value: 'current_image',
-        description: t('nodes.currentImageDescription'),
-        tags: ['progress'],
-      });
+      //We only want these nodes if we're not filtered
+      if (fieldFilter === null) {
+        options.push({
+          label: t('nodes.currentImage'),
+          value: 'current_image',
+          description: t('nodes.currentImageDescription'),
+          tags: ['progress'],
+        });
 
-      data.push({
-        label: t('nodes.notes'),
-        value: 'notes',
-        description: t('nodes.notesDescription'),
-        tags: ['notes'],
-      });
+        options.push({
+          label: t('nodes.notes'),
+          value: 'notes',
+          description: t('nodes.notesDescription'),
+          tags: ['notes'],
+        });
+      }
+
+      options.sort((a, b) => a.label.localeCompare(b.label));
+
+      return { options };
     }
+  );
 
-    data.sort((a, b) => a.label.localeCompare(b.label));
-
-    return { data };
-  });
-
-  const { data } = useAppSelector(selector);
+  const { options } = useAppSelector(selector);
   const isOpen = useAppSelector((state) => state.nodes.isAddNodePopoverOpen);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const addNode = useCallback(
     (nodeType: string) => {
@@ -133,13 +151,12 @@ const AddNodePopover = () => {
     [dispatch, buildInvocation, toaster, t]
   );
 
-  const handleChange = useCallback(
-    (v: string | null) => {
+  const onChange = useCallback<InvSelectOnChange>(
+    (v) => {
       if (!v) {
         return;
       }
-
-      addNode(v);
+      addNode(v.value);
     },
     [addNode]
   );
@@ -156,9 +173,9 @@ const AddNodePopover = () => {
     (e) => {
       e.preventDefault();
       onOpen();
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 0);
+      flushSync(() => {
+        selectRef.current?.inputRef?.focus();
+      });
     },
     [onOpen]
   );
@@ -169,10 +186,19 @@ const AddNodePopover = () => {
 
   useHotkeys(['shift+a', 'space'], handleHotkeyOpen);
   useHotkeys(['escape'], handleHotkeyClose);
+  const onKeyDown: KeyboardEventHandler = useCallback(
+    (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  const noOptionsMessage = useCallback(() => t('nodes.noMatchingNodes'), [t]);
 
   return (
-    <Popover
-      initialFocusRef={inputRef}
+    <InvPopover
       isOpen={isOpen}
       onClose={onClose}
       placement="bottom"
@@ -180,52 +206,41 @@ const AddNodePopover = () => {
       closeDelay={0}
       closeOnBlur={true}
       returnFocusOnClose={true}
+      initialFocusRef={inputRef}
     >
-      <PopoverAnchor>
+      <InvPopoverAnchor>
         <Flex
-          sx={{
-            position: 'absolute',
-            top: '15%',
-            insetInlineStart: '50%',
-            pointerEvents: 'none',
-          }}
+          position="absolute"
+          top="15%"
+          insetInlineStart="50%"
+          pointerEvents="none"
         />
-      </PopoverAnchor>
-      <PopoverContent
-        sx={{
-          p: 0,
-          top: -1,
-          shadow: 'dark-lg',
-          borderColor: 'accent.300',
-          borderWidth: '2px',
-          borderStyle: 'solid',
-          _dark: { borderColor: 'accent.400' },
-        }}
+      </InvPopoverAnchor>
+      <InvPopoverContent
+        p={0}
+        top={-1}
+        shadow="dark-lg"
+        borderColor="blue.400"
+        borderWidth="2px"
+        borderStyle="solid"
       >
-        <PopoverBody sx={{ p: 0 }}>
-          <IAIMantineSearchableSelect
-            inputRef={inputRef}
-            selectOnBlur={false}
-            placeholder={t('nodes.nodeSearch')}
+        <InvPopoverBody w="32rem" p={0}>
+          <InvSelect
+            menuIsOpen={isOpen}
+            selectRef={selectRef}
             value={null}
-            data={data}
-            maxDropdownHeight={400}
-            nothingFound={t('nodes.noMatchingNodes')}
-            itemComponent={AddNodePopoverSelectItem}
-            filter={selectFilter}
-            onChange={handleChange}
-            hoverOnSearchChange={true}
-            onDropdownClose={onClose}
-            sx={{
-              width: '32rem',
-              input: {
-                padding: '0.5rem',
-              },
-            }}
+            placeholder={t('nodes.nodeSearch')}
+            options={options}
+            noOptionsMessage={noOptionsMessage}
+            filterOption={filterOption}
+            onChange={onChange}
+            onMenuClose={onClose}
+            onKeyDown={onKeyDown}
+            inputRef={inputRef}
           />
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
+        </InvPopoverBody>
+      </InvPopoverContent>
+    </InvPopover>
   );
 };
 

@@ -1,51 +1,40 @@
-import {
-  As,
-  Flex,
-  FlexProps,
-  Icon,
-  Skeleton,
-  Spinner,
-  StyleProps,
-  Text,
-} from '@chakra-ui/react';
+import type { As, FlexProps, StyleProps } from '@chakra-ui/react';
+import { Flex, Icon, Skeleton, Spinner } from '@chakra-ui/react';
+import { memo, useMemo } from 'react';
 import { FaImage } from 'react-icons/fa';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
+
+import { InvText } from './InvText/wrapper';
 
 type Props = { image: ImageDTO | undefined };
 
-export const IAILoadingImageFallback = (props: Props) => {
+export const IAILoadingImageFallback = memo((props: Props) => {
   if (props.image) {
     return (
       <Skeleton
-        sx={{
-          w: `${props.image.width}px`,
-          h: 'auto',
-          objectFit: 'contain',
-          aspectRatio: `${props.image.width}/${props.image.height}`,
-        }}
+        w={`${props.image.width}px`}
+        h="auto"
+        objectFit="contain"
+        aspectRatio={`${props.image.width}/${props.image.height}`}
       />
     );
   }
 
   return (
     <Flex
-      sx={{
-        opacity: 0.7,
-        w: 'full',
-        h: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 'base',
-        bg: 'base.200',
-        _dark: {
-          bg: 'base.900',
-        },
-      }}
+      opacity={0.7}
+      w="full"
+      h="full"
+      alignItems="center"
+      justifyContent="center"
+      borderRadius="base"
+      bg="base.900"
     >
       <Spinner size="xl" />
     </Flex>
   );
-};
+});
+IAILoadingImageFallback.displayName = 'IAILoadingImageFallback';
 
 type IAINoImageFallbackProps = FlexProps & {
   label?: string;
@@ -53,47 +42,48 @@ type IAINoImageFallbackProps = FlexProps & {
   boxSize?: StyleProps['boxSize'];
 };
 
-export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
+export const IAINoContentFallback = memo((props: IAINoImageFallbackProps) => {
   const { icon = FaImage, boxSize = 16, sx, ...rest } = props;
 
+  const styles = useMemo(
+    () => ({
+      w: 'full',
+      h: 'full',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 'base',
+      flexDir: 'column',
+      gap: 2,
+      userSelect: 'none',
+      opacity: 0.7,
+      color: 'base.500',
+      ...sx,
+    }),
+    [sx]
+  );
+
   return (
-    <Flex
-      sx={{
-        w: 'full',
-        h: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 'base',
-        flexDir: 'column',
-        gap: 2,
-        userSelect: 'none',
-        opacity: 0.7,
-        color: 'base.700',
-        _dark: {
-          color: 'base.500',
-        },
-        ...sx,
-      }}
-      {...rest}
-    >
+    <Flex sx={styles} {...rest}>
       {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
-      {props.label && <Text textAlign="center">{props.label}</Text>}
+      {props.label && (
+        <InvText textAlign="center" fontSize="md">
+          {props.label}
+        </InvText>
+      )}
     </Flex>
   );
-};
+});
+IAINoContentFallback.displayName = 'IAINoContentFallback';
 
 type IAINoImageFallbackWithSpinnerProps = FlexProps & {
   label?: string;
 };
 
-export const IAINoContentFallbackWithSpinner = (
-  props: IAINoImageFallbackWithSpinnerProps
-) => {
-  const { sx, ...rest } = props;
-
-  return (
-    <Flex
-      sx={{
+export const IAINoContentFallbackWithSpinner = memo(
+  (props: IAINoImageFallbackWithSpinnerProps) => {
+    const { sx, ...rest } = props;
+    const styles = useMemo(
+      () => ({
         w: 'full',
         h: 'full',
         alignItems: 'center',
@@ -103,16 +93,18 @@ export const IAINoContentFallbackWithSpinner = (
         gap: 2,
         userSelect: 'none',
         opacity: 0.7,
-        color: 'base.700',
-        _dark: {
-          color: 'base.500',
-        },
+        color: 'base.500',
         ...sx,
-      }}
-      {...rest}
-    >
-      <Spinner size="xl" />
-      {props.label && <Text textAlign="center">{props.label}</Text>}
-    </Flex>
-  );
-};
+      }),
+      [sx]
+    );
+
+    return (
+      <Flex sx={styles} {...rest}>
+        <Spinner size="xl" />
+        {props.label && <InvText textAlign="center">{props.label}</InvText>}
+      </Flex>
+    );
+  }
+);
+IAINoContentFallbackWithSpinner.displayName = 'IAINoContentFallbackWithSpinner';

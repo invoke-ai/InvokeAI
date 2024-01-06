@@ -1,26 +1,27 @@
-import { Divider, Flex, Text } from '@chakra-ui/react';
-import { useForm } from '@mantine/form';
+import { Divider, Flex } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineTextInput from 'common/components/IAIMantineInput';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvText } from 'common/components/InvText/wrapper';
+import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
+import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import {
-  DiffusersModelConfigEntity,
-  useUpdateMainModelsMutation,
-} from 'services/api/endpoints/models';
-import { DiffusersModelConfig } from 'services/api/types';
-import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
-import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
+import type { DiffusersModelConfigEntity } from 'services/api/endpoints/models';
+import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
+import type { DiffusersModelConfig } from 'services/api/types';
 
 type DiffusersModelEditProps = {
   model: DiffusersModelConfigEntity;
 };
 
-export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
+const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
   const { model } = props;
 
   const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
@@ -28,8 +29,14 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const diffusersEditForm = useForm<DiffusersModelConfig>({
-    initialValues: {
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = useForm<DiffusersModelConfig>({
+    defaultValues: {
       model_name: model.model_name ? model.model_name : '',
       base_model: model.base_model,
       model_type: 'main',
@@ -39,14 +46,11 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
       vae: model.vae ? model.vae : '',
       variant: model.variant,
     },
-    validate: {
-      path: (value) =>
-        value.trim().length === 0 ? 'Must provide a path' : null,
-    },
+    mode: 'onChange',
   });
 
-  const editModelFormSubmitHandler = useCallback(
-    (values: DiffusersModelConfig) => {
+  const onSubmit = useCallback<SubmitHandler<DiffusersModelConfig>>(
+    (values) => {
       const responseBody = {
         base_model: model.base_model,
         model_name: model.model_name,
@@ -56,7 +60,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
       updateMainModel(responseBody)
         .unwrap()
         .then((payload) => {
-          diffusersEditForm.setValues(payload as DiffusersModelConfig);
+          reset(payload as DiffusersModelConfig, { keepDefaultValues: true });
           dispatch(
             addToast(
               makeToast({
@@ -67,7 +71,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
           );
         })
         .catch((_) => {
-          diffusersEditForm.reset();
+          reset();
           dispatch(
             addToast(
               makeToast({
@@ -78,64 +82,68 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
           );
         });
     },
-    [
-      diffusersEditForm,
-      dispatch,
-      model.base_model,
-      model.model_name,
-      t,
-      updateMainModel,
-    ]
+    [dispatch, model.base_model, model.model_name, reset, t, updateMainModel]
   );
 
   return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex flexDirection="column">
-        <Text fontSize="lg" fontWeight="bold">
+        <InvText fontSize="lg" fontWeight="bold">
           {model.model_name}
-        </Text>
-        <Text fontSize="sm" color="base.400">
+        </InvText>
+        <InvText fontSize="sm" color="base.400">
           {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
-        </Text>
+        </InvText>
       </Flex>
       <Divider />
 
-      <form
-        onSubmit={diffusersEditForm.onSubmit((values) =>
-          editModelFormSubmitHandler(values)
-        )}
-      >
+      <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <IAIMantineTextInput
+          <InvControl
             label={t('modelManager.name')}
-            {...diffusersEditForm.getInputProps('model_name')}
+            isInvalid={Boolean(errors.model_name)}
+            error={errors.model_name?.message}
+          >
+            <InvInput
+              {...register('model_name', {
+                validate: (value) =>
+                  value.trim().length > 3 || 'Must be at least 3 characters',
+              })}
+            />
+          </InvControl>
+          <InvControl label={t('modelManager.description')}>
+            <InvInput {...register('description')} />
+          </InvControl>
+          <BaseModelSelect<DiffusersModelConfig>
+            control={control}
+            name="base_model"
           />
-          <IAIMantineTextInput
-            label={t('modelManager.description')}
-            {...diffusersEditForm.getInputProps('description')}
+          <ModelVariantSelect<DiffusersModelConfig>
+            control={control}
+            name="variant"
           />
-          <BaseModelSelect
-            required
-            {...diffusersEditForm.getInputProps('base_model')}
-          />
-          <ModelVariantSelect
-            required
-            {...diffusersEditForm.getInputProps('variant')}
-          />
-          <IAIMantineTextInput
-            required
+          <InvControl
             label={t('modelManager.modelLocation')}
-            {...diffusersEditForm.getInputProps('path')}
-          />
-          <IAIMantineTextInput
-            label={t('modelManager.vaeLocation')}
-            {...diffusersEditForm.getInputProps('vae')}
-          />
-          <IAIButton type="submit" isLoading={isLoading}>
+            isInvalid={Boolean(errors.path)}
+            error={errors.path?.message}
+          >
+            <InvInput
+              {...register('path', {
+                validate: (value) =>
+                  value.trim().length > 0 || 'Must provide a path',
+              })}
+            />
+          </InvControl>
+          <InvControl label={t('modelManager.vaeLocation')}>
+            <InvInput {...register('vae')} />
+          </InvControl>
+          <InvButton type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}
-          </IAIButton>
+          </InvButton>
         </Flex>
       </form>
     </Flex>
   );
-}
+};
+
+export default memo(DiffusersModelEdit);

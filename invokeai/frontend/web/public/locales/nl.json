@@ -148,10 +148,6 @@
             "title": "Zet Opties vast",
             "desc": "Zet het deelscherm Opties vast"
         },
-        "toggleViewer": {
-            "title": "Zet Viewer vast",
-            "desc": "Opent of sluit Afbeeldingsviewer"
-        },
         "toggleGallery": {
             "title": "Zet Galerij vast",
             "desc": "Opent of sluit het deelscherm Galerij"
@@ -211,10 +207,6 @@
         "nextImage": {
             "title": "Volgende afbeelding",
             "desc": "Toont de volgende afbeelding in de galerij"
-        },
-        "toggleGalleryPin": {
-            "title": "Zet galerij vast/los",
-            "desc": "Zet de galerij vast of los aan de gebruikersinterface"
         },
         "increaseGalleryThumbSize": {
             "title": "Vergroot afbeeldingsgrootte galerij",
@@ -1071,7 +1063,6 @@
         "processor": "Verwerker",
         "addControlNet": "Voeg $t(common.controlNet) toe",
         "none": "Geen",
-        "incompatibleBaseModel": "Niet-compatibel basismodel:",
         "enableControlnet": "Schakel ControlNet in",
         "detectResolution": "Herken resolutie",
         "controlNetT2IMutexDesc": "Gelijktijdig gebruik van $t(common.controlNet) en $t(common.t2iAdapter) wordt op dit moment niet ondersteund.",

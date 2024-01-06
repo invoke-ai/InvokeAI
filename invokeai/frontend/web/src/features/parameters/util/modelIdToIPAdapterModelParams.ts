@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { zParameterIPAdapterModel } from 'features/parameters/types/parameterSchemas';
-import { IPAdapterModelField } from 'services/api/types';
+import type { IPAdapterModelField } from 'services/api/types';
 
 export const modelIdToIPAdapterModelParam = (
   ipAdapterModelId: string

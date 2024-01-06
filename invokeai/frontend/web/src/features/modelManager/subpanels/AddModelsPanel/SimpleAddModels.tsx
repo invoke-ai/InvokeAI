@@ -1,16 +1,19 @@
 import { Flex } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useTranslation } from 'react-i18next';
-import { SelectItem } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineTextInput from 'common/components/IAIMantineInput';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvInput } from 'common/components/InvInput/InvInput';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type { InvSelectOption } from 'common/components/InvSelect/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import type { CSSProperties } from 'react';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
-const predictionSelectData: SelectItem[] = [
+const options: InvSelectOption[] = [
   { label: 'None', value: 'none' },
   { label: 'v_prediction', value: 'v_prediction' },
   { label: 'epsilon', value: 'epsilon' },
@@ -22,7 +25,7 @@ type ExtendedImportModelConfig = {
   prediction_type?: 'v_prediction' | 'epsilon' | 'sample' | 'none' | undefined;
 };
 
-export default function SimpleAddModels() {
+const SimpleAddModels = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -72,25 +75,33 @@ export default function SimpleAddModels() {
   return (
     <form
       onSubmit={addModelForm.onSubmit((v) => handleAddModelSubmit(v))}
-      style={{ width: '100%' }}
+      style={formStyles}
     >
       <Flex flexDirection="column" width="100%" gap={4}>
-        <IAIMantineTextInput
-          label={t('modelManager.modelLocation')}
-          placeholder={t('modelManager.simpleModelDesc')}
-          w="100%"
-          {...addModelForm.getInputProps('location')}
-        />
-        <IAIMantineSelect
-          label={t('modelManager.predictionType')}
-          data={predictionSelectData}
-          defaultValue="none"
-          {...addModelForm.getInputProps('prediction_type')}
-        />
-        <IAIButton type="submit" isLoading={isLoading}>
+        <InvControl label={t('modelManager.modelLocation')}>
+          <InvInput
+            placeholder={t('modelManager.simpleModelDesc')}
+            w="100%"
+            {...addModelForm.getInputProps('location')}
+          />
+        </InvControl>
+        <InvControl label={t('modelManager.predictionType')}>
+          <InvSelect
+            options={options}
+            defaultValue={options[0]}
+            {...addModelForm.getInputProps('prediction_type')}
+          />
+        </InvControl>
+        <InvButton type="submit" isLoading={isLoading}>
           {t('modelManager.addModel')}
-        </IAIButton>
+        </InvButton>
       </Flex>
     </form>
   );
-}
+};
+
+const formStyles: CSSProperties = {
+  width: '100%',
+};
+
+export default memo(SimpleAddModels);

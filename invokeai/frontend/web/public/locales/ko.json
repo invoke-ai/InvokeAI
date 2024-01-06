@@ -363,7 +363,6 @@
         "processor": "프로세서",
         "addControlNet": "$t(common.controlNet) 추가",
         "none": "해당없음",
-        "incompatibleBaseModel": "호환되지 않는 기본 모델:",
         "enableControlnet": "사용 가능한 ControlNet",
         "detectResolution": "해상도 탐지",
         "controlNetT2IMutexDesc": "$t(common.controlNet)와 $t(common.t2iAdapter)는 현재 동시에 지원되지 않습니다.",
@@ -408,10 +407,6 @@
         "maxFaces": "Max Faces"
     },
     "hotkeys": {
-        "toggleGalleryPin": {
-            "title": "Gallery Pin 전환",
-            "desc": "갤러리를 UI에 고정했다가 풉니다"
-        },
         "toggleSnap": {
             "desc": "Snap을 Grid로 전환",
             "title": "Snap 전환"
@@ -600,10 +595,6 @@
         "addNodes": {
             "desc": "노드 추가 메뉴 열기",
             "title": "노드 추가"
-        },
-        "toggleViewer": {
-            "desc": "이미지 뷰어 열기 및 닫기",
-            "title": "Viewer 전환"
         },
         "undoStroke": {
             "title": "Stroke 실행 취소",

@@ -1,7 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
-import { workflowLoaded } from 'features/nodes/store/actions';
+import {
+  workflowLoaded,
+  workflowLoadRequested,
+} from 'features/nodes/store/actions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import {
   WorkflowMigrationError,
@@ -14,6 +16,7 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
+
 import { startAppListening } from '..';
 
 export const addWorkflowLoadRequestedListener = () => {
@@ -22,7 +25,7 @@ export const addWorkflowLoadRequestedListener = () => {
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
       const { workflow, asCopy } = action.payload;
-      const nodeTemplates = getState().nodes.nodeTemplates;
+      const nodeTemplates = getState().nodeTemplates.templates;
 
       try {
         const { workflow: validatedWorkflow, warnings } = validateWorkflow(

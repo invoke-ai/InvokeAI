@@ -1,130 +1,58 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
-import SDXLImageToImageTabParameters from 'features/sdxl/components/SDXLImageToImageTabParameters';
-import SDXLTextToImageTabParameters from 'features/sdxl/components/SDXLTextToImageTabParameters';
-import SDXLUnifiedCanvasTabParameters from 'features/sdxl/components/SDXLUnifiedCanvasTabParameters';
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { PropsWithChildren, memo } from 'react';
+import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
+import { AdvancedSettingsAccordion } from 'features/settingsAccordions/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
+import { CompositingSettingsAccordion } from 'features/settingsAccordions/CompositingSettingsAccordion/CompositingSettingsAccordion';
+import { ControlSettingsAccordion } from 'features/settingsAccordions/ControlSettingsAccordion/ControlSettingsAccordion';
+import { GenerationSettingsAccordion } from 'features/settingsAccordions/GenerationSettingsAccordion/GenerationSettingsAccordion';
+import { ImageSettingsAccordion } from 'features/settingsAccordions/ImageSettingsAccordion/ImageSettingsAccordion';
+import { RefinerSettingsAccordion } from 'features/settingsAccordions/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import ImageToImageTabParameters from './tabs/ImageToImage/ImageToImageTabParameters';
-import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
-import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameters';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
+import type { CSSProperties } from 'react';
+import { memo } from 'react';
+
+const overlayScrollbarsStyles: CSSProperties = {
+  height: '100%',
+  width: '100%',
+};
 
 const ParametersPanel = () => {
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const model = useAppSelector((state: RootState) => state.generation.model);
+  const isSDXL = useAppSelector(
+    (state: RootState) => state.generation.model?.base_model === 'sdxl'
+  );
 
-  if (activeTabName === 'txt2img') {
-    return (
-      <ParametersPanelWrapper>
-        {model && model.base_model === 'sdxl' ? (
-          <SDXLTextToImageTabParameters />
-        ) : (
-          <TextToImageTabParameters />
-        )}
-      </ParametersPanelWrapper>
-    );
-  }
-
-  if (activeTabName === 'img2img') {
-    return (
-      <ParametersPanelWrapper>
-        {model && model.base_model === 'sdxl' ? (
-          <SDXLImageToImageTabParameters />
-        ) : (
-          <ImageToImageTabParameters />
-        )}
-      </ParametersPanelWrapper>
-    );
-  }
-
-  if (activeTabName === 'unifiedCanvas') {
-    return (
-      <ParametersPanelWrapper>
-        {model && model.base_model === 'sdxl' ? (
-          <SDXLUnifiedCanvasTabParameters />
-        ) : (
-          <UnifiedCanvasParameters />
-        )}
-      </ParametersPanelWrapper>
-    );
-  }
-
-  return null;
-};
-
-export default memo(ParametersPanel);
-
-const ParametersPanelWrapper = memo((props: PropsWithChildren) => {
   return (
-    <Flex
-      sx={{
-        w: 'full',
-        h: 'full',
-        flexDir: 'column',
-        gap: 2,
-      }}
-    >
+    <Flex w="full" h="full" flexDir="column" gap={2}>
       <QueueControls />
-      <Flex
-        layerStyle="first"
-        sx={{
-          w: 'full',
-          h: 'full',
-          position: 'relative',
-          borderRadius: 'base',
-          p: 2,
-        }}
-      >
-        <Flex
-          sx={{
-            w: 'full',
-            h: 'full',
-            position: 'relative',
-          }}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
+      <Flex w="full" h="full" position="relative">
+        <Box position="absolute" top={0} left={0} right={0} bottom={0}>
+          <OverlayScrollbarsComponent
+            defer
+            style={overlayScrollbarsStyles}
+            options={overlayScrollbarsParams.options}
           >
-            <OverlayScrollbarsComponent
-              defer
-              style={{ height: '100%', width: '100%' }}
-              options={{
-                scrollbars: {
-                  visibility: 'auto',
-                  autoHide: 'scroll',
-                  autoHideDelay: 800,
-                  theme: 'os-theme-dark',
-                },
-                overflow: {
-                  x: 'hidden',
-                },
-              }}
-            >
-              <Flex
-                sx={{
-                  gap: 2,
-                  flexDirection: 'column',
-                  h: 'full',
-                  w: 'full',
-                }}
-              >
-                {props.children}
-              </Flex>
-            </OverlayScrollbarsComponent>
-          </Box>
-        </Flex>
+            <Flex gap={2} flexDirection="column" h="full" w="full">
+              {isSDXL ? <SDXLPrompts /> : <Prompts />}
+              <ImageSettingsAccordion />
+              <GenerationSettingsAccordion />
+              <ControlSettingsAccordion />
+              {activeTabName === 'unifiedCanvas' && (
+                <CompositingSettingsAccordion />
+              )}
+              {isSDXL && <RefinerSettingsAccordion />}
+              <AdvancedSettingsAccordion />
+            </Flex>
+          </OverlayScrollbarsComponent>
+        </Box>
       </Flex>
     </Flex>
   );
-});
+};
 
-ParametersPanelWrapper.displayName = 'ParametersPanelWrapper';
+export default memo(ParametersPanel);

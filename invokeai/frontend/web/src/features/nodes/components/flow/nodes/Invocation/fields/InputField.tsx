@@ -1,10 +1,14 @@
-import { Box, Flex, FormControl, FormLabel } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvLabel } from 'common/components/InvControl/InvLabel';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValue';
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
-import { PropsWithChildren, memo, useMemo } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldContextMenu from './FieldContextMenu';
 import FieldHandle from './FieldHandle';
@@ -42,86 +46,93 @@ const InputField = ({ nodeId, fieldName }: Props) => {
       return true;
     }
 
-    if (!doesFieldHaveValue && !isConnected && fieldTemplate.input === 'any') {
+    if (
+      !doesFieldHaveValue &&
+      !isConnected &&
+      fieldTemplate.input !== 'connection'
+    ) {
       return true;
     }
+
+    return false;
   }, [fieldTemplate, isConnected, doesFieldHaveValue]);
 
   if (!fieldTemplate || !fieldInstance) {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
-        <FormControl
-          sx={{
-            alignItems: 'stretch',
-            justifyContent: 'space-between',
-            gap: 2,
-            h: 'full',
-            w: 'full',
-          }}
+        <InvControl
+          alignItems="stretch"
+          justifyContent="space-between"
+          flexDir="column"
+          gap={2}
+          h="full"
+          w="full"
         >
-          <FormLabel
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              mb: 0,
-              px: 1,
-              gap: 2,
-              h: 'full',
-              fontWeight: 600,
-              color: 'error.400',
-              _dark: { color: 'error.300' },
-            }}
+          <InvLabel
+            display="flex"
+            alignItems="center"
+            mb={0}
+            px={1}
+            gap={2}
+            h="full"
           >
             {t('nodes.unknownInput', {
               name: fieldInstance?.label ?? fieldTemplate?.title ?? fieldName,
             })}
-          </FormLabel>
-        </FormControl>
+          </InvLabel>
+        </InvControl>
+      </InputFieldWrapper>
+    );
+  }
+
+  if (fieldTemplate.input === 'connection') {
+    return (
+      <InputFieldWrapper shouldDim={shouldDim}>
+        <InvControl isInvalid={isMissingInput} isDisabled={isConnected} px={2}>
+          <EditableFieldTitle
+            nodeId={nodeId}
+            fieldName={fieldName}
+            kind="input"
+            isMissingInput={isMissingInput}
+            withTooltip
+          />
+        </InvControl>
+
+        <FieldHandle
+          fieldTemplate={fieldTemplate}
+          handleType="target"
+          isConnectionInProgress={isConnectionInProgress}
+          isConnectionStartField={isConnectionStartField}
+          connectionError={connectionError}
+        />
       </InputFieldWrapper>
     );
   }
 
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
-      <FormControl
-        isInvalid={isMissingInput}
-        isDisabled={isConnected}
-        sx={{
-          alignItems: 'stretch',
-          justifyContent: 'space-between',
-          ps: fieldTemplate.input === 'direct' ? 0 : 2,
-          gap: 2,
-          h: 'full',
-          w: 'full',
-        }}
-      >
-        <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
-          {(ref) => (
-            <FormLabel
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                mb: 0,
-                px: 1,
-                gap: 2,
-                h: 'full',
-              }}
-            >
+      <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
+        {(ref) => (
+          <InvControl
+            ref={ref}
+            isInvalid={isMissingInput}
+            isDisabled={isConnected}
+            orientation="vertical"
+            px={2}
+          >
+            <Flex flexDir="column" w="full" gap={1}>
               <EditableFieldTitle
-                ref={ref}
                 nodeId={nodeId}
                 fieldName={fieldName}
                 kind="input"
                 isMissingInput={isMissingInput}
                 withTooltip
               />
-            </FormLabel>
-          )}
-        </FieldContextMenu>
-        <Box>
-          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
-        </Box>
-      </FormControl>
+              <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+            </Flex>
+          </InvControl>
+        )}
+      </FieldContextMenu>
 
       {fieldTemplate.input !== 'direct' && (
         <FieldHandle
@@ -146,17 +157,15 @@ const InputFieldWrapper = memo(
   ({ shouldDim, children }: InputFieldWrapperProps) => {
     return (
       <Flex
-        sx={{
-          position: 'relative',
-          minH: 8,
-          py: 0.5,
-          alignItems: 'center',
-          opacity: shouldDim ? 0.5 : 1,
-          transitionProperty: 'opacity',
-          transitionDuration: '0.1s',
-          w: 'full',
-          h: 'full',
-        }}
+        position="relative"
+        minH={8}
+        py={0.5}
+        alignItems="center"
+        opacity={shouldDim ? 0.5 : 1}
+        transitionProperty="opacity"
+        transitionDuration="0.1s"
+        w="full"
+        h="full"
       >
         {children}
       </Flex>

@@ -114,7 +114,9 @@
         "nextPage": "Pagina successiva",
         "saveAs": "Salva come",
         "unsaved": "Non salvato",
-        "direction": "Direzione"
+        "direction": "Direzione",
+        "advancedOptions": "Opzioni avanzate",
+        "free": "Libero"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -132,7 +134,7 @@
         "noImagesInGallery": "Nessuna immagine da visualizzare",
         "deleteImage": "Elimina l'immagine",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
-        "deleteImageBin": "Le immagini eliminate verranno spostate nel Cestino del tuo sistema operativo.",
+        "deleteImageBin": "Le immagini eliminate verranno spostate nel cestino del tuo sistema operativo.",
         "assets": "Risorse",
         "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
@@ -157,18 +159,18 @@
         "problemDeletingImages": "Problema durante l'eliminazione delle immagini"
     },
     "hotkeys": {
-        "keyboardShortcuts": "Tasti rapidi",
-        "appHotkeys": "Tasti di scelta rapida dell'applicazione",
-        "generalHotkeys": "Tasti di scelta rapida generali",
-        "galleryHotkeys": "Tasti di scelta rapida della galleria",
-        "unifiedCanvasHotkeys": "Tasti di scelta rapida Tela Unificata",
+        "keyboardShortcuts": "Tasti di scelta rapida",
+        "appHotkeys": "Applicazione",
+        "generalHotkeys": "Generale",
+        "galleryHotkeys": "Galleria",
+        "unifiedCanvasHotkeys": "Tela Unificata",
         "invoke": {
             "title": "Invoke",
             "desc": "Genera un'immagine"
         },
         "cancel": {
             "title": "Annulla",
-            "desc": "Annulla la generazione dell'immagine"
+            "desc": "Annulla l'elemento della coda corrente"
         },
         "focusPrompt": {
             "title": "Metti a fuoco il Prompt",
@@ -182,12 +184,8 @@
             "title": "Appunta le opzioni",
             "desc": "Blocca il pannello delle opzioni"
         },
-        "toggleViewer": {
-            "title": "Attiva/disattiva visualizzatore",
-            "desc": "Apre e chiude il visualizzatore immagini"
-        },
         "toggleGallery": {
-            "title": "Attiva/disattiva Galleria",
+            "title": "Attiva/disattiva galleria",
             "desc": "Apre e chiude il pannello della galleria"
         },
         "maximizeWorkSpace": {
@@ -245,10 +243,6 @@
         "nextImage": {
             "title": "Immagine successiva",
             "desc": "Visualizza l'immagine successiva nella galleria"
-        },
-        "toggleGalleryPin": {
-            "title": "Attiva/disattiva il blocco della galleria",
-            "desc": "Blocca/sblocca la galleria dall'interfaccia utente"
         },
         "increaseGalleryThumbSize": {
             "title": "Aumenta dimensione immagini nella galleria",
@@ -362,11 +356,26 @@
             "title": "Accetta l'immagine della sessione",
             "desc": "Accetta l'immagine dell'area della sessione corrente"
         },
-        "nodesHotkeys": "Tasti di scelta rapida dei Nodi",
+        "nodesHotkeys": "Nodi",
         "addNodes": {
             "title": "Aggiungi Nodi",
             "desc": "Apre il menu Aggiungi Nodi"
-        }
+        },
+        "cancelAndClear": {
+            "desc": "Annulla l'elemento della coda corrente e cancella tutti gli elementi in sospeso",
+            "title": "Annulla e cancella"
+        },
+        "resetOptionsAndGallery": {
+            "title": "Ripristina Opzioni e Galleria",
+            "desc": "Reimposta le opzioni e i pannelli della galleria"
+        },
+        "searchHotkeys": "Cerca tasti di scelta rapida",
+        "noHotkeysFound": "Nessun tasto di scelta rapida trovato",
+        "toggleOptionsAndGallery": {
+            "desc": "Apre e chiude le opzioni e i pannelli della galleria",
+            "title": "Attiva/disattiva le Opzioni e la Galleria"
+        },
+        "clearSearch": "Cancella ricerca"
     },
     "modelManager": {
         "modelManager": "Gestione Modelli",
@@ -581,8 +590,8 @@
         "hidePreview": "Nascondi l'anteprima",
         "showPreview": "Mostra l'anteprima",
         "noiseSettings": "Rumore",
-        "seamlessXAxis": "Asse X",
-        "seamlessYAxis": "Asse Y",
+        "seamlessXAxis": "Piastrella senza cucitura Asse X",
+        "seamlessYAxis": "Piastrella senza cucitura Asse Y",
         "scheduler": "Campionatore",
         "boundingBoxWidth": "Larghezza riquadro di delimitazione",
         "boundingBoxHeight": "Altezza riquadro di delimitazione",
@@ -642,7 +651,14 @@
         "unmasked": "No maschera",
         "cfgRescaleMultiplier": "Moltiplicatore riscala CFG",
         "cfgRescale": "Riscala CFG",
-        "useSize": "Usa Dimensioni"
+        "useSize": "Usa Dimensioni",
+        "setToOptimalSize": "Ottimizza le dimensioni per il modello",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (potrebbe essere troppo piccolo)",
+        "imageSize": "Dimensione dell'immagine",
+        "lockAspectRatio": "Blocca proporzioni",
+        "swapDimensions": "Scambia dimensioni",
+        "aspect": "Aspetto",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (potrebbe essere troppo grande)"
     },
     "settings": {
         "models": "Modelli",
@@ -1178,7 +1194,6 @@
         "w": "W",
         "processor": "Processore",
         "none": "Nessuno",
-        "incompatibleBaseModel": "Modello base incompatibile:",
         "pidiDescription": "Elaborazione immagini PIDI",
         "fill": "Riempie",
         "colorMapDescription": "Genera una mappa dei colori dall'immagine",
@@ -1214,12 +1229,13 @@
         "minConfidence": "Confidenza minima",
         "scribble": "Scribble",
         "amult": "Angolo di illuminazione",
-        "coarse": "Approssimativo"
+        "coarse": "Approssimativo",
+        "resizeSimple": "Ridimensiona (semplice)"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
         "queueBack": "Aggiungi alla coda",
-        "queueCountPrediction": "Aggiungi {{predicted}} alla coda",
+        "queueCountPrediction": "{{promptsCount}} prompt × {{iterations}} iterazioni -> {{count}} generazioni",
         "queue": "Coda",
         "status": "Stato",
         "pruneSucceeded": "Rimossi {{item_count}} elementi completati dalla coda",
@@ -1277,7 +1293,8 @@
         "graphFailedToQueue": "Impossibile mettere in coda il grafico",
         "queueMaxExceeded": "È stato superato il limite massimo di {{max_queue_size}} e {{skip}} elementi verrebbero saltati",
         "batchFieldValues": "Valori Campi Lotto",
-        "time": "Tempo"
+        "time": "Tempo",
+        "openQueue": "Apri coda"
     },
     "embedding": {
         "noMatchingEmbedding": "Nessun Incorporamento corrispondente",
@@ -1297,7 +1314,12 @@
         "noLoRAsInstalled": "Nessun LoRA installato",
         "esrganModel": "Modello ESRGAN",
         "addLora": "Aggiungi LoRA",
-        "noLoRAsLoaded": "Nessuna LoRA caricata"
+        "noLoRAsLoaded": "Nessun LoRA caricato",
+        "noMainModelSelected": "Nessun modello principale selezionato",
+        "allLoRAsAdded": "Tutti i LoRA aggiunti",
+        "defaultVAE": "VAE predefinito",
+        "incompatibleBaseModel": "Modello base incompatibile",
+        "loraAlreadyAdded": "LoRA già aggiunto"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1331,7 +1353,9 @@
         "promptsWithCount_many": "{{count}} Prompt",
         "promptsWithCount_other": "{{count}} Prompt",
         "dynamicPrompts": "Prompt dinamici",
-        "promptsPreview": "Anteprima dei prompt"
+        "promptsPreview": "Anteprima dei prompt",
+        "showDynamicPrompts": "Mostra prompt dinamici",
+        "loading": "Generazione prompt dinamici..."
     },
     "popovers": {
         "paramScheduler": {
@@ -1557,7 +1581,7 @@
         "scheduler": "Campionatore",
         "noModelsAvailable": "Nessun modello disponibile",
         "denoisingStrength": "Forza di riduzione del rumore",
-        "concatPromptStyle": "Concatena Prompt & Stile",
+        "concatPromptStyle": "Collega Prompt & Stile",
         "loading": "Caricamento...",
         "steps": "Passi",
         "refinerStart": "Inizio Affinamento",
@@ -1568,7 +1592,8 @@
         "useRefiner": "Utilizza l'affinatore",
         "refinermodel": "Modello Affinatore",
         "posAestheticScore": "Punteggio estetico positivo",
-        "posStylePrompt": "Prompt Stile positivo"
+        "posStylePrompt": "Prompt Stile positivo",
+        "freePromptStyle": "Prompt di stile manuale"
     },
     "metadata": {
         "initImage": "Immagine iniziale",
@@ -1641,5 +1666,28 @@
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"
+    },
+    "accordions": {
+        "compositing": {
+            "infillTab": "Riempimento",
+            "coherenceTab": "Passaggio di coerenza",
+            "title": "Composizione"
+        },
+        "control": {
+            "controlAdaptersTab": "Adattatori di Controllo",
+            "ipTab": "Prompt immagine",
+            "title": "Controllo"
+        },
+        "generation": {
+            "title": "Generazione",
+            "conceptsTab": "Concetti",
+            "modelTab": "Modello"
+        },
+        "advanced": {
+            "title": "Avanzate"
+        },
+        "image": {
+            "title": "Immagine"
+        }
     }
 }

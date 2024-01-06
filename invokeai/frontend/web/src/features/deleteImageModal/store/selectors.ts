@@ -1,11 +1,12 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { some } from 'lodash-es';
-import { ImageUsage } from './types';
+
+import type { ImageUsage } from './types';
 
 export const getImageUsage = (state: RootState, image_name: string) => {
   const { generation, canvas, nodes, controlAdapters } = state;

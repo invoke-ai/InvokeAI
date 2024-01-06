@@ -1,26 +1,35 @@
-import { ChakraProps, Flex } from '@chakra-ui/react';
+import type { ChakraProps } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
+import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
-import { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
-import IAINumberInput from './IAINumberInput';
+import type {
+  ColorPickerBaseProps,
+  RgbaColor,
+} from 'react-colorful/dist/types';
+
+import { InvControl } from './InvControl/InvControl';
+import { InvNumberInput } from './InvNumberInput/InvNumberInput';
 
 type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
   withNumberInput?: boolean;
 };
 
-const colorPickerStyles: NonNullable<ChakraProps['sx']> = {
+const colorPickerPointerStyles: NonNullable<ChakraProps['sx']> = {
   width: 6,
   height: 6,
   borderColor: 'base.100',
 };
 
 const sx: ChakraProps['sx'] = {
-  '.react-colorful__hue-pointer': colorPickerStyles,
-  '.react-colorful__saturation-pointer': colorPickerStyles,
-  '.react-colorful__alpha-pointer': colorPickerStyles,
+  '.react-colorful__hue-pointer': colorPickerPointerStyles,
+  '.react-colorful__saturation-pointer': colorPickerPointerStyles,
+  '.react-colorful__alpha-pointer': colorPickerPointerStyles,
   gap: 2,
   flexDir: 'column',
 };
+
+const colorPickerStyles: CSSProperties = { width: '100%' };
 
 const numberInputWidth: ChakraProps['w'] = '4.2rem';
 
@@ -47,48 +56,55 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
       <RgbaColorPicker
         color={color}
         onChange={onChange}
-        style={{ width: '100%' }}
+        style={colorPickerStyles}
         {...rest}
       />
       {withNumberInput && (
         <Flex>
-          <IAINumberInput
-            value={color.r}
-            onChange={handleChangeR}
-            min={0}
-            max={255}
-            step={1}
-            label="Red"
-            w={numberInputWidth}
-          />
-          <IAINumberInput
-            value={color.g}
-            onChange={handleChangeG}
-            min={0}
-            max={255}
-            step={1}
-            label="Green"
-            w={numberInputWidth}
-          />
-          <IAINumberInput
-            value={color.b}
-            onChange={handleChangeB}
-            min={0}
-            max={255}
-            step={1}
-            label="Blue"
-            w={numberInputWidth}
-          />
-          <IAINumberInput
-            value={color.a}
-            onChange={handleChangeA}
-            step={0.1}
-            min={0}
-            max={1}
-            label="Alpha"
-            w={numberInputWidth}
-            isInteger={false}
-          />
+          <InvControl label="Red">
+            <InvNumberInput
+              value={color.r}
+              onChange={handleChangeR}
+              min={0}
+              max={255}
+              step={1}
+              w={numberInputWidth}
+              defaultValue={90}
+            />
+          </InvControl>
+          <InvControl label="Green">
+            <InvNumberInput
+              value={color.g}
+              onChange={handleChangeG}
+              min={0}
+              max={255}
+              step={1}
+              w={numberInputWidth}
+              defaultValue={90}
+            />
+          </InvControl>
+          <InvControl label="Blue">
+            <InvNumberInput
+              value={color.b}
+              onChange={handleChangeB}
+              min={0}
+              max={255}
+              step={1}
+              w={numberInputWidth}
+              defaultValue={255}
+            />
+          </InvControl>
+          <InvControl label="Alpha">
+            <InvNumberInput
+              value={color.a}
+              onChange={handleChangeA}
+              step={0.1}
+              min={0}
+              max={1}
+              w={numberInputWidth}
+              defaultValue={1}
+            />
+          </InvControl>
         </Flex>
       )}
     </Flex>

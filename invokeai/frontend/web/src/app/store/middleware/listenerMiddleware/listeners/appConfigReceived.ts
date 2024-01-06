@@ -4,6 +4,7 @@ import {
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
+
 import { startAppListening } from '..';
 
 export const addAppConfigReceivedListener = () => {

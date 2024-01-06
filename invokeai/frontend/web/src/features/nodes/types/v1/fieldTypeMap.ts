@@ -1,5 +1,6 @@
-import { FieldType, StatefulFieldType } from 'features/nodes/types/field';
-import { FieldTypeV1 } from './workflowV1';
+import type { FieldType, StatefulFieldType } from 'features/nodes/types/field';
+
+import type { FieldTypeV1 } from './workflowV1';
 
 /**
  * Mapping of V1 field type strings to their *stateful* V2 field type counterparts.
@@ -271,11 +272,6 @@ const FIELD_TYPE_V1_TO_STATELESS_FIELD_TYPE_V2: {
     name: 'MetadataItemField',
     isCollection: false,
     isCollectionOrScalar: true,
-  },
-  ONNXModelField: {
-    name: 'ONNXModelField',
-    isCollection: false,
-    isCollectionOrScalar: false,
   },
   T2IAdapterField: {
     name: 'T2IAdapterField',

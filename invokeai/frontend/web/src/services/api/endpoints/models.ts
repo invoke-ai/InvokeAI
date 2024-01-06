@@ -1,25 +1,27 @@
-import { EntityState, createEntityAdapter } from '@reduxjs/toolkit';
+import type { EntityState } from '@reduxjs/toolkit';
+import { createEntityAdapter } from '@reduxjs/toolkit';
 import { cloneDeep } from 'lodash-es';
-import {
+import queryString from 'query-string';
+import type { operations, paths } from 'services/api/schema';
+import type {
   AnyModelConfig,
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
-  IPAdapterModelConfig,
-  T2IAdapterModelConfig,
   DiffusersModelConfig,
   ImportModelConfig,
+  IPAdapterModelConfig,
   LoRAModelConfig,
   MainModelConfig,
-  OnnxModelConfig,
   MergeModelConfig,
+  ModelType,
+  T2IAdapterModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
-  ModelType,
 } from 'services/api/types';
-import queryString from 'query-string';
-import { ApiTagDescription, LIST_TAG, api } from '..';
-import { operations, paths } from 'services/api/schema';
+
+import type { ApiTagDescription } from '..';
+import { api, LIST_TAG } from '..';
 
 export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
 export type CheckpointModelConfigEntity = CheckpointModelConfig & {
@@ -28,8 +30,6 @@ export type CheckpointModelConfigEntity = CheckpointModelConfig & {
 export type MainModelConfigEntity =
   | DiffusersModelConfigEntity
   | CheckpointModelConfigEntity;
-
-export type OnnxModelConfigEntity = OnnxModelConfig & { id: string };
 
 export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
 
@@ -51,9 +51,8 @@ export type TextualInversionModelConfigEntity = TextualInversionModelConfig & {
 
 export type VaeModelConfigEntity = VaeModelConfig & { id: string };
 
-type AnyModelConfigEntity =
+export type AnyModelConfigEntity =
   | MainModelConfigEntity
-  | OnnxModelConfigEntity
   | LoRAModelConfigEntity
   | ControlNetModelConfigEntity
   | IPAdapterModelConfigEntity
@@ -135,10 +134,6 @@ type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-
-const onnxModelsAdapter = createEntityAdapter<OnnxModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
-});
 export const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
@@ -166,7 +161,8 @@ export const getModelId = ({
   base_model,
   model_type,
   model_name,
-}: AnyModelConfig) => `${base_model}/${model_type}/${model_name}`;
+}: Pick<AnyModelConfig, 'base_model' | 'model_name' | 'model_type'>) =>
+  `${base_model}/${model_type}/${model_name}`;
 
 const createModelEntities = <T extends AnyModelConfigEntity>(
   models: AnyModelConfig[]
@@ -184,46 +180,6 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getOnnxModels: build.query<
-      EntityState<OnnxModelConfigEntity, string>,
-      BaseModelType[]
-    >({
-      query: (base_models) => {
-        const params = {
-          model_type: 'onnx',
-          base_models,
-        };
-
-        const query = queryString.stringify(params, { arrayFormat: 'none' });
-        return `models/?${query}`;
-      },
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'OnnxModel', id: LIST_TAG },
-          'Model',
-        ];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'OnnxModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: OnnxModelConfig[] }) => {
-        const entities = createModelEntities<OnnxModelConfigEntity>(
-          response.models
-        );
-        return onnxModelsAdapter.setAll(
-          onnxModelsAdapter.getInitialState(),
-          entities
-        );
-      },
-    }),
     getMainModels: build.query<
       EntityState<MainModelConfigEntity, string>,
       BaseModelType[]
@@ -580,7 +536,6 @@ export const modelsApi = api.injectEndpoints({
 
 export const {
   useGetMainModelsQuery,
-  useGetOnnxModelsQuery,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
   useGetT2IAdapterModelsQuery,

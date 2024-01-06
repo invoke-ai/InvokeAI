@@ -1,8 +1,6 @@
 import { logger } from 'app/logging/logger';
-import {
-  ParameterModel,
-  zParameterModel,
-} from 'features/parameters/types/parameterSchemas';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
+import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 
 export const modelIdToMainModelParam = (
   mainModelId: string

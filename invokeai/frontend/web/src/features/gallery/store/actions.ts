@@ -1,6 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
-import { ImageUsage } from 'features/deleteImageModal/store/types';
-import { BoardDTO } from 'services/api/types';
+import type { ImageUsage } from 'features/deleteImageModal/store/types';
+import type { BoardDTO } from 'services/api/types';
 
 export type RequestedBoardImagesDeletionArg = {
   board: BoardDTO;

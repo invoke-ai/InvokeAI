@@ -1,81 +1,33 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { configChanged } from 'features/system/store/configSlice';
-import { clamp } from 'lodash-es';
-import { ImageDTO } from 'services/api/types';
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
+import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
+import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
-import {
+import type {
   ParameterCanvasCoherenceMode,
+  ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
-  ParameterHeight,
-  ParameterHRFMethod,
-  ParameterModel,
   ParameterMaskBlurMethod,
-  ParameterNegativePrompt,
-  ParameterPositivePrompt,
+  ParameterModel,
   ParameterPrecision,
   ParameterScheduler,
-  ParameterSeed,
-  ParameterSteps,
-  ParameterStrength,
   ParameterVAEModel,
-  ParameterWidth,
-  zParameterModel,
-  ParameterCFGRescaleMultiplier,
 } from 'features/parameters/types/parameterSchemas';
+import { zParameterModel } from 'features/parameters/types/parameterSchemas';
+import {
+  getIsSizeOptimal,
+  getOptimalDimension,
+} from 'features/parameters/util/optimalDimension';
+import { configChanged } from 'features/system/store/configSlice';
+import { clamp } from 'lodash-es';
+import type { ImageDTO } from 'services/api/types';
 
-export interface GenerationState {
-  hrfEnabled: boolean;
-  hrfStrength: ParameterStrength;
-  hrfMethod: ParameterHRFMethod;
-  cfgScale: ParameterCFGScale;
-  cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
-  height: ParameterHeight;
-  img2imgStrength: ParameterStrength;
-  infillMethod: string;
-  initialImage?: { imageName: string; width: number; height: number };
-  iterations: number;
-  perlin: number;
-  positivePrompt: ParameterPositivePrompt;
-  negativePrompt: ParameterNegativePrompt;
-  scheduler: ParameterScheduler;
-  maskBlur: number;
-  maskBlurMethod: ParameterMaskBlurMethod;
-  canvasCoherenceMode: ParameterCanvasCoherenceMode;
-  canvasCoherenceSteps: number;
-  canvasCoherenceStrength: ParameterStrength;
-  seed: ParameterSeed;
-  seedWeights: string;
-  shouldFitToWidthHeight: boolean;
-  shouldGenerateVariations: boolean;
-  shouldRandomizeSeed: boolean;
-  steps: ParameterSteps;
-  threshold: number;
-  infillTileSize: number;
-  infillPatchmatchDownscaleSize: number;
-  variationAmount: number;
-  width: ParameterWidth;
-  shouldUseSymmetry: boolean;
-  horizontalSymmetrySteps: number;
-  verticalSymmetrySteps: number;
-  model: ParameterModel | null;
-  vae: ParameterVAEModel | null;
-  vaePrecision: ParameterPrecision;
-  seamlessXAxis: boolean;
-  seamlessYAxis: boolean;
-  clipSkip: number;
-  shouldUseCpuNoise: boolean;
-  shouldShowAdvancedOptions: boolean;
-  aspectRatio: number | null;
-  shouldLockAspectRatio: boolean;
-}
+import type { GenerationState } from './types';
 
 export const initialGenerationState: GenerationState = {
-  hrfStrength: 0.45,
-  hrfEnabled: false,
-  hrfMethod: 'ESRGAN',
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
   height: 512,
@@ -113,15 +65,12 @@ export const initialGenerationState: GenerationState = {
   clipSkip: 0,
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
-  aspectRatio: null,
-  shouldLockAspectRatio: false,
+  aspectRatio: { ...initialAspectRatioState },
 };
-
-const initialState: GenerationState = initialGenerationState;
 
 export const generationSlice = createSlice({
   name: 'generation',
-  initialState,
+  initialState: initialGenerationState,
   reducers: {
     setPositivePrompt: (state, action: PayloadAction<string>) => {
       state.positivePrompt = action.payload;
@@ -161,17 +110,6 @@ export const generationSlice = createSlice({
     },
     setPerlin: (state, action: PayloadAction<number>) => {
       state.perlin = action.payload;
-    },
-    setHeight: (state, action: PayloadAction<number>) => {
-      state.height = action.payload;
-    },
-    setWidth: (state, action: PayloadAction<number>) => {
-      state.width = action.payload;
-    },
-    toggleSize: (state) => {
-      const [width, height] = [state.width, state.height];
-      state.width = height;
-      state.height = width;
     },
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.scheduler = action.payload;
@@ -265,15 +203,26 @@ export const generationSlice = createSlice({
       state.initialImage = { imageName: image_name, width, height };
     },
     modelChanged: (state, action: PayloadAction<ParameterModel | null>) => {
-      state.model = action.payload;
+      const newModel = action.payload;
+      state.model = newModel;
 
-      if (state.model === null) {
+      if (newModel === null) {
         return;
       }
 
       // Clamp ClipSkip Based On Selected Model
-      const { maxClip } = CLIP_SKIP_MAP[state.model.base_model];
+      const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
       state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+      const optimalDimension = getOptimalDimension(newModel);
+      if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
+        return;
+      }
+      const { width, height } = calculateNewSize(
+        state.aspectRatio.value,
+        optimalDimension * optimalDimension
+      );
+      state.width = width;
+      state.height = height;
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
@@ -285,27 +234,17 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
-    setHrfStrength: (state, action: PayloadAction<number>) => {
-      state.hrfStrength = action.payload;
-    },
-    setHrfEnabled: (state, action: PayloadAction<boolean>) => {
-      state.hrfEnabled = action.payload;
-    },
-    setHrfMethod: (state, action: PayloadAction<ParameterHRFMethod>) => {
-      state.hrfMethod = action.payload;
-    },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
-    setAspectRatio: (state, action: PayloadAction<number | null>) => {
-      const newAspectRatio = action.payload;
-      state.aspectRatio = newAspectRatio;
-      if (newAspectRatio) {
-        state.height = roundToMultiple(state.width / newAspectRatio, 8);
-      }
+    widthChanged: (state, action: PayloadAction<number>) => {
+      state.width = action.payload;
     },
-    setShouldLockAspectRatio: (state, action: PayloadAction<boolean>) => {
-      state.shouldLockAspectRatio = action.payload;
+    heightChanged: (state, action: PayloadAction<number>) => {
+      state.height = action.payload;
+    },
+    aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
+      state.aspectRatio = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -336,6 +275,9 @@ export const generationSlice = createSlice({
       }
     });
   },
+  selectors: {
+    selectOptimalDimension: (slice) => getOptimalDimension(slice.model),
+  },
 });
 
 export const {
@@ -345,9 +287,6 @@ export const {
   resetSeed,
   setCfgScale,
   setCfgRescaleMultiplier,
-  setWidth,
-  setHeight,
-  toggleSize,
   setImg2imgStrength,
   setInfillMethod,
   setIterations,
@@ -379,13 +318,13 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
-  setHrfEnabled,
-  setHrfStrength,
-  setHrfMethod,
   shouldUseCpuNoiseChanged,
-  setAspectRatio,
-  setShouldLockAspectRatio,
   vaePrecisionChanged,
+  aspectRatioChanged,
+  widthChanged,
+  heightChanged,
 } = generationSlice.actions;
+
+export const { selectOptimalDimension } = generationSlice.selectors;
 
 export default generationSlice.reducer;

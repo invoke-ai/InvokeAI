@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { imagesApi } from 'services/api/endpoints/images';
+
 import { startAppListening } from '..';
 
 export const addImageRemovedFromBoardFulfilledListener = () => {

@@ -3,6 +3,7 @@ import {
   appSocketGeneratorProgress,
   socketGeneratorProgress,
 } from 'services/events/actions';
+
 import { startAppListening } from '../..';
 
 export const addGeneratorProgressEventListener = () => {

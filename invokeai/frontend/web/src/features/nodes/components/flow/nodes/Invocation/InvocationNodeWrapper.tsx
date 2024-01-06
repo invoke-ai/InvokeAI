@@ -2,9 +2,10 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import InvocationNode from 'features/nodes/components/flow/nodes/Invocation/InvocationNode';
-import { InvocationNodeData } from 'features/nodes/types/invocation';
+import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
-import { NodeProps } from 'reactflow';
+import type { NodeProps } from 'reactflow';
+
 import InvocationNodeUnknownFallback from './InvocationNodeUnknownFallback';
 
 const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
@@ -13,8 +14,8 @@ const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
 
   const hasTemplateSelector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) =>
-        Boolean(nodes.nodeTemplates[type])
+      createMemoizedSelector(stateSelector, ({ nodeTemplates }) =>
+        Boolean(nodeTemplates.templates[type])
       ),
     [type]
   );

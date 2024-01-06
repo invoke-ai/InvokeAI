@@ -1,11 +1,12 @@
+import { createEntityAdapter } from '@reduxjs/toolkit';
+import { dateComparator } from 'common/util/dateComparator';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/types';
-import { ImageCache, ImageDTO, ListImagesArgs } from './types';
-import { createEntityAdapter } from '@reduxjs/toolkit';
-import { dateComparator } from 'common/util/dateComparator';
 import queryString from 'query-string';
+
+import type { ImageCache, ImageDTO, ListImagesArgs } from './types';
 
 export const getIsImageInDateRange = (
   data: ImageCache | undefined,

@@ -2,10 +2,10 @@ import { enqueueRequested } from 'app/store/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 export const useQueueFront = () => {
   const dispatch = useAppDispatch();

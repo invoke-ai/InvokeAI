@@ -50,9 +50,33 @@
         "uncategorized": "Uncategorized",
         "downloadBoard": "Download Board"
     },
+    "accordions": {
+        "generation": {
+            "title": "Generation",
+            "modelTab": "Model",
+            "conceptsTab": "Concepts"
+        },
+        "image": {
+            "title": "Image"
+        },
+        "advanced": {
+            "title": "Advanced"
+        },
+        "control": {
+            "title": "Control",
+            "controlAdaptersTab": "Control Adapters",
+            "ipTab": "Image Prompts"
+        },
+        "compositing": {
+            "title": "Compositing",
+            "coherenceTab": "Coherence Pass",
+            "infillTab": "Infill"
+        }
+    },
     "common": {
         "accept": "Accept",
         "advanced": "Advanced",
+        "advancedOptions": "Advanced Options",
         "ai": "ai",
         "areYouSure": "Are you sure?",
         "auto": "Auto",
@@ -62,6 +86,7 @@
         "copyError": "$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
+        "or": "or",
         "checkpoint": "Checkpoint",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
@@ -79,6 +104,7 @@
         "file": "File",
         "folder": "Folder",
         "format": "format",
+        "free": "Free",
         "generate": "Generate",
         "githubLabel": "Github",
         "hotkeysLabel": "Hotkeys",
@@ -131,6 +157,7 @@
         "save": "Save",
         "saveAs": "Save As",
         "settingsLabel": "Settings",
+        "preferencesLabel": "Preferences",
         "simple": "Simple",
         "somethingWentWrong": "Something went wrong",
         "statusConnected": "Connected",
@@ -221,7 +248,6 @@
         "colorMapTileSize": "Tile Size",
         "importImageFromCanvas": "Import Image From Canvas",
         "importMaskFromCanvas": "Import Mask From Canvas",
-        "incompatibleBaseModel": "Incompatible base model:",
         "lineart": "Lineart",
         "lineartAnime": "Lineart Anime",
         "lineartAnimeDescription": "Anime-style lineart processing",
@@ -246,6 +272,7 @@
         "prompt": "Prompt",
         "resetControlImage": "Reset Control Image",
         "resize": "Resize",
+        "resizeSimple": "Resize (Simple)",
         "resizeMode": "Resize Mode",
         "safe": "Safe",
         "saveControlImage": "Save Control Image",
@@ -284,7 +311,7 @@
         "queue": "Queue",
         "queueFront": "Add to Front of Queue",
         "queueBack": "Add to Queue",
-        "queueCountPrediction": "Add {{predicted}} to Queue",
+        "queueCountPrediction": "{{promptsCount}} prompts × {{iterations}} iterations -> {{count}} generations",
         "queueMaxExceeded": "Max of {{max_queue_size}} exceeded, would skip {{skip}}",
         "queuedCount": "{{pending}} Pending",
         "queueTotal": "{{total}} Total",
@@ -340,7 +367,8 @@
         "back": "back",
         "batchFailedToQueue": "Failed to Queue Batch",
         "graphQueued": "Graph queued",
-        "graphFailedToQueue": "Failed to queue graph"
+        "graphFailedToQueue": "Failed to queue graph",
+        "openQueue": "Open Queue"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",
@@ -400,6 +428,9 @@
         "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
     "hotkeys": {
+        "searchHotkeys": "Search Hotkeys",
+        "clearSearch": "Clear Search",
+        "noHotkeysFound": "No Hotkeys Found",
         "acceptStagingImage": {
             "desc": "Accept Current Staging Area Image",
             "title": "Accept Staging Image"
@@ -408,10 +439,14 @@
             "desc": "Opens the add node menu",
             "title": "Add Nodes"
         },
-        "appHotkeys": "App Hotkeys",
+        "appHotkeys": "App",
         "cancel": {
-            "desc": "Cancel image generation",
+            "desc": "Cancel current queue item",
             "title": "Cancel"
+        },
+        "cancelAndClear": {
+            "desc": "Cancel current queue item and clear all pending items",
+            "title": "Cancel and Clear"
         },
         "changeTabs": {
             "desc": "Switch to another workspace",
@@ -469,8 +504,8 @@
             "desc": "Focus the prompt input area",
             "title": "Focus Prompt"
         },
-        "galleryHotkeys": "Gallery Hotkeys",
-        "generalHotkeys": "General Hotkeys",
+        "galleryHotkeys": "Gallery",
+        "generalHotkeys": "General",
         "hideMask": {
             "desc": "Hide and unhide mask",
             "title": "Hide Mask"
@@ -491,7 +526,7 @@
             "desc": "Generate an image",
             "title": "Invoke"
         },
-        "keyboardShortcuts": "Keyboard Shortcuts",
+        "keyboardShortcuts": "Hotkeys",
         "maximizeWorkSpace": {
             "desc": "Close panels and maximize work area",
             "title": "Maximize Workspace"
@@ -512,7 +547,7 @@
             "desc": "Next Staging Area Image",
             "title": "Next Staging Image"
         },
-        "nodesHotkeys": "Nodes Hotkeys",
+        "nodesHotkeys": "Nodes",
         "pinOptions": {
             "desc": "Pin the options panel",
             "title": "Pin Options"
@@ -581,31 +616,31 @@
             "desc": "Open and close the gallery drawer",
             "title": "Toggle Gallery"
         },
-        "toggleGalleryPin": {
-            "desc": "Pins and unpins the gallery to the UI",
-            "title": "Toggle Gallery Pin"
+        "toggleOptions": {
+            "desc": "Open and close the options panel",
+            "title": "Toggle Options"
+        },
+        "toggleOptionsAndGallery": {
+            "desc": "Open and close the options and gallery panels",
+            "title": "Toggle Options and Gallery"
+        },
+        "resetOptionsAndGallery": {
+            "desc": "Resets the options and gallery panels",
+            "title": "Reset Options and Gallery"
         },
         "toggleLayer": {
             "desc": "Toggles mask/base layer selection",
             "title": "Toggle Layer"
         },
-        "toggleOptions": {
-            "desc": "Open and close the options panel",
-            "title": "Toggle Options"
-        },
         "toggleSnap": {
             "desc": "Toggles Snap to Grid",
             "title": "Toggle Snap"
-        },
-        "toggleViewer": {
-            "desc": "Open and close Image Viewer",
-            "title": "Toggle Viewer"
         },
         "undoStroke": {
             "desc": "Undo a brush stroke",
             "title": "Undo Stroke"
         },
-        "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
+        "unifiedCanvasHotkeys": "Unified Canvas",
         "upscale": {
             "desc": "Upscale the current image",
             "title": "Upscale"
@@ -788,17 +823,23 @@
     },
     "models": {
         "addLora": "Add LoRA",
+        "allLoRAsAdded": "All LoRAs added",
+        "loraAlreadyAdded": "LoRA already added",
         "esrganModel": "ESRGAN Model",
         "loading": "loading",
+        "incompatibleBaseModel": "Incompatible base model",
+        "noMainModelSelected": "No main model selected",
         "noLoRAsAvailable": "No LoRAs available",
         "noLoRAsLoaded": "No LoRAs Loaded",
         "noMatchingLoRAs": "No matching LoRAs",
         "noMatchingModels": "No matching Models",
         "noModelsAvailable": "No models available",
+        "lora": "LoRA",
         "selectLoRA": "Select a LoRA",
         "selectModel": "Select a Model",
         "noLoRAsInstalled": "No LoRAs installed",
-        "noRefinerModelsInstalled": "No SDXL Refiner models installed"
+        "noRefinerModelsInstalled": "No SDXL Refiner models installed",
+        "defaultVAE": "Default VAE"
     },
     "nodes": {
         "addNode": "Add Node",
@@ -1037,8 +1078,14 @@
         "prototypeDesc": "This invocation is a prototype. It may have breaking changes during app updates and may be removed at any time."
     },
     "parameters": {
+        "aspect": "Aspect",
         "aspectRatio": "Aspect Ratio",
         "aspectRatioFree": "Free",
+        "lockAspectRatio": "Lock Aspect Ratio",
+        "swapDimensions": "Swap Dimensions",
+        "setToOptimalSize": "Optimize size for model",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (may be too small)",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (may be too large)",
         "boundingBoxHeader": "Bounding Box",
         "boundingBoxHeight": "Bounding Box Height",
         "boundingBoxWidth": "Bounding Box Width",
@@ -1077,6 +1124,7 @@
         "imageFit": "Fit Initial Image To Output Size",
         "images": "Images",
         "imageToImage": "Image to Image",
+        "imageSize": "Image Size",
         "img2imgStrength": "Image To Image Strength",
         "infillMethod": "Infill Method",
         "infillScalingHeader": "Infill and Scaling",
@@ -1091,7 +1139,7 @@
             "noControlImageForControlAdapter": "Control Adapter #{{number}} has no control image",
             "noInitialImageSelected": "No initial image selected",
             "noModelForControlAdapter": "Control Adapter #{{number}} has no model selected.",
-            "incompatibleBaseModelForControlAdapter": "Control Adapter #{{number}} model is invalid with main model.",
+            "incompatibleBaseModelForControlAdapter": "Control Adapter #{{number}} model is incompatible with main model.",
             "noModelSelected": "No model selected",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
@@ -1127,8 +1175,8 @@
         "seamCorrectionHeader": "Seam Correction",
         "seamHighThreshold": "High",
         "seamlessTiling": "Seamless Tiling",
-        "seamlessXAxis": "X Axis",
-        "seamlessYAxis": "Y Axis",
+        "seamlessXAxis": "Seamless Tiling X Axis",
+        "seamlessYAxis": "Seamless Tiling Y Axis",
         "seamlessX": "Seamless X",
         "seamlessY": "Seamless Y",
         "seamlessX&Y": "Seamless X & Y",
@@ -1171,6 +1219,7 @@
     },
     "dynamicPrompts": {
         "combinatorial": "Combinatorial Generation",
+        "showDynamicPrompts": "Show Dynamic Prompts",
         "dynamicPrompts": "Dynamic Prompts",
         "enableDynamicPrompts": "Enable Dynamic Prompts",
         "maxPrompts": "Max Prompts",
@@ -1183,11 +1232,13 @@
             "perIterationDesc": "Use a different seed for each iteration",
             "perPromptLabel": "Seed per Image",
             "perPromptDesc": "Use a different seed for each image"
-        }
+        },
+        "loading": "Generating Dynamic Prompts..."
     },
     "sdxl": {
         "cfgScale": "CFG Scale",
-        "concatPromptStyle": "Concatenate Prompt & Style",
+        "concatPromptStyle": "Linking Prompt & Style",
+        "freePromptStyle": "Manual Style Prompting",
         "denoisingStrength": "Denoising Strength",
         "loading": "Loading...",
         "negAestheticScore": "Negative Aesthetic Score",

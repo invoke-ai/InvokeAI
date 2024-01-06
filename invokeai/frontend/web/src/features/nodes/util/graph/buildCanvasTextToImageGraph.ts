@@ -1,10 +1,7 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
-  DenoiseLatentsInvocation,
-  NonNullableGraph,
-  ONNXTextToLatentsInvocation,
-} from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { NonNullableGraph } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -23,7 +20,6 @@ import {
   MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
-  ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
@@ -70,36 +66,7 @@ export const buildCanvasTextToImageGraph = (
 
   const use_cpu = shouldUseCpuNoise;
 
-  const isUsingOnnxModel = model.model_type === 'onnx';
-
-  let modelLoaderNodeId = isUsingOnnxModel
-    ? ONNX_MODEL_LOADER
-    : MAIN_MODEL_LOADER;
-
-  const modelLoaderNodeType = isUsingOnnxModel
-    ? 'onnx_model_loader'
-    : 'main_model_loader';
-
-  const t2lNode: DenoiseLatentsInvocation | ONNXTextToLatentsInvocation =
-    isUsingOnnxModel
-      ? {
-          type: 't2l_onnx',
-          id: DENOISE_LATENTS,
-          is_intermediate,
-          cfg_scale,
-          scheduler,
-          steps,
-        }
-      : {
-          type: 'denoise_latents',
-          id: DENOISE_LATENTS,
-          is_intermediate,
-          cfg_scale,
-          scheduler,
-          steps,
-          denoising_start: 0,
-          denoising_end: 1,
-        };
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -111,12 +78,11 @@ export const buildCanvasTextToImageGraph = (
    */
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
-  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: CANVAS_TEXT_TO_IMAGE_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
-        type: modelLoaderNodeType,
+        type: 'main_model_loader',
         id: modelLoaderNodeId,
         is_intermediate,
         model,
@@ -128,13 +94,13 @@ export const buildCanvasTextToImageGraph = (
         skipped_layers: clipSkip,
       },
       [POSITIVE_CONDITIONING]: {
-        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
+        type: 'compel',
         id: POSITIVE_CONDITIONING,
         is_intermediate,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
+        type: 'compel',
         id: NEGATIVE_CONDITIONING,
         is_intermediate,
         prompt: negativePrompt,
@@ -152,7 +118,16 @@ export const buildCanvasTextToImageGraph = (
           : scaledBoundingBoxDimensions.height,
         use_cpu,
       },
-      [t2lNode.id]: t2lNode,
+      [DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: DENOISE_LATENTS,
+        is_intermediate,
+        cfg_scale,
+        scheduler,
+        steps,
+        denoising_start: 0,
+        denoising_end: 1,
+      },
     },
     edges: [
       // Connect Model Loader to UNet & CLIP Skip
@@ -235,7 +210,7 @@ export const buildCanvasTextToImageGraph = (
   if (isUsingScaledDimensions) {
     graph.nodes[LATENTS_TO_IMAGE] = {
       id: LATENTS_TO_IMAGE,
-      type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
+      type: 'l2i',
       is_intermediate,
       fp32,
     };
@@ -273,7 +248,7 @@ export const buildCanvasTextToImageGraph = (
     );
   } else {
     graph.nodes[CANVAS_OUTPUT] = {
-      type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
+      type: 'l2i',
       id: CANVAS_OUTPUT,
       is_intermediate,
       fp32,

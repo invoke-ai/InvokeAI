@@ -1,42 +1,35 @@
+import { useDisclosure } from '@chakra-ui/react';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import type { InvButtonProps } from 'common/components/InvButton/types';
+import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
-import { useClearQueue } from 'features/queue/hooks/useClearQueue';
-import QueueButton from './common/QueueButton';
-import { ChakraProps, Text } from '@chakra-ui/react';
-import IAIAlertDialog from 'common/components/IAIAlertDialog';
 
-type Props = {
-  asIconButton?: boolean;
-  sx?: ChakraProps['sx'];
-};
+type Props = InvButtonProps;
 
-const ClearQueueButton = ({ asIconButton, sx }: Props) => {
+const ClearQueueButton = (props: Props) => {
   const { t } = useTranslation();
-  const { clearQueue, isLoading, isDisabled } = useClearQueue();
+  const disclosure = useDisclosure();
+  const { isLoading, isDisabled } = useClearQueue();
 
   return (
-    <IAIAlertDialog
-      title={t('queue.clearTooltip')}
-      acceptCallback={clearQueue}
-      acceptButtonText={t('queue.clear')}
-      triggerComponent={
-        <QueueButton
-          isDisabled={isDisabled}
-          isLoading={isLoading}
-          asIconButton={asIconButton}
-          label={t('queue.clear')}
-          tooltip={t('queue.clearTooltip')}
-          icon={<FaTrash />}
-          colorScheme="error"
-          sx={sx}
-        />
-      }
-    >
-      <Text>{t('queue.clearQueueAlertDialog')}</Text>
-      <br />
-      <Text>{t('queue.clearQueueAlertDialog2')}</Text>
-    </IAIAlertDialog>
+    <>
+      <InvButton
+        isDisabled={isDisabled}
+        isLoading={isLoading}
+        tooltip={t('queue.clearTooltip')}
+        leftIcon={<FaTrash />}
+        colorScheme="error"
+        onClick={disclosure.onOpen}
+        data-testid={t('queue.clear')}
+        {...props}
+      >
+        {t('queue.clear')}
+      </InvButton>
+      <ClearQueueConfirmationAlertDialog disclosure={disclosure} />
+    </>
   );
 };
 

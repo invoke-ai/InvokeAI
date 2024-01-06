@@ -7,29 +7,25 @@ import {
   Tabs,
 } from '@chakra-ui/react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import WorkflowGeneralTab from './WorkflowGeneralTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
 import WorkflowLinearTab from './WorkflowLinearTab';
-import { useTranslation } from 'react-i18next';
 
 const WorkflowPanel = () => {
   const { t } = useTranslation();
   return (
     <Flex
       layerStyle="first"
-      sx={{
-        flexDir: 'column',
-        w: 'full',
-        h: 'full',
-        borderRadius: 'base',
-        p: 2,
-        gap: 2,
-      }}
+      flexDir="column"
+      w="full"
+      h="full"
+      borderRadius="base"
+      p={2}
+      gap={2}
     >
-      <Tabs
-        variant="line"
-        sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
-      >
+      <Tabs variant="line" display="flex" w="full" h="full" flexDir="column">
         <TabList>
           <Tab>{t('common.linear')}</Tab>
           <Tab>{t('common.details')}</Tab>
