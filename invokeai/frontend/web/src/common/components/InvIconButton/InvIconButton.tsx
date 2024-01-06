@@ -11,7 +11,7 @@ export const InvIconButton = memo(
           <InvTooltip label={tooltip}>
             <IconButton
               ref={ref}
-              colorScheme={isChecked ? 'blue' : 'base'}
+              colorScheme={isChecked ? 'invokeBlue' : 'base'}
               {...rest}
             />
           </InvTooltip>
@@ -21,7 +21,7 @@ export const InvIconButton = memo(
       return (
         <IconButton
           ref={ref}
-          colorScheme={isChecked ? 'blue' : 'base'}
+          colorScheme={isChecked ? 'invokeBlue' : 'base'}
           {...rest}
         />
       );

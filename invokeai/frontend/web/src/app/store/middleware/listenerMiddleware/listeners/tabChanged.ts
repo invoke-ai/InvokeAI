@@ -1,7 +1,10 @@
 import { modelChanged } from 'features/parameters/store/generationSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
-import { mainModelsAdapter, modelsApi } from 'services/api/endpoints/models';
+import {
+  mainModelsAdapterSelectors,
+  modelsApi,
+} from 'services/api/endpoints/models';
 
 import { startAppListening } from '..';
 
@@ -37,8 +40,7 @@ export const addTabChangedListener = () => {
           }
 
           // need to filter out all the invalid canvas models (currently refiner & any)
-          const validCanvasModels = mainModelsAdapter
-            .getSelectors()
+          const validCanvasModels = mainModelsAdapterSelectors
             .selectAll(models)
             .filter((model) =>
               ['sd-1', 'sd-2', 'sdxl'].includes(model.base_model)

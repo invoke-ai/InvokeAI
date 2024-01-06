@@ -1,16 +1,21 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { useMemo } from 'react';
 
 export const useNodeTemplate = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes, nodeTemplates }) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
-        return nodeTemplate;
-      }),
+      createMemoizedSelector(
+        selectNodesSlice,
+        selectNodeTemplatesSlice,
+        (nodes, nodeTemplates) => {
+          const node = nodes.nodes.find((node) => node.id === nodeId);
+          const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
+          return nodeTemplate;
+        }
+      ),
     [nodeId]
   );
 

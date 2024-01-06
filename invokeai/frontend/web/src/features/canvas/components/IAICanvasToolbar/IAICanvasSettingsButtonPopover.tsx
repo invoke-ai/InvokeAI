@@ -1,6 +1,4 @@
 import { Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -28,50 +26,28 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixBold } from 'react-icons/pi'
 
-export const canvasControlsSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas }) => {
-    const {
-      shouldAutoSave,
-      shouldCropToBoundingBoxOnSave,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowCanvasDebugInfo,
-      shouldShowGrid,
-      shouldShowIntermediates,
-      shouldSnapToGrid,
-      shouldRestrictStrokesToBox,
-      shouldAntialias,
-    } = canvas;
-
-    return {
-      shouldAutoSave,
-      shouldCropToBoundingBoxOnSave,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowCanvasDebugInfo,
-      shouldShowGrid,
-      shouldShowIntermediates,
-      shouldSnapToGrid,
-      shouldRestrictStrokesToBox,
-      shouldAntialias,
-    };
-  }
-);
-
 const IAICanvasSettingsButtonPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const {
-    shouldAutoSave,
-    shouldCropToBoundingBoxOnSave,
-    shouldDarkenOutsideBoundingBox,
-    shouldShowCanvasDebugInfo,
-    shouldShowGrid,
-    shouldShowIntermediates,
-    shouldSnapToGrid,
-    shouldRestrictStrokesToBox,
-    shouldAntialias,
-  } = useAppSelector(canvasControlsSelector);
+  const shouldAutoSave = useAppSelector((s) => s.canvas.shouldAutoSave);
+  const shouldCropToBoundingBoxOnSave = useAppSelector(
+    (s) => s.canvas.shouldCropToBoundingBoxOnSave
+  );
+  const shouldDarkenOutsideBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldDarkenOutsideBoundingBox
+  );
+  const shouldShowCanvasDebugInfo = useAppSelector(
+    (s) => s.canvas.shouldShowCanvasDebugInfo
+  );
+  const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
+  const shouldShowIntermediates = useAppSelector(
+    (s) => s.canvas.shouldShowIntermediates
+  );
+  const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
+  const shouldRestrictStrokesToBox = useAppSelector(
+    (s) => s.canvas.shouldRestrictStrokesToBox
+  );
+  const shouldAntialias = useAppSelector((s) => s.canvas.shouldAntialias);
 
   useHotkeys(
     ['n'],

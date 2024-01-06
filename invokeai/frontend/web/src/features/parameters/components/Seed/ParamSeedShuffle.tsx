@@ -1,5 +1,4 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import randomInt from 'common/util/randomInt';
@@ -11,7 +10,7 @@ import { PiShuffleBold } from 'react-icons/pi'
 export const ParamSeedShuffle = memo(() => {
   const dispatch = useAppDispatch();
   const shouldRandomizeSeed = useAppSelector(
-    (state: RootState) => state.generation.shouldRandomizeSeed
+    (s) => s.generation.shouldRandomizeSeed
   );
   const { t } = useTranslation();
 

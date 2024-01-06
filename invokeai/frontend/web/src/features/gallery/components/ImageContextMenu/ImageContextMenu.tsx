@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
@@ -16,14 +14,8 @@ type Props = {
   children: InvContextMenuProps<HTMLDivElement>['children'];
 };
 
-const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
-  const selectionCount = gallery.selection.length;
-
-  return { selectionCount };
-});
-
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
-  const { selectionCount } = useAppSelector(selector);
+  const selectionCount = useAppSelector((s) => s.gallery.selection.length);
 
   const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();

@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -12,34 +10,26 @@ import { selectOptimalDimension } from 'features/parameters/store/generationSlic
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(
-  [stateSelector, selectOptimalDimension],
-  ({ canvas }, optimalDimension) => {
-    const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = canvas;
-
-    return {
-      optimalDimension,
-      scaledBoundingBoxDimensions,
-      isManual: boundingBoxScaleMethod === 'manual',
-    };
-  }
-);
-
 const ParamScaledHeight = () => {
   const dispatch = useAppDispatch();
-  const { isManual, scaledBoundingBoxDimensions, optimalDimension } =
-    useAppSelector(selector);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const isManual = useAppSelector(
+    (s) => s.canvas.boundingBoxScaleMethod === 'manual'
+  );
+  const height = useAppSelector(
+    (s) => s.canvas.scaledBoundingBoxDimensions.height
+  );
 
   const { t } = useTranslation();
 
-  const handleChangeScaledHeight = useCallback(
+  const onChange = useCallback(
     (height: number) => {
       dispatch(setScaledBoundingBoxDimensions({ height }));
     },
     [dispatch]
   );
 
-  const handleResetScaledHeight = useCallback(() => {
+  const onReset = useCallback(() => {
     dispatch(setScaledBoundingBoxDimensions({ height: optimalDimension }));
   }, [dispatch, optimalDimension]);
 
@@ -50,12 +40,12 @@ const ParamScaledHeight = () => {
         max={1536}
         step={CANVAS_GRID_SIZE_COARSE}
         fineStep={CANVAS_GRID_SIZE_FINE}
-        value={scaledBoundingBoxDimensions.height}
-        onChange={handleChangeScaledHeight}
+        value={height}
+        onChange={onChange}
         marks
         withNumberInput
         numberInputMax={4096}
-        onReset={handleResetScaledHeight}
+        onReset={onReset}
       />
     </InvControl>
   );

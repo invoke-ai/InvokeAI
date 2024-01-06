@@ -1,5 +1,4 @@
 import { Flex } from '@chakra-ui/react';
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -22,9 +21,7 @@ import {
 } from 'services/api/endpoints/models';
 
 const FoundModelsList = () => {
-  const searchFolder = useAppSelector(
-    (state: RootState) => state.modelmanager.searchFolder
-  );
+  const searchFolder = useAppSelector((s) => s.modelmanager.searchFolder);
   const [nameFilter, setNameFilter] = useState<string>('');
 
   // Get paths of models that are already installed
@@ -146,8 +143,8 @@ const FoundModelsList = () => {
               fontWeight="semibold"
               p={2}
               borderRadius={4}
-              color="blue.100"
-              bg="blue.600"
+              color="invokeBlue.100"
+              bg="invokeBlue.600"
             >
               {t('common.installed')}
             </InvText>
@@ -187,7 +184,7 @@ const FoundModelsList = () => {
           <InvText fontWeight="semibold">
             {t('modelManager.modelsFound')}: {foundModels.length}
           </InvText>
-          <InvText fontWeight="semibold" color="blue.200">
+          <InvText fontWeight="semibold" color="invokeBlue.200">
             {t('common.notInstalled')}: {filteredModels.length}
           </InvText>
         </Flex>

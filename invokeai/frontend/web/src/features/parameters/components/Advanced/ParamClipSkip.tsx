@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -8,11 +7,9 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamClipSkip = () => {
-  const clipSkip = useAppSelector(
-    (state: RootState) => state.generation.clipSkip
-  );
+  const clipSkip = useAppSelector((s) => s.generation.clipSkip);
 
-  const { model } = useAppSelector((state: RootState) => state.generation);
+  const { model } = useAppSelector((s) => s.generation);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

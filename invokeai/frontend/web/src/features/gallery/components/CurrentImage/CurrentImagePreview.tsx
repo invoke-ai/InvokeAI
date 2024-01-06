@@ -1,7 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -12,79 +11,30 @@ import type {
 import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-export const imagesSelector = createMemoizedSelector(
-  [stateSelector, selectLastSelectedImage],
-  ({ ui, system }, lastSelectedImage) => {
-    const {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-    } = ui;
-    const { denoiseProgress } = system;
-    return {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      imageName: lastSelectedImage?.image_name,
-      hasDenoiseProgress: Boolean(denoiseProgress),
-      shouldShowProgressInViewer,
-    };
-  }
+const selectLastSelectedImageName = createSelector(
+  selectLastSelectedImage,
+  (lastSelectedImage) => lastSelectedImage?.image_name
 );
 
 const CurrentImagePreview = () => {
-  const {
-    shouldShowImageDetails,
-    imageName,
-    hasDenoiseProgress,
-    shouldShowProgressInViewer,
-  } = useAppSelector(imagesSelector);
-
-  const {
-    handlePrevImage,
-    handleNextImage,
-    isOnLastImage,
-    handleLoadMoreImages,
-    areMoreImagesAvailable,
-    isFetching,
-  } = useNextPrevImage();
-
-  useHotkeys(
-    'left',
-    () => {
-      handlePrevImage();
-    },
-    [handlePrevImage]
+  const shouldShowImageDetails = useAppSelector(
+    (s) => s.ui.shouldShowImageDetails
   );
-
-  useHotkeys(
-    'right',
-    () => {
-      if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
-        handleLoadMoreImages();
-        return;
-      }
-      if (!isOnLastImage) {
-        handleNextImage();
-      }
-    },
-    [
-      isOnLastImage,
-      areMoreImagesAvailable,
-      handleLoadMoreImages,
-      isFetching,
-      handleNextImage,
-    ]
+  const imageName = useAppSelector(selectLastSelectedImageName);
+  const hasDenoiseProgress = useAppSelector((s) =>
+    Boolean(s.system.denoiseProgress)
+  );
+  const shouldShowProgressInViewer = useAppSelector(
+    (s) => s.ui.shouldShowProgressInViewer
   );
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);

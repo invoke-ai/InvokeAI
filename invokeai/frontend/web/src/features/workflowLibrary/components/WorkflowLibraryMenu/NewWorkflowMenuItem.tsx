@@ -14,7 +14,7 @@ const NewWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const isTouched = useAppSelector((state) => state.workflow.isTouched);
+  const isTouched = useAppSelector((s) => s.workflow.isTouched);
 
   const handleNewWorkflow = useCallback(() => {
     dispatch(nodeEditorReset());

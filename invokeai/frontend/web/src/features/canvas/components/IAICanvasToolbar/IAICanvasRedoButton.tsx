@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { redo } from 'features/canvas/store/canvasSlice';
@@ -9,21 +7,10 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowClockwiseBold } from 'react-icons/pi'
 
-const canvasRedoSelector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ canvas }, activeTabName) => {
-    const { futureLayerStates } = canvas;
-
-    return {
-      canRedo: futureLayerStates.length > 0,
-      activeTabName,
-    };
-  }
-);
-
 const IAICanvasRedoButton = () => {
   const dispatch = useAppDispatch();
-  const { canRedo, activeTabName } = useAppSelector(canvasRedoSelector);
+  const canRedo = useAppSelector((s) => s.canvas.futureLayerStates.length > 0);
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const { t } = useTranslation();
 

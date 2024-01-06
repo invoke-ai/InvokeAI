@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -12,34 +10,25 @@ import { selectOptimalDimension } from 'features/parameters/store/generationSlic
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(
-  [stateSelector, selectOptimalDimension],
-  ({ canvas }, optimalDimension) => {
-    const { boundingBoxScaleMethod, scaledBoundingBoxDimensions } = canvas;
-
-    return {
-      optimalDimension,
-      scaledBoundingBoxDimensions,
-      isManual: boundingBoxScaleMethod === 'manual',
-    };
-  }
-);
-
 const ParamScaledWidth = () => {
   const dispatch = useAppDispatch();
-  const { optimalDimension, isManual, scaledBoundingBoxDimensions } =
-    useAppSelector(selector);
-
   const { t } = useTranslation();
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const isManual = useAppSelector(
+    (s) => s.canvas.boundingBoxScaleMethod === 'manual'
+  );
+  const width = useAppSelector(
+    (s) => s.canvas.scaledBoundingBoxDimensions.width
+  );
 
-  const handleChangeScaledWidth = useCallback(
+  const onChange = useCallback(
     (width: number) => {
       dispatch(setScaledBoundingBoxDimensions({ width }));
     },
     [dispatch]
   );
 
-  const handleResetScaledWidth = useCallback(() => {
+  const onReset = useCallback(() => {
     dispatch(setScaledBoundingBoxDimensions({ width: optimalDimension }));
   }, [dispatch, optimalDimension]);
 
@@ -50,12 +39,12 @@ const ParamScaledWidth = () => {
         max={1536}
         step={CANVAS_GRID_SIZE_COARSE}
         fineStep={CANVAS_GRID_SIZE_FINE}
-        value={scaledBoundingBoxDimensions.width}
-        onChange={handleChangeScaledWidth}
+        value={width}
+        onChange={onChange}
         numberInputMax={4096}
         marks
         withNumberInput
-        onReset={handleResetScaledWidth}
+        onReset={onReset}
       />
     </InvControl>
   );

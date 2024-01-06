@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { z } from 'zod';
 
 export const zParamESRGANModelName = z.enum([
@@ -36,3 +37,6 @@ export const postprocessingSlice = createSlice({
 export const { esrganModelNameChanged } = postprocessingSlice.actions;
 
 export default postprocessingSlice.reducer;
+
+export const selectPostprocessingSlice = (state: RootState) =>
+  state.postprocessing;

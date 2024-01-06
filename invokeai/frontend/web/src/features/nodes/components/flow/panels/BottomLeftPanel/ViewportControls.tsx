@@ -15,10 +15,10 @@ const ViewportControls = () => {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
   // const shouldShowFieldTypeLegend = useAppSelector(
-  //   (state) => state.nodes.shouldShowFieldTypeLegend
+  //   (s) => s.nodes.shouldShowFieldTypeLegend
   // );
   const shouldShowMinimapPanel = useAppSelector(
-    (state) => state.nodes.shouldShowMinimapPanel
+    (s) => s.nodes.shouldShowMinimapPanel
   );
 
   const handleClickedZoomIn = useCallback(() => {

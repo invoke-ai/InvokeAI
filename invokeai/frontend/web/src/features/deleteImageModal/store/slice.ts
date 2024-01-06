@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { ImageDTO } from 'services/api/types';
 
 import { initialDeleteImageState } from './initialState';
@@ -28,3 +29,6 @@ export const {
 } = deleteImageModal.actions;
 
 export default deleteImageModal.reducer;
+
+export const selectDeleteImageModalSlice = (state: RootState) =>
+  state.deleteImageModal;

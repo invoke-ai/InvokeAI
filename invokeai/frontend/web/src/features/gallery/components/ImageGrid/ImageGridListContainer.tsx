@@ -1,6 +1,5 @@
 import type { FlexProps } from '@chakra-ui/react';
 import { forwardRef, Grid } from '@chakra-ui/react';
-import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
@@ -8,7 +7,7 @@ import { memo } from 'react';
 type ListContainerProps = PropsWithChildren & FlexProps;
 const ListContainer = forwardRef((props: ListContainerProps, ref) => {
   const galleryImageMinimumWidth = useAppSelector(
-    (state: RootState) => state.gallery.galleryImageMinimumWidth
+    (s) => s.gallery.galleryImageMinimumWidth
   );
 
   return (

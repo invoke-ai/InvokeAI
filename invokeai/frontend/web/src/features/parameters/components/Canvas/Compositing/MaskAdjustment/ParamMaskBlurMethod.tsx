@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
@@ -17,9 +16,7 @@ const options: InvSelectOption[] = [
 ];
 
 const ParamMaskBlurMethod = () => {
-  const maskBlurMethod = useAppSelector(
-    (state: RootState) => state.generation.maskBlurMethod
-  );
+  const maskBlurMethod = useAppSelector((s) => s.generation.maskBlurMethod);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

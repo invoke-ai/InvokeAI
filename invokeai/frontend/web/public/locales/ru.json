@@ -121,7 +121,11 @@
         "unsaved": "несохраненный",
         "input": "Вход",
         "details": "Детали",
-        "notInstalled": "Нет $t(common.installed)"
+        "notInstalled": "Нет $t(common.installed)",
+        "preferencesLabel": "Предпочтения",
+        "or": "или",
+        "advancedOptions": "Расширенные настройки",
+        "free": "Свободно"
     },
     "gallery": {
         "generations": "Генерации",
@@ -365,7 +369,22 @@
             "desc": "Открывает меню добавления узла",
             "title": "Добавление узлов"
         },
-        "nodesHotkeys": "Горячие клавиши узлов"
+        "nodesHotkeys": "Горячие клавиши узлов",
+        "cancelAndClear": {
+            "desc": "Отмена текущего элемента очереди и очистка всех ожидающих элементов",
+            "title": "Отменить и очистить"
+        },
+        "resetOptionsAndGallery": {
+            "title": "Сброс настроек и галереи",
+            "desc": "Сброс панелей галереи и настроек"
+        },
+        "searchHotkeys": "Поиск горячих клавиш",
+        "noHotkeysFound": "Горячие клавиши не найдены",
+        "toggleOptionsAndGallery": {
+            "desc": "Открытие и закрытие панели опций и галереи",
+            "title": "Переключить опции и галерею"
+        },
+        "clearSearch": "Очистить поиск"
     },
     "modelManager": {
         "modelManager": "Менеджер моделей",
@@ -1188,7 +1207,8 @@
         "handAndFace": "Руки и Лицо",
         "enableIPAdapter": "Включить IP Adapter",
         "maxFaces": "Макс Лица",
-        "mlsdDescription": "Минималистичный детектор отрезков линии"
+        "mlsdDescription": "Минималистичный детектор отрезков линии",
+        "resizeSimple": "Изменить размер (простой)"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1540,7 +1560,8 @@
         "cancelBatchFailed": "Проблема с отменой пакета",
         "clearQueueAlertDialog2": "Вы уверены, что хотите очистить очередь?",
         "item": "Элемент",
-        "graphFailedToQueue": "Не удалось поставить график в очередь"
+        "graphFailedToQueue": "Не удалось поставить график в очередь",
+        "openQueue": "Открыть очередь"
     },
     "sdxl": {
         "refinerStart": "Запуск перерисовщика",
@@ -1635,9 +1656,38 @@
         "selectModel": "Выберите модель",
         "noRefinerModelsInstalled": "Модели SDXL Refiner не установлены",
         "noLoRAsInstalled": "Нет установленных LoRA",
-        "selectLoRA": "Выберите LoRA"
+        "selectLoRA": "Выберите LoRA",
+        "noMainModelSelected": "Базовая модель не выбрана",
+        "lora": "LoRA",
+        "allLoRAsAdded": "Все LoRA добавлены",
+        "defaultVAE": "Стандартное VAE",
+        "incompatibleBaseModel": "Несовместимая базовая модель",
+        "loraAlreadyAdded": "LoRA уже добавлена"
     },
     "app": {
         "storeNotInitialized": "Магазин не инициализирован"
+    },
+    "accordions": {
+        "compositing": {
+            "infillTab": "Заполнение",
+            "coherenceTab": "Согласованность",
+            "title": "Композиция"
+        },
+        "control": {
+            "controlAdaptersTab": "Адаптеры контроля",
+            "ipTab": "Запросы изображений",
+            "title": "Контроль"
+        },
+        "generation": {
+            "title": "Генерация",
+            "conceptsTab": "Концепты",
+            "modelTab": "Модель"
+        },
+        "advanced": {
+            "title": "Расширенные"
+        },
+        "image": {
+            "title": "Изображение"
+        }
     }
 }

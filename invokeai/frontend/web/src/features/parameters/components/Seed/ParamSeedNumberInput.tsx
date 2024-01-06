@@ -7,9 +7,9 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const ParamSeedNumberInput = memo(() => {
-  const seed = useAppSelector((state) => state.generation.seed);
+  const seed = useAppSelector((s) => s.generation.seed);
   const shouldRandomizeSeed = useAppSelector(
-    (state) => state.generation.shouldRandomizeSeed
+    (s) => s.generation.shouldRandomizeSeed
   );
 
   const { t } = useTranslation();

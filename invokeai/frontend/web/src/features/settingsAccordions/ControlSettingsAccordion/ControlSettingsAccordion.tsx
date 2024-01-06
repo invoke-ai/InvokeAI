@@ -1,7 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
 import { Divider } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -13,6 +12,7 @@ import {
   selectAllIPAdapters,
   selectAllT2IAdapters,
   selectControlAdapterIds,
+  selectControlAdaptersSlice,
   selectValidControlNets,
   selectValidIPAdapters,
   selectValidT2IAdapters,
@@ -23,8 +23,8 @@ import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi'
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ controlAdapters }) => {
+  selectControlAdaptersSlice,
+  (controlAdapters) => {
     const badges: string[] = [];
     let isError = false;
 
@@ -61,8 +61,7 @@ const selector = createMemoizedSelector(
       isError = true;
     }
 
-    const controlAdapterIds =
-      selectControlAdapterIds(controlAdapters).map(String);
+    const controlAdapterIds = selectControlAdapterIds(controlAdapters);
 
     return {
       controlAdapterIds,

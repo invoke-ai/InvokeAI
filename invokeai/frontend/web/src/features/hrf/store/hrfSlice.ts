@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type {
   ParameterHRFMethod,
   ParameterStrength,
@@ -38,3 +39,5 @@ export const hrfSlice = createSlice({
 export const { setHrfEnabled, setHrfStrength, setHrfMethod } = hrfSlice.actions;
 
 export default hrfSlice.reducer;
+
+export const selectHrfSlice = (state: RootState) => state.hrf;

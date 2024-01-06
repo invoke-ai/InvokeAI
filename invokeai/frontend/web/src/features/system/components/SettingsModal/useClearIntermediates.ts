@@ -17,7 +17,9 @@ export type UseClearIntermediatesReturn = {
   hasPendingItems: boolean;
 };
 
-export const useClearIntermediates = (): UseClearIntermediatesReturn => {
+export const useClearIntermediates = (
+  shouldShowClearIntermediates: boolean
+): UseClearIntermediatesReturn => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -25,6 +27,7 @@ export const useClearIntermediates = (): UseClearIntermediatesReturn => {
     undefined,
     {
       refetchOnMountOrArgChange: true,
+      skip: !shouldShowClearIntermediates,
     }
   );
 

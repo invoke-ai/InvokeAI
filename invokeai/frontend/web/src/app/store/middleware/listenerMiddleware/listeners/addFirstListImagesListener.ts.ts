@@ -3,7 +3,7 @@ import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageCache } from 'services/api/types';
-import { getListImagesUrl, imagesAdapter } from 'services/api/util';
+import { getListImagesUrl, imagesSelectors } from 'services/api/util';
 
 import { startAppListening } from '..';
 
@@ -33,7 +33,7 @@ export const addFirstListImagesListener = () => {
 
       if (data.ids.length > 0) {
         // Select the first image
-        const firstImage = imagesAdapter.getSelectors().selectAll(data)[0];
+        const firstImage = imagesSelectors.selectAll(data)[0];
         dispatch(imageSelected(firstImage ?? null));
       }
     },

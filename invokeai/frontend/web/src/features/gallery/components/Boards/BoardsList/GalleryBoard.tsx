@@ -8,9 +8,8 @@ import {
   Icon,
   Image,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { InvText } from 'common/components/InvText/wrapper';
@@ -22,6 +21,7 @@ import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMen
 import {
   autoAddBoardIdChanged,
   boardIdSelected,
+  selectGallerySlice,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,22 +54,19 @@ const GalleryBoard = ({
   setBoardToDelete,
 }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
-  const selector = useMemo(
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
+  const selectIsSelectedForAutoAdd = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ gallery }) => {
-        const isSelectedForAutoAdd = board.board_id === gallery.autoAddBoardId;
-        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-
-        return {
-          isSelectedForAutoAdd,
-          autoAssignBoardOnClick,
-        };
-      }),
+      createSelector(
+        selectGallerySlice,
+        (gallery) => board.board_id === gallery.autoAddBoardId
+      ),
     [board.board_id]
   );
 
-  const { isSelectedForAutoAdd, autoAssignBoardOnClick } =
-    useAppSelector(selector);
+  const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
@@ -221,7 +218,7 @@ const GalleryBoard = ({
                   w="full"
                   maxW="full"
                   borderBottomRadius="base"
-                  bg={isSelected ? 'blue.500' : 'base.600'}
+                  bg={isSelected ? 'invokeBlue.500' : 'base.600'}
                   color={isSelected ? 'base.50' : 'base.100'}
                   lineHeight="short"
                   fontSize="xs"

@@ -9,7 +9,7 @@ import { ParamSDXLPositiveStylePrompt } from './ParamSDXLPositiveStylePrompt';
 
 export const SDXLPrompts = memo(() => {
   const shouldConcatSDXLStylePrompt = useAppSelector(
-    (state) => state.sdxl.shouldConcatSDXLStylePrompt
+    (s) => s.sdxl.shouldConcatSDXLStylePrompt
   );
   return (
     <Flex flexDir="column" gap={2} pos="relative">

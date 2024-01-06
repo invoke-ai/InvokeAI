@@ -1,21 +1,20 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import LinearViewField from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
+import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(stateSelector, ({ workflow }) => {
-  return {
-    fields: workflow.exposedFields,
-  };
-});
+const selector = createMemoizedSelector(
+  selectWorkflowSlice,
+  (workflow) => workflow.exposedFields
+);
 
 const WorkflowLinearTab = () => {
-  const { fields } = useAppSelector(selector);
+  const fields = useAppSelector(selector);
   const { t } = useTranslation();
 
   return (
