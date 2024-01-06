@@ -21,7 +21,7 @@ const ParamScaleBeforeProcessing = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const boundingBoxScaleMethod = useAppSelector(
-    (state) => state.canvas.boundingBoxScaleMethod
+    (s) => s.canvas.boundingBoxScaleMethod
   );
   const optimalDimension = useAppSelector(selectOptimalDimension);
 

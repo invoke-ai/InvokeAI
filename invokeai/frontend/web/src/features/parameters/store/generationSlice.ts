@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
@@ -328,3 +329,5 @@ export const {
 export const { selectOptimalDimension } = generationSlice.selectors;
 
 export default generationSlice.reducer;
+
+export const selectGenerationSlice = (state: RootState) => state.generation;

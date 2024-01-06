@@ -1,11 +1,12 @@
 import { Divider, Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { InvText } from 'common/components/InvText/wrapper';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import {
   getImageUsage,
@@ -14,8 +15,11 @@ import {
 import {
   imageDeletionCanceled,
   isModalOpenChanged,
+  selectDeleteImageModalSlice,
 } from 'features/deleteImageModal/store/slice';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { some } from 'lodash-es';
 import type { ChangeEvent } from 'react';
@@ -24,16 +28,27 @@ import { useTranslation } from 'react-i18next';
 
 import ImageUsageMessage from './ImageUsageMessage';
 
-const selector = createMemoizedSelector(
-  [stateSelector, selectImageUsage],
-  (state, imagesUsage) => {
-    const { system, config, deleteImageModal } = state;
-    const { shouldConfirmOnDelete } = system;
-    const { canRestoreDeletedImagesFromBin } = config;
-    const { imagesToDelete, isModalOpen } = deleteImageModal;
+const selectImageUsages = createMemoizedSelector(
+  [
+    selectDeleteImageModalSlice,
+    selectGenerationSlice,
+    selectCanvasSlice,
+    selectNodesSlice,
+    selectControlAdaptersSlice,
+    selectImageUsage,
+  ],
+  (
+    deleteImageModal,
+    generation,
+    canvas,
+    nodes,
+    controlAdapters,
+    imagesUsage
+  ) => {
+    const { imagesToDelete } = deleteImageModal;
 
     const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
-      getImageUsage(state, image_name)
+      getImageUsage(generation, canvas, nodes, controlAdapters, image_name)
     );
 
     const imageUsageSummary: ImageUsage = {
@@ -44,11 +59,8 @@ const selector = createMemoizedSelector(
     };
 
     return {
-      shouldConfirmOnDelete,
-      canRestoreDeletedImagesFromBin,
       imagesToDelete,
       imagesUsage,
-      isModalOpen,
       imageUsageSummary,
     };
   }
@@ -57,15 +69,15 @@ const selector = createMemoizedSelector(
 const DeleteImageModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const {
-    shouldConfirmOnDelete,
-    canRestoreDeletedImagesFromBin,
-    imagesToDelete,
-    imagesUsage,
-    isModalOpen,
-    imageUsageSummary,
-  } = useAppSelector(selector);
+  const shouldConfirmOnDelete = useAppSelector(
+    (s) => s.system.shouldConfirmOnDelete
+  );
+  const canRestoreDeletedImagesFromBin = useAppSelector(
+    (s) => s.config.canRestoreDeletedImagesFromBin
+  );
+  const isModalOpen = useAppSelector((s) => s.deleteImageModal.isModalOpen);
+  const { imagesToDelete, imagesUsage, imageUsageSummary } =
+    useAppSelector(selectImageUsages);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) =>

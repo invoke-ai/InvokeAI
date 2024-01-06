@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/layout';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
@@ -11,6 +10,7 @@ import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSea
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -22,28 +22,31 @@ const labelProps2: InvLabelProps = {
   flexGrow: 1,
 };
 
-const selectBadges = createMemoizedSelector(stateSelector, (state) => {
-  const badges: (string | number)[] = [];
-  if (state.generation.vae) {
-    let vaeBadge = state.generation.vae.model_name;
-    if (state.generation.vaePrecision === 'fp16') {
-      vaeBadge += ` ${state.generation.vaePrecision}`;
+const selectBadges = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => {
+    const badges: (string | number)[] = [];
+    if (generation.vae) {
+      let vaeBadge = generation.vae.model_name;
+      if (generation.vaePrecision === 'fp16') {
+        vaeBadge += ` ${generation.vaePrecision}`;
+      }
+      badges.push(vaeBadge);
+    } else if (generation.vaePrecision === 'fp16') {
+      badges.push(`VAE ${generation.vaePrecision}`);
     }
-    badges.push(vaeBadge);
-  } else if (state.generation.vaePrecision === 'fp16') {
-    badges.push(`VAE ${state.generation.vaePrecision}`);
+    if (generation.clipSkip) {
+      badges.push(`Skip ${generation.clipSkip}`);
+    }
+    if (generation.cfgRescaleMultiplier) {
+      badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
+    }
+    if (generation.seamlessXAxis || generation.seamlessYAxis) {
+      badges.push('seamless');
+    }
+    return badges;
   }
-  if (state.generation.clipSkip) {
-    badges.push(`Skip ${state.generation.clipSkip}`);
-  }
-  if (state.generation.cfgRescaleMultiplier) {
-    badges.push(`Rescale ${state.generation.cfgRescaleMultiplier}`);
-  }
-  if (state.generation.seamlessXAxis || state.generation.seamlessYAxis) {
-    badges.push('seamless');
-  }
-  return badges;
-});
+);
 
 export const AdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);

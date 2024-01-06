@@ -25,7 +25,7 @@ const FloatingGalleryButton = (props: Props) => {
         transform="translate(0, -50%)"
         minW={8}
         top="50%"
-        insetInlineEnd={0}
+        insetInlineEnd="21px"
       >
         <InvTooltip
           label={t('accessibility.showGalleryPanel')}

@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 const ParamScheduler = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const scheduler = useAppSelector((state) => state.generation.scheduler);
+  const scheduler = useAppSelector((s) => s.generation.scheduler);
 
   const onChange = useCallback<InvSelectOnChange>(
     (v) => {

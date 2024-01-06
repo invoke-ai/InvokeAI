@@ -15,7 +15,7 @@ const options = [
 const ParamVAEModelSelect = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const vaePrecision = useAppSelector((state) => state.generation.vaePrecision);
+  const vaePrecision = useAppSelector((s) => s.generation.vaePrecision);
 
   const onChange = useCallback<InvSelectOnChange>(
     (v) => {

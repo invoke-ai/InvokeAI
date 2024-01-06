@@ -1,6 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMoveStageKeyHeld } from 'features/canvas/store/canvasNanostore';
 import {
@@ -18,14 +16,9 @@ import { clamp } from 'lodash-es';
 import type { MutableRefObject } from 'react';
 import { useCallback } from 'react';
 
-const selector = createMemoizedSelector(
-  [stateSelector],
-  (state) => state.canvas.stageScale
-);
-
 const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
-  const stageScale = useAppSelector(selector);
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
   const isMoveStageKeyHeld = useStore($isMoveStageKeyHeld);
 
   return useCallback(

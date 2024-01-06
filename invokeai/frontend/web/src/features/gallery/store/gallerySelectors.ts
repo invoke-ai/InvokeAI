@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { RootState } from 'app/store/store';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { ListImagesArgs } from 'services/api/types';
 
 import {
@@ -8,17 +8,15 @@ import {
   INITIAL_IMAGE_LIMIT,
 } from './types';
 
-export const gallerySelector = (state: RootState) => state.gallery;
-
 export const selectLastSelectedImage = createMemoizedSelector(
-  (state: RootState) => state,
-  (state) => state.gallery.selection[state.gallery.selection.length - 1]
+  selectGallerySlice,
+  (gallery) => gallery.selection[gallery.selection.length - 1]
 );
 
 export const selectListImagesBaseQueryArgs = createMemoizedSelector(
-  [(state: RootState) => state],
-  (state) => {
-    const { selectedBoardId, galleryView } = state.gallery;
+  selectGallerySlice,
+  (gallery) => {
+    const { selectedBoardId, galleryView } = gallery;
     const categories =
       galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES;
 

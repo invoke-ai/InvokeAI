@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 export const SettingsLanguageSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const language = useAppSelector((state) => state.system.language);
+  const language = useAppSelector((s) => s.system.language);
   const options = useMemo(
     () => [
       { label: t('common.langArabic'), value: 'ar' },

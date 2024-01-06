@@ -16,7 +16,7 @@ type Props = {
 
 const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
   const { t } = useTranslation();
-  const workflowId = useAppSelector((state) => state.workflow.id);
+  const workflowId = useAppSelector((s) => s.workflow.id);
   const { onClose } = useWorkflowLibraryModalContext();
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow({});
   const { getAndLoadWorkflow, getAndLoadWorkflowResult } =
@@ -40,7 +40,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
       <Flex w="full" alignItems="center" gap={2} h={12}>
         <Flex flexDir="column" flexGrow={1} h="full">
           <Flex alignItems="center" w="full" h="50%">
-            <Heading size="sm" variant={isOpen ? 'blue' : undefined}>
+            <Heading size="sm" variant={isOpen ? 'invokeBlue' : undefined}>
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
             <Spacer />

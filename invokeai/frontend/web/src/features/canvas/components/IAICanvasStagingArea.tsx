@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
 import { Group, Rect } from 'react-konva';
@@ -9,7 +9,7 @@ import IAICanvasImage from './IAICanvasImage';
 
 const dash = [4, 4];
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   const {
     layerState,
     shouldShowStagingImage,

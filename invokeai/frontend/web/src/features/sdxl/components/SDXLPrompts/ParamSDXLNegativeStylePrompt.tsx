@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLNegativeStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((state) => state.sdxl.negativeStylePrompt);
+  const prompt = useAppSelector((s) => s.sdxl.negativeStylePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(

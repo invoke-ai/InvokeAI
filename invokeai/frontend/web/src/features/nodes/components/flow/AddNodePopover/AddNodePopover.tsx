@@ -3,7 +3,6 @@ import 'reactflow/dist/style.css';
 import { Flex } from '@chakra-ui/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
 import {
@@ -23,6 +22,7 @@ import {
   addNodePopoverOpened,
   nodeAdded,
 } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import { filter, map, memoize, some } from 'lodash-es';
 import type { KeyboardEventHandler } from 'react';
@@ -67,16 +67,14 @@ const AddNodePopover = () => {
   const selectRef = useRef<SelectInstance<InvSelectOption> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fieldFilter = useAppSelector(
-    (state) => state.nodes.connectionStartFieldType
-  );
+  const fieldFilter = useAppSelector((s) => s.nodes.connectionStartFieldType);
   const handleFilter = useAppSelector(
-    (state) => state.nodes.connectionStartParams?.handleType
+    (s) => s.nodes.connectionStartParams?.handleType
   );
 
   const selector = createMemoizedSelector(
-    [stateSelector],
-    ({ nodeTemplates }) => {
+    selectNodeTemplatesSlice,
+    (nodeTemplates) => {
       // If we have a connection in progress, we need to filter the node choices
       const filteredNodeTemplates = fieldFilter
         ? filter(nodeTemplates.templates, (template) => {
@@ -130,7 +128,7 @@ const AddNodePopover = () => {
   );
 
   const { options } = useAppSelector(selector);
-  const isOpen = useAppSelector((state) => state.nodes.isAddNodePopoverOpen);
+  const isOpen = useAppSelector((s) => s.nodes.isAddNodePopoverOpen);
 
   const addNode = useCallback(
     (nodeType: string) => {
@@ -220,7 +218,7 @@ const AddNodePopover = () => {
         p={0}
         top={-1}
         shadow="dark-lg"
-        borderColor="blue.400"
+        borderColor="invokeBlue.400"
         borderWidth="2px"
         borderStyle="solid"
       >

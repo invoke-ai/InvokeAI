@@ -5,7 +5,7 @@ import { useDebounce } from 'use-debounce';
 
 export const useDebouncedMetadata = (imageName?: string | null) => {
   const metadataFetchDebounce = useAppSelector(
-    (state) => state.config.metadataFetchDebounce ?? 300
+    (s) => s.config.metadataFetchDebounce ?? 300
   );
 
   const [debouncedImageName] = useDebounce(imageName, metadataFetchDebounce);

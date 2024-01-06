@@ -1,8 +1,10 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { selectionChanged } from 'features/gallery/store/gallerySlice';
+import {
+  selectGallerySlice,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';
@@ -11,13 +13,11 @@ import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
 
 const selector = createMemoizedSelector(
-  [stateSelector, selectListImagesBaseQueryArgs],
-  ({ gallery }, queryArgs) => {
-    const selection = gallery.selection;
-
+  [selectGallerySlice, selectListImagesBaseQueryArgs],
+  (gallery, queryArgs) => {
     return {
       queryArgs,
-      selection,
+      selection: gallery.selection,
     };
   }
 );

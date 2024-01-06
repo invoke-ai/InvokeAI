@@ -1,7 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -11,6 +10,7 @@ import {
   discardStagedImages,
   nextStagingAreaImage,
   prevStagingAreaImage,
+  selectCanvasSlice,
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
@@ -29,7 +29,7 @@ import {
 } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   const {
     layerState: {
       stagingArea: { images, selectedImageIndex },
@@ -142,7 +142,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.previous')} (Left)`}
           icon={<FaArrowLeft />}
           onClick={handlePrevImage}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
           isDisabled={!shouldShowStagingImage}
         />
         <InvButton
@@ -156,7 +156,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.next')} (Right)`}
           icon={<FaArrowRight />}
           onClick={handleNextImage}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
           isDisabled={!shouldShowStagingImage}
         />
       </InvButtonGroup>
@@ -166,7 +166,7 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
           icon={<FaCheck />}
           onClick={handleAccept}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
         />
         <InvIconButton
           tooltip={
@@ -182,7 +182,7 @@ const IAICanvasStagingAreaToolbar = () => {
           data-alert={!shouldShowStagingImage}
           icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
           onClick={handleToggleShouldShowStagingImage}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
         />
         <InvIconButton
           tooltip={t('unifiedCanvas.saveToGallery')}
@@ -190,7 +190,7 @@ const IAICanvasStagingAreaToolbar = () => {
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<FaSave />}
           onClick={handleSaveToGallery}
-          colorScheme="blue"
+          colorScheme="invokeBlue"
         />
         <InvIconButton
           tooltip={t('unifiedCanvas.discardAll')}

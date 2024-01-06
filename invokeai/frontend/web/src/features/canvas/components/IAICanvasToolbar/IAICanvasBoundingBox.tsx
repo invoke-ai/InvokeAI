@@ -1,6 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $shift } from 'common/hooks/useGlobalModifiers';
 import {
@@ -38,47 +36,23 @@ import { Group, Rect, Transformer } from 'react-konva';
 
 const borderDash = [4, 4];
 
-const boundingBoxPreviewSelector = createMemoizedSelector(
-  [stateSelector, selectOptimalDimension],
-  ({ canvas }, optimalDimension) => {
-    const {
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      stageScale,
-      tool,
-      shouldSnapToGrid,
-      aspectRatio,
-    } = canvas;
-
-    return {
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      stageScale,
-      shouldSnapToGrid,
-      tool,
-      hitStrokeWidth: 20 / stageScale,
-      aspectRatio,
-      optimalDimension,
-    };
-  }
-);
-
 type IAICanvasBoundingBoxPreviewProps = GroupConfig;
 
 const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   const { ...rest } = props;
   const dispatch = useAppDispatch();
-  const {
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    stageScale,
-    shouldSnapToGrid,
-    tool,
-    hitStrokeWidth,
-    aspectRatio,
-    optimalDimension,
-  } = useAppSelector(boundingBoxPreviewSelector);
-
+  const boundingBoxCoordinates = useAppSelector(
+    (s) => s.canvas.boundingBoxCoordinates
+  );
+  const boundingBoxDimensions = useAppSelector(
+    (s) => s.canvas.boundingBoxDimensions
+  );
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
+  const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const hitStrokeWidth = useAppSelector((s) => 20 / s.canvas.stageScale);
+  const aspectRatio = useAppSelector((s) => s.canvas.aspectRatio);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRef = useRef<Konva.Rect>(null);
   const shift = useStore($shift);

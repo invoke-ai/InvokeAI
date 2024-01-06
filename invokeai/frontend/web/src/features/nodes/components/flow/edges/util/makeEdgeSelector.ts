@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 
 import { getFieldColor } from './getEdgeColor';
@@ -12,7 +12,7 @@ export const makeEdgeSelector = (
   targetHandleId: string | null | undefined,
   selected?: boolean
 ) =>
-  createMemoizedSelector(stateSelector, ({ nodes }) => {
+  createMemoizedSelector(selectNodesSlice, (nodes) => {
     const sourceNode = nodes.nodes.find((node) => node.id === source);
     const targetNode = nodes.nodes.find((node) => node.id === target);
 

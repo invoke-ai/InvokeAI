@@ -34,7 +34,7 @@ export const EmbeddingPopover = memo((props: EmbeddingPopoverProps) => {
         p={0}
         insetBlockStart={-1}
         shadow="dark-lg"
-        borderColor="blue.300"
+        borderColor="invokeBlue.300"
         borderWidth="2px"
         borderStyle="solid"
       >

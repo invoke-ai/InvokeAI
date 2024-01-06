@@ -1,6 +1,4 @@
 import { Flex, useDisclosure } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -38,41 +36,11 @@ import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 import { SettingsLanguageSelect } from './SettingsLanguageSelect';
 import { SettingsLogLevelSelect } from './SettingsLogLevelSelect';
 
-const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ system, ui, generation }) => {
-    const {
-      shouldConfirmOnDelete,
-      enableImageDebugging,
-      shouldLogToConsole,
-      shouldAntialiasProgressImage,
-      shouldUseNSFWChecker,
-      shouldUseWatermarker,
-      shouldEnableInformationalPopovers,
-    } = system;
-    const { shouldUseCpuNoise } = generation;
-    const { shouldShowProgressInViewer } = ui;
-
-    return {
-      shouldUseCpuNoise,
-      shouldConfirmOnDelete,
-      enableImageDebugging,
-      shouldShowProgressInViewer,
-      shouldLogToConsole,
-      shouldAntialiasProgressImage,
-      shouldUseNSFWChecker,
-      shouldUseWatermarker,
-      shouldEnableInformationalPopovers,
-    };
-  }
-);
-
 type ConfigOptions = {
-  shouldShowDeveloperSettings: boolean;
-  shouldShowResetWebUiText: boolean;
-  shouldShowAdvancedOptionsSettings: boolean;
-  shouldShowClearIntermediates: boolean;
-  shouldShowLocalizationToggle: boolean;
+  shouldShowDeveloperSettings?: boolean;
+  shouldShowResetWebUiText?: boolean;
+  shouldShowClearIntermediates?: boolean;
+  shouldShowLocalizationToggle?: boolean;
 };
 
 type SettingsModalProps = {
@@ -115,7 +83,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     hasPendingItems,
     intermediatesCount,
     isLoading: isLoadingClearIntermediates,
-  } = useClearIntermediates();
+  } = useClearIntermediates(shouldShowClearIntermediates);
 
   const {
     isOpen: isSettingsModalOpen,
@@ -129,17 +97,31 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     onClose: onRefreshModalClose,
   } = useDisclosure();
 
-  const {
-    shouldUseCpuNoise,
-    shouldConfirmOnDelete,
-    enableImageDebugging,
-    shouldShowProgressInViewer,
-    shouldLogToConsole,
-    shouldAntialiasProgressImage,
-    shouldUseNSFWChecker,
-    shouldUseWatermarker,
-    shouldEnableInformationalPopovers,
-  } = useAppSelector(selector);
+  const shouldUseCpuNoise = useAppSelector(
+    (s) => s.generation.shouldUseCpuNoise
+  );
+  const shouldConfirmOnDelete = useAppSelector(
+    (s) => s.system.shouldConfirmOnDelete
+  );
+  const enableImageDebugging = useAppSelector(
+    (s) => s.system.enableImageDebugging
+  );
+  const shouldShowProgressInViewer = useAppSelector(
+    (s) => s.ui.shouldShowProgressInViewer
+  );
+  const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
+  const shouldAntialiasProgressImage = useAppSelector(
+    (s) => s.system.shouldAntialiasProgressImage
+  );
+  const shouldUseNSFWChecker = useAppSelector(
+    (s) => s.system.shouldUseNSFWChecker
+  );
+  const shouldUseWatermarker = useAppSelector(
+    (s) => s.system.shouldUseWatermarker
+  );
+  const shouldEnableInformationalPopovers = useAppSelector(
+    (s) => s.system.shouldEnableInformationalPopovers
+  );
 
   const clearStorage = useClearStorage();
 

@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
@@ -8,6 +7,7 @@ import { InvInput } from 'common/components/InvInput/InvInput';
 import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
+  selectWorkflowSlice,
   workflowAuthorChanged,
   workflowContactChanged,
   workflowDescriptionChanged,
@@ -20,7 +20,7 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(stateSelector, ({ workflow }) => {
+const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
   const { author, name, description, tags, version, contact, notes } = workflow;
 
   return {

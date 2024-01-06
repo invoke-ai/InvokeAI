@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { z } from 'zod';
 
 export const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
@@ -74,3 +75,6 @@ export const {
 } = dynamicPromptsSlice.actions;
 
 export default dynamicPromptsSlice.reducer;
+
+export const selectDynamicPromptsSlice = (state: RootState) =>
+  state.dynamicPrompts;

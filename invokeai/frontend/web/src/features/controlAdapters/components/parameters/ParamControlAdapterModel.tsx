@@ -1,5 +1,4 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
@@ -10,6 +9,7 @@ import { useControlAdapterModel } from 'features/controlAdapters/hooks/useContro
 import { useControlAdapterModelEntities } from 'features/controlAdapters/hooks/useControlAdapterModelEntities';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { pick } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,10 +24,10 @@ type ParamControlAdapterModelProps = {
   id: string;
 };
 
-const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
-  const { model } = generation;
-  return { mainModel: model };
-});
+const selectMainModel = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => generation.model
+);
 
 const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);
@@ -35,9 +35,9 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const model = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
   const currentBaseModel = useAppSelector(
-    (state) => state.generation.model?.base_model
+    (s) => s.generation.model?.base_model
   );
-  const { mainModel } = useAppSelector(selector);
+  const mainModel = useAppSelector(selectMainModel);
   const { t } = useTranslation();
 
   const models = useControlAdapterModelEntities(controlAdapterType);

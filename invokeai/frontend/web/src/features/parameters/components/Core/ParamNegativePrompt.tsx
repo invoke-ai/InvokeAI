@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((state) => state.generation.negativePrompt);
+  const prompt = useAppSelector((s) => s.generation.negativePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(

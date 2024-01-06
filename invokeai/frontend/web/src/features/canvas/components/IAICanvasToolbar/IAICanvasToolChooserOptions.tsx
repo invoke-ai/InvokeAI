@@ -1,6 +1,4 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -36,23 +34,12 @@ import {
   FaTimes,
 } from 'react-icons/fa';
 
-export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
-    const { tool, brushColor, brushSize } = canvas;
-
-    return {
-      tool,
-      isStaging,
-      brushColor,
-      brushSize,
-    };
-  }
-);
-
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
-  const { tool, brushColor, brushSize, isStaging } = useAppSelector(selector);
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const brushColor = useAppSelector((s) => s.canvas.brushColor);
+  const brushSize = useAppSelector((s) => s.canvas.brushSize);
+  const isStaging = useAppSelector(isStagingSelector);
   const { t } = useTranslation();
 
   useHotkeys(

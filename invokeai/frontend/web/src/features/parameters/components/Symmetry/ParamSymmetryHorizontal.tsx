@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -8,10 +7,10 @@ import { useTranslation } from 'react-i18next';
 
 const ParamSymmetryHorizontal = () => {
   const horizontalSymmetrySteps = useAppSelector(
-    (state: RootState) => state.generation.horizontalSymmetrySteps
+    (s) => s.generation.horizontalSymmetrySteps
   );
 
-  const steps = useAppSelector((state: RootState) => state.generation.steps);
+  const steps = useAppSelector((s) => s.generation.steps);
 
   const dispatch = useAppDispatch();
 

@@ -1,6 +1,4 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { InvButton } from 'common/components/InvButton/InvButton';
@@ -22,7 +20,6 @@ import {
   setMaskColor,
   setShouldPreserveMaskedArea,
 } from 'features/canvas/store/canvasSlice';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
@@ -30,33 +27,16 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
 
-export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
-    const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } =
-      canvas;
-
-    return {
-      layer,
-      maskColor,
-      maskColorString: rgbaColorToString(maskColor),
-      isMaskEnabled,
-      shouldPreserveMaskedArea,
-      isStaging,
-    };
-  }
-);
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const {
-    layer,
-    maskColor,
-    isMaskEnabled,
-    shouldPreserveMaskedArea,
-    isStaging,
-  } = useAppSelector(selector);
+  const layer = useAppSelector((s) => s.canvas.layer);
+  const maskColor = useAppSelector((s) => s.canvas.maskColor);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const shouldPreserveMaskedArea = useAppSelector(
+    (s) => s.canvas.shouldPreserveMaskedArea
+  );
+  const isStaging = useAppSelector(isStagingSelector);
 
   useHotkeys(
     ['q'],
