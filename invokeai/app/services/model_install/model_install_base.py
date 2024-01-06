@@ -142,12 +142,6 @@ class URLModelSource(StringLikeSource):
         """Return string version of the url when string rep needed."""
         return str(self.url)
 
-    @field_validator("url", mode="before")
-    @classmethod
-    def to_url(cls, raw: str) -> AnyHttpUrl:
-        """Change raw string into a Url."""
-        return AnyHttpUrl(raw)
-
 
 ModelSource = Annotated[
     Union[LocalModelSource, HFModelSource, CivitaiModelSource, URLModelSource], Field(discriminator="type")

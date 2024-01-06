@@ -12,6 +12,7 @@ from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Set, Union
 
 from huggingface_hub import HfFolder
+from pydantic.networks import AnyHttpUrl
 from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -76,16 +77,16 @@ class ModelInstallService(ModelInstallServiceBase):
         self._record_store = record_store
         self._event_bus = event_bus
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
-        self._install_jobs = []
-        self._install_queue = Queue()
-        self._cached_model_paths = set()
-        self._models_installed = set()
+        self._install_jobs: List[ModelInstallJob] = []
+        self._install_queue: Queue[ModelInstallJob] = Queue()
+        self._cached_model_paths: Set[Path] = set()
+        self._models_installed: Set[str] = set()
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._download_queue = download_queue
-        self._metadata_cache = {}
-        self._download_cache = {}
+        self._metadata_cache: Dict[ModelSource, Optional[AnyModelRepoMetadata]] = {}
+        self._download_cache: Dict[AnyHttpUrl, ModelInstallJob] = {}
         self._running = False
         self._session = session
         self._next_job_id = 0
@@ -307,12 +308,11 @@ class ModelInstallService(ModelInstallServiceBase):
 
             except InvalidModelConfigException as excp:
                 if "unrecognized suffix" in str(excp):
-                    job.set_error(
-                        InvalidModelConfigException(
-                            f"The file {job.local_path} is not recognized as a model. Check the URL and access token."
-                        )
+                    excp = InvalidModelConfigException(
+                        f"The file {job.local_path} is not recognized as a model. Check the URL and access token."
                     )
-                    self._signal_job_errored(job)
+                job.set_error(excp)
+                self._signal_job_errored(job)
 
             except (OSError, DuplicateModelException) as excp:
                 job.set_error(excp)
@@ -519,7 +519,7 @@ class ModelInstallService(ModelInstallServiceBase):
             return [RemoteModelFile(url=source.url, path=Path("."), size=0)]
 
         else:
-            raise Exception(f"Sources of type {type(source)} are not yet handled")
+            raise NotImplementedError(f"Sources of type {type(source)} are not yet handled")
 
     @staticmethod
     def _guess_variant() -> ModelRepoVariant:
@@ -569,8 +569,11 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Add the user's access token to HuggingFace requests
         if isinstance(source, HFModelSource) and not source.access_token:
-            self._logger.info("Using saved HuggingFace access token.")
-            source.access_token = HfFolder.get_token()
+            if token := HfFolder.get_token():
+                self._logger.info("Using saved HuggingFace access token.")
+                source.access_token = token
+            else:
+                self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
 
         self._logger.info(f"Queuing {source} for downloading")
         for model_file in url_and_paths:

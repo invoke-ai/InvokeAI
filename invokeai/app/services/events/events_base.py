@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -410,7 +410,7 @@ class EventServiceBase:
         local_path: str,
         bytes: int,
         total_bytes: int,
-        parts: List[Dict[str, Any]],
+        parts: List[Dict[str, Union[str, int]]],
     ) -> None:
         """
         Emit at intervals while the install job is in progress (remote models only).
@@ -450,7 +450,7 @@ class EventServiceBase:
 
         :param source: Source of the model; local path, repo_id or url
         :param key: Model config record key
-        :param total_bytes: Size of the model (may be None if not known)
+        :param total_bytes: Size of the model (may be None for installation of a local path)
         """
         self.__emit_model_event(
             event_name="model_install_completed",
