@@ -182,8 +182,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
     @classmethod
     def from_json(cls, json: str) -> CivitaiMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
-        metadata = AnyModelRepoMetadataValidator.validate_json(json)
-        assert isinstance(metadata, CivitaiMetadata)
+        metadata = CivitaiMetadata.model_validate_json(json)
         return metadata
 
 
